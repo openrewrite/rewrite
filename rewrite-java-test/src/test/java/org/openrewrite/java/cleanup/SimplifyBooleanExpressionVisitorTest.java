@@ -786,15 +786,27 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void defensiveSetter() {
         rewriteRun(
-          //language=java
           java(
             """
               class A {
                   String a;
                   void setA(String a) {
-                      if(!a.equals(this.a)) {
+                      if (!a.equals(this.a)) {
                           this.a = a;
                       }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class B {
+                  String b;
+                  void setB(String b) {
+                      if (b.equals(this.b)) {
+                          return;
+                      }
+                      this.b = b;
                   }
               }
               """
