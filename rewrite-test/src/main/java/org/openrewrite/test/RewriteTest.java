@@ -315,7 +315,7 @@ public interface RewriteTest extends SourceSpecs {
                                 "When parsing and printing the source code back to text without modifications, " +
                                 "the printed source didn't match the original source code. This means there is a bug in the " +
                                 "parser implementation itself. Please open an issue to report this, providing a sample of the " +
-                                "code that generated this error for"
+                                "code that generated this error."
                         );
                         try {
                             WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
