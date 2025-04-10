@@ -35,7 +35,7 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
     private final Path cache;
 
     public LocalMavenArtifactCache(Path cache) {
-        if (!cache.toFile().mkdirs() && !cache.toFile().exists()) { // 2nd exists is for concurrency
+        if (!cache.toFile().mkdirs() && !cache.toFile().exists()) {
             throw new IllegalStateException("Unable to find or create maven artifact cache at " + cache);
         }
         this.cache = cache;
