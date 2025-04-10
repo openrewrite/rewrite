@@ -1923,8 +1923,7 @@ class ChangeTypeTest implements RewriteTest {
           recipeSpec -> recipeSpec.recipes(
             new ChangeType(
               "org.codehaus.jackson.map.ObjectMapper",
-              "com.fasterxml.jackson.databind.ObjectMapper",
-              true),
+              "com.fasterxml.jackson.databind.ObjectMapper", true),
             new ChangeType(
               "org.codehaus.jackson.map.SerializationConfig$Feature",
               "com.fasterxml.jackson.databind.SerializationFeature", true)
@@ -2082,7 +2081,6 @@ class ChangeTypeTest implements RewriteTest {
               """
           )
         );
-    }
 
     @Test
     void changeTypeInLiteral() {

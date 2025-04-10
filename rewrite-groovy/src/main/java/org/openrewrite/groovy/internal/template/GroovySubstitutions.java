@@ -17,8 +17,10 @@ package org.openrewrite.groovy.internal.template;
 
 import org.openrewrite.java.internal.template.Substitutions;
 
+import java.util.Collections;
+
 public class GroovySubstitutions extends Substitutions {
     public GroovySubstitutions(String code, Object[] parameters) {
-        super(code, parameters);
+        super(code, Collections.emptySet(), parameters);
     }
 }
