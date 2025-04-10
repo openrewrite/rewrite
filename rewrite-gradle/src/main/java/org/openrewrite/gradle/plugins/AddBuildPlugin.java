@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -24,6 +25,7 @@ import org.openrewrite.semver.Semver;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
+@NoArgsConstructor(force = true)
 public class AddBuildPlugin extends Recipe {
     @Option(displayName = "Plugin id",
             description = "The plugin id to apply.",
@@ -63,6 +65,19 @@ public class AddBuildPlugin extends Recipe {
             required = false)
     @Nullable
     Boolean acceptTransitive;
+
+    @Deprecated
+    public AddBuildPlugin(String pluginId, @Nullable String version, @Nullable String versionPattern, @Nullable Boolean apply) {
+        this(pluginId, version, versionPattern, apply, null);
+    }
+
+    public AddBuildPlugin(String pluginId, @Nullable String version, @Nullable String versionPattern, @Nullable Boolean apply, @Nullable Boolean acceptTransitive) {
+        this.pluginId = pluginId;
+        this.version = version;
+        this.versionPattern = versionPattern;
+        this.apply = apply;
+        this.acceptTransitive = acceptTransitive;
+    }
 
     @Override
     public String getDisplayName() {
