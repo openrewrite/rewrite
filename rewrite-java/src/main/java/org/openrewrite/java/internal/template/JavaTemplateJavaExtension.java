@@ -389,11 +389,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if ((loc == METHOD_INVOCATION_ARGUMENTS || loc == METHOD_INVOCATION_NAME) && isScope(method)) {
                     J.MethodInvocation m;
                     if (loc == METHOD_INVOCATION_ARGUMENTS) {
-                        m = unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, substitutions.getTypeVariablesReferencedByParameters(), loc));
+                        m = unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, substitutions.getTypeVariables(), loc));
                         m = autoFormat(m, 0);
                         m = method.withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     } else {
-                        m = unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, substitutions.getTypeVariablesReferencedByParameters(), loc));
+                        m = unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, substitutions.getTypeVariables(), loc));
                         m = autoFormat(m, 0);
                         m = method.withName(m.getName()).withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     }
@@ -450,7 +450,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (loc == STATEMENT_PREFIX && isScope(statement)) {
                     if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                         List<J3> gen = unsubstitute(templateParser.parseBlockStatements(getCursor(),
-                                expected, substitutedTemplate, substitutions.getTypeVariablesReferencedByParameters(), loc, mode));
+                                expected, substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
                         if (gen.size() != 1) {
                             // for some languages with optional semicolons, templates may generate a statement
                             // and an empty, e.g. for a statement replacement in Groovy for the last statement
