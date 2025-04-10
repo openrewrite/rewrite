@@ -2081,49 +2081,6 @@ class ChangeTypeTest implements RewriteTest {
               """
           )
         );
-
-    @Test
-    void changeTypeInLiteral() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("javax.type.A", "jakarta.type.B", true)),
-          java(
-            """
-              class Test {
-                  String ref = "javax.type.A";
-                  String refNested = "javax.type.other.A";
-                  String extendedRef = "there is a type reference here -> javax.type.A <- hopefully it only replaces that";
-              }
-              """,
-            """
-              class Test {
-                  String ref = "jakarta.type.B";
-                  String refNested = "javax.type.other.A";
-                  String extendedRef = "there is a type reference here -> jakarta.type.B <- hopefully it only replaces that";
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void changeTypeInLiteralTrueButNoLiteralReference() {
-        rewriteRun(
-          spec -> spec
-            .recipe(new ChangeType("a.A1", "a.A2", true))
-            .parser(JavaParser.fromJavaVersion().dependsOn(a1, a2)),
-          java(
-            """
-              import a.A1;
-              
-              public class B extends A1 {}
-              """,
-            """
-              import a.A2;
-              
-              public class B extends A2 {}
-              """
-          )
-        );
     }
 
     @Test

@@ -29,9 +29,6 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
@@ -94,15 +91,6 @@ public class ChangePackage extends Recipe {
                 stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
-                    if (Traits.literal().asVisitor((Literal lit, AtomicBoolean bool) -> {
-                        String string = lit.getString();
-                        if (string != null && string.contains(oldPackageName)) {
-                            bool.set(true);
-                        }
-                        return lit.getTree();
-                    }).reduce(cu, new AtomicBoolean(false), getCursor().getParentTreeCursor()).get()) {
-                        return SearchResult.found(cu);
-                    }
                     if (cu.getPackageDeclaration() != null) {
                         String original = cu.getPackageDeclaration().getExpression()
                                 .printTrimmed(getCursor()).replaceAll("\\s", "");
@@ -173,7 +161,6 @@ public class ChangePackage extends Recipe {
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
-        private final Pattern stringLiteralPattern = Pattern.compile("\\b" + oldPackageName + "\\b");
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
@@ -246,19 +233,6 @@ public class ChangePackage extends Recipe {
         @Override
         public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
             return updateType(javaType);
-        }
-
-        @Override
-        public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
-            J.Literal lit = literal;
-            if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
-                Matcher matcher = stringLiteralPattern.matcher((String) lit.getValue());
-                if (matcher.find()) {
-                    lit = lit.withValue(matcher.replaceAll(newPackageName))
-                            .withValueSource(stringLiteralPattern.matcher(lit.getValueSource()).replaceAll(newPackageName));
-                }
-            }
-            return super.visitLiteral(lit, ctx);
         }
 
         @Override

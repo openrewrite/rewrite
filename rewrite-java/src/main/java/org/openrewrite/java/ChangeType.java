@@ -30,8 +30,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
@@ -99,15 +97,6 @@ public class ChangeType extends Recipe {
                     if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
-                    if (Traits.literal().asVisitor((Literal lit, AtomicBoolean bool) -> {
-                        String string = lit.getString();
-                        if (string != null && string.contains(oldFullyQualifiedTypeName)) {
-                            bool.set(true);
-                        }
-                        return lit.getTree();
-                    }).reduce(cu, new AtomicBoolean(false), getCursor().getParentTreeCursor()).get()) {
-                        return SearchResult.found(cu);
-                    }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
@@ -155,16 +144,12 @@ public class ChangeType extends Recipe {
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
-        private final Pattern stringLiteralPattern;
 
         private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
-            this.oldFullyQualifiedTypeName = oldFullyQualifiedTypeName;
-            this.newFullyQualifiedTypeName = newFullyQualifiedTypeName;
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
             this.ignoreDefinition = ignoreDefinition;
-            this.importAlias = null;
-            this.stringLiteralPattern = Pattern.compile("\\b" + oldFullyQualifiedTypeName + "\\b");
+            importAlias = null;
         }
 
         @Override
@@ -212,19 +197,6 @@ public class ChangeType extends Recipe {
         @Override
         public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
             return updateType(javaType);
-        }
-
-        @Override
-        public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
-            J.Literal lit = literal;
-            if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
-                Matcher matcher = stringLiteralPattern.matcher((String) lit.getValue());
-                if (matcher.find()) {
-                    lit = lit.withValue(matcher.replaceAll(newFullyQualifiedTypeName))
-                            .withValueSource(stringLiteralPattern.matcher(lit.getValueSource()).replaceAll(newFullyQualifiedTypeName));
-                }
-            }
-            return super.visitLiteral(lit, ctx);
         }
 
         private void addImport(JavaType.FullyQualified owningClass) {
