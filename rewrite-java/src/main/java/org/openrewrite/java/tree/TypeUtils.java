@@ -161,6 +161,11 @@ public class TypeUtils {
             }
             return true;
         }
+        if(type1 instanceof JavaType.Variable && type2 instanceof JavaType.Variable) {
+            JavaType.Variable var1 = (JavaType.Variable) type1;
+            JavaType.Variable var2 = (JavaType.Variable) type2;
+            return isOfType((var1).getType(), var2.getType()) && isOfType(var1.getOwner(), var2.getOwner());
+        }
         return type1.equals(type2);
     }
 
