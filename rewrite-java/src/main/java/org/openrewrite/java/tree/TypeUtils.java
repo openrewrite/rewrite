@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
+import org.openrewrite.java.internal.JavaReflectionTypeMapping;
+import org.openrewrite.java.internal.JavaTypeCache;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -62,6 +64,23 @@ public class TypeUtils {
                     "Throwable",
                     "Void"
             ));
+    private static final Map<JavaType.Primitive, JavaType> BOXED_TYPES = new EnumMap<>(JavaType.Primitive.class);
+
+    static {
+        JavaReflectionTypeMapping typeMapping = new JavaReflectionTypeMapping(new JavaTypeCache());
+        BOXED_TYPES.put(JavaType.Primitive.Boolean, typeMapping.type(Boolean.class));
+        BOXED_TYPES.put(JavaType.Primitive.Byte, typeMapping.type(Byte.class));
+        BOXED_TYPES.put(JavaType.Primitive.Char, typeMapping.type(Character.class));
+        BOXED_TYPES.put(JavaType.Primitive.Short, typeMapping.type(Short.class));
+        BOXED_TYPES.put(JavaType.Primitive.Int, typeMapping.type(Integer.class));
+        BOXED_TYPES.put(JavaType.Primitive.Long, typeMapping.type(Long.class));
+        BOXED_TYPES.put(JavaType.Primitive.Float, typeMapping.type(Float.class));
+        BOXED_TYPES.put(JavaType.Primitive.Double, typeMapping.type(Double.class));
+        BOXED_TYPES.put(JavaType.Primitive.String, typeMapping.type(String.class));
+        BOXED_TYPES.put(JavaType.Primitive.Void, JavaType.Unknown.getInstance());
+        BOXED_TYPES.put(JavaType.Primitive.None, JavaType.Unknown.getInstance());
+        BOXED_TYPES.put(JavaType.Primitive.Null, JavaType.Unknown.getInstance());
+    }
 
     private TypeUtils() {
     }
@@ -304,6 +323,9 @@ public class TypeUtils {
             if (to == from) {
                 return true;
             }
+            if (from == JavaType.Primitive.Null) {
+                return !(to instanceof JavaType.Primitive);
+            }
 
             // Handle parameterized types (e.g., List<String>)
             if (to instanceof JavaType.Parameterized) {
@@ -418,12 +440,7 @@ public class TypeUtils {
             else if (to instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
                 if (from instanceof JavaType.Primitive) {
-                    JavaType.Primitive toPrimitive = JavaType.Primitive.fromClassName(toFq.getFullyQualifiedName());
-                    if (toPrimitive != null) {
-                        return isAssignableTo(toPrimitive, from, position);
-                    } else if (isObject(toFq)) {
-                        return true;
-                    }
+                    return isAssignableTo(to, BOXED_TYPES.get((JavaType.Primitive) from), position);
                 } else if (from instanceof JavaType.Intersection) {
                     for (JavaType intersectionType : ((JavaType.Intersection) from).getBounds()) {
                         if (isAssignableTo(to, intersectionType, position)) {
@@ -516,25 +533,29 @@ public class TypeUtils {
     private static boolean handlePrimitiveAssignability(JavaType.Primitive to, @Nullable JavaType from) {
         if (from instanceof JavaType.FullyQualified) {
             // Account for auto-unboxing
-            JavaType.FullyQualified boxed = JavaType.ShallowClass.build(to.getClassName());
-            return isAssignableTo(boxed, from);
+            JavaType.FullyQualified fromFq = (JavaType.FullyQualified) from;
+            JavaType.Primitive fromPrimitive = JavaType.Primitive.fromClassName(fromFq.getFullyQualifiedName());
+            return handlePrimitiveAssignability(to, fromPrimitive);
         } else if (from instanceof JavaType.Primitive) {
             JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
             switch (fromPrimitive) {
-                case Boolean:
                 case Void:
                 case None:
                 case Null:
                 case String:
                     return false;
+                case Boolean:
+                    return fromPrimitive == to;
                 default:
                     switch (to) {
+                        case Byte:
                         case Char:
-                            return false;
+                            return fromPrimitive == to;
                         case Short:
                             switch (fromPrimitive) {
                                 case Byte:
                                 case Char:
+                                case Short:
                                     return true;
                             }
                             return false;
@@ -543,6 +564,7 @@ public class TypeUtils {
                                 case Byte:
                                 case Char:
                                 case Short:
+                                case Int:
                                     return true;
                             }
                             return false;
@@ -552,6 +574,7 @@ public class TypeUtils {
                                 case Char:
                                 case Short:
                                 case Int:
+                                case Long:
                                     return true;
                             }
                             return false;
