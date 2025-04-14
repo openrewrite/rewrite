@@ -960,40 +960,40 @@ class JavaTemplateMatchTest implements RewriteTest {
               }
               """,
             """
-                    class Foo {
-                        @SuppressWarnings("all")
-                        void test() {
-                            Long.valueOf(null);
-                            Long.valueOf("1");
-                            /*~~(long)~~>*/Long.valueOf('a');
-                            /*~~(long)~~>*/Long.valueOf((byte) 1);
-                            /*~~(long)~~>*/Long.valueOf((short) 1);
-                            /*~~(long)~~>*/Long.valueOf(1);
-                            /*~~(long)~~>*/Long.valueOf(1L);
-                            /*~~(long)~~>*/Long.valueOf(Character.valueOf('a'));
-                            /*~~(long)~~>*/Long.valueOf(Byte.valueOf((byte) 1));
-                            /*~~(long)~~>*/Long.valueOf(Short.valueOf((short) 1));
-                            /*~~(long)~~>*/Long.valueOf(Integer.valueOf(1));
-                            /*~~(long)~~>*/Long.valueOf((Long) 1L);
-              
-                            Double.valueOf(null);
-                            Double.valueOf("1.0");
-                            /*~~(double)~~>*/Double.valueOf('a');
-                            /*~~(double)~~>*/Double.valueOf((byte) 1);
-                            /*~~(double)~~>*/Double.valueOf((short) 1);
-                            /*~~(double)~~>*/Double.valueOf(1);
-                            /*~~(double)~~>*/Double.valueOf(1L);
-                            /*~~(double)~~>*/Double.valueOf(1.2f);
-                            /*~~(double)~~>*/Double.valueOf(1.2);
-                            /*~~(double)~~>*/Double.valueOf(Character.valueOf('a'));
-                            /*~~(double)~~>*/Double.valueOf(Byte.valueOf((byte) 1));
-                            /*~~(double)~~>*/Double.valueOf(Short.valueOf((short) 1));
-                            /*~~(double)~~>*/Double.valueOf(Integer.valueOf(1));
-                            /*~~(double)~~>*/Double.valueOf((Long) 1L);
-                            /*~~(double)~~>*/Double.valueOf(Float.valueOf(1.2f));
-                            /*~~(double)~~>*/Double.valueOf((Double) 1.2);
-                        }
-                    }
+              class Foo {
+                  @SuppressWarnings("all")
+                  void test() {
+                      Long.valueOf(null);
+                      Long.valueOf("1");
+                      /*~~(long)~~>*/Long.valueOf('a');
+                      /*~~(long)~~>*/Long.valueOf((byte) 1);
+                      /*~~(long)~~>*/Long.valueOf((short) 1);
+                      /*~~(long)~~>*/Long.valueOf(1);
+                      /*~~(long)~~>*/Long.valueOf(1L);
+                      /*~~(long)~~>*/Long.valueOf(Character.valueOf('a'));
+                      /*~~(long)~~>*/Long.valueOf(Byte.valueOf((byte) 1));
+                      /*~~(long)~~>*/Long.valueOf(Short.valueOf((short) 1));
+                      /*~~(long)~~>*/Long.valueOf(Integer.valueOf(1));
+                      /*~~(long)~~>*/Long.valueOf((Long) 1L);
+        
+                      Double.valueOf(null);
+                      Double.valueOf("1.0");
+                      /*~~(double)~~>*/Double.valueOf('a');
+                      /*~~(double)~~>*/Double.valueOf((byte) 1);
+                      /*~~(double)~~>*/Double.valueOf((short) 1);
+                      /*~~(double)~~>*/Double.valueOf(1);
+                      /*~~(double)~~>*/Double.valueOf(1L);
+                      /*~~(double)~~>*/Double.valueOf(1.2f);
+                      /*~~(double)~~>*/Double.valueOf(1.2);
+                      /*~~(double)~~>*/Double.valueOf(Character.valueOf('a'));
+                      /*~~(double)~~>*/Double.valueOf(Byte.valueOf((byte) 1));
+                      /*~~(double)~~>*/Double.valueOf(Short.valueOf((short) 1));
+                      /*~~(double)~~>*/Double.valueOf(Integer.valueOf(1));
+                      /*~~(double)~~>*/Double.valueOf((Long) 1L);
+                      /*~~(double)~~>*/Double.valueOf(Float.valueOf(1.2f));
+                      /*~~(double)~~>*/Double.valueOf((Double) 1.2);
+                  }
+              }
               """
           )
         );
