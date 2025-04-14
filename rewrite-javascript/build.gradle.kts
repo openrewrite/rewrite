@@ -22,6 +22,8 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-yaml"))
     testImplementation("io.moderne:jsonrpc:latest.release")
+
+    integTestImplementation(project(":rewrite-json"))
 }
 
 val npmTest = tasks.named("npm_test")

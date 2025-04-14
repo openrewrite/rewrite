@@ -16,7 +16,14 @@ describe("RewriteRpcTest", () => {
     beforeEach(() => {
         // Create in-memory streams to simulate the pipes.
         const clientToServer = new PassThrough();
+        clientToServer.on('data', chunk => {
+            console.debug('[server] ⇦ received:', `'${chunk.toString()}'`);
+        });
+
         const serverToClient = new PassThrough();
+        serverToClient.on('data', chunk => {
+            console.debug('[client] ⇦ received:', `'${chunk.toString()}'`);
+        });
 
         client = new RewriteRpc(rpc.createMessageConnection(
             new rpc.StreamMessageReader(serverToClient),
@@ -38,24 +45,24 @@ describe("RewriteRpcTest", () => {
         {
             ...text("Hello Jon!"),
             beforeRecipe: async (text: PlainText) => {
-                expect(await server.print(text)).toEqual("Hello Jon!");
+                expect(await client.print(text)).toEqual("Hello Jon!");
                 return text;
             }
         }
     ));
 
     test("getRecipes", async () =>
-        expect((await server.recipes()).length).toBeGreaterThan(0)
+        expect((await client.recipes()).length).toBeGreaterThan(0)
     );
 
     test("prepareRecipe", async () => {
-        const recipe = await server.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
+        const recipe = await client.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
         expect(recipe.displayName).toEqual("Change text");
         expect(recipe.instanceName()).toEqual("Change text to 'hello'");
     });
 
     test("runRecipe", async () => {
-        spec.recipe = await server.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
+        spec.recipe = await client.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
         await spec.rewriteRun(
             {
                 ...text(
@@ -68,7 +75,7 @@ describe("RewriteRpcTest", () => {
     });
 
     test("runScanningRecipeThatGenerates", async () => {
-        spec.recipe = await server.prepareRecipe("org.openrewrite.text.create-text", {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.text.create-text", {
             text: "hello",
             sourcePath: "hello.txt"
         });
@@ -84,7 +91,7 @@ describe("RewriteRpcTest", () => {
     });
 
     test("runRecipeWithRecipeList", async () => {
-        spec.recipe = await server.prepareRecipe("org.openrewrite.text.with-recipe-list");
+        spec.recipe = await client.prepareRecipe("org.openrewrite.text.with-recipe-list");
         await spec.rewriteRun(
             text(
                 "hi",

@@ -102,8 +102,7 @@ export class RewriteRpc {
 
     async recipes(): Promise<({ name: string } & RecipeDescriptor)[]> {
         return await this.connection.sendRequest(
-            new rpc.RequestType<{}, ({ name: string } & RecipeDescriptor)[], Error>("GetRecipes"),
-            {}
+            new rpc.RequestType0<({ name: string } & RecipeDescriptor)[], Error>("GetRecipes")
         );
     }
 
