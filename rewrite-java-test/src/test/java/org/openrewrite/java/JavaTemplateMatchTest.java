@@ -655,16 +655,16 @@ class JavaTemplateMatchTest implements RewriteTest {
                     boolean found = template.matches(getCursor());
                     return found ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
                 }
-          })),
+            })),
           java(
-              """
+            """
               import java.util.Collections;
               import java.util.List;
               class Test {
                   static List<Object> EMPTY_LIST = Collections.emptyList();
               }
               """,
-              """
+            """
               import java.util.Collections;
               import java.util.List;
               class Test {
@@ -688,7 +688,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                 }
             })),
           java(
-              """
+            """
               import java.util.Collections;
               import java.util.List;
               class Test {
@@ -697,7 +697,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                   static List<String> COLLECTION_OF_SUBTYPE        = Collections.emptyList(); // List of Dogs is not List of Animals
               }
               """,
-              """
+            """
               import java.util.Collections;
               import java.util.List;
               class Test {
@@ -837,33 +837,34 @@ class JavaTemplateMatchTest implements RewriteTest {
     @SuppressWarnings("UnnecessaryBoxing")
     void matchBoxedTypes() {
         rewriteRun(
-          spec -> spec
-            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                final JavaTemplate template = JavaTemplate
-                  .builder("foo.Utils.fromNumber(#{any(java.lang.Number)})")
-                  .javaParser(JavaParser.fromJavaVersion().dependsOn("""
-                            package foo;
-                            public class Utils {
-                                public static void fromNumber(Number n) {}
-                            }
-                            """))
-                  .build();
+          spec -> {
+              JavaParser.Builder<? extends JavaParser, ?> parser = JavaParser.fromJavaVersion()
+                .dependsOn("""
+                  package foo;
+                  public class Utils {
+                      public static void fromNumber(Number n) {}
+                  }
+                  """);
+              spec
+                .parser(parser)
+                .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    final JavaTemplate template = JavaTemplate
+                      .builder("foo.Utils.fromNumber(#{any(java.lang.Number)})")
+                      .javaParser(parser)
+                      .build();
 
-                @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                    return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
-                }
-            })),
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                        return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+                    }
+                }));
+          },
           //language=java
           java(
             """
               package foo;
               import java.math.BigDecimal;
               import java.util.Collections;
-              
-              class Utils {
-                  public static void fromNumber(Number n) {}
-              }
 
               class Foo {
                   void test() {
@@ -879,10 +880,6 @@ class JavaTemplateMatchTest implements RewriteTest {
               package foo;
               import java.math.BigDecimal;
               import java.util.Collections;
-              
-              class Utils {
-                  public static void fromNumber(Number n) {}
-              }
 
               class Foo {
                   void test() {
@@ -903,12 +900,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                final JavaTemplate valueOfLong = JavaTemplate
-                  .builder("java.lang.Long.valueOf(#{any(long)})")
-                  .build();
-                final JavaTemplate valueOfDouble = JavaTemplate
-                  .builder("java.lang.Double.valueOf(#{any(double)})")
-                  .build();
+                final JavaTemplate valueOfLong = JavaTemplate.builder("java.lang.Long.valueOf(#{any(long)})").build();
+                final JavaTemplate valueOfDouble = JavaTemplate.builder("java.lang.Double.valueOf(#{any(double)})").build();
 
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
@@ -939,7 +932,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                       Long.valueOf(Short.valueOf((short) 1));
                       Long.valueOf(Integer.valueOf(1));
                       Long.valueOf((Long) 1L);
-              
+
                       Double.valueOf(null);
                       Double.valueOf("1.0");
                       Double.valueOf('a');
@@ -975,7 +968,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                       /*~~(long)~~>*/Long.valueOf(Short.valueOf((short) 1));
                       /*~~(long)~~>*/Long.valueOf(Integer.valueOf(1));
                       /*~~(long)~~>*/Long.valueOf((Long) 1L);
-        
+
                       Double.valueOf(null);
                       Double.valueOf("1.0");
                       /*~~(double)~~>*/Double.valueOf('a');
