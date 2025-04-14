@@ -607,7 +607,8 @@ public class SemanticallyEqual {
                         isEqual.set(false);
                         return fieldAccess;
                     }
-                } else if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType()) ||
+                } else if (!fieldAccess.getSimpleName().equals(compareTo.getSimpleName()) ||
+                           !TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType()) ||
                            !TypeUtils.isOfType(fieldType, compareTo.getName().getFieldType())) {
                     isEqual.set(false);
                     return fieldAccess;
