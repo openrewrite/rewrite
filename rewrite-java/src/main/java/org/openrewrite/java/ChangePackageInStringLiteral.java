@@ -19,14 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.trait.Literal;
-import org.openrewrite.java.trait.Traits;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.marker.SearchResult;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -69,32 +65,7 @@ public class ChangePackageInStringLiteral extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
-            private static final String STOP_AFTER_PRE_VISIT = "__org.openrewrite.stopVisitor__";
-
-            @Override
-            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
-                stopAfterPreVisit();
-                if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) tree;
-                    if (Traits.literal().asVisitor((Literal lit, AtomicBoolean bool) -> {
-                        if (!Boolean.TRUE.equals(bool.get())) {
-                            String string = lit.getString();
-                            if (string != null && string.contains(oldPackageName)) {
-                                bool.set(true);
-                                lit.getCursor().putMessage(STOP_AFTER_PRE_VISIT, true);
-                            }
-                        }
-                        return lit.getTree();
-                    }).reduce(cu, new AtomicBoolean(false), getCursor().getParentTreeCursor()).get()) {
-                        return SearchResult.found(cu);
-                    }
-                }
-                return tree;
-            }
-        };
-
-        return Preconditions.check(condition, new TreeVisitor<Tree, ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                 return sourceFile instanceof JavaSourceFile;
@@ -108,7 +79,7 @@ public class ChangePackageInStringLiteral extends Recipe {
                 }
                 return tree;
             }
-        });
+        };
     }
 
     private static class JavaChangePackageLiteralVisitor extends JavaVisitor<ExecutionContext> {
