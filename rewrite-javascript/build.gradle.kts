@@ -23,7 +23,7 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-yaml"))
-    testImplementation("io.moderne:jsonrpc:latest.release")
+    testImplementation("io.moderne:jsonrpc:latest.integration")
 
     integTestImplementation(project(":rewrite-json"))
 }

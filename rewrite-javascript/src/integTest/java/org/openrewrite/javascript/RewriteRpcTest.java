@@ -10,7 +10,6 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Duration;
@@ -22,17 +21,15 @@ public class RewriteRpcTest implements RewriteTest {
     JavaScriptRewriteRpcProcess server;
 
     @BeforeEach
-    void before() throws IOException, InterruptedException {
+    void before() throws InterruptedException {
         this.server = new JavaScriptRewriteRpcProcess(
           "node",
-          "--inspect-brk",
+//          "--inspect-brk",
           "./dist/src/main/javascript/rpc/server.js"
         );
         server.start();
         InputStream serverIn = server.getInputStream();
         OutputStream serverOut = server.getOutputStream();
-
-        waitUntilReady(serverIn);
 
         Thread.sleep(3000);
         System.out.println("Sending message");
@@ -42,18 +39,6 @@ public class RewriteRpcTest implements RewriteTest {
             new HeaderDelimitedMessageHandler(serverIn, serverOut))),
           Environment.builder().build()
         ).batchSize(1).timeout(Duration.ofMinutes(10));
-    }
-
-    private static void waitUntilReady(InputStream serverIn) throws IOException {
-        byte[] buffer = new byte[1024];
-        int bytesRead;
-        StringBuilder message = new StringBuilder();
-        while ((bytesRead = serverIn.read(buffer)) != -1) {
-            message.append(new String(buffer, 0, bytesRead));
-            if (message.toString().contains("Debugger attached.")) {
-                break;
-            }
-        }
     }
 
     @AfterEach

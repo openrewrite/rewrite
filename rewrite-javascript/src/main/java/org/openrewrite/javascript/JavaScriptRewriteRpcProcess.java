@@ -22,7 +22,6 @@ public class JavaScriptRewriteRpcProcess extends Thread {
     public void run() {
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
-            pb.redirectErrorStream(true);
             process = pb.start();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
