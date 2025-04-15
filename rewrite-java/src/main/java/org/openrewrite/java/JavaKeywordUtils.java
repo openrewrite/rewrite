@@ -120,4 +120,3 @@ final class JavaKeywordUtils {
         return RESERVED_LITERALS_SET.contains(word);
     }
 }
-

@@ -31,25 +31,25 @@ public class ChangeMethodName extends Recipe {
     public static final String VALID_JAVA_METHOD_PATTERN = "^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*$";
 
     @Option(displayName = "Method pattern",
-            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
-            example = "org.mockito.Matchers anyVararg()")
+          description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
+          example = "org.mockito.Matchers anyVararg()")
     String methodPattern;
 
     @Option(displayName = "New method name",
-            description = "The method name that will replace the existing name.",
-            example = "any")
+          description = "The method name that will replace the existing name.",
+          example = "any")
     String newMethodName;
 
     @Option(displayName = "Match on overrides",
-            description = "When enabled, find methods that are overrides of the method pattern.",
-            required = false)
+          description = "When enabled, find methods that are overrides of the method pattern.",
+          required = false)
     @Nullable
     Boolean matchOverrides;
 
     @Option(displayName = "Ignore type definition",
-            description = "When set to `true` the definition of the old type will be left untouched. " +
-                          "This is useful when you're replacing usage of a class but don't want to rename it.",
-            required = false)
+          description = "When set to `true` the definition of the old type will be left untouched. " +
+                "This is useful when you're replacing usage of a class but don't want to rename it.",
+          required = false)
     @Nullable
     Boolean ignoreDefinition;
 
@@ -73,30 +73,38 @@ public class ChangeMethodName extends Recipe {
         return super.validate().and(MethodMatcher.validate(methodPattern));
     }
 
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
+
             @Override
-            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
                 if (!JavaKeywordUtils.isReservedKeyword(newMethodName) &&
                       !JavaKeywordUtils.isReservedLiteral(newMethodName) &&
                       !StringUtils.isBlank(newMethodName) &&
                       newMethodName.matches(VALID_JAVA_METHOD_PATTERN)) {
-                    if (tree instanceof JavaSourceFile) {
-                        JavaSourceFile cu = (JavaSourceFile) tree;
-                        if (Boolean.TRUE.equals(ignoreDefinition)) {
-                            J j = new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
-                            if (cu != j) {
-                                return cu;
-                            }
-                        } else {
-                            cu = (JavaSourceFile) new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
-                            if (cu != tree) {
-                                return cu;
-                            }
+                    return super.isAcceptable(sourceFile, executionContext);
+                }
+                return false;
+            }
+
+            @Override
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) tree;
+                    if (Boolean.TRUE.equals(ignoreDefinition)) {
+                        J j = new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
+                        if (cu != j) {
+                            return cu;
                         }
-                        return new UsesMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
+                    } else {
+                        cu = (JavaSourceFile) new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
+                        if (cu != tree) {
+                            return cu;
+                        }
                     }
+                    return new UsesMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
                 }
                 return super.visit(tree, ctx);
             }
@@ -111,14 +119,14 @@ public class ChangeMethodName extends Recipe {
                 J.NewClass newClass = getCursor().firstEnclosing(J.NewClass.class);
                 J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
                 boolean methodMatches = newClass != null && methodMatcher.matches(method, newClass) ||
-                                        classDecl != null && methodMatcher.matches(method, classDecl);
+                      classDecl != null && methodMatcher.matches(method, classDecl);
                 if (methodMatches) {
                     JavaType.Method type = m.getMethodType();
                     if (type != null) {
                         type = type.withName(newMethodName);
                     }
                     m = m.withName(m.getName().withSimpleName(newMethodName).withType(type))
-                            .withMethodType(type);
+                          .withMethodType(type);
                 }
                 return m;
             }
@@ -132,7 +140,7 @@ public class ChangeMethodName extends Recipe {
                         type = type.withName(newMethodName);
                     }
                     m = m.withName(m.getName().withSimpleName(newMethodName).withType(type))
-                            .withMethodType(type);
+                          .withMethodType(type);
                 }
                 return m;
             }
@@ -166,7 +174,7 @@ public class ChangeMethodName extends Recipe {
                         String className = target.printTrimmed(getCursor());
                         String fullyQualified = className + "." + newMethodName;
                         return TypeTree.build(fullyQualified)
-                                .withPrefix(f.getPrefix());
+                              .withPrefix(f.getPrefix());
                     }
                 }
                 return f;
