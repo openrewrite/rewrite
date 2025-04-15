@@ -22,7 +22,7 @@ public class RewriteRpcTest implements RewriteTest {
     JavaScriptRewriteRpcProcess server;
 
     @BeforeEach
-    void before() throws IOException {
+    void before() throws IOException, InterruptedException {
         this.server = new JavaScriptRewriteRpcProcess(
           "node",
           "--inspect-brk",
@@ -33,6 +33,9 @@ public class RewriteRpcTest implements RewriteTest {
         OutputStream serverOut = server.getOutputStream();
 
         waitUntilReady(serverIn);
+
+        Thread.sleep(3000);
+        System.out.println("Sending message");
 
         this.client = new RewriteRpc(
           new JsonRpc(new TraceMessageHandler("client",

@@ -155,7 +155,7 @@ public class RewriteRpc {
         while (p2 instanceof DelegatingExecutionContext) {
             p2 = ((DelegatingExecutionContext) p2).getDelegate();
         }
-        String pId = localObjectIds.computeIfAbsent(p2, p3 -> SnowflakeId.generateId());
+        String pId = localObjectIds.computeIfAbsent(p2, p3 -> SnowflakeId.generateIdAsString());
         if (p2 instanceof ExecutionContext) {
             ((ExecutionContext) p2).putMessage("org.openrewrite.rpc.id", pId);
         }
@@ -189,7 +189,7 @@ public class RewriteRpc {
             cursorIds = cursor.getPathAsStream().map(c -> {
                 String id = c instanceof Tree ?
                         ((Tree) c).getId().toString() :
-                        localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
+                        localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateIdAsString());
                 localObjects.put(id, c);
                 return id;
             }).collect(Collectors.toList());

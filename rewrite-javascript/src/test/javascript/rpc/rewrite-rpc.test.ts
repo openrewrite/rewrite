@@ -13,27 +13,40 @@ describe("RewriteRpcTest", () => {
     let server: RewriteRpc;
     let client: RewriteRpc;
 
-    beforeEach(() => {
+    const logger: rpc.Logger = {
+        error: (msg: string) => console.log(`[Error] ${msg}\n`),
+        warn: (msg: string) => console.log(`[Warn] ${msg}\n`),
+        info: (msg: string) => console.log(`[Info] ${msg}\n`),
+        log: (msg: string) => console.log(`[Log] ${msg}\n`)
+    };
+
+    beforeEach(async () => {
         // Create in-memory streams to simulate the pipes.
         const clientToServer = new PassThrough();
         clientToServer.on('data', chunk => {
             console.debug('[server] ⇦ received:', `'${chunk.toString()}'`);
+            console.debug(`[server] ⇦ received: [${Array.from(chunk).join(", ")}]`);
         });
 
         const serverToClient = new PassThrough();
         serverToClient.on('data', chunk => {
-            console.debug('[client] ⇦ received:', `'${chunk.toString()}'`);
+            // console.debug('[client] ⇦ received:', `'${chunk.toString()}'`);
         });
 
-        client = new RewriteRpc(rpc.createMessageConnection(
+        const clientConnection = rpc.createMessageConnection(
             new rpc.StreamMessageReader(serverToClient),
-            new rpc.StreamMessageWriter(clientToServer)
-        ), 1);
+            new rpc.StreamMessageWriter(clientToServer),
+            logger
+        );
+        await clientConnection.trace(rpc.Trace.Verbose, logger);
+        client = new RewriteRpc(clientConnection, 1);
 
-        server = new RewriteRpc(rpc.createMessageConnection(
+        const serverConnection = rpc.createMessageConnection(
             new rpc.StreamMessageReader(clientToServer),
-            new rpc.StreamMessageWriter(serverToClient)
-        ));
+            new rpc.StreamMessageWriter(serverToClient),
+            logger
+        );
+        server = new RewriteRpc(serverConnection);
     });
 
     afterEach(() => {

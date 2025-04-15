@@ -15,6 +15,7 @@ public class JavaScriptRewriteRpcProcess extends Thread {
 
     public JavaScriptRewriteRpcProcess(String... command) {
         this.command = command;
+        this.setDaemon(false);
     }
 
     @Override
