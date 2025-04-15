@@ -397,8 +397,42 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/5300")
     @Test
+    void doesNotMakeChangesInDependencyManagement() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite", "*", "8.44.1", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  openRewriteVersion = "8.44.1"
+              }
+              
+              dependencies {
+                implementation platform("com.google.guava:guava:29.0-jre")
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.openrewrite:rewrite-core:${openRewriteVersion}"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5300")
+    @Test
     @Ignore
-    void worksWithDependencyManagement() {
+    void makeChangesInDependencyManagement() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite", "*", "8.44.1", null)),
           buildGradle(
