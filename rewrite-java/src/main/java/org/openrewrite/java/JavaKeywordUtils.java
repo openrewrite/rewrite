@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+// Intentionally package private, at least for now, to limit the publicly exposed API surface
 final class JavaKeywordUtils {
     JavaKeywordUtils() {
     }
