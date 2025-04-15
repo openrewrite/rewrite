@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import org.junit.Ignore;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -388,6 +389,65 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencies {
                 implementation platform("com.google.guava:guava:30.1.1-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5300")
+    @Test
+    @Ignore
+    void worksWithDependencyManagement() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite", "*", "8.44.1", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  openRewriteVersion = "8.0.0"
+              }
+              
+              dependencies {
+                implementation platform("com.google.guava:guava:29.0-jre")
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.openrewrite:rewrite-core:${openRewriteVersion}"
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              
+              ext {
+                  openRewriteVersion = "8.44.1"
+              }
+              
+              dependencies {
+                implementation platform("com.google.guava:guava:29.0-jre")
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.openrewrite:rewrite-core:${openRewriteVersion}"
+                  }
               }
               """
           )
