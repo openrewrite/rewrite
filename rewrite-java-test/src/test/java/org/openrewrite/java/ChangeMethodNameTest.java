@@ -422,4 +422,70 @@ class ChangeMethodNameTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void ignoreInvalidMethodNames() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "123", null, null)),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              package com.abc;
+              
+              import java.util.ArrayList;
+              
+              class A {
+                 public void test() {
+                     com.abc.B.static1("boo");
+                     new java.util.ArrayList<String>().forEach(B::static1);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ignoreBlankMethodNames() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "\t", null, null)),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              package com.abc;
+              
+              import java.util.ArrayList;
+              
+              class A {
+                 public void test() {
+                     com.abc.B.static1("boo");
+                     new java.util.ArrayList<String>().forEach(B::static1);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ignoreReservedKeyWordMethodNames() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "this", null, null)),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              package com.abc;
+              
+              import java.util.ArrayList;
+              
+              class A {
+                 public void test() {
+                     com.abc.B.static1("boo");
+                     new java.util.ArrayList<String>().forEach(B::static1);
+                 }
+              }
+              """
+          )
+        );
+    }
 }

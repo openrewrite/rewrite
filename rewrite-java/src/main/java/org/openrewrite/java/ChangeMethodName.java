@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
@@ -26,6 +27,9 @@ import org.openrewrite.java.tree.*;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeMethodName extends Recipe {
+
+    //A valid java method starts with a letter, an underscore or a $
+    public static final String VALID_JAVA_METHOD_PATTERN = "^[a-zA-Z_$][a-zA-Z0-9_$]*$";
 
     @Option(displayName = "Method pattern",
             description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
@@ -100,7 +104,9 @@ public class ChangeMethodName extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-
+                if (JavaKeywordUtils.isReserved(newMethodName) || StringUtils.isBlank(newMethodName) || !newMethodName.matches(VALID_JAVA_METHOD_PATTERN)) {
+                    return m;
+                }
                 J.NewClass newClass = getCursor().firstEnclosing(J.NewClass.class);
                 J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
                 boolean methodMatches = newClass != null && methodMatcher.matches(method, newClass) ||
@@ -119,6 +125,9 @@ public class ChangeMethodName extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if (JavaKeywordUtils.isReserved(newMethodName) || StringUtils.isBlank(newMethodName) || !newMethodName.matches(VALID_JAVA_METHOD_PATTERN)) {
+                    return m;
+                }
                 if (methodMatcher.matches(method) && !method.getSimpleName().equals(newMethodName)) {
                     JavaType.Method type = m.getMethodType();
                     if (type != null) {
@@ -133,6 +142,9 @@ public class ChangeMethodName extends Recipe {
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
+                if (JavaKeywordUtils.isReserved(newMethodName) || StringUtils.isBlank(newMethodName) || !newMethodName.matches(VALID_JAVA_METHOD_PATTERN)) {
+                    return m;
+                }
                 if (methodMatcher.matches(m.getMethodType()) && !m.getReference().getSimpleName().equals(newMethodName)) {
                     JavaType.Method type = m.getMethodType();
                     if (type != null) {
@@ -153,6 +165,9 @@ public class ChangeMethodName extends Recipe {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
+                if (JavaKeywordUtils.isReserved(newMethodName) || StringUtils.isBlank(newMethodName) || !newMethodName.matches(VALID_JAVA_METHOD_PATTERN)) {
+                    return f;
+                }
                 if (getCursor().getParentTreeCursor().getValue() instanceof J.Import && methodMatcher.isFullyQualifiedClassReference(f)) {
                     Expression target = f.getTarget();
                     if (target instanceof J.FieldAccess) {

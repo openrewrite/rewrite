@@ -43,7 +43,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        if (!VariableNameUtils.JavaKeywords.isReserved(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
+        if (!JavaKeywordUtils.isReserved(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
             doAfterVisit(new RenameVariableVisitor(variable, toName));
             return variable;
         }
