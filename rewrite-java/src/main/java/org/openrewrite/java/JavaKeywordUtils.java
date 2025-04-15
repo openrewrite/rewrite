@@ -15,16 +15,17 @@
  */
 package org.openrewrite.java;
 
+import lombok.experimental.UtilityClass;
+
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
 // Intentionally package private, at least for now, to limit the publicly exposed API surface
+@UtilityClass
 final class JavaKeywordUtils {
-    JavaKeywordUtils() {
-    }
 
-    private static final String[] RESERVED_WORDS = new String[]{
+    private static final String[] RESERVED_KEYWORDS = new String[]{
           "abstract",
           "assert",
           "boolean",
@@ -77,9 +78,46 @@ final class JavaKeywordUtils {
           "while",
     };
 
-    private static final Set<String> RESERVED_WORDS_SET = new HashSet<>(Arrays.asList(RESERVED_WORDS));
+    private static final String[] RESERVED_IDENTIFIERS = new String[]{
+          "exports",
+          "module",
+          "non-sealed",
+          "open",
+          "opens",
+          "permits",
+          "provides",
+          "record",
+          "requires",
+          "sealed",
+          "to",
+          "transitive",
+          "uses",
+          "var",
+          "when",
+          "with",
+          "yield"
+    };
 
-    public static boolean isReserved(String word) {
-        return RESERVED_WORDS_SET.contains(word);
+    private static final String[] RESERVED_LITERALS = new String[]{
+          "true",
+          "false",
+          "null"
+    };
+
+    private static final Set<String> RESERVED_KEYWORDS_SET = new HashSet<>(Arrays.asList(RESERVED_KEYWORDS));
+    private static final Set<String> RESERVED_IDENTIFIERS_SET = new HashSet<>(Arrays.asList(RESERVED_IDENTIFIERS));
+    private static final Set<String> RESERVED_LITERALS_SET = new HashSet<>(Arrays.asList(RESERVED_LITERALS));
+
+    public static boolean isReservedKeyword(String word) {
+        return RESERVED_KEYWORDS_SET.contains(word);
+    }
+
+    public static boolean isReservedIdentifier(String word) {
+        return RESERVED_IDENTIFIERS_SET.contains(word);
+    }
+
+    public static boolean isReservedLiteral(String word) {
+        return RESERVED_LITERALS_SET.contains(word);
     }
 }
+

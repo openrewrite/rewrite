@@ -468,9 +468,31 @@ class ChangeMethodNameTest implements RewriteTest {
     }
 
     @Test
-    void ignoreReservedKeyWordMethodNames() {
+    void ignoreReservedKeywordMethodNames() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "this", null, null)),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              package com.abc;
+              
+              import java.util.ArrayList;
+              
+              class A {
+                 public void test() {
+                     com.abc.B.static1("boo");
+                     new java.util.ArrayList<String>().forEach(B::static1);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ignoreReservedLiteralMethodNames() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "null", null, null)),
           java(b, SourceSpec::skip),
           java(
             """

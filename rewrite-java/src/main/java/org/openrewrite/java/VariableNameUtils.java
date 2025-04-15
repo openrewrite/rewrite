@@ -64,7 +64,7 @@ public class VariableNameUtils {
 
             baseName = baseName.substring(0, baseName.length() - postFix.length());
             int count = postFix.length() == 0 ? 0 : Integer.parseInt(postFix.reverse().toString());
-            while (namesInScope.contains(newName) || JavaKeywordUtils.isReserved(newName)) {
+            while (namesInScope.contains(newName) || JavaKeywordUtils.isReservedKeyword(newName) || JavaKeywordUtils.isReservedLiteral(newName)) {
                 newName = baseName + (count += 1);
             }
         }
