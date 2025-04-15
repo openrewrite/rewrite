@@ -246,6 +246,19 @@ public class GroovyParser implements Parser {
             return this;
         }
 
+        /**
+         * This is an internal API which is subject to removal or change.
+         */
+        public Builder addClasspathEntry(Path entry) {
+            if (classpath.isEmpty()) {
+                classpath = Collections.singletonList(entry);
+            } else if (!classpath.contains(entry)) {
+                classpath = new ArrayList<>(classpath);
+                classpath.add(entry);
+            }
+            return this;
+        }
+
         @SuppressWarnings("unused")
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;

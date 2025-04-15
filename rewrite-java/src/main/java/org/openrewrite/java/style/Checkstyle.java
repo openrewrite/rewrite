@@ -73,7 +73,7 @@ public class Checkstyle extends NamedStyles {
     public static final EmptyBlockStyle.BlockPolicy defaultBlockPolicy = EmptyBlockStyle.BlockPolicy.TEXT;
 
     public static EmptyBlockStyle emptyBlock() {
-        return new EmptyBlockStyle(defaultBlockPolicy, true, true, true, true,
+        return new EmptyBlockStyle(EmptyBlockStyle.BlockPolicy.TEXT, true, true, true, true,
                 true, true, true, true, true, true, true, true);
     }
 
@@ -118,7 +118,7 @@ public class Checkstyle extends NamedStyles {
     public static final OperatorWrapStyle.WrapOption defaultOperatorWrapStyleOption = OperatorWrapStyle.WrapOption.NL;
 
     public static OperatorWrapStyle operatorWrapStyle() {
-        return new OperatorWrapStyle(defaultOperatorWrapStyleOption, true, true, true, true, true,
+        return new OperatorWrapStyle(OperatorWrapStyle.WrapOption.NL, true, true, true, true, true,
                 true, true, true, true, true, true, true, true, true, true,
                 true, true, true, true, true, true, true, true,
                 false, false, false, false, false, false,

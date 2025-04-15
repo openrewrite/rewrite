@@ -62,7 +62,7 @@ public class ChangeText extends Recipe {
         return new TreeVisitor<Tree, ExecutionContext>() {
 
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
                     return sourceFile;

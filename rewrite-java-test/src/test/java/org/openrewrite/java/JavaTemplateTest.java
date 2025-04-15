@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
@@ -64,6 +65,62 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addParentheses() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+                    return JavaTemplate.builder("#{any()}")
+                      .build()
+                      .apply(getCursor(), parens.getCoordinates().replace(), parens.getTree());
+                }
+            }))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """,
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addParenthesesToParameter() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                    return JavaTemplate.builder("#{any(int)} * 3")
+                      .build()
+                      .apply(getCursor(), binary.getCoordinates().replace(), binary);
+                }
+            }))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              public class A {
+                  int a = 1 + 2;
+              }
+              """,
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
     void assignmentWithinIfPredicate() {
@@ -72,7 +129,7 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                   if ((assignment.getAssignment() instanceof J.Literal) &&
-                    ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
+                      ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
                       return JavaTemplate.builder("value = 0")
                         .contextSensitive()
                         .build()
@@ -113,8 +170,7 @@ class JavaTemplateTest implements RewriteTest {
                       return multiVariable;
                   }
                   J.VariableDeclarations.NamedVariable var0 = multiVariable.getVariables().get(0);
-                  return JavaTemplate.builder("var #{} = #{any()}")
-                    .contextSensitive()
+                  return JavaTemplate.builder("var #{} = #{any()};")
                     .build()
                     .apply(getCursor(), multiVariable.getCoordinates().replace(), var0.getSimpleName(), var0.getInitializer());
               }
@@ -439,7 +495,6 @@ class JavaTemplateTest implements RewriteTest {
                       maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
                       return JavaTemplate.builder("Collections.singletonList(#{any()})")
-                        .contextSensitive()
                         .imports("java.util.Collections")
                         .build()
                         .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
@@ -489,7 +544,6 @@ class JavaTemplateTest implements RewriteTest {
                       maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
                       return JavaTemplate.builder("Collections.singletonList(#{any()})")
-                        .contextSensitive()
                         .imports("java.util.Collections")
                         .build()
                         .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
@@ -577,7 +631,7 @@ class JavaTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher bigDecimalSetScale = new MethodMatcher("java.math.BigDecimal setScale(int, int)");
-              final JavaTemplate twoArgScale = JavaTemplate.builder("#{any(int)}, #{}").contextSensitive()
+              final JavaTemplate twoArgScale = JavaTemplate.builder("#{any(int)}, #{}")
                 .imports("java.math.RoundingMode").build();
 
               @Override
@@ -625,7 +679,6 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitUnary(J.Unary unary, ExecutionContext ctx) {
                   return JavaTemplate.builder("#{any()}++")
-                    .contextSensitive()
                     .build().apply(
                       getCursor(),
                       unary.getCoordinates().replace(),
@@ -865,7 +918,7 @@ class JavaTemplateTest implements RewriteTest {
               public class ArrayHelper {
                   public static Object[] of(Object... objects){ return null;}
               }
-              """
+              """, SourceSpec::skip
           ),
           java(
             """
@@ -963,7 +1016,8 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return JavaTemplate.builder("\"ab\"").contextSensitive().build()
+                  return JavaTemplate.builder("\"ab\"")
+                    .build()
                     .apply(getCursor(), binary.getCoordinates().replace());
               }
           })),
@@ -1083,9 +1137,8 @@ class JavaTemplateTest implements RewriteTest {
                       }
                   }
                   Statement lastStatement = newBlock.getStatements().get(newBlock.getStatements().size() - 1);
-                  String code = "s.toLowerCase();";
                   return JavaTemplate
-                    .builder(code)
+                    .builder("s.toLowerCase();")
                     .contextSensitive()
                     .javaParser(JavaParser.fromJavaVersion())
                     .build()
@@ -1299,8 +1352,6 @@ class JavaTemplateTest implements RewriteTest {
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if (new MethodMatcher("batch.StepBuilder create()").matches(method)) {
                         return JavaTemplate.builder("new StepBuilder()")
-                          //.doBeforeParseTemplate(System.out::println)
-                          .contextSensitive()
                           .build()
                           .apply(getCursor(), method.getCoordinates().replace());
                     }
@@ -1351,9 +1402,8 @@ class JavaTemplateTest implements RewriteTest {
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
                   if (new MethodMatcher("Foo bar(..)").matches(mi) &&
-                    mi.getArguments().get(0) instanceof J.Binary) {
+                      mi.getArguments().get(0) instanceof J.Binary) {
                       return JavaTemplate.builder("\"Hello, {}\", \"World!\"")
-                        .contextSensitive()
                         .build()
                         .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments());
                   }
