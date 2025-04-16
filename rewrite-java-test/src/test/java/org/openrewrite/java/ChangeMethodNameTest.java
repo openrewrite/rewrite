@@ -17,11 +17,17 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Tree;
+import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -423,10 +429,18 @@ class ChangeMethodNameTest implements RewriteTest {
         );
     }
 
-    @Test
-    void ignoreInvalidMethodNames() {
+    @ParameterizedTest
+    @ValueSource(strings = {"123", "  ", "\t", "this", "class", "null", "true"})
+    void ignoreInvalidMethodNamesWhenCalledDownstream(String newMethodName) {
+        AdHocRecipe downstreamRecipe = new AdHocRecipe("DownStream", "downstream", false, () -> new JavaIsoVisitor<>() {
+            @Override
+            public J visit(Tree tree, ExecutionContext executionContext) {
+                return (J) new ChangeMethodName("com.abc.B singleArg(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, executionContext);
+            }
+        }, List.of(), 1);
+
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "123", null, null)),
+          spec -> spec.recipe(downstreamRecipe),
           java(b, SourceSpec::skip),
           java(
             """
@@ -446,68 +460,38 @@ class ChangeMethodNameTest implements RewriteTest {
     }
 
     @Test
-    void ignoreBlankMethodNames() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "\t", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
-              package com.abc;
-              
-              import java.util.ArrayList;
-              
-              class A {
-                 public void test() {
-                     com.abc.B.static1("boo");
-                     new java.util.ArrayList<String>().forEach(B::static1);
-                 }
-              }
-              """
-          )
-        );
+    void validation() {
+        Validated<Object> validObject = new ChangeMethodName("a.Clazz method(..)", "method2", null, null).validate();
+        assertThat(validObject.isValid()).isTrue();
     }
 
     @Test
-    void ignoreReservedKeywordMethodNames() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "this", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
-              package com.abc;
-              
-              import java.util.ArrayList;
-              
-              class A {
-                 public void test() {
-                     com.abc.B.static1("boo");
-                     new java.util.ArrayList<String>().forEach(B::static1);
-                 }
-              }
-              """
-          )
-        );
+    void validateReservedKeyword() {
+        Validated<Object> reservedKeyword = new ChangeMethodName("a.Clazz method(..)", "this", null, null).validate();
+        assertThat(reservedKeyword.isValid()).isFalse();
+        assertThat(reservedKeyword.failures()).singleElement()
+          .matches(f -> f.getProperty().equals("newMethodName"))
+          .matches(f -> f.getInvalidValue().equals("this"))
+          .matches(f -> f.getMessage().equals("should not be a Java Reserved Keyword."));
     }
 
     @Test
-    void ignoreReservedLiteralMethodNames() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "null", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
-              package com.abc;
-              
-              import java.util.ArrayList;
-              
-              class A {
-                 public void test() {
-                     com.abc.B.static1("boo");
-                     new java.util.ArrayList<String>().forEach(B::static1);
-                 }
-              }
-              """
-          )
-        );
+    void validateReservedLiteral() {
+        Validated<Object> reservedLiteral = new ChangeMethodName("a.Clazz method(..)", "null", null, null).validate();
+        assertThat(reservedLiteral.isValid()).isFalse();
+        assertThat(reservedLiteral.failures()).singleElement()
+          .matches(f -> f.getProperty().equals("newMethodName"))
+          .matches(f -> f.getInvalidValue().equals("null"))
+          .matches(f -> f.getMessage().equals("should not be a Java Reserved Literal."));
+    }
+
+    @Test
+    void validatePattern() {
+        Validated<Object> invalidPattern = new ChangeMethodName("a.Clazz method(..)", "123", null, null).validate();
+        assertThat(invalidPattern.isValid()).isFalse();
+        assertThat(invalidPattern.failures()).singleElement()
+          .matches(f -> f.getProperty().equals("newMethodName"))
+          .matches(f -> f.getInvalidValue().equals("123"))
+          .matches(f -> f.getMessage().equals("should be a valid Java method name."));
     }
 }

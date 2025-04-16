@@ -19,37 +19,44 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
+
+import java.util.function.Predicate;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeMethodName extends Recipe {
 
-    public static final String VALID_JAVA_METHOD_PATTERN = "^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*$";
+    private static final String VALID_JAVA_METHOD_PATTERN = "^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*$";
+    private static final Predicate<String> IS_NOT_RESERVED_KEYWORD = s -> !JavaKeywordUtils.isReservedKeyword(s);
+    private static final Predicate<String> IS_NOT_RESERVED_LITERAL = s -> !JavaKeywordUtils.isReservedLiteral(s);
+    private static final Predicate<String> IS_VALID_METHOD_PATTERN = s -> s.matches(VALID_JAVA_METHOD_PATTERN);
+    private static final Predicate<String> IS_VALID_METHOD_NAME = IS_NOT_RESERVED_KEYWORD
+          .and(IS_NOT_RESERVED_LITERAL)
+          .and(IS_VALID_METHOD_PATTERN);
 
     @Option(displayName = "Method pattern",
-          description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
-          example = "org.mockito.Matchers anyVararg()")
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
+            example = "org.mockito.Matchers anyVararg()")
     String methodPattern;
 
     @Option(displayName = "New method name",
-          description = "The method name that will replace the existing name.",
-          example = "any")
+            description = "The method name that will replace the existing name.",
+            example = "any")
     String newMethodName;
 
     @Option(displayName = "Match on overrides",
-          description = "When enabled, find methods that are overrides of the method pattern.",
-          required = false)
+            description = "When enabled, find methods that are overrides of the method pattern.",
+            required = false)
     @Nullable
     Boolean matchOverrides;
 
     @Option(displayName = "Ignore type definition",
-          description = "When set to `true` the definition of the old type will be left untouched. " +
-                "This is useful when you're replacing usage of a class but don't want to rename it.",
-          required = false)
+            description = "When set to `true` the definition of the old type will be left untouched. " +
+                          "This is useful when you're replacing usage of a class but don't want to rename it.",
+            required = false)
     @Nullable
     Boolean ignoreDefinition;
 
@@ -70,25 +77,25 @@ public class ChangeMethodName extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        return super.validate().and(MethodMatcher.validate(methodPattern));
+        return super.validate()
+              .and(MethodMatcher.validate(methodPattern))
+              .and(Validated.test("newMethodName",
+                    "should not be a Java Reserved Keyword.",
+                    newMethodName,
+                    IS_NOT_RESERVED_KEYWORD))
+              .and(Validated.test("newMethodName",
+                    "should not be a Java Reserved Literal.",
+                    newMethodName,
+                    IS_NOT_RESERVED_LITERAL))
+              .and(Validated.test("newMethodName",
+                    "should be a valid Java method name.",
+                    newMethodName,
+                    IS_VALID_METHOD_PATTERN));
     }
-
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
-
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-                if (!JavaKeywordUtils.isReservedKeyword(newMethodName) &&
-                      !JavaKeywordUtils.isReservedLiteral(newMethodName) &&
-                      !StringUtils.isBlank(newMethodName) &&
-                      newMethodName.matches(VALID_JAVA_METHOD_PATTERN)) {
-                    return super.isAcceptable(sourceFile, executionContext);
-                }
-                return false;
-            }
-
             @Override
             public J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
@@ -114,19 +121,28 @@ public class ChangeMethodName extends Recipe {
             private final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
 
             @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+                if (IS_VALID_METHOD_NAME.test(newMethodName)) {
+                    return super.isAcceptable(sourceFile, executionContext);
+                }
+                return false;
+            }
+
+            @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+
                 J.NewClass newClass = getCursor().firstEnclosing(J.NewClass.class);
                 J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
                 boolean methodMatches = newClass != null && methodMatcher.matches(method, newClass) ||
-                      classDecl != null && methodMatcher.matches(method, classDecl);
+                                        classDecl != null && methodMatcher.matches(method, classDecl);
                 if (methodMatches) {
                     JavaType.Method type = m.getMethodType();
                     if (type != null) {
                         type = type.withName(newMethodName);
                     }
                     m = m.withName(m.getName().withSimpleName(newMethodName).withType(type))
-                          .withMethodType(type);
+                            .withMethodType(type);
                 }
                 return m;
             }
@@ -140,7 +156,7 @@ public class ChangeMethodName extends Recipe {
                         type = type.withName(newMethodName);
                     }
                     m = m.withName(m.getName().withSimpleName(newMethodName).withType(type))
-                          .withMethodType(type);
+                            .withMethodType(type);
                 }
                 return m;
             }
@@ -174,7 +190,7 @@ public class ChangeMethodName extends Recipe {
                         String className = target.printTrimmed(getCursor());
                         String fullyQualified = className + "." + newMethodName;
                         return TypeTree.build(fullyQualified)
-                              .withPrefix(f.getPrefix());
+                                .withPrefix(f.getPrefix());
                     }
                 }
                 return f;

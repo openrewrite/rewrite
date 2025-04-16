@@ -108,15 +108,15 @@ final class JavaKeywordUtils {
     private static final Set<String> RESERVED_IDENTIFIERS_SET = new HashSet<>(Arrays.asList(RESERVED_IDENTIFIERS));
     private static final Set<String> RESERVED_LITERALS_SET = new HashSet<>(Arrays.asList(RESERVED_LITERALS));
 
-    public static boolean isReservedKeyword(String word) {
+    static boolean isReservedKeyword(String word) {
         return RESERVED_KEYWORDS_SET.contains(word);
     }
 
-    public static boolean isReservedIdentifier(String word) {
+    static boolean isReservedIdentifier(String word) {
         return RESERVED_IDENTIFIERS_SET.contains(word);
     }
 
-    public static boolean isReservedLiteral(String word) {
+    static boolean isReservedLiteral(String word) {
         return RESERVED_LITERALS_SET.contains(word);
     }
 }
