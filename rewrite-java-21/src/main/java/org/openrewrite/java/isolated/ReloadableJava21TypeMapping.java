@@ -37,8 +37,6 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.java.template.internal.Javac.CTC_UNKNOWN;
-import static org.openrewrite.java.template.internal.JavacTreeMaker.TypeTag.typeTag;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -49,8 +47,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     private final JavaTypeCache typeCache;
 
     public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
-        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || CTC_UNKNOWN.equals(typeTag(type))
-                || type instanceof NullType) {
+        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
+                type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
@@ -491,8 +489,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             }
         }
 
-        if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR
-                || CTC_UNKNOWN.equals(typeTag(symbol.type))) {
+        if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
 
@@ -557,7 +554,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     exceptionTypes.add(javaType);
                 }
             }
-        } else if (CTC_UNKNOWN.equals(typeTag(selectType))) {
+        } else if (selectType instanceof Type.UnknownType) {
             returnType = JavaType.Unknown.getInstance();
         }
 

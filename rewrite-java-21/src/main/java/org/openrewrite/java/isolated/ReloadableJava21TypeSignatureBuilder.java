@@ -30,9 +30,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
-import static org.openrewrite.java.template.internal.Javac.CTC_UNKNOWN;
-import static org.openrewrite.java.template.internal.JavacTreeMaker.TypeTag.typeTag;
-
 class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     private Set<String> typeVariableNameStack;
@@ -43,7 +40,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String signature(@Nullable Type type) {
-        if (type == null || CTC_UNKNOWN.equals(typeTag(type)) || type instanceof NullType) {
+        if (type == null || type instanceof Type.UnknownType || type instanceof NullType) {
             return "{undefined}";
         } else if (type instanceof Type.IntersectionClassType) {
             return intersectionSignature(type);
