@@ -24,6 +24,7 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.ow2.asm:asm:latest.release")
+    implementation("org.openrewrite:rewrite-templating:latest.release")
 
     testImplementation(project(":rewrite-test"))
     "javaTck"(project(":rewrite-java-tck"))
