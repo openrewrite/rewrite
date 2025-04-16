@@ -23,11 +23,9 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
-import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.internal.JavaScriptPrinter;
-import org.openrewrite.javascript.service.JavaScriptImportService;
 import org.openrewrite.marker.Markers;
 
 import java.beans.Transient;
@@ -36,7 +34,9 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -215,15 +215,7 @@ public interface JS extends J {
         public <S, T extends S> T service(Class<S> service) {
             String serviceName = service.getName();
             try {
-                Class<S> serviceClass;
-                if (JavaScriptImportService.class.getName().equals(serviceName)) {
-                    serviceClass = service;
-                } else if (ImportService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(JavaScriptImportService.class.getName());
-                } else {
-                    return JavaSourceFile.super.service(service);
-                }
-                return (T) serviceClass.getConstructor().newInstance();
+                return JavaSourceFile.super.service(service);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
