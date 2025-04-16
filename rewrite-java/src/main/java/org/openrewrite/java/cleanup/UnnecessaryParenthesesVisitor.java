@@ -60,8 +60,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
 
         assert par != null;
         if (par instanceof J.Parentheses) {
-            J parentCursorValue = getCursor().getParentTreeCursor().getValue();
-            if (parentCursorValue instanceof J.Parentheses) {
+            if (getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
                 return ((J.Parentheses<?>) par).getTree().withPrefix(Space.EMPTY);
             }
         }
