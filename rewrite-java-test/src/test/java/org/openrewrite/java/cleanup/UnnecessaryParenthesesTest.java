@@ -934,7 +934,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
 
     @Test
     @ExpectedToFail("Not implemented yet")
-    public void unwrapBinaryInIf() {
+    void unwrapBinaryInIf() {
         rewriteRun(
           //language=java
           java(
@@ -957,7 +957,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     }
 
     @Test
-    public void unwrapMethodArguments() {
+    void unwrapMethodArguments() {
         rewriteRun(
           //language=java
           java(
