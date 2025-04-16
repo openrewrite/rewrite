@@ -278,6 +278,15 @@ class SemanticallyEqualTest {
             }
             """
         );
+        assertExpressionsNotEqual(
+          """
+           import java.math.BigDecimal;
+           class T {
+               BigDecimal a = BigDecimal.ONE;
+               BigDecimal b = BigDecimal.ZERO;
+           }
+           """
+        );
     }
 
     @ExpectedToFail

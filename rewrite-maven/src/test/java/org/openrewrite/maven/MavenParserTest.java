@@ -1325,6 +1325,7 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("LanguageMismatch")
     @Nested
     class Profiles {
 
@@ -3697,8 +3698,8 @@ class MavenParserTest implements RewriteTest {
               """
           ),
           mavenProject("child",
-            //language=xml
             pomXml(
+              //language=xml
               """
                 <project>
                   <parent>
@@ -3827,24 +3828,119 @@ class MavenParserTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>app</artifactId>
                 <version>1.0.0</version>
-                  <dependencies>
-                    <dependency>
-                        <groupId>ch.qos.logback</groupId>
-                        <artifactId>logback-classic</artifactId>
-                        <version>1.3.11</version>
-                        <exclusions>
-                            <exclusion>
-                                <groupId>*</groupId>
-                                <artifactId>*</artifactId>
-                            </exclusion>
-                        </exclusions>
-                    </dependency>
-                  </dependencies>
+                <dependencies>
+                  <dependency>
+                      <groupId>ch.qos.logback</groupId>
+                      <artifactId>logback-classic</artifactId>
+                      <version>1.3.11</version>
+                      <exclusions>
+                          <exclusion>
+                              <groupId>*</groupId>
+                              <artifactId>*</artifactId>
+                          </exclusion>
+                      </exclusions>
+                  </dependency>
+                </dependencies>
               </project>
               """, spec -> spec.afterRecipe(pom -> {
                 MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                 assertThat(resolution.findDependencies("ch.qos.logback", "logback-core", Scope.Compile)).isEmpty();
             })
           ));
+    }
+
+    @Test
+    void parentNearerThanBom() {
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+            
+              <groupId>org.openrewrite</groupId>
+              <artifactId>sam-parent</artifactId>
+              <version>1.0.0</version>
+              <packaging>pom</packaging>
+            
+              <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-core</artifactId>
+                        <version>8.0.0</version>
+                    </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+            """),
+          mavenProject("sam-bom",
+            pomXml(
+              //language=xml
+              """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>org.openrewrite</groupId>
+                <artifactId>sam-bom</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+              
+                <dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.openrewrite</groupId>
+                          <artifactId>rewrite-core</artifactId>
+                          <version>7.0.0</version>
+                      </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """)),
+          mavenProject("sam",
+            pomXml(
+              //language=xml
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>sam</artifactId>
+                  <version>1.0.0</version>
+                
+                  <parent>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>sam-parent</artifactId>
+                      <version>1.0.0</version>
+                  </parent>
+                
+                  <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite</groupId>
+                            <artifactId>sam-bom</artifactId>
+                            <version>1.0.0</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                
+                  <dependencies>
+                    <dependency>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-core</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """, spec -> spec.afterRecipe(pom -> {
+                  MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(resolution.findDependencies("org.openrewrite", "rewrite-core", Scope.Compile))
+                    .singleElement()
+                    .extracting(r -> r.getGav().getVersion())
+                    .as("The parent says 8.0.0, the bom says 7.0.0, Maven says the parent is nearer.")
+                    .isEqualTo("8.0.0");
+              })))
+          );
     }
 }
