@@ -1098,5 +1098,20 @@ class UnnecessaryParenthesesTest implements RewriteTest {
             );
         }
 
+        @Test
+        void methodInvocationSelect() {
+            rewriteRun(
+              //language=java
+              java(
+                """
+                  class Test {
+                    void f(String s, int x) {
+                      (s + x).toString();
+                    }
+                  }
+                  """
+              )
+            );
+        }
     }
 }

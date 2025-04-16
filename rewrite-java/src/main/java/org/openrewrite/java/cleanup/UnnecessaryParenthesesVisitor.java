@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import lombok.EqualsAndHashCode;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
@@ -41,7 +42,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     private UnnecessaryParenthesesStyle getStyle() {
         if (style == null) {
             JavaSourceFile cu = getCursor().firstEnclosing(JavaSourceFile.class);
-            if(cu == null) {
+            if (cu == null) {
                 style = Checkstyle.unnecessaryParentheses();
             } else {
                 style = Style.from(UnnecessaryParenthesesStyle.class, cu, Checkstyle::unnecessaryParentheses);
@@ -63,13 +64,6 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
             J parentCursorValue = getCursor().getParentTreeCursor().getValue();
             if (parentCursorValue instanceof J.Parentheses) {
                 return ((J.Parentheses<?>) par).getTree().withPrefix(Space.EMPTY);
-            } else if (parentCursorValue instanceof J.MethodInvocation) {
-                J tree = ((J.Parentheses<?>) par).getTree();
-                Space outside = par.getPrefix();
-                Space inside = tree.getPrefix();
-                return tree.withPrefix(Space.build(
-                        outside.getWhitespace() + inside.getWhitespace(),
-                        ListUtils.concatAll(outside.getComments(), inside.getComments())));
             }
         }
         return par;
@@ -89,16 +83,16 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         J.Literal l = (J.Literal) super.visitLiteral(literal, ctx);
         JavaType.Primitive type = l.getType();
         if ((getStyle().getNumInt() && type == JavaType.Primitive.Int) ||
-            (getStyle().getNumDouble() && type == JavaType.Primitive.Double) ||
-            (getStyle().getNumLong() && type == JavaType.Primitive.Long) ||
-            (getStyle().getNumFloat() && type == JavaType.Primitive.Float) ||
-            (getStyle().getStringLiteral() && type == JavaType.Primitive.String) ||
-            (getStyle().getLiteralNull() && type == JavaType.Primitive.Null) ||
-            (getStyle().getLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
-            (getStyle().getLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
+                (getStyle().getNumDouble() && type == JavaType.Primitive.Double) ||
+                (getStyle().getNumLong() && type == JavaType.Primitive.Long) ||
+                (getStyle().getNumFloat() && type == JavaType.Primitive.Float) ||
+                (getStyle().getStringLiteral() && type == JavaType.Primitive.String) ||
+                (getStyle().getLiteralNull() && type == JavaType.Primitive.Null) ||
+                (getStyle().getLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
+                (getStyle().getLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
             if (getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
                 getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MESSAGE,
-                    getCursor());
+                        getCursor());
             }
         }
         return l;
@@ -109,18 +103,18 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         J.AssignmentOperation a = (J.AssignmentOperation) super.visitAssignmentOperation(assignOp, ctx);
         J.AssignmentOperation.Type op = a.getOperator();
         if (a.getAssignment() instanceof J.Parentheses && ((getStyle().getBitAndAssign() && op == J.AssignmentOperation.Type.BitAnd) ||
-                                                           (getStyle().getBitOrAssign() && op == J.AssignmentOperation.Type.BitOr) ||
-                                                           (getStyle().getBitShiftRightAssign() && op == J.AssignmentOperation.Type.UnsignedRightShift) ||
-                                                           (getStyle().getBitXorAssign() && op == J.AssignmentOperation.Type.BitXor) ||
-                                                           (getStyle().getShiftRightAssign() && op == J.AssignmentOperation.Type.RightShift) ||
-                                                           (getStyle().getShiftLeftAssign() && op == J.AssignmentOperation.Type.LeftShift) ||
-                                                           (getStyle().getMinusAssign() && op == J.AssignmentOperation.Type.Subtraction) ||
-                                                           (getStyle().getDivAssign() && op == J.AssignmentOperation.Type.Division) ||
-                                                           (getStyle().getPlusAssign() && op == J.AssignmentOperation.Type.Addition) ||
-                                                           (getStyle().getStarAssign() && op == J.AssignmentOperation.Type.Multiplication) ||
-                                                           (getStyle().getModAssign() && op == J.AssignmentOperation.Type.Modulo))) {
+                (getStyle().getBitOrAssign() && op == J.AssignmentOperation.Type.BitOr) ||
+                (getStyle().getBitShiftRightAssign() && op == J.AssignmentOperation.Type.UnsignedRightShift) ||
+                (getStyle().getBitXorAssign() && op == J.AssignmentOperation.Type.BitXor) ||
+                (getStyle().getShiftRightAssign() && op == J.AssignmentOperation.Type.RightShift) ||
+                (getStyle().getShiftLeftAssign() && op == J.AssignmentOperation.Type.LeftShift) ||
+                (getStyle().getMinusAssign() && op == J.AssignmentOperation.Type.Subtraction) ||
+                (getStyle().getDivAssign() && op == J.AssignmentOperation.Type.Division) ||
+                (getStyle().getPlusAssign() && op == J.AssignmentOperation.Type.Addition) ||
+                (getStyle().getStarAssign() && op == J.AssignmentOperation.Type.Multiplication) ||
+                (getStyle().getModAssign() && op == J.AssignmentOperation.Type.Modulo))) {
             a = (J.AssignmentOperation) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visitNonNull(a,
-                ctx, getCursor().getParentOrThrow());
+                    ctx, getCursor().getParentOrThrow());
         }
         return a;
     }
@@ -130,7 +124,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         J.Assignment a = visitAndCast(assignment, ctx, super::visitAssignment);
         if (getStyle().getAssign() && a.getAssignment() instanceof J.Parentheses) {
             a = (J.Assignment) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visitNonNull(a, ctx,
-                getCursor().getParentOrThrow());
+                    getCursor().getParentOrThrow());
         }
         return a;
     }
@@ -140,7 +134,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         J.Return rtn = (J.Return) super.visitReturn(return_, ctx);
         if (getStyle().getExpr() && rtn.getExpression() instanceof J.Parentheses) {
             rtn = (J.Return) new UnwrapParentheses<>((J.Parentheses<?>) rtn.getExpression()).visitNonNull(rtn, ctx,
-                getCursor().getParentOrThrow());
+                    getCursor().getParentOrThrow());
         }
         return rtn;
     }
@@ -148,7 +142,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, P ctx) {
         J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable,
-            ctx);
+                ctx);
         if (getStyle().getAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
             v = (J.VariableDeclarations.NamedVariable) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visitNonNull(v, ctx, getCursor().getParentOrThrow());
         }
@@ -159,10 +153,10 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public J visitLambda(J.Lambda lambda, P ctx) {
         J.Lambda l = (J.Lambda) super.visitLambda(lambda, ctx);
         if (getStyle().getLambda() &&
-            l.getParameters().getParameters().size() == 1 &&
-            l.getParameters().isParenthesized() &&
-            l.getParameters().getParameters().get(0) instanceof J.VariableDeclarations &&
-            ((J.VariableDeclarations) l.getParameters().getParameters().get(0)).getTypeExpression() == null) {
+                l.getParameters().getParameters().size() == 1 &&
+                l.getParameters().isParenthesized() &&
+                l.getParameters().getParameters().get(0) instanceof J.VariableDeclarations &&
+                ((J.VariableDeclarations) l.getParameters().getParameters().get(0)).getTypeExpression() == null) {
             l = l.withParameters(l.getParameters().withParenthesized(false));
         }
         return l;
@@ -175,7 +169,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         Expression expression = i.getIfCondition().getTree();
         if (expression instanceof J.Parentheses) {
             i = (J.If) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(i, ctx,
-                getCursor().getParentOrThrow());
+                    getCursor().getParentOrThrow());
         }
         return i;
     }
@@ -187,7 +181,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         Expression expression = w.getCondition().getTree();
         if (expression instanceof J.Parentheses) {
             w = (J.WhileLoop) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(w, ctx,
-                getCursor().getParentOrThrow());
+                    getCursor().getParentOrThrow());
         }
         return w;
     }
@@ -199,7 +193,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         Expression expression = dw.getWhileCondition().getTree();
         if (expression instanceof J.Parentheses) {
             dw = (J.DoWhileLoop) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(dw, ctx,
-                getCursor().getParentOrThrow());
+                    getCursor().getParentOrThrow());
         }
         return dw;
     }
@@ -210,7 +204,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         Expression condition = fc.getCondition();
         if (condition instanceof J.Parentheses) {
             fc = (J.ForLoop.Control) new UnwrapParentheses<>((J.Parentheses<?>) condition).visitNonNull(fc, ctx,
-                getCursor().getParentOrThrow());
+                    getCursor().getParentOrThrow());
         }
         return fc;
     }
@@ -233,5 +227,26 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         return u;
     }
 
+    @Override
+    public J visitMethodInvocation(J.MethodInvocation method, P p) {
+        J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, p);
+        if (mi.getSelect() instanceof J.Parentheses &&
+                !(((J.Parentheses<?>) mi.getSelect()).getTree() instanceof J.Binary)) {
+            Expression tree = (Expression) ((J.Parentheses<?>) mi.getSelect()).getTree();
+            mi = mi.withSelect(tree.withPrefix((mergeSpace(mi.getSelect().getPrefix(), tree.getPrefix()))));
+        }
+        return mi.withArguments(ListUtils.map(mi.getArguments(), arg -> {
+            if (arg instanceof J.Parentheses) {
+                J tree = ((J.Parentheses<?>) arg).getTree();
+                return tree.withPrefix(mergeSpace(arg.getPrefix(), tree.getPrefix()));
+            }
+            return arg;
+        }));
+    }
 
+    private static @NotNull Space mergeSpace(Space outside, Space inside) {
+        return Space.build(
+                outside.getWhitespace() + inside.getWhitespace(),
+                ListUtils.concatAll(outside.getComments(), inside.getComments()));
+    }
 }
