@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.style.Checkstyle;
@@ -59,8 +60,16 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
 
         assert par != null;
         if (par instanceof J.Parentheses) {
-            if (getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
+            J parentCursorValue = getCursor().getParentTreeCursor().getValue();
+            if (parentCursorValue instanceof J.Parentheses) {
                 return ((J.Parentheses<?>) par).getTree().withPrefix(Space.EMPTY);
+            } else if (parentCursorValue instanceof J.MethodInvocation) {
+                J tree = ((J.Parentheses<?>) par).getTree();
+                Space outside = par.getPrefix();
+                Space inside = tree.getPrefix();
+                return tree.withPrefix(Space.build(
+                        outside.getWhitespace() + inside.getWhitespace(),
+                        ListUtils.concatAll(outside.getComments(), inside.getComments())));
             }
         }
         return par;
@@ -223,4 +232,6 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         }
         return u;
     }
+
+
 }

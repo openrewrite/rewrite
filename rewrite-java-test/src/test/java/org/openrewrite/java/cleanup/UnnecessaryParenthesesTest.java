@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
@@ -295,7 +296,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                       String t = ("literallyString" + "stringLiteral");
                       if (s == null) {
                           s = null;
-                      } else if (("someLiteral".toLowerCase()).equals(s)) {
+                      } else if ("someLiteral".toLowerCase().equals(s)) {
                           s = null;
                       }
                   }
@@ -925,6 +926,53 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   boolean falseMethod() {
                       return false;
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @ExpectedToFail("Not implemented yet")
+    public void unwrapBinaryInIf() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(String s, int x) {
+                  if (((x > 3) || x < 0)) {}
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(String s, int x) {
+                  if (x > 3 || x < 0) {}
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    public void unwrapMethodArguments() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(String s, int x) {
+                  System.err.printf((s + "."), (x), (x + 3));
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(String s, int x) {
+                  System.err.printf(s + ".", x, x + 3);
+                }
               }
               """
           )
