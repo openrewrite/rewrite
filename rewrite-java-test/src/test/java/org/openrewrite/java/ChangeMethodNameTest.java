@@ -27,7 +27,6 @@ import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -35,6 +34,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class ChangeMethodNameTest implements RewriteTest {
     @Language("java")
@@ -433,7 +433,7 @@ class ChangeMethodNameTest implements RewriteTest {
     @ValueSource(strings = {"123", "  ", "\t", "this", "class", "null", "true"})
     void ignoreInvalidMethodNamesWhenCalledDownstream(String newMethodName) {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J visit(Tree tree, ExecutionContext executionContext) {
                   return (J) new ChangeMethodName("com.abc.B static1(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, executionContext);
