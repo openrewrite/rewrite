@@ -75,5 +75,8 @@ class SemverTest {
         assertThat(Semver.max("1.0.1RC", "1.0.1-release")).isEqualTo("1.0.1-release");
         assertThat(Semver.max("4.3.30.RELEASE", "4.3.30.RELEASE-2")).isEqualTo("4.3.30.RELEASE"); // Multiple labels with same version takes first label
         assertThat(Semver.max("4.3.30.RELEASE", "4.3.31.RELEASE")).isEqualTo("4.3.31.RELEASE");
+        assertThat(Semver.max("INVALID-2023.1.0.1", "1.0.2")).isEqualTo("1.0.2");
+        assertThat(Semver.max("INVALID-2023.1.0.3", "1.0.2")).isEqualTo("1.0.2");
+        assertThat(Semver.max("1.0.2", "INVALID-2023.1.0.3")).isEqualTo("1.0.2");
     }
 }
