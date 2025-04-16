@@ -50,6 +50,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -141,8 +142,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               """,
             spec -> spec.beforeRecipe(pom -> {
                 MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                assertThat(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null)
-                  .stream()
+                assertThat(StreamSupport.stream(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null).spliterator(), false)
                   .map(MavenRepository::getId))
                   .containsExactly("settings-provided", "local-provided");
             }))
@@ -186,7 +186,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
 
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
-            Collection<MavenRepository> repos = downloader.distinctNormalizedRepositories(emptyList(), null, null);
+            Iterable<MavenRepository> repos = downloader.distinctNormalizedRepositories(emptyList(), null, null);
             assertThat(repos).areExactly(1, new Condition<>(repo -> "central".equals(repo.getId()),
               "id \"central\""));
             assertThat(repos).areExactly(1, new Condition<>(repo -> "https://internalartifactrepository.yourorg.com".equals(repo.getUri()),

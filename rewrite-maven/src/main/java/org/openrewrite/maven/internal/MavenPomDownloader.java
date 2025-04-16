@@ -47,6 +47,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -243,9 +244,9 @@ public class MavenPomDownloader {
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "metadata");
 
         MavenMetadata mavenMetadata = null;
-        Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
-        List<String> attemptedUris = new ArrayList<>(normalizedRepos.size());
+        List<String> attemptedUris = new ArrayList<>();
         for (MavenRepository repo : normalizedRepos) {
             ctx.getResolutionListener().repository(repo, containingPom);
             if (gav.getVersion() != null && !repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
@@ -530,7 +531,7 @@ public class MavenPomDownloader {
             }
         }
 
-        Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
 
         Timer.Sample sample = Timer.start();
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "pom");
@@ -669,6 +670,7 @@ public class MavenPomDownloader {
                 repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
         }
+
         if (foundJarInRepo != null && foundResolvedGav != null) {
             // IF JAR has been found return the artificially created POM not to throw exception
             RawPom rawPom = rawPomFromGav(gav);
@@ -756,10 +758,11 @@ public class MavenPomDownloader {
         return gav.getVersion();
     }
 
-    Collection<MavenRepository> distinctNormalizedRepositories(
+    Iterable<MavenRepository> distinctNormalizedRepositories(
             List<MavenRepository> repositories,
             @Nullable ResolvedPom containingPom,
             @Nullable String acceptsVersion) {
+
         // Temporary guard for the introduction of pluginRepositories to ResolvedPom,
         //  which on older LSTs will be null.
         //noinspection ConstantValue
@@ -767,35 +770,66 @@ public class MavenPomDownloader {
             repositories = emptyList();
         }
 
-        LinkedHashMap<String, MavenRepository> normalizedRepositories = new LinkedHashMap<>();
+        // Create a list of raw repository suppliers in the correct order
+        List<Supplier<MavenRepository>> repositorySuppliers = new ArrayList<>();
 
+        // Add local repository if needed
         if (addLocalRepository) {
-            normalizedRepositories.put(ctx.getLocalRepository().getId(), ctx.getLocalRepository());
+            repositorySuppliers.add(ctx::getLocalRepository);
         }
 
-        // repositories from maven settings
+        // Add repositories from maven settings
         for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+            repositorySuppliers.add(() -> repo);
         }
 
+        // Add repositories passed as parameter
         for (MavenRepository repo : repositories) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+            repositorySuppliers.add(() -> repo);
         }
 
-        if (!normalizedRepositories.containsKey(MavenRepository.MAVEN_CENTRAL.getId()) && addCentralRepository) {
-            MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, ctx, containingPom);
-            if (normalizedRepo != null) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+        // Add Maven Central if needed
+        if (addCentralRepository) {
+            repositorySuppliers.add(() -> MavenRepository.MAVEN_CENTRAL);
         }
 
-        return normalizedRepositories.values();
+        // Return lazy iterable
+        return () -> new Iterator<MavenRepository>() {
+            private final Map<@Nullable String, MavenRepository> seen = new LinkedHashMap<>();
+            private int index = 0;
+            private @Nullable MavenRepository next = findNext();
+
+            private @Nullable MavenRepository findNext() {
+                while (index < repositorySuppliers.size()) {
+                    MavenRepository repo = repositorySuppliers.get(index++).get();
+                    MavenRepository normalized = normalizeRepository(repo, ctx, containingPom);
+
+                    if (normalized != null &&
+                        (acceptsVersion == null || repositoryAcceptsVersion(normalized, acceptsVersion, containingPom)) &&
+                        !seen.containsKey(normalized.getId())) {
+
+                        seen.put(normalized.getId(), normalized);
+                        return normalized;
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public boolean hasNext() {
+                return next != null;
+            }
+
+            @Override
+            public MavenRepository next() {
+                if (next == null) {
+                    throw new NoSuchElementException();
+                }
+                MavenRepository result = next;
+                next = findNext();
+                return result;
+            }
+        };
     }
 
     public @Nullable MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
