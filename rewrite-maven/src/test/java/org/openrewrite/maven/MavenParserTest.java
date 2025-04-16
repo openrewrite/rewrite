@@ -3849,9 +3849,8 @@ class MavenParserTest implements RewriteTest {
           ));
     }
 
-    @Disabled
     @Test
-    void parentOverBom() {
+    void parentNearerThanBom() {
         rewriteRun(
           pomXml(
             //language=xml
@@ -3875,71 +3874,73 @@ class MavenParserTest implements RewriteTest {
               </dependencyManagement>
             </project>
             """),
-          pomXml(
-            //language=xml
-            """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-            
-              <groupId>org.openrewrite</groupId>
-              <artifactId>sam-bom</artifactId>
-              <version>1.0.0</version>
-              <packaging>pom</packaging>
-            
-              <dependencyManagement>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.openrewrite</groupId>
-                        <artifactId>rewrite-core</artifactId>
-                        <version>7.0.0</version>
-                    </dependency>
-                </dependencies>
-              </dependencyManagement>
-            </project>
-            """),
-          pomXml(
-            //language=xml
-            """
+          mavenProject("sam-bom",
+            pomXml(
+              //language=xml
+              """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
                 <groupId>org.openrewrite</groupId>
-                <artifactId>sam</artifactId>
+                <artifactId>sam-bom</artifactId>
                 <version>1.0.0</version>
-              
-                <parent>
-                    <groupId>org.openrewrite</groupId>
-                    <artifactId>sam-parent</artifactId>
-                    <version>1.0.0</version>
-                </parent>
+                <packaging>pom</packaging>
               
                 <dependencyManagement>
                   <dependencies>
                       <dependency>
                           <groupId>org.openrewrite</groupId>
-                          <artifactId>sam-bom</artifactId>
-                          <version>1.0.0</version>
-                          <type>pom</type>
-                          <scope>import</scope>
+                          <artifactId>rewrite-core</artifactId>
+                          <version>7.0.0</version>
                       </dependency>
                   </dependencies>
                 </dependencyManagement>
-              
-                <dependencies>
-                  <dependency>
-                      <groupId>org.openrewrite</groupId>
-                      <artifactId>rewrite-core</artifactId>
-                  </dependency>
-                </dependencies>
               </project>
-              """, spec -> spec.afterRecipe(pom -> {
-                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                assertThat(resolution.findDependencies("org.openrewrite", "rewrite-core", Scope.Compile))
-                  .singleElement()
-                  .extracting(r -> r.getGav().getVersion())
-                  .as("The parent says 8.0.0, the bom says 7.0.0, Maven says the parent is right.")
-                  .isEqualTo("8.0.0");
-            })
-          ));
+              """)),
+          mavenProject("sam",
+            pomXml(
+              //language=xml
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>sam</artifactId>
+                  <version>1.0.0</version>
+                
+                  <parent>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>sam-parent</artifactId>
+                      <version>1.0.0</version>
+                  </parent>
+                
+                  <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite</groupId>
+                            <artifactId>sam-bom</artifactId>
+                            <version>1.0.0</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                
+                  <dependencies>
+                    <dependency>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-core</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """, spec -> spec.afterRecipe(pom -> {
+                  MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(resolution.findDependencies("org.openrewrite", "rewrite-core", Scope.Compile))
+                    .singleElement()
+                    .extracting(r -> r.getGav().getVersion())
+                    .as("The parent says 8.0.0, the bom says 7.0.0, Maven says the parent is nearer.")
+                    .isEqualTo("8.0.0");
+              })))
+          );
     }
 }
