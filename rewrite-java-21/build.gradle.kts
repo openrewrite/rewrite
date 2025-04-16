@@ -54,7 +54,10 @@ tasks.withType<Javadoc> {
             "**/ReloadableJava21Parser**",
             "**/ReloadableJava21ParserVisitor**",
             "**/ReloadableJava21TypeMapping**",
-            "**/ReloadableJava21TypeSignatureBuilder**"
+            "**/ReloadableJava21TypeSignatureBuilder**",
+            "**/Javac**",
+            "**/JavacTreeMaker**",
+            "**/Permit**"
     )
 }
 
