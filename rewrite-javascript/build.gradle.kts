@@ -1,4 +1,5 @@
 import com.github.gradle.node.npm.task.NpmTask
+import nl.javadude.gradle.plugins.license.LicenseExtension
 import org.eclipse.jgit.api.Git
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -94,4 +95,11 @@ listOf("final", "snapshot").forEach { phase ->
     project.rootProject.tasks.named(phase) {
         dependsOn(npmPublishProcess)
     }
+}
+
+extensions.configure<LicenseExtension> {
+    header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
+//    includePatterns.addAll(
+//        listOf("**/*.ts")
+//    )
 }
