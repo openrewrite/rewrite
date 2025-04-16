@@ -481,8 +481,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     if (targetClass.getSimpleName().equals("RecoveryErrorType")) {
                         Field field = targetClass.getDeclaredField("candidateSymbol");
                         field.setAccessible(true);
-                        Symbol originalSymbol = (Symbol) field.get(selectType);
-                        return methodInvocationType(selectType.getOriginalType(), originalSymbol);
+                        return methodInvocationType(selectType.getOriginalType(), (Symbol) field.get(selectType));
                     }
                 }
             } catch (Exception e) {
@@ -662,11 +661,11 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             JavaType.FullyQualified resolvedDeclaringType = declaringType;
-            if (declaringType == null) {
-                if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
+            if (declaringType == null && (methodSymbol.owner instanceof Symbol.ClassSymbol
+                    || methodSymbol.owner instanceof Symbol.TypeVariableSymbol)) {
                     resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
                 }
-            }
+
 
             if (resolvedDeclaringType == null) {
                 return null;
@@ -709,6 +708,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         try {
             classSymbol.complete();
         } catch (Symbol.CompletionFailure ignore) {
+            // Ignore
         }
     }
 
