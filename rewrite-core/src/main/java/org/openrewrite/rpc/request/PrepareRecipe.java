@@ -37,7 +37,7 @@ public class PrepareRecipe implements RpcRequest {
         @Override
         protected Object handle(PrepareRecipe request) throws Exception {
             Recipe recipe = new RecipeLoader(null).load(request.getId(), request.getOptions());
-            String instanceId = SnowflakeId.generateIdAsString();
+            String instanceId = SnowflakeId.generateId();
             preparedRecipes.put(instanceId, recipe);
             return new PrepareRecipeResponse(instanceId, recipe.getDescriptor(),
                     "edit:" + instanceId,
