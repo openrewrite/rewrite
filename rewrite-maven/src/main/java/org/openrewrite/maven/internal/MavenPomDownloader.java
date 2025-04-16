@@ -47,7 +47,6 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -762,7 +761,6 @@ public class MavenPomDownloader {
             List<MavenRepository> repositories,
             @Nullable ResolvedPom containingPom,
             @Nullable String acceptsVersion) {
-
         // Temporary guard for the introduction of pluginRepositories to ResolvedPom,
         //  which on older LSTs will be null.
         //noinspection ConstantValue
@@ -771,44 +769,42 @@ public class MavenPomDownloader {
         }
 
         // Create a list of raw repository suppliers in the correct order
-        List<Supplier<MavenRepository>> repositorySuppliers = new ArrayList<>();
+        Map<@Nullable String, MavenRepository> repositoriesById = new LinkedHashMap<>();
 
         // Add local repository if needed
         if (addLocalRepository) {
-            repositorySuppliers.add(ctx::getLocalRepository);
+            repositoriesById.put("local", ctx.getLocalRepository());
         }
 
         // Add repositories from maven settings
         for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
-            repositorySuppliers.add(() -> repo);
+            repositoriesById.put(repo.getId(), repo);
         }
 
         // Add repositories passed as parameter
         for (MavenRepository repo : repositories) {
-            repositorySuppliers.add(() -> repo);
+            repositoriesById.put(repo.getId(), repo);
         }
 
         // Add Maven Central if needed
         if (addCentralRepository) {
-            repositorySuppliers.add(() -> MavenRepository.MAVEN_CENTRAL);
+            repositoriesById.put("central", MavenRepository.MAVEN_CENTRAL);
         }
 
         // Return lazy iterable
         return () -> new Iterator<MavenRepository>() {
+            private final Iterator<MavenRepository> repoIterator = repositoriesById.values().iterator();
             private final Map<@Nullable String, MavenRepository> seen = new LinkedHashMap<>();
-            private int index = 0;
             private @Nullable MavenRepository next = findNext();
 
             private @Nullable MavenRepository findNext() {
-                while (index < repositorySuppliers.size()) {
-                    MavenRepository repo = repositorySuppliers.get(index++).get();
+                while (repoIterator.hasNext()) {
+                    MavenRepository repo = repoIterator.next();
                     MavenRepository normalized = normalizeRepository(repo, ctx, containingPom);
 
                     if (normalized != null &&
                         (acceptsVersion == null || repositoryAcceptsVersion(normalized, acceptsVersion, containingPom)) &&
-                        !seen.containsKey(normalized.getId())) {
-
-                        seen.put(normalized.getId(), normalized);
+                        seen.put(normalized.getId(), normalized) == null) {
                         return normalized;
                     }
                 }
