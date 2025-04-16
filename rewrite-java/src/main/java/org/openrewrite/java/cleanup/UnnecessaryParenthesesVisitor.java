@@ -16,7 +16,6 @@
 package org.openrewrite.java.cleanup;
 
 import lombok.EqualsAndHashCode;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
@@ -236,7 +235,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         }));
     }
 
-    private static @NotNull Space mergeSpace(Space outside, Space inside) {
+    private static Space mergeSpace(Space outside, Space inside) {
         return Space.build(
                 outside.getWhitespace() + inside.getWhitespace(),
                 ListUtils.concatAll(outside.getComments(), inside.getComments()));
