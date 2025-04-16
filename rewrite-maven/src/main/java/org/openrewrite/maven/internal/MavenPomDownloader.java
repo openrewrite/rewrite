@@ -787,7 +787,7 @@ public class MavenPomDownloader {
         }
 
         // Add Maven Central if needed
-        if (addCentralRepository) {
+        if (addCentralRepository && !repositoriesById.containsKey("central")) {
             repositoriesById.put("central", MavenRepository.MAVEN_CENTRAL);
         }
 
@@ -795,7 +795,7 @@ public class MavenPomDownloader {
         return () -> new Iterator<MavenRepository>() {
             private final Iterator<MavenRepository> repoIterator = repositoriesById.values().iterator();
             private final Map<@Nullable String, MavenRepository> seen = new LinkedHashMap<>();
-            private @Nullable MavenRepository next = findNext();
+            private @Nullable MavenRepository next;
 
             private @Nullable MavenRepository findNext() {
                 while (repoIterator.hasNext()) {
@@ -813,16 +813,19 @@ public class MavenPomDownloader {
 
             @Override
             public boolean hasNext() {
-                return next != null;
+                if (next != null) {
+                    return true;
+                }
+                return (next = findNext()) != null;
             }
 
             @Override
             public MavenRepository next() {
-                if (next == null) {
+                MavenRepository result = next;
+                if (result == null) {
                     throw new NoSuchElementException();
                 }
-                MavenRepository result = next;
-                next = findNext();
+                next = null;
                 return result;
             }
         };
