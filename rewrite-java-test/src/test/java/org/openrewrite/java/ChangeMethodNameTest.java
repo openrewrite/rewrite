@@ -432,15 +432,13 @@ class ChangeMethodNameTest implements RewriteTest {
     @ParameterizedTest
     @ValueSource(strings = {"123", "  ", "\t", "this", "class", "null", "true"})
     void ignoreInvalidMethodNamesWhenCalledDownstream(String newMethodName) {
-        AdHocRecipe downstreamRecipe = new AdHocRecipe("DownStream", "downstream", false, () -> new JavaIsoVisitor<>() {
-            @Override
-            public J visit(Tree tree, ExecutionContext executionContext) {
-                return (J) new ChangeMethodName("com.abc.B singleArg(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, executionContext);
-            }
-        }, List.of(), 1);
-
         rewriteRun(
-          spec -> spec.recipe(downstreamRecipe),
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+              @Override
+              public J visit(Tree tree, ExecutionContext executionContext) {
+                  return (J) new ChangeMethodName("com.abc.B static1(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, executionContext);
+              }
+          })),
           java(b, SourceSpec::skip),
           java(
             """
