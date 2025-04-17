@@ -55,6 +55,6 @@ public class LatestMinor implements VersionComparator {
     public static Validated<LatestMinor> build(String toVersion, @Nullable String metadataPattern) {
         return "latest.minor".equalsIgnoreCase(toVersion) ?
                 Validated.valid("latestMinor", new LatestMinor(metadataPattern)) :
-                Validated.invalid("latestMinor", toVersion, "not latest release");
+                Validated.invalid("latestMinor", toVersion, "not latest minor");
     }
 }
