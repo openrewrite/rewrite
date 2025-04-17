@@ -160,7 +160,8 @@ class AddBuildPluginTest implements RewriteTest {
 
               dependencies {
               }
-              """, """
+              """,
+                """
               /*
                * License header
                */
@@ -191,7 +192,8 @@ class AddBuildPluginTest implements RewriteTest {
               // Comment
               dependencies {
               }
-              """, """
+              """,
+                """
               /*
                * License header
                */
@@ -219,7 +221,8 @@ class AddBuildPluginTest implements RewriteTest {
               /*
                * License header
                */
-              """, """
+              """,
+                """
               /*
                * License header
                */

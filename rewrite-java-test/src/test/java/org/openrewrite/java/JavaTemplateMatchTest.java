@@ -451,7 +451,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                       System.out.println(/*~~>*/(long) /*~~>*/1);
                   }
               }
-              """)
+              """
+          )
         );
     }
 
@@ -495,7 +496,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                       }
                   }
               }
-              """)
+              """
+          )
         );
     }
 
@@ -530,7 +532,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                       return i;
                   }
               }
-              """)
+              """
+          )
         );
     }
 
@@ -570,7 +573,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                   }
                   int f = 1;
               }
-              """)
+              """
+          )
         );
     }
 
@@ -597,7 +601,8 @@ class JavaTemplateMatchTest implements RewriteTest {
               @SuppressWarnings(value = {/*~~>*/"a" + "b", "c"})
               class Test {
               }
-              """)
+              """
+          )
         );
     }
 
@@ -670,7 +675,8 @@ class JavaTemplateMatchTest implements RewriteTest {
               class Test {
                   static List<Object> EMPTY_LIST = /*~~>*/Collections.emptyList();
               }
-              """)
+              """
+          )
         );
     }
 
@@ -705,7 +711,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                   static List<CharSequence> EXACT_MATCH_EXPLICIT   = /*~~>*/Collections.<CharSequence>emptyList();
                   static List<String> COLLECTION_OF_SUBTYPE        = Collections.emptyList(); // List of Dogs is not List of Animals
               }
-              """)
+              """
+          )
         );
     }
 

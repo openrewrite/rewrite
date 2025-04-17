@@ -117,7 +117,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       <release.version>17</release.version>
                   </properties>
               </project>
-              """)
+              """
+          )
         );
     }
 
@@ -161,7 +162,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                         <release.version>17</release.version>
                     </properties>
                 </project>
-                """),
+                """
+            ),
             mavenProject("example-child",
                 //language=xml
                 pomXml(
@@ -208,7 +210,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       </plugins>
                   </build>
               </project>
-              """),
+              """
+          ),
           mavenProject("example-child",
             //language=xml
             pomXml(

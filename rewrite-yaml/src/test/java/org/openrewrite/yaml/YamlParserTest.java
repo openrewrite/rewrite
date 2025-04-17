@@ -349,7 +349,8 @@ class YamlParserTest implements RewriteTest {
             - name: Elephant
             - #🦍COMMENT: unicode
             - action: Do something
-            """)
+            """
+          )
         );
     }
 
@@ -361,7 +362,8 @@ class YamlParserTest implements RewriteTest {
             - name: Elephant
             - #🦍COMMENT: 🐶unicode
             - action: Do something
-            """)
+            """
+          )
         );
     }
 
@@ -373,7 +375,8 @@ class YamlParserTest implements RewriteTest {
             - name: Elephant
             - #COMMENT: unicode
             - action: Do something
-            """)
+            """
+          )
         );
     }
 
@@ -387,7 +390,8 @@ class YamlParserTest implements RewriteTest {
             - color: Black
             - #🦍COMMENT: unicode
             - action: Escape
-            """)
+            """
+          )
         );
     }
 
@@ -401,7 +405,8 @@ class YamlParserTest implements RewriteTest {
             - color: Black
             - #🦍COMMENT: 🎱unicode
             - action: Escape
-            """)
+            """
+          )
         );
     }
 }

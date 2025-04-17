@@ -42,7 +42,8 @@ class FindDependencyTest implements RewriteTest {
           dependencies {
               api "org.openrewrite:rewrite-core:latest.release"
           }
-          """, """
+          """,
+                """
           plugins {
               id 'java-library'
           }
@@ -54,7 +55,7 @@ class FindDependencyTest implements RewriteTest {
           dependencies {
               /*~~>*/api "org.openrewrite:rewrite-core:latest.release"
           }
-          """));
+          """ ));
     }
 
     @Test
@@ -73,7 +74,8 @@ class FindDependencyTest implements RewriteTest {
           dependencies {
               api 'org.openrewrite:rewrite-core:latest.release'
           }
-          """, """
+          """,
+                """
           plugins {
               id 'java-library'
           }
@@ -85,7 +87,7 @@ class FindDependencyTest implements RewriteTest {
           dependencies {
               /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
           }
-          """));
+          """ ));
     }
 
     @Nested
@@ -119,7 +121,8 @@ class FindDependencyTest implements RewriteTest {
                     api "de.openrewrite:rewrite-core:${someVersion}"
                     implementation "de.openrewrite:rewrite-core:${someVersion}"
                 }
-                """, """
+                """,
+                    """
                 plugins {
                     id 'java-library'
                 }
@@ -143,7 +146,7 @@ class FindDependencyTest implements RewriteTest {
                     api "de.openrewrite:rewrite-core:${someVersion}"
                     implementation "de.openrewrite:rewrite-core:${someVersion}"
                 }
-                """));
+                """ ));
         }
 
         @Test
@@ -167,7 +170,7 @@ class FindDependencyTest implements RewriteTest {
                 dependencies {
                     api "org.openrewrite:${otherVersion}:${someVersion}"
                 }
-                """));
+                """ ));
         }
 
     }
