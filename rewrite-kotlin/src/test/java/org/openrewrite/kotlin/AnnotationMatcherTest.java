@@ -34,20 +34,21 @@ class AnnotationMatcherTest implements RewriteTest {
             """
               @Deprecated("")
               class A
-              """, spec -> spec.afterRecipe(cu -> {
-                AtomicBoolean found = new AtomicBoolean(false);
-                AnnotationMatcher matcher = new AnnotationMatcher("@kotlin.Deprecated");
-                new KotlinIsoVisitor<AtomicBoolean>() {
-                    @Override
-                    public J.Annotation visitAnnotation(J.Annotation annotation, AtomicBoolean atomicBoolean) {
-                        if (matcher.matches(annotation)) {
-                            found.set(true);
+              """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    AnnotationMatcher matcher = new AnnotationMatcher("@kotlin.Deprecated");
+                    new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.Annotation visitAnnotation(J.Annotation annotation, AtomicBoolean atomicBoolean) {
+                            if (matcher.matches(annotation)) {
+                                found.set(true);
+                            }
+                            return super.visitAnnotation(annotation, atomicBoolean);
                         }
-                        return super.visitAnnotation(annotation, atomicBoolean);
-                    }
-                }.visit(cu, found);
-                assertThat(found.get()).isTrue();
-            })
+                    }.visit(cu, found);
+                    assertThat(found.get()).isTrue();
+                })
           )
         );
     }

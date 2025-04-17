@@ -503,7 +503,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       }
                   }
               }
-              """, """
+              """,
+                """
               plugins {
                   id 'java'
               }
@@ -546,7 +547,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
-              """, """
+              """,
+                """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
@@ -580,7 +582,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
-              """, """
+              """,
+                """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
@@ -616,7 +619,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
-              """, """
+              """,
+                """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'

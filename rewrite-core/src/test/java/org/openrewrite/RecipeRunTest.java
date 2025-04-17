@@ -39,9 +39,10 @@ class RecipeRunTest implements RewriteTest {
             }), text(
                 """
             replace_me
-            """, """
+            """,
+                """
             replacement
-            """));
+            """ ));
     }
 
 
