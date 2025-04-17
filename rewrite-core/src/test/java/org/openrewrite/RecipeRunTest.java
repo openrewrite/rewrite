@@ -46,7 +46,7 @@ class RecipeRunTest implements RewriteTest {
 
 
     @Test
-    void testDelegateRecipeWithOnComplete() {
+    void delegateRecipeWithOnComplete() {
         ExecutionContext ctx = new InMemoryExecutionContext();
         rewriteRun(recipeSpec -> recipeSpec.recipe(new DelegatingRecipe()).executionContext(ctx).typeValidationOptions(TypeValidation.none()));
         assertThat(ctx.<String>getMessage("org.openrewrite.recipe.oncomplete")).isEqualTo("with delegate recipe.");
