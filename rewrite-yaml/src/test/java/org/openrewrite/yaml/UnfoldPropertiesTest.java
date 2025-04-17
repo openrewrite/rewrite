@@ -138,4 +138,89 @@ class UnfoldPropertiesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void exclusionWithSubSetOfKey() {
+        rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(List.of("com.service"))),
+          yaml(
+            """
+              logging.level.com.service.A: DEBUG
+              logging.level.com.service.B: INFO
+              logging.level.com.another.package: INFO
+              """,
+            """
+              logging:
+                level:
+                  com.service:
+                    A: DEBUG
+                    B: INFO
+                  com.another.package: INFO
+              """
+          )
+        );
+    }
+
+    @Test
+    void exclusionWithRegex() {
+        rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(List.of("com.*"))),
+          yaml(
+            """
+              A.B:
+                com.some.service: DEBUG
+                com.another.package: INFO
+              """,
+            """
+             A:
+               B:
+                 com.some.service: DEBUG
+                 com.another.package: INFO
+             """
+          )
+        );
+    }
+
+    @Test
+    void exclusionWithParentAndRegex() {
+        rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(List.of("[logging.level]->.*"))),
+          yaml(
+            """
+              logging.level:
+                com.desjardins.financementengagementcreditrotatif.externe.sic.service: DEBUG
+                com.another.package: INFO
+              """,
+            """
+              logging:
+                level:
+                  com.desjardins.financementengagementcreditrotatif.externe.sic.service: DEBUG
+                  com.another.package: INFO
+              """
+          )
+        );
+    }
+
+    @Test
+    void sameBlocks() {
+        rewriteRun(
+          yaml(
+            """
+              logging.level:
+                com.first.package: INFO
+              
+              logging.level.com.another.package: DEBUG
+              """,
+            """
+              logging:
+                level:
+                  com:
+                    first:
+                      package: INFO
+                    another:
+                      package: DEBUG
+              """
+          )
+        );
+    }
 }
