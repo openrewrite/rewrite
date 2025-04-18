@@ -111,4 +111,41 @@ class AddPropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addPropertyAfterDeleteProperty() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: org.openrewrite.testsuite.AddPropertyAfterDeleteProperty
+                displayName: test
+                description: test.
+                recipeList:
+                  - org.openrewrite.properties.DeleteProperty:
+                      propertyKey: dog
+                  - org.openrewrite.gradle.AddProperty:
+                      key: cat
+                      value: true
+                      overwrite: true
+              """,
+            "org.openrewrite.testsuite.AddPropertyAfterDeleteProperty"),
+          buildGradle("plugins { id 'java' }"),
+          properties(
+            //language=properties
+            """
+              aaa=true
+              dog=false
+              dog=true
+              zzz=true
+              """,
+            //language=properties
+            """
+              aaa=true
+              cat=true
+              zzz=true
+              """,
+            spec -> spec.path("gradle.properties")
+          ));
+    }
 }
