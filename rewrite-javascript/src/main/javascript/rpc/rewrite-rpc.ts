@@ -77,7 +77,7 @@ export class RewriteRpc {
             );
         });
 
-        let remoteObject = await q.receive<P>(this.localObjects.get(id), (before: any) => {
+        const remoteObject = await q.receive<P>(this.localObjects.get(id), (before: any) => {
             return RpcCodecs.forInstance(before)?.rpcReceive(before, q) ?? before;
         });
 

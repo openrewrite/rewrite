@@ -31,7 +31,7 @@ export const JsonKind = {
 
 export type JsonKey = Identifier | Literal
 
-export type JsonValue = JsonArray | Empty | JsonObject
+export type JsonValue = JsonArray | Empty | JsonObject | Literal
 
 const jsonKindValues = new Set(Object.values(JsonKind));
 

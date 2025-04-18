@@ -1,6 +1,6 @@
 {
   "name": "@openrewrite/rewrite",
-  "version": "8.50.0-20250408.164310",
+  "version": "8.50.0-20250416.101721",
   "license": "Moderne Source Available License",
   "description": "OpenRewrite JavaScript.",
   "homepage": "https://github.com/openrewrite/rewrite",

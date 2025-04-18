@@ -21,3 +21,4 @@ tsconfig.build.tsbuildinfo
 /openrewrite-rewrite-*.tgz
 
 server.log
+npm.token
