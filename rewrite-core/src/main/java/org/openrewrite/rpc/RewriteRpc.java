@@ -31,6 +31,7 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -41,6 +42,13 @@ public class RewriteRpc {
 
     private int batchSize = 10;
     private Duration timeout = Duration.ofMinutes(1);
+
+    /**
+     * Configures the {@link ExecutionContext} that is created for executing
+     * recipe runs.
+     */
+    private Consumer<ExecutionContext> executionContext = ctx -> {
+    };
 
     /**
      * Keeps track of the local and remote state of objects that are used in
@@ -97,6 +105,11 @@ public class RewriteRpc {
         return this;
     }
 
+    public RewriteRpc executionContext(Consumer<ExecutionContext> executionContext) {
+        this.executionContext = executionContext;
+        return this;
+    }
+
     public void shutdown() {
         jsonRpc.shutdown();
     }
@@ -122,7 +135,7 @@ public class RewriteRpc {
         // asks for it, we know what to send.
         localObjects.put(sourceFile.getId().toString(), sourceFile);
 
-        String pId = maybeUnwrapExecutionContext(p);
+        String pId = getIdForVisitorParameter(p);
         List<String> cursorIds = getCursorIds(cursor);
 
         return send("Visit", new Visit(visitorName, null, sourceFile.getId().toString(), pId, cursorIds),
@@ -130,7 +143,7 @@ public class RewriteRpc {
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
-        String ctxId = maybeUnwrapExecutionContext(ctx);
+        String ctxId = getIdForVisitorParameter(ctx);
         List<String> generated = send("Generate", new Generate(remoteRecipeId, ctxId),
                 GenerateResponse.class);
         if (!generated.isEmpty()) {
@@ -141,24 +154,12 @@ public class RewriteRpc {
         return emptyList();
     }
 
-    /**
-     * If the p object is a DelegatingExecutionContext, unwrap it to get the underlying
-     * ExecutionContext
-     *
-     * @param p   A visitor parameter, which may or may not be an ExecutionContext
-     * @param <P> The type of p
-     * @return The ID of p as represented in the local object cache.
-     */
-    private <P> String maybeUnwrapExecutionContext(P p) {
-        Object p2 = p;
-        while (p2 instanceof DelegatingExecutionContext) {
-            p2 = ((DelegatingExecutionContext) p2).getDelegate();
+    private <P> String getIdForVisitorParameter(P p) {
+        if (p instanceof ExecutionContext) {
+            return "org.openrewrite.ExecutionContext";
         }
-        String pId = localObjectIds.computeIfAbsent(p2, p3 -> SnowflakeId.generateId());
-        if (p2 instanceof ExecutionContext) {
-            ((ExecutionContext) p2).putMessage("org.openrewrite.rpc.id", pId);
-        }
-        localObjects.put(pId, p2);
+        String pId = localObjectIds.computeIfAbsent(p, p2 -> SnowflakeId.generateId());
+        localObjects.put(pId, p);
         return pId;
     }
 

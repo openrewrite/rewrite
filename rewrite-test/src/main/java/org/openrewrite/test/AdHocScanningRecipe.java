@@ -26,6 +26,7 @@ import org.openrewrite.internal.StringUtils;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 @Value
@@ -45,10 +46,11 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
     Boolean causesAnotherCycle;
 
     @With
-    Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
-
     @Nullable
+    transient Function<Recipe, TreeVisitor<?, ExecutionContext>> getVisitor;
+
     @With
+    @Nullable
     Supplier<Collection<SourceFile>> generator;
 
     @With
@@ -90,7 +92,7 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
     }
 
     @Override
-    public @Nullable Void getInitialValue(ExecutionContext ctx) {
+    public Void getInitialValue(ExecutionContext ctx) {
         return null;
     }
 
@@ -106,6 +108,9 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Void acc) {
-        return getVisitor.get();
+        if (getVisitor == null) {
+            return super.getVisitor(acc);
+        }
+        return getVisitor.apply(this);
     }
 }
