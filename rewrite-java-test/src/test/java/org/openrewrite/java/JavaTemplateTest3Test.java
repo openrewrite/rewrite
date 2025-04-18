@@ -392,7 +392,8 @@ class JavaTemplateTest3Test implements RewriteTest {
                   public A acceptString(String s) { return this; }
                   public A someOtherMethod() { return this; }
               }
-              """, SourceSpec::skip
+              """,
+                SourceSpec::skip
           ),
           java(
             """
@@ -441,7 +442,8 @@ class JavaTemplateTest3Test implements RewriteTest {
                   public void method(int[] val) {}
                   public void method(int[] val1, String val2) {}
               }
-              """, SourceSpec::skip
+              """,
+                SourceSpec::skip
           ),
           java(
             """

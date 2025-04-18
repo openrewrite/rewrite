@@ -23,9 +23,19 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
+import java.util.function.Predicate;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeMethodName extends Recipe {
+
+    private static final String VALID_JAVA_METHOD_PATTERN = "^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*$";
+    private static final Predicate<String> IS_NOT_RESERVED_KEYWORD = s -> !JavaKeywordUtils.isReservedKeyword(s);
+    private static final Predicate<String> IS_NOT_RESERVED_LITERAL = s -> !JavaKeywordUtils.isReservedLiteral(s);
+    private static final Predicate<String> IS_VALID_METHOD_PATTERN = s -> s.matches(VALID_JAVA_METHOD_PATTERN);
+    private static final Predicate<String> IS_VALID_METHOD_NAME = IS_NOT_RESERVED_KEYWORD
+          .and(IS_NOT_RESERVED_LITERAL)
+          .and(IS_VALID_METHOD_PATTERN);
 
     @Option(displayName = "Method pattern",
             description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
@@ -67,7 +77,20 @@ public class ChangeMethodName extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        return super.validate().and(MethodMatcher.validate(methodPattern));
+        return super.validate()
+              .and(MethodMatcher.validate(methodPattern))
+              .and(Validated.test("newMethodName",
+                    "should not be a Java Reserved Keyword.",
+                    newMethodName,
+                    IS_NOT_RESERVED_KEYWORD))
+              .and(Validated.test("newMethodName",
+                    "should not be a Java Reserved Literal.",
+                    newMethodName,
+                    IS_NOT_RESERVED_LITERAL))
+              .and(Validated.test("newMethodName",
+                    "should be a valid Java method name.",
+                    newMethodName,
+                    IS_VALID_METHOD_PATTERN));
     }
 
     @Override
@@ -96,6 +119,14 @@ public class ChangeMethodName extends Recipe {
 
         return Preconditions.check(condition, new JavaIsoVisitor<ExecutionContext>() {
             private final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
+
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+                if (IS_VALID_METHOD_NAME.test(newMethodName)) {
+                    return super.isAcceptable(sourceFile, executionContext);
+                }
+                return false;
+            }
 
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {

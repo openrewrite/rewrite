@@ -1319,7 +1319,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       </pluginManagement>
                   </build>
               </project>
-              """, SourceSpec::skip),
+              """,
+                SourceSpec::skip),
           mavenProject("child", pomXml(
               """
                 <project>
@@ -1399,7 +1400,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       </pluginManagement>
                   </build>
               </project>
-              """, SourceSpec::skip),
+              """,
+                SourceSpec::skip),
           mavenProject("child", pomXml(
               """
                 <project>
@@ -1795,7 +1797,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </plugins>
                 </build>
             </project>
-            """, """
+            """,
+                """
             <project>
                 <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -1851,7 +1854,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </dependency>
                 </dependencies>
             </project>
-            """, """
+            """,
+                """
             <project>
                 <parent>
                     <groupId>org.springframework.boot</groupId>
