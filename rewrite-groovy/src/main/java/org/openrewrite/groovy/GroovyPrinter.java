@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 import static org.openrewrite.groovy.internal.Delimiter.DOUBLE_QUOTE_STRING;
+import static org.openrewrite.groovy.tree.G.Unary.Type.Spread;
 
 public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private final GroovyJavaPrinter delegate = new GroovyJavaPrinter();
@@ -130,6 +131,21 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         visitContainer("[", mapLiteral.getPadding().getElements(), GContainer.Location.MAP_LITERAL_ELEMENTS, ",", "]", p);
         afterSyntax(mapLiteral, p);
         return mapLiteral;
+    }
+
+    @Override
+    public J visitUnary(G.Unary unary, PrintOutputCapture<P> p) {
+        beforeSyntax(unary, Space.Location.UNARY_PREFIX, p);
+        switch (unary.getOperator()) {
+            case Spread:
+                p.append("*");
+                visit(unary.getExpression(), p);
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown unary operator.");
+        }
+        afterSyntax(unary, p);
+        return unary;
     }
 
     @Override

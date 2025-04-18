@@ -25,6 +25,20 @@ import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyVisitorTest implements RewriteTest {
 
+    @Test
+    void spreadOperator() {
+        rewriteRun(groovy(
+          """
+            class A {
+                static void main(String[] argv) {
+                    def l = [1,2,3]
+                    System.out.printf("%d, %d, %d", *l);
+                }
+            }
+            """
+        ));
+    }
+
     @DocumentExample
     @Test
     void autoFormatIncludesOmitParentheses() {
