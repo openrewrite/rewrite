@@ -112,7 +112,8 @@ class NoStaticImportTest implements RewriteTest {
                     }
                   }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -130,7 +131,8 @@ class NoStaticImportTest implements RewriteTest {
                     
                     boolean hasNext();
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -146,7 +148,8 @@ class NoStaticImportTest implements RewriteTest {
                         return false;
                     }
                 }
-                """),
+                """
+              ),
               java(
                     """
                 package org.example;
@@ -156,7 +159,8 @@ class NoStaticImportTest implements RewriteTest {
                         return foo();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -176,7 +180,8 @@ class NoStaticImportTest implements RewriteTest {
                         method0();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -193,7 +198,8 @@ class NoStaticImportTest implements RewriteTest {
                         super();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -214,7 +220,8 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -235,7 +242,8 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -256,7 +264,8 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -280,7 +289,8 @@ class NoStaticImportTest implements RewriteTest {
                         }.run();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -304,7 +314,8 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """, """
+                """,
+                    """
                 package org.openrewrite.java;
                                 
                 public class Test {
@@ -317,7 +328,8 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
     }
 }

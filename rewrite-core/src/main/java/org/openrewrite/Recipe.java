@@ -364,6 +364,9 @@ public abstract class Recipe implements Cloneable {
      */
     @Incubating(since = "8.48.0")
     public void onComplete(ExecutionContext ctx) {
+        if (this instanceof DelegatingRecipe) {
+            ((DelegatingRecipe) this).getDelegate().onComplete(ctx);
+        }
     }
 
     /**

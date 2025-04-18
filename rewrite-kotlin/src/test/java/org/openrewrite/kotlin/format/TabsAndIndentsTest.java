@@ -2118,7 +2118,8 @@ class TabsAndIndentsTest implements RewriteTest {
             package org.a
 
             open class A {}
-            """),
+            """
+          ),
           kotlin(
             """
               package org.b

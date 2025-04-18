@@ -35,7 +35,8 @@ class KTSTest implements RewriteTest {
                 """
             var x = 5
             x += 1 /*C1*/
-            """)
+            """
+          )
         );
     }
 
@@ -45,7 +46,8 @@ class KTSTest implements RewriteTest {
           kotlinScript(
                 """
             println("foo")
-            """)
+            """
+          )
         );
     }
 
@@ -58,7 +60,8 @@ class KTSTest implements RewriteTest {
             for (item in items) {
                 println(item)
             }
-            """)
+            """
+          )
         );
     }
 
@@ -78,17 +81,18 @@ class KTSTest implements RewriteTest {
                     url = uri("https://maven.springframework.org/release")
                 }
             }
-            """, spec -> spec.afterRecipe(cu -> {
-              AtomicInteger count = new AtomicInteger();
-                new KotlinIsoVisitor<AtomicInteger>() {
-                    @Override
-                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicInteger i) {
-                        i.incrementAndGet();
-                        return super.visitMethodInvocation(method, i);
-                    }
-                }.visit(cu, count);
-                assertThat(count.get()).isEqualTo(7);
-          }))
+            """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicInteger count = new AtomicInteger();
+                    new KotlinIsoVisitor<AtomicInteger>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicInteger i) {
+                            i.incrementAndGet();
+                            return super.visitMethodInvocation(method, i);
+                        }
+                    }.visit(cu, count);
+                    assertThat(count.get()).isEqualTo(7);
+                }))
         );
     }
 }

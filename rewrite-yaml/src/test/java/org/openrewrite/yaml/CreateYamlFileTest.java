@@ -227,7 +227,8 @@ class CreateYamlFileTest implements RewriteTest {
           yaml(
                 """
             foo: bar
-            """, spec -> spec.path("precondition.yml")),
+            """,
+                spec -> spec.path("precondition.yml")),
           yaml(
             null,
             """
@@ -259,7 +260,8 @@ class CreateYamlFileTest implements RewriteTest {
           yaml(
                 """
             foo: bar
-            """, spec -> spec.path("precondition.yml")),
+            """,
+                spec -> spec.path("precondition.yml")),
           yaml(
             null,
             """

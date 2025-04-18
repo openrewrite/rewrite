@@ -1505,21 +1505,22 @@ class MavenParserTest implements RewriteTest {
                           </profile>
                       </profiles>
                   </project>
-                  """, spec -> spec.afterRecipe(pomXml -> {
-                      Map<String, List<ResolvedDependency>> deps =
-                        pomXml.getMarkers()
-                          .findFirst(MavenResolutionResult.class)
-                          .orElseThrow()
-                          .getDependencies()
-                          .get(Scope.Compile)
-                          .stream()
-                          .collect(groupingBy(ResolvedDependency::getArtifactId));
+                  """,
+                    spec -> spec.afterRecipe(pomXml -> {
+                                Map<String, List<ResolvedDependency>> deps =
+                                        pomXml.getMarkers()
+                                                .findFirst(MavenResolutionResult.class)
+                                                .orElseThrow()
+                                                .getDependencies()
+                                                .get(Scope.Compile)
+                                                .stream()
+                                                .collect(groupingBy(ResolvedDependency::getArtifactId));
 
-                      assertThat(deps)
-                        .hasEntrySatisfying("commons-io", rds -> assertThat(rds)
-                          .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.11.0"));
-                  }
-                )
+                                assertThat(deps)
+                                        .hasEntrySatisfying("commons-io", rds -> assertThat(rds)
+                                                .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.11.0"));
+                            }
+                    )
               )
             );
         }
@@ -2144,7 +2145,8 @@ class MavenParserTest implements RewriteTest {
                 </modules>
               
               </project>
-              """, spec -> spec.path("pom.xml")),
+              """,
+                spec -> spec.path("pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -2162,7 +2164,8 @@ class MavenParserTest implements RewriteTest {
                   <relativePath>../pom.xml</relativePath>
                 </parent>
               </project>
-              """, spec -> spec.path("rest/pom.xml"))
+              """,
+                spec -> spec.path("rest/pom.xml"))
         );
     }
 
@@ -2192,7 +2195,8 @@ class MavenParserTest implements RewriteTest {
                   <revision>0.0.0-SNAPSHOT</revision>
                 </properties>
               </project>
-              """, spec -> spec.path("pom.xml")),
+              """,
+                spec -> spec.path("pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -2223,7 +2227,8 @@ class MavenParserTest implements RewriteTest {
                   </dependencies>
                 </dependencyManagement>
               </project>
-              """, spec -> spec.path("parent/pom.xml")),
+              """,
+                spec -> spec.path("parent/pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -2253,7 +2258,8 @@ class MavenParserTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """, spec -> spec.path("app/pom.xml")),
+              """,
+                spec -> spec.path("app/pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -2271,7 +2277,8 @@ class MavenParserTest implements RewriteTest {
                   <relativePath>../parent/pom.xml</relativePath>
                 </parent>
               </project>
-              """, spec -> spec.path("rest/pom.xml")),
+              """,
+                spec -> spec.path("rest/pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -2289,7 +2296,8 @@ class MavenParserTest implements RewriteTest {
                   <relativePath>../parent/pom.xml</relativePath>
                 </parent>
               </project>
-              """, spec -> spec.path("web/pom.xml"))
+              """,
+                spec -> spec.path("web/pom.xml"))
         );
     }
 
@@ -2320,7 +2328,8 @@ class MavenParserTest implements RewriteTest {
                   <revision>0.0.0-SNAPSHOT</revision>
                 </properties>
               </project>
-              """, spec -> spec.path("pom.xml")),
+              """,
+                spec -> spec.path("pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -2351,7 +2360,8 @@ class MavenParserTest implements RewriteTest {
                   </dependencies>
                 </dependencyManagement>
               </project>
-              """, spec -> spec.path("parent/pom.xml")),
+              """,
+                spec -> spec.path("parent/pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -2387,7 +2397,8 @@ class MavenParserTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """, """
+              """,
+                """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -2421,7 +2432,8 @@ class MavenParserTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """, spec -> spec.path("app/pom.xml")),
+              """,
+                spec -> spec.path("app/pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -2439,7 +2451,8 @@ class MavenParserTest implements RewriteTest {
                   <relativePath>../parent/pom.xml</relativePath>
                 </parent>
               </project>
-              """, spec -> spec.path("rest/pom.xml")),
+              """,
+                spec -> spec.path("rest/pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -2457,7 +2470,8 @@ class MavenParserTest implements RewriteTest {
                   <relativePath>../parent/pom.xml</relativePath>
                 </parent>
               </project>
-              """, spec -> spec.path("web/pom.xml"))
+              """,
+                spec -> spec.path("web/pom.xml"))
         );
     }
 
@@ -2501,7 +2515,8 @@ class MavenParserTest implements RewriteTest {
               
                 <artifactId>sub</artifactId>
               </project>
-              """, spec -> spec.path("sub/pom.xml"))
+              """,
+                spec -> spec.path("sub/pom.xml"))
         );
     }
 
@@ -3716,6 +3731,7 @@ class MavenParserTest implements RewriteTest {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                   assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+                  assert results.getParent() != null;
                   assertThat(results.getParent().getPom().getVersion()).isEqualTo("${revision}");
                   assertThat(results.getParent().getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               })
@@ -3842,10 +3858,11 @@ class MavenParserTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """, spec -> spec.afterRecipe(pom -> {
-                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                assertThat(resolution.findDependencies("ch.qos.logback", "logback-core", Scope.Compile)).isEmpty();
-            })
+              """,
+                spec -> spec.afterRecipe(pom -> {
+                    MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    assertThat(resolution.findDependencies("ch.qos.logback", "logback-core", Scope.Compile)).isEmpty();
+                })
           ));
     }
 
@@ -3873,7 +3890,8 @@ class MavenParserTest implements RewriteTest {
                 </dependencies>
               </dependencyManagement>
             </project>
-            """),
+            """
+          ),
           mavenProject("sam-bom",
             pomXml(
               //language=xml
@@ -3942,5 +3960,44 @@ class MavenParserTest implements RewriteTest {
                     .isEqualTo("8.0.0");
               })))
           );
+    }
+
+    @Test
+    void jaxbRuntime() {
+        rewriteRun(
+          pomXml(
+                """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany</groupId>
+                <artifactId>my-jaxb</artifactId>
+                <version>1.0-SNAPSHOT</version>
+
+                <dependencies>
+                  <dependency>
+                      <groupId>org.glassfish.jaxb</groupId>
+                      <artifactId>jaxb-runtime</artifactId>
+                      <version>2.3.9</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+                spec -> spec.afterRecipe(pom -> {
+                            MavenResolutionResult mrr = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                            assertThat(mrr.getDependencies().get(Scope.Runtime))
+                                    .map(ResolvedDependency::getGav)
+                                    .map(ResolvedGroupArtifactVersion::asGroupArtifactVersion)
+                                    .as("At one point this test failed with no version number found for jakarta.xml.bind-api because ResolvedPom was not considering classifiers as significant for dependency management")
+                                    .containsExactlyInAnyOrder(
+                                            new GroupArtifactVersion("org.glassfish.jaxb", "jaxb-runtime", "2.3.9"),
+                                            new GroupArtifactVersion("jakarta.xml.bind", "jakarta.xml.bind-api", "2.3.3"),
+                                            new GroupArtifactVersion("org.glassfish.jaxb", "txw2", "2.3.9"),
+                                            new GroupArtifactVersion("com.sun.istack", "istack-commons-runtime", "3.0.12"),
+                                            new GroupArtifactVersion("com.sun.activation", "jakarta.activation", "1.2.2")
+                                    );
+                        }
+                )
+          )
+        );
     }
 }

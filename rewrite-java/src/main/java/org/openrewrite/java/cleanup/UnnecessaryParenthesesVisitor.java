@@ -220,9 +220,15 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, P p) {
         J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, p);
-        if (mi.getSelect() instanceof J.Parentheses &&
-                !(((J.Parentheses<?>) mi.getSelect()).getTree() instanceof J.Binary)) {
-            Expression tree = (Expression) ((J.Parentheses<?>) mi.getSelect()).getTree();
+        if (mi.getSelect() instanceof J.Parentheses) {
+            J.Parentheses<?> parentheses = (J.Parentheses<?>) mi.getSelect();
+            if (parentheses.getTree() instanceof J.Assignment ||
+                    parentheses.getTree() instanceof J.Binary ||
+                    parentheses.getTree() instanceof J.Ternary ||
+                    parentheses.getTree() instanceof J.TypeCast) {
+                return mi;
+            }
+            Expression tree = (Expression) parentheses.getTree();
             mi = mi.withSelect(tree.withPrefix((mergeSpace(mi.getSelect().getPrefix(), tree.getPrefix()))));
         }
         return mi.withArguments(ListUtils.map(mi.getArguments(), arg -> {

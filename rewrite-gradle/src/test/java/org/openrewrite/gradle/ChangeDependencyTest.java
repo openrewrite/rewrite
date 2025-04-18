@@ -279,7 +279,8 @@ class ChangeDependencyTest implements RewriteTest {
               dependencies {
                   runtimeOnly 'com.mysql:mysql-connector-j'
               }
-              """)
+              """
+          )
         );
     }
 
@@ -317,7 +318,8 @@ class ChangeDependencyTest implements RewriteTest {
               dependencies {
                   runtimeOnly group: 'com.mysql', name: 'mysql-connector-j'
               }
-              """)
+              """
+          )
         );
     }
 
@@ -355,7 +357,8 @@ class ChangeDependencyTest implements RewriteTest {
               dependencies {
                   runtimeOnly 'com.mysql:mysql-connector-j:8.0.33'
               }
-              """)
+              """
+          )
         );
     }
 

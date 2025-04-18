@@ -560,7 +560,8 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
           text(
             """
               /gradle/**
-              """, """
+              """,
+                """
               /gradle/**
               !/gradle/wrapper/
               /gradle/wrapper/**

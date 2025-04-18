@@ -194,16 +194,17 @@ class MethodDeclarationTest implements RewriteTest {
           groovy(
             """
               def foo(String[][] s) {}
-              """, spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
-                    if (arrayType.getElementType() instanceof J.ArrayType) {
-                        assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
-                        assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
+              """,
+                spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                        if (arrayType.getElementType() instanceof J.ArrayType) {
+                            assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
+                            assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
+                        }
+                        return super.visitArrayType(arrayType, o);
                     }
-                    return super.visitArrayType(arrayType, o);
-                }
-            }.visit(cu, 0))
+                }.visit(cu, 0))
           )
         );
     }

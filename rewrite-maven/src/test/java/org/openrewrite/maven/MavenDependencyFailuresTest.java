@@ -311,7 +311,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """)
+              """
+          )
         );
     }
 

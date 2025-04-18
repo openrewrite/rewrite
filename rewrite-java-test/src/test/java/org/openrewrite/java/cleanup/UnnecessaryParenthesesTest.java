@@ -1100,13 +1100,40 @@ class UnnecessaryParenthesesTest implements RewriteTest {
 
         @Test
         void methodInvocationSelect() {
+            //language=java
             rewriteRun(
-              //language=java
               java(
                 """
-                  class Test {
+                  class A {
                     void f(String s, int x) {
                       (s + x).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class B {
+                    void f(String s, boolean b) {
+                      (b ? s : "not s").toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class C {
+                    void f(Object x) {
+                      ((String) x).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class D {
+                    void f(Object x) {
+                      (x = "Foo").toString();
                     }
                   }
                   """

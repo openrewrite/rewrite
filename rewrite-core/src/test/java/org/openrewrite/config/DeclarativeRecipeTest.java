@@ -23,11 +23,13 @@ import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.ChangeText;
+import org.openrewrite.text.Find;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.net.URI;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -262,6 +264,15 @@ class DeclarativeRecipeTest implements RewriteTest {
             .expectedCyclesThatMakeChanges(1),
           text("1")
         );
+    }
+
+    @Test
+    void exposesUnderlyingDataTables() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
+          "test", emptySet(), null, URI.create("dummy"), true, Collections.emptyList());
+        dr.addUninitialized(new Find("sam", null, null, null, null, null, null));
+        dr.initialize(List.of(), Map.of());
+        assertThat(dr.getDataTableDescriptors()).anyMatch(it -> "org.openrewrite.table.TextMatches".equals(it.getName()));
     }
 
     @Test
