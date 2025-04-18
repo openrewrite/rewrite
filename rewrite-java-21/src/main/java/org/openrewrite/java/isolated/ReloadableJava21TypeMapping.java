@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.java.isolated.internal.JavacTreeMaker.TypeTag.matchesUnknownType;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -47,7 +48,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     private final JavaTypeCache typeCache;
 
     public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
-        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
+        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || matchesUnknownType(type) ||
                 type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
@@ -480,8 +481,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     if (targetClass.getSimpleName().equals("RecoveryErrorType")) {
                         Field field = targetClass.getDeclaredField("candidateSymbol");
                         field.setAccessible(true);
-                        Symbol originalSymbol = (Symbol) field.get(selectType);
-                        return methodInvocationType(selectType.getOriginalType(), originalSymbol);
+                        return methodInvocationType(selectType.getOriginalType(), (Symbol) field.get(selectType));
                     }
                 }
             } catch (Exception e) {
@@ -489,7 +489,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             }
         }
 
-        if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
+        if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR
+                || matchesUnknownType(symbol.type)) {
             return null;
         }
 
@@ -554,7 +555,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     exceptionTypes.add(javaType);
                 }
             }
-        } else if (selectType instanceof Type.UnknownType) {
+        } else if (matchesUnknownType(selectType)) {
             returnType = JavaType.Unknown.getInstance();
         }
 
@@ -660,11 +661,11 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             JavaType.FullyQualified resolvedDeclaringType = declaringType;
-            if (declaringType == null) {
-                if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
+            if (declaringType == null && (methodSymbol.owner instanceof Symbol.ClassSymbol
+                    || methodSymbol.owner instanceof Symbol.TypeVariableSymbol)) {
                     resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
                 }
-            }
+
 
             if (resolvedDeclaringType == null) {
                 return null;
@@ -707,6 +708,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         try {
             classSymbol.complete();
         } catch (Symbol.CompletionFailure ignore) {
+            // Ignore
         }
     }
 
