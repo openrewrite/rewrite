@@ -17,6 +17,8 @@ package org.openrewrite.groovy.tree;
 
 public class GSpace {
     public enum Location {
+        UNARY_PREFIX,
+        UNARY_OPERATOR,
         BINARY_PREFIX,
         BINARY_OPERATOR,
         BINARY_SUFFIX,
