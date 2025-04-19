@@ -122,6 +122,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         maybeAddImport(fullyQualifiedName, null, onlyIfReferenced);
     }
 
+    public void addExplicitImport(String fullyQualifiedName) {
+       JavaVisitor<P> visitor = service(ImportService.class).addExplicitImport(fullyQualifiedName);
+        if (!getAfterVisit().contains(visitor)) {
+            doAfterVisit(visitor);
+        }
+    }
+
     public void maybeAddImport(String fullyQualifiedName, @Nullable String member, boolean onlyIfReferenced) {
         int lastDotIdx = fullyQualifiedName.lastIndexOf('.');
         String packageName = lastDotIdx != -1 ? fullyQualifiedName.substring(0, lastDotIdx) : null;
