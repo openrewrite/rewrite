@@ -19,4 +19,34 @@ public class AddExplicitImportTest implements RewriteTest {
             class Dummy {}
             """));
     }
+
+    @Test
+    void addExplicitImportWhenExistingImports() {
+        rewriteRun(spec -> spec.recipe(new AddExplicitImport("foo.bar"))
+          , java("""
+            import xyz.bbb.ccc.D;
+
+            class Dummy {}
+            """, """
+            import xyz.bbb.ccc.D;
+            import foo.bar;
+
+            class Dummy {}
+            """));
+    }
+
+    @Test
+    void addStaticImports() {
+        rewriteRun(spec -> spec.recipe(new AddExplicitImport("static foo.bar.staticMethod"))
+          , java("""
+            import xyz.bbb.ccc.D;
+
+            class Dummy {}
+            """, """
+            import xyz.bbb.ccc.D;
+            import static foo.bar.staticMethod;
+
+            class Dummy {}
+            """));
+    }
 }

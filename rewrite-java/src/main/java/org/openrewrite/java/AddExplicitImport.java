@@ -22,6 +22,11 @@ public class AddExplicitImport extends Recipe {
     public String getDisplayName() {
         return "Add explicit imports";
     }
+
+    @Override
+    public int maxCycles() {
+        return 1;
+    }
     @Override
     public String getDescription() {
         return "This recipe adds an explicit import to a single Java file.";
@@ -34,7 +39,7 @@ public class AddExplicitImport extends Recipe {
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 if (javaSourceFile != null) {
-                    maybeAddImport(imports, false);
+                    addExplicitImport(imports);
                 }
                 return super.visitCompilationUnit(cu, executionContext);
             }
