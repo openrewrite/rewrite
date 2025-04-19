@@ -1,0 +1,45 @@
+{
+  "name": "@openrewrite/rewrite",
+  "version": "8.50.0-20250408.164310",
+  "license": "Moderne Source Available License",
+  "description": "OpenRewrite JavaScript.",
+  "homepage": "https://github.com/openrewrite/rewrite",
+  "main": "./dist/src/main/javascript/index.js",
+  "types": "./dist/src/main/javascript/index.d.ts",
+  "files": [
+    "dist/src/main/javascript/**"
+  ],
+  "exports": {
+    ".": "./dist/src/main/javascript/index.js",
+    "./json": "./dist/src/main/javascript/json/index.js",
+    "./rpc": "./dist/src/main/javascript/rpc/index.js",
+    "./test": "./dist/src/main/javascript/test/index.js"
+  },
+  "scripts": {
+    "build": "rm -rf ./dist && tsc --build tsconfig.build.json",
+    "dev": "tsc --watch -p tsconfig.json",
+    "test": "npm run build && jest",
+    "start": "npm run build && node ./dist/src/main/javascript/rpc/server.js"
+  },
+  "dependencies": {
+    "@akashrajpurohit/snowflake-id": "^2.0.0",
+    "@types/node": "^22.5.4",
+    "dedent": "^1.5.3",
+    "diff": "^7.0.0",
+    "immer": "^10.1.1",
+    "typescript": "^5.6.2",
+    "uuid": "^10.0.0",
+    "vscode-jsonrpc": "^8.2.1"
+  },
+  "devDependencies": {
+    "@types/diff": "^5.2.2",
+    "@types/jest": "^29.5.13",
+    "@types/uuid": "^10.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2"
+  },
+  "bin": {
+    "rewrite-js": "./dist/src/main/javascript/rpc/server.js"
+  }
+}
