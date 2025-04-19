@@ -569,6 +569,42 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    void arrayIsAssignableToObject() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  Object o;
+                  Object[] oa;
+                  String[] sa;
+                  int[] ia;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    J.VariableDeclarations o = (J.VariableDeclarations) classDecl.getBody().getStatements().get(0);
+                    J.VariableDeclarations oa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(1);
+                    J.VariableDeclarations sa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(2);
+                    J.VariableDeclarations ia = (J.VariableDeclarations) classDecl.getBody().getStatements().get(3);
+                    JavaType object = o.getType();
+                    JavaType objectArray = oa.getType();
+                    JavaType stringArray = sa.getType();
+                    JavaType intArray = ia.getType();
+                    assertThat(TypeUtils.isAssignableTo(object, objectArray)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(object, stringArray)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(objectArray, stringArray)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(stringArray, objectArray)).isFalse();
+                    assertThat(TypeUtils.isAssignableTo(object, intArray)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(objectArray, intArray)).isFalse();
+                    return classDecl;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
     void isAssignableToNone() {
         EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.None));
         for (JavaType.Primitive other : others) {
