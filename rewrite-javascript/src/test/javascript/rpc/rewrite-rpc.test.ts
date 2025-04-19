@@ -21,6 +21,9 @@ import {RecipeSpec} from "../../../main/javascript/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import "../example-recipe";
+import inspector from 'inspector';
+
+const isDebugging = Boolean(inspector.url());
 
 describe("RewriteRpcTest", () => {
     const spec = new RecipeSpec();
@@ -28,38 +31,32 @@ describe("RewriteRpcTest", () => {
     let server: RewriteRpc;
     let client: RewriteRpc;
 
-    const logger: rpc.Logger = {
-        error: (msg: string) => console.log(`[Error] ${msg}\n`),
-        warn: (msg: string) => console.log(`[Warn] ${msg}\n`),
-        info: (msg: string) => console.log(`[Info] ${msg}\n`),
-        log: (msg: string) => console.log(`[Log] ${msg}\n`)
-    };
-
     beforeEach(async () => {
         // Create in-memory streams to simulate the pipes.
         const clientToServer = new PassThrough();
-        clientToServer.on('data', chunk => {
-            console.debug('[server] ⇦ received:', `'${chunk.toString()}'`);
-            console.debug(`[server] ⇦ received: [${Array.from(chunk).join(", ")}]`);
-        });
+
+        if (isDebugging) {
+            clientToServer.on('data', chunk => {
+                console.debug('[server] ⇦ received:', `'${chunk.toString()}'`);
+            });
+        }
 
         const serverToClient = new PassThrough();
-        serverToClient.on('data', chunk => {
-            // console.debug('[client] ⇦ received:', `'${chunk.toString()}'`);
-        });
+        if (isDebugging) {
+            serverToClient.on('data', chunk => {
+                console.debug('[client] ⇦ received:', `'${chunk.toString()}'`);
+            });
+        }
 
         const clientConnection = rpc.createMessageConnection(
             new rpc.StreamMessageReader(serverToClient),
-            new rpc.StreamMessageWriter(clientToServer),
-            logger
+            new rpc.StreamMessageWriter(clientToServer)
         );
-        await clientConnection.trace(rpc.Trace.Verbose, logger);
         client = new RewriteRpc(clientConnection, 1);
 
         const serverConnection = rpc.createMessageConnection(
             new rpc.StreamMessageReader(clientToServer),
-            new rpc.StreamMessageWriter(serverToClient),
-            logger
+            new rpc.StreamMessageWriter(serverToClient)
         );
         server = new RewriteRpc(serverConnection);
     });

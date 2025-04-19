@@ -2,6 +2,8 @@
   "compilerOptions": {
     "target": "es2016",
     "module": "Node16",
+    "declarationMap": true,
+    "inlineSources": true,
     "sourceMap": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,

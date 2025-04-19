@@ -5,9 +5,11 @@ import {ChangeText} from "../example-recipe";
 
 describe("rewrite test", () => {
     const spec = new RecipeSpec();
-    spec.recipe = new ChangeText({text: "changed"});
 
-    test("a recipe that makes no changes", () => spec.rewriteRun(
-        text("test")
-    ));
+    test("a recipe that makes no changes", async () => {
+        spec.recipe = new ChangeText({text: "test"});
+        await spec.rewriteRun(
+            text("test")
+        )
+    });
 });
