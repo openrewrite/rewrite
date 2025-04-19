@@ -56,6 +56,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
     private final ReloadableJava8TypeMapping typeMapping;
     private final TreeScanner<J, Space> javaVisitor = new JavaVisitor();
+    
     private final Map<Integer, Javadoc.LineBreak> lineBreaks = new HashMap<>();
 
     /**
@@ -99,6 +100,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         // skip past the opening '/**'
         int i = 3;
         for (; i < source.length(); i++) {
+        
             char c = source.charAt(i);
             if (inFirstPrefix) {
                 // '*' characters are considered a part of the margin until a non '*' is parsed.

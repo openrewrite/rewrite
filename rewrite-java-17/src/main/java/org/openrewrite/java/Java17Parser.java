@@ -36,6 +36,7 @@ public class Java17Parser implements JavaParser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+
         return delegate.parseInputs(sourceFiles, relativeTo, ctx);
     }
 
@@ -95,6 +96,7 @@ public class Java17Parser implements JavaParser {
             } catch (Exception e) {
                 throw new IllegalStateException("Unable to construct Java17Parser.", e);
             }
+            
         }
     }
 }
