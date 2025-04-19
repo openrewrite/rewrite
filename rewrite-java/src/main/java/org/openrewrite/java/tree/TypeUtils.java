@@ -460,7 +460,7 @@ public class TypeUtils {
             } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
                 JavaType.Array toArray = (JavaType.Array) to;
                 JavaType.Array fromArray = (JavaType.Array) from;
-                if (toArray.getElemType() instanceof JavaType.Primitive) {
+                if (toArray.getElemType() instanceof JavaType.Primitive || fromArray.getElemType() instanceof JavaType.Primitive) {
                     return isOfType(toArray.getElemType(), fromArray.getElemType());
                 }
                 // Arrays are invariant in Java
@@ -637,7 +637,7 @@ public class TypeUtils {
         } catch (Exception e) {
             return false;
         }
-        return false;
+        return to.equals("java.lang.Object");
     }
 
     public static boolean isAssignableTo(Pattern to, @Nullable JavaType from) {
