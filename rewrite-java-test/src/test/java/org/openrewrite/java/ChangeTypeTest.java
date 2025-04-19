@@ -2083,7 +2083,6 @@ class ChangeTypeTest implements RewriteTest {
               """
           )
         );
-
     }
 
     @Test
