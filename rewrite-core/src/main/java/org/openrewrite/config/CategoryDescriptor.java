@@ -52,4 +52,6 @@ public class CategoryDescriptor {
     int priority;
 
     boolean synthetic;
+
+    Set<String> rootPackages;
 }

@@ -20,6 +20,7 @@ import org.openrewrite.internal.StringUtils;
 
 import java.net.URI;
 import java.util.Collection;
+import java.util.List;
 import java.util.Properties;
 
 import static java.util.Collections.emptyList;
@@ -124,16 +125,6 @@ class CategoryTreeTest {
     }
 
     @Test
-    void categoryRoots() {
-        CategoryTree.Root<Group> ct = categoryTree();
-        assertThat(ct.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
-          .contains(
-            "io.moderne.rewrite", "io.moderne.cloud", // because "io.moderne" is marked as a root
-            "org.openrewrite" // because "org" is marked as a root
-          );
-    }
-
-    @Test
     void getCategory() {
         CategoryTree.Root<Group> ct = categoryTree();
         assertThat(ct.getCategoryOrThrow("org", "openrewrite")).isNotNull();
@@ -171,10 +162,36 @@ class CategoryTreeTest {
           .isEqualTo(Group1);
     }
 
+    @Test
+    void mergeRootCategory() {
+        CategoryTree.Root<Integer> categoryTree = CategoryTree.build();
+        categoryTree
+          .putCategories(2, categoryRootDescriptor("io.moderne"), categoryRootDescriptor("org.openrewrite"), categoryDescriptor("org.openrewrite.java.test"), categoryDescriptor("io.moderne.java.test"))
+          .putRecipes(2, recipeDescriptor("org.openrewrite.java.test"), recipeDescriptor("io.moderne.java.test"));
+
+
+        assertThat(categoryTree.getCategory("java.test")).isNotNull();
+        assertThat(categoryTree.getCategory("org.openrewrite")).isNull();
+        assertThat(categoryTree.getCategory("org")).isNull();
+        assertThat(categoryTree.getCategory("io.moderne")).isNull();
+        assertThat(categoryTree.getCategory("io")).isNull();
+
+        assertThat(categoryTree.getCategory("java.test").getRecipes()).containsAll(List.of(
+          recipeDescriptor("org.openrewrite.java.test"),
+          recipeDescriptor("io.moderne.java.test")
+        ));
+    }
+
     private static CategoryDescriptor categoryDescriptor(String packageName) {
         return new CategoryDescriptor(StringUtils.capitalize(packageName.substring(packageName.lastIndexOf('.') + 1)),
           packageName, "", emptySet(),
-          false, CategoryDescriptor.DEFAULT_PRECEDENCE, false);
+          false, CategoryDescriptor.DEFAULT_PRECEDENCE, false, emptySet());
+    }
+
+    private static CategoryDescriptor categoryRootDescriptor(String packageName) {
+        return new CategoryDescriptor(StringUtils.capitalize(packageName.substring(packageName.lastIndexOf('.') + 1)),
+          packageName, "", emptySet(),
+          true, CategoryDescriptor.DEFAULT_PRECEDENCE, false, emptySet());
     }
 
     enum Group {

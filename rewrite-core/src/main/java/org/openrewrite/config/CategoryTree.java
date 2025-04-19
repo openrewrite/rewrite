@@ -66,7 +66,7 @@ public class CategoryTree<G> {
     public static class Root<G> extends CategoryTree<G> {
         private static final CategoryDescriptor ROOT_DESCRIPTOR = new CategoryDescriptor(
                 "ε", "", "", emptySet(), true,
-                CategoryDescriptor.LOWEST_PRECEDENCE, true);
+                CategoryDescriptor.LOWEST_PRECEDENCE, true, emptySet());
 
         private Root() {
             super();
@@ -96,9 +96,13 @@ public class CategoryTree<G> {
         }
 
         public synchronized CategoryTree.Root<G> putCategories(G group, CategoryDescriptor... categories) {
+
             synchronized (lock) {
+                List<String> rootGroups = Arrays.stream(categories).filter(CategoryDescriptor::isRoot)
+                        .map(CategoryDescriptor::getPackageName)
+                        .collect(toList());
                 for (CategoryDescriptor category : categories) {
-                    findOrAddCategory(group, category);
+                    findOrAddCategory(group, category, rootGroups);
                 }
             }
             return this;
@@ -249,9 +253,36 @@ public class CategoryTree<G> {
         return null;
     }
 
-    CategoryTree<G> findOrAddCategory(G group, CategoryDescriptor category) {
+    CategoryTree<G> findOrAddCategory(G group, CategoryDescriptor category, List<String> rootGroups) {
         String packageName = getDescriptor().getPackageName();
         String categoryPackage = category.getPackageName();
+        Set<String> roots = new HashSet<>();
+        if (category.isRoot()) {
+            return this;
+        } else {
+            List<String> possibleRoots = rootGroups.stream()
+                    .filter(categoryPackage::startsWith).collect(toList());
+            int elementCount = possibleRoots
+                    .stream().map(s -> s.length() - s.replace(".", "").length())
+                    .max(Comparator.comparingInt(s -> s)).orElse(0);
+
+            possibleRoots.stream().filter(s -> s.length() - s.replace(".", "").length() == elementCount)
+                    .forEach(s -> roots.add(s));
+
+            if (!possibleRoots.isEmpty()) {
+                String rootPrefix = possibleRoots.get(0);
+                categoryPackage = categoryPackage.replace(rootPrefix, "");
+
+                if (categoryPackage.startsWith(".")) {
+                    categoryPackage = categoryPackage.substring(1);
+                }
+                category = category.withPackageName(categoryPackage);
+
+                String finalCategoryPackage = categoryPackage;
+                subtrees.stream().filter(t -> finalCategoryPackage.startsWith(t.getDescriptor().getPackageName())).collect(toList())
+                        .forEach(s -> roots.addAll(s.getDescriptor().getRootPackages()));
+            }
+        }
 
         // same category with a potentially different descriptor coming from this group
         if (categoryPackage.equals(packageName)) {
@@ -283,10 +314,17 @@ public class CategoryTree<G> {
                                 emptySet(),
                                 false,
                                 CategoryDescriptor.LOWEST_PRECEDENCE,
-                                true
+                                true,
+                                roots
                         ));
+                    } else {
+                        CategoryDescriptor groupCategoryDescriptor = subtree.descriptorsByGroup.get(group);
+                        Set<String> knownRootPackages = groupCategoryDescriptor.getRootPackages();
+                        knownRootPackages.addAll(roots);
+                        groupCategoryDescriptor.withRootPackages(knownRootPackages);
+                        subtree.descriptorsByGroup.put(group, groupCategoryDescriptor);
                     }
-                    return subtree.findOrAddCategory(group, category);
+                    return subtree.findOrAddCategory(group, category, rootGroups);
                 }
             }
 
@@ -309,8 +347,9 @@ public class CategoryTree<G> {
                         emptySet(),
                         false,
                         CategoryDescriptor.LOWEST_PRECEDENCE,
-                        true
-                )).findOrAddCategory(group, category);
+                        true,
+                        roots
+                ), rootGroups).findOrAddCategory(group, category, rootGroups);
             }
 
             // a direct subcategory of this category
@@ -335,6 +374,7 @@ public class CategoryTree<G> {
                                                "a package, but it did not.");
         }
         String category = recipe.getName().substring(0, recipe.getName().lastIndexOf('.'));
+        List<String> rootPackageNames = this.getRootPackageNames();
         CategoryTree<G> categoryTree = findOrAddCategory(group, new CategoryDescriptor(
                 StringUtils.capitalize(category.substring(category.lastIndexOf('.') + 1)),
                 category,
@@ -342,8 +382,9 @@ public class CategoryTree<G> {
                 emptySet(),
                 false,
                 CategoryDescriptor.LOWEST_PRECEDENCE,
-                true
-        ));
+                true,
+                emptySet()
+        ), rootPackageNames);
         categoryTree.recipesByGroup.computeIfAbsent(group, g -> new CopyOnWriteArrayList<>()).add(recipe);
     }
 
@@ -382,6 +423,13 @@ public class CategoryTree<G> {
 
     public Collection<CategoryTree<G>> getCategories() {
         return getCategories(true, true);
+    }
+
+    public List<String> getRootPackageNames() {
+        return getCategories(false, false)
+                .stream().map(i -> i.getDescriptor().getRootPackages())
+                .flatMap(Set::stream)
+                .collect(toList());
     }
 
     /**
@@ -428,7 +476,8 @@ public class CategoryTree<G> {
                         emptySet(),
                         false,
                         CategoryDescriptor.LOWEST_PRECEDENCE,
-                        true
+                        true,
+                        emptySet()
                 );
             }
 
