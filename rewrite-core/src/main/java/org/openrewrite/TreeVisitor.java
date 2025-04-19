@@ -224,10 +224,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
             return defaultValue(null, p);
         }
 
-        boolean topLevel = false;
-        if (visitCount == 0) {
-            topLevel = true;
-        }
+        boolean topLevel = visitCount == 0;
 
         visitCount++;
         setCursor(new Cursor(cursor, tree));
