@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.AddImport;
+import org.openrewrite.java.AddExplicitImportVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.ShortenFullyQualifiedTypeReferences;
 import org.openrewrite.java.tree.J;
@@ -26,12 +27,21 @@ import org.openrewrite.java.tree.J;
 @Incubating(since = "8.2.0")
 public class ImportService {
 
+    public static final String STATIC_PREFIX = "static ";
     public <P> JavaVisitor<P> addImportVisitor(@Nullable String packageName,
                                                String typeName,
                                                @Nullable String member,
                                                @Nullable String alias,
                                                boolean onlyIfReferenced) {
         return new AddImport<>(packageName, typeName, member,  alias, onlyIfReferenced);
+    }
+
+    public <P> JavaVisitor<P> addExplicitImport(String fullyQualifiedName) {
+        final boolean isStatic = fullyQualifiedName.startsWith(STATIC_PREFIX);
+        if (isStatic) {
+            fullyQualifiedName = fullyQualifiedName.substring(STATIC_PREFIX.length());
+        }
+        return new AddExplicitImportVisitor<>(fullyQualifiedName, isStatic);
     }
 
     public <J2 extends J> JavaVisitor<ExecutionContext> shortenAllFullyQualifiedTypeReferences() {

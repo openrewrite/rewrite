@@ -59,12 +59,12 @@ import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 public class AddImport<P> extends JavaIsoVisitor<P> {
 
     @Nullable
-    private final String packageName;
+    protected final String packageName;
 
-    private final String typeName;
+    protected final String typeName;
 
     @EqualsAndHashCode.Include
-    private final String fullyQualifiedName;
+    protected final String fullyQualifiedName;
 
     @EqualsAndHashCode.Include
     @Nullable
@@ -181,7 +181,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         return j;
     }
 
-    private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports) {
+    protected List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports) {
         GeneralFormatStyle generalFormatStyle = Optional.ofNullable(Style.from(GeneralFormatStyle.class, ((SourceFile) cu)))
                 .orElse(autodetectGeneralFormatStyle(cu));
         if (generalFormatStyle.isUseCRLFNewLines()) {
@@ -212,7 +212,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
      * @return true if the import is referenced by the class either explicitly or through a method reference.
      */
     //Note that using anyMatch when a stream is empty ends up returning true, which is not the behavior needed here!
-    private boolean hasReference(JavaSourceFile compilationUnit) {
+    protected boolean hasReference(JavaSourceFile compilationUnit) {
         if (member == null) {
             //Non-static imports, we just look for field accesses.
             for (NameTree t : FindTypes.find(compilationUnit, fullyQualifiedName)) {
