@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 
-public class AddExplicitImportTest implements RewriteTest {
+class AddExplicitImportTest implements RewriteTest {
 
     @Test
     void addExplicitImportWhenNoExistingImports() {
