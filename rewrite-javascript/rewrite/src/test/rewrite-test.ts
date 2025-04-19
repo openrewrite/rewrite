@@ -30,7 +30,8 @@ export interface SourceSpec<T extends SourceFile> {
     after?: AfterRecipe
     path?: string,
     parser: (ctx: ExecutionContext) => Parser<T>,
-    beforeRecipe?: (sourceFile: T) => T | void | Promise<T>
+    beforeRecipe?: (sourceFile: T) => T | void | Promise<T>,
+    ext: string
 }
 
 export class RecipeSpec {
@@ -134,7 +135,7 @@ export class RecipeSpec {
         const before: [SourceSpec<any>, { text: string, sourcePath: string }][] = [];
         for (const spec of specs) {
             if (spec.before) {
-                const sourcePath = `${SnowflakeId().generate()}.txt`;
+                const sourcePath = spec.path || `${SnowflakeId().generate()}.${spec.ext}`;
                 before.push([spec, {text: dedent(spec.before), sourcePath: sourcePath}]);
             }
         }

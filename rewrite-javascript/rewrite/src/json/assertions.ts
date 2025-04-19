@@ -22,6 +22,7 @@ export function json(before: string | null, after?: AfterRecipe): SourceSpec<Jso
         kind: JsonKind.Document,
         before: before,
         after: dedentAfter(after),
+        ext: 'json',
         parser: () => new JsonParser()
     };
 }

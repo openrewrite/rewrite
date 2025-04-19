@@ -21,6 +21,7 @@ export function text(before: string | null, after?: AfterRecipe): SourceSpec<Pla
         kind: PlainTextKind.PlainText,
         before: before,
         after: dedentAfter(after),
+        ext: 'txt',
         parser: () => new PlainTextParser()
     };
 }
