@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeRegistry} from "../../main/javascript";
+import {RecipeRegistry} from "../src";
 import {describe} from "@jest/globals";
 import {ChangeText} from "./example-recipe";
 

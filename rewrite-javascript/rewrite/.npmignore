@@ -1,15 +1,5 @@
-# Exclude Java output directories
-/build/
-/out/
-/src/main/java/
-/src/test/java/
-*gradle*
-
-# Exclude TypeScript source files
-/src/main/javascript/
-
 # Exclude test source files
-/src/test/javascript/
+/test/
 /dist/test/
 
 # Exclude development dependency files
@@ -23,9 +13,7 @@ jest.config.js
 node_modules/
 
 # Exclude other unnecessary files
-/.git
 .gitignore
-/.idea/
 .editorconfig
 .eslintrc.js
 .prettierrc

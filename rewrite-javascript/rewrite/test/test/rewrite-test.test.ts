@@ -1,6 +1,6 @@
 import {describe} from "@jest/globals";
-import {RecipeSpec} from "../../../main/javascript/test";
-import {text} from "../../../main/javascript/text";
+import {RecipeSpec} from "../../src/test";
+import {text} from "../../src/text";
 import {ChangeText} from "../example-recipe";
 
 describe("rewrite test", () => {

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {produceAsync} from "../../main/javascript";
+import {produceAsync} from "../src";
 
 describe('produceAsync', () => {
     interface State {

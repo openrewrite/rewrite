@@ -1,25 +1,26 @@
 {
   "name": "@openrewrite/rewrite",
-  "version": "8.50.0-20250419.101721",
+  "version": "8.50.0-20250419.101722",
   "license": "Moderne Source Available License",
   "description": "OpenRewrite JavaScript.",
   "homepage": "https://github.com/openrewrite/rewrite",
-  "main": "./dist/src/main/javascript/index.js",
-  "types": "./dist/src/main/javascript/index.d.ts",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "files": [
-    "dist/src/main/javascript/**"
+    "dist/src/**",
+    "src/**"
   ],
   "exports": {
-    ".": "./dist/src/main/javascript/index.js",
-    "./json": "./dist/src/main/javascript/json/index.js",
-    "./rpc": "./dist/src/main/javascript/rpc/index.js",
-    "./test": "./dist/src/main/javascript/test/index.js"
+    ".": "./dist/src/index.js",
+    "./json": "./dist/src/json/index.js",
+    "./rpc": "./dist/src/rpc/index.js",
+    "./test": "./dist/src/test/index.js"
   },
   "scripts": {
     "build": "rm -rf ./dist && tsc --build tsconfig.build.json",
     "dev": "tsc --watch -p tsconfig.json",
     "test": "npm run build && jest",
-    "start": "npm run build && node ./dist/src/main/javascript/rpc/server.js"
+    "start": "npm run build && node ./dist/src/rpc/server.js"
   },
   "dependencies": {
     "@akashrajpurohit/snowflake-id": "^2.0.0",
@@ -42,6 +43,6 @@
     "ts-node": "^10.9.2"
   },
   "bin": {
-    "rewrite-js": "./dist/src/main/javascript/rpc/server.js"
+    "rewrite-js": "./dist/src/rpc/server.js"
   }
 }

@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Empty, emptySpace, Json, JsonDocument, JsonKind, JsonVisitor} from "../../../main/javascript/json";
-import {emptyMarkers, randomId} from "../../../main/javascript";
+import {Empty, emptySpace, Json, JsonDocument, JsonKind, JsonVisitor} from "../../src/json";
+import {emptyMarkers, randomId} from "../../src";
 
 class SetEmptySpace extends JsonVisitor<number> {
     protected async visitEmpty(empty: Empty, p: number): Promise<Json | undefined> {

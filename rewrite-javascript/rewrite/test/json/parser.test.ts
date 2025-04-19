@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeSpec} from "../../../main/javascript/test";
-import {json} from "../../../main/javascript/json";
+import {RecipeSpec} from "../../src/test";
+import {json} from "../../src/json";
 
 describe('JSON parsing', () => {
     const spec = new RecipeSpec();

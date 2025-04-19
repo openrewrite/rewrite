@@ -3,7 +3,6 @@
     "target": "es2016",
     "module": "Node16",
     "declarationMap": true,
-    "inlineSources": true,
     "sourceMap": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -15,7 +14,7 @@
     "moduleResolution": "node16"
   },
   "include": [
-    "src/main/javascript/**/*",
-    "src/test/javascript/**/*"
+    "src/**/*",
+    "test/**/*"
   ]
 }

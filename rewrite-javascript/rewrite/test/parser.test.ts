@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {describe} from "@jest/globals";
-import {ParserSourceReader, readSourceSync} from "../../main/javascript";
+import {ParserSourceReader, readSourceSync} from "../src";
 
 
 describe("parse source reader utility", () => {

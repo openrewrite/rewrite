@@ -24,8 +24,8 @@ import {
     SourceFile,
     Transient,
     TreeVisitor
-} from "../../main/javascript";
-import {PlainText, PlainTextParser, PlainTextVisitor} from "../../main/javascript/text";
+} from "../src";
+import {PlainText, PlainTextParser, PlainTextVisitor} from "../src/text";
 
 export class ReplacedText {
     @Column({

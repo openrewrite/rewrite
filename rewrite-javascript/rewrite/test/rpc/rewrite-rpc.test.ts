@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {Cursor, rootCursor} from "../../../main/javascript";
-import {RewriteRpc} from "../../../main/javascript/rpc";
-import {PlainText, text} from "../../../main/javascript/text";
-import {RecipeSpec} from "../../../main/javascript/test";
+import {Cursor, rootCursor} from "../../src";
+import {RewriteRpc} from "../../src/rpc";
+import {PlainText, text} from "../../src/text";
+import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import "../example-recipe";

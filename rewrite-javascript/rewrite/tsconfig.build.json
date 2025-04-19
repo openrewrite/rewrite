@@ -8,7 +8,7 @@
     "removeComments": true
   },
   "include": [
-    "src/main/javascript/**/*",
-    "src/test/javascript/**/*"
+    "src/**/*",
+    "test/**/*"
   ]
 }

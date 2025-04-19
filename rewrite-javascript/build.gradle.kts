@@ -1,3 +1,4 @@
+import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import org.eclipse.jgit.api.Git
@@ -27,6 +28,10 @@ dependencies {
     testImplementation("io.moderne:jsonrpc:latest.integration")
 
     integTestImplementation(project(":rewrite-json"))
+}
+
+extensions.configure<NodeExtension> {
+    npmWorkDir.set(projectDir.resolve("rewrite"))
 }
 
 val npmTest = tasks.named("npm_test")
@@ -73,8 +78,8 @@ open class RestorePackageJson : DefaultTask() {
     fun restore() {
         val git = Git.open(project.rootDir)
         git.checkout()
-            .addPath("${project.projectDir.relativeTo(project.rootDir).path}/package.json")
-            .addPath("${project.projectDir.relativeTo(project.rootDir).path}/package-lock.json")
+            .addPath("${project.projectDir.relativeTo(project.rootDir).path}/rewrite/package.json")
+            .addPath("${project.projectDir.relativeTo(project.rootDir).path}/rewrite/package-lock.json")
             .call()
     }
 }
