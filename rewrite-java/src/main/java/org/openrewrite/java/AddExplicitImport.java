@@ -26,7 +26,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddExplicitImport extends Recipe {
     @Option(displayName = "List of imports to add",
             description = "The list of imports, this field is multiline.",
