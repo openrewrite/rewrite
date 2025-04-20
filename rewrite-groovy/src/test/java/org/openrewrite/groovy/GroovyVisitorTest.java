@@ -25,6 +25,19 @@ import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyVisitorTest implements RewriteTest {
 
+    @Test
+    void newArrayWithSize() {
+        rewriteRun(groovy(
+          """
+          class A {
+              static void main(String[] argv) {
+                  int[][][] addr = new int[4+3][3][5];
+              }
+          }
+          """
+        ));
+    }
+
     @DocumentExample
     @Test
     void autoFormatIncludesOmitParentheses() {

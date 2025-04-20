@@ -682,6 +682,32 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitArrayExpression(ArrayExpression expression) {
+            List<JRightPadded<Expression>> visitedInitExpressions = new ArrayList<>();
+            Space whitespaceBeforeNew = whitespace();
+            skip("new");
+            JavaType type = typeMapping.type(expression.getElementType());
+            TypeTree typeTree = visitTypeTree(expression.getElementType());
+            List<J.ArrayDimension> dimensions = new ArrayList<>();
+            for (int i = 0; i < expression.getSizeExpression().size(); i++) {
+                dimensions.add(new J.ArrayDimension(randomId(), sourceBefore("["), Markers.EMPTY, padRight(visit(expression.getSizeExpression().get(i)), sourceBefore("]"))));
+            }
+            for (int i = 0; i < expression.getExpressions().size(); i++) {
+                Expression initExpression = visit(expression.getExpression(i));
+                visitedInitExpressions.add(JRightPadded.build(initExpression));
+            }
+
+            JContainer<Expression> initializer = null;
+            if (!visitedInitExpressions.isEmpty()) {
+                initializer = JContainer.build(visitedInitExpressions);
+            }
+
+            queue.add(
+                    new J.NewArray(randomId(), whitespaceBeforeNew, Markers.EMPTY, typeTree, dimensions, initializer, type)
+            );
+        }
+
+        @Override
         public void visitArgumentlistExpression(ArgumentListExpression expression) {
             List<JRightPadded<Expression>> args = new ArrayList<>(expression.getExpressions().size());
 
@@ -2021,7 +2047,11 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
             String typeName = "";
 
-            if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
+            if (expression.getOriginType().isArray()) {
+                typeName = expression.getOriginType().toString();
+                skip(typeName);
+            }
+            else if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
                 typeName = expression.getOriginType().getUnresolvedName();
                 skip(typeName);
             }
