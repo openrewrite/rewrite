@@ -24,7 +24,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Markers;
@@ -40,7 +40,6 @@ import static org.openrewrite.Tree.randomId;
 public class AddExplicitImportVisitor<P> extends AddImport<P> {
     final String imports;
     public AddExplicitImportVisitor(String imports) {
-        super("", null, false);
         this.imports = imports;
     }
 
@@ -50,46 +49,29 @@ public class AddExplicitImportVisitor<P> extends AddImport<P> {
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            String[] split = imports.split("\n");
-            List<String> receivedImports = Arrays.stream(split)
-                    .filter(s -> !s.isEmpty())
+            final String[] split = imports.split("\n");
+            final List<String> receivedImports = Arrays.stream(split)
                     .map(String::trim)
+                    .filter(s -> !s.isEmpty())
                     .collect(Collectors.toList());
 
-            List<J.Import> jImports = new ArrayList<>();
-            Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
-
-            List<JRightPadded<J.Import>> existingImports = new ArrayList<>(cu.getPadding().getImports());
-
+            final List<J.Import> jImports = new ArrayList<>();
+            final Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
+            final List<JRightPadded<J.Import>> existingImports = new ArrayList<>(cu.getPadding().getImports());
             for (String anImport : receivedImports) {
-                int lastDotIdx = anImport.lastIndexOf('.');
-                String packageName = lastDotIdx != -1 ? anImport.substring(0, lastDotIdx) : null;
-                String typeName = lastDotIdx != -1 ? anImport.substring(lastDotIdx + 1) : anImport;
-                if (packageName == null || JavaType.Primitive.fromKeyword(anImport) != null) {
-                    continue;
-                }
-                if ("java.lang".equals(packageName)) {
-                    continue;
-                }
-                // Nor if the classes are within the same package
-                if (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
-                        packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
-                    continue;
-                }
-
-                if (!"Record".equals(typeName) && cu.getImports().stream().anyMatch(i -> {
-                    String ending = i.getQualid().getSimpleName();
-                    return !i.isStatic() && i.getPackageName().equals(packageName) &&
-                            (ending.equals(typeName) || "*".equals(ending));
-                })) {
-                    continue;
-                }
-
-                JLeftPadded<Boolean> statik = new JLeftPadded<>(Space.EMPTY, false, Markers.EMPTY);
+                final JLeftPadded<Boolean> statik;
                 if (anImport.startsWith("static ")) {
                     statik = JLeftPadded.build(true).withBefore(Space.SINGLE_SPACE);
                     anImport = anImport.replace("static ", "");
+                } else {
+                    statik = new JLeftPadded<>(Space.EMPTY, false, Markers.EMPTY);
                 }
+                final int lastDotIdx = anImport.lastIndexOf('.');
+                final String packageName = lastDotIdx != -1 ? anImport.substring(0, lastDotIdx) : null;
+                if (packageName == null) {
+                    continue;
+                }
+
                 J.Import aJimport = new J.Import(randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
@@ -97,12 +79,12 @@ public class AddExplicitImportVisitor<P> extends AddImport<P> {
                         TypeTree.build(anImport).withPrefix(Space.SINGLE_SPACE),
                         null);
 
-//                if ((jImports.isEmpty() || existingImports.isEmpty()) && !cu.getClasses().isEmpty() && cu.getPackageDeclaration() == null) {
-//                    aJimport = aJimport.withPrefix(firstClassPrefix
-//                            .withComments(ListUtils.map(firstClassPrefix.getComments(),
-//                                    comment -> comment instanceof Javadoc ? null : comment))
-//                            .withWhitespace(""));
-//                }
+                if ((jImports.isEmpty() || existingImports.isEmpty()) && !cu.getClasses().isEmpty() && cu.getPackageDeclaration() == null) {
+                    aJimport = aJimport.withPrefix(firstClassPrefix
+                            .withComments(ListUtils.map(firstClassPrefix.getComments(),
+                                    comment -> comment instanceof Javadoc ? null : comment))
+                            .withWhitespace(""));
+                }
                 jImports.add(aJimport);
             }
 

@@ -30,7 +30,7 @@ class AddExplicitImportTest implements RewriteTest {
             class Dummy {}
             """, """
             import foo.bar;
-
+            
             class Dummy {}
             """));
     }
@@ -40,12 +40,12 @@ class AddExplicitImportTest implements RewriteTest {
         rewriteRun(spec -> spec.recipe(new AddExplicitImport("foo.bar"))
           , java("""
             import xyz.bbb.ccc.D;
-
+            
             class Dummy {}
             """, """
             import xyz.bbb.ccc.D;
             import foo.bar;
-
+            
             class Dummy {}
             """));
     }
@@ -53,14 +53,14 @@ class AddExplicitImportTest implements RewriteTest {
     @Test
     void addMultipleImports() {
         rewriteRun(spec -> spec.recipe(new AddExplicitImport("""
-          foo.bar
-          aaa.bbb.ccc
-          ztf.core.ASimpleClass
-          static a.b.c.staticMethod
-          """))
+            foo.bar
+            aaa.bbb.ccc
+            ztf.core.ASimpleClass
+            static a.b.c.staticMethod
+            """))
           , java("""
             import xyz.bbb.ccc.D;
-
+            
             class Dummy {}
             """, """
             import xyz.bbb.ccc.D;
@@ -68,7 +68,7 @@ class AddExplicitImportTest implements RewriteTest {
             import aaa.bbb.ccc;
             import ztf.core.ASimpleClass;
             import static a.b.c.staticMethod;
-
+            
             class Dummy {}
             """));
     }
@@ -78,12 +78,32 @@ class AddExplicitImportTest implements RewriteTest {
         rewriteRun(spec -> spec.recipe(new AddExplicitImport("static foo.bar.staticMethod"))
           , java("""
             import xyz.bbb.ccc.D;
-
+            
             class Dummy {}
             """, """
             import xyz.bbb.ccc.D;
             import static foo.bar.staticMethod;
+            
+            class Dummy {}
+            """));
+    }
 
+    @Test
+    void addImportsWhenJavadoc() {
+        rewriteRun(spec -> spec.recipe(new AddExplicitImport("foo.bar.AClass"))
+          , java("""
+            /**
+            * This is a simple javadoc
+            */
+            
+            class Dummy {}
+            """, """
+            import foo.bar.AClass;
+            
+            /**
+            * This is a simple javadoc
+            */
+            
             class Dummy {}
             """));
     }

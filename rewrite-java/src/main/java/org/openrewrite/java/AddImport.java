@@ -77,6 +77,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final String alias;
 
+    public AddImport() {
+        this("", null, false);
+    }
+
     public AddImport(String type, @Nullable String member, boolean onlyIfReferenced) {
         int lastDotIdx = type.lastIndexOf('.');
         this.packageName = lastDotIdx != -1 ? type.substring(0, lastDotIdx) : null;
