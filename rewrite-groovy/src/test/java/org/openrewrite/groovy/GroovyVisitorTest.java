@@ -31,7 +31,20 @@ class GroovyVisitorTest implements RewriteTest {
           """
           class A {
               static void main(String[] argv) {
-                  int[][][] addr =   new      int[4+3][3][5];
+                  int[][][] addr = new int[4+3][3][5];
+              }
+          }
+          """
+        ));
+    }
+
+    @Test
+    void dynamicallyTypedNewArrayWithSize() {
+        rewriteRun(groovy(
+          """
+          class A {
+              static void main(String[] argv) {
+                  def addr = new int[4+3][3][5];
               }
           }
           """
