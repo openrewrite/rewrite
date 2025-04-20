@@ -19,32 +19,29 @@ import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.PreserveImportLayoutStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddExplicitImportVisitor<P> extends AddImport<P> {
-
-    private final boolean isStatic;
-    public AddExplicitImportVisitor(String fullyQualifiedName, boolean isStatic) {
-        super(fullyQualifiedName, null, false);
-        this.isStatic = isStatic;
+    final String imports;
+    public AddExplicitImportVisitor(String imports) {
+        super("", null, false);
+        this.imports = imports;
     }
 
     @Override
@@ -53,63 +50,64 @@ public class AddExplicitImportVisitor<P> extends AddImport<P> {
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            if (packageName == null || JavaType.Primitive.fromKeyword(fullyQualifiedName) != null) {
-                return cu;
+            String[] split = imports.split("\n");
+            List<String> receivedImports = Arrays.stream(split)
+                    .filter(s -> !s.isEmpty())
+                    .map(String::trim)
+                    .collect(Collectors.toList());
+
+            List<J.Import> jImports = new ArrayList<>();
+            Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
+
+            List<JRightPadded<J.Import>> existingImports = new ArrayList<>(cu.getPadding().getImports());
+
+            for (String anImport : receivedImports) {
+                int lastDotIdx = anImport.lastIndexOf('.');
+                String packageName = lastDotIdx != -1 ? anImport.substring(0, lastDotIdx) : null;
+                String typeName = lastDotIdx != -1 ? anImport.substring(lastDotIdx + 1) : anImport;
+                if (packageName == null || JavaType.Primitive.fromKeyword(anImport) != null) {
+                    continue;
+                }
+                if ("java.lang".equals(packageName)) {
+                    continue;
+                }
+                // Nor if the classes are within the same package
+                if (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
+                        packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
+                    continue;
+                }
+
+                if (!"Record".equals(typeName) && cu.getImports().stream().anyMatch(i -> {
+                    String ending = i.getQualid().getSimpleName();
+                    return !i.isStatic() && i.getPackageName().equals(packageName) &&
+                            (ending.equals(typeName) || "*".equals(ending));
+                })) {
+                    continue;
+                }
+
+                JLeftPadded<Boolean> statik = new JLeftPadded<>(Space.EMPTY, false, Markers.EMPTY);
+                if (anImport.startsWith("static ")) {
+                    statik = JLeftPadded.build(true).withBefore(Space.SINGLE_SPACE);
+                    anImport = anImport.replace("static ", "");
+                }
+                J.Import aJimport = new J.Import(randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        statik,
+                        TypeTree.build(anImport).withPrefix(Space.SINGLE_SPACE),
+                        null);
+
+//                if ((jImports.isEmpty() || existingImports.isEmpty()) && !cu.getClasses().isEmpty() && cu.getPackageDeclaration() == null) {
+//                    aJimport = aJimport.withPrefix(firstClassPrefix
+//                            .withComments(ListUtils.map(firstClassPrefix.getComments(),
+//                                    comment -> comment instanceof Javadoc ? null : comment))
+//                            .withWhitespace(""));
+//                }
+                jImports.add(aJimport);
             }
-            if ("java.lang".equals(packageName)) {
-                return cu;
-            }
-            // Nor if the classes are within the same package
-            if (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
-                    packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
-                return cu;
-            }
 
-            if (!"Record".equals(typeName) && cu.getImports().stream().anyMatch(i -> {
-                String ending = i.getQualid().getSimpleName();
-                return !i.isStatic() && i.getPackageName().equals(packageName) &&
-                        (ending.equals(typeName) || "*".equals(ending));
-            })) {
-                return cu;
-            }
-
-            JLeftPadded<Boolean> statik = new JLeftPadded<>(Space.EMPTY, false, Markers.EMPTY);
-            Space prefix = Space.EMPTY;
-
-            if (isStatic) {
-                statik = JLeftPadded.build(true).withBefore(Space.SINGLE_SPACE);
-            }
-            J.Import importToAdd = new J.Import(randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    statik,
-                    TypeTree.build(fullyQualifiedName).withPrefix(Space.SINGLE_SPACE),
-                    null);
-
-            List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
-
-            if (imports.isEmpty() && !cu.getClasses().isEmpty() && cu.getPackageDeclaration() == null) {
-                // leave javadocs on the class and move other comments up to the import
-                // (which could include license headers and the like)
-                Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
-                importToAdd = importToAdd.withPrefix(firstClassPrefix
-                        .withComments(ListUtils.map(firstClassPrefix.getComments(),
-                                comment -> comment instanceof Javadoc ? null : comment))
-                        .withWhitespace(""));
-
-                cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
-                        clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ?
-                                comment : null))
-                ));
-            }
-
-            ImportLayoutStyle layoutStyle = new PreserveImportLayoutStyle();
-            List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
-                    .map(JavaSourceSet::getClasspath)
-                    .orElse(Collections.emptyList());
-
-            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd
-                    , cu.getPackageDeclaration(), classpath);
+            PreserveImportLayoutStyle layoutStyle = new PreserveImportLayoutStyle(cu.getPadding().getImports());
+            List<JRightPadded<J.Import>> newImports = layoutStyle.addImports(jImports);
 
             // ImportLayoutStyle::addImport adds always `\n` as newlines. Checking if we need to fix them
             newImports = checkCRLF(cu, newImports);

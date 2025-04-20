@@ -51,6 +51,29 @@ class AddExplicitImportTest implements RewriteTest {
     }
 
     @Test
+    void addMultipleImports() {
+        rewriteRun(spec -> spec.recipe(new AddExplicitImport("""
+          foo.bar
+          aaa.bbb.ccc
+          ztf.core.ASimpleClass
+          static a.b.c.staticMethod
+          """))
+          , java("""
+            import xyz.bbb.ccc.D;
+
+            class Dummy {}
+            """, """
+            import xyz.bbb.ccc.D;
+            import foo.bar;
+            import aaa.bbb.ccc;
+            import ztf.core.ASimpleClass;
+            import static a.b.c.staticMethod;
+
+            class Dummy {}
+            """));
+    }
+
+    @Test
     void addStaticImports() {
         rewriteRun(spec -> spec.recipe(new AddExplicitImport("static foo.bar.staticMethod"))
           , java("""

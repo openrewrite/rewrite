@@ -27,7 +27,6 @@ import org.openrewrite.java.tree.J;
 @Incubating(since = "8.2.0")
 public class ImportService {
 
-    public static final String STATIC_PREFIX = "static ";
     public <P> JavaVisitor<P> addImportVisitor(@Nullable String packageName,
                                                String typeName,
                                                @Nullable String member,
@@ -37,11 +36,7 @@ public class ImportService {
     }
 
     public <P> JavaVisitor<P> addExplicitImport(String fullyQualifiedName) {
-        final boolean isStatic = fullyQualifiedName.startsWith(STATIC_PREFIX);
-        if (isStatic) {
-            fullyQualifiedName = fullyQualifiedName.substring(STATIC_PREFIX.length());
-        }
-        return new AddExplicitImportVisitor<>(fullyQualifiedName, isStatic);
+        return new AddExplicitImportVisitor<>(fullyQualifiedName);
     }
 
     public <J2 extends J> JavaVisitor<ExecutionContext> shortenAllFullyQualifiedTypeReferences() {

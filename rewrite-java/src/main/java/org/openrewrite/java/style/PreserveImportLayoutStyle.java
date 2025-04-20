@@ -17,15 +17,12 @@ package org.openrewrite.java.style;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -33,19 +30,33 @@ import java.util.List;
 @Getter
 public class PreserveImportLayoutStyle extends ImportLayoutStyle {
 
-    public PreserveImportLayoutStyle() {
+    final List<JRightPadded<J.Import>> existingImports;
+
+    public PreserveImportLayoutStyle(List<JRightPadded<J.Import>> imports) {
         super(0, 0, Collections.emptyList(), Collections.emptyList());
+        this.existingImports = imports;
     }
-    @Override
-    public List<JRightPadded<J.Import>> addImport(List<JRightPadded<J.Import>> originalImports, J.Import toAdd,
-                                                  J.@Nullable Package pkg,
-                                                  Collection<JavaType.FullyQualified> classpath) {
-        JRightPadded<J.Import> paddedImport = new JRightPadded<>(toAdd, Space.EMPTY, Markers.EMPTY);
-        if (!originalImports.isEmpty()) {
-            paddedImport = paddedImport.withElement(paddedImport.getElement().withPrefix(Space.format("\n")));
+
+    public List<JRightPadded<J.Import>> addImports(List<J.Import> toAdd) {
+        List<JRightPadded<J.Import>> paddings = new ArrayList<>();
+        Space prefix = Space.format("\n");
+        if (existingImports.isEmpty()) {
+            prefix = Space.EMPTY;
         }
-        final List<JRightPadded<J.Import>> newImports = new ArrayList<>(originalImports);
-        newImports.add(paddedImport);
+
+        boolean first = true;
+        for (J.Import anImport : toAdd) {
+            if (!first) {
+                prefix = Space.format("\n");
+            }
+            JRightPadded<J.Import> paddedImport = new JRightPadded<>(anImport, Space.EMPTY, Markers.EMPTY);
+            paddedImport = paddedImport.withElement(paddedImport.getElement().withPrefix(prefix));
+            paddings.add(paddedImport);
+            first = false;
+
+        }
+        final List<JRightPadded<J.Import>> newImports = new ArrayList<>(existingImports);
+        newImports.addAll(paddings);
         return newImports;
     }
 }
