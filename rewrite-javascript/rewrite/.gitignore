@@ -2,6 +2,9 @@
 /out-tsc
 /dist
 
+# Where recipes are installed during RPC tests
+/.rewrite
+
 /node_modules
 npm-debug.log*
 yarn-debug.log*

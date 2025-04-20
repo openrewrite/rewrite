@@ -22,6 +22,7 @@ import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import "../example-recipe";
 import inspector from 'inspector';
+import * as path from "node:path";
 
 const isDebugging = Boolean(inspector.url());
 
@@ -34,7 +35,6 @@ describe("RewriteRpcTest", () => {
     beforeEach(async () => {
         // Create in-memory streams to simulate the pipes.
         const clientToServer = new PassThrough();
-
         if (isDebugging) {
             clientToServer.on('data', chunk => {
                 console.debug('[server] ⇦ received:', `'${chunk.toString()}'`);
@@ -84,6 +84,14 @@ describe("RewriteRpcTest", () => {
         const recipe = await client.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
         expect(recipe.displayName).toEqual("Change text");
         expect(recipe.instanceName()).toEqual("Change text to 'hello'");
+    });
+
+    test("installRecipes", async () => {
+        const installed = await client.installRecipes(
+            {packageName: "@openrewrite/recipes-npm"},
+            path.join(process.cwd(), ".rewrite")
+        );
+        expect(installed).toBeGreaterThan(0);
     });
 
     test("runRecipe", async () => {

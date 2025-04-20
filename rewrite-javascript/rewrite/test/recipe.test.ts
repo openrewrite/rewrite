@@ -41,5 +41,5 @@ describe("recipes", () => {
             recipeList: [],
             tags: []
         })
-    })
+    });
 })
