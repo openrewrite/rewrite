@@ -702,9 +702,7 @@ public class GroovyParserVisitor {
                 initializer = JContainer.build(visitedInitExpressions);
             }
 
-            queue.add(
-                    new J.NewArray(randomId(), whitespaceBeforeNew, Markers.EMPTY, typeTree, dimensions, initializer, type)
-            );
+            queue.add(new J.NewArray(randomId(), whitespaceBeforeNew, Markers.EMPTY, typeTree, dimensions, initializer, type));
         }
 
         @Override
@@ -2047,11 +2045,10 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
             String typeName = "";
 
-            if (expression.getOriginType().isArray()) {
+            if (!expression.isDynamicTyped() && expression.getOriginType().isArray()) {
                 typeName = expression.getOriginType().toString();
                 skip(typeName);
-            }
-            else if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
+            } else if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
                 typeName = expression.getOriginType().getUnresolvedName();
                 skip(typeName);
             }
