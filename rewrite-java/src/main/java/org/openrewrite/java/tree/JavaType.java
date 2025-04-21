@@ -1293,24 +1293,6 @@ public interface JavaType {
         @NonFinal
         String @Nullable [] declaredFormalTypeNames;
 
-        @Deprecated
-        public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
-                      @Nullable JavaType returnType, @Nullable List<String> parameterNames,
-                      @Nullable List<JavaType> parameterTypes, @Nullable List<JavaType> thrownExceptions,
-                      @Nullable List<FullyQualified> annotations) {
-            this(managedReference, flagsBitMap, declaringType, name, returnType, parameterNames, parameterTypes,
-                    thrownExceptions, annotations, null);
-        }
-
-        @Deprecated
-        public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
-                      @Nullable JavaType returnType, @Nullable List<String> parameterNames,
-                      @Nullable List<JavaType> parameterTypes, @Nullable List<JavaType> thrownExceptions,
-                      @Nullable List<FullyQualified> annotations, @Nullable List<String> defaultValue) {
-            this(managedReference, flagsBitMap, declaringType, name, returnType, parameterNames, parameterTypes,
-                    thrownExceptions, annotations, defaultValue, null);
-        }
-
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
                       @Nullable List<JavaType> parameterTypes, @Nullable List<JavaType> thrownExceptions,
