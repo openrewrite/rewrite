@@ -39,6 +39,22 @@ class GroovyVisitorTest implements RewriteTest {
     }
 
     @Test
+    void newArrayWithSizeAndInitializers() {
+        rewriteRun(groovy(
+          """
+          class A {
+              static void main(String[] argv) {
+                  int[] addr = new int[] {
+                      123,
+                      new Integer(456).intValue()
+                  };
+              }
+          }
+          """
+        ));
+    }
+
+    @Test
     void dynamicallyTypedNewArrayWithSize() {
         rewriteRun(groovy(
           """
