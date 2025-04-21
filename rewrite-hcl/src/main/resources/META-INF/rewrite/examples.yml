@@ -1,0 +1,143 @@
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.hcl.DeleteContent
+examples:
+- description: ''
+  parameters:
+  - $.before
+  sources:
+  - before: |
+      after {
+      }
+      before {
+      }
+    after: |
+      after {
+      }
+    language: hcl
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.hcl.MoveContentToFile
+examples:
+- description: ''
+  parameters:
+  - $.before
+  - from.tf
+  - to.tf
+  sources:
+  - before: |
+      after {
+      }
+      before {
+      }
+    after: |
+      after {
+      }
+    language: hcl
+  - after: |
+      before {
+      }
+    language: hcl
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.hcl.ReplaceLegacyAttributeIndexSyntax
+examples:
+- description: ''
+  sources:
+  - before: |
+      locals {
+        dns_record = aws_acm_certificate.google_dot_com.0.resource_record_name
+      }
+    after: |
+      locals {
+        dns_record = aws_acm_certificate.google_dot_com[0].resource_record_name
+      }
+    language: hcl
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.hcl.format.AutoFormat
+examples:
+- description: ''
+  sources:
+  - before: |
+      locals {
+        object = {
+               string_attr = "value1"
+               int_attr    = 2
+        }
+      }
+    after: |
+      locals {
+        object = {
+          string_attr = "value1"
+          int_attr    = 2
+        }
+      }
+    language: hcl
+- description: ''
+  sources:
+  - before: |
+      resource "aws_ebs_volume"    {    size      = 1
+      encrypted = true   }
+    after: |
+      resource "aws_ebs_volume" {
+        size      = 1
+        encrypted = true
+      }
+    language: hcl
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.hcl.format.Spaces
+examples:
+- description: ''
+  sources:
+  - before: |
+      resource "aws_ebs_volume" {
+        size =1
+        encrypted =true
+      }
+    after: |
+      resource "aws_ebs_volume" {
+        size      = 1
+        encrypted = true
+      }
+    language: hcl
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.hcl.search.FindAndReplaceLiteral
+examples:
+- description: ''
+  parameters:
+  - app-cluster
+  - new-app-cluster
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      config = {
+        app_deployment = {
+          cluster_name = "app-cluster"
+        }
+      }
+    after: |
+      config = {
+        app_deployment = {
+          cluster_name = "new-app-cluster"
+        }
+      }
+    language: hcl
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.hcl.search.FindContent
+examples:
+- description: ''
+  parameters:
+  - $.provider
+  sources:
+  - before: |
+      provider {
+      }
+    after: |
+      /*~~>*/provider {
+      }
+    language: hcl

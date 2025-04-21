@@ -1,0 +1,113 @@
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.properties.AddProperty
+examples:
+- description: ''
+  parameters:
+  - management.metrics.enable.process.files
+  - 'true'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      management=true
+    after: |
+      management=true
+      management.metrics.enable.process.files=true
+    language: properties
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.properties.AddPropertyComment
+examples:
+- description: ''
+  parameters:
+  - management.metrics.enable.process.files
+  - myComment
+  - 'false'
+  sources:
+  - before: |
+      management.metrics.enable.process.files=true
+      yyy=true
+    after: |
+      # myComment
+      management.metrics.enable.process.files=true
+      yyy=true
+    language: properties
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.properties.ChangePropertyKey
+examples:
+- description: ''
+  parameters:
+  - management.metrics.binders.files.enabled
+  - management.metrics.enable.process.files
+  - 'null'
+  - 'null'
+  sources:
+  - before: management.metrics.binders.files.enabled=true
+    after: management.metrics.enable.process.files=true
+    language: properties
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.properties.ChangePropertyValue
+examples:
+- description: ''
+  parameters:
+  - management.metrics.binders.files.enabled
+  - 'false'
+  - 'null'
+  - 'false'
+  - 'null'
+  sources:
+  - before: management.metrics.binders.files.enabled=true
+    after: management.metrics.binders.files.enabled=false
+    language: properties
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.properties.CreatePropertiesFile
+examples:
+- description: ''
+  parameters:
+  - test/test.properties
+  - |
+    # This is a comment
+    x.y=z
+  - 'null'
+  sources:
+  - after: |
+      # This is a comment
+      x.y=z
+    language: properties
+- description: ''
+  parameters:
+  - test/test.properties
+  - after=true
+  - 'true'
+  sources:
+  - before: test.property=test
+    after: after=true
+    language: properties
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.properties.DeleteProperty
+examples:
+- description: ''
+  parameters:
+  - delete.me
+  - 'null'
+  sources:
+  - before: |
+      delete.me = baz
+    language: properties
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.properties.search.FindProperties
+examples:
+- description: ''
+  parameters:
+  - management.metrics.binders.files.enabled
+  - 'null'
+  sources:
+  - before: management.metrics.binders.files.enabled=true
+    after: management.metrics.binders.files.enabled=~~>true
+    language: properties

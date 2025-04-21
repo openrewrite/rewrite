@@ -1,0 +1,144 @@
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.AddCommentToMethod
+examples:
+- description: ''
+  parameters:
+  - SHORT_COMMENT
+  - foo.Foo bar(..)
+  - 'false'
+  sources:
+  - before: |
+      package foo;
+      public class Foo {
+          public void bar(String arg) {}
+      }
+    after: |
+      package foo;
+      public class Foo {
+          // Short comment to add
+          public void bar(String arg) {}
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.AddMethodParameter
+examples:
+- description: ''
+  parameters:
+  - foo.Foo#bar(..)
+  - int
+  - i
+  - 'null'
+  sources:
+  - before: |
+      package foo;
+
+      public class Foo {
+          public void bar() {
+          }
+      }
+    after: |
+      package foo;
+
+      public class Foo {
+          public void bar(int i) {
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangeMethodInvocationReturnType
+examples:
+- description: ''
+  parameters:
+  - java.lang.Integer parseInt(String)
+  - long
+  sources:
+  - before: |
+      class Foo {
+          void bar() {
+              int one = Integer.parseInt("1");
+          }
+      }
+    after: |
+      class Foo {
+          void bar() {
+              long one = Integer.parseInt("1");
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ReplaceAnnotation
+examples:
+- description: ''
+  parameters:
+  - '@org.jetbrains.annotations.NotNull("Test")'
+  - '@lombok.NonNull'
+  - 'null'
+  sources:
+  - before: |
+      import org.jetbrains.annotations.NotNull;
+
+      class A {
+          @NotNull("Test")
+          String testMethod() {}
+      }
+    after: |
+      import lombok.NonNull;
+
+      class A {
+          @NonNull
+          String testMethod() {}
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ReplaceStringLiteralValue
+examples:
+- description: ''
+  parameters:
+  - apple
+  - orange
+  sources:
+  - before: |
+      class Test {
+          String s = "apple";
+      }
+    after: |
+      class Test {
+          String s = "orange";
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindCompileErrors
+examples:
+- description: ''
+  sources:
+  - before: |
+      class A {
+          void test() {
+              owner
+          }
+      }
+    after: |
+      class A {
+          void test() {
+              /*~~>*/owner
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.HasBuildToolVersion
+examples:
+- description: ''
+  parameters:
+  - BuildTool.Type.Maven
+  - 3.6.0-3.8.0
+  sources:
+  - before: class A {}
+    after: /*~~>*/class A {}
+    language: java

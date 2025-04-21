@@ -1,0 +1,168 @@
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.json.AddKeyValue
+examples:
+- description: ''
+  parameters:
+  - $.
+  - key
+  - '"val"'
+  - 'false'
+  sources:
+  - before: |
+      {
+          "x": "x",
+          "l": [1, 2]
+      }
+    after: |
+      {
+          "x": "x",
+          "l": [1, 2],
+          "key": "val"
+      }
+    language: json
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.json.ChangeKey
+examples:
+- description: ''
+  parameters:
+  - $.description
+  - '"newDescription"'
+  sources:
+  - before: |
+      {
+        "id": "something",
+        "description": "desc",
+        "other": "whatever"
+      }
+    after: |
+      {
+        "id": "something",
+        "newDescription": "desc",
+        "other": "whatever"
+      }
+    language: json
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.json.ChangeValue
+examples:
+- description: ''
+  parameters:
+  - $.metadata.name
+  - '"monitoring"'
+  sources:
+  - before: |
+      {
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "monitoring-tools",
+          "namespace": "monitoring-tools"
+        }
+      }
+    after: |
+      {
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "monitoring",
+          "namespace": "monitoring-tools"
+        }
+      }
+    language: json
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.json.DeleteKey
+examples:
+- description: ''
+  parameters:
+  - $.metadata.name
+  sources:
+  - before: |
+      {
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "monitoring-tools",
+          "namespace": "monitoring-tools"
+        }
+      }
+    after: |
+      {
+        "apiVersion": "v1",
+        "metadata": {
+          "namespace": "monitoring-tools"
+        }
+      }
+    language: json
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.json.format.AutoFormat
+examples:
+- description: ''
+  sources:
+  - before: |
+      {   "a": 3,
+      "b": 5,
+          "c": 7}
+    after: |
+      {
+          "a": 3,
+          "b": 5,
+          "c": 7
+      }
+    language: json
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.json.format.Indents
+examples:
+- description: ''
+  sources:
+  - before: |
+      {
+      "a": 3,
+      "b": 5
+      }
+    after: |
+      {
+        "a": 3,
+        "b": 5
+      }
+    language: json
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.json.format.WrappingAndBraces
+examples:
+- description: ''
+  sources:
+  - before: |
+      {"a": 3,"b": 5}
+    after: |
+      {
+      "a": 3,
+      "b": 5
+      }
+    language: json
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.json.search.FindKey
+examples:
+- description: ''
+  parameters:
+  - $.metadata.name
+  sources:
+  - before: |
+      {
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "monitoring-tools",
+          "namespace": "monitoring-tools"
+        }
+      }
+    after: |
+      {
+        "apiVersion": "v1",
+        "metadata": {
+          /*~~>*/"name": "monitoring-tools",
+          "namespace": "monitoring-tools"
+        }
+      }
+    language: json
