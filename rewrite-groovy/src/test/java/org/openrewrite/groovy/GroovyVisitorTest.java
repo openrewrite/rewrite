@@ -39,7 +39,18 @@ class GroovyVisitorTest implements RewriteTest {
     }
 
     @Test
-    void newArrayWithSizeAndInitializers() {
+    void newArrayWithEmptyInitializer() {
+        rewriteRun(groovy(
+          """
+          class A {
+              static void main(String[] argv) {int[] addr = new int[]{}}
+          }
+          """
+        ));
+    }
+
+    @Test
+    void newArrayWithInitializer() {
         rewriteRun(groovy(
           """
           class A {
@@ -64,6 +75,19 @@ class GroovyVisitorTest implements RewriteTest {
               }
           }
           """
+        ));
+    }
+
+    @Test
+    void returnNewArray() {
+        rewriteRun(groovy(
+          """
+            class TestMe{
+              String[] getArgs() {
+                return new String[0]
+              }
+            }
+            """
         ));
     }
 

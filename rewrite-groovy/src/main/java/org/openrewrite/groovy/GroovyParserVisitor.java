@@ -686,38 +686,51 @@ public class GroovyParserVisitor {
             Space whitespaceBeforeNew = whitespace();
             skip("new");
             TypeTree typeTree = visitTypeTree(expression.getElementType());
+            List<J.ArrayDimension> dimensions = buildNewArrayDimensions(expression);
+            JContainer<Expression> initializer = buildNewArrayInitializer(expression);
+            queue.add(new J.NewArray(randomId(), whitespaceBeforeNew, Markers.EMPTY, typeTree, dimensions, initializer, typeMapping.type(expression.getElementType())));
+        }
+
+        private JContainer<Expression> buildNewArrayInitializer(ArrayExpression expression) {
+            if (expression.getSizeExpression() != null) {
+                return null;
+            }
+
+            Space whitespaceBefore = sourceBefore("{");
+
+            List<JRightPadded<Expression>> expressions;
+            if (expression.getExpressions().isEmpty()) {
+                expressions = singletonList(padRight(new J.Empty(randomId(), sourceBefore("}"), Markers.EMPTY), EMPTY));
+            } else {
+                expressions = convertAll(expression.getExpressions(), n -> sourceBefore(","), n -> whitespace(), n -> {
+                    if (n == expression.getExpression(expression.getExpressions().size() - 1) && source.charAt(cursor) == ',') {
+                        cursor++;
+                        return Markers.build(singletonList(new TrailingComma(randomId(), whitespace())));
+                    }
+                    return Markers.EMPTY;
+                });
+                skip("}");
+            }
+
+            return JContainer.build(whitespaceBefore, expressions, Markers.EMPTY);
+        }
+
+        private List<J.ArrayDimension> buildNewArrayDimensions(ArrayExpression expression) {
             List<J.ArrayDimension> dimensions = new ArrayList<>();
             for (int i = 0; expression.getSizeExpression() != null && i < expression.getSizeExpression().size(); i++) {
                 dimensions.add(new J.ArrayDimension(randomId(), sourceBefore("["), Markers.EMPTY, padRight(visit(expression.getSizeExpression().get(i)), sourceBefore("]"))));
             }
-            while(true) {
+            while (true) {
                 int beginBracket = indexOfNextNonWhitespace(cursor, source);
                 if (source.charAt(beginBracket) != '[') {
                     break;
                 }
 
                 int endBracket = indexOfNextNonWhitespace(beginBracket + 1, source);
-                dimensions.add(new J.ArrayDimension(
-                        randomId(),
-                        format(source, cursor, beginBracket),
-                        Markers.EMPTY,
-                        padRight(new J.Empty(randomId(), format(source, beginBracket + 1, endBracket), Markers.EMPTY), EMPTY)));
+                dimensions.add(new J.ArrayDimension(randomId(), format(source, cursor, beginBracket), Markers.EMPTY, padRight(new J.Empty(randomId(), format(source, beginBracket + 1, endBracket), Markers.EMPTY), EMPTY)));
                 cursor = endBracket + 1;
             }
-
-            JContainer<Expression> initializer = expression.getSizeExpression() != null ? null :
-                    JContainer.build(sourceBefore("{"), expression.getExpressions().isEmpty() ?
-                            singletonList(padRight(new J.Empty(randomId(), sourceBefore("}"), Markers.EMPTY), EMPTY)) :
-                            convertAll(expression.getExpressions(), n -> sourceBefore(","), t -> whitespace(), t -> {
-                                if (t == expression.getExpression(expression.getExpressions().size() - 1) && source.charAt(cursor) == ',') {
-                                    cursor++;
-                                    return Markers.build(singletonList(new TrailingComma(randomId(), whitespace())));
-                                }
-                                return Markers.EMPTY;
-                            }), Markers.EMPTY);
-            skip("}");
-
-            queue.add(new J.NewArray(randomId(), whitespaceBeforeNew, Markers.EMPTY, typeTree, dimensions, initializer, typeMapping.type(expression.getElementType())));
+            return dimensions;
         }
 
         @Override
