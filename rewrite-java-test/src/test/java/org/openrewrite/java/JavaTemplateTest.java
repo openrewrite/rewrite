@@ -129,7 +129,7 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                   if ((assignment.getAssignment() instanceof J.Literal) &&
-                      ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
+                    ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
                       return JavaTemplate.builder("value = 0")
                         .contextSensitive()
                         .build()
@@ -186,7 +186,7 @@ class JavaTemplateTest implements RewriteTest {
                   }
               }
               """,
-                """
+            """
               import java.io.Serializable;
               
               abstract class Outer<T extends Serializable> {
@@ -920,7 +920,7 @@ class JavaTemplateTest implements RewriteTest {
                   public static Object[] of(Object... objects){ return null;}
               }
               """,
-                SourceSpec::skip
+            SourceSpec::skip
           ),
           java(
             """
@@ -1335,7 +1335,7 @@ class JavaTemplateTest implements RewriteTest {
                   String testMethod(@NotNull final String test) {}
               }
               """,
-                """
+            """
               import lombok.NonNull;
               
               class A {
@@ -1406,7 +1406,7 @@ class JavaTemplateTest implements RewriteTest {
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
                   if (new MethodMatcher("Foo bar(..)").matches(mi) &&
-                      mi.getArguments().get(0) instanceof J.Binary) {
+                    mi.getArguments().get(0) instanceof J.Binary) {
                       return JavaTemplate.builder("\"Hello, {}\", \"World!\"")
                         .build()
                         .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments());
@@ -1483,8 +1483,8 @@ class JavaTemplateTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/5289")
     void recursiveType() {
         rewriteRun(
-            spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
-              .recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext o) {
                     J.VariableDeclarations param = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
@@ -1499,27 +1499,27 @@ class JavaTemplateTest implements RewriteTest {
           java(
             """
               import java.util.Optional;
-            
+              
               class BugTest {
                   void run(One<?, ?> firstBuild) {
                       Optional.of(firstBuild).ifPresent(reference -> {});
                   }
-            
+              
                   abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
                   abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
               }
+              """,
+            """
               import java.util.Optional;
-            
+              
               class BugTest {
                   void run(One<?, ?> firstBuild) {
                       Optional.of(firstBuild).ifPresent(reference -> System.out.println(reference));
                   }
-            
+              
                   abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
                   abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
               }
-                    abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
-                }
               """
           )
         );
