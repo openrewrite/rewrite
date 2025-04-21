@@ -1498,26 +1498,26 @@ class JavaTemplateTest implements RewriteTest {
             })),
           java(
             """
-                import java.util.Optional;
-              
-                class BugTest {
-                    void run(One<?, ?> firstBuild) {
-                        Optional.of(firstBuild).ifPresent(reference -> {});
-                    }
-              
-                    abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
-                    abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
-                }
-              """,
-            """
-                import java.util.Optional;
-              
-                class BugTest {
-                    void run(One<?, ?> firstBuild) {
-                        Optional.of(firstBuild).ifPresent(reference -> System.out.println(reference));
-                    }
-              
-                    abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              import java.util.Optional;
+            
+              class BugTest {
+                  void run(One<?, ?> firstBuild) {
+                      Optional.of(firstBuild).ifPresent(reference -> {});
+                  }
+            
+                  abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                  abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              }
+              import java.util.Optional;
+            
+              class BugTest {
+                  void run(One<?, ?> firstBuild) {
+                      Optional.of(firstBuild).ifPresent(reference -> System.out.println(reference));
+                  }
+            
+                  abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                  abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              }
                     abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
                 }
               """
