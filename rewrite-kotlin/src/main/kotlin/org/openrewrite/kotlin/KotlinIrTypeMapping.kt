@@ -376,7 +376,7 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             if (function is IrConstructor) "<constructor>" else function.name.asString(),
             null,
             paramNames,
-            null, null, null, null
+            null, null, null, null, null
         )
         typeCache.put(signature, method)
         var declaringType = when (val irParent = function.parent) {
@@ -434,7 +434,7 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             null,
             type.symbol.owner.name.asString(),
             null,
-            paramNames, null, null, null)
+            paramNames, null, null, null, null, null)
         typeCache.put(signature, method)
         var declaringType = TypeUtils.asFullyQualified(type(type.symbol.owner.parent))
         if (declaringType is JavaType.Parameterized) {
@@ -472,7 +472,7 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             null,
             "<constructor>",
             null,
-            paramNames, null, null, null)
+            paramNames, null, null, null, null, null)
         typeCache.put(signature, method)
         var declaringType = TypeUtils.asFullyQualified(type(type.symbol.owner.parent))
         if (declaringType is JavaType.Parameterized) {
@@ -510,7 +510,7 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             null,
             "<constructor>",
             null,
-            paramNames, null, null, null)
+            paramNames, null, null, null, null, null)
         return method
     }
 

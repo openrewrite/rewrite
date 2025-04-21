@@ -540,7 +540,7 @@ class KotlinTypeMapping(
             null,
             paramNames,
             null, null, null,
-            null
+            null, null
         )
         typeCache.put(signature, method)
         var parentType = when {
@@ -637,7 +637,7 @@ class KotlinTypeMapping(
             null,
             paramNames,
             null, null, null,
-            defaultValues
+            defaultValues, null
         )
         typeCache.put(signature, method)
         val exceptionTypes: List<FullyQualified>? = null
@@ -720,7 +720,7 @@ class KotlinTypeMapping(
             null,
             paramNames,
             null, null, null,
-            null
+            null, null
         )
         typeCache.put(signature, method)
         var declaringType: FullyQualified? = null
@@ -1106,7 +1106,7 @@ class KotlinTypeMapping(
             null,
             paramNames,
             null, null, null,
-            defaultValues
+            defaultValues, null
         )
         typeCache.put(signature, method)
         val exceptionTypes: List<FullyQualified>? = null
