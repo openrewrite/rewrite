@@ -15,11 +15,14 @@
  */
 import {RecipeRegistry} from "../src";
 import {describe} from "@jest/globals";
-import {ChangeText} from "./example-recipe";
+import {ChangeText, activate} from "./example-recipe";
 
 describe("recipes", () => {
+
     test("register a recipe with options", async () => {
-        const recipe = RecipeRegistry.all.get(
+        const recipeRegistry = new RecipeRegistry();
+        activate(recipeRegistry);
+        const recipe = recipeRegistry.all.get(
             "org.openrewrite.text.change-text")
         expect(recipe).toBeDefined()
         expect(new recipe!()).toBeInstanceOf(ChangeText)
@@ -42,4 +45,4 @@ describe("recipes", () => {
             tags: []
         })
     });
-})
+});

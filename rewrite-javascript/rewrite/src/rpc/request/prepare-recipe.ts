@@ -23,11 +23,12 @@ export class PrepareRecipe {
     }
 
     static handle(connection: MessageConnection,
+                  registry: RecipeRegistry,
                   preparedRecipes: Map<String, Recipe>) {
         const snowflake = SnowflakeId();
         connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), async (request) => {
             const id = snowflake.generate();
-            const recipeCtor = RecipeRegistry.all.get(request.id);
+            const recipeCtor = registry.all.get(request.id);
             if (!recipeCtor) {
                 throw new Error(`Could not find recipe with id ${request.id}`);
             }

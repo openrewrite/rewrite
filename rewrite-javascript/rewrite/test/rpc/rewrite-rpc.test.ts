@@ -20,13 +20,13 @@ import {PlainText, text} from "../../src/text";
 import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
-import "../example-recipe";
 import inspector from 'inspector';
 import * as path from "node:path";
+import {activate} from "../example-recipe";
 
 const isDebugging = Boolean(inspector.url());
 
-describe("RewriteRpcTest", () => {
+describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
 
     let server: RewriteRpc;
@@ -59,6 +59,7 @@ describe("RewriteRpcTest", () => {
             new rpc.StreamMessageWriter(serverToClient)
         );
         server = new RewriteRpc(serverConnection);
+        activate(server.registry);
     });
 
     afterEach(() => {
@@ -91,7 +92,7 @@ describe("RewriteRpcTest", () => {
             {packageName: "@openrewrite/recipes-npm"},
             path.join(process.cwd(), ".rewrite")
         );
-        expect(installed).toBeGreaterThan(0);
+        expect(installed.recipesInstalled).toBeGreaterThan(0);
     });
 
     test("runRecipe", async () => {

@@ -197,22 +197,15 @@ export class RecipeRegistry {
     /**
      * The registry map stores recipe constructors keyed by their name.
      */
-    static all = new Map<string, { new(options?: {}): Recipe }>();
+    all = new Map<string, new (options?: any) => Recipe>();
 
-    public static register(name: string, recipeClass: { new(options?: {}): Recipe }): void {
-        RecipeRegistry.all.set(name, recipeClass);
-    }
-}
-
-export function Registered<T extends { new(...args: any[]): Recipe }>(constructor: T): T {
-    try {
-        // Validate that the constructor can be called without arguments.
-        const r = new constructor();
-
-        RecipeRegistry.register(r.name, constructor);
-        return constructor;
-    } catch (e) {
-        throw new Error(`Failed to register recipe. Ensure the constructor can be called without any arguments.`);
+    public register<T extends Recipe>(recipeClass: new (options?: any) => T): void {
+        try {
+            const r = new recipeClass({});
+            this.all.set(r.name, recipeClass);
+        } catch (e) {
+            throw new Error(`Failed to register recipe. Ensure the constructor can be called without any arguments.`);
+        }
     }
 }
 

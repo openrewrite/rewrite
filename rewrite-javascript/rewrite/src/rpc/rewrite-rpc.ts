@@ -16,7 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
 import {Cursor, isSourceFile, isTree, rootCursor, SourceFile, Tree} from "../tree";
-import {Recipe, RecipeDescriptor} from "../recipe";
+import {Recipe, RecipeDescriptor, RecipeRegistry} from "../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {
     Generate,
@@ -47,7 +47,7 @@ export class RewriteRpc {
     constructor(private readonly connection: MessageConnection = rpc.createMessageConnection(
         new rpc.StreamMessageReader(process.stdin),
         new rpc.StreamMessageWriter(process.stdout)
-    ), batchSize: number = 10) {
+    ), batchSize: number = 10, public readonly registry: RecipeRegistry = new RecipeRegistry()) {
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
 
@@ -58,10 +58,10 @@ export class RewriteRpc {
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects, batchSize);
-        GetRecipes.handle(this.connection);
-        PrepareRecipe.handle(this.connection, preparedRecipes);
+        GetRecipes.handle(this.connection, registry);
+        PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Print.handle(this.connection, getObject, getCursor);
-        InstallRecipes.handle(this.connection);
+        InstallRecipes.handle(this.connection, registry);
 
         this.connection.listen();
     }

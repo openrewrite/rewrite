@@ -19,13 +19,19 @@ import {
     ExecutionContext,
     Option,
     Recipe,
-    Registered,
+    RecipeRegistry,
     ScanningRecipe,
     SourceFile,
     Transient,
     TreeVisitor
 } from "../src";
 import {PlainText, PlainTextParser, PlainTextVisitor} from "../src/text";
+
+export function activate(registry: RecipeRegistry) {
+    registry.register(ChangeText);
+    registry.register(CreateText);
+    registry.register(RecipeWithRecipeList);
+}
 
 export class ReplacedText {
     @Column({
@@ -53,7 +59,6 @@ export class ReplacedText {
     );
 }
 
-@Registered
 export class CreateText extends ScanningRecipe<{ exists: boolean }> {
     name = "org.openrewrite.text.create-text";
     displayName = "Create text file";
@@ -87,7 +92,6 @@ export class CreateText extends ScanningRecipe<{ exists: boolean }> {
     }
 }
 
-@Registered
 export class ChangeText extends Recipe {
     name = "org.openrewrite.text.change-text"
     displayName = "Change text";
@@ -126,7 +130,6 @@ export class ChangeText extends Recipe {
     }
 }
 
-@Registered
 export class RecipeWithRecipeList extends Recipe {
     name = "org.openrewrite.text.with-recipe-list"
     displayName = "A recipe that has a recipe list";
