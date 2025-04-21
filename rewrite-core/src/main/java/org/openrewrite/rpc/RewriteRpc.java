@@ -31,6 +31,7 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -39,7 +40,7 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
 
-    private int batchSize = 10;
+    private AtomicInteger batchSize = new AtomicInteger(10);
     private Duration timeout = Duration.ofMinutes(1);
 
     /**
@@ -97,7 +98,7 @@ public class RewriteRpc {
     }
 
     public RewriteRpc batchSize(int batchSize) {
-        this.batchSize = batchSize;
+        this.batchSize.set(batchSize);
         return this;
     }
 

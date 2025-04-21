@@ -27,6 +27,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
@@ -39,7 +40,7 @@ public class GetObject implements RpcRequest {
     public static class Handler extends JsonRpcMethod<GetObject> {
         private static final ExecutorService forkJoin = ForkJoinPool.commonPool();
 
-        private final int batchSize;
+        private final AtomicInteger batchSize;
         private final Map<String, Object> remoteObjects;
         private final Map<String, Object> localObjects;
 
@@ -66,7 +67,7 @@ public class GetObject implements RpcRequest {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
                 Object before = remoteObjects.get(id);
 
-                RpcSendQueue sendQueue = new RpcSendQueue(batchSize, batch::put, localRefs);
+                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs);
                 forkJoin.submit(() -> {
                     try {
                         Runnable onChange = after instanceof RpcCodec ? () -> {

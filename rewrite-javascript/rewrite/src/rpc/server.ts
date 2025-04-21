@@ -19,7 +19,12 @@ import {RewriteRpc} from "./rewrite-rpc";
 import * as fs from "fs";
 import {WriteStream} from "fs";
 
+// Include all languages you want this server to support.
+import "../text";
+import "../json";
+
 const log: WriteStream = fs.createWriteStream(`${process.cwd()}/server.log`, {flags: 'a'});
+log.write("\n--------------------------------------------------------------------------\n");
 log.write(`[server] starting\n\n`);
 
 process.stdin.on('data', (chunk) => {

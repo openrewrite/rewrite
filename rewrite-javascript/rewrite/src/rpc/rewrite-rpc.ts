@@ -80,10 +80,12 @@ export class RewriteRpc {
         });
 
         const remoteObject = await q.receive<P>(this.localObjects.get(id), (before: any) => {
-            return RpcCodecs.forInstance(before)?.rpcReceive(before, q) ?? before;
+            const codec = RpcCodecs.forInstance(before);
+            return codec?.rpcReceive(before, q) ?? before;
         });
 
-        if ((await q.take()).state !== RpcObjectState.END_OF_OBJECT) {
+        const eof = (await q.take());
+        if (eof.state !== RpcObjectState.END_OF_OBJECT) {
             throw new Error("Expected END_OF_OBJECT");
         }
 

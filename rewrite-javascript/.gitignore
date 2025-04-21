@@ -1,1 +1,4 @@
 server.log
+
+# Where recipes are installed during RPC tests
+/.rewrite
