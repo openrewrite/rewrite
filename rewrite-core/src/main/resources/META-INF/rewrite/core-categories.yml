@@ -40,3 +40,7 @@ type: specs.openrewrite.org/v1beta/category
 packageName: ai
 root: true
 ---
+type: specs.openrewrite.org/v1beta/category
+packageName: tech
+root: true
+---
