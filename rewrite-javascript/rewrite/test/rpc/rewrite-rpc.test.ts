@@ -21,7 +21,6 @@ import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import inspector from 'inspector';
-import * as path from "node:path";
 import {activate} from "../example-recipe";
 
 const isDebugging = Boolean(inspector.url());
@@ -89,8 +88,7 @@ describe("Rewrite RPC", () => {
 
     test("installRecipes", async () => {
         const installed = await client.installRecipes(
-            {packageName: "@openrewrite/recipes-npm"},
-            path.join(process.cwd(), ".rewrite")
+            "@openrewrite/recipes-npm",
         );
         expect(installed.recipesInstalled).toBeGreaterThan(0);
     });

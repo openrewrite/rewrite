@@ -57,6 +57,15 @@ public class RewriteRpc {
 
     private final Map<Integer, Object> remoteRefs = new HashMap<>();
 
+    /**
+     * Creates a new RPC interface that can be used to communicate with a remote.
+     *
+     * @param jsonRpc     The JSON-RPC connection to the remote peer.
+     * @param marketplace The marketplace of recipes that this peer makes available.
+     *                    Even if this peer is the host process, configuring this
+     *                    marketplace allows the remote peer to discover what recipes
+     *                    the host process has available for its use in composite recipes.
+     */
     public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
         this.jsonRpc = jsonRpc;
 
@@ -219,7 +228,7 @@ public class RewriteRpc {
         return (T) remoteObject;
     }
 
-    private <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
+    protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
         try {
             // TODO handle error
             return jsonRpc

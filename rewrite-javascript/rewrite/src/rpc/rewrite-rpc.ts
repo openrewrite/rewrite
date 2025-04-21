@@ -32,7 +32,7 @@ import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcCodecs} from "./codec";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
-import {InstallRecipes, InstallRecipesResponse, RecipeDependency} from "./request/install-recipes";
+import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
@@ -61,7 +61,7 @@ export class RewriteRpc {
         GetRecipes.handle(this.connection, registry);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Print.handle(this.connection, getObject, getCursor);
-        InstallRecipes.handle(this.connection, registry);
+        InstallRecipes.handle(this.connection, ".rewrite", registry);
 
         this.connection.listen();
     }
@@ -162,10 +162,10 @@ export class RewriteRpc {
         return generated;
     }
 
-    installRecipes(recipeModule: RecipeDependency, installDir?: string): Promise<InstallRecipesResponse> {
+    installRecipes(packageName: string, version?: string): Promise<InstallRecipesResponse> {
         return this.connection.sendRequest(
             new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"),
-            new InstallRecipes(recipeModule, installDir || process.cwd())
+            new InstallRecipes(packageName, version)
         );
     }
 

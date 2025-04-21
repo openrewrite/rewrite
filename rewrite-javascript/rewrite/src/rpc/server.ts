@@ -22,9 +22,13 @@ import {WriteStream} from "fs";
 const log: WriteStream = fs.createWriteStream(`${process.cwd()}/server.log`, {flags: 'a'});
 log.write(`[server] starting\n\n`);
 
-// const inprocess.stdin.on('data', (chunk) => {
-//   log.write(`[server] ⇦ received: '${chunk.toString()}'\n\n`);
-// })
+process.stdin.on('data', (chunk) => {
+    log.write(`[server] ⇦ received: '${chunk.toString()}'\n\n`);
+})
+
+process.stdout.on('data', (chunk) => {
+    log.write(`[server] ⇨ sent: '${chunk.toString()}'\n\n`);
+})
 
 const logger: rpc.Logger = {
     error: (msg: string) => log.write(`[Error] ${msg}\n`),
