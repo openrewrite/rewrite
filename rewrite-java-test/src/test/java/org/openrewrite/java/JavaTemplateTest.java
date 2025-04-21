@@ -1478,4 +1478,50 @@ class JavaTemplateTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5289")
+    void recursiveType() {
+        rewriteRun(
+            spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
+              .recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext o) {
+                    J.VariableDeclarations param = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
+                    J.VariableDeclarations.NamedVariable variable = param.getVariables().get(0);
+
+                    return JavaTemplate.builder("reference -> System.out.println(#{any()})")
+                      .contextSensitive()
+                      .build()
+                      .apply(getCursor(), lambda.getCoordinates().replace(), variable.getName());
+                }
+            })),
+          java(
+            """
+                import java.util.Optional;
+              
+                class BugTest {
+                    void run(One<?, ?> firstBuild) {
+                        Optional.of(firstBuild).ifPresent(reference -> {});
+                    }
+              
+                    abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                    abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                }
+              """,
+            """
+                import java.util.Optional;
+              
+                class BugTest {
+                    void run(One<?, ?> firstBuild) {
+                        Optional.of(firstBuild).ifPresent(reference -> System.out.println(reference));
+                    }
+              
+                    abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                    abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                }
+              """
+          )
+        );
+    }
 }

@@ -809,4 +809,43 @@ class TypeUtilsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5289")
+    void toStringRecursiveType() {
+        rewriteRun(
+          java(
+            """
+                import java.util.Optional;
+              
+                class BugTest {
+                    void run(Rec<?> m, One<?, ?> d) {
+                        Optional.of(m).ifPresent(mono -> {});
+                        Optional.of(d).ifPresent(mutual -> {});
+                    }
+
+                    abstract static class Rec<T extends Rec<T>> {}
+              
+                    abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                    abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext o) {
+                    J.VariableDeclarations param = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
+                    J.VariableDeclarations.NamedVariable variable = param.getVariables().get(0);
+
+                    if ("mono".equals(variable.getSimpleName())) {
+                        assertThat(TypeUtils.toString(variable.getVariableType().getType())).isEqualTo("BugTest$Rec<?>");
+                    } else {
+                        assertThat(TypeUtils.toString(variable.getVariableType().getType())).isEqualTo("BugTest$One<?, ?>");
+                    }
+
+                    return lambda;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
 }

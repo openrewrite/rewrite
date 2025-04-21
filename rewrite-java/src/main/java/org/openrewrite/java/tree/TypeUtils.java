@@ -903,31 +903,44 @@ public class TypeUtils {
     }
 
     public static String toString(JavaType type) {
+        return toString(type, new IdentityHashMap<>());
+    }
+
+    private static String toString(JavaType type, IdentityHashMap<JavaType, Boolean> recursiveTypes) {
         if (type instanceof JavaType.Primitive) {
             return ((JavaType.Primitive) type).getKeyword();
         } else if (type instanceof JavaType.Class) {
             return ((JavaType.Class) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-            String base = toString(parameterized.getType());
+            String base = toString(parameterized.getType(), recursiveTypes);
             StringJoiner joiner = new StringJoiner(", ", "<", ">");
             for (JavaType parameter : parameterized.getTypeParameters()) {
-                joiner.add(toString(parameter));
+                joiner.add(toString(parameter, recursiveTypes));
             }
             return base + joiner;
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
             if (!genericType.getName().equals("?")) {
                 return genericType.getName();
-            } else if (genericType.getVariance() == JavaType.GenericTypeVariable.Variance.INVARIANT
-                    || genericType.getBounds().size() != 1) { // Safe check, wildcards don't allow additional bounds
+            } else if (genericType.getVariance() == JavaType.GenericTypeVariable.Variance.INVARIANT ||
+                    genericType.getBounds().size() != 1) { // Safe check, wildcards don't allow additional bounds
+                return "?";
+            } else if (recursiveTypes.containsKey(genericType)) {
+                recursiveTypes.put(genericType, true);
                 return "?";
             } else {
+                recursiveTypes.put(genericType, false);
                 String variance = genericType.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT ? "? extends " : "? super ";
-                return variance + toString(genericType.getBounds().get(0));
+                String bound = toString(genericType.getBounds().get(0), recursiveTypes);
+                if (!recursiveTypes.get(genericType)) {
+                    recursiveTypes.remove(genericType);
+                    return variance + bound;
+                }
+                return "?";
             }
         } else if (type instanceof JavaType.Array) {
-            return toString(((JavaType.Array) type).getElemType()) + "[]";
+            return toString(((JavaType.Array) type).getElemType(), recursiveTypes) + "[]";
         }
         return type.toString();
     }
