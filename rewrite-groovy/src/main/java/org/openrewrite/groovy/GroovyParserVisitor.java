@@ -705,7 +705,7 @@ public class GroovyParserVisitor {
                 cursor = endBracket + 1;
             }
 
-            JContainer<Expression> initializer = expression.getExpressions() == null ? null :
+            JContainer<Expression> initializer = expression.getSizeExpression() != null ? null :
                     JContainer.build(sourceBefore("{"), expression.getExpressions().isEmpty() ?
                             singletonList(padRight(new J.Empty(randomId(), sourceBefore("}"), Markers.EMPTY), EMPTY)) :
                             convertAll(expression.getExpressions(), n -> sourceBefore(","), t -> whitespace(), t -> {
