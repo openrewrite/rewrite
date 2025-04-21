@@ -27,6 +27,7 @@ import org.openrewrite.internal.StringUtils;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
@@ -50,7 +51,7 @@ public class AdHocRecipe extends Recipe {
 
     @With
     @Nullable
-    transient Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
+    transient Function<Recipe, TreeVisitor<?, ExecutionContext>> getVisitor;
 
     @With
     @Nullable
@@ -96,6 +97,6 @@ public class AdHocRecipe extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return requireNonNull(getVisitor).get();
+        return requireNonNull(getVisitor).apply(this);
     }
 }

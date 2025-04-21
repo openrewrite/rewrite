@@ -21,14 +21,12 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.InMemoryDataTableStore;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
@@ -107,13 +105,8 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     }
 
     private void addRowToDataTable(ExecutionContext ctx, Row row) {
-        //noinspection DuplicatedCode
-        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
-            //noinspection unchecked
-            List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
-            dataTablesOfType.add(row);
-            return allDataTables;
-        });
+        ctx.computeMessage(ExecutionContext.DATA_TABLE_STORE, row, InMemoryDataTableStore::new, (extract, dataTableStore) -> dataTableStore)
+                .insertRow(this, ctx, row);
     }
 
     @Value
