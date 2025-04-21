@@ -15,12 +15,8 @@
  */
 package org.openrewrite.kotlin.marker;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Value;
 import lombok.With;
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
@@ -29,15 +25,4 @@ import java.util.UUID;
 @With
 public class KObject implements Marker {
     UUID id;
-
-    public KObject(UUID id) {
-        this.id = id;
-    }
-
-    // to be dereleased
-    @Deprecated
-    @JsonCreator
-    KObject(UUID id, @Deprecated @Nullable @JsonProperty("prefix") Space prefix) {
-        this.id = id;
-    }
 }
