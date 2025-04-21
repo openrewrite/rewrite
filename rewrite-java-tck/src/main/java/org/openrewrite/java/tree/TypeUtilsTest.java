@@ -816,18 +816,18 @@ class TypeUtilsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                import java.util.Optional;
-              
-                class BugTest {
-                    void run(Rec<?> m, One<?, ?> d) {
-                        Optional.of(m).ifPresent(mono -> {});
-                        Optional.of(d).ifPresent(mutual -> {});
-                    }
-
-                    abstract static class Rec<T extends Rec<T>> {}
-              
-                    abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
-                    abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              import java.util.Optional;
+            
+              class BugTest {
+                  void run(Rec<?> m, One<?, ?> d) {
+                      Optional.of(m).ifPresent(mono -> {});
+                      Optional.of(d).ifPresent(mutual -> {});
+                  }
+                  abstract static class Rec<T extends Rec<T>> {}
+            
+                  abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                  abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              }
                 }
               """,
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<ExecutionContext>() {
