@@ -35,8 +35,8 @@ const textCodec: RpcCodec<PlainText> = {
         draft.charsetBomMarked = await q.receive(before.charsetBomMarked);
         draft.checksum = await q.receive(before.checksum);
         draft.fileAttributes = await q.receive(before.fileAttributes);
-        draft.snippets = (await q.receiveList(before.snippets, snippet => receiveSnippet(snippet, q)))!;
         draft.text = await q.receive(before.text);
+        draft.snippets = (await q.receiveList(before.snippets, snippet => receiveSnippet(snippet, q)))!;
         return finishDraft(draft);
     },
 
@@ -48,12 +48,12 @@ const textCodec: RpcCodec<PlainText> = {
         await q.getAndSend(after, p => p.charsetBomMarked);
         await q.getAndSend(after, p => p.checksum);
         await q.getAndSend(after, p => p.fileAttributes);
+        await q.getAndSend(after, p => p.text);
         await q.getAndSendList(after, a => a.snippets, s => s.id, async (snippet) => {
             await q.getAndSend(snippet, p => p.id);
             await q.sendMarkers(after, p => p.markers);
             await q.getAndSend(snippet, p => p.text);
         });
-        await q.getAndSend(after, p => p.text);
     }
 }
 

@@ -46,7 +46,7 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
           Environment.builder().build(),
           "node",
           // Uncomment this to debug the server
-          "--inspect-brk",
+//          "--inspect-brk",
           "./rewrite/dist/src/rpc/server.js"
         );
         client.batchSize(20).timeout(Duration.ofMinutes(10));

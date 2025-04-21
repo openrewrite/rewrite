@@ -24,6 +24,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.RpcObjectData.ADDED_LIST_ITEM;
 import static org.openrewrite.rpc.RpcObjectData.State.*;
@@ -64,6 +65,7 @@ public class RpcSendQueue {
     public <T> void sendMarkers(T parent, Function<T, Markers> markersFn) {
         getAndSend(parent, t2 -> asRef(markersFn.apply(t2)), markersRef -> {
             Markers markers = Reference.getValue(markersRef);
+            getAndSend(requireNonNull(markers), Markers::getId);
             getAndSendList(markers, Markers::getMarkers, Marker::getId, null);
         });
     }

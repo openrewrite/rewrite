@@ -22,6 +22,7 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -65,8 +66,9 @@ public class RpcReceiveQueue {
     }
 
     public Markers receiveMarkers(Markers markers) {
-        return receive(markers, m -> m.withMarkers(
-                receiveList(m.getMarkers(), null)));
+        return receive(markers, m -> m
+                .withId(UUID.fromString(receiveAndGet(m.getId(), UUID::toString)))
+                .withMarkers(receiveList(m.getMarkers(), null)));
     }
 
     /**
