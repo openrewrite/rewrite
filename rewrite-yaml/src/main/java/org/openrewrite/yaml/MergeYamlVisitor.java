@@ -88,14 +88,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         this.shouldAutoFormat = shouldAutoFormat;
     }
 
-    /**
-     * @deprecated Use {@link #MergeYamlVisitor(Yaml.Block, Yaml, boolean, String, boolean, InsertMode, String)} instead.
-     */
-    @Deprecated
-    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
-        this(scope, MergeYaml.parse(yamlString), acceptTheirs, objectIdentifyingProperty, insertMode, insertProperty);
-    }
-
     @Override
     public Yaml visitScalar(Yaml.Scalar existingScalar, P p) {
         if (existing.isScope(existingScalar) && incoming instanceof Yaml.Scalar) {

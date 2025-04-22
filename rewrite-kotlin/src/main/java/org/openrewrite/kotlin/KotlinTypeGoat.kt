@@ -21,7 +21,9 @@ package org.openrewrite.kotlin
 import java.lang.Object
 
 const val field = 10
+@Suppress("UNUSED_PARAMETER")
 fun function(arg: C) {
+    @Suppress("UNUSED_VARIABLE")
     val inFun = 10
 }
 

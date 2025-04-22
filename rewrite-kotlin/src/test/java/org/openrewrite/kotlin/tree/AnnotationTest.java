@@ -54,7 +54,8 @@ class AnnotationTest implements RewriteTest {
               @Target(AnnotationTarget.FILE)
               @Retention(AnnotationRetention.SOURCE)
               annotation class Anno
-              """),
+              """
+          ),
           kotlin(
             //language=none
             """

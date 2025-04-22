@@ -445,7 +445,7 @@ public class ResolvedPom {
             }
             Map<GroupArtifactScope, ResolvedManagedDependencyDepth> gaToNearest = dependencyManagement.stream()
                     .collect(Collectors.toMap(
-                            d -> new GroupArtifactScope(d.getGav().asGroupArtifact(), d.getScope()),
+                            d -> new GroupArtifactScope(d.getGav().asGroupArtifact(), d.getScope(), d.getClassifier()),
                             d -> new ResolvedManagedDependencyDepth(d, 0),
                             (x, y) -> y,
                             LinkedHashMap::new));
@@ -840,6 +840,8 @@ public class ResolvedPom {
             GroupArtifact ga;
             @Nullable
             Scope scope;
+            @Nullable
+            String classifier;
         }
 
         @Value
@@ -869,7 +871,7 @@ public class ResolvedPom {
                             .withRequestedBom(d)
                             .withBomGav(bom.getGav()));
                     for (ResolvedManagedDependency managed : bomManaged) {
-                        gaToNearest.compute(new GroupArtifactScope(managed.getGav().asGroupArtifact(), managed.getScope()), (ga, existing) -> {
+                        gaToNearest.compute(new GroupArtifactScope(managed.getGav().asGroupArtifact(), managed.getScope(), managed.getClassifier()), (ga, existing) -> {
                             // Add one to the depth to account for the BOM which brings it in
                             int depthPlusBom = depth + 1;
                             if (existing == null || existing.depth > depthPlusBom ||
@@ -886,7 +888,7 @@ public class ResolvedPom {
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()
                             .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
-                    gaToNearest.compute(new GroupArtifactScope(defined.getGav().asGroupArtifact(), defined.getScope() == null ? null : Scope.fromName(defined.getScope())), (ga, existing) -> {
+                    gaToNearest.compute(new GroupArtifactScope(defined.getGav().asGroupArtifact(), defined.getScope() == null ? null : Scope.fromName(defined.getScope()), defined.getClassifier()), (ga, existing) -> {
                         if (existing == null || existing.depth > depth || (existing.depth == depth && existing.getDependency().getBomGav() != null)) {
                             return new ResolvedManagedDependencyDepth(new ResolvedManagedDependency(
                                     getValues(defined.getGav()),

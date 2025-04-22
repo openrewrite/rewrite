@@ -285,7 +285,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   'com.google.guava:guava-gwt:29.0-jre',
                   'com.google.guava:guava:30.1.1-jre')
               }
-              """)
+              """
+          )
         );
     }
 

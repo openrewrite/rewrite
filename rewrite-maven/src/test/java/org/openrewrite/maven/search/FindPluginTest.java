@@ -122,7 +122,8 @@ class FindPluginTest implements RewriteTest {
                           </plugins>
                       </build>
                   </project>
-                  """, sourceSpecs -> sourceSpecs.path("pom.xml")),
+                  """,
+                sourceSpecs -> sourceSpecs.path("pom.xml")),
           pomXml(
             """
                 <project>
@@ -142,7 +143,8 @@ class FindPluginTest implements RewriteTest {
                         </plugins>
                     </build>
                 </project>
-                """, sourceSpecs -> sourceSpecs.path("submodule.pom.xml")
+                """,
+                sourceSpecs -> sourceSpecs.path("submodule.pom.xml")
           )
         );
     }

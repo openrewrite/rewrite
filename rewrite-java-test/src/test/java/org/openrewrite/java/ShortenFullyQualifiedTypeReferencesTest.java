@@ -476,7 +476,8 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   class A {
                   }
               }
-              """),
+              """
+          ),
           java(
             """
               import java.util.ArrayList;
@@ -486,7 +487,8 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                       java.util.List<Integer> l2 = new ArrayList<>();
                   }
               }
-              """)
+              """
+          )
         );
     }
 
@@ -501,7 +503,8 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                       }
                   }
               }
-              """),
+              """
+          ),
           java(
             """
               import java.util.ArrayList;
@@ -511,7 +514,8 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                       java.util.List<Integer> l2 = new ArrayList<>();
                   }
               }
-              """)
+              """
+          )
         );
     }
 

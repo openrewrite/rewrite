@@ -260,7 +260,8 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """, """
+              """,
+                """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               

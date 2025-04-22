@@ -390,7 +390,8 @@ class JavaParserTest implements RewriteTest {
                 return null;
               }
             }
-            """));
+            """
+          ));
     }
 
 }

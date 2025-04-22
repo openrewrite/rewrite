@@ -185,7 +185,8 @@ class JavaTemplateTest implements RewriteTest {
                       T x = doIt();
                   }
               }
-              """, """
+              """,
+                """
               import java.io.Serializable;
               
               abstract class Outer<T extends Serializable> {
@@ -918,7 +919,8 @@ class JavaTemplateTest implements RewriteTest {
               public class ArrayHelper {
                   public static Object[] of(Object... objects){ return null;}
               }
-              """, SourceSpec::skip
+              """,
+                SourceSpec::skip
           ),
           java(
             """
@@ -1332,13 +1334,15 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   String testMethod(@NotNull final String test) {}
               }
-              """, """
+              """,
+                """
               import lombok.NonNull;
               
               class A {
                   String testMethod(@NonNull final String test) {}
               }
-              """)
+              """
+          )
         );
     }
 
