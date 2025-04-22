@@ -120,6 +120,22 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
+    public J visitUnary(G.Unary unary, P p) {
+        G.Unary u = unary;
+        u = u.withPrefix(visitSpace(u.getPrefix(), GSpace.Location.UNARY_PREFIX, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(u, p);
+        if (!(temp instanceof G.Unary)) {
+            return temp;
+        } else {
+            u = (G.Unary) temp;
+        }
+        u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), GLeftPadded.Location.UNARY_OPERATOR, p));
+        u = u.withExpression(visitAndCast(u.getExpression(), p));
+        u = u.withType(visitType(u.getType(), p));
+        return u;
+    }
+
     public J visitBinary(G.Binary binary, P p) {
         G.Binary b = binary;
         b = b.withPrefix(visitSpace(b.getPrefix(), GSpace.Location.BINARY_PREFIX, p));
