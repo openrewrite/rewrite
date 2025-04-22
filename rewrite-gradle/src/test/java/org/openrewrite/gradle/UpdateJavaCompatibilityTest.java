@@ -449,6 +449,8 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               compileJava {
                   options.release = 8
               }
+              
+              compileJava.options.release = 8
               """,
             """
               plugins {
@@ -466,6 +468,8 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               compileJava {
                   options.release = 11
               }
+              
+              compileJava.options.release = 11
               """
           )
         );
