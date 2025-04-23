@@ -207,6 +207,7 @@ public class Substitutions {
         if (type == null) {
             return;
         }
+        Set<JavaType> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         new JavaTypeVisitor<Integer>() {
             @Override
             public JavaType visitAnnotation(JavaType.Annotation annotation, Integer p) {
@@ -226,9 +227,10 @@ public class Substitutions {
 
             @Override
             public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Integer p) {
-                if (typeVariables.contains(generic)) {
+                if (!visited.add(generic)) {
                     return generic;
-                } else if (!generic.getName().equals("?")) {
+                }
+                if (!generic.getName().equals("?")) {
                     typeVariables.add(generic);
                 }
                 return super.visitGenericTypeVariable(generic, p);
