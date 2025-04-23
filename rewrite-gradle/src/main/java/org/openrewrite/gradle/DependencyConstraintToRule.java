@@ -68,17 +68,17 @@ public class DependencyConstraintToRule extends Recipe {
         return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof JavaSourceFile) {
-                    List<GroupArtifactVersionBecause> gavs = new ArrayList<>();
-                    JavaSourceFile cu = (JavaSourceFile) new RemoveConstraints().visitNonNull(tree, gavs);
-                    if (gavs.isEmpty()) {
-                        return (J) tree;
-                    }
-                    cu = (JavaSourceFile) new MaybeAddEachDependency().visitNonNull(cu, ctx);
-                    cu = (JavaSourceFile) new UpdateEachDependency(gavs, cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
-                    return cu;
+                if (!(tree instanceof JavaSourceFile)) {
+                    return (J) tree;
                 }
-                return super.visit(tree, ctx);
+                List<GroupArtifactVersionBecause> gavs = new ArrayList<>();
+                JavaSourceFile cu = (JavaSourceFile) new RemoveConstraints().visitNonNull(tree, gavs);
+                if (gavs.isEmpty()) {
+                    return (J) tree;
+                }
+                cu = (JavaSourceFile) new MaybeAddEachDependency().visitNonNull(cu, ctx);
+                cu = (JavaSourceFile) new UpdateEachDependency(gavs, cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
+                return cu;
             }
         });
     }
@@ -390,6 +390,7 @@ public class DependencyConstraintToRule extends Recipe {
                     return cu;
                 } else {
                     K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
+                    assert cu != null;
                     J.Block block = (J.Block) cu.getStatements().get(0);
                     int insertionIndex = 0;
                     while (insertionIndex < block.getStatements().size()) {
@@ -446,7 +447,16 @@ public class DependencyConstraintToRule extends Recipe {
         Cursor c = cursor.dropParentUntil(value ->
                 value == Cursor.ROOT_VALUE ||
                 (value instanceof J.MethodInvocation && ((J.MethodInvocation) value).getSimpleName().equals("dependencies")));
-        return c.getValue() instanceof J.MethodInvocation;
+        if (!(c.getValue() instanceof J.MethodInvocation)) {
+            return false;
+        }
+        // Exclude "dependencies" blocks inside of buildscripts
+        // No plugins can prevent the "constraints" block from working there, as they can for regular dependencies block
+        Cursor maybeBuildscript = c.dropParentUntil(value -> value == Cursor.ROOT_VALUE || value instanceof J.MethodInvocation);
+        if (maybeBuildscript.getValue() instanceof J.MethodInvocation) {
+            return !"buildscript".equals(((J.MethodInvocation) maybeBuildscript.getValue()).getSimpleName());
+        }
+        return true;
     }
 
     private static boolean isEachDependency(J.MethodInvocation m) {
