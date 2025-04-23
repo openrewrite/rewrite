@@ -941,6 +941,24 @@ public class TypeUtils {
             }
         } else if (type instanceof JavaType.Array) {
             return toString(((JavaType.Array) type).getElemType(), recursiveTypes) + "[]";
+        } else if (type instanceof JavaType.Intersection) {
+            JavaType.Intersection intersection = (JavaType.Intersection) type;
+            StringJoiner joiner = new StringJoiner(" & ");
+            for (JavaType bound : intersection.getBounds()) {
+                joiner.add(toString(bound, recursiveTypes));
+            }
+            return joiner.toString();
+        } else if (type instanceof JavaType.MultiCatch) {
+            JavaType.MultiCatch multiCatch = (JavaType.MultiCatch) type;
+            StringJoiner joiner = new StringJoiner(" | ");
+            for (JavaType throwableType : multiCatch.getThrowableTypes()) {
+                joiner.add(toString(throwableType, recursiveTypes));
+            }
+            return joiner.toString();
+        } else if (type instanceof JavaType.Method) {
+            return toString(((JavaType.Method) type).getReturnType(), recursiveTypes);
+        } else if (type instanceof JavaType.Variable) {
+            return toString(((JavaType.Variable) type).getType(), recursiveTypes);
         }
         return type.toString();
     }
