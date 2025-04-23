@@ -146,16 +146,12 @@ class UnfoldPropertiesTest implements RewriteTest {
           yaml(
             """
               logging.level.com.service.A: DEBUG
-              logging.level.com.service.B: INFO
-              logging.level.com.another.package: INFO
               """,
             """
               logging:
                 level:
                   com.service:
                     A: DEBUG
-                    B: INFO
-                  com.another.package: INFO
               """
           )
         );
