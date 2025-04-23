@@ -45,12 +45,14 @@ public class AddImportTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               package a.b
               class Target
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original

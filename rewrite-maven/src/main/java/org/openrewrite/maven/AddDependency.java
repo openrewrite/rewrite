@@ -24,7 +24,6 @@ import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -51,9 +50,6 @@ import static java.util.Objects.requireNonNull;
 public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
-
-    @EqualsAndHashCode.Exclude
-    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
@@ -239,7 +235,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if ((resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) && dependencies.get(resolvedScopeEnum) != null) {
                     for (ResolvedDependency d : dependencies.get(resolvedScopeEnum)) {
                         if (hasAcceptableTransitivity(d, acc) &&
-                            groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                             return maven;
                         }
                     }
@@ -252,19 +248,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return maven;
                 }
 
-                return new AddDependencyVisitor(groupId,
-                        artifactId,
-                        version,
-                        versionPattern,
-                        resolvedScope,
-                        releasesOnly,
-                        type,
-                        classifier,
-                        optional,
-                        familyPatternCompiled,
-                        metadataFailures,
-                        mavenDownloadEvents
-                ).visitNonNull(document, ctx);
+                return new AddDependencyVisitor(
+                        groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
+                        type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(document, ctx);
             }
 
             private boolean isSubprojectOfParentInRepository(Scanned acc) {

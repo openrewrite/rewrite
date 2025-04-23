@@ -918,7 +918,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               public class Const {
                     public static final String HI = "hi";
               }
-              """),
+              """
+          ),
           java(
             """
               package org.example;

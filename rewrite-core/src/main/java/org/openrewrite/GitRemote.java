@@ -340,7 +340,7 @@ public class GitRemote {
                 String path = uri.getPath().replaceFirst("/$", "")
                         .replaceFirst("(?i)\\.git$", "")
                         .replaceFirst("^/", "");
-                return URI.create((scheme + "://" + host + maybePort + "/" + path).replaceFirst("/$", ""));
+                return URI.create((scheme + "://" + host + maybePort + "/" + path.replace(" ", "%20")).replaceFirst("/$", ""));
             } catch (URISyntaxException e) {
                 throw new IllegalStateException("Unable to parse origin from: " + url, e);
             }

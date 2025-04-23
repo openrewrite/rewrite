@@ -33,7 +33,6 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenPomCache;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 
@@ -132,10 +131,8 @@ public class MavenPomDownloader {
      * @param projectPoms Project poms on disk.
      * @param httpSender  The HTTP sender.
      * @param ctx         The execution context.
-     * @deprecated Use {@link #MavenPomDownloader(Map, ExecutionContext)} instead.
      */
-    @Deprecated
-    public MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
+    private MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
         this.projectPoms = projectPoms;
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
@@ -149,25 +146,12 @@ public class MavenPomDownloader {
 
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
         long start = System.nanoTime();
-        MavenDownloadEvents downloadEventsDataTable = ctx.getDownloadEventsDataTable();
-        if (downloadEventsDataTable != null) {
-            downloadEventsDataTable.insertStartedRow(ctx, request.getUrl().toString());
-        }
         try {
             return Failsafe.with(retryPolicy).get(() -> {
                 try (HttpSender.Response response = httpSender.send(request)) {
                     if (!response.isSuccessful()) {
-                        HttpSenderResponseException exception = new HttpSenderResponseException(null, response.getCode(),
+                        throw new HttpSenderResponseException(null, response.getCode(),
                                 new String(response.getBodyAsBytes()));
-                        Duration duration = Duration.ofNanos(System.nanoTime() - start);
-                        if (downloadEventsDataTable != null) {
-                            downloadEventsDataTable.insertErrorRow(ctx, request.getUrl().toString(), Integer.toString(response.getCode()), exception.getMessage(), duration);
-                        }
-                        throw exception;
-                    }
-                    Duration duration = Duration.ofNanos(System.nanoTime() - start);
-                    if (downloadEventsDataTable != null) {
-                        downloadEventsDataTable.insertFinishedRow(ctx, request.getUrl().toString(), Integer.toString(response.getCode()), duration);
                     }
                     return response.getBodyAsBytes();
                 }
@@ -176,14 +160,8 @@ public class MavenPomDownloader {
             if (failsafeException.getCause() instanceof HttpSenderResponseException) {
                 throw (HttpSenderResponseException) failsafeException.getCause();
             }
-            if (downloadEventsDataTable != null) {
-                downloadEventsDataTable.insertErrorRow(ctx, request.getUrl().toString(), null, failsafeException.getMessage(), Duration.ofNanos(System.nanoTime() - start));
-            }
             throw failsafeException;
         } catch (UncheckedIOException e) {
-            if (downloadEventsDataTable != null) {
-                downloadEventsDataTable.insertErrorRow(ctx, request.getUrl().toString(), null, e.getMessage(), Duration.ofNanos(System.nanoTime() - start));
-            }
             throw e.getCause();
         } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
@@ -263,9 +241,9 @@ public class MavenPomDownloader {
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "metadata");
 
         MavenMetadata mavenMetadata = null;
-        Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
-        List<String> attemptedUris = new ArrayList<>(normalizedRepos.size());
+        List<String> attemptedUris = new ArrayList<>();
         for (MavenRepository repo : normalizedRepos) {
             ctx.getResolutionListener().repository(repo, containingPom);
             if (gav.getVersion() != null && !repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
@@ -550,7 +528,7 @@ public class MavenPomDownloader {
             }
         }
 
-        Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
 
         Timer.Sample sample = Timer.start();
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "pom");
@@ -689,6 +667,7 @@ public class MavenPomDownloader {
                 repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
         }
+
         if (foundJarInRepo != null && foundResolvedGav != null) {
             // IF JAR has been found return the artificially created POM not to throw exception
             RawPom rawPom = rawPomFromGav(gav);
@@ -776,7 +755,7 @@ public class MavenPomDownloader {
         return gav.getVersion();
     }
 
-    Collection<MavenRepository> distinctNormalizedRepositories(
+    Iterable<MavenRepository> distinctNormalizedRepositories(
             List<MavenRepository> repositories,
             @Nullable ResolvedPom containingPom,
             @Nullable String acceptsVersion) {
@@ -787,35 +766,67 @@ public class MavenPomDownloader {
             repositories = emptyList();
         }
 
-        LinkedHashMap<String, MavenRepository> normalizedRepositories = new LinkedHashMap<>();
+        // Create a list of raw repository suppliers in the correct order
+        Map<@Nullable String, MavenRepository> repositoriesById = new LinkedHashMap<>();
 
+        // Add local repository if needed
         if (addLocalRepository) {
-            normalizedRepositories.put(ctx.getLocalRepository().getId(), ctx.getLocalRepository());
+            repositoriesById.put("local", ctx.getLocalRepository());
         }
 
-        // repositories from maven settings
+        // Add repositories from maven settings
         for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+            repositoriesById.put(repo.getId(), repo);
         }
 
+        // Add repositories passed as parameter
         for (MavenRepository repo : repositories) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+            repositoriesById.put(repo.getId(), repo);
         }
 
-        if (!normalizedRepositories.containsKey(MavenRepository.MAVEN_CENTRAL.getId()) && addCentralRepository) {
-            MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, ctx, containingPom);
-            if (normalizedRepo != null) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+        // Add Maven Central if needed
+        if (addCentralRepository && !repositoriesById.containsKey("central")) {
+            repositoriesById.put("central", MavenRepository.MAVEN_CENTRAL);
         }
 
-        return normalizedRepositories.values();
+        // Return lazy iterable
+        return () -> new Iterator<MavenRepository>() {
+            private final Iterator<MavenRepository> repoIterator = repositoriesById.values().iterator();
+            private final Map<@Nullable String, MavenRepository> seen = new LinkedHashMap<>();
+            private @Nullable MavenRepository next;
+
+            private @Nullable MavenRepository findNext() {
+                while (repoIterator.hasNext()) {
+                    MavenRepository repo = repoIterator.next();
+                    MavenRepository normalized = normalizeRepository(repo, ctx, containingPom);
+
+                    if (normalized != null &&
+                        (acceptsVersion == null || repositoryAcceptsVersion(normalized, acceptsVersion, containingPom)) &&
+                        seen.put(normalized.getId(), normalized) == null) {
+                        return normalized;
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public boolean hasNext() {
+                if (next != null) {
+                    return true;
+                }
+                return (next = findNext()) != null;
+            }
+
+            @Override
+            public MavenRepository next() {
+                MavenRepository result = next;
+                if (result == null) {
+                    throw new NoSuchElementException();
+                }
+                next = null;
+                return result;
+            }
+        };
     }
 
     public @Nullable MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
@@ -960,26 +971,11 @@ public class MavenPomDownloader {
     private boolean jarExistsForPomUri(MavenRepository repo, String pomUrl) {
         String jarUrl = pomUrl.replaceAll("\\.pom$", ".jar");
         try {
-
-            MavenDownloadEvents downloadEventsDataTable = MavenExecutionContextView.view(ctx).getDownloadEventsDataTable();
-            long start = System.nanoTime();
             try {
                 return Failsafe.with(retryPolicy).get(() -> {
                     HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(jarUrl)).build();
-                    if (downloadEventsDataTable != null) {
-                        downloadEventsDataTable.insertStartedRow(ctx, authenticated.getUrl().toString());
-                    }
                     try (HttpSender.Response response = httpSender.send(authenticated)) {
-                        boolean successful = response.isSuccessful();
-                        if (downloadEventsDataTable != null) {
-                            String code = Integer.toString(response.getCode());
-                            if (successful) {
-                                downloadEventsDataTable.insertFinishedRow(ctx, authenticated.getUrl().toString(), code, Duration.ofNanos(System.nanoTime() - start));
-                            } else {
-                                downloadEventsDataTable.insertErrorRow(ctx, authenticated.getUrl().toString(), code, "HTTP " + code, Duration.ofNanos(System.nanoTime() - start));
-                            }
-                        }
-                        return successful;
+                        return response.isSuccessful();
                     }
                 });
             } catch (FailsafeException failsafeException) {
@@ -992,10 +988,6 @@ public class MavenPomDownloader {
                             return response.isSuccessful();
                         }
                     });
-                } else {
-                    if (downloadEventsDataTable != null) {
-                        downloadEventsDataTable.insertErrorRow(ctx, jarUrl, null, cause.getMessage(), Duration.ofNanos(System.nanoTime() - start));
-                    }
                 }
             }
         } catch (Throwable e) {

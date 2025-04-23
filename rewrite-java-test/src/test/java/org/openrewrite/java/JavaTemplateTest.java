@@ -65,6 +65,62 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addParentheses() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+                    return JavaTemplate.builder("#{any()}")
+                      .build()
+                      .apply(getCursor(), parens.getCoordinates().replace(), parens.getTree());
+                }
+            }))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """,
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addParenthesesToParameter() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                    return JavaTemplate.builder("#{any(int)} * 3")
+                      .build()
+                      .apply(getCursor(), binary.getCoordinates().replace(), binary);
+                }
+            }))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              public class A {
+                  int a = 1 + 2;
+              }
+              """,
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
     void assignmentWithinIfPredicate() {
@@ -129,7 +185,8 @@ class JavaTemplateTest implements RewriteTest {
                       T x = doIt();
                   }
               }
-              """, """
+              """,
+            """
               import java.io.Serializable;
               
               abstract class Outer<T extends Serializable> {
@@ -862,7 +919,8 @@ class JavaTemplateTest implements RewriteTest {
               public class ArrayHelper {
                   public static Object[] of(Object... objects){ return null;}
               }
-              """, SourceSpec::skip
+              """,
+            SourceSpec::skip
           ),
           java(
             """
@@ -1276,13 +1334,15 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   String testMethod(@NotNull final String test) {}
               }
-              """, """
+              """,
+            """
               import lombok.NonNull;
               
               class A {
                   String testMethod(@NonNull final String test) {}
               }
-              """)
+              """
+          )
         );
     }
 
@@ -1413,6 +1473,52 @@ class JavaTemplateTest implements RewriteTest {
                   void bar(List<String> lst) {
                       for (final var s : lst) {}
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5289")
+    void recursiveType() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext o) {
+                    J.VariableDeclarations param = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
+                    J.VariableDeclarations.NamedVariable variable = param.getVariables().get(0);
+
+                    return JavaTemplate.builder("reference -> System.out.println(#{any()})")
+                      .contextSensitive()
+                      .build()
+                      .apply(getCursor(), lambda.getCoordinates().replace(), variable.getName());
+                }
+            })),
+          java(
+            """
+              import java.util.Optional;
+              
+              class BugTest {
+                  void run(One<?, ?> firstBuild) {
+                      Optional.of(firstBuild).ifPresent(reference -> {});
+                  }
+              
+                  abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                  abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              }
+              """,
+            """
+              import java.util.Optional;
+              
+              class BugTest {
+                  void run(One<?, ?> firstBuild) {
+                      Optional.of(firstBuild).ifPresent(reference -> System.out.println(reference));
+                  }
+              
+                  abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                  abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
               }
               """
           )

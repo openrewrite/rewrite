@@ -24,9 +24,7 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.*;
@@ -46,9 +44,6 @@ import static java.util.Objects.requireNonNull;
 public class DependencyVersionSelector {
     @Nullable
     MavenMetadataFailures metadataFailures;
-
-    @Nullable
-    MavenDownloadEvents mavenDownloadEvents;
 
     @Nullable
     GradleProject gradleProject;
@@ -187,7 +182,6 @@ public class DependencyVersionSelector {
                                               @Nullable String configuration,
                                               VersionComparator versionComparator,
                                               ExecutionContext ctx) throws MavenDownloadingException {
-        MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(mavenDownloadEvents);
         try {
             if(gav.getGroupId() == null) {
                 return Optional.empty();
@@ -202,8 +196,6 @@ public class DependencyVersionSelector {
         } catch (IllegalStateException e) {
             // this can happen when we encounter exotic versions
             return Optional.empty();
-        } finally {
-            MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(null);
         }
     }
 

@@ -426,4 +426,52 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://docs.gradle.org/current/userguide/building_java_projects.html#sec:compiling_with_release")
+    void releaseValueGetsUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              tasks.withType(JavaCompile) {
+                  options.release = 8
+              }
+              
+              tasks.withType(JavaCompile).configureEach {
+                  options.release = 8
+              }
+              
+              compileJava {
+                  options.release = 8
+              }
+              
+              compileJava.options.release = 8
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              tasks.withType(JavaCompile) {
+                  options.release = 11
+              }
+              
+              tasks.withType(JavaCompile).configureEach {
+                  options.release = 11
+              }
+              
+              compileJava {
+                  options.release = 11
+              }
+              
+              compileJava.options.release = 11
+              """
+          )
+        );
+    }
 }

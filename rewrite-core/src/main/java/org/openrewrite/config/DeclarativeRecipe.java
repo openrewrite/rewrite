@@ -70,6 +70,7 @@ public class DeclarativeRecipe extends Recipe {
 
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
 
+    @Getter
     @Setter
     private List<Recipe> preconditions = new ArrayList<>();
 
@@ -405,5 +406,24 @@ public class DeclarativeRecipe extends Recipe {
             contributors.sort(Comparator.comparing(Contributor::getLineCount).reversed());
         }
         return contributors;
+    }
+
+    @Override
+    public List<DataTableDescriptor> getDataTableDescriptors() {
+        List<DataTableDescriptor> dataTableDescriptors = null;
+        for (Recipe recipe : getRecipeList()) {
+            List<DataTableDescriptor> dtds = recipe.getDataTableDescriptors();
+            if (!dtds.isEmpty()) {
+                if (dataTableDescriptors == null) {
+                    dataTableDescriptors = new ArrayList<>();
+                }
+                for (DataTableDescriptor dtd : dtds) {
+                    if (!dataTableDescriptors.contains(dtd)) {
+                        dataTableDescriptors.add(dtd);
+                    }
+                }
+            }
+        }
+        return dataTableDescriptors == null ? super.getDataTableDescriptors() : dataTableDescriptors;
     }
 }

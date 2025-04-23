@@ -28,7 +28,7 @@ public class Semver {
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isVersion(@Nullable String version) {
-        if (version == null) {
+        if (StringUtils.isBlank(version)) {
             return false;
         }
         return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
@@ -96,9 +96,9 @@ public class Semver {
     }
 
     public static @Nullable String max(@Nullable String version1, @Nullable String version2) {
-        if (StringUtils.isBlank(version1)) {
+        if (!isVersion(version1)) {
             return StringUtils.isBlank(version2) ? null : version2;
-        } else if (StringUtils.isBlank(version2)) {
+        } else if (!isVersion(version2)) {
             return version1;
         }
 

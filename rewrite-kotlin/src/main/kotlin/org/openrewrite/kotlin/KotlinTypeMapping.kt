@@ -539,7 +539,10 @@ class KotlinTypeMapping(
             if (function.symbol is FirConstructorSymbol) "<constructor>" else methodName(function),
             null,
             paramNames,
-            null, null, null,
+            null,
+            null,
+            null,
+            null,
             null
         )
         typeCache.put(signature, method)
@@ -636,8 +639,11 @@ class KotlinTypeMapping(
             javaMethod.name.asString(),
             null,
             paramNames,
-            null, null, null,
-            defaultValues
+            null,
+            null,
+            null,
+            defaultValues,
+            null
         )
         typeCache.put(signature, method)
         val exceptionTypes: List<FullyQualified>? = null
@@ -715,11 +721,15 @@ class KotlinTypeMapping(
             when {
                 sym is FirConstructorSymbol ||
                         sym is FirSyntheticFunctionSymbol && sym.origin == FirDeclarationOrigin.SamConstructor -> "<constructor>"
+
                 else -> (sym as FirNamedFunctionSymbol).name.asString()
             },
             null,
             paramNames,
-            null, null, null,
+            null,
+            null,
+            null,
+            null,
             null
         )
         typeCache.put(signature, method)
@@ -1105,8 +1115,11 @@ class KotlinTypeMapping(
             "<constructor>",
             null,
             paramNames,
-            null, null, null,
-            defaultValues
+            null,
+            null,
+            null,
+            defaultValues,
+            null
         )
         typeCache.put(signature, method)
         val exceptionTypes: List<FullyQualified>? = null

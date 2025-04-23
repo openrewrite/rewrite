@@ -81,21 +81,14 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Nullable
     List<String> except;
 
-    @Deprecated
-    public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
-                                             @Nullable Boolean onlyIfVersionsMatch, @Nullable List<String> except) {
-        this(groupPattern, artifactPattern, onlyIfVersionsMatch, null, except);
-    }
-
     public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
                                              @Nullable Comparator onlyIfManagedVersionIs, @Nullable List<String> except) {
         this(groupPattern, artifactPattern, null, onlyIfManagedVersionIs, except);
     }
 
     @JsonCreator
-    @Deprecated
     @SuppressWarnings("DeprecatedIsStillUsed")
-    public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
+    private RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
                                              @Nullable Boolean onlyIfVersionsMatch, @Nullable Comparator onlyIfManagedVersionIs,
                                              @Nullable List<String> except) {
         this.groupPattern = groupPattern;

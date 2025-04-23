@@ -246,7 +246,8 @@ class AddPropertyTest implements RewriteTest {
               # sam
               com.sam=true
               com.zoe=true
-              """)
+              """
+          )
         );
     }
 
@@ -281,7 +282,8 @@ class AddPropertyTest implements RewriteTest {
               com.seb=true
               # zoe
               com.zoe=true
-              """)
+              """
+          )
         );
     }
 
@@ -302,7 +304,8 @@ class AddPropertyTest implements RewriteTest {
               com.amy=true
               # sam
               com.sam=true
-              """)
+              """
+          )
         );
     }
 }

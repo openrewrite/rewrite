@@ -62,7 +62,8 @@ class FindManagedDependencyTest implements RewriteTest {
                   </dependencies>
                 </dependencyManagement>
               </project>
-              """)
+              """
+          )
         );
     }
 
@@ -105,7 +106,8 @@ class FindManagedDependencyTest implements RewriteTest {
                 </dependencies>
               </dependencyManagement>
             </project>
-            """)
+            """
+          )
         );
     }
 

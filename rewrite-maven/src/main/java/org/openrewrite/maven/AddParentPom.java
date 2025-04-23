@@ -21,11 +21,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.ResolutionEventListener;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -40,11 +38,7 @@ import java.util.stream.Collectors;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddParentPom extends Recipe {
-    @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
-
-    @EqualsAndHashCode.Exclude
-    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     @Option(displayName = "Group ID",
             description = "The group ID of the maven parent pom to be adopted.",
@@ -121,7 +115,6 @@ public class AddParentPom extends Recipe {
                 Xml.Tag root = document.getRoot();
                 assert !root.getChild("parent").isPresent();
 
-                MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(mavenDownloadEvents);
                 try {
                     Optional<String> targetVersion = findAcceptableVersion(groupId, artifactId, ctx);
                     if (targetVersion.isPresent()) {
@@ -148,8 +141,6 @@ public class AddParentPom extends Recipe {
                                 repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
                     }
                     return e.warn(document);
-                } finally {
-                    MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(null);
                 }
 
                 return super.visitDocument(document, ctx);

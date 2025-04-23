@@ -24,6 +24,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.List;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
@@ -456,6 +457,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void constraintDoesNotGetAddedToNonTransitiveNonExtendingConfiguration() {
         rewriteRun(
@@ -479,7 +481,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void constraintDoesNotGetAddedInsideConstraint() {
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-core","2.12.5", null, "CVE-2024-BAD", null)),
+            .recipe(new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null)),
           //language=groovy
           buildGradle(
             """
@@ -501,7 +503,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       }
                   }
               }
-              """, """
+              """,
+                """
               plugins {
                   id 'java'
               }
@@ -544,7 +547,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
-              """, """
+              """,
+                """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
@@ -578,7 +582,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
-              """, """
+              """,
+                """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
@@ -614,7 +619,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
-              """, """
+              """,
+                """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
@@ -666,6 +672,116 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
               
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslAddConstraint() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                `java-library`
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """,
+            """
+              plugins {
+                `java-library`
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.5") {
+                          because("CVE-2024-BAD")
+                      }
+                  }
+              
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslUpdateConstraint() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.0") {
+                          because("some reason")
+                      }
+                  }
+              
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """,
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.5") {
+                          because("CVE-2024-BAD")
+                      }
+                  }
+              
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslUseResolutionStrategyWhenSpringDependencyManagementPluginIsPresent() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+                  id("io.spring.dependency-management") version "1.1.5"
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+              
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+                  id("io.spring.dependency-management") version "1.1.5"
+              }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == "com.fasterxml.jackson.core" && details.requested.name == "jackson-core") {
+                          details.useVersion("2.12.5")
+                          details.because("CVE-2024-BAD")
+                      }
+                  }
+              }
+              
+              dependencies {
+              
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
               }
               """
           )
