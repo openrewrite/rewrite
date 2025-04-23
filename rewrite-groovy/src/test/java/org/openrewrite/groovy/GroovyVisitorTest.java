@@ -25,6 +25,36 @@ import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyVisitorTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void autoFormatIncludesOmitParentheses() {
+        rewriteRun(
+          spec -> spec
+            .recipeExecutionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
+                @Override
+                public Tree treeChanged(Cursor cursor, Tree newTree) {
+                    return newTree;
+                }
+            }).subscribeToType(J.Lambda.class)))
+            .recipe(RewriteTest.toRecipe(() -> new GroovyVisitor<>() {
+                @Override
+                public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                    return autoFormat(super.visitCompilationUnit(cu, ctx), ctx);
+                }
+            })),
+          groovy(
+            """
+              Test.test({ it })
+              """,
+            """
+              Test.test {
+                  it
+              }
+              """
+          )
+        );
+    }
+  
     @Test
     void newArrayWithSize() {
         rewriteRun(groovy(
@@ -90,34 +120,18 @@ class GroovyVisitorTest implements RewriteTest {
             """
         ));
     }
-
-    @DocumentExample
+  
     @Test
-    void autoFormatIncludesOmitParentheses() {
-        rewriteRun(
-          spec -> spec
-            .recipeExecutionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
-                @Override
-                public Tree treeChanged(Cursor cursor, Tree newTree) {
-                    return newTree;
+    void spreadOperator() {
+        rewriteRun(groovy(
+          """
+            class A {
+                static void main(String[] argv) {
+                    def l = [1,2,3]
+                    System.out.printf("%d, %d, %d", *l);
                 }
-            }).subscribeToType(J.Lambda.class)))
-            .recipe(RewriteTest.toRecipe(() -> new GroovyVisitor<>() {
-                @Override
-                public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                    return autoFormat(super.visitCompilationUnit(cu, ctx), ctx);
-                }
-            })),
-          groovy(
+            }
             """
-              Test.test({ it })
-              """,
-            """
-              Test.test {
-                  it
-              }
-              """
-          )
-        );
+        ));
     }
 }

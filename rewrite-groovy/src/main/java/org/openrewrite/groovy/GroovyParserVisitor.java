@@ -2068,6 +2068,13 @@ public class GroovyParserVisitor {
                     null));
         }
 
+        @Override
+        public void visitSpreadExpression(SpreadExpression spreadExpression) {
+            Space fmt = whitespace();
+            skip("*");
+            queue.add(new G.Unary(randomId(), fmt, Markers.EMPTY, JLeftPadded.build(G.Unary.Type.Spread), visit(spreadExpression.getExpression()), null));
+        }
+
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
             Space prefix = whitespace();
