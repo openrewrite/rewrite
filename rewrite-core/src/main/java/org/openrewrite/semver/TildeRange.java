@@ -32,21 +32,26 @@ public class TildeRange extends LatestRelease {
 
     private final String upperExclusive;
     private final String lower;
+    private final boolean requireRelease;
 
-    private TildeRange(String lower, String upperExclusive, @Nullable String metadataPattern) {
+    private TildeRange(String lower, String upperExclusive, @Nullable String metadataPattern, boolean requireRelease) {
         super(metadataPattern);
         this.lower = lower;
         this.upperExclusive = upperExclusive;
+        this.requireRelease = requireRelease;
     }
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        return VersionComparator.checkVersion(version, getMetadataPattern(), false) &&
+        return VersionComparator.checkVersion(version, getMetadataPattern(), requireRelease) &&
                 super.compare(currentVersion, version, upperExclusive) < 0 &&
                 super.compare(currentVersion, version, lower) >= 0;
     }
 
     public static Validated<TildeRange> build(String pattern, @Nullable String metadataPattern) {
+        return build(pattern, metadataPattern, false);
+    }
+    public static Validated<TildeRange> build(String pattern, @Nullable String metadataPattern, boolean requireRelease) {
         Matcher matcher = TILDE_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("tildeRange", pattern, "not a tilde range");
@@ -74,6 +79,6 @@ public class TildeRange extends LatestRelease {
             upper = major + "." + minor + "." + (parseInt(patch) + 1);
         }
 
-        return Validated.valid("tildeRange", new TildeRange(lower, upper, metadataPattern));
+        return Validated.valid("tildeRange", new TildeRange(lower, upper, metadataPattern, requireRelease));
     }
 }

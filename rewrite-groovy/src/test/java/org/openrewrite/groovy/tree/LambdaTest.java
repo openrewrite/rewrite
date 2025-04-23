@@ -30,7 +30,8 @@ class LambdaTest implements RewriteTest {
           groovy(
                 """
             def lambda = a -> a
-            """)
+            """
+          )
         );
     }
 
@@ -40,7 +41,8 @@ class LambdaTest implements RewriteTest {
           groovy(
                 """
             ( ) -> arg
-            """)
+            """
+          )
         );
     }
     @Test
@@ -49,7 +51,8 @@ class LambdaTest implements RewriteTest {
           groovy(
                 """
             ( String arg ) -> arg
-            """)
+            """
+          )
         );
     }
 
@@ -62,7 +65,8 @@ class LambdaTest implements RewriteTest {
             foo { String a ->
                 ( _ ) -> a
             }
-            """)
+            """
+          )
         );
     }
 
@@ -77,7 +81,8 @@ class LambdaTest implements RewriteTest {
                 a
                 a
             }
-            """)
+            """
+          )
         );
     }
 

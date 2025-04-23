@@ -32,7 +32,8 @@ class RemoveUnusedVisitorTest implements RewriteTest {
     @Test
     void unusedMappings() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                 root:
                   a:
                     b:
@@ -49,7 +50,8 @@ class RemoveUnusedVisitorTest implements RewriteTest {
     @Test
     void unusedSequences() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                 root:
                   -
                   - 0

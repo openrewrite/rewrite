@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
+import org.openrewrite.java.internal.JavaReflectionTypeMapping;
+import org.openrewrite.java.internal.JavaTypeCache;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -62,6 +64,23 @@ public class TypeUtils {
                     "Throwable",
                     "Void"
             ));
+    private static final Map<JavaType.Primitive, JavaType> BOXED_TYPES = new EnumMap<>(JavaType.Primitive.class);
+
+    static {
+        JavaReflectionTypeMapping typeMapping = new JavaReflectionTypeMapping(new JavaTypeCache());
+        BOXED_TYPES.put(JavaType.Primitive.Boolean, typeMapping.type(Boolean.class));
+        BOXED_TYPES.put(JavaType.Primitive.Byte, typeMapping.type(Byte.class));
+        BOXED_TYPES.put(JavaType.Primitive.Char, typeMapping.type(Character.class));
+        BOXED_TYPES.put(JavaType.Primitive.Short, typeMapping.type(Short.class));
+        BOXED_TYPES.put(JavaType.Primitive.Int, typeMapping.type(Integer.class));
+        BOXED_TYPES.put(JavaType.Primitive.Long, typeMapping.type(Long.class));
+        BOXED_TYPES.put(JavaType.Primitive.Float, typeMapping.type(Float.class));
+        BOXED_TYPES.put(JavaType.Primitive.Double, typeMapping.type(Double.class));
+        BOXED_TYPES.put(JavaType.Primitive.String, typeMapping.type(String.class));
+        BOXED_TYPES.put(JavaType.Primitive.Void, JavaType.Unknown.getInstance());
+        BOXED_TYPES.put(JavaType.Primitive.None, JavaType.Unknown.getInstance());
+        BOXED_TYPES.put(JavaType.Primitive.Null, JavaType.Unknown.getInstance());
+    }
 
     private TypeUtils() {
     }
@@ -160,6 +179,11 @@ public class TypeUtils {
                 }
             }
             return true;
+        }
+        if(type1 instanceof JavaType.Variable && type2 instanceof JavaType.Variable) {
+            JavaType.Variable var1 = (JavaType.Variable) type1;
+            JavaType.Variable var2 = (JavaType.Variable) type2;
+            return isOfType((var1).getType(), var2.getType()) && isOfType(var1.getOwner(), var2.getOwner());
         }
         return type1.equals(type2);
     }
@@ -299,6 +323,9 @@ public class TypeUtils {
             if (to == from) {
                 return true;
             }
+            if (from == JavaType.Primitive.Null) {
+                return !(to instanceof JavaType.Primitive);
+            }
 
             // Handle parameterized types (e.g., List<String>)
             if (to instanceof JavaType.Parameterized) {
@@ -413,12 +440,7 @@ public class TypeUtils {
             else if (to instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
                 if (from instanceof JavaType.Primitive) {
-                    JavaType.Primitive toPrimitive = JavaType.Primitive.fromClassName(toFq.getFullyQualifiedName());
-                    if (toPrimitive != null) {
-                        return isAssignableTo(toPrimitive, from, position);
-                    } else if (isObject(toFq)) {
-                        return true;
-                    }
+                    return isAssignableTo(to, BOXED_TYPES.get((JavaType.Primitive) from), position);
                 } else if (from instanceof JavaType.Intersection) {
                     for (JavaType intersectionType : ((JavaType.Intersection) from).getBounds()) {
                         if (isAssignableTo(to, intersectionType, position)) {
@@ -438,7 +460,7 @@ public class TypeUtils {
             } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
                 JavaType.Array toArray = (JavaType.Array) to;
                 JavaType.Array fromArray = (JavaType.Array) from;
-                if (toArray.getElemType() instanceof JavaType.Primitive) {
+                if (toArray.getElemType() instanceof JavaType.Primitive || fromArray.getElemType() instanceof JavaType.Primitive) {
                     return isOfType(toArray.getElemType(), fromArray.getElemType());
                 }
                 // Arrays are invariant in Java
@@ -511,25 +533,29 @@ public class TypeUtils {
     private static boolean handlePrimitiveAssignability(JavaType.Primitive to, @Nullable JavaType from) {
         if (from instanceof JavaType.FullyQualified) {
             // Account for auto-unboxing
-            JavaType.FullyQualified boxed = JavaType.ShallowClass.build(to.getClassName());
-            return isAssignableTo(boxed, from);
+            JavaType.FullyQualified fromFq = (JavaType.FullyQualified) from;
+            JavaType.Primitive fromPrimitive = JavaType.Primitive.fromClassName(fromFq.getFullyQualifiedName());
+            return handlePrimitiveAssignability(to, fromPrimitive);
         } else if (from instanceof JavaType.Primitive) {
             JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
             switch (fromPrimitive) {
-                case Boolean:
                 case Void:
                 case None:
                 case Null:
                 case String:
                     return false;
+                case Boolean:
+                    return fromPrimitive == to;
                 default:
                     switch (to) {
+                        case Byte:
                         case Char:
-                            return false;
+                            return fromPrimitive == to;
                         case Short:
                             switch (fromPrimitive) {
                                 case Byte:
                                 case Char:
+                                case Short:
                                     return true;
                             }
                             return false;
@@ -538,6 +564,7 @@ public class TypeUtils {
                                 case Byte:
                                 case Char:
                                 case Short:
+                                case Int:
                                     return true;
                             }
                             return false;
@@ -547,6 +574,7 @@ public class TypeUtils {
                                 case Char:
                                 case Short:
                                 case Int:
+                                case Long:
                                     return true;
                             }
                             return false;
@@ -609,7 +637,7 @@ public class TypeUtils {
         } catch (Exception e) {
             return false;
         }
-        return false;
+        return to.equals("java.lang.Object");
     }
 
     public static boolean isAssignableTo(Pattern to, @Nullable JavaType from) {
@@ -875,31 +903,62 @@ public class TypeUtils {
     }
 
     public static String toString(JavaType type) {
+        return toString(type, new IdentityHashMap<>());
+    }
+
+    private static String toString(JavaType type, IdentityHashMap<JavaType, Boolean> recursiveTypes) {
         if (type instanceof JavaType.Primitive) {
             return ((JavaType.Primitive) type).getKeyword();
         } else if (type instanceof JavaType.Class) {
             return ((JavaType.Class) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-            String base = toString(parameterized.getType());
+            String base = toString(parameterized.getType(), recursiveTypes);
             StringJoiner joiner = new StringJoiner(", ", "<", ">");
             for (JavaType parameter : parameterized.getTypeParameters()) {
-                joiner.add(toString(parameter));
+                joiner.add(toString(parameter, recursiveTypes));
             }
             return base + joiner;
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
             if (!genericType.getName().equals("?")) {
                 return genericType.getName();
-            } else if (genericType.getVariance() == JavaType.GenericTypeVariable.Variance.INVARIANT
-                    || genericType.getBounds().size() != 1) { // Safe check, wildcards don't allow additional bounds
+            } else if (genericType.getVariance() == JavaType.GenericTypeVariable.Variance.INVARIANT ||
+                    genericType.getBounds().size() != 1) { // Safe check, wildcards don't allow additional bounds
+                return "?";
+            } else if (recursiveTypes.containsKey(genericType)) {
+                recursiveTypes.put(genericType, true);
                 return "?";
             } else {
+                recursiveTypes.put(genericType, false);
                 String variance = genericType.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT ? "? extends " : "? super ";
-                return variance + toString(genericType.getBounds().get(0));
+                String bound = toString(genericType.getBounds().get(0), recursiveTypes);
+                if (!recursiveTypes.get(genericType)) {
+                    recursiveTypes.remove(genericType);
+                    return variance + bound;
+                }
+                return "?";
             }
         } else if (type instanceof JavaType.Array) {
-            return toString(((JavaType.Array) type).getElemType()) + "[]";
+            return toString(((JavaType.Array) type).getElemType(), recursiveTypes) + "[]";
+        } else if (type instanceof JavaType.Intersection) {
+            JavaType.Intersection intersection = (JavaType.Intersection) type;
+            StringJoiner joiner = new StringJoiner(" & ");
+            for (JavaType bound : intersection.getBounds()) {
+                joiner.add(toString(bound, recursiveTypes));
+            }
+            return joiner.toString();
+        } else if (type instanceof JavaType.MultiCatch) {
+            JavaType.MultiCatch multiCatch = (JavaType.MultiCatch) type;
+            StringJoiner joiner = new StringJoiner(" | ");
+            for (JavaType throwableType : multiCatch.getThrowableTypes()) {
+                joiner.add(toString(throwableType, recursiveTypes));
+            }
+            return joiner.toString();
+        } else if (type instanceof JavaType.Method) {
+            return toString(((JavaType.Method) type).getReturnType(), recursiveTypes);
+        } else if (type instanceof JavaType.Variable) {
+            return toString(((JavaType.Variable) type).getType(), recursiveTypes);
         }
         return type.toString();
     }

@@ -171,12 +171,14 @@ class ChangePropertyValueTest implements RewriteTest {
             multiple-prefixed=test[replaceme:1]test[replaceme:2]
             multiple-suffixed=[replaceme:1]test[replaceme:2]test
             multiple-both=test[replaceme:1]test[replaceme:2]test
-            """, """
+            """,
+                """
             multiple=[replaced:1][replaced:2]
             multiple-prefixed=test[replaced:1]test[replaced:2]
             multiple-suffixed=[replaced:1]test[replaced:2]test
             multiple-both=test[replaced:1]test[replaced:2]test
-            """)
+            """
+          )
         );
     }
 
@@ -190,7 +192,8 @@ class ChangePropertyValueTest implements RewriteTest {
             multiple-prefixed=test[replaceme:1]test[replaceme:2]
             multiple-suffixed=[replaceme:1]test[replaceme:2]test
             multiple-both=test[replaceme:1]test[replaceme:2]test
-            """)
+            """
+          )
         );
     }
 

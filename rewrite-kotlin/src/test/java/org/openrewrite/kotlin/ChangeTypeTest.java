@@ -40,7 +40,8 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original
@@ -67,7 +68,8 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original
@@ -95,7 +97,8 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.`Original`
@@ -122,7 +125,8 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original as MyAlias
@@ -150,12 +154,14 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package x.y
               class Target<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package example
@@ -184,12 +190,14 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package x.y
               class Target<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package example
@@ -216,12 +224,14 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package x.y
               class Target<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package example
@@ -246,7 +256,8 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               class A {
@@ -414,7 +425,8 @@ class ChangeTypeTest implements RewriteTest {
               package a.b
 
               open class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original
@@ -443,7 +455,8 @@ class ChangeTypeTest implements RewriteTest {
               package a.b
 
               annotation class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original

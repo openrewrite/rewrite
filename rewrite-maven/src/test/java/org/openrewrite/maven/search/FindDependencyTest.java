@@ -214,7 +214,8 @@ class FindDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-            ,sourceSpecs -> sourceSpecs.path("pom.xml")),
+            ,
+                sourceSpecs -> sourceSpecs.path("pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -248,7 +249,8 @@ class FindDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          ,sourceSpecs -> sourceSpecs.path("sample-module/pom.xml"))
+          ,
+                sourceSpecs -> sourceSpecs.path("sample-module/pom.xml"))
         );
     }
 
