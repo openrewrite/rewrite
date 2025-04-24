@@ -76,43 +76,20 @@ public class ChangeTypeInStringLiteral extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new TreeVisitor<Tree, ExecutionContext>() {
+        final Pattern stringLiteralPattern = Pattern.compile("\\b" + oldFullyQualifiedTypeName + "\\b");
+        return new JavaVisitor<ExecutionContext>() {
             @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile instanceof JavaSourceFile;
-            }
-
-            @Override
-            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
-                stopAfterPreVisit();
-                if (tree instanceof J) {
-                    return new JavaChangeTypeLiteralVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+            public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                J.Literal lit = literal;
+                if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
+                    Matcher matcher = stringLiteralPattern.matcher((String) lit.getValue());
+                    if (matcher.find()) {
+                        lit = lit.withValue(matcher.replaceAll(newFullyQualifiedTypeName))
+                                .withValueSource(stringLiteralPattern.matcher(lit.getValueSource()).replaceAll(newFullyQualifiedTypeName));
+                    }
                 }
-                return tree;
+                return super.visitLiteral(lit, ctx);
             }
         };
-    }
-
-    private static class JavaChangeTypeLiteralVisitor extends JavaVisitor<ExecutionContext> {
-        private final String newFullyQualifiedTypeName;
-        private final Pattern stringLiteralPattern;
-
-        private JavaChangeTypeLiteralVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName) {
-            this.newFullyQualifiedTypeName = newFullyQualifiedTypeName;
-            this.stringLiteralPattern = Pattern.compile("\\b" + oldFullyQualifiedTypeName + "\\b");
-        }
-
-        @Override
-        public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
-            J.Literal lit = literal;
-            if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
-                Matcher matcher = stringLiteralPattern.matcher((String) lit.getValue());
-                if (matcher.find()) {
-                    lit = lit.withValue(matcher.replaceAll(newFullyQualifiedTypeName))
-                            .withValueSource(stringLiteralPattern.matcher(lit.getValueSource()).replaceAll(newFullyQualifiedTypeName));
-                }
-            }
-            return super.visitLiteral(lit, ctx);
-        }
     }
 }
