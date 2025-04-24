@@ -73,20 +73,6 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             }
         }
 
-        if (result instanceof JavaType.Class) {
-            TypeMetadata.Annotations annotations;
-            if ((annotations = (TypeMetadata.Annotations) type.getMetadata().get(TypeMetadata.Entry.Kind.ANNOTATIONS)) != null) {
-                List<JavaType.FullyQualified> annotationList = new ArrayList<>(4);
-                for (Attribute.TypeCompound compound : annotations.getAnnotations()) {
-                    JavaType.Annotation annotationType = annotationType(compound);
-                    if (annotationType != null) {
-                        annotationList.add(annotationType);
-                    }
-                }
-                result = ((JavaType.Class) result).withAnnotations(annotationList);
-            }
-        }
-
         if (result != null) {
             return result;
         }
@@ -474,7 +460,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+    public JavaType.@Nullable Method methodInvocationType(@Nullable Type selectType, @Nullable Symbol symbol) {
         if (selectType instanceof Type.ErrorType) {
             try {
                 // Ugly reflection solution, because AttrRecover$RecoveryErrorType is private inner class
@@ -681,17 +667,68 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             if (signatureType instanceof Type.MethodType) {
                 Type.MethodType mt = (Type.MethodType) signatureType;
 
+                com.sun.tools.javac.util.List<Attribute.TypeCompound> typeAttributes =
+                        symbol.getMetadata() != null ? symbol.getMetadata().getTypeAttributes() : null;
                 if (!mt.argtypes.isEmpty()) {
                     parameterTypes = new ArrayList<>(mt.argtypes.size());
-                    for (Type argtype : mt.argtypes) {
+                    for (int i = 0; i < mt.argtypes.size(); i++) {
+                        Type argtype = mt.argtypes.get(i);
                         if (argtype != null) {
                             JavaType javaType = type(argtype);
+                            if (typeAttributes != null) {
+                                List<JavaType.FullyQualified> annotations = new ArrayList<>(1);
+                                for (Attribute.TypeCompound typeAttribute : typeAttributes) {
+                                    if (typeAttribute.getPosition().type == TargetType.METHOD_FORMAL_PARAMETER && typeAttribute.getPosition().parameter_index == i) {
+                                        JavaType.Annotation annotationType = annotationType(typeAttribute);
+                                        if (annotationType != null) {
+                                            annotations.add(annotationType);
+                                        }
+                                    }
+                                }
+                                if (annotations.size() > 0) {
+                                    if (javaType instanceof JavaType.Class) {
+                                        javaType = ((JavaType.Class) javaType).withAnnotations(annotations);
+                                    } else if (javaType instanceof JavaType.Parameterized) {
+                                        javaType = javaType;
+                                    } else if (javaType instanceof JavaType.GenericTypeVariable) {
+                                        javaType = javaType;
+                                    } else if (javaType instanceof JavaType.Array) {
+                                        javaType = ((JavaType.Array) javaType).withAnnotations(annotations);
+                                    } else {
+                                        javaType = javaType;
+                                    }
+                                }
+                            }
                             parameterTypes.add(javaType);
                         }
                     }
                 }
 
                 returnType = type(mt.restype);
+                if (typeAttributes != null) {
+                    List<JavaType.FullyQualified> annotations = new ArrayList<>(1);
+                    for (Attribute.TypeCompound typeAttribute : typeAttributes) {
+                        if (typeAttribute.getPosition().type == TargetType.METHOD_RETURN) {
+                            JavaType.Annotation annotationType = annotationType(typeAttribute);
+                            if (annotationType != null) {
+                                annotations.add(annotationType);
+                            }
+                        }
+                    }
+                    if (annotations.size() > 0) {
+                        if (returnType instanceof JavaType.Class) {
+                            returnType = ((JavaType.Class) returnType).withAnnotations(annotations);
+                        } else if (returnType instanceof JavaType.Parameterized) {
+                            returnType = returnType;
+                        } else if (returnType instanceof JavaType.GenericTypeVariable) {
+                            returnType = returnType;
+                        } else if (returnType instanceof JavaType.Array) {
+                            returnType = ((JavaType.Array) returnType).withAnnotations(annotations);
+                        } else {
+                            returnType = returnType;
+                        }
+                    }
+                }
             } else {
                 throw new UnsupportedOperationException("Unexpected method signature type" + signatureType.getClass().getName());
             }
