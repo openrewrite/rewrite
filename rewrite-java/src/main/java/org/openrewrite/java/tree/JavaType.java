@@ -1056,7 +1056,7 @@ public interface JavaType {
             if (Arrays.equals(annotationsArray, this.annotations)) {
                 return this;
             }
-            return new Array(this.managedReference, this.elemType, this.annotations);
+            return new Array(this.managedReference, this.elemType, annotationsArray);
         }
 
         @Override
