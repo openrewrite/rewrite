@@ -123,6 +123,39 @@ class DependencyPluginGoalResolveSourcesTest implements RewriteTest {
     }
 
     @Test
+    void noChangeForMissingVersion() {
+        rewriteRun(
+          mavenProject("foo",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-dependency-plugin</artifactId>
+                                <executions>
+                                    <execution>
+                                        <goals>
+                                            <goal>sources</goal>
+                                        </goals>
+                                    </execution>
+                                </executions>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """
+            ))
+        );
+    }
+
+    @Test
     void noChangesForResolveSources() {
         rewriteRun(
           mavenProject("foo",
