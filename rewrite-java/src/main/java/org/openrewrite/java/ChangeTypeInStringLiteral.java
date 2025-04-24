@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,26 +47,12 @@ public class ChangeTypeInStringLiteral extends Recipe {
         return "Change type in String literals";
     }
 
-    @Override
-    public String getInstanceNameSuffix() {
-        // Defensively guard against null values when recipes are first classloaded. This
-        // is a temporary workaround until releases of workers/CLI that include the defensive
-        // coding in Recipe.
-        //noinspection ConstantValue
-        if (oldFullyQualifiedTypeName == null || newFullyQualifiedTypeName == null) {
-            return getDisplayName();
-        }
 
-        String oldShort = oldFullyQualifiedTypeName.substring(oldFullyQualifiedTypeName.lastIndexOf('.') + 1);
-        String newShort = newFullyQualifiedTypeName.substring(newFullyQualifiedTypeName.lastIndexOf('.') + 1);
-        if (oldShort.equals(newShort)) {
-            return String.format("`%s` to `%s`",
-                    oldFullyQualifiedTypeName,
-                    newFullyQualifiedTypeName);
-        } else {
-            return String.format("`%s` to `%s`",
-                    oldShort, newShort);
-        }
+    @Override
+    public Validated<Object> validate() {
+        return Validated.none()
+                .and(Validated.notBlank("oldPackageName", oldFullyQualifiedTypeName))
+                .and(Validated.required("newPackageName", newFullyQualifiedTypeName));
     }
 
     @Override
