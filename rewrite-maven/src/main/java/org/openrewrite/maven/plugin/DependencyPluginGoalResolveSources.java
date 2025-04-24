@@ -20,10 +20,13 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.MavenVisitor;
+import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
+
+import static java.util.Objects.requireNonNull;
 
 @SuppressWarnings("ALL")
 public class DependencyPluginGoalResolveSources extends Recipe {
@@ -42,17 +45,12 @@ public class DependencyPluginGoalResolveSources extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-
+        VersionComparator comparator = requireNonNull(Semver.validate(minimumVersion, null).getValue());
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-
-                if (!xPathMatcher.matches(getCursor())) {
-                    return t;
-                }
-
-                if (isPlugInVersionInRange()) {
+                if (xPathMatcher.matches(getCursor()) && isPlugInVersionInRange()) {
                     return tag.withValue("resolve-sources");
                 }
                 return t;
@@ -60,15 +58,15 @@ public class DependencyPluginGoalResolveSources extends Recipe {
 
             private boolean isPlugInVersionInRange() {
                 Cursor pluginCursor = getCursor().dropParentUntil(i -> i instanceof Xml.Tag && ((Xml.Tag) i).getName().equals("plugin"));
-                Xml.Tag MavenPluginTag = pluginCursor.getValue();
-
-                String currentVersion = MavenPluginTag.getChildValue("version").orElse(null);
-                if (currentVersion == null || !Semver.validate(currentVersion, null).isValid()) {
-                    return false;
+                Xml.Tag pluginTag = pluginCursor.getValue();
+                Plugin plugin = findPlugin(pluginTag);
+                if (plugin == null || plugin.getVersion() == null) {
+                    plugin = findManagedPlugin(pluginTag);
+                    if (plugin == null || plugin.getVersion() == null) {
+                        return false;
+                    }
                 }
-
-                VersionComparator comparator = Semver.validate(minimumVersion, null).getValue();
-                return comparator != null && comparator.compare(null, currentVersion, minimumVersion) >= 0;
+                return comparator.compare(null, plugin.getVersion(), minimumVersion) >= 0;
             }
         };
     }

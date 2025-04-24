@@ -16,6 +16,7 @@
 package org.openrewrite.maven.plugin;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -29,6 +30,7 @@ class DependencyPluginGoalResolveSourcesTest implements RewriteTest {
         spec.recipe(new DependencyPluginGoalResolveSources());
     }
 
+    @DocumentExample
     @Test
     void sourcesToResolveSources() {
         rewriteRun(
@@ -72,6 +74,82 @@ class DependencyPluginGoalResolveSourcesTest implements RewriteTest {
                                 <groupId>org.apache.maven.plugins</groupId>
                                 <artifactId>maven-dependency-plugin</artifactId>
                                 <version>3.8.0</version>
+                                <executions>
+                                    <execution>
+                                        <goals>
+                                            <goal>resolve-sources</goal>
+                                        </goals>
+                                    </execution>
+                                </executions>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """
+            ))
+        );
+    }
+
+
+    @Test
+    void managedDependencyVersion() {
+        rewriteRun(
+          mavenProject("foo",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <build>
+                        <pluginManagement>
+                            <plugins>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-dependency-plugin</artifactId>
+                                    <version>3.8.0</version>
+                                </plugin>
+                            </plugins>
+                        </pluginManagement>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-dependency-plugin</artifactId>
+                                <executions>
+                                    <execution>
+                                        <goals>
+                                            <goal>sources</goal>
+                                        </goals>
+                                    </execution>
+                                </executions>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """,
+
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <build>
+                        <pluginManagement>
+                            <plugins>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-dependency-plugin</artifactId>
+                                    <version>3.8.0</version>
+                                </plugin>
+                            </plugins>
+                        </pluginManagement>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-dependency-plugin</artifactId>
                                 <executions>
                                     <execution>
                                         <goals>
