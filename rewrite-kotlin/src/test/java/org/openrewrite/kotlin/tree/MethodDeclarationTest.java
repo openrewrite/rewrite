@@ -248,7 +248,8 @@ class MethodDeclarationTest implements RewriteTest {
               inline fun example (
                 crossinline block : ( ) -> Unit
               ) : Unit = Unit
-              """)
+              """
+          )
         );
     }
 
@@ -261,7 +262,8 @@ class MethodDeclarationTest implements RewriteTest {
               inline fun example (
                 noinline block : ( ) -> Unit
               ) : Unit = Unit
-              """)
+              """
+          )
         );
     }
 

@@ -76,7 +76,8 @@ class DependencyInsightTest implements RewriteTest {
               repositories {
                   gradlePluginPortal()
               }
-              """, spec -> spec.path("buildSrc/build.gradle")),
+              """,
+                spec -> spec.path("buildSrc/build.gradle")),
           groovy(
             """
               plugins{
@@ -85,7 +86,8 @@ class DependencyInsightTest implements RewriteTest {
               dependencies{
                   implementation 'com.google.guava:guava:31.1-jre'
               }
-              """, spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
+              """,
+                spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
           buildGradle(
             """
               plugins {
@@ -124,7 +126,8 @@ class DependencyInsightTest implements RewriteTest {
               repositories {
                   gradlePluginPortal()
               }
-              """, spec -> spec.path("buildSrc/build.gradle")),
+              """,
+                spec -> spec.path("buildSrc/build.gradle")),
           groovy(
             """
               plugins{
@@ -133,7 +136,8 @@ class DependencyInsightTest implements RewriteTest {
               dependencies{
                   implementation 'com.google.guava:guava:31.1-jre'
               }
-              """, spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
+              """,
+                spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
           buildGradle(
             """
               plugins {

@@ -197,7 +197,8 @@ class LiteralTest implements RewriteTest {
           groovy(
                 """
             "$System.env.BAR_BAZ"
-            """)
+            """
+          )
         );
     }
 
@@ -207,7 +208,8 @@ class LiteralTest implements RewriteTest {
           groovy(
                 """
             "${}"
-            """)
+            """
+          )
         );
     }
 
@@ -217,7 +219,8 @@ class LiteralTest implements RewriteTest {
           groovy(
                 """
             " ${ " ${ " " } " } "
-            """)
+            """
+          )
         );
     }
 
@@ -227,7 +230,8 @@ class LiteralTest implements RewriteTest {
           groovy(
                 """
             " ${""}\\n${" "} "
-            """)
+            """
+          )
         );
     }
 

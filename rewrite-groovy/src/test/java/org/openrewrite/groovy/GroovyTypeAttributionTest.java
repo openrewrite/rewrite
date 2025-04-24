@@ -234,7 +234,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
             class A {
                 /*~~>*/Test t
             }
-            """)
+            """
+          )
         );
     }
 

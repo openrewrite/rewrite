@@ -1749,7 +1749,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
                     B9 b9 = r.theOther9();
                   }
               }
-              """));
+              """
+          ));
     }
 
     @Test

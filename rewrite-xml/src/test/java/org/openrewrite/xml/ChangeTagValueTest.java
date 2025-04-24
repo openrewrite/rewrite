@@ -45,7 +45,8 @@ class ChangeTagValueTest implements RewriteTest {
               <dependency>
                   <version>2.0</version>
               </dependency>
-              """)
+              """
+          )
         );
     }
 
@@ -65,7 +66,8 @@ class ChangeTagValueTest implements RewriteTest {
               <dependency>
                   <version>2.0</version>
               </dependency>
-              """)
+              """
+          )
         );
     }
 
@@ -80,7 +82,8 @@ class ChangeTagValueTest implements RewriteTest {
               <dependency>
                   <version>3.0</version>
               </dependency>
-              """)
+              """
+          )
         );
     }
 

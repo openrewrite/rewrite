@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.style.Checkstyle;
@@ -40,7 +41,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     private UnnecessaryParenthesesStyle getStyle() {
         if (style == null) {
             JavaSourceFile cu = getCursor().firstEnclosing(JavaSourceFile.class);
-            if(cu == null) {
+            if (cu == null) {
                 style = Checkstyle.unnecessaryParentheses();
             } else {
                 style = Style.from(UnnecessaryParenthesesStyle.class, cu, Checkstyle::unnecessaryParentheses);
@@ -88,8 +89,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
             (getStyle().getLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
             (getStyle().getLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
             if (getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
-                getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MESSAGE,
-                    getCursor());
+                getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MESSAGE, getCursor());
             }
         }
         return l;
@@ -111,7 +111,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
                                                            (getStyle().getStarAssign() && op == J.AssignmentOperation.Type.Multiplication) ||
                                                            (getStyle().getModAssign() && op == J.AssignmentOperation.Type.Modulo))) {
             a = (J.AssignmentOperation) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visitNonNull(a,
-                ctx, getCursor().getParentOrThrow());
+                    ctx, getCursor().getParentOrThrow());
         }
         return a;
     }
@@ -120,8 +120,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public J visitAssignment(J.Assignment assignment, P ctx) {
         J.Assignment a = visitAndCast(assignment, ctx, super::visitAssignment);
         if (getStyle().getAssign() && a.getAssignment() instanceof J.Parentheses) {
-            a = (J.Assignment) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visitNonNull(a, ctx,
-                getCursor().getParentOrThrow());
+            a = (J.Assignment) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visitNonNull(a, ctx, getCursor().getParentOrThrow());
         }
         return a;
     }
@@ -130,16 +129,14 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public J visitReturn(J.Return return_, P ctx) {
         J.Return rtn = (J.Return) super.visitReturn(return_, ctx);
         if (getStyle().getExpr() && rtn.getExpression() instanceof J.Parentheses) {
-            rtn = (J.Return) new UnwrapParentheses<>((J.Parentheses<?>) rtn.getExpression()).visitNonNull(rtn, ctx,
-                getCursor().getParentOrThrow());
+            rtn = (J.Return) new UnwrapParentheses<>((J.Parentheses<?>) rtn.getExpression()).visitNonNull(rtn, ctx, getCursor().getParentOrThrow());
         }
         return rtn;
     }
 
     @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, P ctx) {
-        J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable,
-            ctx);
+        J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
         if (getStyle().getAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
             v = (J.VariableDeclarations.NamedVariable) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visitNonNull(v, ctx, getCursor().getParentOrThrow());
         }
@@ -150,10 +147,10 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public J visitLambda(J.Lambda lambda, P ctx) {
         J.Lambda l = (J.Lambda) super.visitLambda(lambda, ctx);
         if (getStyle().getLambda() &&
-            l.getParameters().getParameters().size() == 1 &&
-            l.getParameters().isParenthesized() &&
-            l.getParameters().getParameters().get(0) instanceof J.VariableDeclarations &&
-            ((J.VariableDeclarations) l.getParameters().getParameters().get(0)).getTypeExpression() == null) {
+                l.getParameters().getParameters().size() == 1 &&
+                l.getParameters().isParenthesized() &&
+                l.getParameters().getParameters().get(0) instanceof J.VariableDeclarations &&
+                ((J.VariableDeclarations) l.getParameters().getParameters().get(0)).getTypeExpression() == null) {
             l = l.withParameters(l.getParameters().withParenthesized(false));
         }
         return l;
@@ -165,8 +162,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         // Unwrap when if condition is a single parenthesized expression
         Expression expression = i.getIfCondition().getTree();
         if (expression instanceof J.Parentheses) {
-            i = (J.If) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(i, ctx,
-                getCursor().getParentOrThrow());
+            i = (J.If) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(i, ctx, getCursor().getParentOrThrow());
         }
         return i;
     }
@@ -177,8 +173,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         // Unwrap when while condition is a single parenthesized expression
         Expression expression = w.getCondition().getTree();
         if (expression instanceof J.Parentheses) {
-            w = (J.WhileLoop) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(w, ctx,
-                getCursor().getParentOrThrow());
+            w = (J.WhileLoop) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(w, ctx, getCursor().getParentOrThrow());
         }
         return w;
     }
@@ -189,8 +184,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         // Unwrap when while condition is a single parenthesized expression
         Expression expression = dw.getWhileCondition().getTree();
         if (expression instanceof J.Parentheses) {
-            dw = (J.DoWhileLoop) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(dw, ctx,
-                getCursor().getParentOrThrow());
+            dw = (J.DoWhileLoop) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(dw, ctx, getCursor().getParentOrThrow());
         }
         return dw;
     }
@@ -200,8 +194,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         J.ForLoop.Control fc = (J.ForLoop.Control) super.visitForControl(control, ctx);
         Expression condition = fc.getCondition();
         if (condition instanceof J.Parentheses) {
-            fc = (J.ForLoop.Control) new UnwrapParentheses<>((J.Parentheses<?>) condition).visitNonNull(fc, ctx,
-                getCursor().getParentOrThrow());
+            fc = (J.ForLoop.Control) new UnwrapParentheses<>((J.Parentheses<?>) condition).visitNonNull(fc, ctx, getCursor().getParentOrThrow());
         }
         return fc;
     }
@@ -222,5 +215,34 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
             u = (J.Unary) new UnwrapParentheses<>((J.Parentheses<?>) u.getExpression()).visitNonNull(u, ctx, getCursor().getParentOrThrow());
         }
         return u;
+    }
+
+    @Override
+    public J visitMethodInvocation(J.MethodInvocation method, P p) {
+        J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, p);
+        if (mi.getSelect() instanceof J.Parentheses) {
+            J.Parentheses<?> parentheses = (J.Parentheses<?>) mi.getSelect();
+            if (parentheses.getTree() instanceof J.Assignment ||
+                    parentheses.getTree() instanceof J.Binary ||
+                    parentheses.getTree() instanceof J.Ternary ||
+                    parentheses.getTree() instanceof J.TypeCast) {
+                return mi;
+            }
+            Expression tree = (Expression) parentheses.getTree();
+            mi = mi.withSelect(tree.withPrefix((mergeSpace(mi.getSelect().getPrefix(), tree.getPrefix()))));
+        }
+        return mi.withArguments(ListUtils.map(mi.getArguments(), arg -> {
+            if (arg instanceof J.Parentheses) {
+                J tree = ((J.Parentheses<?>) arg).getTree();
+                return tree.withPrefix(mergeSpace(arg.getPrefix(), tree.getPrefix()));
+            }
+            return arg;
+        }));
+    }
+
+    private static Space mergeSpace(Space outside, Space inside) {
+        return Space.build(
+                outside.getWhitespace() + inside.getWhitespace(),
+                ListUtils.concatAll(outside.getComments(), inside.getComments()));
     }
 }

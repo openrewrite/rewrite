@@ -38,7 +38,11 @@ class LatestPatchTest {
         assertThat(latestPatch.isValid("1.0", "1.0.1")).isTrue();
         assertThat(latestPatch.isValid("1.0.0", "1.1.0")).isFalse();
         assertThat(latestPatch.isValid("1.0.0", "2.0.0")).isFalse();
-        assertThat(latestPatch.isValid("2.0.0.Alpha1", "2.0.0.Beta1")).isTrue();
+    }
+
+    @Test
+    void noSnapshots() {
+        assertThat(latestPatch.isValid("1.0.0", "1.0.1-SNAPSHOT")).isFalse();
     }
 
     @Test

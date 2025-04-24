@@ -134,7 +134,8 @@ class HasJavaVersionTest implements RewriteTest {
                       /*~~>*/list.add("1");
                   }
               }
-              """, spec -> spec.markers(javaVersion(11)))
+              """,
+                spec -> spec.markers(javaVersion(11)))
         );
     }
 
@@ -173,7 +174,8 @@ class HasJavaVersionTest implements RewriteTest {
                       /*~~>*/list.add("1");
                   }
               }
-              """, spec -> spec.markers(javaVersion(11)))
+              """,
+                spec -> spec.markers(javaVersion(11)))
         );
     }
 

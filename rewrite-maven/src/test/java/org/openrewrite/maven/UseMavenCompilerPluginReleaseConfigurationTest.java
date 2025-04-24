@@ -419,7 +419,8 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
                 </build>
               
               </project>
-              """)
+              """
+          )
         );
     }
 
@@ -442,7 +443,8 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
               
                 <packaging>pom</packaging>
               </project>
-              """),
+              """
+          ),
           mavenProject(
             "sample",
             //language=xml
