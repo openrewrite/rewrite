@@ -17,16 +17,12 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -65,43 +61,20 @@ public class ChangePackageInStringLiteral extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new TreeVisitor<Tree, ExecutionContext>() {
+        Pattern stringLiteralPattern = Pattern.compile("\\b" + oldPackageName + "\\b");
+        return new JavaVisitor<ExecutionContext>() {
             @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile instanceof JavaSourceFile;
-            }
-
-            @Override
-            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
-                stopAfterPreVisit();
-                if (tree instanceof JavaSourceFile) {
-                    return new JavaChangePackageLiteralVisitor(oldPackageName, newPackageName).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+            public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                J.Literal lit = literal;
+                if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
+                    Matcher matcher = stringLiteralPattern.matcher((String) lit.getValue());
+                    if (matcher.find()) {
+                        lit = lit.withValue(matcher.replaceAll(newPackageName))
+                                .withValueSource(stringLiteralPattern.matcher(lit.getValueSource()).replaceAll(newPackageName));
+                    }
                 }
-                return tree;
+                return super.visitLiteral(lit, ctx);
             }
         };
-    }
-
-    private static class JavaChangePackageLiteralVisitor extends JavaVisitor<ExecutionContext> {
-        private final String newPackageName;
-        private final Pattern stringLiteralPattern;
-
-        private JavaChangePackageLiteralVisitor(String oldPackageName, String newPackageName) {
-            this.newPackageName = newPackageName;
-            this.stringLiteralPattern = Pattern.compile("\\b" + oldPackageName + "\\b");
-        }
-
-        @Override
-        public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
-            J.Literal lit = literal;
-            if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
-                Matcher matcher = stringLiteralPattern.matcher((String) lit.getValue());
-                if (matcher.find()) {
-                    lit = lit.withValue(matcher.replaceAll(newPackageName))
-                            .withValueSource(stringLiteralPattern.matcher(lit.getValueSource()).replaceAll(newPackageName));
-                }
-            }
-            return super.visitLiteral(lit, ctx);
-        }
     }
 }
