@@ -22,8 +22,8 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -46,7 +46,7 @@ public class JacocoReportDeprecations extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J. Assignment visitAssignment(J. Assignment assignment, ExecutionContext ctx) {
                 String prefix = getCursor().getNearestMessage(JACOCO_SETTINGS_PATH);
@@ -84,14 +84,14 @@ public class JacocoReportDeprecations extends Recipe {
                     String field = path.substring(path.lastIndexOf(".") + 1);
                     if (assignment.getVariable() instanceof J.FieldAccess) {
                         J.FieldAccess fieldAccess = (J.FieldAccess) assignment.getVariable();
-                        if ("enabled".equalsIgnoreCase(field)) {
+                        if ("enabled".equalsIgnoreCase(field) || "isEnabled".equalsIgnoreCase(field)) {
                             return assignment.withVariable(fieldAccess.withName(fieldAccess.getName().withSimpleName("required")));
                         } else if ("destination".equalsIgnoreCase(field)) {
                             return assignment.withVariable(fieldAccess.withName(fieldAccess.getName().withSimpleName("outputLocation")));
                         }
                     } else if (assignment.getVariable() instanceof J.Identifier) {
                         J.Identifier identifier = (J.Identifier) assignment.getVariable();
-                        if ("enabled".equalsIgnoreCase(field)) {
+                        if ("enabled".equalsIgnoreCase(field) || "isEnabled".equalsIgnoreCase(field)) {
                             return assignment.withVariable(identifier.withSimpleName("required"));
                         } else if ("destination".equalsIgnoreCase(field)) {
                             return assignment.withVariable(identifier.withSimpleName("outputLocation"));
@@ -115,7 +115,7 @@ public class JacocoReportDeprecations extends Recipe {
                 if (parts.length >= 3 && !"xml".equalsIgnoreCase(parts[2]) && !"csv".equalsIgnoreCase(parts[2]) && !"html".equalsIgnoreCase(parts[2])) {
                     return false;
                 }
-                if (parts.length >= 4 && !"enabled".equalsIgnoreCase(parts[3]) && !"destination".equalsIgnoreCase(parts[3])) {
+                if (parts.length >= 4 && !"enabled".equalsIgnoreCase(parts[3]) && !"isEnabled".equalsIgnoreCase(parts[3]) && !"destination".equalsIgnoreCase(parts[3])) {
                     return false;
                 }
                 return parts.length < 5;

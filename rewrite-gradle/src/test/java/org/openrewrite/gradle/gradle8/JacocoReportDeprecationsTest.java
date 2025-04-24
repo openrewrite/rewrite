@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 class JacocoReportDeprecationsTest implements RewriteTest {
 
@@ -452,6 +453,42 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                    jacocoTestReport.reports.html.destination = layout.buildDirectory.dir('jacocoHtml')
               }
 
+              """
+          )
+        );
+    }
+
+    @Test
+    void alsoWorkOnKotlinDsl() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  java
+                  jacoco
+              }
+
+              tasks.jacocoTestReport {
+                  reports {
+                      xml.isEnabled = false
+                      html.isEnabled = true
+                      html.destination = layout.buildDirectory.dir("jacocoHtml")
+                  }
+              }
+              """,
+            """
+              plugins {
+                  java
+                  jacoco
+              }
+
+              tasks.jacocoTestReport {
+                  reports {
+                      xml.required = false
+                      html.required = true
+                      html.outputLocation = layout.buildDirectory.dir("jacocoHtml")
+                  }
+              }
               """
           )
         );
