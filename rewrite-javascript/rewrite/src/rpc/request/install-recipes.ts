@@ -9,9 +9,12 @@ export interface InstallRecipesResponse {
 }
 
 export class InstallRecipes {
-    constructor(
-        private readonly packageName: string,
-        private readonly version?: string) {
+    /**
+     * Install a recipe from a local path or an NPM package.
+     * @param recipes The path to a file on disk that provides an activate function or the
+     * name of an NPM package.
+     */
+    constructor(private readonly recipes: string | { packageName: string, version?: string }) {
     }
 
     static handle(connection: rpc.MessageConnection, relativeInstallDir: string, registry: RecipeRegistry): void {
@@ -25,38 +28,47 @@ export class InstallRecipes {
                     `{"name": "please-work"}`)
             }
 
-            await new Promise<void>((resolve, reject) => {
-                // Rather than using npm on PATH, use `node_cli.js`.
-                // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
-                const packageSpec = request.packageName + (request.version ? `@${request.version}` : "");
-                const installer = spawn("npm", ["install", packageSpec], {
-                    cwd: installDir
-                });
-                // installer.stdout.on("data", (data: any) => {
-                //     // TODO write this to rpc log instead
-                //     console.log(data.toString());
-                // });
-                // installer.stderr.on("data", (data: any) => {
-                //     // TODO write this to rpc log instead
-                //     console.log(data.toString());
-                // });
-                installer.on("error", reject);
-                installer.on("close", (exitCode: number) => {
-                    if (exitCode === 0) {
-                        resolve();
-                    } else {
-                        reject(new Error(`npm install exited with code ${exitCode}`));
-                    }
-                });
-            });
+            let resolvedPath;
+            let recipesName = request.recipes;
 
-            const resolvedPath = require.resolve(path.join(installDir, "node_modules", request.packageName));
+            if (typeof request.recipes === "object") {
+                const recipePackage = request.recipes;
+                await new Promise<void>((resolve, reject) => {
+                    // Rather than using npm on PATH, use `node_cli.js`.
+                    // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
+                    const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");
+                    const installer = spawn("npm", ["install", packageSpec], {
+                        cwd: installDir
+                    });
+                    // installer.stdout.on("data", (data: any) => {
+                    //     // TODO write this to rpc log instead
+                    //     console.log(data.toString());
+                    // });
+                    // installer.stderr.on("data", (data: any) => {
+                    //     // TODO write this to rpc log instead
+                    //     console.log(data.toString());
+                    // });
+                    installer.on("error", reject);
+                    installer.on("close", (exitCode: number) => {
+                        if (exitCode === 0) {
+                            resolve();
+                        } else {
+                            reject(new Error(`npm install exited with code ${exitCode}`));
+                        }
+                    });
+                });
+                resolvedPath = require.resolve(path.join(installDir, "node_modules", recipePackage.packageName));
+                recipesName = request.recipes.packageName;
+            } else {
+                resolvedPath = request.recipes;
+            }
+
             const recipeModule = require(resolvedPath);
 
             if (typeof recipeModule.activate === "function") {
                 recipeModule.activate(registry);
             } else {
-                throw new Error(`${request.packageName} does not export an 'activate' function`);
+                throw new Error(`${recipesName} does not export an 'activate' function`);
             }
 
             return {recipesInstalled: registry.all.size - beforeInstall};

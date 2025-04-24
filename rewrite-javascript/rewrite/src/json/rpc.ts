@@ -30,7 +30,7 @@ import {
     Space
 } from "./tree";
 import {produceAsync} from "../visitor";
-import {Draft} from "immer";
+import {createDraft, Draft, finishDraft} from "immer";
 
 class JsonSender extends JsonVisitor<RpcSendQueue> {
 
@@ -50,7 +50,8 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
         await q.getAndSend(document, d => d.fileAttributes);
         await q.getAndSend(document, d => d.value,
             async j => await this.visit(j, q));
-        await q.getAndSend(document, d => asRef(d.eof));
+        await q.getAndSend(document, d => asRef(d.eof),
+            async space => await this.visitSpace(space, q));
         return document;
     }
 
@@ -110,30 +111,30 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
 class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     protected async preVisit(j: Json, q: RpcReceiveQueue): Promise<Json | undefined> {
-        return this.produceJson<Json>(j, q, async draft => {
-            draft.id = await q.receive(j.id);
-            draft.prefix = await q.receive(j.prefix, async space => await this.visitSpace(space, q));
-            draft.markers = await q.receiveMarkers(j.markers);
-        });
+        const draft = createDraft(j)
+        draft.id = await q.receive(j.id);
+        draft.prefix = await q.receive(j.prefix, async space => await this.visitSpace(space, q));
+        draft.markers = await q.receiveMarkers(j.markers);
+        return finishDraft(draft);
     }
 
     protected async visitDocument(document: JsonDocument, q: RpcReceiveQueue): Promise<Json | undefined> {
-        return this.produceJson<JsonDocument>(document, q, async draft => {
-            draft.sourcePath = await q.receive(document.sourcePath);
-            draft.charsetName = await q.receive(document.charsetName);
-            draft.charsetBomMarked = await q.receive(document.charsetBomMarked);
-            draft.checksum = await q.receive(document.checksum);
-            draft.fileAttributes = await q.receive(document.fileAttributes);
-            draft.value = await q.receive<JsonValue>(document.value, async j => await this.visit(j, q)!);
-            draft.eof = await q.receive(document.eof);
-        });
+        const draft = createDraft(document);
+        draft.sourcePath = await q.receive(document.sourcePath);
+        draft.charsetName = await q.receive(document.charsetName);
+        draft.charsetBomMarked = await q.receive(document.charsetBomMarked);
+        draft.checksum = await q.receive(document.checksum);
+        draft.fileAttributes = await q.receive(document.fileAttributes);
+        draft.value = await q.receive<JsonValue>(document.value, async j => await this.visit(j, q)!);
+        draft.eof = await q.receive(document.eof, async space => await this.visitSpace(space, q));
+        return finishDraft(draft);
     }
 
     protected async visitArray(array: JsonArray, q: RpcReceiveQueue): Promise<Json | undefined> {
-        return this.produceJson<JsonArray>(array, q, async draft => {
-            draft.values = await q.receiveListDefined(array.values,
-                async j => await this.visitRightPadded(j, q)!)!;
-        });
+        const draft = createDraft(array);
+        draft.values = await q.receiveListDefined(array.values,
+            async j => await this.visitRightPadded(j, q)!)!;
+        return finishDraft(draft);
     }
 
     protected async visitEmpty(empty: Empty): Promise<Json | undefined> {
@@ -141,32 +142,32 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
     }
 
     protected async visitIdentifier(identifier: Identifier, q: RpcReceiveQueue): Promise<Json | undefined> {
-        return this.produceJson<Identifier>(identifier, q, async draft => {
-            draft.name = await q.receive(identifier.name);
-        });
+        const draft = createDraft(identifier);
+        draft.name = await q.receive(identifier.name);
+        return finishDraft(draft);
     }
 
     protected async visitLiteral(literal: Literal, q: RpcReceiveQueue): Promise<Json | undefined> {
-        return this.produceJson<Literal>(literal, q, async draft => {
-            draft.source = await q.receive(literal.source);
-            draft.value = await q.receive(literal.value);
-        });
+        const draft = createDraft(literal);
+        draft.source = await q.receive(literal.source);
+        draft.value = await q.receive(literal.value);
+        return finishDraft(draft);
     }
 
     protected async visitMember(member: Member, q: RpcReceiveQueue): Promise<Json | undefined> {
-        return this.produceJson<Member>(member, q, async draft => {
-            draft.key = await q.receive(member.key,
-                async j => await this.visitRightPadded(j, q)!)!;
-            draft.value = await q.receive<JsonValue>(member.value,
-                async j => await this.visit(j, q)!);
-        });
+        const draft = createDraft(member);
+        draft.key = await q.receive(member.key,
+            async j => await this.visitRightPadded(j, q)!)!;
+        draft.value = await q.receive<JsonValue>(member.value,
+            async j => await this.visit(j, q)!);
+        return finishDraft(draft);
     }
 
     protected async visitObject(obj: JsonObject, q: RpcReceiveQueue): Promise<Json | undefined> {
-        return this.produceJson<JsonObject>(obj, q, async draft => {
-            draft.members = await q.receiveListDefined(obj.members,
-                async j => await this.visitRightPadded(j, q));
-        });
+        const draft = createDraft(obj);
+        draft.members = await q.receiveListDefined(obj.members,
+            async j => await this.visitRightPadded(j, q));
+        return finishDraft(draft);
     }
 
     protected async visitSpace(space: Space, q: RpcReceiveQueue): Promise<Space> {
@@ -188,7 +189,7 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty padding")
         }
         return produceAsync<JsonRightPadded<T>>(right, async draft => {
-            draft.element = await p.receive(right.element,  async j => await this.visit(j, p)!) as Draft<T>;
+            draft.element = await p.receive(right.element, async j => await this.visit(j, p)!) as Draft<T>;
             draft.after = await p.receive(right.after, async space => await this.visitSpace(space, p));
             draft.markers = await p.receiveMarkers(right.markers);
         });

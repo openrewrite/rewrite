@@ -8,6 +8,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.Environment;
 import org.openrewrite.rpc.RewriteRpc;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
@@ -36,13 +37,25 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         }
     }
 
+    public int installRecipes(File recipes) {
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByFile(recipes),
+                InstallRecipesResponse.class
+        ).getRecipesInstalled();
+    }
+
     public int installRecipes(String packageName) {
         return installRecipes(packageName, null);
     }
 
     public int installRecipes(String packageName, @Nullable String version) {
-        return send("InstallRecipes", new InstallRecipes(packageName, version),
-                InstallRecipesResponse.class).getRecipesInstalled();
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByPackage(
+                        new InstallRecipesByPackage.Package(packageName, version)),
+                InstallRecipesResponse.class
+        ).getRecipesInstalled();
     }
 
     private static class JavaScriptRewriteRpcProcess extends Thread {

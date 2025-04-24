@@ -24,8 +24,15 @@ export interface Reference {
     [REFERENCE_KEY]: true;
 }
 
-export function asRef<T>(obj: T): T & Reference {
-    return {...obj, [REFERENCE_KEY]: true};
+export function asRef<T extends {}>(obj: T): T & Reference {
+    try {
+        // Spread would create a new object. This can be used multiple times on the
+        // same object without changing the reference.
+        Object.assign(obj, {[REFERENCE_KEY]: true});
+        return obj as T & Reference;
+    } catch (Error) {
+        return obj as T & Reference;
+    }
 }
 
 function isRef(obj?: any): obj is Reference {

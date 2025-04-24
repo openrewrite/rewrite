@@ -17,6 +17,7 @@ import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
 import {Cursor, rootCursor} from "../../src";
 import {RewriteRpc} from "../../src/rpc";
 import {PlainText, text} from "../../src/text";
+import {json} from "../../src/json";
 import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
@@ -102,6 +103,30 @@ describe("Rewrite RPC", () => {
                     "hello"
                 ),
                 path: "hello.txt"
+            }
+        );
+    });
+
+    test("run a JSON recipe", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.npm.change-version", {version: "1.0.0"});
+        await spec.rewriteRun(
+            {
+                //language=json
+                ...json(
+                    `
+                      {
+                        "name": "@openrewrite/rewrite-example",
+                        "version": "0"
+                      }
+                    `,
+                    `
+                      {
+                        "name": "@openrewrite/rewrite-example",
+                        "version": "1.0.0"
+                      }
+                    `
+                ),
+                path: "package.json"
             }
         );
     });

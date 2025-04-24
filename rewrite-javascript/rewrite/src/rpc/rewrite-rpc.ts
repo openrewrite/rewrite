@@ -164,10 +164,10 @@ export class RewriteRpc {
         return generated;
     }
 
-    installRecipes(packageName: string, version?: string): Promise<InstallRecipesResponse> {
+    installRecipes(recipes: string | { packageName: string, version?: string }): Promise<InstallRecipesResponse> {
         return this.connection.sendRequest(
             new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"),
-            new InstallRecipes(packageName, version)
+            new InstallRecipes(recipes)
         );
     }
 

@@ -23,7 +23,7 @@ export const JsonKind = {
     Identifier: "org.openrewrite.json.tree.Json$Identifier",
     Literal: "org.openrewrite.json.tree.Json$Literal",
     Member: "org.openrewrite.json.tree.Json$Member",
-    Object: "org.openrewrite.json.tree.Json$Object",
+    Object: "org.openrewrite.json.tree.Json$JsonObject",
     Space: "org.openrewrite.json.tree.Space",
     Comment: "org.openrewrite.json.tree.Comment",
     RightPadded: "org.openrewrite.json.tree.JsonRightPadded"

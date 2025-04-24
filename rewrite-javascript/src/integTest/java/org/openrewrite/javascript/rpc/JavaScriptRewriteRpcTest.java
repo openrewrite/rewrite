@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.rpc;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -24,6 +25,7 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.Map;
 
@@ -37,14 +39,16 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.validateRecipeSerialization(false);
+        spec.validateRecipeSerialization(false)
+          .cycles(1)
+          .expectedCyclesThatMakeChanges(1);
     }
 
     @BeforeEach
     void before() throws InterruptedException {
         this.client = JavaScriptRewriteRpc.start(
           Environment.builder().build(),
-          "node",
+          "/usr/local/bin/node",
           // Uncomment this to debug the server
 //          "--inspect-brk",
           "./rewrite/dist/src/rpc/server.js"
@@ -58,6 +62,11 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
     @AfterEach
     void after() {
         client.shutdown();
+    }
+
+    @Test
+    void installRecipesFromNpm() {
+        assertThat(client.installRecipes("@openrewrite/recipes-npm")).isEqualTo(1);
     }
 
     @Test
@@ -75,7 +84,7 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void print() {
+    void printText() {
         rewriteRun(
           text(
             "Hello Jon!",
@@ -86,11 +95,27 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void printJson() {
+        @Language("json")
+        String packageJson = """
+          {
+            "name": "my-project",
+            "version": "0.0.1"
+          }
+          """;
+        rewriteRun(
+          json(packageJson, spec -> spec.beforeRecipe(json ->
+            assertThat(client.print(json)).isEqualTo(packageJson.trim())))
+        );
+    }
+
+    @Test
     void runRecipe() {
         installRecipes();
         rewriteRun(
-          spec -> spec.recipe(client.prepareRecipe("org.openrewrite.npm.change-version",
-            Map.of("version", "1.0.0"))),
+          spec -> spec
+            .recipe(client.prepareRecipe("org.openrewrite.npm.change-version",
+              Map.of("version", "1.0.0"))),
           json(
             """
               {
@@ -110,6 +135,8 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     private void installRecipes() {
-        assertThat(client.installRecipes("@openrewrite/recipes-npm")).isEqualTo(1);
+        File exampleRecipes = new File("rewrite/dist/test/example-recipe.js");
+        assertThat(exampleRecipes).exists();
+        assertThat(client.installRecipes(exampleRecipes)).isGreaterThan(0);
     }
 }

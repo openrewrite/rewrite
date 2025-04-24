@@ -50,7 +50,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
                 .withChecksum(q.receive(document.getChecksum()))
                 .withFileAttributes(q.receive(document.getFileAttributes()))
                 .withValue(q.receive(document.getValue(), j -> (JsonValue) visitNonNull(j, q)))
-                .withEof(q.receive(document.getEof()));
+                .withEof(q.receive(document.getEof(), space -> visitSpace(space, q)));
     }
 
     @Override

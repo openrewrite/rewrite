@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Empty, emptySpace, Json, JsonDocument, JsonKind, JsonVisitor} from "../../src/json";
-import {emptyMarkers, randomId} from "../../src";
+import {emptyMarkers, randomId, Tree} from "../../src";
 
 class SetEmptySpace extends JsonVisitor<number> {
     protected async visitEmpty(empty: Empty, p: number): Promise<Json | undefined> {
@@ -28,6 +28,19 @@ class SetEmptySpace extends JsonVisitor<number> {
 }
 
 describe('visiting JSON', () => {
+
+    test('preVisit', async () => {
+        const partialDocument = {kind: JsonKind.Document};
+        const visitor = new class extends JsonVisitor<number> {
+            protected async preVisit(j: Json, p: number): Promise<Json | undefined> {
+                return this.produceJson<Json>(j, p, async draft => {
+                    draft.id = randomId();
+                });
+            }
+        }
+        expect((await visitor.visit(partialDocument as Tree, 0))?.id).toBeDefined();
+    });
+
     test('calls super', async () => {
         const empty: Empty = {
             kind: JsonKind.Empty,
