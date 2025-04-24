@@ -31,7 +31,7 @@ import org.openrewrite.java.tree.J;
 @EqualsAndHashCode(callSuper = false)
 public class JacocoReportDeprecations extends Recipe {
 
-    private static final String JACOCO_SETTINGS_PATH = "JACOCO_SETTINGS_PATH";
+    private static final String JACOCO_SETTINGS_INDEX = "JACOCO_SETTINGS_INDEX";
 
     @Override
     public String getDisplayName() {
@@ -49,38 +49,41 @@ public class JacocoReportDeprecations extends Recipe {
         return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
-                String prefix = getCursor().getNearestMessage(JACOCO_SETTINGS_PATH);
-                String prefixOrEmpty = prefix == null ? "" : prefix + ".";
+                Integer index = getCursor().getNearestMessage(JACOCO_SETTINGS_INDEX);
+                if (index == null) {
+                    index = 0;
+                } else {
+                    index = index + 1;
+                }
                 if (assignment.getVariable() instanceof J.FieldAccess) {
                     J.FieldAccess fieldAccess = (J.FieldAccess) assignment.getVariable();
                     String fieldName = getFieldName(fieldAccess);
-                    return replaceDeprecations(assignment, prefixOrEmpty + fieldName);
+                    return replaceDeprecations(assignment, index, fieldName);
                 } else if (assignment.getVariable() instanceof J.Identifier) {
                     J.Identifier identifier = (J.Identifier) assignment.getVariable();
-                    return replaceDeprecations(assignment, prefixOrEmpty + identifier.getSimpleName());
+                    return replaceDeprecations(assignment, index, identifier.getSimpleName());
                 }
                 return assignment;
             }
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                String parent = getCursor().getNearestMessage(JACOCO_SETTINGS_PATH);
-                String message;
+                Integer parent = getCursor().getNearestMessage(JACOCO_SETTINGS_INDEX);
                 if (parent == null) {
-                    message = method.getSimpleName();
+                    parent = 0;
                 } else {
-                    message = parent + "." + method.getSimpleName();
+                    parent = parent + 1;
                 }
-                if (isDeprecatedPath(message)) {
-                    getCursor().putMessage(JACOCO_SETTINGS_PATH, message);
+                if (isPartOfDeprecatedPath(method.getSimpleName(), parent)) {
+                    getCursor().putMessage(JACOCO_SETTINGS_INDEX, parent);
 
                     return super.visitMethodInvocation(method, ctx);
                 }
                 return method;
             }
 
-            private J.Assignment replaceDeprecations(J.Assignment assignment, String path) {
-                if (isDeprecatedPath(path)) {
+            private J.Assignment replaceDeprecations(J.Assignment assignment, int index, String path) {
+                if (isDeprecatedPath(path, index)) {
                     String field = path.substring(path.lastIndexOf(".") + 1);
                     if (assignment.getVariable() instanceof J.FieldAccess) {
                         J.FieldAccess fieldAccess = (J.FieldAccess) assignment.getVariable();
@@ -101,24 +104,35 @@ public class JacocoReportDeprecations extends Recipe {
                 return assignment;
             }
 
-            private boolean isDeprecatedPath(String path) {
+            private boolean isPartOfDeprecatedPath(String path, int index) {
+                if (StringUtils.isNullOrEmpty(path)) {
+                    return false;
+                }
+                switch (index) {
+                    case 0:
+                        return "jacocoTestReport".equalsIgnoreCase(path);
+                    case 1:
+                        return "reports".equalsIgnoreCase(path);
+                    case 2:
+                        return "xml".equalsIgnoreCase(path) || "csv".equalsIgnoreCase(path) || "html".equalsIgnoreCase(path);
+                    case 3:
+                        return "enabled".equalsIgnoreCase(path) || "isEnabled".equalsIgnoreCase(path) || "destination".equalsIgnoreCase(path);
+                    default:
+                        return false;
+                }
+            }
+
+            private boolean isDeprecatedPath(String path, int index) {
                 if (StringUtils.isNullOrEmpty(path)) {
                     return false;
                 }
                 String[] parts = path.split("\\.");
-                if (parts.length >= 1 && !"jacocoTestReport".equalsIgnoreCase(parts[0])) {
-                    return false;
+                for (int i = 0; i < parts.length; i++) {
+                    if (!isPartOfDeprecatedPath(parts[i], index + i)) {
+                        return false;
+                    }
                 }
-                if (parts.length >= 2 && !"reports".equalsIgnoreCase(parts[1])) {
-                    return false;
-                }
-                if (parts.length >= 3 && !"xml".equalsIgnoreCase(parts[2]) && !"csv".equalsIgnoreCase(parts[2]) && !"html".equalsIgnoreCase(parts[2])) {
-                    return false;
-                }
-                if (parts.length >= 4 && !"enabled".equalsIgnoreCase(parts[3]) && !"isEnabled".equalsIgnoreCase(parts[3]) && !"destination".equalsIgnoreCase(parts[3])) {
-                    return false;
-                }
-                return parts.length < 5;
+                return true;
             }
 
             private String getFieldName(J.FieldAccess fieldAccess) {
