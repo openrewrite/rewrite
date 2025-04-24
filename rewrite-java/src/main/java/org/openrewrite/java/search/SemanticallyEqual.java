@@ -995,7 +995,7 @@ public class SemanticallyEqual {
                       !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
                     method.getMethodType() == null ||
                     compareTo.getMethodType() == null ||
-                    !TypeUtils.isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType())) {
+                    !TypeUtils.isTypeAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType())) {
                     isEqual.set(false);
                     return method;
                 }

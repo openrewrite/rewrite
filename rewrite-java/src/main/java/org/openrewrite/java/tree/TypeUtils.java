@@ -17,8 +17,6 @@ package org.openrewrite.java.tree;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
-import org.openrewrite.java.JavaTypeSignatureBuilder;
-import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
 
@@ -101,6 +99,15 @@ public class TypeUtils {
                );
     }
 
+    public static boolean isWildcard(@Nullable JavaType type) {
+        return type instanceof JavaType.GenericTypeVariable &&
+                ((JavaType.GenericTypeVariable) type).getName().equals("?");
+    }
+
+    private static boolean isUnknown(@Nullable JavaType type) {
+        return type == null || type instanceof JavaType.Unknown;
+    }
+
     public static String toFullyQualifiedName(String fqn) {
         return fqn.replace('$', '.');
     }
@@ -114,11 +121,66 @@ public class TypeUtils {
     }
 
     /**
+     * Defines how target type variables should be interpreted during checks.
+     */
+    public static class TypeVariableMode {
+
+        /**
+         * Type variables are treated as already bound to specific types.
+         */
+        public static final TypeVariableMode BOUND = new TypeVariableMode(false);
+
+        /**
+         * Target type variables are considered unbound and may be bound to the source type.
+         */
+        public static final TypeVariableMode INFER = new TypeVariableMode(true);
+
+        private final boolean inferMode;
+        private final boolean reverseMode;
+        private final Set<JavaType.GenericTypeVariable> inScope;
+
+        private TypeVariableMode(boolean inferMode) {
+            this.inferMode = inferMode;
+            this.reverseMode = false;
+            this.inScope = Collections.emptySet();
+        }
+
+        private TypeVariableMode(boolean inferMode, boolean reverseMode, Set<JavaType.GenericTypeVariable> inScope) {
+            this.inferMode = inferMode;
+            this.reverseMode = reverseMode;
+            this.inScope = inScope;
+        }
+
+        public TypeVariableMode enter(JavaType.GenericTypeVariable typeVariable) {
+            return new TypeVariableMode(inferMode, reverseMode, append(inScope, typeVariable));
+        }
+
+        public TypeVariableMode reverse(JavaType.GenericTypeVariable typeVariable) {
+            return new TypeVariableMode(inferMode, !reverseMode, append(inScope, typeVariable));
+        }
+
+        private Set<JavaType.GenericTypeVariable> append(Set<JavaType.GenericTypeVariable> inScope, JavaType.GenericTypeVariable typeVariable) {
+            Set<JavaType.GenericTypeVariable> newInScope = Collections.newSetFromMap(new IdentityHashMap<>());
+            newInScope.addAll(inScope);
+            newInScope.add(typeVariable);
+            return newInScope;
+        }
+
+        public boolean isInScope(JavaType.GenericTypeVariable toGeneric) {
+            return inScope.contains(toGeneric);
+        }
+    }
+
+    /**
      * Returns true if the JavaTypes are of the same type.
      * {@link JavaType.Parameterized} will be checked for both the FQN and each of the parameters.
      * {@link JavaType.GenericTypeVariable} will be checked for {@link JavaType.GenericTypeVariable.Variance} and each of the bounds.
      */
     public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2) {
+        return isOfType(type1, type2, TypeVariableMode.BOUND);
+    }
+
+    public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2, TypeVariableMode mode) {
         if (type1 instanceof JavaType.Unknown || type2 instanceof JavaType.Unknown) {
             return false;
         }
@@ -128,12 +190,17 @@ public class TypeUtils {
         if (type1 == null || type2 == null) {
             return false;
         }
+        if (isInferable(type1, type2, mode)) {
+            return true;
+        }
+
         // Strings, uniquely amongst all other types, can be either primitives or classes depending on the context
         if (TypeUtils.isString(type1) && TypeUtils.isString(type2)) {
             return true;
         }
         if (type1 instanceof JavaType.Primitive && type2 instanceof JavaType.Primitive) {
-            return ((JavaType.Primitive) type1).getKeyword().equals(((JavaType.Primitive) type2).getKeyword());
+            //noinspection ConstantValue
+            return type1 == type2;
         }
         if (type1 instanceof JavaType.FullyQualified && type2 instanceof JavaType.FullyQualified) {
             if (TypeUtils.fullyQualifiedNamesAreEqual(
@@ -142,48 +209,76 @@ public class TypeUtils {
                 if (type1 instanceof JavaType.Class && type2 instanceof JavaType.Class) {
                     return true;
                 } else if (type1 instanceof JavaType.Parameterized && type2 instanceof JavaType.Parameterized) {
-                    JavaTypeSignatureBuilder signatureBuilder = new DefaultJavaTypeSignatureBuilder();
-                    return signatureBuilder.signature(type1).equals(signatureBuilder.signature(type2));
+                    JavaType.Parameterized parameterized1 = (JavaType.Parameterized) type1;
+                    JavaType.Parameterized parameterized2 = (JavaType.Parameterized) type2;
+                    if (parameterized1.getTypeParameters().size() != parameterized2.getTypeParameters().size()) {
+                        return false;
+                    }
+                    for (int i = 0; i < parameterized1.getTypeParameters().size(); i++) {
+                        JavaType typeParam1 = parameterized1.getTypeParameters().get(i);
+                        JavaType typeParam2 = parameterized2.getTypeParameters().get(i);
+                        if (!isOfType(typeParam1, typeParam2, mode)) {
+                            return false;
+                        }
+                    }
+                    return true;
                 } else if (type1 instanceof JavaType.Annotation && type2 instanceof JavaType.Annotation) {
                     return isOfType((JavaType.Annotation) type1, (JavaType.Annotation) type2);
                 }
             }
         }
         if (type1 instanceof JavaType.Array && type2 instanceof JavaType.Array) {
-            return isOfType(((JavaType.Array) type1).getElemType(), ((JavaType.Array) type2).getElemType());
+            return isOfType(((JavaType.Array) type1).getElemType(), ((JavaType.Array) type2).getElemType(), mode);
         }
         if (type1 instanceof JavaType.GenericTypeVariable && type2 instanceof JavaType.GenericTypeVariable) {
-            JavaTypeSignatureBuilder signatureBuilder = new DefaultJavaTypeSignatureBuilder();
-            return signatureBuilder.signature(type1).equals(signatureBuilder.signature(type2));
-        }
-        if (type1 instanceof JavaType.Method && type2 instanceof JavaType.Method) {
-            JavaType.Method method1 = (JavaType.Method) type1;
-            JavaType.Method method2 = (JavaType.Method) type2;
-            if (!method1.getName().equals(method2.getName()) ||
-                method1.getFlagsBitMap() != method2.getFlagsBitMap() ||
-                !TypeUtils.isOfType(method1.getDeclaringType(), method2.getDeclaringType()) ||
-                !TypeUtils.isOfType(method1.getReturnType(), method2.getReturnType()) ||
-                method1.getThrownExceptions().size() != method2.getThrownExceptions().size() ||
-                method1.getParameterTypes().size() != method2.getParameterTypes().size()) {
+            JavaType.GenericTypeVariable generic1 = (JavaType.GenericTypeVariable) type1;
+            JavaType.GenericTypeVariable generic2 = (JavaType.GenericTypeVariable) type2;
+            if (!generic1.getName().equals(generic2.getName()) ||
+                    generic1.getVariance() != generic2.getVariance() ||
+                    generic1.getBounds().size() != generic2.getBounds().size()) {
                 return false;
             }
-
-            for (int index = 0; index < method1.getParameterTypes().size(); index++) {
-                if (!TypeUtils.isOfType(method1.getParameterTypes().get(index), method2.getParameterTypes().get(index))) {
-                    return false;
-                }
+            if (mode.isInScope(generic1)) {
+                // Generics can be recursive, if we are is scope all checks have been positive
+                return true;
             }
-            for (int index = 0; index < method1.getThrownExceptions().size(); index++) {
-                if (!TypeUtils.isOfType(method1.getThrownExceptions().get(index), method2.getThrownExceptions().get(index))) {
+            for (int i = 0; i < generic1.getBounds().size(); i++) {
+                JavaType bound1 = generic1.getBounds().get(i);
+                JavaType bound2 = generic2.getBounds().get(i);
+                if (!isOfType(bound1, bound2, mode.enter(generic1))) {
                     return false;
                 }
             }
             return true;
         }
-        if(type1 instanceof JavaType.Variable && type2 instanceof JavaType.Variable) {
+        if (type1 instanceof JavaType.Method && type2 instanceof JavaType.Method) {
+            JavaType.Method method1 = (JavaType.Method) type1;
+            JavaType.Method method2 = (JavaType.Method) type2;
+            if (!method1.getName().equals(method2.getName()) ||
+                    method1.getFlagsBitMap() != method2.getFlagsBitMap() ||
+                    !TypeUtils.isOfType(method1.getDeclaringType(), method2.getDeclaringType(), mode) ||
+                    !TypeUtils.isOfType(method1.getReturnType(), method2.getReturnType(), mode) ||
+                    method1.getThrownExceptions().size() != method2.getThrownExceptions().size() ||
+                    method1.getParameterTypes().size() != method2.getParameterTypes().size()) {
+                return false;
+            }
+
+            for (int index = 0; index < method1.getParameterTypes().size(); index++) {
+                if (!TypeUtils.isOfType(method1.getParameterTypes().get(index), method2.getParameterTypes().get(index), mode)) {
+                    return false;
+                }
+            }
+            for (int index = 0; index < method1.getThrownExceptions().size(); index++) {
+                if (!TypeUtils.isOfType(method1.getThrownExceptions().get(index), method2.getThrownExceptions().get(index), mode)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (type1 instanceof JavaType.Variable && type2 instanceof JavaType.Variable) {
             JavaType.Variable var1 = (JavaType.Variable) type1;
             JavaType.Variable var2 = (JavaType.Variable) type2;
-            return isOfType((var1).getType(), var2.getType()) && isOfType(var1.getOwner(), var2.getOwner());
+            return isOfType(var1.getType(), var2.getType(), mode) && isOfType(var1.getOwner(), var2.getOwner(), mode);
         }
         return type1.equals(type2);
     }
@@ -307,170 +402,67 @@ public class TypeUtils {
         return false;
     }
 
-    public enum TypePosition {
-        In, Out, Invariant
+    public static boolean isTypeAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
+        return isTypeAssignableTo(to, from, TypeVariableMode.BOUND);
+    }
+
+    public static boolean isTypeAssignableTo(@Nullable JavaType to, @Nullable JavaType from, TypeVariableMode mode) {
+        if (to instanceof JavaType.Variable) {
+            return isTypeAssignableTo(((JavaType.Variable) to).getType(), from, mode);
+        } else if (to instanceof JavaType.Method) {
+            return isTypeAssignableTo(((JavaType.Method) to).getReturnType(), from, mode);
+        } else if (from instanceof JavaType.Variable) {
+            return isTypeAssignableTo(to, ((JavaType.Variable) from).getType(), mode);
+        } else if (from instanceof JavaType.Method) {
+            return isTypeAssignableTo(to, ((JavaType.Method) from).getReturnType(), mode);
+        }
+
+        if (isWildcard(to)) {
+            // This should be false, but happens when comparing method return types
+            return isTypeArgumentsAssignableTo(to, from, mode);
+        }
+
+        return isAssignableTo(to, from, mode);
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
-        return isAssignableTo(to, from, TypePosition.Invariant);
+        return isAssignableTo(to, from, TypeVariableMode.BOUND);
     }
 
-    public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, TypePosition position) {
+    public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, TypeVariableMode mode) {
         try {
-            if (to instanceof JavaType.Unknown || from instanceof JavaType.Unknown) {
+            if (isUnknown(to) || isUnknown(from) || isWildcard(to)) {
                 return false;
             }
-            if (to == from) {
+            if (isInferable(to, from, mode)) {
                 return true;
             }
             if (from == JavaType.Primitive.Null) {
                 return !(to instanceof JavaType.Primitive);
             }
-
-            // Handle parameterized types (e.g., List<String>)
-            if (to instanceof JavaType.Parameterized) {
-                JavaType.Parameterized toParameterized = (JavaType.Parameterized) to;
-
-                // If 'from' is not parameterized but the 'to' type is,
-                // this would be an unsafe raw type conversion - disallow it unless for wildcards
-                if (!(from instanceof JavaType.Parameterized)) {
-                    for (JavaType typeParameter : toParameterized.getTypeParameters()) {
-                        if (typeParameter instanceof JavaType.GenericTypeVariable && ((JavaType.GenericTypeVariable) typeParameter).getName().equals("?")) {
-                            continue;
-                        }
-                        return false;
-                    }
-                    // all wildcards case
-                    return isAssignableTo(toParameterized.getType(), from);
-                }
-
-                JavaType.Parameterized fromParameterized = (JavaType.Parameterized) from;
-                List<JavaType> toParameters = toParameterized.getTypeParameters();
-                List<JavaType> fromParameters = fromParameterized.getTypeParameters();
-
-                // First check if the raw types are assignable
-                if (toParameters.size() != fromParameters.size() ||
-                    !isAssignableTo(toParameterized.getType(), fromParameterized.getType(), position)) {
-                    return false;
-                }
-
-                // Check type parameters with appropriate variance
-                for (int i = 0; i < toParameters.size(); i++) {
-                    JavaType toParam = toParameters.get(i);
-                    JavaType fromParam = fromParameters.get(i);
-
-                    if (toParam instanceof JavaType.GenericTypeVariable) {
-                        JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) toParam;
-
-                        // Special handling for wildcards
-                        if (toGeneric.getName().equals("?")) {
-                            // If both are wildcards, check their compatibility
-                            if (fromParam instanceof JavaType.GenericTypeVariable &&
-                                ((JavaType.GenericTypeVariable) fromParam).getName().equals("?")) {
-
-                                // If both are unbounded wildcards, they're compatible
-                                if (toGeneric.getBounds().isEmpty() &&
-                                    ((JavaType.GenericTypeVariable) fromParam).getBounds().isEmpty()) {
-                                    continue;  // Skip to next parameter, these wildcards match
-                                }
-
-                                // If they have bounds, check bound compatibility
-                                return areWildcardBoundsCompatible(toGeneric, (JavaType.GenericTypeVariable) fromParam, position);
-                            }
-
-                            // Wildcard to non-wildcard case
-                            if (toGeneric.getBounds().isEmpty()) {
-                                // Unbounded wildcard accepts anything
-                                return true;
-                            } else {
-                                // Bounded wildcard - use the variance from the wildcard
-                                TypePosition wildcardPosition = convertVarianceToPosition(toGeneric.getVariance());
-                                for (JavaType bound : toGeneric.getBounds()) {
-                                    if (!isAssignableTo(bound, fromParam, wildcardPosition)) {
-                                        return false;
-                                    }
-                                }
-                                return true;
-                            }
-                        }
-                    }
-
-                    // For all non-wildcard cases, use invariant position
-                    if (!isOfType(toParam, fromParam)) {
-                        return false;
-                    }
-                }
+            if (to == from) {
                 return true;
+            }
+
+            // Handle fully qualified types (e.g., java.util.List, java.util.List<String>)
+            if (to instanceof JavaType.FullyQualified) {
+                return isFullyQualifiedAssignableTo((JavaType.FullyQualified) to, from, mode);
             }
 
             // Handle generic type variables (e.g., T extends Collection<String>)
             else if (to instanceof JavaType.GenericTypeVariable) {
-                JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
-
-                switch (position) {
-                    case In:
-                        // In parameter position (contravariant), the provided type must be a supertype
-                        // of at least one possible type that could satisfy the bounds
-                        for (JavaType bound : toGeneric.getBounds()) {
-                            if (isAssignableTo(from, bound, TypePosition.Invariant)) {
-                                return true;
-                            }
-                        }
-                        return false;
-
-                    case Out:
-                        // In return position (covariant), we can assign any subtype that satisfies the bounds
-                        for (JavaType bound : toGeneric.getBounds()) {
-                            if (!isAssignableTo(bound, from, TypePosition.Invariant)) {
-                                return false;
-                            }
-                        }
-                        return true;
-
-                    case Invariant:
-                        // In invariant position, types must match exactly
-                        if (from instanceof JavaType.GenericTypeVariable) {
-                            return toGeneric.getName().equals(((JavaType.GenericTypeVariable) from).getName());
-                        }
-                        return false;
-                }
+                return isTypeVariableAssignableTo((JavaType.GenericTypeVariable) to, from, mode);
             }
 
-            // Handle fully qualified types (e.g., java.util.List)
-            else if (to instanceof JavaType.FullyQualified) {
-                JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
-                if (from instanceof JavaType.Primitive) {
-                    return isAssignableTo(to, BOXED_TYPES.get((JavaType.Primitive) from), position);
-                } else if (from instanceof JavaType.Intersection) {
-                    for (JavaType intersectionType : ((JavaType.Intersection) from).getBounds()) {
-                        if (isAssignableTo(to, intersectionType, position)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-                return !(from instanceof JavaType.GenericTypeVariable) && isAssignableTo(toFq.getFullyQualifiedName(), from);
+            // Handle arrays types (e.g., String[])
+            else if (to instanceof JavaType.Array) {
+                return isArrayAssignableTo((JavaType.Array) to, from, mode);
             }
 
-            // Rest of the existing cases, passing through the position parameter
-            else if (to instanceof JavaType.Variable) {
-                return isAssignableTo(((JavaType.Variable) to).getType(), from, position);
-            } else if (to instanceof JavaType.Method) {
-                return isAssignableTo(((JavaType.Method) to).getReturnType(), from, position);
-            } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
-                JavaType.Array toArray = (JavaType.Array) to;
-                JavaType.Array fromArray = (JavaType.Array) from;
-                if (toArray.getElemType() instanceof JavaType.Primitive || fromArray.getElemType() instanceof JavaType.Primitive) {
-                    return isOfType(toArray.getElemType(), fromArray.getElemType());
-                }
-                // Arrays are invariant in Java
-                return isAssignableTo(toArray.getElemType(), fromArray.getElemType(), TypePosition.Invariant);
-            }
-
-            // Handle primitives with their existing logic
+            // Handle primitive types (e.g., int, boolean)
             else if (to instanceof JavaType.Primitive) {
                 // Primitive handling remains unchanged as they don't involve variance
-                return handlePrimitiveAssignability((JavaType.Primitive) to, from);
+                return isPrimitiveAssignableTo((JavaType.Primitive) to, from, mode);
             }
 
         } catch (Exception ignored) {
@@ -478,64 +470,201 @@ public class TypeUtils {
         return false;
     }
 
-    private static boolean areWildcardBoundsCompatible(JavaType.GenericTypeVariable to, JavaType.GenericTypeVariable from, TypePosition position) {
-        // If both wildcards are unbounded, they're compatible
-        if (to.getBounds().isEmpty() && from.getBounds().isEmpty()) {
+    private static boolean isFullyQualifiedAssignableTo(JavaType.FullyQualified to, @Nullable JavaType from, TypeVariableMode mode) {
+        if (isObject(to)) {
             return true;
         }
 
-        // If we have a bounded and unbounded wildcard:
-        if (to.getBounds().isEmpty()) {
-            // Unbounded target only accepts unbounded source
-            return false;
-        }
-        if (from.getBounds().isEmpty()) {
-            // Source being unbounded is never safe when target is bounded
-            return false;
-        }
+        if (from instanceof JavaType.FullyQualified) {
+            JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
+            if (!fullyQualifiedNamesAreEqual(to.getFullyQualifiedName(), classFrom.getFullyQualifiedName())) {
+                if (isFullyQualifiedAssignableTo(to, maybeResolveParameters(classFrom, classFrom.getSupertype()), mode)) {
+                    return true;
+                }
+                for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
+                    if (isFullyQualifiedAssignableTo(to, maybeResolveParameters(classFrom, i), mode)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
 
-        // Both wildcards are bounded
-        switch (position) {
-            case Out:
-                // In covariant position, source bounds must be more specific than target bounds
-                for (JavaType bound : to.getBounds()) {
-                    if (!isAssignableTo(bound, from.getBounds().get(0), TypePosition.Invariant)) {
+            // If 'to' is not parameterized is safe conversion,
+            if (!(to instanceof JavaType.Parameterized)) {
+                return true;
+            }
+
+            // If 'from' is not parameterized but the 'to' type is,
+            // this would be an unsafe raw type conversion - disallow it unless for wildcards
+            if (!(from instanceof JavaType.Parameterized)) {
+                for (JavaType typeParameter : to.getTypeParameters()) {
+                    if (!isWildcard(typeParameter) || !((JavaType.GenericTypeVariable) typeParameter).getBounds().isEmpty()) {
                         return false;
                     }
                 }
+                // all wildcards case
                 return true;
-            case In:
-                // In contravariant position, target bounds must be more specific than source bounds
-                for (JavaType bound : from.getBounds()) {
-                    if (!isAssignableTo(bound, to.getBounds().get(0), TypePosition.Invariant)) {
-                        return false;
-                    }
+            }
+
+            // Both are parameterized, check type parameters
+            JavaType.Parameterized fromParameterized = (JavaType.Parameterized) from;
+            List<JavaType> toParameters = to.getTypeParameters();
+            List<JavaType> fromParameters = fromParameterized.getTypeParameters();
+
+            if (toParameters.size() != fromParameters.size()) {
+                return false;
+            }
+            for (int i = 0; i < toParameters.size(); i++) {
+                JavaType toParam = toParameters.get(i);
+                JavaType fromParam = fromParameters.get(i);
+
+                if (!isTypeArgumentsAssignableTo(toParam, fromParam, mode)) {
+                    return false;
                 }
-                return true;
-            case Invariant:
-                // In invariant position, bounds must match exactly
-                return to.getBounds().equals(from.getBounds());
+            }
+            return true;
+        } else if (from instanceof JavaType.Primitive) {
+            return isFullyQualifiedAssignableTo(to, BOXED_TYPES.get((JavaType.Primitive) from), mode);
+        } else if (from instanceof JavaType.Array) {
+            String fqn = to.getFullyQualifiedName();
+            return "java.io.Serializable".equals(fqn) || "java.lang.Cloneable".equals(fqn);
+        } else if (from instanceof JavaType.Intersection) {
+            for (JavaType intersectionType : ((JavaType.Intersection) from).getBounds()) {
+                if (isFullyQualifiedAssignableTo(to, intersectionType, mode)) {
+                    return true;
+                }
+            }
+            return false;
+        } else if (from instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
+            if (isWildcard(genericFrom) || mode.isInScope(genericFrom)) {
+                return false;
+            }
+            for (JavaType bound : genericFrom.getBounds()) {
+                if (isFullyQualifiedAssignableTo(to, bound, mode.enter(genericFrom))) {
+                    return true;
+                }
+            }
+            return false;
         }
         return false;
     }
 
-    private static TypePosition convertVarianceToPosition(JavaType.GenericTypeVariable.Variance variance) {
-        switch (variance) {
-            case COVARIANT:
-                return TypePosition.Out;
-            case CONTRAVARIANT:
-                return TypePosition.In;
-            default:
-                return TypePosition.Invariant;
+    private static @Nullable JavaType maybeResolveParameters(JavaType.FullyQualified source, JavaType.@Nullable FullyQualified target) {
+        if (!(source instanceof JavaType.Parameterized) || !(target instanceof JavaType.Parameterized)) {
+            return target;
         }
+        JavaType.Parameterized src = (JavaType.Parameterized) source;
+        JavaType.Parameterized tgt = (JavaType.Parameterized) target;
+
+        if (src.getTypeParameters().size() != src.getType().getTypeParameters().size()) {
+            return tgt;
+        }
+
+        Map<JavaType.GenericTypeVariable, JavaType> typeVariableMap = new IdentityHashMap<>();
+        for (int i = 0; i < src.getTypeParameters().size(); i++) {
+            if (src.getType().getTypeParameters().get(i) instanceof JavaType.GenericTypeVariable) {
+                typeVariableMap.put((JavaType.GenericTypeVariable) src.getType().getTypeParameters().get(i), src.getTypeParameters().get(i));
+            }
+        }
+        List<JavaType> resolvedTypeParameters = new ArrayList<>();
+        for (JavaType tp : target.getTypeParameters()) {
+            //noinspection SuspiciousMethodCalls
+            resolvedTypeParameters.add(typeVariableMap.getOrDefault(tp, tp));
+        }
+        return tgt.withTypeParameters(resolvedTypeParameters);
     }
 
-    private static boolean handlePrimitiveAssignability(JavaType.Primitive to, @Nullable JavaType from) {
+    private static boolean isTypeArgumentsAssignableTo(JavaType toParam, @Nullable JavaType fromParam, TypeVariableMode mode) {
+        if (isWildcard(toParam)) {
+            JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) toParam;
+
+            // If target "to" wildcard is unbounded, it accepts anything
+            if (toGeneric.getBounds().isEmpty()) {
+                return true;
+            }
+
+            // Extract the target bound
+            JavaType target = toGeneric.getBounds().get(0);
+
+            // Determine if "from" is a wildcard and handle it
+            JavaType source = fromParam;
+            if (isWildcard(fromParam)) {
+                JavaType.GenericTypeVariable fromGeneric = (JavaType.GenericTypeVariable) fromParam;
+
+                // Unbounded "from" wildcard is incompatible with a bounded "to" wildcard
+                if (fromGeneric.getBounds().isEmpty()) {
+                    return false;
+                }
+
+                // If variances mismatch, the wildcards are incompatible
+                if (fromGeneric.getVariance() != toGeneric.getVariance()) {
+                    return false;
+                }
+
+                // Set the source to the bound of the "from" wildcard
+                source = fromGeneric.getBounds().get(0);
+            }
+
+            // If in scope, so far all checks have passed
+            if (mode.isInScope(toGeneric)) {
+                return true;
+            }
+
+            // Handle variance and type assignability
+            switch (toGeneric.getVariance()) {
+                case COVARIANT:
+                    // ? extends TARGET. Source must be assignable to target
+                    return isAssignableTo(target, source, mode.enter(toGeneric));
+                case CONTRAVARIANT:
+                    // ? super TARGET. Source must be assignable from target. In infer mode that will make source inferable.
+                    return isAssignableTo(source, target, mode.reverse(toGeneric));
+                default:
+                    // In Java, an invariant wildcard with bounds (e.g., ? T) is not valid syntax
+                    return false;
+            }
+        }
+
+        // For non-wildcard "to", types must match exactly
+        return isOfType(toParam, fromParam, mode);
+    }
+
+    private static boolean isTypeVariableAssignableTo(JavaType.GenericTypeVariable to, JavaType from, TypeVariableMode mode) {
+        if (!(from instanceof JavaType.GenericTypeVariable)) {
+            return false;
+        }
+
+        JavaType.GenericTypeVariable fromGeneric = (JavaType.GenericTypeVariable) from;
+        if (to.getName().equals(fromGeneric.getName())) {
+            return isOfType(to, from, mode);
+        }
+
+        for (JavaType bound : fromGeneric.getBounds()) {
+            if (isTypeVariableAssignableTo(to, bound, mode)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isArrayAssignableTo(JavaType.Array to, JavaType from, TypeVariableMode mode) {
+        if (!(from instanceof JavaType.Array)) {
+            return false;
+        }
+
+        JavaType.Array fromArray = (JavaType.Array) from;
+        if (to.getElemType() instanceof JavaType.Primitive || fromArray.getElemType() instanceof JavaType.Primitive) {
+            return isOfType(to.getElemType(), fromArray.getElemType(), mode);
+        }
+        return isAssignableTo(to.getElemType(), fromArray.getElemType(), mode);
+    }
+
+    private static boolean isPrimitiveAssignableTo(JavaType.Primitive to, @Nullable JavaType from, TypeVariableMode mode) {
         if (from instanceof JavaType.FullyQualified) {
             // Account for auto-unboxing
             JavaType.FullyQualified fromFq = (JavaType.FullyQualified) from;
             JavaType.Primitive fromPrimitive = JavaType.Primitive.fromClassName(fromFq.getFullyQualifiedName());
-            return handlePrimitiveAssignability(to, fromPrimitive);
+            return isPrimitiveAssignableTo(to, fromPrimitive, mode);
         } else if (from instanceof JavaType.Primitive) {
             JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
             switch (fromPrimitive) {
@@ -586,6 +715,16 @@ public class TypeUtils {
                             return false;
                     }
             }
+        }
+        return false;
+    }
+
+    private static boolean isInferable(@Nullable JavaType to, @Nullable JavaType from, TypeVariableMode mode) {
+        // TODO: Check bounds
+        if (mode.inferMode && !mode.reverseMode && to instanceof JavaType.GenericTypeVariable && !isWildcard(to)) {
+            return true;
+        } else if (mode.inferMode && mode.reverseMode && from instanceof JavaType.GenericTypeVariable && !isWildcard(from)) {
+            return true;
         }
         return false;
     }
