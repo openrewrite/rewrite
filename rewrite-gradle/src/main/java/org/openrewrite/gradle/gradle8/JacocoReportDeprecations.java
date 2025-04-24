@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ public class JacocoReportDeprecations extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J. Assignment visitAssignment(J. Assignment assignment, ExecutionContext ctx) {
+            public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                 String prefix = getCursor().getNearestMessage(JACOCO_SETTINGS_PATH);
                 String prefixOrEmpty = prefix == null ? "" : prefix + ".";
                 if (assignment.getVariable() instanceof J.FieldAccess) {
@@ -63,7 +63,7 @@ public class JacocoReportDeprecations extends Recipe {
             }
 
             @Override
-            public J. MethodInvocation visitMethodInvocation(J. MethodInvocation method, ExecutionContext ctx) {
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 String parent = getCursor().getNearestMessage(JACOCO_SETTINGS_PATH);
                 String message;
                 if (parent == null) {
@@ -79,7 +79,7 @@ public class JacocoReportDeprecations extends Recipe {
                 return method;
             }
 
-            private J.Assignment replaceDeprecations(J. Assignment assignment, String path) {
+            private J.Assignment replaceDeprecations(J.Assignment assignment, String path) {
                 if (isDeprecatedPath(path)) {
                     String field = path.substring(path.lastIndexOf(".") + 1);
                     if (assignment.getVariable() instanceof J.FieldAccess) {
@@ -121,14 +121,14 @@ public class JacocoReportDeprecations extends Recipe {
                 return parts.length < 5;
             }
 
-            private String getFieldName(J. FieldAccess fieldAccess) {
+            private String getFieldName(J.FieldAccess fieldAccess) {
                 String fieldName = fieldAccess.getSimpleName();
                 Expression target = fieldAccess;
                 while (target instanceof J.FieldAccess) {
                     target = ((J.FieldAccess) target).getTarget();
                     if (target instanceof J.Identifier) {
                         fieldName = ((J.Identifier) target).getSimpleName() + "." + fieldName;
-                    } else if (target instanceof J.FieldAccess){
+                    } else if (target instanceof J.FieldAccess) {
                         fieldName = ((J.FieldAccess) target).getSimpleName() + "." + fieldName;
                     }
                 }
