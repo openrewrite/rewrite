@@ -683,7 +683,7 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitArrayExpression(ArrayExpression expression) {
-            Space whitespaceBeforeNew = whitespace();
+            Space prefix = whitespace();
             skip("new");
             TypeTree typeTree = visitTypeTree(expression.getElementType());
             List<J.ArrayDimension> dimensions = buildNewArrayDimensions(expression);
@@ -696,7 +696,7 @@ public class GroovyParserVisitor {
                 return null;
             }
 
-            Space whitespaceBefore = sourceBefore("{");
+            Space fmt = sourceBefore("{");
 
             List<JRightPadded<Expression>> expressions;
             if (expression.getExpressions().isEmpty()) {
