@@ -95,11 +95,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return statement;
     }
 
-    protected async visitSpace(space: Space, loc: any, p: P): Promise<Space> {
+    protected async visitSpace(space: Space, p: P): Promise<Space> {
         return space;
     }
 
-    protected async visitType(javaType: JavaType | null, p: P): Promise<JavaType | null> {
+    protected async visitType(javaType: JavaType | undefined, p: P): Promise<JavaType | undefined> {
         return javaType;
     }
 
@@ -161,14 +161,14 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitAssert(assert_: Assert, p: P): Promise<J | undefined> {
         return this.produceJava<Assert>(assert_, p, async draft => {
             draft.condition = await this.visitDefined(assert_.condition, p) as Expression;
-            draft.detail = await this.visitLeftPadded(assert_.detail, JLeftPadded.Location.AssertDetail, p);
+            draft.detail = await this.visitLeftPadded(assert_.detail, p);
         });
     }
 
     protected async visitAssignment(assignment: Assignment, p: P): Promise<J | undefined> {
         return this.produceJava<Assignment>(assignment, p, async draft => {
             draft.variable = await this.visitDefined(assignment.variable, p) as Expression;
-            draft.assignment = await this.visitLeftPadded(assignment.assignment, JLeftPadded.Location.Assignment, p);
+            draft.assignment = await this.visitLeftPadded(assignment.assignment, p);
             draft.type = await this.visitType(assignment.type, p);
         });
     }
@@ -204,7 +204,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.imports = await mapAsync(cu.imports, imp =>
                 this.visitRightPadded(imp, p) as Promise<JRightPadded<Import>>);
             draft.classes = await mapAsync(cu.classes, cls => this.visitDefined(cls, p) as Promise<ClassDeclaration>);
-            draft.eof = await this.visitSpace(cu.eof, null, p);
+            draft.eof = await this.visitSpace(cu.eof, p);
         });
     }
 
@@ -217,16 +217,16 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (!right) return undefined;
         return produceAsync<JRightPadded<T>>(right, async draft => {
             draft.element = await this.visitDefined(right.element, p);
-            draft.after = await this.visitSpace(right.after, null, p);
+            draft.after = await this.visitSpace(right.after, p);
         });
     }
 
-    protected async visitLeftPadded<T extends J>(left: JLeftPadded<T>, loc: JLeftPadded.Location, p: P): Promise<JLeftPadded<T>>;
-    protected async visitLeftPadded<T extends J>(left: JLeftPadded<T> | null, loc: JLeftPadded.Location, p: P): Promise<JLeftPadded<T> | null>;
-    protected async visitLeftPadded<T extends J>(left: JLeftPadded<T> | null, loc: JLeftPadded.Location, p: P): Promise<JLeftPadded<T> | null> {
-        if (left === null) return null;
+    protected async visitLeftPadded<T extends J>(left: JLeftPadded<T>, p: P): Promise<JLeftPadded<T>>;
+    protected async visitLeftPadded<T extends J>(left: JLeftPadded<T> | undefined, p: P): Promise<JLeftPadded<T> | undefined>;
+    protected async visitLeftPadded<T extends J>(left: JLeftPadded<T> | undefined, p: P): Promise<JLeftPadded<T> | undefined> {
+        if (!left) return undefined;
         return produceAsync<JLeftPadded<T>>(left, async draft => {
-            draft.before = await this.visitSpace(left.before, JLeftPadded.Location.beforeLocation(loc), p);
+            draft.before = await this.visitSpace(left.before, p);
             draft.element = await this.visitDefined(left.element, p);
         });
     }
@@ -239,7 +239,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             PromiseLike<ValidImmerRecipeReturnType<Draft<J2>>>
     ): Promise<J2> {
         const draft: Draft<J2> = createDraft(before as J2);
-        (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, null, p);
+        (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, p);
         (draft as Draft<J>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {
             await recipe(draft);
