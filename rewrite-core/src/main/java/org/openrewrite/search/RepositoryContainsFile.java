@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @SuppressWarnings("unused")
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class RepositoryContainsFiles extends ScanningRecipe<AtomicBoolean> {
+public class RepositoryContainsFile extends ScanningRecipe<AtomicBoolean> {
 
     @Option(displayName = "File pattern",
             description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all." +
@@ -40,7 +40,7 @@ public class RepositoryContainsFiles extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public String getDisplayName() {
-        return "Repository contains files";
+        return "Repository contains file";
     }
 
     @Override
