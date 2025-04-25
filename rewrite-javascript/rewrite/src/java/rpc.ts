@@ -96,10 +96,10 @@ import {
     Variable,
     WhileLoop,
     Wildcard,
-    Yield,
+    Yield, JavaType,
 } from "./tree";
 import { produceAsync } from "../visitor";
-import { createDraft, Draft, finishDraft } from "immer";
+import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
 
 class JavaSender extends JavaVisitor<RpcSendQueue> {
 
@@ -121,7 +121,7 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitAnnotation(annotation: Annotation, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(annotation, a => a.annotationType, type => this.visit(type, q));
-        await q.getAndSend(annotation, a => a.arguments, args => this.visitOptionalContainer(args, q));
+        await q.getAndSend(annotation, a => a.arguments, args => this.visitContainer(args, q));
         await q.getAndSend(annotation, a => a.type && asRef(a.type), type => this.visitType(type, q));
 
         return annotation;
@@ -144,7 +144,7 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitArrayType(arrayType: ArrayType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(arrayType, a => a.elementType, type => this.visit(type, q));
         await q.getAndSendList(arrayType, a => a.annotations || [], annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSend(arrayType, a => a.dimension, dim => this.visitOptionalLeftPadded(dim, q));
+        await q.getAndSend(arrayType, a => a.dimension, dim => this.visitLeftPadded(dim, q));
         await q.getAndSend(arrayType, a => a.type && asRef(a.type), type => this.visitType(type, q));
 
         return arrayType;
@@ -152,7 +152,7 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitAssert(assert: Assert, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(assert, a => a.condition, cond => this.visit(cond, q));
-        await q.getAndSend(assert, a => a.detail, detail => this.visitOptionalLeftPadded(detail, q));
+        await q.getAndSend(assert, a => a.detail, detail => this.visitLeftPadded(detail, q));
 
         return assert;
     }
@@ -219,13 +219,13 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitDoWhileLoop(doWhile: DoWhileLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(doWhile, d => d.body, body => this.visitOptionalRightPadded(body, q));
+        await q.getAndSend(doWhile, d => d.body, body => this.visitRightPadded(body, q));
         await q.getAndSend(doWhile, d => d.whileCondition, cond => this.visit(cond, q));
 
         return doWhile;
     }
 
-    protected async visitEmpty(empty: Empty, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitEmpty(empty: Empty, _q: RpcSendQueue): Promise<J | undefined> {
         // No additional properties to send
         return empty;
     }
@@ -402,10 +402,11 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitNewClass(newClass: NewClass, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(newClass, n => n.enclosing, encl => this.visitRightPadded(encl, q));
+        await q.getAndSend(newClass, n => n.new, n => this.visitSpace(n, q));
         await q.getAndSend(newClass, n => n.clazz, clazz => this.visit(clazz, q));
         await q.getAndSend(newClass, n => n.arguments, args => this.visitContainer(args, q));
         await q.getAndSend(newClass, n => n.body, body => this.visit(body, q));
-        await q.getAndSend(newClass, n => n.type && asRef(n.type), type => this.visitType(type, q));
+        await q.getAndSend(newClass, n => n.constructorType && asRef(n.constructorType), type => this.visitType(type, q));
 
         return newClass;
     }
@@ -737,6 +738,612 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
+    protected async visitAnnotatedType(annotatedType: AnnotatedType, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(annotatedType);
+
+        draft.annotations = await q.receiveListDefined(annotatedType.annotations, annot => this.visit(annot, q));
+        draft.typeExpression = await q.receive(annotatedType.typeExpression, type => this.visit(type, q));
+        draft.type = await q.receive(annotatedType.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitAnnotation(annotation: Annotation, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(annotation);
+
+        draft.annotationType = await q.receive(annotation.annotationType, type => this.visit(type, q));
+        draft.arguments = await q.receive(annotation.arguments, args => this.visitContainer(args, q));
+        draft.type = await q.receive(annotation.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitArrayAccess(arrayAccess: ArrayAccess, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(arrayAccess);
+
+        draft.indexed = await q.receive(arrayAccess.indexed, indexed => this.visit(indexed, q));
+        draft.dimension = await q.receive(arrayAccess.dimension, dim => this.visit(dim, q));
+        draft.type = await q.receive(arrayAccess.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitArrayDimension(dimension: ArrayDimension, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(dimension);
+
+        draft.index = await q.receive(dimension.index, idx => this.visitRightPadded(idx, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitArrayType(arrayType: ArrayType, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(arrayType);
+
+        draft.elementType = await q.receive(arrayType.elementType, type => this.visit(type, q));
+        draft.annotations = await q.receiveListDefined(arrayType.annotations || [], annot => this.visit(annot, q));
+        draft.dimension = await q.receive(arrayType.dimension, dim => this.visitOptionalLeftPadded(dim, q));
+        draft.type = await q.receive(arrayType.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitAssert(assert: Assert, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(assert);
+
+        draft.condition = await q.receive(assert.condition, cond => this.visit(cond, q));
+        draft.detail = await q.receive(assert.detail, detail => this.visitOptionalLeftPadded(detail, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitAssignment(assignment: Assignment, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(assignment);
+
+        draft.variable = await q.receive(assignment.variable, variable => this.visit(variable, q));
+        draft.assignment = await q.receive(assignment.assignment, assign => this.visitLeftPadded(assign, q));
+        draft.type = await q.receive(assignment.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitAssignmentOperation(assignOp: AssignmentOperation, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(assignOp);
+
+        draft.variable = await q.receive(assignOp.variable, variable => this.visit(variable, q));
+        draft.operator = await q.receive(assignOp.operator, op => this.visitLeftPadded(op, q));
+        draft.assignment = await q.receive(assignOp.assignment, assign => this.visit(assign, q));
+        draft.type = await q.receive(assignOp.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitBinary(binary: Binary, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(binary);
+
+        draft.left = await q.receive(binary.left, left => this.visit(left, q));
+        draft.operator = await q.receive(binary.operator, op => this.visitLeftPadded(op, q));
+        draft.right = await q.receive(binary.right, right => this.visit(right, q));
+        draft.type = await q.receive(binary.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitBreak(breakStmt: Break, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(breakStmt);
+
+        draft.label = await q.receive(breakStmt.label, label => this.visit(label, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitCase(caseStmt: Case, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(caseStmt);
+
+        draft.caseType = await q.receive(caseStmt.caseType);
+        draft.caseLabels = await q.receive(caseStmt.caseLabels, labels => this.visitContainer(labels, q));
+        draft.statements = await q.receive(caseStmt.statements, stmts => this.visitContainer(stmts, q));
+        draft.body = await q.receive(caseStmt.body, body => this.visitRightPadded(body, q));
+        draft.guard = await q.receive(caseStmt.guard, guard => this.visit(guard, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitContinue(continueStmt: Continue, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(continueStmt);
+
+        draft.label = await q.receive(continueStmt.label, label => this.visit(label, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitControlParentheses<T extends J>(controlParens: ControlParentheses<T>, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(controlParens);
+
+        draft.tree = await q.receive(controlParens.tree, tree => this.visitRightPadded(tree, q)) as unknown as WritableDraft<JRightPadded<T>>;
+
+        return finishDraft(draft);
+    }
+
+    protected async visitDeconstructionPattern(pattern: DeconstructionPattern, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(pattern);
+
+        draft.deconstructor = await q.receive(pattern.deconstructor, deconstructor => this.visit(deconstructor, q));
+        draft.nested = await q.receive(pattern.nested, nested => this.visitContainer(nested, q));
+        draft.type = await q.receive(pattern.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitDoWhileLoop(doWhile: DoWhileLoop, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(doWhile);
+
+        draft.body = await q.receive(doWhile.body, body => this.visitOptionalRightPadded(body, q));
+        draft.whileCondition = await q.receive(doWhile.whileCondition, cond => this.visit(cond, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitEmpty(empty: Empty, q: RpcReceiveQueue): Promise<J | undefined> {
+        // no additional properties to receive
+        return empty;
+    }
+
+    protected async visitEnumValueSet(enumValueSet: EnumValueSet, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(enumValueSet);
+
+        draft.enums = await q.receiveListDefined(enumValueSet.enums, enumValue => this.visitRightPadded(enumValue, q));
+        draft.terminatedWithSemicolon = await q.receive(enumValueSet.terminatedWithSemicolon);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitEnumValue(enumValue: EnumValue, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(enumValue);
+
+        draft.annotations = await q.receiveListDefined(enumValue.annotations, annot => this.visit(annot, q));
+        draft.name = await q.receive(enumValue.name, name => this.visit(name, q));
+        draft.initializer = await q.receive(enumValue.initializer, init => this.visit(init, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitErroneous(erroneous: Erroneous, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(erroneous);
+
+        draft.text = await q.receive(erroneous.text);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitFieldAccess(fieldAccess: FieldAccess, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(fieldAccess);
+
+        draft.target = await q.receive(fieldAccess.target, target => this.visit(target, q));
+        draft.name = await q.receive(fieldAccess.name, name => this.visitLeftPadded(name, q));
+        draft.type = await q.receive(fieldAccess.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitForEachLoop(forEachLoop: ForEachLoop, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(forEachLoop);
+
+        draft.control = await q.receive(forEachLoop.control, c => this.visit(c, q));
+        draft.body = await q.receive(forEachLoop.body, body => this.visitRightPadded(body, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitForEachLoopControl(control: ForEachLoopControl, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(control);
+
+        draft.variable = await q.receive(control.variable, variable => this.visitRightPadded(variable, q));
+        draft.iterable = await q.receive(control.iterable, expr => this.visitRightPadded(expr, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitForLoop(forLoop: ForLoop, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(forLoop);
+
+        draft.control = await q.receive(forLoop.control, c => this.visit(c, q));
+        draft.body = await q.receive(forLoop.body, body => this.visitRightPadded(body, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitForLoopControl(control: ForLoopControl, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(control);
+
+        draft.init = await q.receiveListDefined(control.init, init => this.visitRightPadded(init, q));
+        draft.condition = await q.receive(control.condition, cond => this.visitRightPadded(cond, q));
+        draft.update = await q.receiveListDefined(control.update, update => this.visitRightPadded(update, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitIf(ifStmt: If, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(ifStmt);
+
+        draft.ifCondition = await q.receive(ifStmt.ifCondition, cond => this.visit(cond, q));
+        draft.thenPart = await q.receive(ifStmt.thenPart, thenPart => this.visitRightPadded(thenPart, q));
+        draft.elsePart = await q.receive(ifStmt.elsePart, elsePart => this.visit(elsePart, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitIfElse(ifElse: IfElse, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(ifElse);
+
+        draft.body = await q.receive(ifElse.body, body => this.visitRightPadded(body, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitImport(importStmt: Import, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(importStmt);
+
+        draft.static = await q.receive(importStmt.static);
+        draft.qualid = await q.receive(importStmt.qualid, qualid => this.visit(qualid, q));
+        draft.alias = await q.receive(importStmt.alias, alias => this.visitLeftPadded(alias, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitInstanceOf(instanceOf: InstanceOf, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(instanceOf);
+
+        draft.expression = await q.receive(instanceOf.expression, expr => this.visitRightPadded(expr, q));
+        draft.clazz = await q.receive(instanceOf.clazz, clazz => this.visit(clazz, q));
+        draft.pattern = await q.receive(instanceOf.pattern, pattern => this.visit(pattern, q));
+        draft.type = await q.receive(instanceOf.type, type => this.visitType(type, q));
+        draft.type = await q.receive(instanceOf.modifier, mod => this.visit(mod, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitIntersectionType(intersectionType: IntersectionType, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(intersectionType);
+
+        draft.bounds = await q.receive(intersectionType.bounds, bounds => this.visitContainer(bounds, q));
+        draft.type = await q.receive(intersectionType.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitLabel(label: Label, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(label);
+
+        draft.label = await q.receive(label.label, lbl => this.visitRightPadded(lbl, q));
+        draft.statement = await q.receive(label.statement, stmt => this.visit(stmt, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitLambda(lambda: Lambda, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(lambda);
+
+        draft.parameters = await q.receive(lambda.parameters, params => this.visit(params, q));
+        draft.arrow = await q.receive(lambda.arrow, arrow => this.visitSpace(arrow, q));
+        draft.body = await q.receive(lambda.body, body => this.visit(body, q));
+        draft.type = await q.receive(lambda.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitLambdaParameters(params: LambdaParameters, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(params);
+
+        draft.parameters = await q.receiveListDefined(params.parameters, param => this.visitRightPadded(param, q));
+        draft.parenthesized = await q.receive(params.parenthesized);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitLiteral(literal: Literal, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(literal);
+
+        draft.value = await q.receive(literal.value);
+        draft.valueSource = await q.receive(literal.valueSource);
+        draft.unicodeEscapes = await q.receiveList(literal.unicodeEscapes);
+        draft.type = await q.receive(literal.type, type => this.visitType(type, q) as unknown as JavaType.Primitive);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitMemberReference(memberRef: MemberReference, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(memberRef);
+
+        draft.containing = await q.receive(memberRef.containing, container => this.visitRightPadded(container, q));
+        draft.typeParameters = await q.receive(memberRef.typeParameters, typeParams => this.visitContainer(typeParams, q));
+        draft.reference = await q.receive(memberRef.reference, ref => this.visitLeftPadded(ref, q));
+        draft.type = await q.receive(memberRef.type, type => this.visitType(type, q));
+        draft.methodType = await q.receive(memberRef.methodType, type => this.visitType(type, q) as unknown as JavaType.Method);
+        draft.variableType = await q.receive(memberRef.variableType, type => this.visitType(type, q) as unknown as JavaType.Variable);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitMethodInvocation(methodInvoc: MethodInvocation, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(methodInvoc);
+
+        draft.select = await q.receive(methodInvoc.select, select => this.visitRightPadded(select, q));
+        draft.typeParameters = await q.receive(methodInvoc.typeParameters, typeParams => this.visitContainer(typeParams, q));
+        draft.name = await q.receive(methodInvoc.name, name => this.visit(name, q));
+        draft.arguments = await q.receive(methodInvoc.arguments, args => this.visitContainer(args, q));
+        draft.methodType = await q.receive(methodInvoc.methodType, type => this.visitType(type, q) as unknown as JavaType.Method);
+        draft.type = await q.receive(methodInvoc.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitModifier(modifier: Modifier, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(modifier);
+
+        draft.type = await q.receive(modifier.type);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitMultiCatch(multiCatch: MultiCatch, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(multiCatch);
+
+        draft.alternatives = await q.receiveListDefined(multiCatch.alternatives, alt => this.visitRightPadded(alt, q));
+        draft.type = await q.receive(multiCatch.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitNewArray(newArray: NewArray, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(newArray);
+
+        draft.typeExpression = await q.receive(newArray.typeExpression, type => this.visit(type, q));
+        draft.dimensions = await q.receiveListDefined(newArray.dimensions, dim => this.visit(dim, q));
+        draft.initializer = await q.receive(newArray.initializer, init => this.visitContainer(init, q));
+        draft.type = await q.receive(newArray.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitNewClass(newClass: NewClass, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(newClass);
+
+        draft.enclosing = await q.receive(newClass.enclosing, encl => this.visitRightPadded(encl, q));
+        draft.new = await q.receive(newClass.new, new_ => this.visitSpace(new_, q));
+        draft.clazz = await q.receive(newClass.clazz, clazz => this.visit(clazz, q));
+        draft.arguments = await q.receive(newClass.arguments, args => this.visitContainer(args, q));
+        draft.body = await q.receive(newClass.body, body => this.visit(body, q));
+        draft.constructorType = await q.receive(newClass.constructorType, type => this.visitType(type, q) as unknown as JavaType.Method);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitNullableType(nullableType: NullableType, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(nullableType);
+
+        draft.annotations = await q.receiveListDefined(nullableType.annotations, annot => this.visit(annot, q));
+        draft.typeTree = await q.receive(nullableType.typeTree, type => this.visitRightPadded(type, q));
+        draft.type = await q.receive(nullableType.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitParameterizedType(paramType: ParameterizedType, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(paramType);
+
+        draft.clazz = await q.receive(paramType.clazz, clazz => this.visit(clazz, q));
+        draft.typeParameters = await q.receive(paramType.typeParameters, params => this.visitContainer(params, q));
+        draft.type = await q.receive(paramType.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitParentheses<T extends J>(parentheses: Parentheses<T>, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(parentheses);
+
+        draft.tree = await q.receive(parentheses.tree, tree =>
+            this.visitRightPadded(tree, q)) as unknown as WritableDraft<JRightPadded<T>>;
+        draft.type = await q.receive(parentheses.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitParenthesizedTypeTree(parenthesizedType: ParenthesizedTypeTree, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(parenthesizedType);
+
+        draft.annotations = await q.receiveListDefined(parenthesizedType.annotations, annot => this.visit(annot, q));
+        draft.parenthesizedType = await q.receive(parenthesizedType.parenthesizedType, tree => this.visit(tree, q));
+        draft.type = await q.receive(parenthesizedType.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitPrimitive(primitive: Primitive, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(primitive);
+
+        draft.type = await q.receive(primitive.type, type => this.visitType(type, q) as unknown as JavaType.Primitive);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitSwitch(switchStmt: Switch, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(switchStmt);
+
+        draft.selector = await q.receive(switchStmt.selector, selector => this.visit(selector, q));
+        draft.cases = await q.receive(switchStmt.cases, cases => this.visit(cases, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitSwitchExpression(switchExpr: SwitchExpression, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(switchExpr);
+
+        draft.selector = await q.receive(switchExpr.selector, selector => this.visit(selector, q));
+        draft.cases = await q.receive(switchExpr.cases, cases => this.visit(cases, q));
+        draft.type = await q.receive(switchExpr.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitTernary(ternary: Ternary, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(ternary);
+
+        draft.condition = await q.receive(ternary.condition, cond => this.visit(cond, q));
+        draft.truePart = await q.receive(ternary.truePart, truePart => this.visitLeftPadded(truePart, q));
+        draft.falsePart = await q.receive(ternary.falsePart, falsePart => this.visitLeftPadded(falsePart, q));
+        draft.type = await q.receive(ternary.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitThrow(throwStmt: Throw, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(throwStmt);
+
+        draft.exception = await q.receive(throwStmt.exception, exception => this.visit(exception, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitTry(tryStmt: Try, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(tryStmt);
+
+        draft.resources = await q.receive(tryStmt.resources, resources => this.visitContainer(resources, q));
+        draft.body = await q.receive(tryStmt.body, body => this.visit(body, q));
+        draft.catches = await q.receiveListDefined(tryStmt.catches, catchBlock => this.visit(catchBlock, q));
+        draft.finally = await q.receive(tryStmt.finally, finallyBlock => this.visitOptionalLeftPadded(finallyBlock, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitTryResource(resource: TryResource, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(resource);
+
+        draft.variableDeclarations = await q.receive(resource.variableDeclarations, variables => this.visit(variables, q));
+        draft.terminatedWithSemicolon = await q.receive(resource.terminatedWithSemicolon);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitTryCatch(tryCatch: TryCatch, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(tryCatch);
+
+        draft.parameter = await q.receive(tryCatch.parameter, param => this.visit(param, q));
+        draft.body = await q.receive(tryCatch.body, body => this.visit(body, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitUnary(unary: Unary, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(unary);
+
+        draft.operator = await q.receive(unary.operator);
+        draft.expression = await q.receive(unary.expression, expr => this.visit(expr, q));
+        draft.type = await q.receive(unary.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitUnknown(unknown: Unknown, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(unknown);
+
+        draft.source = await q.receive(unknown.source, source => this.visit(source, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitUnknownSource(unknownSource: UnknownSource, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(unknownSource);
+
+        draft.text = await q.receive(unknownSource.text);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitVariable(variable: Variable, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(variable);
+
+        draft.name = await q.receive(variable.name, name => this.visit(name, q));
+        draft.dimensionsAfterName = await q.receiveListDefined(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, q));
+        draft.initializer = await q.receive(variable.initializer, init => this.visitOptionalLeftPadded(init, q));
+        draft.variableType = await q.receive(variable.variableType, type => this.visitType(type, q) as unknown as JavaType.Variable);
+
+        return finishDraft(draft);
+    }
+
+    protected async visitYield(yieldStmt: Yield, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(yieldStmt);
+
+        draft.implicit = await q.receive(yieldStmt.implicit);
+        draft.value = await q.receive(yieldStmt.value, value => this.visit(value, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitTypeParameters(typeParams: TypeParameters, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(typeParams);
+
+        draft.annotations = await q.receiveListDefined(typeParams.annotations, annot => this.visit(annot, q));
+        draft.typeParameters = await q.receiveListDefined(typeParams.typeParameters, param => this.visitRightPadded(param, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitReturn(returnStmt: Return, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(returnStmt);
+
+        draft.expression = await q.receive(returnStmt.expression, expr => this.visit(expr, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitSynchronized(synchronizedStmt: Synchronized, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(synchronizedStmt);
+
+        draft.lock = await q.receive(synchronizedStmt.lock, lock => this.visit(lock, q));
+        draft.body = await q.receive(synchronizedStmt.body, body => this.visit(body, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitTypeCast(typeCast: TypeCast, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(typeCast);
+
+        draft.clazz = await q.receive(typeCast.clazz, typeExpr => this.visit(typeExpr, q));
+        draft.expression = await q.receive(typeCast.expression, expr => this.visit(expr, q));
+        draft.type = await q.receive(typeCast.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitTypeParameter(typeParameter: TypeParameter, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(typeParameter);
+
+        draft.annotations = await q.receiveListDefined(typeParameter.annotations, annot => this.visit(annot, q));
+        draft.name = await q.receive(typeParameter.name, name => this.visit(name, q));
+        draft.bounds = await q.receive(typeParameter.bounds, bounds => this.visitContainer(bounds, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitWhileLoop(whileLoop: WhileLoop, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(whileLoop);
+
+        draft.condition = await q.receive(whileLoop.condition, cond => this.visit(cond, q));
+        draft.body = await q.receive(whileLoop.body, body => this.visitOptionalRightPadded(body, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitWildcard(wildcard: Wildcard, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(wildcard);
+
+        draft.bound = await q.receive(wildcard.bound, bound => this.visitLeftPadded(bound, q));
+        draft.boundedType = await q.receive(wildcard.boundedType, type => this.visit(type, q));
+        draft.type = await q.receive(wildcard.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
     protected async visitCompilationUnit(cu: CompilationUnit, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(cu);
 
@@ -779,6 +1386,15 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
+    protected async visitClassDeclarationKind(kind: ClassDeclarationKind, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(kind);
+
+        draft.annotations = await q.receiveListDefined(kind.annotations, annot => this.visit(annot, q));
+        draft.type = await q.receive(kind.type);
+
+        return finishDraft(draft);
+    }
+
     protected async visitBlock(block: Block, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(block);
 
@@ -801,6 +1417,15 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         draft.throws = await q.receive(method.throws, throws => this.visitContainer(throws, q));
         draft.body = await q.receive(method.body, body => this.visit(body, q));
         draft.defaultValue = await q.receive(method.defaultValue, def => this.visitLeftPadded(def, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitIdentifierWithAnnotations(idWithAnn: IdentifierWithAnnotations, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(idWithAnn);
+
+        draft.identifier = await q.receive(idWithAnn.identifier, id => this.visit(id, q));
+        draft.annotations = await q.receiveListDefined(idWithAnn.annotations, annot => this.visit(annot, q));
 
         return finishDraft(draft);
     }
