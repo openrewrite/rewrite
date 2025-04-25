@@ -274,7 +274,7 @@ class DeclarativeRecipeTest implements RewriteTest {
               name: org.openrewrite.ScanningPreconditionTest
               description: Test.
               preconditions:
-                - org.openrewrite.search.RepositoryContainsFiles:
+                - org.openrewrite.search.RepositoryContainsFile:
                     filePattern: sam.txt
               recipeList:
                 - org.openrewrite.text.FindAndReplace:
@@ -295,7 +295,7 @@ class DeclarativeRecipeTest implements RewriteTest {
               name: org.openrewrite.ScanningPreconditionTest
               description: Test.
               preconditions:
-                - org.openrewrite.search.RepositoryContainsFiles:
+                - org.openrewrite.search.RepositoryContainsFile:
                     filePattern: sam.txt
               recipeList:
                 - org.openrewrite.text.FindAndReplace:
