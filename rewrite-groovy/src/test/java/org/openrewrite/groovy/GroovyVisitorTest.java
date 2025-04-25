@@ -80,6 +80,19 @@ class GroovyVisitorTest implements RewriteTest {
     }
 
     @Test
+    void newArrayOfListOfStrings() {
+        rewriteRun(groovy(
+          """
+          class A {
+              static void main(String[] argv) {
+                  List<String>[] l = new List<String>[]{ new ArrayList<String>() };
+              }
+          }
+          """
+        ));
+    }
+
+    @Test
     void newArrayWithInitializer() {
         rewriteRun(groovy(
           """
