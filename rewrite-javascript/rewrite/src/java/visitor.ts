@@ -52,6 +52,7 @@ import {
     InstanceOf,
     IntersectionType,
     isJava,
+    isSpace,
     J,
     JavaKind,
     JLeftPadded,
@@ -765,8 +766,10 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (!left) return undefined;
         return produceAsync<JLeftPadded<T>>(left, async draft => {
             draft.before = await this.visitSpace(left.before, p);
-            if (typeof left.element !== 'number' && typeof left.element !== 'boolean' && left.element.kind !== JavaKind.Space) {
-                draft.element = await this.visitDefined(left.element as any, p) as any;
+            if (isJava(left.element)) {
+                draft.element = await this.visitDefined(left.element, p) as Draft<T>;
+            } else if (isSpace(left.element)) {
+                draft.element = await this.visitSpace(left.element, p) as Draft<T>;
             }
         });
     }
@@ -776,7 +779,9 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitContainer<T extends J>(container: JContainer<T> | undefined, p: P): Promise<JContainer<T> | undefined> {
         if (!container) return undefined;
         return produceAsync<JContainer<T>>(container, async draft => {
+            draft.before = await this.visitSpace(container.before, p);
             (draft.elements as JRightPadded<J>[]) = await mapAsync(container.elements, e => this.visitRightPadded(e, p));
+            draft.markers = await this.visitMarkers(container.markers, p);
         });
     }
 

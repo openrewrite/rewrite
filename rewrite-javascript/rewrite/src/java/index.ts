@@ -19,4 +19,4 @@ export * from "./visitor";
 // export * from "./parser";
 
 // import "./print";
-// import "./rpc";
+import "./rpc";

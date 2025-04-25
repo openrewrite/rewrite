@@ -110,6 +110,12 @@ export interface Space {
     readonly whitespace: string;
 }
 
+export function isSpace(tree: any): tree is Space {
+    return tree &&
+        typeof tree === 'object' &&
+        tree.kind === JavaKind.Space;
+}
+
 export function space(whitespace: string): Space {
     return {
         kind: JavaKind.Space,
@@ -158,7 +164,9 @@ export interface JRightPadded<T extends J | boolean> {
 
 export interface JContainer<T extends J> {
     readonly kind: typeof JavaKind.JContainer;
+    readonly before: Space;
     readonly elements: JRightPadded<T>[];
+    readonly markers: Markers;
 }
 
 export interface JavaSourceFile extends J, SourceFile {
