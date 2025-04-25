@@ -193,7 +193,7 @@ type JavaExpressionBase = FieldAccess | Assignment | AssignmentOperation | Insta
     MemberReference | AnnotatedType | ArrayType | Literal | Annotation | SwitchExpression | Primitive | Wildcard |
     IntersectionType | NullableType | ControlParentheses<J> | Empty | Unknown | Erroneous;
 
-type Expression<T extends { kind: string } = never> = JavaExpressionBase | T;
+export type Expression<T extends { kind: string } = never> = JavaExpressionBase | T;
 
 // noinspection JSUnusedLocalSymbols
 type JavaExpression = Expression;
@@ -217,6 +217,11 @@ export interface ArrayAccess extends J, TypedTree {
     readonly indexed: Expression;
     readonly dimension: ArrayDimension;
     readonly type?: JavaType;
+}
+
+export interface ArrayDimension extends J {
+    readonly kind: typeof JavaKind.ArrayDimension;
+    readonly index: JRightPadded<Expression>;
 }
 
 export interface ArrayType extends J, TypeTree {
@@ -568,11 +573,6 @@ export interface NewArray extends J, TypedTree {
     readonly dimensions: ArrayDimension[];
     readonly initializer?: JContainer<Expression>;
     readonly type?: JavaType;
-}
-
-export interface ArrayDimension extends J {
-    readonly kind: typeof JavaKind.ArrayDimension;
-    readonly index: JRightPadded<Expression>;
 }
 
 export interface NewClass extends J, TypedTree {
