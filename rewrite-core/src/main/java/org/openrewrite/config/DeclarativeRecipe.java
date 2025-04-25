@@ -329,8 +329,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         for (Recipe r : recipe.getRecipeList()) {
             conditions.add(orVisitors(r));
         }
-        if(conditions.isEmpty()) {
-            return recipe.getVisitor();
+        if (conditions.size() == 1) {
+            return conditions.get(0);
         }
         //noinspection unchecked
         return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
