@@ -47,6 +47,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                 
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
+                  api( group: 'org.openrewrite', name: 'rewrite-gradle', version: 'latest.release' )
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
               }
               """,
@@ -61,6 +62,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                 
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release")
+                  api( "org.openrewrite:rewrite-gradle:latest.release" )
                   implementation "org.openrewrite:rewrite-core:latest.release"
               }
               """
