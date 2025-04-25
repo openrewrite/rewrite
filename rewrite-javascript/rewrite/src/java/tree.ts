@@ -473,6 +473,7 @@ export interface DeconstructionPattern extends J, TypedTree {
 export interface IntersectionType extends J, TypeTree {
     readonly kind: typeof JavaKind.IntersectionType;
     readonly bounds: JContainer<TypeTree>;
+    readonly type?: JavaType;
 }
 
 export interface Label extends J, Statement {
