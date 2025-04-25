@@ -337,18 +337,6 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
     }
 
-    private static boolean isScanningRecipe(Recipe recipe) {
-        if (recipe instanceof ScanningRecipe) {
-            return true;
-        }
-        for (Recipe r : recipe.getRecipeList()) {
-            if (isScanningRecipe(r)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {
         List<Recipe> mappedRecipeList = new ArrayList<>(recipeList.size());
         for (Recipe recipe : recipeList) {
