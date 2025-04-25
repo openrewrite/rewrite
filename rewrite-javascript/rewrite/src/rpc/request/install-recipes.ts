@@ -63,7 +63,12 @@ export class InstallRecipes {
                 resolvedPath = request.recipes;
             }
 
-            const recipeModule = require(resolvedPath);
+            let recipeModule;
+            try {
+                recipeModule = require(resolvedPath);
+            } catch (e: any) {
+                throw new Error(`Failed to load recipe module from ${resolvedPath}: ${e.stack}`);
+            }
 
             if (typeof recipeModule.activate === "function") {
                 recipeModule.activate(registry);

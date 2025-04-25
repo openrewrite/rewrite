@@ -1,1 +1,1 @@
-{"name": "please-work"}
+{"name":"please-work","dependencies":{"@openrewrite/recipes-npm":"^0.1.5"}}

@@ -54,9 +54,6 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
           "./rewrite/dist/src/rpc/server.js"
         );
         client.batchSize(20).timeout(Duration.ofMinutes(10));
-
-        Thread.sleep(3000);
-        System.out.println("Sending message");
     }
 
     @AfterEach

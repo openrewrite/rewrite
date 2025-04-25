@@ -89,7 +89,7 @@ describe("Rewrite RPC", () => {
 
     test("installRecipes", async () => {
         const installed = await client.installRecipes(
-            "@openrewrite/recipes-npm",
+            {packageName: "@openrewrite/recipes-npm"}
         );
         expect(installed.recipesInstalled).toBeGreaterThan(0);
     });
