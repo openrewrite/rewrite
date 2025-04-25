@@ -115,7 +115,8 @@ public class JContainer<T> {
         THROWS(Space.Location.THROWS, JRightPadded.Location.THROWS),
         TRY_RESOURCES(Space.Location.TRY_RESOURCES, JRightPadded.Location.TRY_RESOURCE),
         TYPE_BOUNDS(Space.Location.TYPE_BOUNDS, JRightPadded.Location.TYPE_BOUND),
-        TYPE_PARAMETERS(Space.Location.TYPE_PARAMETERS, JRightPadded.Location.TYPE_PARAMETER);
+        TYPE_PARAMETERS(Space.Location.TYPE_PARAMETERS, JRightPadded.Location.TYPE_PARAMETER),
+        ANY(Space.Location.ANY, JRightPadded.Location.ANY);
 
         private final Space.Location beforeLocation;
         private final JRightPadded.Location elementLocation;
