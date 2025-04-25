@@ -18,20 +18,13 @@ import { asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue } from "../rp
 import {
     J,
     JavaKind,
-    Statement,
     Expression,
     JRightPadded,
     JLeftPadded,
     JContainer,
-    TypeTree,
-    NameTree,
     Space,
-    Comment,
-    Annotation,
-    Import,
     CompilationUnit,
     Package,
-    TypesInUse,
     ClassDeclaration,
     MethodDeclaration,
     Block,
@@ -143,10 +136,14 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
         if (!left) {
             return undefined;
         }
-        await q.getAndSend(left, l => l.element,
-            async elem => typeof elem === 'object' && 'kind' in elem
-                ? await this.visit(elem as J, q)
-                : elem);
+
+        if (isJava(left.element)) {
+            await q.getAndSend(left, l => l.element, elem => this.visit(elem as J, q));
+        } else if (isSpace(left.element)) {
+            await q.getAndSend(left, l => asRef(l.before), space => this.visitSpace(space, q));
+        } else {
+            await q.getAndSend(left, l => l.element);
+        }
 
         await q.getAndSend(left, l => asRef(l.before), space => this.visitSpace(space, q));
         await q.sendMarkers(left, l => l.markers);
@@ -172,12 +169,7 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
         return right;
     }
 
-    protected async visitContainer<T extends J>(container: JContainer<T>, q: RpcSendQueue): Promise<JContainer<T>>;
-    protected async visitContainer<T extends J>(container: JContainer<T>, q: RpcSendQueue): Promise<JContainer<T> | undefined>;
-    protected async visitContainer<T extends J>(container: JContainer<T>, q: RpcSendQueue): Promise<JContainer<T> | undefined> {
-        if (!container) {
-            return undefined;
-        }
+    protected async visitContainer<T extends J>(container: JContainer<T>, q: RpcSendQueue): Promise<JContainer<T>> {
         await q.getAndSend(container, c => asRef(c.before), space => this.visitSpace(space, q));
         await q.getAndSendList(container, c => c.elements, elem => elem.element.id, elem => this.visitRightPadded(elem, q));
         await q.sendMarkers(container, c => c.markers);
@@ -186,7 +178,6 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 }
 
-// noinspection ES6MissingAwait
 class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     protected async preVisit(j: J, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -302,9 +293,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         });
     }
 
-    protected async visitLeftPadded<T extends J | Space | number | boolean>(left: JLeftPadded<T>, q: RpcReceiveQueue): Promise<JLeftPadded<T>>;
-    protected async visitLeftPadded<T extends J | Space | number | boolean>(left: JLeftPadded<T> | undefined, q: RpcReceiveQueue): Promise<JLeftPadded<T> | undefined>;
-    protected async visitLeftPadded<T extends J | Space | number | boolean>(left: JLeftPadded<T>, q: RpcReceiveQueue): Promise<JLeftPadded<T> | undefined> {
+    protected async visitLeftPadded<T extends J | Space | number | boolean>(left: JLeftPadded<T>, q: RpcReceiveQueue): Promise<JLeftPadded<T>> {
         if (!left) {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty left padding");
         }
@@ -315,9 +304,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 draft.element = await q.receive(left.element, elem => this.visit(elem, q)) as Draft<T>;
             } else if (isSpace(left.element)) {
                 draft.element = await q.receive<Space>(left.element, space => this.visitSpace(space, q)) as Draft<T>;
-            } else if (typeof left.element === 'boolean') {
-                draft.element = await q.receive(left.element) as Draft<T>;
-            } else if (typeof left.element === 'number') {
+            } else {
                 draft.element = await q.receive(left.element) as Draft<T>;
             }
 
@@ -326,10 +313,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         });
     }
 
-    protected async visitRightPadded<T extends J>(right: JRightPadded<T>, q: RpcReceiveQueue): Promise<JRightPadded<T>>;
-    protected async visitRightPadded<T extends boolean>(right: JRightPadded<T>, q: RpcReceiveQueue): Promise<JRightPadded<T>>;
-    protected async visitRightPadded<T extends J | boolean>(right: JRightPadded<T> | undefined, q: RpcReceiveQueue): Promise<JRightPadded<T> | undefined>;
-    protected async visitRightPadded<T extends J | boolean>(right: JRightPadded<T> | undefined, q: RpcReceiveQueue): Promise<JRightPadded<T> | undefined> {
+    protected async visitRightPadded<T extends J | boolean>(right: JRightPadded<T>, q: RpcReceiveQueue): Promise<JRightPadded<T>> {
         if (!right) {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty right padding");
         }
@@ -347,13 +331,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         });
     }
 
-    protected async visitContainer<T extends J>(container: JContainer<T>, q: RpcReceiveQueue): Promise<JContainer<T>>;
-    protected async visitContainer<T extends J>(container: JContainer<T> | undefined, q: RpcReceiveQueue): Promise<JContainer<T> | undefined>;
-    protected async visitContainer<T extends J>(container: JContainer<T> | undefined, q: RpcReceiveQueue): Promise<JContainer<T> | undefined> {
-        if (!container) {
-            return undefined;
-        }
-
+    protected async visitContainer<T extends J>(container: JContainer<T>, q: RpcReceiveQueue): Promise<JContainer<T>> {
         return produceAsync<JContainer<T>>(container, async draft => {
             draft.before = await q.receive(container.before, space => this.visitSpace(space, q));
             draft.elements = await q.receiveListDefined(container.elements, elem => this.visitRightPadded(elem, q)) as Draft<JRightPadded<T>[]>;
