@@ -326,7 +326,6 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         } else {
             conditions.add(recipe.getVisitor());
         }
-        conditions.add(recipe.getVisitor());
         for (Recipe r : recipe.getRecipeList()) {
             conditions.add(orVisitors(r));
         }
