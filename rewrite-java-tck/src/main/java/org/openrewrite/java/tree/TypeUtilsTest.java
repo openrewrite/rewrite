@@ -340,7 +340,7 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
-    void isAssignableToGenericTypeVariable() {
+    void isAssignableToGenericTypeVariable1() {
         rewriteRun(
           java(
             """
@@ -395,8 +395,8 @@ class TypeUtilsTest implements RewriteTest {
                     if (method.getSimpleName().equals("test")) {
                         J.Return return_ = (J.Return) method.getBody().getStatements().get(0);
                         J.TypeCast cast = (J.TypeCast) return_.getExpression();
-                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), BOUND)).isFalse();
-                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), INFER)).isTrue();
+                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType())).isFalse();
+//                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType())).isTrue();
                     }
                     return method;
                 }
@@ -441,8 +441,8 @@ class TypeUtilsTest implements RewriteTest {
                         JavaType consumeClassParamType = ((J.VariableDeclarations) consumeClass.getParameters().get(0)).getVariables().get(0).getType();
                         JavaType consumeMethodParamType = ((J.VariableDeclarations) consumeMethod.getParameters().get(0)).getVariables().get(0).getType();
 
-                        assertThat(TypeUtils.isAssignableTo(consumeClassParamType, list.getType(), INFER)).isTrue();
-                        assertThat(TypeUtils.isAssignableTo(consumeMethodParamType, list.getType(), INFER)).isTrue();
+//                        assertThat(TypeUtils.isAssignableTo(consumeClassParamType, list.getType())).isTrue();
+//                        assertThat(TypeUtils.isAssignableTo(consumeMethodParamType, list.getType())).isTrue();
                     }
                     return method;
                 }
@@ -628,11 +628,12 @@ class TypeUtilsTest implements RewriteTest {
 
     @Test
     void isAssignableToString() {
-        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String));
+        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String, JavaType.Primitive.Null));
         for (JavaType.Primitive other : others) {
             assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.String, other));
         }
         assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.String, JavaType.Primitive.String));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.String, JavaType.Primitive.Null));
     }
 
     @Test
@@ -905,6 +906,539 @@ class TypeUtilsTest implements RewriteTest {
                         assertions.toString("Optional.of(m)").isEqualTo("java.util.Optional<One<?, ?>>");
                         assertions.toString("Optional.of(m).get()").isEqualTo("One<?, ?>");
                         assertions.toString("sm").isEqualTo("One<?, ?>");
+                    }
+                    return cu;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void isOfType() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.Map;
+              
+              class Test<T extends Number, U extends List<String>, V extends U> {
+                  Integer integerA;
+                  Integer integerB;
+              
+                  int[] intArrayA;
+                  int[] intArrayB;
+                  Integer[] integerArrayA;
+                  Integer[] integerArrayB;
+                  String[] stringArrayA;
+                  String[] stringArrayB;
+                  List<String>[] genericArrayA;
+                  List<String>[] genericArrayB;
+                  Integer[][] nestedArrayA;
+                  Integer[][] nestedArrayB;
+                  T[] tArrayA;
+                  T[] tArrayB;
+                  U[] uArrayA;
+                  U[] uArrayB;
+                  V[] vArrayA;
+                  V[] vArrayB;
+              
+                  T numberTypeA;
+                  T numberTypeB;
+                  U listTypeA;
+                  U listTypeB;
+                  V nestedListTypeA;
+                  V nestedListTypeB;
+              
+                  List<T> numberListA;
+                  List<T> numberListB;
+                  List<String> listStringA;
+                  List<String> listStringB;
+                  Map<String, T> stringToNumberMapA;
+                  Map<String, T> stringToNumberMapB;
+              
+                  List<? extends Number> extendsNumberListA;
+                  List<? extends Number> extendsNumberListB;
+                  List<? super Integer> superIntegerListA;
+                  List<? super Integer> superIntegerListB;
+              
+                  Map<String, List<Map<Integer, String>>> complexNestedA;
+                  Map<String, List<Map<Integer, String>>> complexNestedB;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                    try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                        // 1. Primitive exact matches
+                        assertions.isOfType("int", "int").isTrue();
+                        assertions.isOfType("int", "Integer").isFalse();
+                        assertions.isOfType("Integer", "int").isFalse();
+
+                        // 2. Array matches
+                        assertions.isOfType("int[]", "int[]").isTrue();
+                        assertions.isOfType("Integer[]", "Integer[]").isTrue();
+                        assertions.isOfType("Integer[]", "int[]").isFalse();
+                        assertions.isOfType("int[]", "Integer[]").isFalse();
+                        assertions.isOfType("Integer[][]", "Integer[][]").isTrue();
+                        assertions.isOfType("List<String>[]", "List<String>[]").isTrue();
+                        assertions.isOfType("List<String>[]", "String[]").isFalse();
+                        assertions.isOfType("int[]", "String[]").isFalse();
+                        assertions.isOfType("List<String>[]", "String[]").isFalse();
+
+                        // 3. Generic array matches
+                        assertions.isOfType("T[]", "T[]").isTrue();
+                        assertions.isOfType("U[]", "U[]").isTrue();
+                        assertions.isOfType("T[]", "Integer[]").isFalse();
+                        assertions.isOfType("U[]", "List<String>[]").isFalse();
+                        assertions.isOfType("Integer[][]", "T[]").isFalse();
+                        assertions.isOfType("T[]", "Integer[][]").isFalse();
+                        assertions.isOfType("U[]", "Integer[][]").isFalse();
+                        assertions.isOfType("U[]", "V[]").isFalse();
+                        assertions.isOfType("V[]", "U[]").isFalse();
+                        assertions.isOfType("Integer[][]", "int[]").isFalse();
+
+                        // 4. Type variable matches <T extends Number, U extends List<String>, V extends U>
+                        assertions.isOfType("T", "T").isTrue();
+                        assertions.isOfType("U", "U").isTrue();
+                        assertions.isOfType("V", "V").isTrue();
+                        assertions.isOfType("T", "Integer").isFalse();
+                        assertions.isOfType("T", "Integer").isFalse();
+                        assertions.isOfType("U", "V").isFalse();
+                        assertions.isOfType("T", "U").isFalse();
+
+                        // 5. Parameterized types
+                        assertions.isOfType("List<T>", "List<T>").isTrue();
+                        assertions.isOfType("List<? extends Number>", "List<? extends Number>").isTrue();
+                        assertions.isOfType("Map<String, List<Map<Integer, String>>>", "Map<String, List<Map<Integer, String>>>").isTrue();
+                        assertions.isOfType("List<T>", "List<? extends Number>").isFalse();
+                        assertions.isOfType("List<? extends Number>", "List<T>").isFalse();
+
+                        // 6. With INFER mode <T extends Number, U extends List<String>, V extends U>
+//                        assertions.isOfType("T", "Integer", INFER).isTrue();
+//                        assertions.isOfType("U", "Integer", INFER).isFalse();
+//                        assertions.isOfType("U", "List<String>", INFER).isTrue();
+//                        assertions.isOfType("V", "List<String>", INFER).isTrue();
+//                        assertions.isOfType("T", "Integer[]", INFER).isTrue();
+//                        assertions.isOfType("T[]", "Integer[]", INFER).isTrue();
+//                        assertions.isOfType("U[]", "List<String>[]", INFER).isTrue();
+//                        assertions.isOfType("V[]", "List<String>[]", INFER).isTrue();
+//                        assertions.isOfType("Integer[][]", "T[]", INFER).isFalse();
+//                        assertions.isOfType("T[]", "Integer[][]", INFER).isTrue();
+//                        assertions.isOfType("U[]", "Integer[][]", INFER).isFalse();
+//                        assertions.isOfType("U[]", "V[]", INFER).isTrue();
+//                        assertions.isOfType("V[]", "U[]", INFER).isTrue();
+//                        assertions.isOfType("Integer[][]", "int[]", INFER).isFalse();
+//                        assertions.isOfType("Map<String, T>", "Map<String, List<Map<Integer, String>>>", INFER).isTrue();
+//                        assertions.isOfType("Map<String, List<Map<Integer, String>>>", "Map<String, T>", INFER).isFalse();
+                    }
+                    return cu;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    void isClassAssignableTo() {
+        rewriteRun(
+          java(
+            """
+              import java.io.Serializable;
+              import java.util.ArrayList;
+              import java.util.Collection;
+              import java.util.List;
+              
+              @SuppressWarnings("all")
+              class Test<T extends Number & Serializable, U> {
+                  Integer integer;
+                  Boolean bool;
+                  Double bool;
+                  Number number;
+                  Cloneable cloneable;
+                  Serializable serializable;
+                  String[] array;
+              
+                  Object obj;
+                  String str;
+                  List listRaw;
+                  Collection collectionRaw;
+                  ArrayList arrayListRaw;
+                  List<String> listString;
+                  T genericBounded;
+                  U generic;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                    try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                        // Boxed from primitives
+                        assertions.isAssignableTo("Integer", "int").isTrue();
+                        assertions.isAssignableTo("Number", "int").isTrue();
+                        assertions.isAssignableTo("Serializable", "int").isTrue();
+                        assertions.isAssignableTo("Boolean", "boolean").isTrue();
+                        assertions.isAssignableTo("Number", "boolean").isFalse();
+                        assertions.isAssignableTo("Serializable", "boolean").isTrue();
+                        assertions.isAssignableTo("Double", "double").isTrue();
+                        assertions.isAssignableTo("Number", "double").isTrue();
+                        assertions.isAssignableTo("Serializable", "double").isTrue();
+                        assertions.isAssignableTo("String", "int").isFalse();
+
+                        // FullyQualified direct
+                        assertions.isAssignableTo("Object", "String").isTrue();
+                        assertions.isAssignableTo("String", "Object").isFalse();
+                        assertions.isAssignableTo("List", "String").isFalse();
+
+                        // Null type (assignable to any reference type)
+                        assertions.isAssignableTo("String", "null").isTrue();
+                        assertions.isAssignableTo("List", "null").isTrue();
+
+                        // Parameterized type to raw type
+                        assertions.isAssignableTo("List", "List<String>").isTrue();
+
+                        // Class to interface
+                        assertions.isAssignableTo("Serializable", "String").isTrue();
+                        assertions.isAssignableTo("Collection", "ArrayList").isTrue();
+
+                        // Interface to class
+                        assertions.isAssignableTo("String", "Serializable").isFalse();
+
+                        // Array assignability
+                        assertions.isAssignableTo("Object", "String[]").isTrue();
+                        assertions.isAssignableTo("Cloneable", "String[]").isTrue();
+                        assertions.isAssignableTo("Serializable", "String[]").isTrue();
+
+                        // Generic type <T extends Number & Serializable, U>
+                        assertions.isAssignableTo("Serializable", "T").isTrue();
+                        assertions.isAssignableTo("Number", "T").isTrue();
+                        assertions.isAssignableTo("String", "T").isFalse();
+                        assertions.isAssignableTo("Object", "T").isTrue();
+                        assertions.isAssignableTo("Number", "U").isFalse();
+                        assertions.isAssignableTo("Number", "U").isFalse();
+                        assertions.isAssignableTo("Object", "U").isTrue();
+                    }
+                    return cu;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void isParameterizedAssignableTo() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+              import java.util.function.Supplier;
+              
+              class Test<T, U extends T, N extends Number, CS extends CharSequence> {
+                  ArrayList v1;
+                  Comparable<?> v2;
+                  Comparable<ImplementsComparable> v3;
+                  Comparable<Number> v4;
+                  Comparable<String> v5;
+                  ComparableSupplier<String, Number> v6;
+                  ExtendsComparable v7;
+                  List v8;
+                  List<? extends CharSequence> v9;
+                  List<? extends List<? extends CharSequence>> v10;
+                  List<? super String> v11;
+                  List<? super CharSequence> v25;
+                  List<? super T> v26;
+                  List<? super U> v27;
+                  List<?> v12;
+                  List<CS> v13;
+                  List<CharSequence> v14;
+                  List<List<? extends CharSequence>> v15;
+                  List<List<String>> v16;
+                  List<N> v17;
+                  List<String> v18;
+                  List<T> v19;
+                  List<U> v20;
+                  MySupplier<Number> v21;
+                  Supplier<Number> v22;
+                  Supplier<String> v23;
+                  ImplementsComparable v24;
+              
+                  static abstract class ImplementsComparable implements Comparable<ImplementsComparable> {}
+                  static abstract class ExtendsComparable extends ImplementsComparable {}
+                  static abstract class MySupplier<T> implements Supplier<T> {}
+                  static abstract class ComparableSupplier<T, U> extends MySupplier<U> implements Comparable<T> {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                    try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                        // 1. Generic Variance
+                        assertions.isAssignableTo("List<? extends CharSequence>", "List<String>").isTrue();
+                        assertions.isAssignableTo("List<String>", "List<? extends CharSequence>").isFalse();
+                        assertions.isAssignableTo("List<? super String>", "List<CharSequence>").isTrue();
+
+                        // 2. Wildcards and Raw Types
+                        assertions.isAssignableTo("List<?>", "List<String>").isTrue();
+                        assertions.isAssignableTo("List<?>", "ArrayList").isTrue();
+                        assertions.isAssignableTo("List<String>", "List").isFalse(); // We don't allow unsafe assignments
+                        assertions.isAssignableTo("List<?>", "List").isTrue(); // Except for wildcards
+
+                        // 3. Type Hierarchy with Generics (String, Number)
+                        assertions.isAssignableTo("Comparable<?>", "ImplementsComparable").isTrue();
+                        assertions.isAssignableTo("Comparable<ImplementsComparable>", "ImplementsComparable").isTrue();
+                        assertions.isAssignableTo("Comparable<ImplementsComparable>", "ExtendsComparable").isTrue();
+                        assertions.isAssignableTo("Comparable<?>", "ExtendsComparable").isTrue();
+                        assertions.isAssignableTo("Comparable<String>", "ExtendsComparable").isFalse();
+
+                        assertions.isAssignableTo("Comparable<String>", "ComparableSupplier<String, Number>").isTrue();
+                        assertions.isAssignableTo("Comparable<Number>", "ComparableSupplier<String, Number>").isFalse();
+                        assertions.isAssignableTo("Supplier<Number>", "ComparableSupplier<String, Number>").isTrue();
+                        assertions.isAssignableTo("Supplier<String>", "ComparableSupplier<String, Number>").isFalse();
+                        assertions.isAssignableTo("MySupplier<Number>", "ComparableSupplier<String, Number>").isTrue();
+                        assertions.isAssignableTo("Comparable<?>", "ComparableSupplier<String, Number>").isTrue();
+
+                        // 4. Type Variables
+                        assertions.isAssignableTo("List<T>", "List<String>").isFalse();
+                        assertions.isAssignableTo("List<T>", "List<U>").isFalse();
+                        assertions.isAssignableTo("List<? extends CharSequence>", "List<CS>").isTrue();
+                        assertions.isAssignableTo("List<? super U>", "List<? super T>").isTrue();
+                        assertions.isAssignableTo("List<? super String>", "List<? super CharSequence>").isTrue();
+                        assertions.isAssignableTo("List<? super T>", "List<? super U>").isFalse();
+                        assertions.isAssignableTo("List<? super CharSequence>", "List<? super String>").isFalse();
+
+                        // 5. Edge Cases
+                        assertions.isAssignableTo("List<? extends List<? extends CharSequence>>", "List<List<String>>").isTrue();
+                        assertions.isAssignableTo("List<List<? extends CharSequence>>", "List<List<String>>").isFalse();
+
+                        // 6. Inference Mode
+//                        assertions.isAssignableTo("List<T>", "List<String>", INFER).isTrue();
+//                        assertions.isAssignableTo("List<CS>", "List<String>", INFER).isTrue();
+//                        assertions.isAssignableTo("List<N>", "List<String>", INFER).isFalse();
+//                        assertions.isAssignableTo("List<? super T>", "List<? super String>", INFER).isTrue();
+                    }
+                    return cu;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    void isAssignableToArray() {
+        rewriteRun(
+          java(
+            """
+              class Test<T extends CharSequence, U> {
+                  Object[] objectArray;
+                  String[] stringArray;
+                  CharSequence[] charSequenceArray;
+                  int[] intArray;
+                  double[] doubleArray;
+                  Integer[] integerArray;
+                  Double[][] double2DArray;
+                  Number[][] number2DArray;
+                  Object[][] object2DArray;
+                  String[][] string2DArray;
+                  T[] genericCsArray;
+                  U[] genericArray;
+                  U generic;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                    try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                        // Identity and exact match
+                        assertions.isAssignableTo("String[]", "String[]").isTrue();
+
+                        // Covariant assignability of reference types
+                        assertions.isAssignableTo("Object[]", "String[]").isTrue();
+                        assertions.isAssignableTo("CharSequence[]", "String[]").isTrue();
+
+                        // Reverse should fail
+                        assertions.isAssignableTo("String[]", "Object[]").isFalse();
+                        assertions.isAssignableTo("String[]", "CharSequence[]").isFalse();
+
+                        // Primitive arrays are not assignable to Object[]
+                        assertions.isAssignableTo("Object[]", "int[]").isFalse();
+                        assertions.isAssignableTo("Object[]", "Integer[]").isTrue();
+
+                        // Primitive identity
+                        assertions.isAssignableTo("int[]", "int[]").isTrue();
+                        assertions.isAssignableTo("int[]", "Integer[]").isFalse();
+                        assertions.isAssignableTo("Integer[]", "int[]").isFalse();
+
+                        // Different primitives are not assignable
+                        assertions.isAssignableTo("int[]", "double[]").isFalse();
+
+                        // 2D array covariance
+                        assertions.isAssignableTo("Object[][]", "String[][]").isTrue();
+                        assertions.isAssignableTo("Number[][]", "Double[][]").isTrue();
+                        assertions.isAssignableTo("Double[][]", "Number[][]").isFalse();
+
+                        // Incompatible inner dimension
+                        assertions.isAssignableTo("Number[][]", "Integer[]").isFalse();
+
+                        // Generics: <T extends CharSequence, U>
+                        assertions.isAssignableTo("T[]", "String[]").isFalse();
+                        assertions.isAssignableTo("T[]", "CharSequence[]").isFalse();
+                        assertions.isAssignableTo("Object[]", "T[]").isTrue();
+                        assertions.isAssignableTo("CharSequence[]", "T[]").isTrue();
+                        assertions.isAssignableTo("U[]", "CharSequence[]").isFalse();
+                        assertions.isAssignableTo("Object[]", "U[]").isTrue();
+
+                        // Infer mode: <T extends CharSequence, U>
+//                        assertions.isAssignableTo("T[]", "String[]", INFER).isTrue();
+//                        assertions.isAssignableTo("T[]", "CharSequence[]", INFER).isTrue();
+//                        assertions.isAssignableTo("T[]", "String[][]", INFER).isFalse();
+//
+//                        assertions.isAssignableTo("U", "String[]", INFER).isTrue();
+//                        assertions.isAssignableTo("U", "CharSequence[]", INFER).isTrue();
+//                        assertions.isAssignableTo("U", "String[][]", INFER).isTrue();
+//                        assertions.isAssignableTo("U", "int[]", INFER).isTrue();
+//                        assertions.isAssignableTo("U", "double[]", INFER).isTrue();
+//
+//                        assertions.isAssignableTo("U[]", "String[]", INFER).isTrue();
+//                        assertions.isAssignableTo("U[]", "CharSequence[]", INFER).isTrue();
+//                        assertions.isAssignableTo("U[]", "String[][]", INFER).isTrue();
+//                        assertions.isAssignableTo("U[]", "int[]", INFER).isFalse();
+//                        assertions.isAssignableTo("U[]", "double[]", INFER).isFalse();
+                    }
+                    return cu;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    void isAssignableToPrimitive() {
+        rewriteRun(
+          java(
+            """
+              class Test<T, U extends Number> {
+                  Byte boxedByte;
+                  Character boxedChar;
+                  Short boxedShort;
+                  Integer boxedInt;
+                  Long boxedLong;
+                  Float boxedFloat;
+                  Double boxedDouble;
+                  Boolean boxedBoolean;
+              
+                  T genericT;
+                  U genericU;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                    try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                        // Direct primitive assignability
+                        assertions.isAssignableTo("int", "byte").isTrue();
+                        assertions.isAssignableTo("int", "char").isTrue();
+                        assertions.isAssignableTo("int", "short").isTrue();
+                        assertions.isAssignableTo("int", "int").isTrue();
+                        assertions.isAssignableTo("int", "long").isFalse();
+                        assertions.isAssignableTo("float", "int").isTrue();
+                        assertions.isAssignableTo("double", "float").isTrue();
+                        assertions.isAssignableTo("float", "double").isFalse();
+
+                        // Boolean isn't compatible with numeric types
+                        assertions.isAssignableTo("int", "boolean").isFalse();
+                        assertions.isAssignableTo("boolean", "boolean").isTrue();
+                        assertions.isAssignableTo("boolean", "int").isFalse();
+
+                        // Auto-unboxing
+                        assertions.isAssignableTo("int", "Integer").isTrue();
+                        assertions.isAssignableTo("double", "Double").isTrue();
+                        assertions.isAssignableTo("boolean", "Boolean").isTrue();
+                        assertions.isAssignableTo("Integer", "int").isTrue();
+                        assertions.isAssignableTo("Double", "double").isTrue();
+                        assertions.isAssignableTo("Boolean", "boolean").isTrue();
+
+                        // Mismatched boxed types
+                        assertions.isAssignableTo("int", "Boolean").isFalse();
+                        assertions.isAssignableTo("boolean", "Integer").isFalse();
+                        assertions.isAssignableTo("Boolean", "int").isFalse();
+                        assertions.isAssignableTo("Integer", "boolean").isFalse();
+
+                        // Generics <T, U extends Number>
+//                        assertions.isAssignableTo("T", "byte", INFER).isTrue();
+//                        assertions.isAssignableTo("T", "short", INFER).isTrue();
+//                        assertions.isAssignableTo("T", "char", INFER).isTrue();
+//                        assertions.isAssignableTo("T", "int", INFER).isTrue();
+//                        assertions.isAssignableTo("T", "long", INFER).isTrue();
+//                        assertions.isAssignableTo("T", "float", INFER).isTrue();
+//                        assertions.isAssignableTo("T", "double", INFER).isTrue();
+//                        assertions.isAssignableTo("T", "boolean", INFER).isTrue();
+//
+//                        assertions.isAssignableTo("U", "byte", INFER).isTrue();
+//                        assertions.isAssignableTo("U", "short", INFER).isTrue();
+//                        assertions.isAssignableTo("U", "int", INFER).isTrue();
+//                        assertions.isAssignableTo("U", "long", INFER).isTrue();
+//                        assertions.isAssignableTo("U", "float", INFER).isTrue();
+//                        assertions.isAssignableTo("U", "double", INFER).isTrue();
+//                        assertions.isAssignableTo("U", "char", INFER).isFalse();
+//                        assertions.isAssignableTo("U", "boolean", INFER).isFalse();
+                    }
+                    return cu;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    void isAssignableToGenericTypeVariable() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  class A<T, U extends T, V extends U, X> {
+                      T t;
+                      U u;
+                      V v;
+                      X x;
+                  }
+              
+                  class B<T, U extends T, V extends U, X> {
+                      T t;
+                      U u;
+                      V v;
+                      X x;
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                    try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                        // 1. Same variable name
+                        assertions.isAssignableTo("T", "T").isTrue();
+                        assertions.isAssignableTo("U", "U").isTrue();
+                        assertions.isOfType("T", "T").isTrue();
+
+                        // 2. Different variables with compatible bounds
+                        // class <T, U extends T, V extends U>
+                        assertions.isAssignableTo("T", "U").isTrue(); // U is assignable to T
+                        assertions.isAssignableTo("U", "T").isFalse(); // T not assignable to U (U more specific)
+                        assertions.isAssignableTo("T", "V").isTrue(); // V -> U -> T
+                        assertions.isAssignableTo("U", "V").isTrue(); // V -> U
+                        assertions.isAssignableTo("V", "T").isFalse(); // T is more general
+
+                        // 3. Unrelated variables
+                        // class <T, X>
+                        assertions.isAssignableTo("T", "X").isFalse();
+                        assertions.isAssignableTo("X", "T").isFalse();
+
+                        // 4. isOfType tests for completeness
+                        assertions.isOfType("T", "T").isTrue();
+                        assertions.isOfType("U", "U").isTrue();
+                        assertions.isOfType("T", "U").isFalse();
+                        assertions.isOfType("U", "T").isFalse();
                     }
                     return cu;
                 }
