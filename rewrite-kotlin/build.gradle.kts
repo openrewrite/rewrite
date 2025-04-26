@@ -2,10 +2,10 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("org.openrewrite.build.language-library")
-    kotlin("jvm") version "1.9.25"
+    kotlin("jvm") version "2.1.20"
 }
 
-val kotlinVersion = "1.9.25"
+val kotlinVersion = "2.1.20"
 
 dependencies {
     compileOnly(project(":rewrite-core"))
