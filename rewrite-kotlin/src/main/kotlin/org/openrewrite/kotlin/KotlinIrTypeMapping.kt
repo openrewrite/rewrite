@@ -95,7 +95,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
                 return type(baseType.type)
             }
 
-            is IrConst<*> -> {
+            is IrConst -> {
                 return primitive(baseType)
             }
 
@@ -536,7 +536,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
 
     fun primitive(type: Any?): JavaType.Primitive {
         return when (type) {
-            is IrConst<*> -> {
+            is IrConst -> {
                 when (type.kind) {
                     IrConstKind.Int -> JavaType.Primitive.Int
                     IrConstKind.Boolean -> JavaType.Primitive.Boolean

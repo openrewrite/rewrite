@@ -63,7 +63,7 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
                 return signature(baseType.type)
             }
 
-            is IrConst<*> -> {
+            is IrConst -> {
                 return primitiveSignature(baseType)
             }
 
@@ -265,7 +265,7 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
 
     override fun primitiveSignature(type: Any): String {
         return when (type) {
-            is IrConst<*> -> type.type.classFqName!!.asString()
+            is IrConst -> type.type.classFqName!!.asString()
             else -> {
                 throw UnsupportedOperationException("Unsupported primitive type" + type.javaClass)
             }

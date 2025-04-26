@@ -147,7 +147,7 @@ class PsiElementIrAssociations(private val typeMapping: KotlinIrTypeMapping, pri
             }
 
             is KtConstantExpression, is KtStringTemplateExpression -> {
-                { it is IrConst<*> }
+                { it is IrConst }
             }
 
             is KtClassLiteralExpression -> {
