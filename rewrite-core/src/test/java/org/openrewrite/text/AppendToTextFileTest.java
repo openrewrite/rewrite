@@ -28,6 +28,24 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class AppendToTextFileTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void replacesFileIfRequested() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Replace)),
+          text(
+            """
+              existing
+              """,
+            """
+              preamble
+              content
+              """,
+            spec -> spec.path("file.txt").noTrim()
+          )
+        );
+    }
+
     @Test
     void createsFileIfNeeded() {
         rewriteRun(
@@ -54,24 +72,6 @@ class AppendToTextFileTest implements RewriteTest {
               content
               """,
             spec -> spec.path("file.txt")
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void replacesFileIfRequested() {
-        rewriteRun(
-          spec -> spec.recipe(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Replace)),
-          text(
-            """
-              existing
-              """,
-            """
-              preamble
-              content
-              """,
-            spec -> spec.path("file.txt").noTrim()
           )
         );
     }

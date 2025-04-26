@@ -30,19 +30,6 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
         spec.recipe(new UseHttpsForRepositories());
     }
 
-    @Test
-    void unchangedUseOfHttps() {
-        rewriteRun(
-          buildGradle(
-            """
-              repositories {
-                  maven { url 'https://repo.spring.example.com/libs-release-local' }
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void updateUnwrappedInvocationToUseHttpsSingleQuote() {
@@ -53,6 +40,19 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                   maven { url 'http://repo.spring.example.com/libs-release-local' }
               }
               """,
+            """
+              repositories {
+                  maven { url 'https://repo.spring.example.com/libs-release-local' }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unchangedUseOfHttps() {
+        rewriteRun(
+          buildGradle(
             """
               repositories {
                   maven { url 'https://repo.spring.example.com/libs-release-local' }

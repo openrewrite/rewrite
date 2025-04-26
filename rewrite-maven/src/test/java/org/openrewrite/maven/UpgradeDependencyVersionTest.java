@@ -40,6 +40,51 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void updateManagedDependencyVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.7.2", null,
+            null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                              <version>5.6.2</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                              <version>5.7.2</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void doNotOverrideImplicitProperty() {
         rewriteRun(
@@ -129,51 +174,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           <version>4.2.9</version>
                       </dependency>
                   </dependencies>
-              </project>
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void updateManagedDependencyVersion() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.7.2", null,
-            null, null)),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.junit.jupiter</groupId>
-                              <artifactId>junit-jupiter-api</artifactId>
-                              <version>5.6.2</version>
-                              <scope>test</scope>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.junit.jupiter</groupId>
-                              <artifactId>junit-jupiter-api</artifactId>
-                              <version>5.7.2</version>
-                              <scope>test</scope>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
               </project>
               """
           )

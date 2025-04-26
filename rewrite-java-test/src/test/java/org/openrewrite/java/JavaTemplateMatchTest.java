@@ -31,6 +31,38 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavaTemplateMatchTest implements RewriteTest {
 
+    @DocumentExample
+    @SuppressWarnings({"ConstantValue", "ConstantConditions"})
+    @Test
+    void matchBinary() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                  return JavaTemplate.matches("1 == #{any(int)}", getCursor()) ?
+                    SearchResult.found(binary) : super.visitBinary(binary, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  boolean b1 = 1 == 2;
+                  boolean b2 = 1 == 3;
+
+                  boolean b3 = 2 == 1;
+              }
+              """,
+            """
+              class Test {
+                  boolean b1 = /*~~>*/1 == 2;
+                  boolean b2 = /*~~>*/1 == 3;
+
+                  boolean b3 = 2 == 1;
+              }
+              """
+          ));
+    }
+
     @Test
     @Issue("https://github.com/openrewrite/rewrite-templating/pull/91")
     void shouldMatchAbstractStringAssertIsEqualToEmptyString() {
@@ -71,38 +103,6 @@ class JavaTemplateMatchTest implements RewriteTest {
           )
         );
 
-    }
-
-    @DocumentExample
-    @SuppressWarnings({"ConstantValue", "ConstantConditions"})
-    @Test
-    void matchBinary() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return JavaTemplate.matches("1 == #{any(int)}", getCursor()) ?
-                    SearchResult.found(binary) : super.visitBinary(binary, ctx);
-              }
-          })),
-          java(
-            """
-              class Test {
-                  boolean b1 = 1 == 2;
-                  boolean b2 = 1 == 3;
-
-                  boolean b3 = 2 == 1;
-              }
-              """,
-            """
-              class Test {
-                  boolean b1 = /*~~>*/1 == 2;
-                  boolean b2 = /*~~>*/1 == 3;
-
-                  boolean b3 = 2 == 1;
-              }
-              """
-          ));
     }
 
     @SuppressWarnings("ConstantConditions")

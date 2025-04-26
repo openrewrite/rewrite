@@ -36,19 +36,6 @@ import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class NormalizeTabsOrSpacesTest implements RewriteTest {
-    private static Consumer<RecipeSpec> tabsAndIndents() {
-        return tabsAndIndents(style -> style);
-    }
-
-    private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
-        return spec -> spec.recipe(toRecipe(() -> new NormalizeTabsOrSpacesVisitor<>(with.apply(IntelliJ.tabsAndIndents()))))
-          .parser(GroovyParser.builder().styles(singletonList(
-            new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(IntelliJ.tabsAndIndents()))
-            )
-          )));
-    }
 
     @DocumentExample
     @Test
@@ -72,6 +59,19 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               """
           )
         );
+    }
+    private static Consumer<RecipeSpec> tabsAndIndents() {
+        return tabsAndIndents(style -> style);
+    }
+
+    private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
+        return spec -> spec.recipe(toRecipe(() -> new NormalizeTabsOrSpacesVisitor<>(with.apply(IntelliJ.tabsAndIndents()))))
+          .parser(GroovyParser.builder().styles(singletonList(
+            new NamedStyles(
+              Tree.randomId(), "test", "test", "test", emptySet(),
+              singletonList(with.apply(IntelliJ.tabsAndIndents()))
+            )
+          )));
     }
 
     @Test

@@ -34,20 +34,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class NormalizeTabsOrSpacesTest implements RewriteTest {
 
-    private static Consumer<RecipeSpec> tabsAndIndents() {
-        return tabsAndIndents(style -> style);
-    }
-
-    private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<org.openrewrite.kotlin.style.TabsAndIndentsStyle> with) {
-        return spec -> spec.recipe(toRecipe(() -> new NormalizeTabsOrSpacesVisitor<>(with.apply(org.openrewrite.kotlin.style.IntelliJ.tabsAndIndents()))))
-          .parser(KotlinParser.builder().styles(singletonList(
-            new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(org.openrewrite.kotlin.style.IntelliJ.tabsAndIndents()))
-            )
-          )));
-    }
-
     @DocumentExample
     @Test
     void mixedToTabs() {
@@ -70,6 +56,20 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static Consumer<RecipeSpec> tabsAndIndents() {
+        return tabsAndIndents(style -> style);
+    }
+
+    private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<org.openrewrite.kotlin.style.TabsAndIndentsStyle> with) {
+        return spec -> spec.recipe(toRecipe(() -> new NormalizeTabsOrSpacesVisitor<>(with.apply(org.openrewrite.kotlin.style.IntelliJ.tabsAndIndents()))))
+          .parser(KotlinParser.builder().styles(singletonList(
+            new NamedStyles(
+              Tree.randomId(), "test", "test", "test", emptySet(),
+              singletonList(with.apply(org.openrewrite.kotlin.style.IntelliJ.tabsAndIndents()))
+            )
+          )));
     }
 
     @Test

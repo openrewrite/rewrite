@@ -40,13 +40,13 @@ import static org.openrewrite.java.Assertions.version;
 @SuppressWarnings("InfiniteRecursion")
 class MethodParamPadTest implements RewriteTest {
 
+    static Iterable<NamedStyles> namedStyles(Collection<Style> styles) {
+        return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
+    }
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new MethodParamPad());
-    }
-
-    static Iterable<NamedStyles> namedStyles(Collection<Style> styles) {
-        return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
     }
 
     @DocumentExample
