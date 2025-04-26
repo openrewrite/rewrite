@@ -35,7 +35,7 @@ import {
     ControlParentheses,
     DeconstructionPattern,
     DoWhileLoop,
-    Empty,
+    Empty, emptySpace,
     EnumValue,
     EnumValueSet,
     Erroneous,
@@ -102,6 +102,8 @@ import {
 } from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
+import {randomId} from "../uuid";
+import {emptyMarkers} from "../markers";
 
 class JavaSender extends JavaVisitor<RpcSendQueue> {
 
@@ -1392,7 +1394,23 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.leadingAnnotations = await q.receiveListDefined(cls.leadingAnnotations, annot => this.visit(annot, q));
         draft.modifiers = await q.receiveListDefined(cls.modifiers, mod => this.visit(mod, q));
-        draft.classKind = await q.receive(cls.classKind);
+
+        const kindType = await q.receive(cls.classKind?.type);
+        if (kindType) {
+            if (!draft.classKind) {
+                draft.classKind = {
+                    kind: JavaKind.ClassDeclarationKind,
+                    id: randomId(),
+                    markers: emptyMarkers,
+                    prefix: emptySpace,
+                    annotations: [],
+                    type: kindType
+                };
+            } else {
+                draft.classKind.type = kindType;
+            }
+        }
+
         draft.name = await q.receive(cls.name, name => this.visit(name, q));
         draft.typeParameters = await q.receive(cls.typeParameters, params => this.visitContainer(params, q));
         draft.primaryConstructor = await q.receive(cls.primaryConstructor, cons => this.visitContainer(cons, q));
