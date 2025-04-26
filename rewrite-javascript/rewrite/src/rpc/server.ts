@@ -67,4 +67,4 @@ connection.onDispose(() => {
     log.write(`[server] connection disposed\n\n`);
 });
 
-new RewriteRpc(connection);
+new RewriteRpc(connection, {logFile: log});

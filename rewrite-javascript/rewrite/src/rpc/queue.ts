@@ -17,6 +17,7 @@ import {Marker, Markers, MarkersKind} from "../markers";
 import {RpcCodecs} from "./codec";
 import {produceAsync} from "../visitor";
 import {randomId} from "../uuid";
+import {WriteStream} from "fs";
 
 const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
 
@@ -222,7 +223,8 @@ export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
 
     constructor(private readonly refs: Map<number, any>,
-                private readonly pull: () => Promise<RpcObjectData[]>) {
+                private readonly pull: () => Promise<RpcObjectData[]>,
+                private readonly logFile?: WriteStream) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -251,6 +253,9 @@ export class RpcReceiveQueue {
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T> {
         const message = await this.take();
+        if (message.trace) {
+            this.logFile?.write(`${JSON.stringify(message)}\n`);
+        }
         let ref: number | undefined;
         switch (message.state) {
             case RpcObjectState.NO_CHANGE:
@@ -324,6 +329,7 @@ export interface RpcObjectData {
     valueType?: string
     value?: any
     ref?: number
+    trace?: string
 }
 
 export enum RpcObjectState {

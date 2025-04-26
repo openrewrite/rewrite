@@ -33,6 +33,7 @@ import {RpcCodecs} from "./codec";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
+import {WriteStream} from "fs";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
@@ -45,9 +46,14 @@ export class RewriteRpc {
     private readonly remoteRefs: Map<number, any> = new Map();
 
     constructor(private readonly connection: MessageConnection = rpc.createMessageConnection(
-        new rpc.StreamMessageReader(process.stdin),
-        new rpc.StreamMessageWriter(process.stdout)
-    ), batchSize: number = 10, public readonly registry: RecipeRegistry = new RecipeRegistry()) {
+                    new rpc.StreamMessageReader(process.stdin),
+                    new rpc.StreamMessageWriter(process.stdout),
+                ),
+                private readonly options: {
+                    batchSize?: number,
+                    registry?: RecipeRegistry,
+                    logFile?: WriteStream
+                }) {
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
 
@@ -55,9 +61,11 @@ export class RewriteRpc {
         const getObject = (id: string) => this.getObject(id);
         const getCursor = (cursorIds: string[] | undefined) => this.getCursor(cursorIds);
 
+        const registry = options.registry || new RecipeRegistry();
+
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
-        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, batchSize);
+        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, options?.batchSize || 10);
         GetRecipes.handle(this.connection, registry);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Print.handle(this.connection, getObject, getCursor);
@@ -77,7 +85,7 @@ export class RewriteRpc {
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
                 new GetObject(id)
             );
-        });
+        }, this.options.logFile);
 
         const remoteObject = await q.receive<P>(this.localObjects.get(id), (before: any) => {
             const codec = RpcCodecs.forInstance(before);

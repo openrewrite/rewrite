@@ -31,6 +31,7 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -40,8 +41,9 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
 
-    private AtomicInteger batchSize = new AtomicInteger(10);
+    private final AtomicInteger batchSize = new AtomicInteger(10);
     private Duration timeout = Duration.ofMinutes(1);
+    private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
 
     /**
      * Keeps track of the local and remote state of objects that are used in
@@ -77,7 +79,7 @@ public class RewriteRpc {
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject));
-        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects));
+        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, traceSendPackets));
         jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
@@ -99,6 +101,11 @@ public class RewriteRpc {
 
     public RewriteRpc batchSize(int batchSize) {
         this.batchSize.set(batchSize);
+        return this;
+    }
+
+    public RewriteRpc traceSendPackets(boolean trace) {
+        this.traceSendPackets.set(trace);
         return this;
     }
 

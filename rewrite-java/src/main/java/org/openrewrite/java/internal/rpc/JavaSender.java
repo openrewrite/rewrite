@@ -138,7 +138,10 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(classDecl, J.ClassDeclaration::getKind); // the enum type
 
         q.getAndSend(classDecl, J.ClassDeclaration::getName, j -> visit(j, q));
-        q.getAndSend(classDecl, J.ClassDeclaration::getTypeParameters, tp -> visit(tp, q));
+        q.getAndSend(classDecl, c -> c.getPadding().getTypeParameters(), tp -> visitContainer(tp,
+                JContainer.Location.TYPE_PARAMETERS, q));
+        q.getAndSend(classDecl, c -> c.getPadding().getPrimaryConstructor(), ctor ->
+                visitContainer(ctor, JContainer.Location.RECORD_STATE_VECTOR, q));
         q.getAndSend(classDecl, c -> c.getPadding().getExtends(), ext -> visitLeftPadded(ext,
                 JLeftPadded.Location.EXTENDS, q));
         q.getAndSend(classDecl, c -> c.getPadding().getImplements(), impl -> visitContainer(impl,

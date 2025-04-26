@@ -55,7 +55,9 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
           "--inspect-brk",
           "./rewrite/dist/src/rpc/server.js"
         );
-        client.batchSize(20).timeout(Duration.ofMinutes(10));
+        client.batchSize(20)
+          .timeout(Duration.ofMinutes(10))
+          .traceSendPackets(true);
     }
 
     @AfterEach

@@ -27,6 +27,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
@@ -43,6 +44,7 @@ public class GetObject implements RpcRequest {
         private final AtomicInteger batchSize;
         private final Map<String, Object> remoteObjects;
         private final Map<String, Object> localObjects;
+        private final AtomicBoolean trace;
 
         private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
 
@@ -58,8 +60,8 @@ public class GetObject implements RpcRequest {
 
             if (after == null) {
                 List<RpcObjectData> deleted = new ArrayList<>(2);
-                deleted.add(new RpcObjectData(DELETE, null, null, null));
-                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null));
+                deleted.add(new RpcObjectData(DELETE, null, null, null, false));
+                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null, false));
                 return deleted;
             }
 
@@ -67,7 +69,7 @@ public class GetObject implements RpcRequest {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
                 Object before = remoteObjects.get(id);
 
-                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs);
+                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, trace.get());
                 forkJoin.submit(() -> {
                     try {
                         Runnable onChange = after instanceof RpcCodec ? () -> {
@@ -83,7 +85,7 @@ public class GetObject implements RpcRequest {
                     } catch (Throwable ignored) {
                         // TODO do something with this exception
                     } finally {
-                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null));
+                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null, false));
                         sendQueue.flush();
                     }
                     return 0;

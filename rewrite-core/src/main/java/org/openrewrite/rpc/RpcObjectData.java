@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 
@@ -73,11 +74,28 @@ public class RpcObjectData {
     @Nullable
     Integer ref;
 
-    public RpcObjectData(State state, @Nullable String valueType, @Nullable Object value, @Nullable Integer ref) {
+    @Nullable
+    @NonFinal
+    String trace;
+
+    public RpcObjectData(State state, @Nullable String valueType, @Nullable Object value, @Nullable Integer ref,
+                         boolean trace) {
         this.state = state;
         this.valueType = valueType;
         this.value = value;
         this.ref = ref;
+        if (trace) {
+            this.trace = "Unknown";
+            for (StackTraceElement stackElement : Thread.currentThread().getStackTrace()) {
+                if (stackElement.getClassName().endsWith("Sender")) {
+                    this.trace = stackElement.getClassName().substring(stackElement.getClassName().lastIndexOf('.') + 1) +
+                                 "." + stackElement.getMethodName() + ":" + stackElement.getLineNumber();
+                    break;
+                }
+            }
+        } else {
+            this.trace = null;
+        }
     }
 
     public boolean hasValue() {

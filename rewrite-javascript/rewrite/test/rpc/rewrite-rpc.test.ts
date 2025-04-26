@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {Cursor, rootCursor} from "../../src";
+import {Cursor, RecipeRegistry, rootCursor} from "../../src";
 import {RewriteRpc} from "../../src/rpc";
 import {PlainText, text} from "../../src/text";
 import {json} from "../../src/json";
@@ -52,14 +52,15 @@ describe("Rewrite RPC", () => {
             new rpc.StreamMessageReader(serverToClient),
             new rpc.StreamMessageWriter(clientToServer)
         );
-        client = new RewriteRpc(clientConnection, 1);
+        client = new RewriteRpc(clientConnection, {batchSize: 1});
 
         const serverConnection = rpc.createMessageConnection(
             new rpc.StreamMessageReader(clientToServer),
             new rpc.StreamMessageWriter(serverToClient)
         );
-        server = new RewriteRpc(serverConnection);
-        activate(server.registry);
+        const registry = new RecipeRegistry();
+        activate(registry);
+        server = new RewriteRpc(serverConnection, {registry: registry});
     });
 
     afterEach(() => {

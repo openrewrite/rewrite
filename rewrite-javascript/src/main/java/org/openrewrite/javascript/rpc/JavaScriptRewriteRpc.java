@@ -109,11 +109,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 }
             }
             this.rpcClient = new JsonRpc(
-//                    new TraceMessageHandler(
-//                            "client",
-                    new HeaderDelimitedMessageHandler(this.process.getInputStream(),
-                            this.process.getOutputStream())
-//                    )
+                    new TraceMessageHandler(
+                            "client",
+                            new HeaderDelimitedMessageHandler(this.process.getInputStream(),
+                                    this.process.getOutputStream())
+                    )
             );
         }
     }
