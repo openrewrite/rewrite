@@ -41,6 +41,7 @@ import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
 import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
+import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
@@ -312,7 +313,7 @@ class KotlinTypeMapping(
         val firClass = when (type) {
             is FirClass -> type
             is FirResolvedQualifier -> {
-                val ref = type.typeRef.toRegularClassSymbol(firSession)
+                val ref = type.resolvedType.toRegularClassSymbol(firSession)
                 if (type.typeArguments.isNotEmpty()) {
                     params = type.typeArguments
                 }
@@ -1233,7 +1234,7 @@ class KotlinTypeMapping(
     private fun listAnnotations(firAnnotations: List<FirAnnotation>): MutableList<FullyQualified>? {
         var annotations: MutableList<FullyQualified>? = null
         for (firAnnotation in firAnnotations) {
-            val fir = firAnnotation.typeRef.toRegularClassSymbol(firSession)?.fir
+            val fir = firAnnotation.resolvedType.toRegularClassSymbol(firSession)?.fir
             if (fir != null && isNotSourceRetention(fir.annotations)) {
                 if (annotations == null) {
                     annotations = ArrayList()
