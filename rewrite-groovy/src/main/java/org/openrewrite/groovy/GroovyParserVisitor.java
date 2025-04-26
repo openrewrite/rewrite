@@ -2077,7 +2077,7 @@ public class GroovyParserVisitor {
 
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
             if (!expression.isDynamicTyped() && expression.getOriginType().isArray()) {
-                return visitTypeTree(expression.getType(), expression.getNodeMetaData().containsKey(StaticTypesMarker.INFERRED_TYPE));
+                return visitTypeTree(expression.getType(), false);
             }
 
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
