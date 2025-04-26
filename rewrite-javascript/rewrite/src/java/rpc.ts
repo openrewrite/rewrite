@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { JavaVisitor } from "./visitor";
-import { asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue } from "../rpc";
+import {JavaVisitor} from "./visitor";
+import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {
     Annotation,
     AnnotatedType,
@@ -96,9 +96,9 @@ import {
     Variable,
     WhileLoop,
     Wildcard,
-    Yield, JavaType,
+    Yield, JavaType, TextComment,
 } from "./tree";
-import { produceAsync } from "../visitor";
+import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
 
 class JavaSender extends JavaVisitor<RpcSendQueue> {
@@ -144,7 +144,6 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitArrayType(arrayType: ArrayType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(arrayType, a => a.elementType, type => this.visit(type, q));
         await q.getAndSendList(arrayType, a => a.annotations || [], annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSend(arrayType, a => a.dimension, dim => this.visitLeftPadded(dim, q));
         await q.getAndSend(arrayType, a => a.type && asRef(a.type), type => this.visitType(type, q));
 
         return arrayType;
@@ -190,7 +189,7 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitCase(caseStmt: Case, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(caseStmt, c => c.caseType);
+        await q.getAndSend(caseStmt, c => c.type);
         await q.getAndSend(caseStmt, c => c.caseLabels, labels => this.visitContainer(labels, q));
         await q.getAndSend(caseStmt, c => c.statements, stmts => this.visitContainer(stmts, q));
         await q.getAndSend(caseStmt, c => c.body, body => this.visitRightPadded(body, q));
@@ -549,7 +548,8 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitVariable(variable: Variable, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(variable, v => v.name, name => this.visit(name, q));
-        await q.getAndSendList(variable, v => v.dimensionsAfterName, d => d.element, dims => this.visitLeftPadded(dims, q));
+        // TODO what to do here
+        // await q.getAndSendList(variable, v => v.dimensionsAfterName, d => d.element, dims => this.visitLeftPadded(dims, q));
         await q.getAndSend(variable, v => v.initializer, init => this.visitLeftPadded(init, q));
         await q.getAndSend(variable, v => v.variableType && asRef(v.variableType), type => this.visitType(type, q));
 
@@ -680,12 +680,24 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitSpace(space: Space, q: RpcSendQueue): Promise<Space> {
-        await q.getAndSendList(space, s => s.comments, c => c.text + c.suffix, async c => {
-            await q.getAndSend(c, c2 => c2.multiline);
-            await q.getAndSend(c, c2 => c2.text);
-            await q.getAndSend(c, c2 => c2.suffix);
-            await q.sendMarkers(c, c2 => c2.markers);
-        });
+        await q.getAndSendList(space, s => s.comments,
+            c => {
+                if (c.kind === JavaKind.TextComment) {
+                    return (c as TextComment).text + c.suffix;
+                }
+                throw new Error(`Unexpected comment type ${c.kind}`);
+            },
+            async c => {
+                if (c.kind === JavaKind.TextComment) {
+                    const tc = c as TextComment;
+                    await q.getAndSend(tc, c2 => c2.multiline);
+                    await q.getAndSend(tc, c2 => c2.text);
+                } else {
+                    throw new Error(`Unexpected comment type ${c.kind}`);
+                }
+                await q.getAndSend(c, c2 => c2.suffix);
+                await q.sendMarkers(c, c2 => c2.markers);
+            });
         await q.getAndSend(space, s => s.whitespace);
         return space;
     }
@@ -781,7 +793,6 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.elementType = await q.receive(arrayType.elementType, type => this.visit(type, q));
         draft.annotations = await q.receiveListDefined(arrayType.annotations || [], annot => this.visit(annot, q));
-        draft.dimension = await q.receive(arrayType.dimension, dim => this.visitOptionalLeftPadded(dim, q));
         draft.type = await q.receive(arrayType.type, type => this.visitType(type, q));
 
         return finishDraft(draft);
@@ -839,7 +850,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitCase(caseStmt: Case, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(caseStmt);
 
-        draft.caseType = await q.receive(caseStmt.caseType);
+        draft.type = await q.receive(caseStmt.type);
         draft.caseLabels = await q.receive(caseStmt.caseLabels, labels => this.visitContainer(labels, q));
         draft.statements = await q.receive(caseStmt.statements, stmts => this.visitContainer(stmts, q));
         draft.body = await q.receive(caseStmt.body, body => this.visitRightPadded(body, q));
@@ -1263,7 +1274,8 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const draft = createDraft(variable);
 
         draft.name = await q.receive(variable.name, name => this.visit(name, q));
-        draft.dimensionsAfterName = await q.receiveListDefined(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, q));
+        // TODO what to do here
+        // draft.dimensionsAfterName = await q.receiveListDefined(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, q));
         draft.initializer = await q.receive(variable.initializer, init => this.visitOptionalLeftPadded(init, q));
         draft.variableType = await q.receive(variable.variableType, type => this.visitType(type, q) as unknown as JavaType.Variable);
 
@@ -1454,12 +1466,17 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitSpace(space: Space, q: RpcReceiveQueue): Promise<Space> {
         return produceAsync<Space>(space, async draft => {
             draft.comments = await q.receiveListDefined(space.comments, async c => {
-                return await produceAsync(c, async draft => {
-                    draft.multiline = await q.receive(c.multiline);
-                    draft.text = await q.receive(c.text);
-                    draft.suffix = await q.receive(c.suffix);
-                    draft.markers = await q.receiveMarkers(c.markers);
-                });
+                if (c.kind === JavaKind.TextComment) {
+                    const tc = c as TextComment;
+                    return await produceAsync(tc, async draft => {
+                        draft.multiline = await q.receive(tc.multiline);
+                        draft.text = await q.receive(tc.text);
+                        draft.suffix = await q.receive(c.suffix);
+                        draft.markers = await q.receiveMarkers(c.markers);
+                    });
+                } else {
+                    throw new Error(`Unexpected comment type ${c.kind}`);
+                }
             });
             draft.whitespace = await q.receive(space.whitespace);
         });

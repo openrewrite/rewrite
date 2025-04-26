@@ -77,6 +77,7 @@ export const JavaKind = {
     SwitchExpression: "org.openrewrite.java.tree.J$SwitchExpression",
     Synchronized: "org.openrewrite.java.tree.J$Synchronized",
     Ternary: "org.openrewrite.java.tree.J$Ternary",
+    TextComment: "org.openrewrite.java.tree.TextComment",
     Throw: "org.openrewrite.java.tree.J$Throw",
     Try: "org.openrewrite.java.tree.J$Try",
     TryResource: "org.openrewrite.java.tree.J$Try$Resource",
@@ -131,17 +132,21 @@ export const emptySpace: Space = {
 };
 
 export interface Comment {
+    readonly kind: string
+    readonly suffix: string;
+    readonly markers: Markers;
+}
+
+export interface TextComment extends Comment {
+    readonly kind: typeof JavaKind.TextComment
     readonly multiline: boolean;
     readonly text: string;
     readonly suffix: string;
     readonly markers: Markers;
 }
 
-export interface TextComment extends Comment {
-    readonly multiline: boolean;
-    readonly text: string;
-    readonly suffix: string;
-    readonly markers: Markers;
+export interface DocComment extends Comment {
+    // TODO implement me!
 }
 
 export interface J extends Tree {
@@ -170,17 +175,9 @@ export interface JContainer<T extends J> {
 }
 
 export interface JavaSourceFile extends J, SourceFile {
-    readonly typesInUse: TypesInUse;
     readonly packageDeclaration: JRightPadded<Package>;
     readonly imports: JRightPadded<Import>[];
     readonly classes: ClassDeclaration[];
-}
-
-export interface TypesInUse {
-    readonly usedTypes: JavaType[];
-    readonly usedMethods: JavaType.Method[];
-    readonly usedVariables: JavaType.Variable[];
-    readonly usedAnnotations: JavaType.Annotation[];
 }
 
 export interface TypedTree extends J {
@@ -236,7 +233,6 @@ export interface ArrayType extends J, TypeTree {
     readonly kind: typeof JavaKind.ArrayType;
     readonly elementType: TypeTree;
     readonly annotations?: Annotation[];
-    readonly dimension?: JLeftPadded<Space>;
     readonly type: JavaType;
 }
 
@@ -322,7 +318,7 @@ export interface Break extends J, Statement {
 
 export interface Case extends J {
     readonly kind: typeof JavaKind.Case;
-    readonly caseType: CaseType;
+    readonly type: CaseType;
     readonly caseLabels: JContainer<J>;
     readonly statements: JContainer<Statement>;
     readonly body?: JRightPadded<J>;
