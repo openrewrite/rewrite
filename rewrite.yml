@@ -60,6 +60,7 @@ preconditions:
 recipeList:
   - org.openrewrite.java.recipes.RewriteTestClassesShouldNotBePublic
   #- org.openrewrite.java.recipes.SelectRecipeExamples
+  - org.openrewrite.java.recipes.ReorderTestMethods
   - org.openrewrite.java.recipes.SourceSpecTextBlockNewLine
   - org.openrewrite.java.recipes.SourceSpecTextBlockIndentation
   - org.openrewrite.java.testing.cleanup.RemoveTestPrefix
