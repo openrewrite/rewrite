@@ -16,8 +16,8 @@
 import {JavaVisitor} from "./visitor";
 import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {
-    Annotation,
     AnnotatedType,
+    Annotation,
     ArrayAccess,
     ArrayDimension,
     ArrayType,
@@ -56,9 +56,10 @@ import {
     isSpace,
     J,
     JavaKind,
+    JavaType,
+    JContainer,
     JLeftPadded,
     JRightPadded,
-    JContainer,
     Label,
     Lambda,
     LambdaParameters,
@@ -82,21 +83,22 @@ import {
     SwitchExpression,
     Synchronized,
     Ternary,
+    TextComment,
     Throw,
     Try,
-    TryResource,
     TryCatch,
+    TryResource,
     TypeCast,
     TypeParameter,
     TypeParameters,
     Unary,
     Unknown,
     UnknownSource,
-    VariableDeclarations,
     Variable,
+    VariableDeclarations,
     WhileLoop,
     Wildcard,
-    Yield, JavaType, TextComment,
+    Yield,
 } from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
@@ -741,13 +743,17 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
 class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     protected async preVisit(j: J, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(j);
+        try {
+            const draft = createDraft(j);
 
-        draft.id = await q.receive(j.id);
-        draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
-        draft.markers = await q.receiveMarkers(j.markers);
+            draft.id = await q.receive(j.id);
+            draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
+            draft.markers = await q.receiveMarkers(j.markers);
 
-        return finishDraft(draft);
+            return finishDraft(draft);
+        } catch (e: any) {
+            throw e;
+        }
     }
 
     protected async visitAnnotatedType(annotatedType: AnnotatedType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1386,7 +1392,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.leadingAnnotations = await q.receiveListDefined(cls.leadingAnnotations, annot => this.visit(annot, q));
         draft.modifiers = await q.receiveListDefined(cls.modifiers, mod => this.visit(mod, q));
-        draft.classKind = await q.receive(cls.classKind, kind => this.visit(kind, q));
+        draft.classKind = await q.receive(cls.classKind);
         draft.name = await q.receive(cls.name, name => this.visit(name, q));
         draft.typeParameters = await q.receive(cls.typeParameters, params => this.visitContainer(params, q));
         draft.primaryConstructor = await q.receive(cls.primaryConstructor, cons => this.visitContainer(cons, q));
@@ -1488,16 +1494,15 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         }
 
         return produceAsync<JLeftPadded<T>>(left, async draft => {
-            // Handle different element types
-            if (isJava(left.element)) {
-                draft.element = await q.receive(left.element, elem => this.visit(elem, q)) as Draft<T>;
-            } else if (isSpace(left.element)) {
-                draft.element = await q.receive<Space>(left.element, space => this.visitSpace(space, q)) as Draft<T>;
-            } else {
-                draft.element = await q.receive(left.element) as Draft<T>;
-            }
-
             draft.before = await q.receive(left.before, space => this.visitSpace(space, q));
+            draft.element = await q.receive(left.element, elem => {
+                if (isJava(elem)) {
+                    return this.visit(elem as J, q) as any as T;
+                } else if (isSpace(elem)) {
+                    return this.visitSpace(elem as Space, q) as any as T;
+                }
+                return elem;
+            }) as Draft<T>;
             draft.markers = await q.receiveMarkers(left.markers);
         });
     }
@@ -1508,13 +1513,12 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         }
 
         return produceAsync<JRightPadded<T>>(right, async draft => {
-            // Handle different element types
-            if (isJava(right.element)) {
-                draft.element = await q.receive(right.element, elem => this.visit(elem as J, q)) as Draft<T>;
-            } else {
-                draft.element = await q.receive(right.element) as Draft<T>;
-            }
-
+            draft.element = await q.receive(right.element, elem => {
+                if (isJava(right.element)) {
+                    return this.visit(elem as J, q) as any as T;
+                }
+                return right.element as any as T;
+            }) as Draft<T>;
             draft.after = await q.receive(right.after, space => this.visitSpace(space, q));
             draft.markers = await q.receiveMarkers(right.markers);
         });

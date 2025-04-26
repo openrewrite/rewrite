@@ -30,6 +30,7 @@ import java.time.Duration;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -45,12 +46,13 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @BeforeEach
-    void before() throws InterruptedException {
+    void before() {
         this.client = JavaScriptRewriteRpc.start(
           Environment.builder().build(),
           "/usr/local/bin/node",
+          "--enable-source-maps",
           // Uncomment this to debug the server
-//          "--inspect-brk",
+          "--inspect-brk",
           "./rewrite/dist/src/rpc/server.js"
         );
         client.batchSize(20).timeout(Duration.ofMinutes(10));
@@ -59,6 +61,22 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
     @AfterEach
     void after() {
         client.shutdown();
+    }
+
+    @Test
+    void printJava() {
+        @Language("java")
+        String java = """
+          class Test {
+          }
+          """;
+        rewriteRun(
+          java(java, spec -> spec.beforeRecipe(cu ->
+            // TODO allow print to return "unsupported" and assert that the JS implementation doesn't
+            //  support printing Java code.
+            assertThat(client.print(cu)).isEqualTo(java.trim())))
+          // TODO do client.getObject(cu) and verify that it has print equality with the `java` variable here.
+        );
     }
 
     @Test

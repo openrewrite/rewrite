@@ -132,11 +132,17 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitClassDeclaration(J.ClassDeclaration classDecl, RpcSendQueue q) {
         q.getAndSendList(classDecl, J.ClassDeclaration::getLeadingAnnotations, Tree::getId, j -> visit(j, q));
         q.getAndSendList(classDecl, J.ClassDeclaration::getModifiers, Tree::getId, j -> visit(j, q));
-        q.getAndSend(classDecl, J.ClassDeclaration::getKind);
+
+        // TODO We don't currently have a way to get to the annotations that are on ClassDeclaration.Kind
+        //  because the getter hides the field.
+        q.getAndSend(classDecl, J.ClassDeclaration::getKind); // the enum type
+
         q.getAndSend(classDecl, J.ClassDeclaration::getName, j -> visit(j, q));
         q.getAndSend(classDecl, J.ClassDeclaration::getTypeParameters, tp -> visit(tp, q));
-        q.getAndSend(classDecl, J.ClassDeclaration::getExtends, ext -> visit(ext, q));
-        q.getAndSend(classDecl, J.ClassDeclaration::getImplements, impl -> visit(impl, q));
+        q.getAndSend(classDecl, c -> c.getPadding().getExtends(), ext -> visitLeftPadded(ext,
+                JLeftPadded.Location.EXTENDS, q));
+        q.getAndSend(classDecl, c -> c.getPadding().getImplements(), impl -> visitContainer(impl,
+                JContainer.Location.IMPLEMENTS, q));
         q.getAndSend(classDecl, J.ClassDeclaration::getBody, j -> visit(j, q));
         return classDecl;
     }

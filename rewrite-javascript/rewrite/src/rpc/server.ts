@@ -22,18 +22,19 @@ import {WriteStream} from "fs";
 // Include all languages you want this server to support.
 import "../text";
 import "../json";
+import "../java";
 
 const log: WriteStream = fs.createWriteStream(`${process.cwd()}/server.log`, {flags: 'a'});
 log.write("\n--------------------------------------------------------------------------\n");
 log.write(`[server] starting\n\n`);
 
-process.stdin.on('data', (chunk) => {
-    log.write(`[server] ⇦ received: '${chunk.toString()}'\n\n`);
-})
-
-process.stdout.on('data', (chunk) => {
-    log.write(`[server] ⇨ sent: '${chunk.toString()}'\n\n`);
-})
+// process.stdin.on('data', (chunk) => {
+//     log.write(`[server] ⇦ received: '${chunk.toString()}'\n\n`);
+// })
+//
+// process.stdout.on('data', (chunk) => {
+//     log.write(`[server] ⇨ sent: '${chunk.toString()}'\n\n`);
+// })
 
 const logger: rpc.Logger = {
     error: (msg: string) => log.write(`[Error] ${msg}\n`),

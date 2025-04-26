@@ -31,8 +31,13 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -50,7 +55,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
-public interface J extends Tree {
+public interface J extends Tree, RpcCodec<J> {
 
     @SuppressWarnings("unchecked")
     @Override
@@ -99,6 +104,16 @@ public interface J extends Tree {
     @Deprecated
     default String printTrimmed() {
         return StringUtils.trimIndent(print());
+    }
+
+    @Override
+    default void rpcSend(J after, RpcSendQueue q) {
+        new JavaSender().visit(after, q);
+    }
+
+    @Override
+    default J rpcReceive(J before, RpcReceiveQueue q) {
+        return new JavaReceiver().visitNonNull(before, q);
     }
 
     @SuppressWarnings("unchecked")
