@@ -43,33 +43,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("rawtypes")
 class AddImportTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/2155")
-    @Test
-    void addImportBeforeImportWithSameInsertIndex() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertFalse", false))),
-          java(
-            """
-              import static org.junit.jupiter.api.Assertions.assertTrue;
-
-              import org.junit.Test;
-
-              public class MyTest {
-              }
-              """,
-            """
-              import static org.junit.jupiter.api.Assertions.assertFalse;
-              import static org.junit.jupiter.api.Assertions.assertTrue;
-
-              import org.junit.Test;
-
-              public class MyTest {
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void importIsAddedToCorrectBlock() {
@@ -91,6 +64,33 @@ class AddImportTest implements RewriteTest {
               import org.junit.jupiter.api.extension.ExtendWith;
               import org.mockito.Mock;
               import org.mockito.junit.jupiter.MockitoExtension;
+
+              public class MyTest {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2155")
+    @Test
+    void addImportBeforeImportWithSameInsertIndex() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertFalse", false))),
+          java(
+            """
+              import static org.junit.jupiter.api.Assertions.assertTrue;
+
+              import org.junit.Test;
+
+              public class MyTest {
+              }
+              """,
+            """
+              import static org.junit.jupiter.api.Assertions.assertFalse;
+              import static org.junit.jupiter.api.Assertions.assertTrue;
+
+              import org.junit.Test;
 
               public class MyTest {
               }

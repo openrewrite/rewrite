@@ -49,6 +49,33 @@ class ChangeMethodNameTest implements RewriteTest {
       }
       """;
 
+    @DocumentExample
+    @Test
+    void changeMethodNameForMethodWithSingleArg() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null)),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              package com.abc;
+              class A {
+                 public void test() {
+                     new B().singleArg("boo");
+                 }
+              }
+              """,
+            """
+              package com.abc;
+              class A {
+                 public void test() {
+                     new B().bar("boo");
+                 }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings({"ConstantConditions", "RedundantOperationOnEmptyContainer"})
     @Issue("https://github.com/openrewrite/rewrite/issues/605")
     @Test
@@ -189,33 +216,6 @@ class ChangeMethodNameTest implements RewriteTest {
                       new B().bar("boo");
                       new java.util.ArrayList<String>().forEach(new B()::bar);
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void changeMethodNameForMethodWithSingleArg() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
-              package com.abc;
-              class A {
-                 public void test() {
-                     new B().singleArg("boo");
-                 }
-              }
-              """,
-            """
-              package com.abc;
-              class A {
-                 public void test() {
-                     new B().bar("boo");
-                 }
               }
               """
           )
