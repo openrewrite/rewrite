@@ -21,17 +21,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
 import org.openrewrite.config.Environment;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.time.Duration;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -39,6 +40,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 @Disabled
 public class JavaScriptRewriteRpcTest implements RewriteTest {
     JavaScriptRewriteRpc client;
+    PrintStream log;
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -47,7 +49,8 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @BeforeEach
-    void before() {
+    void before() throws FileNotFoundException {
+        this.log = new PrintStream(new FileOutputStream("rpc.java.log"));
         this.client = JavaScriptRewriteRpc.start(
           Environment.builder().build(),
           "/usr/local/bin/node",
@@ -56,30 +59,45 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
 //          "--inspect-brk",
           "./rewrite/dist/src/rpc/server.js"
         );
+
         client.batchSize(20)
           .timeout(Duration.ofMinutes(10))
-          .traceSendPackets(true);
+          .traceGetObjectOutput()
+          .traceGetObjectInput(log);
     }
 
     @AfterEach
     void after() {
+        log.close();
         client.shutdown();
     }
 
     @Test
     void printJava() {
+        assertThat(client.installRecipes(new File("rewrite/dist/test/modify-all-trees.js")))
+          .isEqualTo(1);
+        Recipe modifyAll = client.prepareRecipe("org.openrewrite.java.test.modify-all-trees");
+
         @Language("java")
         String java = """
           class Test {
           }
           """;
         rewriteRun(
-          java(java, spec -> spec.beforeRecipe(cu -> {
-              assertThatThrownBy(() -> client.print(cu))
-                .hasMessageContaining("Printing Java source files from JavaScript is not supported");
-              assertThat(client.<SourceFile>getObject(cu.getId().toString()).printAll()).isEqualTo(java.trim());
-          }))
+          spec -> spec
+            .recipe(modifyAll)
+            .expectedCyclesThatMakeChanges(1),
+          java(
+            java,
+            java
+          )
         );
+
+        // spec -> spec.beforeRecipe(cu -> {
+        //              assertThatThrownBy(() -> client.print(cu))
+        //                .hasMessageContaining("Printing Java source files from JavaScript is not supported");
+        //              assertThat(client.<SourceFile>getObject(cu.getId().toString()).printAll()).isEqualTo(java.trim());
+        //          })
     }
 
     @Test

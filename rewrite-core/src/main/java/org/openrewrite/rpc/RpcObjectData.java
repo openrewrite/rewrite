@@ -23,18 +23,11 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
-import lombok.experimental.NonFinal;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.rpc.internal.StackElementSourceLookup;
 
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.Path;
 import java.util.Map;
-import java.util.Stack;
 
 /**
  * A single piece of data in a tree, which can be a marker, leaf value, tree element, etc.
@@ -85,37 +78,9 @@ public class RpcObjectData {
      * The stack trace of the thread that created this object. This is
      * useful in debugging asymmetries between senders/receivers.
      */
+    @With
     @Nullable
-    @NonFinal
     String trace;
-
-    private static StackElementSourceLookup sourceLookup = new StackElementSourceLookup();
-
-    public RpcObjectData(State state, @Nullable String valueType, @Nullable Object value, @Nullable Integer ref,
-                         boolean trace) {
-        this.state = state;
-        this.valueType = valueType;
-        this.value = value;
-        this.ref = ref;
-        if (trace) {
-            this.trace = "Unknown";
-
-            for (StackTraceElement stackElement : Thread.currentThread().getStackTrace()) {
-                if (stackElement.getClassName().endsWith("Sender")) {
-                    this.trace = stackElement.getClassName().substring(stackElement.getClassName().lastIndexOf('.') + 1) +
-                                 ":" + stackElement.getLineNumber() + " => " +
-                                 sourceLookup.getSource(stackElement).trim();
-                    break;
-                }
-            }
-        } else {
-            this.trace = null;
-        }
-    }
-
-    public boolean hasValue() {
-        return value != null;
-    }
 
     public <V> V getValue() {
         if (value instanceof Map && valueType != null) {

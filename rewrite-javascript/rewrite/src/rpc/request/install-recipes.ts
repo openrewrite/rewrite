@@ -19,21 +19,21 @@ export class InstallRecipes {
 
     static handle(connection: rpc.MessageConnection, relativeInstallDir: string, registry: RecipeRegistry): void {
         connection.onRequest(new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"), async (request) => {
-            const installDir = path.join(process.cwd(), relativeInstallDir);
             const beforeInstall = registry.all.size;
-
-            if (!fs.existsSync(installDir)) {
-                fs.mkdirSync(installDir, {recursive: true});
-                fs.writeFileSync(path.join(installDir, "package.json"),
-                    `{"name": "please-work"}`)
-            }
-
             let resolvedPath;
             let recipesName = request.recipes;
 
             if (typeof request.recipes === "object") {
                 const recipePackage = request.recipes;
+                const installDir = path.join(process.cwd(), relativeInstallDir);
                 await new Promise<void>((resolve, reject) => {
+
+                    if (!fs.existsSync(installDir)) {
+                        fs.mkdirSync(installDir, {recursive: true});
+                        fs.writeFileSync(path.join(installDir, "package.json"),
+                            `{"name": "please-work"}`)
+                    }
+
                     // Rather than using npm on PATH, use `node_cli.js`.
                     // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
                     const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");

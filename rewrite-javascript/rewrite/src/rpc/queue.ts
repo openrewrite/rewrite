@@ -17,8 +17,8 @@ import {Marker, Markers, MarkersKind} from "../markers";
 import {RpcCodecs} from "./codec";
 import {produceAsync} from "../visitor";
 import {randomId} from "../uuid";
-import {readFileSync, WriteStream} from "fs";
-import {AsyncLocalStorage} from "node:async_hooks";
+import {WriteStream} from "fs";
+import {trace, saveTrace} from "./trace";
 
 const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
 
@@ -49,7 +49,7 @@ export class RpcSendQueue {
     private refCount = 1
     private before?: any;
 
-    constructor(private readonly refs: WeakMap<Object, number>) {
+    constructor(private readonly refs: WeakMap<Object, number>, private readonly trace: boolean) {
         this.next = new Promise<void>(resolve => {
             this.resolveNext = resolve;
         });
@@ -82,6 +82,9 @@ export class RpcSendQueue {
     }
 
     private put(d: RpcObjectData): void {
+        if (this.trace) {
+            d.trace = trace("Sender");
+        }
         this.q.push(d);
         // Resolve this existing promise
         this.resolveNext();
@@ -92,8 +95,8 @@ export class RpcSendQueue {
         });
     }
 
-    async sendMarkers<T extends { markers: Markers }>(parent: T, markersFn: (parent: T) => any): Promise<void> {
-        await this.getAndSend(parent, t2 => asRef(markersFn(t2)), async (markersRef: Markers & Reference) => {
+    sendMarkers<T extends { markers: Markers }>(parent: T, markersFn: (parent: T) => any): Promise<void> {
+        return this.getAndSend(parent, t2 => asRef(markersFn(t2)), async (markersRef: Markers & Reference) => {
             await this.getAndSend(markersRef, m => m.id);
             await this.getAndSendList(markersRef,
                 (m) => m.markers,
@@ -102,41 +105,43 @@ export class RpcSendQueue {
         });
     }
 
-    async getAndSend<T, U>(parent: T,
-                           value: (parent: T) => U | undefined,
-                           onChange?: (value: U) => Promise<any>): Promise<void> {
+    getAndSend<T, U>(parent: T,
+                     value: (parent: T) => U | undefined,
+                     onChange?: (value: U) => Promise<any>): Promise<void> {
         const after = value(parent);
         const before = this.before === undefined ? undefined : value(this.before as T);
-        await this.send(after, before, onChange ? () => onChange(after!) : undefined);
+        return this.send(after, before, onChange ? () => onChange(after!) : undefined);
     }
 
-    async getAndSendList<T, U>(parent: T,
-                               values: (parent: T) => U[] | undefined,
-                               id: (value: U) => any,
-                               onChange?: (value: U) => Promise<any>): Promise<void> {
+    getAndSendList<T, U>(parent: T,
+                         values: (parent: T) => U[] | undefined,
+                         id: (value: U) => any,
+                         onChange?: (value: U) => Promise<any>): Promise<void> {
         const after = values(parent);
         const before = this.before === undefined ? undefined : values(this.before as T);
-        await this.sendList(after, before, id, onChange);
+        return this.sendList(after, before, id, onChange);
     }
 
-    async send<T>(after: T | undefined, before: T | undefined, onChange: (() => Promise<any>) | undefined): Promise<void> {
-        if (before === after) {
-            this.put({state: RpcObjectState.NO_CHANGE});
-        } else if (before === undefined) {
-            await this.add(after, onChange);
-        } else if (after === undefined) {
-            this.put({state: RpcObjectState.DELETE});
-        } else {
-            this.put({state: RpcObjectState.CHANGE, value: onChange ? undefined : after});
-            await this.doChange(after, before, onChange);
-        }
+    send<T>(after: T | undefined, before: T | undefined, onChange: (() => Promise<any>) | undefined): Promise<void> {
+        return saveTrace(this.trace, async () => {
+            if (before === after) {
+                this.put({state: RpcObjectState.NO_CHANGE});
+            } else if (before === undefined) {
+                await this.add(after, onChange);
+            } else if (after === undefined) {
+                this.put({state: RpcObjectState.DELETE});
+            } else {
+                this.put({state: RpcObjectState.CHANGE, value: onChange ? undefined : after});
+                await this.doChange(after, before, onChange);
+            }
+        });
     }
 
-    async sendList<T>(after: T[] | undefined,
-                      before: T[] | undefined,
-                      id: (value: T) => any,
-                      onChange?: (value: T) => Promise<any>): Promise<void> {
-        await this.send(after, before, async () => {
+    sendList<T>(after: T[] | undefined,
+                before: T[] | undefined,
+                id: (value: T) => any,
+                onChange?: (value: T) => Promise<any>): Promise<void> {
+        return this.send(after, before, async () => {
             if (!after) {
                 throw new Error("A DELETE event should have been sent.");
             }
@@ -228,32 +233,6 @@ export class RpcReceiveQueue {
                 private readonly logFile?: WriteStream) {
     }
 
-    /**
-     * Inspect the call stack to find the nearest Receiver subclass
-     * and log the source line that invoked receive.
-     */
-    private logCallerCode(): void {
-        const stack = this.stackStorage.getStore()?.split("\n") ?? [];
-        for (const frame of stack.slice(1)) {
-            const match = frame.match(/at\s+(.*?)\s+\((.*):(\d+):(\d+)\)/);
-            if (match) {
-                const [, fn, file, line] = match;
-                const className = fn.includes('.') ? fn.split('.')[0] : fn;
-                if (className.endsWith('Receiver')) {
-                    try {
-                        const codeLine = readFileSync(file, 'utf-8')
-                            .split('\n')[parseInt(line, 10) - 1]
-                            .trim();
-                        this.logFile?.write(`  ${className}:${line} => ${codeLine}\n`);
-                    } catch {
-                        // ignore if reading the source file fails
-                    }
-                    break;
-                }
-            }
-        }
-    }
-
     async take(): Promise<RpcObjectData> {
         if (this.batch.length === 0) {
             this.batch = await this.pull();
@@ -271,53 +250,42 @@ export class RpcReceiveQueue {
         }))
     }
 
-    private stackStorage = new AsyncLocalStorage<string>();
-
     receive<T extends any | undefined>(
         before: T | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T> {
-        if (this.logFile) {
-            const entryStack = new Error().stack ?? '';
-            return this.stackStorage.run(entryStack, () => this._receive(before, onChange));
-        }
-        return this._receive(before, onChange);
-    }
-
-    private async _receive<T extends any | undefined>(
-        before: T | undefined,
-        onChange?: (before: T) => T | Promise<T | undefined> | undefined
-    ): Promise<T> {
-        const message = await this.take();
-        if (this.logFile && message.trace) {
-            const trace = message.trace;
-            delete message.trace;
-            this.logFile.write(`${JSON.stringify(message)}\n`);
-            this.logFile.write(`  ${trace}\n`);
-            this.logCallerCode();
-        }
-        let ref: number | undefined;
-        switch (message.state) {
-            case RpcObjectState.NO_CHANGE:
-                return before!;
-            case RpcObjectState.DELETE:
-                return undefined as T;
-            case RpcObjectState.ADD:
-                ref = message.ref;
-                if (ref !== undefined && this.refs.has(ref)) {
-                    return this.refs.get(ref);
-                }
-                before = message.value ?? this.newObj(message.valueType!);
-            // Intentional fall-through...
-            case RpcObjectState.CHANGE:
-                const after = onChange ? onChange(before!) : message.value;
-                if (ref !== undefined) {
-                    this.refs.set(ref, after);
-                }
-                return after;
-            default:
-                throw new Error(`Unknown state type ${message.state}`);
-        }
+        return saveTrace(this.logFile, async () => {
+            const message = await this.take();
+            if (this.logFile && message.trace) {
+                const sendTrace = message.trace;
+                delete message.trace;
+                this.logFile.write(`${JSON.stringify(message)}\n`);
+                this.logFile.write(`  ${sendTrace}\n`);
+                this.logFile.write(`  ${trace("Receiver")}\n`);
+            }
+            let ref: number | undefined;
+            switch (message.state) {
+                case RpcObjectState.NO_CHANGE:
+                    return before!;
+                case RpcObjectState.DELETE:
+                    return undefined as T;
+                case RpcObjectState.ADD:
+                    ref = message.ref;
+                    if (ref !== undefined && this.refs.has(ref)) {
+                        return this.refs.get(ref);
+                    }
+                    before = message.value ?? this.newObj(message.valueType!);
+                // Intentional fall-through...
+                case RpcObjectState.CHANGE:
+                    const after = onChange ? onChange(before!) : message.value;
+                    if (ref !== undefined) {
+                        this.refs.set(ref, after);
+                    }
+                    return after;
+                default:
+                    throw new Error(`Unknown state type ${message.state}`);
+            }
+        });
     }
 
     async receiveListDefined<T>(

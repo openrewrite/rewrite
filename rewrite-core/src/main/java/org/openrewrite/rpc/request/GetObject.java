@@ -60,8 +60,8 @@ public class GetObject implements RpcRequest {
 
             if (after == null) {
                 List<RpcObjectData> deleted = new ArrayList<>(2);
-                deleted.add(new RpcObjectData(DELETE, null, null, null, false));
-                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null, false));
+                deleted.add(new RpcObjectData(DELETE, null, null, null, null));
+                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null, null));
                 return deleted;
             }
 
@@ -85,7 +85,7 @@ public class GetObject implements RpcRequest {
                     } catch (Throwable ignored) {
                         // TODO do something with this exception
                     } finally {
-                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null, false));
+                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null, null));
                         sendQueue.flush();
                     }
                     return 0;

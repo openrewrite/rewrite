@@ -22,6 +22,7 @@ export const MarkersKind = {
 } as const
 
 export interface Marker {
+    readonly kind: string
     readonly id: UUID
 }
 

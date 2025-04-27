@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
 import org.openrewrite.marker.Markers;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,11 +33,14 @@ import static java.util.Objects.requireNonNull;
 public class RpcReceiveQueue {
     private final List<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
+    private final @Nullable PrintStream logFile;
     private final Supplier<List<RpcObjectData>> pull;
 
-    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull) {
+    public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
+                           Supplier<List<RpcObjectData>> pull) {
         this.refs = refs;
         this.batch = new ArrayList<>();
+        this.logFile = logFile;
         this.pull = pull;
     }
 
@@ -96,6 +100,12 @@ public class RpcReceiveQueue {
     @SuppressWarnings("DataFlowIssue")
     public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
+        if (logFile != null && message.getTrace() != null) {
+            logFile.println(message.withTrace(null));
+            logFile.println("  " + message.getTrace());
+            logFile.println("  " + Trace.traceReceiver());
+            logFile.flush();
+        }
         Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:

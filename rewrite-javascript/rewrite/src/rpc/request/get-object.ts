@@ -24,7 +24,8 @@ export class GetObject {
         connection: rpc.MessageConnection,
         remoteObjects: Map<string, any>,
         localObjects: Map<string, any>,
-        batchSize: number
+        batchSize: number,
+        trace: boolean
     ): void {
         const generators = new Map<string, AsyncGenerator<RpcObjectData>>();
         const localRefs = new WeakMap<any, number>();
@@ -42,7 +43,7 @@ export class GetObject {
 
             let generator = generators.get(request.id);
             if (!generator) {
-                generator = new RpcSendQueue(localRefs).generate(after, before);
+                generator = new RpcSendQueue(localRefs, trace).generate(after, before);
                 generators.set(request.id, generator);
             }
 

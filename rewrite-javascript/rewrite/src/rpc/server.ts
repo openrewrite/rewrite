@@ -24,16 +24,15 @@ import "../text";
 import "../json";
 import "../java";
 
-const log: WriteStream = fs.createWriteStream(`${process.cwd()}/server.log`, {flags: 'w'});
-log.write("\n--------------------------------------------------------------------------\n");
-log.write(`[server] starting\n\n`);
+const log: WriteStream = fs.createWriteStream(`${process.cwd()}/rpc.js.log`, {flags: 'w'});
+log.write(`[js-rewrite-rpc] starting\n\n`);
 
 // process.stdin.on('data', (chunk) => {
-//     log.write(`[server] ⇦ received: '${chunk.toString()}'\n\n`);
+//     log.write(`[js-rewrite-rpc] ⇦ received: '${chunk.toString()}'\n\n`);
 // })
 //
 // process.stdout.on('data', (chunk) => {
-//     log.write(`[server] ⇨ sent: '${chunk.toString()}'\n\n`);
+//     log.write(`[js-rewrite-rpc] ⇨ sent: '${chunk.toString()}'\n\n`);
 // })
 
 const logger: rpc.Logger = {
@@ -56,15 +55,15 @@ connection.trace(rpc.Trace.Verbose, logger).catch(err => {
 });
 
 connection.onError(err => {
-    log.write(`[server] error: ${err}\n\n`);
+    log.write(`[js-rewrite-rpc] error: ${err}\n\n`);
 });
 
 connection.onClose(() => {
-    log.write(`[server] connection closed\n\n`);
+    log.write(`[js-rewrite-rpc] connection closed\n\n`);
 })
 
 connection.onDispose(() => {
-    log.write(`[server] connection disposed\n\n`);
+    log.write(`[js-rewrite-rpc] connection disposed\n\n`);
 });
 
-new RewriteRpc(connection, {logFile: log});
+new RewriteRpc(connection, {traceGetObjectInput: log, traceGetObjectOutput: true});

@@ -26,6 +26,7 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
 
+import java.io.PrintStream;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -36,14 +37,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
+@SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
 
     private final AtomicInteger batchSize = new AtomicInteger(10);
     private Duration timeout = Duration.ofMinutes(1);
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
+    private @Nullable PrintStream logFile;
 
     /**
      * Keeps track of the local and remote state of objects that are used in
@@ -104,8 +108,13 @@ public class RewriteRpc {
         return this;
     }
 
-    public RewriteRpc traceSendPackets(boolean trace) {
-        this.traceSendPackets.set(trace);
+    public RewriteRpc traceGetObjectOutput() {
+        this.traceSendPackets.set(true);
+        return this;
+    }
+
+    public RewriteRpc traceGetObjectInput(PrintStream log) {
+        this.logFile = log;
         return this;
     }
 
@@ -184,6 +193,10 @@ public class RewriteRpc {
         return send("GetRecipes", null, GetRecipesResponse.class);
     }
 
+    public Recipe prepareRecipe(String id) {
+        return prepareRecipe(id, emptyMap());
+    }
+
     public Recipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
@@ -216,7 +229,7 @@ public class RewriteRpc {
 
     @VisibleForTesting
     public <T> T getObject(String id) {
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, () -> send("GetObject",
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
                 new GetObject(id), GetObjectResponse.class));
         Object remoteObject = q.receive(localObjects.get(id), before -> {
             if (before instanceof RpcCodec) {
