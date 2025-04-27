@@ -37,9 +37,98 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.tree.TypeUtils.TypeVariableMode.BOUND;
-import static org.openrewrite.java.tree.TypeUtils.TypeVariableMode.INFER;
 import static org.openrewrite.test.RewriteTest.toRecipe;
+
+//abstract class Base implements Comparable<Base> {}
+//abstract class Extends extends Base {}
+//
+//class A {
+//    static <T> void a(Map<T, T> mapA) {}
+//    static <T> void b(Map<T, ? extends T> mapB) {}
+//    static <T> void c(Map<T, ? super T> mapC) {}
+//
+//    static <T> void d(Map<? extends T, ? extends T> mapD) {}
+//    static <T> void e(Map<? extends T, ? super T> mapE) {}
+//    static <T> void f(Map<? super T, ? super T> mapF) {}
+//
+//    static <N extends Number> void an(Map<N, N> mapAn) {}
+//    static <N extends Number> void bn(Map<N, ? extends N> mapBn) {}
+//    static <N extends Number> void cn(Map<N, ? super N> mapCn) {}
+//
+//    static <N extends Number> void dn(Map<? extends N, ? extends N> mapDn) {}
+//    static <N extends Number> void en(Map<? extends N, ? super N> mapEn) {}
+//    static <N extends Number> void fn(Map<? super N, ? super N> mapFn) {}
+//
+//    void concrete(Map<Long, Long> mll, Map<Long, Number> mln, Map<Number, Long> mnl, Map<Number, Number> mnn, Map<? extends Number, ? extends Number> mex, Map<? super Number, ? super Number> msu) {
+//        a(mll);  an(mll);
+//        a(mln);  an(mln); // reason: Incompatible equality constraint: Long and Number
+//        a(mnl);  an(mnl); // reason: Incompatible equality constraint: Number and Long
+//        a(mnn);  an(mnn);
+//        a(mex);  an(mex); // reason: Incompatible equality constraint: capture of ? extends Number and capture of ? extends Number
+//        a(msu);  an(msu); // reason: Incompatible equality constraint: capture of ? extends Number and capture of ? extends Number
+//
+//        b(mll);  bn(mll);
+//        b(mln);  bn(mln); // reason: no instance(s) of type variable(s) exist so that Number conforms to Long
+//                          //         inference variable T has incompatible bounds:
+//                          //         equality constraints: Long
+//                          //         lower bounds: Number
+//        b(mnl);  bn(mnl);
+//        b(mnn);  bn(mnn);
+//        b(mex);  bn(mex); // reason: no instance(s) of type variable(s) exist so that capture of ? extends Number conforms to capture of ? extends Number
+//                          //         inference variable T has incompatible bounds:
+//                          //         equality constraints: capture of ? extends Number
+//                          //         lower bounds: lower bounds: capture of ? extends Number
+//
+//        c(mll);  cn(mll);
+//        c(mln);  cn(mln);
+//        c(mnl);  cn(mnl); // reason: no instance(s) of type variable(s) exist so that Number conforms to Long
+//        c(mnn);  cn(mnn);
+//        c(mex);  cn(mex); // reason: no instance(s) of type variable(s) exist so that capture of ? extends Number conforms to capture of ? extends Number
+//
+//        d(mll);  dn(mll);
+//        d(mln);  dn(mln);
+//        d(mnl);  dn(mnl);
+//        d(mnn);  dn(mnn);
+//        d(mex);  dn(mex);
+//
+//        e(mll);  en(mll);
+//        e(mln);  en(mln);
+//        e(mnl);  en(mnl); // reason: no instance(s) of type variable(s) exist so that Number conforms to Long
+//        e(mnn);  en(mnn);
+//        e(mex);  en(mex); // reason: no instance(s) of type variable(s) exist so that capture of ? extends Number conforms to capture of ? extends Number
+//
+//        f(mll);  fn(mll);
+//        f(mln);  fn(mln);
+//        f(mnl);  fn(mnl);
+//        f(mnn);  fn(mnn);
+//        f(mex);  fn(mex);
+//
+//
+//    }
+//    <T extends Number, EE extends Enum<? extends EE>> void test(Map<T, T> m1, Map<T, ? extends T> m2, Map<T, ? super T> m3, T t, EE enumValue) {
+//        a(m1);
+//        //a(m2); reason: Incompatible equality constraint: T and capture of ? extends T
+//        //a(m3); reason: Incompatible equality constraint: T and capture of ? super T
+//        b(m1);
+//        b(m2);
+//        //b(m3); // reason: no instance(s) of type variable(s) exist so that capture of ? super T conforms to Number
+//                 // inference variable N has incompatible bounds:
+//                 // equality constraints: T
+//        c(m1);
+//        //c(m2); // reason: no instance(s) of type variable(s) exist so that T conforms to capture of ? extends T
+//        c(m3);
+//        d(E1.A);
+//        //d(enumValue); // reason: no instance(s) of type variable(s) E exist so that ? extends EE can be converted to E
+//    }
+//}
+//
+//
+//
+//    class B<> {
+//
+//    }
+//}
+//
 
 @SuppressWarnings("ConstantConditions")
 class TypeUtilsTest implements RewriteTest {
@@ -923,7 +1012,7 @@ class TypeUtilsTest implements RewriteTest {
               import java.util.List;
               import java.util.Map;
               
-              class Test<T extends Number, U extends List<String>, V extends U> {
+              class Test<T extends Number, U extends List<String>, V extends U, X> {
                   Integer integerA;
                   Integer integerB;
               
@@ -943,6 +1032,8 @@ class TypeUtilsTest implements RewriteTest {
                   U[] uArrayB;
                   V[] vArrayA;
                   V[] vArrayB;
+                  X[] xArrayA;
+                  X[] xArrayB;
               
                   T numberTypeA;
                   T numberTypeB;
@@ -950,6 +1041,8 @@ class TypeUtilsTest implements RewriteTest {
                   U listTypeB;
                   V nestedListTypeA;
                   V nestedListTypeB;
+                  X genericA;
+                  X genericB;
               
                   List<T> numberListA;
                   List<T> numberListB;
@@ -957,6 +1050,8 @@ class TypeUtilsTest implements RewriteTest {
                   List<String> listStringB;
                   Map<String, T> stringToNumberMapA;
                   Map<String, T> stringToNumberMapB;
+                  Map<String, X> stringToGenericMapA;
+                  Map<String, X> stringToGenericMapB;
               
                   List<? extends Number> extendsNumberListA;
                   List<? extends Number> extendsNumberListB;
@@ -1016,22 +1111,29 @@ class TypeUtilsTest implements RewriteTest {
                         assertions.isOfType("List<? extends Number>", "List<T>").isFalse();
 
                         // 6. With INFER mode <T extends Number, U extends List<String>, V extends U>
-//                        assertions.isOfType("T", "Integer", INFER).isTrue();
-//                        assertions.isOfType("U", "Integer", INFER).isFalse();
-//                        assertions.isOfType("U", "List<String>", INFER).isTrue();
-//                        assertions.isOfType("V", "List<String>", INFER).isTrue();
-//                        assertions.isOfType("T", "Integer[]", INFER).isTrue();
-//                        assertions.isOfType("T[]", "Integer[]", INFER).isTrue();
-//                        assertions.isOfType("U[]", "List<String>[]", INFER).isTrue();
-//                        assertions.isOfType("V[]", "List<String>[]", INFER).isTrue();
-//                        assertions.isOfType("Integer[][]", "T[]", INFER).isFalse();
-//                        assertions.isOfType("T[]", "Integer[][]", INFER).isTrue();
-//                        assertions.isOfType("U[]", "Integer[][]", INFER).isFalse();
-//                        assertions.isOfType("U[]", "V[]", INFER).isTrue();
-//                        assertions.isOfType("V[]", "U[]", INFER).isTrue();
-//                        assertions.isOfType("Integer[][]", "int[]", INFER).isFalse();
-//                        assertions.isOfType("Map<String, T>", "Map<String, List<Map<Integer, String>>>", INFER).isTrue();
-//                        assertions.isOfType("Map<String, List<Map<Integer, String>>>", "Map<String, T>", INFER).isFalse();
+                        assertions.isOfType("T", "Integer", true).isTrue();
+                        assertions.isOfType("U", "Integer", true).isFalse();
+                        assertions.isOfType("U", "List<String>", true).isTrue();
+                        assertions.isOfType("V", "List<String>", true).isTrue();
+                        assertions.isOfType("T", "Integer[]", true).isFalse();
+                        assertions.isOfType("X", "Integer[]", true).isTrue();
+                        assertions.isOfType("T", "int[]", true).isFalse();
+                        assertions.isOfType("X", "int[]", true).isTrue();
+                        assertions.isOfType("T[]", "int[]", true).isFalse();
+                        assertions.isOfType("X[]", "int[]", true).isFalse();
+                        assertions.isOfType("T[]", "Integer[]", true).isTrue();
+                        assertions.isOfType("X[]", "Integer[]", true).isTrue();
+                        assertions.isOfType("U[]", "List<String>[]", true).isTrue();
+                        assertions.isOfType("V[]", "List<String>[]", true).isTrue();
+                        assertions.isOfType("Integer[][]", "T[]", true).isFalse();
+                        assertions.isOfType("X[]", "Integer[][]", true).isTrue();
+                        assertions.isOfType("T[]", "Integer[][]", true).isFalse();
+                        assertions.isOfType("U[]", "V[]", true).isTrue();
+                        assertions.isOfType("V[]", "U[]", true).isTrue();
+                        assertions.isOfType("Integer[][]", "int[]", true).isFalse();
+                        assertions.isOfType("Map<String, T>", "Map<String, List<Map<Integer, String>>>", true).isFalse();
+                        assertions.isOfType("Map<String, X>", "Map<String, List<Map<Integer, String>>>", true).isTrue();
+                        assertions.isOfType("Map<String, List<Map<Integer, String>>>", "Map<String, T>", true).isFalse();
                     }
                     return cu;
                 }
@@ -1213,10 +1315,10 @@ class TypeUtilsTest implements RewriteTest {
                         assertions.isAssignableTo("List<List<? extends CharSequence>>", "List<List<String>>").isFalse();
 
                         // 6. Inference Mode
-//                        assertions.isAssignableTo("List<T>", "List<String>", INFER).isTrue();
-//                        assertions.isAssignableTo("List<CS>", "List<String>", INFER).isTrue();
-//                        assertions.isAssignableTo("List<N>", "List<String>", INFER).isFalse();
-//                        assertions.isAssignableTo("List<? super T>", "List<? super String>", INFER).isTrue();
+                        assertions.isAssignableTo("List<T>", "List<String>", true).isTrue();
+                        assertions.isAssignableTo("List<CS>", "List<String>", true).isTrue();
+                        assertions.isAssignableTo("List<N>", "List<String>", true).isFalse();
+                        assertions.isAssignableTo("List<? super T>", "List<? super String>", true).isTrue();
                     }
                     return cu;
                 }
@@ -1230,7 +1332,7 @@ class TypeUtilsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              class Test<T extends CharSequence, U> {
+              class Test<T extends CharSequence, U, V extends Number> {
                   Object[] objectArray;
                   String[] stringArray;
                   CharSequence[] charSequenceArray;
@@ -1243,6 +1345,7 @@ class TypeUtilsTest implements RewriteTest {
                   String[][] string2DArray;
                   T[] genericCsArray;
                   U[] genericArray;
+                  V[] genericNumericArray;
                   U generic;
               }
               """,
@@ -1290,21 +1393,23 @@ class TypeUtilsTest implements RewriteTest {
                         assertions.isAssignableTo("Object[]", "U[]").isTrue();
 
                         // Infer mode: <T extends CharSequence, U>
-//                        assertions.isAssignableTo("T[]", "String[]", INFER).isTrue();
-//                        assertions.isAssignableTo("T[]", "CharSequence[]", INFER).isTrue();
-//                        assertions.isAssignableTo("T[]", "String[][]", INFER).isFalse();
-//
-//                        assertions.isAssignableTo("U", "String[]", INFER).isTrue();
-//                        assertions.isAssignableTo("U", "CharSequence[]", INFER).isTrue();
-//                        assertions.isAssignableTo("U", "String[][]", INFER).isTrue();
-//                        assertions.isAssignableTo("U", "int[]", INFER).isTrue();
-//                        assertions.isAssignableTo("U", "double[]", INFER).isTrue();
-//
-//                        assertions.isAssignableTo("U[]", "String[]", INFER).isTrue();
-//                        assertions.isAssignableTo("U[]", "CharSequence[]", INFER).isTrue();
-//                        assertions.isAssignableTo("U[]", "String[][]", INFER).isTrue();
-//                        assertions.isAssignableTo("U[]", "int[]", INFER).isFalse();
-//                        assertions.isAssignableTo("U[]", "double[]", INFER).isFalse();
+                        assertions.isAssignableTo("T[]", "String[]", true).isTrue();
+                        assertions.isAssignableTo("T[]", "CharSequence[]", true).isTrue();
+                        assertions.isAssignableTo("T[]", "String[][]", true).isFalse();
+
+                        assertions.isAssignableTo("U", "String[]", true).isTrue();
+                        assertions.isAssignableTo("U", "CharSequence[]", true).isTrue();
+                        assertions.isAssignableTo("U", "String[][]", true).isTrue();
+                        assertions.isAssignableTo("U", "int[]", true).isTrue();
+                        assertions.isAssignableTo("U", "double[]", true).isTrue();
+
+                        assertions.isAssignableTo("U[]", "String[]", true).isTrue();
+                        assertions.isAssignableTo("U[]", "CharSequence[]", true).isTrue();
+                        assertions.isAssignableTo("U[]", "String[][]", true).isTrue();
+                        assertions.isAssignableTo("U[]", "int[]", true).isFalse();
+                        assertions.isAssignableTo("V[]", "int[]", true).isFalse();
+                        assertions.isAssignableTo("V[]", "Integer[]", true).isTrue();
+                        assertions.isAssignableTo("U[]", "double[]", true).isFalse();
                     }
                     return cu;
                 }
@@ -1366,23 +1471,23 @@ class TypeUtilsTest implements RewriteTest {
                         assertions.isAssignableTo("Integer", "boolean").isFalse();
 
                         // Generics <T, U extends Number>
-//                        assertions.isAssignableTo("T", "byte", INFER).isTrue();
-//                        assertions.isAssignableTo("T", "short", INFER).isTrue();
-//                        assertions.isAssignableTo("T", "char", INFER).isTrue();
-//                        assertions.isAssignableTo("T", "int", INFER).isTrue();
-//                        assertions.isAssignableTo("T", "long", INFER).isTrue();
-//                        assertions.isAssignableTo("T", "float", INFER).isTrue();
-//                        assertions.isAssignableTo("T", "double", INFER).isTrue();
-//                        assertions.isAssignableTo("T", "boolean", INFER).isTrue();
-//
-//                        assertions.isAssignableTo("U", "byte", INFER).isTrue();
-//                        assertions.isAssignableTo("U", "short", INFER).isTrue();
-//                        assertions.isAssignableTo("U", "int", INFER).isTrue();
-//                        assertions.isAssignableTo("U", "long", INFER).isTrue();
-//                        assertions.isAssignableTo("U", "float", INFER).isTrue();
-//                        assertions.isAssignableTo("U", "double", INFER).isTrue();
-//                        assertions.isAssignableTo("U", "char", INFER).isFalse();
-//                        assertions.isAssignableTo("U", "boolean", INFER).isFalse();
+                        assertions.isAssignableTo("T", "byte", true).isTrue();
+                        assertions.isAssignableTo("T", "short", true).isTrue();
+                        assertions.isAssignableTo("T", "char", true).isTrue();
+                        assertions.isAssignableTo("T", "int", true).isTrue();
+                        assertions.isAssignableTo("T", "long", true).isTrue();
+                        assertions.isAssignableTo("T", "float", true).isTrue();
+                        assertions.isAssignableTo("T", "double", true).isTrue();
+                        assertions.isAssignableTo("T", "boolean", true).isTrue();
+
+                        assertions.isAssignableTo("U", "byte", true).isTrue();
+                        assertions.isAssignableTo("U", "short", true).isTrue();
+                        assertions.isAssignableTo("U", "int", true).isTrue();
+                        assertions.isAssignableTo("U", "long", true).isTrue();
+                        assertions.isAssignableTo("U", "float", true).isTrue();
+                        assertions.isAssignableTo("U", "double", true).isTrue();
+                        assertions.isAssignableTo("U", "char", true).isFalse();
+                        assertions.isAssignableTo("U", "boolean", true).isFalse();
                     }
                     return cu;
                 }
@@ -1447,6 +1552,44 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void isAssignableToRecursive() {
+        rewriteRun(
+          java(
+            """
+              abstract class Comp implements Comparable<Comp> {}
+              abstract class Ext extends Comp {}
+              enum EnumType { A, B, C }
+              
+              class Test<E extends Enum<E>, C extends Comparable<? super C>> {
+                  E e;
+                  C c;
+                  Comp comp;
+                  Ext ext;
+                  EnumType enumType;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                    try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                        // 1. Same variable name
+                        assertions.isAssignableTo("E", "EnumType", false).isFalse();
+                        assertions.isAssignableTo("E", "EnumType", true).isTrue();
+
+                        assertions.isAssignableTo("C", "Comp", false).isFalse();
+                        assertions.isAssignableTo("C", "Ext", false).isFalse();
+
+                        assertions.isAssignableTo("C", "Comp", true).isTrue();
+                        assertions.isAssignableTo("C", "Ext", true).isTrue();
+                    }
+                    return cu;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
     static class TypeUtilsAssertions implements AutoCloseable {
         SoftAssertions softly = new SoftAssertions();
         Map<String, List<JavaType>> types = new HashMap<>();
@@ -1482,17 +1625,25 @@ class TypeUtilsTest implements RewriteTest {
         }
 
         public BooleanAssert isAssignableTo(String to, String from) {
+            return isAssignableTo(to, from, false);
+        }
+
+        public BooleanAssert isAssignableTo(String to, String from, boolean capture) {
             JavaType toType = getFirst(to);
             JavaType fromType = getLast(from);
-            return softly.assertThat(TypeUtils.isAssignableTo(toType, fromType))
-              .describedAs("isAssignableTo(%s, %s)", to, from);
+            return softly.assertThat(new Types(capture).isAssignableTo(toType, fromType))
+              .describedAs("isAssignableTo(%s, %s, %s)", to, from, capture);
         }
 
         public BooleanAssert isOfType(String to, String from) {
+            return isOfType(to, from, false);
+        }
+
+        public BooleanAssert isOfType(String to, String from, boolean capture) {
             JavaType toType = getFirst(to);
             JavaType fromType = getLast(from);
-            return softly.assertThat(TypeUtils.isOfType(toType, fromType))
-              .describedAs("isOfType(%s, %s)", to, from);
+            return softly.assertThat(new Types(capture).isOfType(toType, fromType))
+              .describedAs("isOfType(%s, %s, %s)", to, from, capture);
         }
 
         public StringAssert toString(String type) {

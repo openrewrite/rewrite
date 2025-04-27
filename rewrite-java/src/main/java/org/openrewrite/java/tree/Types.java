@@ -21,12 +21,12 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 
-public class InferenceContext {
+public class Types {
     private final Map<JavaType.GenericTypeVariable, JavaType.Intersection> boundsCache = new IdentityHashMap<>();
     private final Set<TypePair> visiting = new HashSet<>();
     private final boolean capture;
 
-    public InferenceContext(boolean capture) {
+    public Types(boolean capture) {
         this.capture = capture;
     }
 
@@ -43,10 +43,6 @@ public class InferenceContext {
             return false;
         } else if (to == from) {
             return true;
-        } else if (mode == CaptureSide.TO && isTypeVariable(to)) {
-            return isAssignableTo(to, from, mode);
-        } else if (mode == CaptureSide.FROM && isTypeVariable(from)) {
-            return isAssignableTo(to, from, mode);
         }
 
         TypePair key = new TypePair(Operation.IS_OF_TYPE, mode, to, from);
@@ -63,6 +59,13 @@ public class InferenceContext {
     }
 
     private boolean isOfTypeCore(JavaType to, JavaType from, CaptureSide mode) {
+        // Try to match captures
+        if (mode == CaptureSide.TO && isTypeVariable(to) ||
+                mode == CaptureSide.FROM && isTypeVariable(from)) {
+            return isAssignableTo(to, from, mode);
+        }
+
+        // Rest of cases
         if (to instanceof JavaType.GenericTypeVariable && from instanceof JavaType.GenericTypeVariable) {
             return isOfTypeGeneric((JavaType.GenericTypeVariable) to, (JavaType.GenericTypeVariable) from, mode);
         } else if (to instanceof JavaType.FullyQualified && from instanceof JavaType.FullyQualified) {
@@ -108,6 +111,10 @@ public class InferenceContext {
     }
 
     private boolean isOfTypeArray(JavaType.Array to, JavaType.Array from, CaptureSide mode) {
+        if (to.getElemType() instanceof JavaType.Primitive || from.getElemType() instanceof JavaType.Primitive) {
+            // Avoid incorrect inference of array types
+            return to.getElemType() == from.getElemType();
+        }
         return isOfType(to.getElemType(), from.getElemType(), mode);
     }
 
@@ -174,7 +181,10 @@ public class InferenceContext {
 
     private boolean isAssignableToCore(@NotNull JavaType to, @NotNull JavaType from, CaptureSide mode) {
         // Handle generic type variables (e.g., T extends Collection<String>)
-        if (to instanceof JavaType.GenericTypeVariable) {
+        if (mode == CaptureSide.FROM && isTypeVariable(from)) {
+            // Is there anything we can validate?
+            return true;
+        } else if (to instanceof JavaType.GenericTypeVariable) {
             return isAssignableToGeneric((JavaType.GenericTypeVariable) to, from, mode);
         } else if (from instanceof JavaType.GenericTypeVariable) {
             return isAssignableFromGeneric(to, (JavaType.GenericTypeVariable) from, mode);
@@ -213,7 +223,7 @@ public class InferenceContext {
     }
 
     private boolean isAssignableToGeneric(JavaType.GenericTypeVariable to, JavaType from, CaptureSide mode) {
-        if (isWildcard(to)) {
+        if (isWildcard(to) || mode == CaptureSide.TO) {
             // If target "to" wildcard is unbounded, it accepts anything
             if (to.getBounds().isEmpty()) {
                 return true;
@@ -222,9 +232,9 @@ public class InferenceContext {
             // Extract the target bound
             JavaType target = getBounds(to);
 
-            // Determine if "from" is a wildcard and handle it
+            // Determine if "from" is a wildcard and handle it unless capture.
             JavaType source = from;
-            if (isWildcard(from)) {
+            if (isWildcard(from) && isWildcard(to)) {
                 JavaType.GenericTypeVariable fromGeneric = (JavaType.GenericTypeVariable) from;
 
                 // Unbounded "from" wildcard is incompatible with a bounded "to" wildcard
@@ -251,12 +261,13 @@ public class InferenceContext {
                     return isAssignableTo(source, target, mode.reverse());
                 default:
                     // In Java, an invariant wildcard with bounds (e.g., ? T) is not valid syntax
-                    return false;
+                    // Could a capture come this way?
+                    assert mode == CaptureSide.TO;
+                    return isAssignableTo(target, source, mode);
             }
         }
 
-        // TODO: Handle capture?
-
+        // Only same T or U extends T can be assigned to T
         if (!(from instanceof JavaType.GenericTypeVariable)) {
             // Only a generic type variable can be assigned to another generic type variable in bound mode
             return false;
@@ -275,7 +286,7 @@ public class InferenceContext {
         return false;
     }
 
-
+    // Handle cases
     private boolean isAssignableFromGeneric(JavaType to, JavaType.GenericTypeVariable from, CaptureSide mode) {
         if (from.getVariance() == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) {
             return isAssignableTo(getBounds(from), to, mode.reverse());
@@ -340,7 +351,7 @@ public class InferenceContext {
             String fqn = to.getFullyQualifiedName();
             return "java.io.Serializable".equals(fqn) || "java.lang.Cloneable".equals(fqn);
         } else if (from instanceof JavaType.Primitive) {
-            return isAssignableToFullyQualified(to, TypeUtils.asBoxed((JavaType.Primitive) from), mode);
+            return isAssignableToFullyQualified(to, TypeUtils.asBoxedType((JavaType.Primitive) from), mode);
         }
         return false;
     }
@@ -375,7 +386,8 @@ public class InferenceContext {
         if (from instanceof JavaType.Array) {
             JavaType.Array fromArray = (JavaType.Array) from;
             if (to.getElemType() instanceof JavaType.Primitive || fromArray.getElemType() instanceof JavaType.Primitive) {
-                return isOfType(to.getElemType(), fromArray.getElemType(), mode);
+                // Avoid boxing or incorrect inference of array types
+                return to.getElemType() == fromArray.getElemType();
             }
             return isAssignableTo(to.getElemType(), fromArray.getElemType(), mode);
         }
@@ -449,7 +461,7 @@ public class InferenceContext {
         } else if (type.getBounds().size() == 1) {
             return type.getBounds().get(0);
         } else {
-            return new JavaType.Intersection(type.getBounds());
+            return boundsCache.computeIfAbsent(type, e -> new JavaType.Intersection(e.getBounds()));
         }
     }
 
@@ -475,7 +487,7 @@ public class InferenceContext {
         } else if (type instanceof JavaType.Variable) {
             return normalize(((JavaType.Variable) type).getType());
         } else if (type == JavaType.Primitive.String) {
-            return TypeUtils.asBoxed(JavaType.Primitive.String);
+            return TypeUtils.asBoxedType(JavaType.Primitive.String);
         } else {
             return type;
         }

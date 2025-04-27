@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
@@ -86,7 +85,7 @@ public class TypeUtils {
 
     public static boolean isObject(@Nullable JavaType type) {
         return type instanceof JavaType.FullyQualified &&
-                "java.lang.Object".equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
+               "java.lang.Object".equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
     }
 
     public static @Nullable String findQualifiedJavaLangTypeName(String name) {
@@ -95,18 +94,9 @@ public class TypeUtils {
 
     public static boolean isString(@Nullable JavaType type) {
         return type == JavaType.Primitive.String ||
-                (type instanceof JavaType.Class &&
-                        "java.lang.String".equals(((JavaType.Class) type).getFullyQualifiedName())
-                );
-    }
-
-    public static boolean isWildcard(@Nullable JavaType type) {
-        return type instanceof JavaType.GenericTypeVariable &&
-                ((JavaType.GenericTypeVariable) type).getName().equals("?");
-    }
-
-    private static boolean isUnknown(@Nullable JavaType type) {
-        return type == null || type instanceof JavaType.Unknown;
+               (type instanceof JavaType.Class &&
+                "java.lang.String".equals(((JavaType.Class) type).getFullyQualifiedName())
+               );
     }
 
     public static String toFullyQualifiedName(String fqn) {
@@ -116,42 +106,9 @@ public class TypeUtils {
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
         if (fqn1 != null && fqn2 != null) {
             return fqn1.equals(fqn2) || fqn1.length() == fqn2.length() &&
-                    toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
+                                        toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
         }
         return fqn1 == null && fqn2 == null;
-    }
-
-    public static JavaType asBoxed(JavaType.Primitive type) {
-        return BOXED_TYPES.get(type);
-    }
-
-    /**
-     * Defines how target type variables should be interpreted during checks.
-     */
-    public enum TypeVariableMode {
-        /**
-         * Type variables are treated as already bound to specific types.
-         */
-        BOUND,
-        /**
-         * Target type variables are considered unbound and may be bound to the source type.
-         */
-        INFER,
-        /**
-         * Internal use. Source type variables are considered unbound.
-         */
-        REVERSE;
-
-        public TypeVariableMode reverse() {
-            switch (this) {
-                case INFER:
-                    return REVERSE;
-                case REVERSE:
-                    return INFER;
-                default:
-                    return BOUND;
-            }
-        }
     }
 
     /**
@@ -160,19 +117,21 @@ public class TypeUtils {
      * {@link JavaType.GenericTypeVariable} will be checked for {@link JavaType.GenericTypeVariable.Variance} and each of the bounds.
      */
     public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2) {
-        if (type1 == null && type2 == null) {
+        if (type1 instanceof JavaType.Unknown || type2 instanceof JavaType.Unknown) {
+            return false;
+        }
+        if (type1 == type2) {
             return true;
         }
-
         if (type1 instanceof JavaType.Method && type2 instanceof JavaType.Method) {
             JavaType.Method method1 = (JavaType.Method) type1;
             JavaType.Method method2 = (JavaType.Method) type2;
             if (!method1.getName().equals(method2.getName()) ||
-                    method1.getFlagsBitMap() != method2.getFlagsBitMap() ||
-                    !TypeUtils.isOfType(method1.getDeclaringType(), method2.getDeclaringType()) ||
-                    !TypeUtils.isOfType(method1.getReturnType(), method2.getReturnType()) ||
-                    method1.getThrownExceptions().size() != method2.getThrownExceptions().size() ||
-                    method1.getParameterTypes().size() != method2.getParameterTypes().size()) {
+                method1.getFlagsBitMap() != method2.getFlagsBitMap() ||
+                !TypeUtils.isOfType(method1.getDeclaringType(), method2.getDeclaringType()) ||
+                !TypeUtils.isOfType(method1.getReturnType(), method2.getReturnType()) ||
+                method1.getThrownExceptions().size() != method2.getThrownExceptions().size() ||
+                method1.getParameterTypes().size() != method2.getParameterTypes().size()) {
                 return false;
             }
 
@@ -187,14 +146,16 @@ public class TypeUtils {
                 }
             }
             return true;
-        } else if (type1 instanceof JavaType.Variable && type2 instanceof JavaType.Variable) {
+        }
+        if(type1 instanceof JavaType.Variable && type2 instanceof JavaType.Variable) {
             JavaType.Variable var1 = (JavaType.Variable) type1;
             JavaType.Variable var2 = (JavaType.Variable) type2;
             return isOfType((var1).getType(), var2.getType()) && isOfType(var1.getOwner(), var2.getOwner());
-        } else if (type1 instanceof JavaType.Annotation && type2 instanceof JavaType.Annotation) {
+        }
+        if (type1 instanceof JavaType.Annotation && type2 instanceof JavaType.Annotation) {
             return isOfType((JavaType.Annotation) type1, (JavaType.Annotation) type2);
         }
-        return new InferenceContext(false).isOfType(type1, type2);
+        return new Types(false).isOfType(type1, type2);
     }
 
     private static boolean isOfType(JavaType.Annotation annotation1, JavaType.Annotation annotation2) {
@@ -299,7 +260,7 @@ public class TypeUtils {
         }
         if (matchOverride) {
             if (!"java.lang.Object".equals(type.getFullyQualifiedName()) &&
-                    isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
+                isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
                 return true;
             }
 
@@ -317,7 +278,7 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
-        return new InferenceContext(false).isAssignableTo(to, from);
+        return new Types(false).isAssignableTo(to, from);
     }
 
     public static boolean isAssignableTo(String to, @Nullable JavaType from) {
@@ -330,7 +291,7 @@ public class TypeUtils {
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
                 if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
-                        isAssignableTo(to, classFrom.getSupertype())) {
+                    isAssignableTo(to, classFrom.getSupertype())) {
                     return true;
                 }
                 for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
@@ -441,6 +402,10 @@ public class TypeUtils {
             return (JavaType.FullyQualified) type;
         }
         return null;
+    }
+
+    public static JavaType asBoxedType(JavaType.Primitive type) {
+        return BOXED_TYPES.get(type);
     }
 
     /**
@@ -567,7 +532,7 @@ public class TypeUtils {
         if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
             return isWellFormedType(parameterized.getType(), seen) &&
-                    parameterized.getTypeParameters().stream().allMatch(it -> isWellFormedType(it, seen));
+                   parameterized.getTypeParameters().stream().allMatch(it -> isWellFormedType(it, seen));
         } else if (type instanceof JavaType.Array) {
             JavaType.Array arr = (JavaType.Array) type;
             return isWellFormedType(arr.getElemType(), seen);
@@ -583,8 +548,8 @@ public class TypeUtils {
         } else if (type instanceof JavaType.Method) {
             JavaType.Method m = (JavaType.Method) type;
             return isWellFormedType(m.getReturnType(), seen) &&
-                    isWellFormedType(m.getDeclaringType(), seen) &&
-                    m.getParameterTypes().stream().allMatch(it -> isWellFormedType(it, seen));
+                   isWellFormedType(m.getDeclaringType(), seen) &&
+                   m.getParameterTypes().stream().allMatch(it -> isWellFormedType(it, seen));
         }
         return true;
     }
