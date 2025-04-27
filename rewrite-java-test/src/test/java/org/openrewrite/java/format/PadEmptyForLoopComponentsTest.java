@@ -48,10 +48,6 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
         spec.recipe(new PadEmptyForLoopComponents());
     }
 
-    private static Iterable<NamedStyles> namedStyles(Collection<Style> styles) {
-        return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
-    }
-
     @DocumentExample
     @Test
     void addSpaceToEmptyInitializer() {
@@ -79,6 +75,10 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
             autoFormatIsIdempotent()
           )
         );
+    }
+
+    private static Iterable<NamedStyles> namedStyles(Collection<Style> styles) {
+        return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
     }
 
     @Test

@@ -26,48 +26,6 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class AddManagedDependencyTest implements RewriteTest {
 
-    @Test
-    void validation()  {
-        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
-          "pom", null, null, null, "org.apache.logging:*", true);
-        Validated<Object> validated = recipe.validate();
-        assertThat(validated).allMatch(Validated::isValid);
-    }
-
-    @Test
-    void validationAllowsDashesInOnlyIfUsing()  {
-        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
-          "pom", null, null, null, "something-with:dashes-is-ok*", true);
-        Validated<Object> validated = recipe.validate();
-        assertThat(validated).allMatch(Validated::isValid);
-    }
-
-    @Test
-    void badCharactersInOnlyIfUsingAreInvalid() {
-        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
-          "pom", null, null, null, "spaced group:*", true);
-        Validated<Object> validated = recipe.validate();
-        assertThat(validated.isValid()).isFalse();
-        assertThat(validated.failures()).anyMatch(v -> "onlyIfUsing".equals(v.getProperty()));
-    }
-
-    @Test
-    void doNotAddIfTypeNotUsed() {
-        rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
-            "pom", null,null, null, "org.apache.logging.log4j:*", false)),
-          pomXml(
-            """
-            <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-            </project>
-            """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void onlyAddedWhenUsing() {
@@ -112,6 +70,94 @@ class AddManagedDependencyTest implements RewriteTest {
                   <version>2.17.2</version>
                 </dependency>
               </dependencies>
+            </project>
+            """
+          )
+        );
+    }
+
+    @DocumentExample
+    @Test
+    void propertiesAsGAVCoordinates() {
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("${quarkus.platform.group-id}", "${quarkus.platform.artifact-id}",
+            "${quarkus.platform.version}", "import", "pom", null,null, null, null, null)),
+          pomXml(
+            """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>core</artifactId>
+              <version>1</version>
+              <properties>
+                <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+                <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+                <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
+              </properties>
+            </project>
+            """,
+            """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>core</artifactId>
+              <version>1</version>
+              <properties>
+                <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+                <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+                <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
+              </properties>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>${quarkus.platform.group-id}</groupId>
+                    <artifactId>${quarkus.platform.artifact-id}</artifactId>
+                    <version>${quarkus.platform.version}</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
+    void validation()  {
+        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+          "pom", null, null, null, "org.apache.logging:*", true);
+        Validated<Object> validated = recipe.validate();
+        assertThat(validated).allMatch(Validated::isValid);
+    }
+
+    @Test
+    void validationAllowsDashesInOnlyIfUsing()  {
+        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+          "pom", null, null, null, "something-with:dashes-is-ok*", true);
+        Validated<Object> validated = recipe.validate();
+        assertThat(validated).allMatch(Validated::isValid);
+    }
+
+    @Test
+    void badCharactersInOnlyIfUsingAreInvalid() {
+        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+          "pom", null, null, null, "spaced group:*", true);
+        Validated<Object> validated = recipe.validate();
+        assertThat(validated.isValid()).isFalse();
+        assertThat(validated.failures()).anyMatch(v -> "onlyIfUsing".equals(v.getProperty()));
+    }
+
+    @Test
+    void doNotAddIfTypeNotUsed() {
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
+            "pom", null,null, null, "org.apache.logging.log4j:*", false)),
+          pomXml(
+            """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
             </project>
             """
           )
@@ -202,52 +248,6 @@ class AddManagedDependencyTest implements RewriteTest {
                 </project>
               """
             )
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void propertiesAsGAVCoordinates() {
-        rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("${quarkus.platform.group-id}", "${quarkus.platform.artifact-id}",
-            "${quarkus.platform.version}", "import", "pom", null,null, null, null, null)),
-          pomXml(
-            """
-            <project>
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>core</artifactId>
-              <version>1</version>
-              <properties>
-                <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-                <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-                <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
-              </properties>
-            </project>
-            """,
-            """
-            <project>
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>core</artifactId>
-              <version>1</version>
-              <properties>
-                <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-                <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-                <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
-              </properties>
-              <dependencyManagement>
-                <dependencies>
-                  <dependency>
-                    <groupId>${quarkus.platform.group-id}</groupId>
-                    <artifactId>${quarkus.platform.artifact-id}</artifactId>
-                    <version>${quarkus.platform.version}</version>
-                    <type>pom</type>
-                    <scope>import</scope>
-                  </dependency>
-                </dependencies>
-              </dependencyManagement>
-            </project>
-            """
           )
         );
     }

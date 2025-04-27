@@ -24,6 +24,42 @@ import static org.openrewrite.java.Assertions.java;
 
 class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void replaceConstant() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
+          java(
+            """
+              import java.io.File;
+
+              import static java.io.File.pathSeparator;
+
+              class Test {
+                  Object o = File.pathSeparator;
+                  void foo() {
+                      System.out.println(pathSeparator);
+                      System.out.println(java.io.File.pathSeparator);
+                  }
+              }
+              """,
+            """
+              import java.io.File;
+
+              import static java.io.File.separator;
+
+              class Test {
+                  Object o = File.separator;
+                  void foo() {
+                      System.out.println(separator);
+                      System.out.println(File.separator);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void replaceConstantInAnnotation() {
         rewriteRun(
@@ -84,42 +120,6 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               class Test {
                   @SuppressWarnings({File.separator})
                   private String bar;
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void replaceConstant() {
-        rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
-          java(
-            """
-              import java.io.File;
-
-              import static java.io.File.pathSeparator;
-
-              class Test {
-                  Object o = File.pathSeparator;
-                  void foo() {
-                      System.out.println(pathSeparator);
-                      System.out.println(java.io.File.pathSeparator);
-                  }
-              }
-              """,
-            """
-              import java.io.File;
-
-              import static java.io.File.separator;
-
-              class Test {
-                  Object o = File.separator;
-                  void foo() {
-                      System.out.println(separator);
-                      System.out.println(File.separator);
-                  }
               }
               """
           )

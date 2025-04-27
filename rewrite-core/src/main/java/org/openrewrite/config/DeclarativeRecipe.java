@@ -32,7 +32,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
 
 @RequiredArgsConstructor
-public class DeclarativeRecipe extends Recipe {
+public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumulator> {
     @Getter
     private final String name;
 
@@ -82,7 +82,7 @@ public class DeclarativeRecipe extends Recipe {
     private Validated<Object> validation = Validated.none();
 
     @JsonIgnore
-    private Validated<Object> initValidation = null;
+    private Validated<Object> initValidation = Validated.none();
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
@@ -91,7 +91,6 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
-        initValidation = Validated.none();
         Map<String, Recipe> recipeMap = new HashMap<>();
         availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
         initialize(uninitializedRecipes, recipeList, recipeMap::get, recipeToContributors);
@@ -99,7 +98,6 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     public void initialize(Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
-        initValidation = Validated.none();
         initialize(uninitializedRecipes, recipeList, availableRecipes, recipeToContributors);
         initialize(uninitializedPreconditions, preconditions, availableRecipes, recipeToContributors);
     }
@@ -132,6 +130,45 @@ public class DeclarativeRecipe extends Recipe {
                 initialized.add(recipe);
             }
         }
+    }
+
+    @SuppressWarnings("NotNullFieldNotInitialized")
+    @JsonIgnore
+    private transient Accumulator accumulator;
+
+    @Override
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        Accumulator acc = new Accumulator();
+        for (Recipe precondition : preconditions) {
+            if(precondition instanceof ScanningRecipe) {
+                acc.recipeToAccumulator.put(precondition, ((ScanningRecipe<?>) precondition).getInitialValue(ctx));
+            }
+        }
+        accumulator = acc;
+        return acc;
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                for (Recipe precondition : preconditions) {
+                    if (precondition instanceof ScanningRecipe) {
+                        ScanningRecipe preconditionRecipe = (ScanningRecipe) precondition;
+                        Object preconditionAcc = acc.recipeToAccumulator.get(precondition);
+                        preconditionRecipe.getScanner(preconditionAcc)
+                                .visit(tree, ctx);
+                    }
+                }
+                return tree;
+            }
+        };
+    }
+
+    public static class Accumulator {
+        Map<Recipe, Object> recipeToAccumulator = new HashMap<>();
     }
 
     @Value
@@ -269,13 +306,9 @@ public class DeclarativeRecipe extends Recipe {
 
         List<Supplier<TreeVisitor<?, ExecutionContext>>> andPreconditions = new ArrayList<>();
         for (Recipe precondition : preconditions) {
-            if (isScanningRecipe(precondition)) {
-                throw new IllegalArgumentException(
-                        getName() + " declares the ScanningRecipe " + precondition.getName() + " as a precondition." +
-                        "ScanningRecipe cannot be used as Preconditions.");
-            }
             andPreconditions.add(() -> orVisitors(precondition));
         }
+        //noinspection unchecked
         PreconditionBellwether bellwether = new PreconditionBellwether(Preconditions.and(andPreconditions.toArray(new Supplier[]{})));
         List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
         recipeListWithBellwether.add(bellwether);
@@ -283,29 +316,24 @@ public class DeclarativeRecipe extends Recipe {
         return recipeListWithBellwether;
     }
 
-    private static TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
-        if (recipe.getRecipeList().isEmpty()) {
-            return recipe.getVisitor();
-        }
+    private TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
         List<TreeVisitor<?, ExecutionContext>> conditions = new ArrayList<>();
-        conditions.add(recipe.getVisitor());
+        if(recipe instanceof ScanningRecipe) {
+            //noinspection rawtypes
+            ScanningRecipe scanning = (ScanningRecipe) recipe;
+            //noinspection unchecked
+            conditions.add(scanning.getVisitor(accumulator.recipeToAccumulator.get(scanning)));
+        } else {
+            conditions.add(recipe.getVisitor());
+        }
         for (Recipe r : recipe.getRecipeList()) {
             conditions.add(orVisitors(r));
         }
+        if (conditions.size() == 1) {
+            return conditions.get(0);
+        }
         //noinspection unchecked
         return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
-    }
-
-    private static boolean isScanningRecipe(Recipe recipe) {
-        if (recipe instanceof ScanningRecipe) {
-            return true;
-        }
-        for (Recipe r : recipe.getRecipeList()) {
-            if (isScanningRecipe(r)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {

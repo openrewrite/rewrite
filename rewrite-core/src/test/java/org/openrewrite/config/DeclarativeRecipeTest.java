@@ -253,16 +253,56 @@ class DeclarativeRecipeTest implements RewriteTest {
                    relativeFileName: test.txt
                    fileContents: "test"
               """, "org.openrewrite.PreconditionTest")
-            .afterRecipe(run -> {
-                assertThat(run.getChangeset().getAllResults()).anySatisfy(
-                  s -> {
-                      assertThat(s.getAfter()).isNotNull();
-                      assertThat(s.getAfter().getSourcePath()).isEqualTo(Paths.get("test.txt"));
-                  }
-                );
-            })
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).anySatisfy(
+              s -> {
+                  //noinspection DataFlowIssue
+                  assertThat(s.getAfter()).isNotNull();
+                  assertThat(s.getAfter().getSourcePath()).isEqualTo(Paths.get("test.txt"));
+              }
+            ))
             .expectedCyclesThatMakeChanges(1),
           text("1")
+        );
+    }
+
+    @Test
+    void scanningPreconditionMet() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.ScanningPreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: sam.txt
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: foo
+                    replace: bar
+              """, "org.openrewrite.ScanningPreconditionTest"),
+          text("sam", spec -> spec.path("sam.txt")),
+          text("foo", "bar")
+        );
+    }
+
+    @Test
+    void scanningPreconditionNotMet() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.ScanningPreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: sam.txt
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: foo
+                    replace: bar
+              """, "org.openrewrite.ScanningPreconditionTest"),
+          text("foo")
         );
     }
 

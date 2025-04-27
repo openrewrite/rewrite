@@ -29,23 +29,6 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
         spec.recipe(new RemoveDuplicateDependencies());
     }
 
-    @Test
-    void notApplicable() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-              
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void removeSingleDuplicate() {
@@ -100,6 +83,23 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                     <scope>test</scope>
                   </dependency>
                 </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void notApplicable() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
               </project>
               """
           )
