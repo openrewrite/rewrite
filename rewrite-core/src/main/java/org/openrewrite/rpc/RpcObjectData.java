@@ -26,8 +26,15 @@ import lombok.Value;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
+import org.openrewrite.rpc.internal.StackElementSourceLookup;
 
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.Map;
+import java.util.Stack;
 
 /**
  * A single piece of data in a tree, which can be a marker, leaf value, tree element, etc.
@@ -82,6 +89,8 @@ public class RpcObjectData {
     @NonFinal
     String trace;
 
+    private static StackElementSourceLookup sourceLookup = new StackElementSourceLookup();
+
     public RpcObjectData(State state, @Nullable String valueType, @Nullable Object value, @Nullable Integer ref,
                          boolean trace) {
         this.state = state;
@@ -90,10 +99,12 @@ public class RpcObjectData {
         this.ref = ref;
         if (trace) {
             this.trace = "Unknown";
+
             for (StackTraceElement stackElement : Thread.currentThread().getStackTrace()) {
                 if (stackElement.getClassName().endsWith("Sender")) {
                     this.trace = stackElement.getClassName().substring(stackElement.getClassName().lastIndexOf('.') + 1) +
-                                 "." + stackElement.getMethodName() + ":" + stackElement.getLineNumber();
+                                 "." + stackElement.getMethodName() + ":" + stackElement.getLineNumber() + " => " +
+                                 sourceLookup.getSource(stackElement).trim();
                     break;
                 }
             }

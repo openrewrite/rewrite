@@ -24,7 +24,7 @@ import "../text";
 import "../json";
 import "../java";
 
-const log: WriteStream = fs.createWriteStream(`${process.cwd()}/server.log`, {flags: 'a'});
+const log: WriteStream = fs.createWriteStream(`${process.cwd()}/server.log`, {flags: 'w'});
 log.write("\n--------------------------------------------------------------------------\n");
 log.write(`[server] starting\n\n`);
 
