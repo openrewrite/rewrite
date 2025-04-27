@@ -17,7 +17,8 @@ import {Marker, Markers, MarkersKind} from "../markers";
 import {RpcCodecs} from "./codec";
 import {produceAsync} from "../visitor";
 import {randomId} from "../uuid";
-import {WriteStream} from "fs";
+import {readFileSync, WriteStream} from "fs";
+import {AsyncLocalStorage} from "node:async_hooks";
 
 const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
 
@@ -227,6 +228,32 @@ export class RpcReceiveQueue {
                 private readonly logFile?: WriteStream) {
     }
 
+    /**
+     * Inspect the call stack to find the nearest Receiver subclass
+     * and log the source line that invoked receive.
+     */
+    private logCallerCode(): void {
+        const stack = this.stackStorage.getStore()?.split("\n") ?? [];
+        for (const frame of stack.slice(1)) {
+            const match = frame.match(/at\s+(.*?)\s+\((.*):(\d+):(\d+)\)/);
+            if (match) {
+                const [, fn, file, line] = match;
+                const className = fn.includes('.') ? fn.split('.')[0] : fn;
+                if (className.endsWith('Receiver')) {
+                    try {
+                        const codeLine = readFileSync(file, 'utf-8')
+                            .split('\n')[parseInt(line, 10) - 1]
+                            .trim();
+                        this.logFile?.write(`  ${className}:${line} => ${codeLine}\n`);
+                    } catch {
+                        // ignore if reading the source file fails
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     async take(): Promise<RpcObjectData> {
         if (this.batch.length === 0) {
             this.batch = await this.pull();
@@ -234,11 +261,7 @@ export class RpcReceiveQueue {
         return this.batch.shift()!;
     }
 
-    async receiveAndGet<T, U extends any | undefined>(before: T | undefined, apply: (before: T) => U): Promise<U> {
-        return await this.receive(before === undefined ? undefined : apply(before)) as U;
-    }
-
-    async receiveMarkers(markers?: Markers): Promise<any> {
+    receiveMarkers(markers?: Markers): Promise<any> {
         if (markers === undefined) {
             markers = {kind: MarkersKind.Markers, id: randomId(), markers: []};
         }
@@ -248,13 +271,27 @@ export class RpcReceiveQueue {
         }))
     }
 
-    async receive<T extends any | undefined>(
+    private stackStorage = new AsyncLocalStorage<string>();
+
+    receive<T extends any | undefined>(
+        before: T | undefined,
+        onChange?: (before: T) => T | Promise<T | undefined> | undefined
+    ): Promise<T> {
+        if (this.logFile) {
+            const entryStack = new Error().stack ?? '';
+            return this.stackStorage.run(entryStack, () => this._receive(before, onChange));
+        }
+        return this._receive(before, onChange);
+    }
+
+    private async _receive<T extends any | undefined>(
         before: T | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T> {
         const message = await this.take();
         if (message.trace) {
             this.logFile?.write(`${JSON.stringify(message)}\n`);
+            this.logCallerCode();
         }
         let ref: number | undefined;
         switch (message.state) {
@@ -324,6 +361,9 @@ export class RpcReceiveQueue {
     }
 }
 
+/**
+ * Refer to RpcObjectData.java for a description of these fields.
+ */
 export interface RpcObjectData {
     state: RpcObjectState
     valueType?: string

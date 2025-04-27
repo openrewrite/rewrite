@@ -74,6 +74,10 @@ public class RpcObjectData {
     @Nullable
     Integer ref;
 
+    /**
+     * The stack trace of the thread that created this object. This is
+     * useful in debugging asymmetries between senders/receivers.
+     */
     @Nullable
     @NonFinal
     String trace;
