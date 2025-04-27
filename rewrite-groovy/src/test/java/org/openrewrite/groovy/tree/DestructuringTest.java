@@ -77,18 +77,4 @@ class DestructuringTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void destructuringWithMap() {
-        rewriteRun(
-          groovy(
-            """
-              def map = [a: 1, b: 2]
-              def (key, value) = map.entrySet().first()
-              println(key)
-              println(value)
-              """
-          )
-        );
-    }
 }

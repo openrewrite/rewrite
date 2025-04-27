@@ -2036,7 +2036,6 @@ public class GroovyParserVisitor {
             queue.add(new G.Unary(randomId(), fmt, Markers.EMPTY, JLeftPadded.build(G.Unary.Type.Spread), visit(spreadExpression.getExpression()), null));
         }
 
-        @Override
         public TypeTree visitTupleExpressionType(TupleExpression expression) {
             String typeName = "";
             JavaType type = typeMapping.type(expression.getType());
