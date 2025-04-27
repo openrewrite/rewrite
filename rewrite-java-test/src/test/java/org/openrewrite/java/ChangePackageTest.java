@@ -60,24 +60,6 @@ class ChangePackageTest implements RewriteTest {
       }
       """;
 
-    @Test
-    void renamePackageNonRecursive() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangePackage(
-            "org.openrewrite",
-            "org.openrewrite.test",
-            false
-          )),
-          java(
-            """
-              package org.openrewrite.internal;
-              class Test {
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void renameUsingSimplePackageName() {
@@ -95,6 +77,24 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import openrewrite.Foo;
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamePackageNonRecursive() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.openrewrite",
+            "org.openrewrite.test",
+            false
+          )),
+          java(
+            """
+              package org.openrewrite.internal;
               class Test {
               }
               """

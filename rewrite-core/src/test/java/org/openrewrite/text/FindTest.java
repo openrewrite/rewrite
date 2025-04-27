@@ -26,6 +26,22 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class FindTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void regex() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("[T\\s]", true, true, null, null, null, null)),
+          text(
+            """
+              This is\ttext.
+              """,
+            """
+              ~~>This~~> is~~>\ttext.
+              """
+          )
+        );
+    }
+
     @Test
     void dataTable() {
         rewriteRun(
@@ -44,22 +60,6 @@ class FindTest implements RewriteTest {
               This is a line above.
               This is ~~>text.
               This is a line below.
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void regex() {
-        rewriteRun(
-          spec -> spec.recipe(new Find("[T\\s]", true, true, null, null, null, null)),
-          text(
-            """
-              This is\ttext.
-              """,
-            """
-              ~~>This~~> is~~>\ttext.
               """
           )
         );

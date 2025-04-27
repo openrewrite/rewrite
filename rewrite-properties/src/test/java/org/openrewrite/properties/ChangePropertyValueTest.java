@@ -40,6 +40,17 @@ class ChangePropertyValueTest implements RewriteTest {
         ));
     }
 
+    @DocumentExample
+    @Test
+    void changeValue() {
+        rewriteRun(
+          properties(
+            "management.metrics.binders.files.enabled=true",
+            "management.metrics.binders.files.enabled=false"
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/575")
     @Test
     void preserveComment() {
@@ -53,17 +64,6 @@ class ChangePropertyValueTest implements RewriteTest {
               management.metrics.binders.files.enabled=false
               # comment
               """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void changeValue() {
-        rewriteRun(
-          properties(
-            "management.metrics.binders.files.enabled=true",
-            "management.metrics.binders.files.enabled=false"
           )
         );
     }
