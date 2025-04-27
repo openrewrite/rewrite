@@ -641,7 +641,6 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(block, b => b.static, s => this.visitRightPadded(s, q));
         await q.getAndSendList(block, b => b.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
         await q.getAndSend(block, b => asRef(b.end), space => this.visitSpace(space, q));
-
         return block;
     }
 
@@ -1483,6 +1482,8 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.annotations = await q.receiveListDefined(ident.annotations, annot => this.visit(annot, q));
         draft.simpleName = await q.receive(ident.simpleName);
+        draft.type = await q.receive(ident.type, type => this.visitType(type, q));
+        draft.fieldType = await q.receive(ident.fieldType, type => this.visitType(type, q) as any as JavaType.Variable);
 
         return finishDraft(draft);
     }
@@ -1532,10 +1533,12 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         return produceAsync<JRightPadded<T>>(right, async draft => {
             draft.element = await q.receive(right.element, elem => {
-                if (isJava(right.element)) {
+                if (isJava(elem)) {
                     return this.visit(elem as J, q) as any as T;
+                } else if (isSpace(elem)) {
+                    return this.visitSpace(elem as Space, q) as any as T;
                 }
-                return right.element as any as T;
+                return elem as any as T;
             }) as Draft<T>;
             draft.after = await q.receive(right.after, space => this.visitSpace(space, q));
             draft.markers = await q.receiveMarkers(right.markers);

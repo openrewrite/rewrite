@@ -289,8 +289,11 @@ export class RpcReceiveQueue {
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T> {
         const message = await this.take();
-        if (message.trace) {
-            this.logFile?.write(`${JSON.stringify(message)}\n`);
+        if (this.logFile && message.trace) {
+            const trace = message.trace;
+            delete message.trace;
+            this.logFile.write(`${JSON.stringify(message)}\n`);
+            this.logFile.write(`  ${trace}\n`);
             this.logCallerCode();
         }
         let ref: number | undefined;

@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.config.Environment;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -30,6 +31,7 @@ import java.time.Duration;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -41,8 +43,7 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.validateRecipeSerialization(false)
-          .cycles(1)
-          .expectedCyclesThatMakeChanges(1);
+          .cycles(1);
     }
 
     @BeforeEach
@@ -52,7 +53,7 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
           "/usr/local/bin/node",
           "--enable-source-maps",
           // Uncomment this to debug the server
-          "--inspect-brk",
+//          "--inspect-brk",
           "./rewrite/dist/src/rpc/server.js"
         );
         client.batchSize(20)
@@ -73,11 +74,11 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
           }
           """;
         rewriteRun(
-          java(java, spec -> spec.beforeRecipe(cu ->
-            // TODO allow print to return "unsupported" and assert that the JS implementation doesn't
-            //  support printing Java code.
-            assertThat(client.print(cu)).isEqualTo(java.trim())))
-          // TODO do client.getObject(cu) and verify that it has print equality with the `java` variable here.
+          java(java, spec -> spec.beforeRecipe(cu -> {
+              assertThatThrownBy(() -> client.print(cu))
+                .hasMessageContaining("Printing Java source files from JavaScript is not supported");
+              assertThat(client.<SourceFile>getObject(cu.getId().toString()).printAll()).isEqualTo(java.trim());
+          }))
         );
     }
 
@@ -132,7 +133,8 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(client.prepareRecipe("org.openrewrite.npm.change-version",
-              Map.of("version", "1.0.0"))),
+              Map.of("version", "1.0.0")))
+            .expectedCyclesThatMakeChanges(1),
           json(
             """
               {

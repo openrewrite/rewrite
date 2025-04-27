@@ -103,7 +103,7 @@ public class RpcObjectData {
             for (StackTraceElement stackElement : Thread.currentThread().getStackTrace()) {
                 if (stackElement.getClassName().endsWith("Sender")) {
                     this.trace = stackElement.getClassName().substring(stackElement.getClassName().lastIndexOf('.') + 1) +
-                                 "." + stackElement.getMethodName() + ":" + stackElement.getLineNumber() + " => " +
+                                 ":" + stackElement.getLineNumber() + " => " +
                                  sourceLookup.getSource(stackElement).trim();
                     break;
                 }
