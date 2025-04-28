@@ -706,25 +706,26 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitLeftPadded<T extends J | Space | number | boolean>(left: JLeftPadded<T>, q: RpcSendQueue): Promise<JLeftPadded<T>> {
+        await q.getAndSend(left, l => asRef(l.before), space => this.visitSpace(space, q));
         if (isJava(left.element)) {
             await q.getAndSend(left, l => l.element, elem => this.visit(elem as J, q));
         } else if (isSpace(left.element)) {
-            await q.getAndSend(left, l => asRef(l.before), space => this.visitSpace(space, q));
+            await q.getAndSend(left, l => asRef(l.element), space => this.visitSpace(space as Space, q));
         } else {
             await q.getAndSend(left, l => l.element);
         }
 
-        await q.getAndSend(left, l => asRef(l.before), space => this.visitSpace(space, q));
         await q.sendMarkers(left, l => l.markers);
 
         return left;
     }
 
     protected async visitRightPadded<T extends J | boolean>(right: JRightPadded<T>, q: RpcSendQueue): Promise<JRightPadded<T>> {
-        await q.getAndSend(right, r => r.element,
-            async elem => typeof elem === 'object' && 'kind' in elem
-                ? await this.visit(elem as J, q)
-                : elem);
+        if (isJava(right.element)) {
+            await q.getAndSend(right, r => r.element, elem => this.visit(elem as J, q));
+        } else {
+            await q.getAndSend(right, r => r.element);
+        }
 
         await q.getAndSend(right, r => asRef(r.after), space => this.visitSpace(space, q));
         await q.sendMarkers(right, r => r.markers);
