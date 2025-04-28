@@ -31,6 +31,51 @@ class JacocoReportDeprecationsTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
+    void deprecationsInNormalSyntax() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+                  id "jacoco"
+              }
+
+              jacocoTestReport {
+                  reports {
+                      xml.enabled = false
+                      csv.enabled = true
+                      html.enabled = false
+
+                      xml.destination = layout.buildDirectory.dir('jacocoXml')
+                      csv.destination = layout.buildDirectory.dir('jacocoCsv')
+                      html.destination = layout.buildDirectory.dir('jacocoHtml')
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+                  id "jacoco"
+              }
+
+              jacocoTestReport {
+                  reports {
+                      xml.required = false
+                      csv.required = true
+                      html.required = false
+
+                      xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
+                      csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
+                      html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void enabledDeprecatedInCollapsedSyntax() {
         rewriteRun(
           buildGradle(
@@ -54,45 +99,6 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               jacocoTestReport.reports.xml.required = false
               jacocoTestReport.reports.csv.required = true
               jacocoTestReport.reports.html.required = false
-
-              """
-          )
-        );
-    }
-
-    @Test
-    @DocumentExample
-    void enabledDeprecatedInNormalSyntax() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-                  id "jacoco"
-              }
-
-              jacocoTestReport {
-                  reports {
-                      xml.enabled = false
-                      csv.enabled = true
-                      html.enabled = false
-                  }
-              }
-
-              """,
-            """
-              plugins {
-                  id "java"
-                  id "jacoco"
-              }
-
-              jacocoTestReport {
-                  reports {
-                      xml.required = false
-                      csv.required = true
-                      html.required = false
-                  }
-              }
 
               """
           )
@@ -274,45 +280,6 @@ class JacocoReportDeprecationsTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void destinationDeprecatedInNormalSyntax() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-                  id "jacoco"
-              }
-
-              jacocoTestReport {
-                  reports {
-                      xml.destination = layout.buildDirectory.dir('jacocoXml')
-                      csv.destination = layout.buildDirectory.dir('jacocoCsv')
-                      html.destination = layout.buildDirectory.dir('jacocoHtml')
-                  }
-              }
-
-              """,
-            """
-              plugins {
-                  id "java"
-                  id "jacoco"
-              }
-
-              jacocoTestReport {
-                  reports {
-                      xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
-                      csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
-                      html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
-                  }
-              }
-
-              """
-          )
-        );
-    }
-
     @Test
     void destinationDeprecatedInElapsedSyntax() {
         rewriteRun(
@@ -336,7 +303,6 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       }
                   }
               }
-
               """,
             """
               plugins {
@@ -357,7 +323,6 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       }
                   }
               }
-
               """
           )
         );

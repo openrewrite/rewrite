@@ -73,6 +73,42 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
+    void IncludedDefaultConfigurationsReceiveRuntimeConstraints() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("implementation", "runtimeOnly"))),
+          buildGradle(
+            """
+              plugins {
+                  id 'info.solidsoft.pitest' version '1.15.0'
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+              }
+              """,
+                """
+              plugins {
+                  id 'info.solidsoft.pitest' version '1.15.0'
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  constraints {
+                      implementation('org.apache.commons:commons-lang3:3.14.0')
+                  }
+              
+                  compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void customConfiguration() {
         rewriteRun(
           buildGradle(
@@ -596,42 +632,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    @DocumentExample
-    void IncludedDefaultConfigurationsReceiveRuntimeConstraints() {
-        rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("implementation", "runtimeOnly"))),
-          buildGradle(
-            """
-              plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
-                  id 'java'
-              }
-              repositories { mavenCentral() }
-              dependencies {
-                  compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
-              }
-              """,
-                """
-              plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
-                  id 'java'
-              }
-              repositories { mavenCentral() }
-              dependencies {
-                  constraints {
-                      implementation('org.apache.commons:commons-lang3:3.14.0')
-                  }
-              
-                  compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """
           )

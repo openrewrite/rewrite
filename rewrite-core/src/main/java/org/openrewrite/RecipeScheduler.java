@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
@@ -127,7 +128,17 @@ public class RecipeScheduler {
 
     private boolean hasScanningRecipe(Recipe recipe) {
         if (recipe instanceof ScanningRecipe) {
-            return true;
+            // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
+            // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
+            if(recipe instanceof DeclarativeRecipe) {
+                for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
+                    if (hasScanningRecipe(precondition)) {
+                        return true;
+                    }
+                }
+            } else {
+                return true;
+            }
         }
         for (Recipe r : recipe.getRecipeList()) {
             if (hasScanningRecipe(r)) {

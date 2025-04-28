@@ -27,6 +27,28 @@ import static org.openrewrite.properties.Assertions.properties;
 @SuppressWarnings("UnusedProperty")
 class AddPropertyTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void newProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "management.metrics.enable.process.files",
+            "true",
+            null,
+            null
+          )),
+          properties(
+            """
+              management=true
+              """,
+            """
+              management=true
+              management.metrics.enable.process.files=true
+              """
+          )
+        );
+    }
+
     @Test
     void emptyProperty() {
         rewriteRun(
@@ -72,28 +94,6 @@ class AddPropertyTest implements RewriteTest {
           )),
           properties(
             """
-              management.metrics.enable.process.files=true
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void newProperty() {
-        rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            null
-          )),
-          properties(
-            """
-              management=true
-              """,
-            """
-              management=true
               management.metrics.enable.process.files=true
               """
           )

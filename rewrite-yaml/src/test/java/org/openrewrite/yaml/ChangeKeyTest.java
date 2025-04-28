@@ -24,26 +24,6 @@ import static org.openrewrite.yaml.Assertions.yaml;
 
 class ChangeKeyTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/434")
-    @Test
-    void simpleChangeRootKey() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeKey("$.description", "newDescription")),
-          yaml(
-            """
-              id: something
-              description: desc
-              other: whatever
-              """,
-            """
-              id: something
-              newDescription: desc
-              other: whatever
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void changeNestedKey() {
@@ -61,6 +41,26 @@ class ChangeKeyTest implements RewriteTest {
                   metadata:
                     name2: monitoring-tools
                     namespace: monitoring-tools
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/434")
+    @Test
+    void simpleChangeRootKey() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey("$.description", "newDescription")),
+          yaml(
+            """
+              id: something
+              description: desc
+              other: whatever
+              """,
+            """
+              id: something
+              newDescription: desc
+              other: whatever
               """
           )
         );
