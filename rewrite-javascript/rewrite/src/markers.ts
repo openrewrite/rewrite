@@ -18,12 +18,21 @@ import {randomId, UUID} from "./uuid";
 export const MarkersKind = {
     Markers: "org.openrewrite.marker.Markers",
     SearchResult: "org.openrewrite.marker.SearchResult",
-    ParseExceptionResult: "org.openrewrite.marker.ParseExceptionResult"
+    ParseExceptionResult: "org.openrewrite.marker.ParseExceptionResult",
+    RpcMarker: "org.openrewrite.rpc.RpcMarker",
 } as const
 
 export interface Marker {
     readonly kind: string
     readonly id: UUID
+}
+
+export function marker(id: UUID, data?: {}): Marker {
+    return {
+        kind: MarkersKind.RpcMarker,
+        id,
+        ...data
+    }
 }
 
 export interface Markers {

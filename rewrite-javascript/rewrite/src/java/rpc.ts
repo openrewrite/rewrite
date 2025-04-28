@@ -35,7 +35,7 @@ import {
     ControlParentheses,
     DeconstructionPattern,
     DoWhileLoop,
-    Empty, emptySpace,
+    Empty,
     EnumValue,
     EnumValueSet,
     Erroneous,
@@ -102,8 +102,6 @@ import {
 } from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
-import {randomId} from "../uuid";
-import {emptyMarkers} from "../markers";
 
 class JavaSender extends JavaVisitor<RpcSendQueue> {
 

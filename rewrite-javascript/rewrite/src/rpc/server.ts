@@ -27,14 +27,6 @@ import "../java";
 const log: WriteStream = fs.createWriteStream(`${process.cwd()}/rpc.js.log`, {flags: 'w'});
 log.write(`[js-rewrite-rpc] starting\n\n`);
 
-// process.stdin.on('data', (chunk) => {
-//     log.write(`[js-rewrite-rpc] ⇦ received: '${chunk.toString()}'\n\n`);
-// })
-//
-// process.stdout.on('data', (chunk) => {
-//     log.write(`[js-rewrite-rpc] ⇨ sent: '${chunk.toString()}'\n\n`);
-// })
-
 const logger: rpc.Logger = {
     error: (msg: string) => log.write(`[Error] ${msg}\n`),
     warn: (msg: string) => log.write(`[Warn] ${msg}\n`),

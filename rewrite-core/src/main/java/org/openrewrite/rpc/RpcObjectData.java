@@ -92,6 +92,8 @@ public class RpcObjectData {
                 // we are converting to is annotated with @JsonTypeInfo.
                 //noinspection unchecked
                 ((Map<String, Object>) value).put("@c", valueType);
+                //noinspection unchecked
+                ((Map<String, Object>) value).put("@ref", 1);
 
                 //noinspection unchecked
                 return (V) mapper.convertValue(value, valueClass);
