@@ -32,7 +32,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
 
     @Test
     @DocumentExample
-    void enabledDeprecatedInNormalSyntax() {
+    void deprecationsInNormalSyntax() {
         rewriteRun(
           buildGradle(
             """
@@ -46,9 +46,12 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       xml.enabled = false
                       csv.enabled = true
                       html.enabled = false
+
+                      xml.destination = layout.buildDirectory.dir('jacocoXml')
+                      csv.destination = layout.buildDirectory.dir('jacocoCsv')
+                      html.destination = layout.buildDirectory.dir('jacocoHtml')
                   }
               }
-
               """,
             """
               plugins {
@@ -61,9 +64,12 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       xml.required = false
                       csv.required = true
                       html.required = false
+
+                      xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
+                      csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
+                      html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
                   }
               }
-
               """
           )
         );
@@ -268,45 +274,6 @@ class JacocoReportDeprecationsTest implements RewriteTest {
               jacocoTestReport.reports.xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
               jacocoTestReport.reports.csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
               jacocoTestReport.reports.html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
-
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void destinationDeprecatedInNormalSyntax() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-                  id "jacoco"
-              }
-
-              jacocoTestReport {
-                  reports {
-                      xml.destination = layout.buildDirectory.dir('jacocoXml')
-                      csv.destination = layout.buildDirectory.dir('jacocoCsv')
-                      html.destination = layout.buildDirectory.dir('jacocoHtml')
-                  }
-              }
-
-              """,
-            """
-              plugins {
-                  id "java"
-                  id "jacoco"
-              }
-
-              jacocoTestReport {
-                  reports {
-                      xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
-                      csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
-                      html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
-                  }
-              }
 
               """
           )
