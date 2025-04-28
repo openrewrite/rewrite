@@ -24,8 +24,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -69,31 +71,63 @@ public class UnfoldProperties extends Recipe {
 
                 String key = entry.getKey().getValue();
                 if (key.contains(".") && !exclusions.contains(key)) {
-                    String[] parts = key.split("\\.");
-                    Yaml.Mapping.Entry nestedEntry = createNestedEntry(parts, 0, entry.getValue()).withPrefix(entry.getPrefix());
-                    Yaml.Mapping.Entry newEntry = maybeAutoFormat(entry, nestedEntry, entry.getValue(), ctx, getCursor());
+                    List<String> parts = getParts(key);
+                    if (parts.size() > 1) {
+                        Yaml.Mapping.Entry nestedEntry = createNestedEntry(parts, 0, entry.getValue()).withPrefix(entry.getPrefix());
+                        Yaml.Mapping.Entry newEntry = maybeAutoFormat(entry, nestedEntry, entry.getValue(), ctx, getCursor());
 
-                    if (shouldShift()) {
-                        int identLevel = Math.abs(getIndentLevel(entry) - getIndentLevel(newEntry));
-                        if (!hasLineBreak(entry.getPrefix()) && hasLineBreak(newEntry.getPrefix())) {
-                            newEntry = newEntry.withPrefix(substringOfAfterFirstLineBreak(entry.getPrefix()));
+                        if (shouldShift()) {
+                            int identLevel = Math.abs(getIndentLevel(entry) - getIndentLevel(newEntry));
+                            if (!hasLineBreak(entry.getPrefix()) && hasLineBreak(newEntry.getPrefix())) {
+                                newEntry = newEntry.withPrefix(substringOfAfterFirstLineBreak(entry.getPrefix()));
+                            }
+                            doAfterVisit(new ShiftFormatLeftVisitor<>(newEntry, identLevel));
                         }
-                        doAfterVisit(new ShiftFormatLeftVisitor<>(newEntry, identLevel));
-                    }
 
-                    return newEntry;
+                        return newEntry;
+                    }
                 }
 
                 return entry;
             }
 
-            private Yaml.Mapping.Entry createNestedEntry(String[] keys, int index, Yaml.Block value) {
-                if (index != keys.length - 1) {
+            private List<String> getParts(String key) {
+                List<String> keepTogether = new ArrayList<>();
+                for (String ex : exclusions) {
+                    Matcher m = Pattern.compile(".*(" + ex + ").*").matcher(key);
+                    if (m.matches()) {
+                        keepTogether.add(m.group(1));
+                    }
+                }
+
+                List<String> result = new ArrayList<>();
+                List<String> parts = Arrays.asList(key.split("\\."));
+                outer: for (int i = 0; i < parts.size();) {
+                    for (String group : keepTogether) {
+                        List<String> groupParts = Arrays.asList(group.split("\\."));
+                        if (i + groupParts.size() <= parts.size()) {
+                            List<String> subList = parts.subList(i, i + groupParts.size());
+                            if (subList.equals(groupParts)) {
+                                result.add(String.join(".", groupParts));
+                                i += groupParts.size();
+                                continue outer;
+                            }
+                        }
+                    }
+                    result.add(parts.get(i));
+                    i++;
+                }
+
+                return result;
+            }
+
+            private Yaml.Mapping.Entry createNestedEntry(List<String> keys, int index, Yaml.Block value) {
+                if (index != keys.size() - 1) {
                     Yaml.Mapping.Entry entry = createNestedEntry(keys, index + 1, value);
                     value = new Yaml.Mapping(randomId(), EMPTY, null, singletonList(entry), null, null, null);
                 }
 
-                Yaml.Scalar key = new Yaml.Scalar(randomId(), "", EMPTY, PLAIN, null, null, keys[index]);
+                Yaml.Scalar key = new Yaml.Scalar(randomId(), "", EMPTY, PLAIN, null, null, keys.get(index));
                 return new Yaml.Mapping.Entry(randomId(), "", EMPTY, key, "", value);
             }
 

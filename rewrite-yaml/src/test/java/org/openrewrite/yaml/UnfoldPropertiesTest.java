@@ -160,18 +160,17 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusionWithRegex() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("com.*"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("some.*"))),
           yaml(
             """
               A.B:
                 com.some.service: DEBUG
-                com.another.package: INFO
               """,
             """
              A:
                B:
-                 com.some.service: DEBUG
-                 com.another.package: INFO
+                 com:
+                   some.service: DEBUG
              """
           )
         );
