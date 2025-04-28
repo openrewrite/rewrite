@@ -364,7 +364,7 @@ export interface Continue extends J, Statement {
 export interface DoWhileLoop extends J, Statement {
     readonly kind: typeof JavaKind.DoWhileLoop;
     readonly body: JRightPadded<Statement>;
-    readonly whileCondition: ControlParentheses<Expression>;
+    readonly whileCondition: JLeftPadded<ControlParentheses<Expression>>;
 }
 
 export interface Empty extends J, Statement, TypeTree {

@@ -292,7 +292,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitDoWhileLoop(doWhileLoop: DoWhileLoop, p: P): Promise<J | undefined> {
         return this.produceJava<DoWhileLoop>(doWhileLoop, p, async draft => {
             draft.body = await this.visitRightPadded(doWhileLoop.body, p);
-            draft.whileCondition = await this.visitDefined(doWhileLoop.whileCondition, p) as ControlParentheses<Expression>;
+            draft.whileCondition = await this.visitLeftPadded(doWhileLoop.whileCondition, p);
         });
     }
 

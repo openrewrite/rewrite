@@ -221,7 +221,7 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitDoWhileLoop(doWhile: DoWhileLoop, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(doWhile, d => d.body, body => this.visitRightPadded(body, q));
-        await q.getAndSend(doWhile, d => d.whileCondition, cond => this.visit(cond, q));
+        await q.getAndSend(doWhile, d => d.whileCondition, cond => this.visitLeftPadded(cond, q));
 
         return doWhile;
     }
@@ -900,7 +900,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const draft = createDraft(doWhile);
 
         draft.body = await q.receive(doWhile.body, body => this.visitOptionalRightPadded(body, q));
-        draft.whileCondition = await q.receive(doWhile.whileCondition, cond => this.visit(cond, q));
+        draft.whileCondition = await q.receive(doWhile.whileCondition, cond => this.visitLeftPadded(cond, q));
 
         return finishDraft(draft);
     }
