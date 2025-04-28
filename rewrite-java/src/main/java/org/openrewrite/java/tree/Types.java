@@ -178,7 +178,7 @@ public class Types {
         }
     }
 
-    private boolean isAssignableToCore(@NotNull JavaType to, @NotNull JavaType from, InferSide mode) {
+    private boolean isAssignableToCore(JavaType to, JavaType from, InferSide mode) {
         // Handle generic type variables (e.g., T extends Collection<String>)
         if (mode == InferSide.FROM && isTypeVariable(from)) {
             // Is there anything we can validate?
