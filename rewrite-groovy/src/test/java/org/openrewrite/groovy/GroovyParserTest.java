@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 
@@ -45,6 +46,37 @@ class GroovyParserTest {
                          println(name)
                       }
                    }
+                  """
+              )).doesNotThrowAnyException();
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4072")
+    void groovySpecialCharacters() {
+        assertThatCode(() ->
+            GroovyParser.builder().build()
+              .parse(
+                """
+                  package openrewrite.issues
+                  
+                  class MapIssue {
+                      Map<String, Integer> mapTest() {
+                          Map map0 = new HashMap()
+                          Map map1 = [:]
+                          Map<String, Object> map2 = [:]
+                          Map<String, Object> map3 = [:] as Map<String, Object>
+                          Map<String, Object> map4 = buildMap()
+                          Map error0 = new HashMap<>()
+                          Map error1 = [:] as Map<String, Object>
+                          Map error2 = buildMap()
+                  
+                          return map
+                      }
+                  
+                      Map<String, Object> buildMap() {
+                          return [:] as Map<String, Object>
+                      }
+                  }
                   """
               )).doesNotThrowAnyException();
     }
