@@ -36,7 +36,8 @@ class GroovyParserTest implements RewriteTest {
                      println(name)
                   }
                }
-              """),
+              """
+          ),
           groovy(
             """
               package org.openrewrite.groovy;
