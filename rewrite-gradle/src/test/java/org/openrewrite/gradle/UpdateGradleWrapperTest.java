@@ -71,43 +71,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @DocumentExample("Add a new Gradle wrapper")
-    void addGradleWrapper() {
-        rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(1).afterRecipe(run -> {
-              assertThat(run.getChangeset().getAllResults()).hasSize(4);
-
-              var gradleSh = result(run, PlainText.class, "gradlew");
-              assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
-              assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
-              //noinspection DataFlowIssue
-              assertThat(gradleSh.getFileAttributes()).isNotNull();
-              assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
-              assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
-
-              var gradleBat = result(run, PlainText.class, "gradlew.bat");
-              assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
-              assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
-
-              var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
-              assertThat(gradleWrapperProperties.getSourcePath()).isEqualTo(WRAPPER_PROPERTIES_LOCATION);
-
-              var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
-              assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-              assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
-              assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
-          }),
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     @DocumentExample("Update existing Gradle wrapper")
     void updateWrapper() {
         rewriteRun(
@@ -156,6 +119,42 @@ class UpdateGradleWrapperTest implements RewriteTest {
           gradlew,
           gradlewBat,
           gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void addGradleWrapper() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(1).afterRecipe(run -> {
+              assertThat(run.getChangeset().getAllResults()).hasSize(4);
+
+              var gradleSh = result(run, PlainText.class, "gradlew");
+              assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
+              assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+              //noinspection DataFlowIssue
+              assertThat(gradleSh.getFileAttributes()).isNotNull();
+              assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
+              assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
+
+              var gradleBat = result(run, PlainText.class, "gradlew.bat");
+              assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
+              assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
+
+              var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
+              assertThat(gradleWrapperProperties.getSourcePath()).isEqualTo(WRAPPER_PROPERTIES_LOCATION);
+
+              var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
+              assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
+              assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
+              assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+          }),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              """
+          )
         );
     }
 
