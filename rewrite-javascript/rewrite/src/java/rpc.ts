@@ -356,6 +356,7 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitLiteral(literal: Literal, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(literal, l => l.value);
         await q.getAndSend(literal, l => l.valueSource);
+        await q.getAndSendList(literal, l => l.unicodeEscapes, e => e.valueSourceIndex);
         await q.getAndSend(literal, l => l.type && asRef(l.type), type => this.visitType(type, q));
 
         return literal;
@@ -363,9 +364,11 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitMemberReference(memberRef: MemberReference, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(memberRef, m => m.containing, cont => this.visitRightPadded(cont, q));
-        await q.getAndSend(memberRef, m => m.reference, ref => this.visitLeftPadded(ref, q));
         await q.getAndSend(memberRef, m => m.typeParameters, params => this.visitContainer(params, q));
+        await q.getAndSend(memberRef, m => m.reference, ref => this.visitLeftPadded(ref, q));
         await q.getAndSend(memberRef, m => m.type && asRef(m.type), type => this.visitType(type, q));
+        await q.getAndSend(memberRef, m => m.methodType && asRef(m.methodType), type => this.visitType(type, q));
+        await q.getAndSend(memberRef, m => m.variableType && asRef(m.variableType), type => this.visitType(type, q));
 
         return memberRef;
     }
@@ -678,6 +681,8 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitIdentifier(ident: Identifier, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(ident, id => id.annotations, annot => annot.id, annot => this.visit(annot, q));
         await q.getAndSend(ident, id => id.simpleName);
+        await q.getAndSend(ident, id => id.type, type => this.visitType(type, q));
+        await q.getAndSend(ident, id => id.fieldType, type => this.visitType(type, q));
 
         return ident;
     }
