@@ -1019,7 +1019,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         draft.clazz = await q.receive(instanceOf.clazz, clazz => this.visit(clazz, q));
         draft.pattern = await q.receive(instanceOf.pattern, pattern => this.visit(pattern, q));
         draft.type = await q.receive(instanceOf.type, type => this.visitType(type, q));
-        draft.type = await q.receive(instanceOf.modifier, mod => this.visit(mod, q));
+        draft.modifier = await q.receive(instanceOf.modifier, mod => this.visit(mod, q));
 
         return finishDraft(draft);
     }

@@ -22,13 +22,12 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @Suite
 @SuiteDisplayName("Java LSTs sent to and from a JavaScript Rewrite RPC server")
 @SelectPackages("org.openrewrite.java.tree")
-//@IncludeClassNamePatterns(".*FieldAccessTest")
+@IncludeClassNamePatterns(".*TryCatchTest")
+@ExcludeClassNamePatterns(".*JavadocTest")
 public class JavaToJavaScriptRpcTest {
-    private static JavaScriptRewriteRpc client;
-    private static PrintStream log;
 
     @BeforeSuite
-    static void beforeSuite() throws FileNotFoundException {
+    static void beforeSuite() {
         RecipeSpec.DEFAULTS = () -> new RecipeSpec()
           .recipe(toRecipe(() -> {
               try {

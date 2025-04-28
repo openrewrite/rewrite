@@ -285,6 +285,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(instanceOf, J.InstanceOf::getClazz, clazz -> visit(clazz, q));
         q.getAndSend(instanceOf, J.InstanceOf::getPattern, pattern -> visit(pattern, q));
         q.getAndSend(instanceOf, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
+        q.getAndSend(instanceOf, J.InstanceOf::getModifier, modifier -> visit(modifier, q));
         return instanceOf;
     }
 
