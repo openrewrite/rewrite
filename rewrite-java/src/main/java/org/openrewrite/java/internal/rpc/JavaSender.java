@@ -134,16 +134,12 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSendList(classDecl, J.ClassDeclaration::getModifiers, Tree::getId, j -> visit(j, q));
         q.getAndSend(classDecl, c -> c.getPadding().getKind(), k -> visitClassDeclarationKind(k, q));
         q.getAndSend(classDecl, J.ClassDeclaration::getName, j -> visit(j, q));
-        q.getAndSend(classDecl, c -> c.getPadding().getTypeParameters(), tp -> visitContainer(tp,
-                JContainer.Location.TYPE_PARAMETERS, q));
+        q.getAndSend(classDecl, c -> c.getPadding().getTypeParameters(), tp -> visitContainer(tp, q));
         q.getAndSend(classDecl, c -> c.getPadding().getPrimaryConstructor(), ctor ->
                 visitContainer(ctor, q));
-        q.getAndSend(classDecl, c -> c.getPadding().getExtends(), ext -> visitLeftPadded(ext,
-                JLeftPadded.Location.EXTENDS, q));
-        q.getAndSend(classDecl, c -> c.getPadding().getImplements(), impl -> visitContainer(impl,
-                JContainer.Location.IMPLEMENTS, q));
-        q.getAndSend(classDecl, c -> c.getPadding().getPermits(), impl -> visitContainer(impl,
-                JContainer.Location.PERMITS, q));
+        q.getAndSend(classDecl, c -> c.getPadding().getExtends(), ext -> visitLeftPadded(ext, q));
+        q.getAndSend(classDecl, c -> c.getPadding().getImplements(), impl -> visitContainer(impl, q));
+        q.getAndSend(classDecl, c -> c.getPadding().getPermits(), impl -> visitContainer(impl, q));
         q.getAndSend(classDecl, J.ClassDeclaration::getBody, j -> visit(j, q));
         return classDecl;
     }
@@ -482,8 +478,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(variable, J.VariableDeclarations.NamedVariable::getName, name -> visit(name, q));
         // TODO what to do here
 //        q.getAndSendList(variable, J.VariableDeclarations.NamedVariable::getDimensionsAfterName, l -> l.getElement(), dim -> visitLeftPadded(dim, q));
-        q.getAndSend(variable, n -> n.getPadding().getInitializer(), init -> visitLeftPadded(init,
-                JLeftPadded.Location.VARIABLE_INITIALIZER, q));
+        q.getAndSend(variable, n -> n.getPadding().getInitializer(), init -> visitLeftPadded(init, q));
         q.getAndSend(variable, a -> asRef(a.getVariableType()), type -> visitType(getValueNonNull(type), q));
         return variable;
     }
