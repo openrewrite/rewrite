@@ -16,12 +16,19 @@
 package org.openrewrite.javascript.rpc;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.config.Environment;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -35,6 +42,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.json.Assertions.json;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 @Disabled
@@ -84,20 +92,19 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
           }
           """;
         rewriteRun(
-          spec -> spec
-            .recipe(modifyAll)
-            .expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J preVisit(@NonNull J tree, @NonNull ExecutionContext ctx) {
+                  SourceFile t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
+                  assertThat(t.printAll()).isEqualTo(java.trim());
+                  stopAfterPreVisit();
+                  return tree;
+              }
+          })),
           java(
-            java,
             java
           )
         );
-
-        // spec -> spec.beforeRecipe(cu -> {
-        //              assertThatThrownBy(() -> client.print(cu))
-        //                .hasMessageContaining("Printing Java source files from JavaScript is not supported");
-        //              assertThat(client.<SourceFile>getObject(cu.getId().toString()).printAll()).isEqualTo(java.trim());
-        //          })
     }
 
     @Test

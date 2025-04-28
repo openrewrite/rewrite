@@ -29,6 +29,9 @@ dependencies {
     testRuntimeOnly(project(":rewrite-java-17"))
 
     integTestImplementation(project(":rewrite-json"))
+    integTestImplementation(project(":rewrite-java-tck"))
+    integTestImplementation("org.junit.platform:junit-platform-suite-api:latest.release")
+    integTestRuntimeOnly("org.junit.platform:junit-platform-suite-engine:latest.release")
 }
 
 extensions.configure<NodeExtension> {

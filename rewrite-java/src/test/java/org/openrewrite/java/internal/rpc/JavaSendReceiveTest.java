@@ -36,6 +36,7 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.time.Duration;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -75,7 +76,7 @@ class JavaSendReceiveTest implements RewriteTest {
             public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
                 Tree t = server.visit((SourceFile) tree, ChangeValue.class.getName(), 0);
                 stopAfterPreVisit();
-                return t;
+                return requireNonNull(t);
             }
         }));
     }
@@ -102,7 +103,7 @@ class JavaSendReceiveTest implements RewriteTest {
     static class ChangeValue extends JavaVisitor<Integer> {
         @Override
         public J visitLiteral(J.Literal literal, Integer p) {
-            if (literal.getValue().equals("value")) {
+            if ("value".equals(literal.getValue())) {
                 return literal.withValue("changed").withValueSource("\"changed\"");
             }
             return literal;
