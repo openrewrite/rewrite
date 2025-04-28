@@ -747,7 +747,7 @@ class TypeUtilsTest implements RewriteTest {
               import java.io.*;
               import java.util.*;
               
-              @SuppressWarnings("all")              
+              @SuppressWarnings("all")
               public class Test<A extends B, B extends Number, C extends Comparable<? super C> & Serializable> {
               
                   // Plain generics

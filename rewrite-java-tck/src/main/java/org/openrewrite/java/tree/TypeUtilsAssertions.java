@@ -15,16 +15,15 @@
  */
 package org.openrewrite.java.tree;
 
+import org.assertj.core.api.AutoCloseableSoftAssertions;
 import org.assertj.core.api.BooleanAssert;
 import org.assertj.core.api.ObjectAssert;
-import org.assertj.core.api.SoftAssertions;
 import org.assertj.core.api.StringAssert;
 import org.openrewrite.java.JavaIsoVisitor;
 
 import java.util.*;
 
-class TypeUtilsAssertions implements AutoCloseable {
-    SoftAssertions softly = new SoftAssertions();
+class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
     Map<String, List<JavaType>> types = new HashMap<>();
 
     public TypeUtilsAssertions(J.CompilationUnit cu) {
@@ -57,7 +56,7 @@ class TypeUtilsAssertions implements AutoCloseable {
 
     public ObjectAssert<JavaType> type(String type) {
         JavaType javaType = getFirst(type);
-        return softly.assertThat(javaType);
+        return assertThat(javaType);
     }
 
     public BooleanAssert isAssignableTo(String to, String from) {
@@ -67,7 +66,7 @@ class TypeUtilsAssertions implements AutoCloseable {
     public BooleanAssert isAssignableTo(String to, String from, boolean capture) {
         JavaType toType = getFirst(to);
         JavaType fromType = getLast(from);
-        return softly.assertThat(new Types(capture).isAssignableTo(toType, fromType))
+        return assertThat(new Types(capture).isAssignableTo(toType, fromType))
           .describedAs("isAssignableTo(%s, %s, %s)", to, from, capture);
     }
 
@@ -78,19 +77,19 @@ class TypeUtilsAssertions implements AutoCloseable {
     public BooleanAssert isOfType(String to, String from, boolean capture) {
         JavaType toType = getFirst(to);
         JavaType fromType = getLast(from);
-        return softly.assertThat(new Types(capture).isOfType(toType, fromType))
+        return assertThat(new Types(capture).isOfType(toType, fromType))
           .describedAs("isOfType(%s, %s, %s)", to, from, capture);
     }
 
     public StringAssert toString(String type) {
         JavaType javaType = getFirst(type);
-        return softly.assertThat(TypeUtils.toString(javaType))
+        return assertThat(TypeUtils.toString(javaType))
           .describedAs("toString(%s)", type);
     }
 
     public StringAssert toGenericTypeString(String type) {
         JavaType javaType = getFirst(type);
-        return softly.assertThat(TypeUtils.toGenericTypeString((JavaType.GenericTypeVariable) javaType))
+        return assertThat(TypeUtils.toGenericTypeString((JavaType.GenericTypeVariable) javaType))
           .describedAs("toGenericTypeString(%s)", type);
     }
 
@@ -104,10 +103,5 @@ class TypeUtilsAssertions implements AutoCloseable {
         return Optional.ofNullable(types.get(type))
           .map(list -> list.get(list.size() - 1))
           .orElseThrow(() -> new IllegalArgumentException("Type not found: " + type));
-    }
-
-    @Override
-    public void close() {
-        softly.assertAll();
     }
 }
