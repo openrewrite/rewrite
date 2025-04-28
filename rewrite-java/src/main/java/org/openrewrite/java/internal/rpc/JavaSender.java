@@ -132,11 +132,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitClassDeclaration(J.ClassDeclaration classDecl, RpcSendQueue q) {
         q.getAndSendList(classDecl, J.ClassDeclaration::getLeadingAnnotations, Tree::getId, j -> visit(j, q));
         q.getAndSendList(classDecl, J.ClassDeclaration::getModifiers, Tree::getId, j -> visit(j, q));
-
-        // TODO We don't currently have a way to get to the annotations that are on ClassDeclaration.Kind
-        //  because the getter hides the field.
-        q.getAndSend(classDecl, J.ClassDeclaration::getKind); // the enum type
-
+        q.getAndSend(classDecl, c -> c.getPadding().getKind(), k -> visitClassDeclarationKind(k, q));
         q.getAndSend(classDecl, J.ClassDeclaration::getName, j -> visit(j, q));
         q.getAndSend(classDecl, c -> c.getPadding().getTypeParameters(), tp -> visitContainer(tp,
                 JContainer.Location.TYPE_PARAMETERS, q));
@@ -150,6 +146,13 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
                 JContainer.Location.PERMITS, q));
         q.getAndSend(classDecl, J.ClassDeclaration::getBody, j -> visit(j, q));
         return classDecl;
+    }
+
+    private void visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcSendQueue q) {
+        // `preVisit()` is not automatically called in this case
+        preVisit(kind, q);
+        q.getAndSendList(kind, J.ClassDeclaration.Kind::getAnnotations, Tree::getId, j -> visit(j, q));
+        q.getAndSend(kind, J.ClassDeclaration.Kind::getType);
     }
 
     @Override

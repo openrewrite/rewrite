@@ -1393,23 +1393,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.leadingAnnotations = await q.receiveListDefined(cls.leadingAnnotations, annot => this.visit(annot, q));
         draft.modifiers = await q.receiveListDefined(cls.modifiers, mod => this.visit(mod, q));
-
-        const kindType = await q.receive(cls.classKind?.type);
-        if (kindType) {
-            if (!draft.classKind) {
-                draft.classKind = {
-                    kind: JavaKind.ClassDeclarationKind,
-                    id: randomId(),
-                    markers: emptyMarkers,
-                    prefix: emptySpace,
-                    annotations: [],
-                    type: kindType
-                };
-            } else {
-                draft.classKind.type = kindType;
-            }
-        }
-
+        draft.classKind = await q.receive(cls.classKind, kind => this.visit(kind, q));
         draft.name = await q.receive(cls.name, name => this.visit(name, q));
         draft.typeParameters = await q.receive(cls.typeParameters, params => this.visitContainer(params, q));
         draft.primaryConstructor = await q.receive(cls.primaryConstructor, cons => this.visitContainer(cons, q));
