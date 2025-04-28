@@ -42,6 +42,7 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -187,6 +188,19 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
                     DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
                     for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
+                        List<Dependency> immediateDependencies = configuration.getRequested();
+                        if (!immediateDependencies.isEmpty()) {
+                            boolean found = false;
+                            for (Dependency dependency : immediateDependencies) {
+                                if (dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (found) {
+                                continue;
+                            }
+                        }
                         for (ResolvedDependency resolved : configuration.getResolved()) {
                             if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(),
                                     resolved.getArtifactId(), resolved.getVersion())) {
