@@ -16,7 +16,6 @@
 package org.openrewrite.java.tree;
 
 import lombok.Value;
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
