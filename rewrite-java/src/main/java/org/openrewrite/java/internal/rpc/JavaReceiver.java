@@ -16,7 +16,6 @@
 package org.openrewrite.java.internal.rpc;
 
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -25,6 +24,8 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+
+import static java.util.Objects.requireNonNull;
 
 public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
@@ -267,8 +268,9 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitIf(J.If iff, RpcReceiveQueue q) {
+        //noinspection unchecked
         return iff
-                .withIfCondition(q.receive(iff.getIfCondition(), c -> (J.ControlParentheses<Expression>) visitNonNull(c, q)))
+                .withIfCondition(q.receive(iff.getIfCondition(), c -> (J.ControlParentheses<@NonNull Expression>) visitNonNull(c, q)))
                 .getPadding().withThenPart(q.receive(iff.getPadding().getThenPart(), t -> visitRightPadded(t, q)))
                 .withElsePart(q.receive(iff.getElsePart(), e -> (J.If.Else) visitNonNull(e, q)));
     }
@@ -291,8 +293,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitInstanceOf(J.InstanceOf instanceOf, RpcReceiveQueue q) {
         return instanceOf
                 .getPadding().withExpression(q.receive(instanceOf.getPadding().getExpression(), e -> visitRightPadded(e, q)))
-                .withClazz(q.receive(instanceOf.getClazz(), c -> (J) visitNonNull(c, q)))
-                .withPattern(q.receive(instanceOf.getPattern(), p -> (J) visitNonNull(p, q)))
+                .withClazz(q.receive(instanceOf.getClazz(), c -> visitNonNull(c, q)))
+                .withPattern(q.receive(instanceOf.getPattern(), p -> visitNonNull(p, q)))
                 .withType(q.receive(instanceOf.getType(), t -> visitType(t, q)))
                 .withModifier(q.receive(instanceOf.getModifier(), m -> (J.Modifier) visitNonNull(m, q)));
     }
@@ -316,7 +318,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return lambda
                 .withParameters(q.receive(lambda.getParameters(), p -> visitLambdaParameters(p, q)))
                 .withArrow(q.receive(lambda.getArrow(), a -> visitSpace(a, q)))
-                .withBody(q.receive(lambda.getBody(), b -> (J) visitNonNull(b, q)))
+                .withBody(q.receive(lambda.getBody(), b -> visitNonNull(b, q)))
                 .withType(q.receive(lambda.getType(), t -> visitType(t, q)));
     }
 
@@ -421,9 +423,10 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parenthesizedType, RpcReceiveQueue q) {
+        //noinspection unchecked
         return parenthesizedType
                 .withAnnotations(q.receiveList(parenthesizedType.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
-                .withParenthesizedType(q.receive(parenthesizedType.getParenthesizedType(), t -> (J.Parentheses<TypeTree>) visitNonNull(t, q)));
+                .withParenthesizedType(q.receive(parenthesizedType.getParenthesizedType(), t -> (J.Parentheses<@NonNull TypeTree>) visitNonNull(t, q)));
     }
 
     @Override
@@ -440,23 +443,26 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitSwitch(J.Switch switzh, RpcReceiveQueue q) {
+        //noinspection unchecked
         return switzh
-                .withSelector(q.receive(switzh.getSelector(), s -> (J.ControlParentheses<Expression>) visitNonNull(s, q)))
+                .withSelector(q.receive(switzh.getSelector(), s -> (J.ControlParentheses<@NonNull Expression>) visitNonNull(s, q)))
                 .withCases(q.receive(switzh.getCases(), c -> (J.Block) visitNonNull(c, q)));
     }
 
     @Override
     public J visitSwitchExpression(J.SwitchExpression switchExpression, RpcReceiveQueue q) {
+        //noinspection unchecked
         return switchExpression
-                .withSelector(q.receive(switchExpression.getSelector(), s -> (J.ControlParentheses<Expression>) visitNonNull(s, q)))
+                .withSelector(q.receive(switchExpression.getSelector(), s -> (J.ControlParentheses<@NonNull Expression>) visitNonNull(s, q)))
                 .withCases(q.receive(switchExpression.getCases(), c -> (J.Block) visitNonNull(c, q)))
                 .withType(q.receive(switchExpression.getType(), t -> visitType(t, q)));
     }
 
     @Override
     public J visitSynchronized(J.Synchronized synch, RpcReceiveQueue q) {
+        //noinspection unchecked
         return synch
-                .withLock(q.receive(synch.getLock(), l -> (J.ControlParentheses<Expression>) visitNonNull(l, q)))
+                .withLock(q.receive(synch.getLock(), l -> (J.ControlParentheses<@NonNull Expression>) visitNonNull(l, q)))
                 .withBody(q.receive(synch.getBody(), b -> (J.Block) visitNonNull(b, q)));
     }
 
@@ -486,8 +492,9 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitCatch(J.Try.Catch tryCatch, RpcReceiveQueue q) {
+        //noinspection unchecked
         return tryCatch
-                .withParameter(q.receive(tryCatch.getParameter(), p -> (J.ControlParentheses<J.VariableDeclarations>) visitNonNull(p, q)))
+                .withParameter(q.receive(tryCatch.getParameter(), p -> (J.ControlParentheses<J.@NonNull VariableDeclarations>) visitNonNull(p, q)))
                 .withBody(q.receive(tryCatch.getBody(), b -> (J.Block) visitNonNull(b, q)));
     }
 
@@ -513,8 +520,9 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitTypeCast(J.TypeCast typeCast, RpcReceiveQueue q) {
+        //noinspection unchecked
         return typeCast
-                .withClazz(q.receive(typeCast.getClazz(), c -> (J.ControlParentheses<TypeTree>) visitNonNull(c, q)))
+                .withClazz(q.receive(typeCast.getClazz(), c -> (J.ControlParentheses<@NonNull TypeTree>) visitNonNull(c, q)))
                 .withExpression(q.receive(typeCast.getExpression(), e -> (Expression) visitNonNull(e, q)))
                 .withType(q.receive(typeCast.getType(), t -> visitType(t, q)));
     }
@@ -549,8 +557,9 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitWhileLoop(J.WhileLoop whileLoop, RpcReceiveQueue q) {
+        //noinspection unchecked
         return whileLoop
-                .withCondition(q.receive(whileLoop.getCondition(), c -> (J.ControlParentheses<Expression>) visitNonNull(c, q)))
+                .withCondition(q.receive(whileLoop.getCondition(), c -> (J.ControlParentheses<@NonNull Expression>) visitNonNull(c, q)))
                 .getPadding().withBody(q.receive(whileLoop.getPadding().getBody(), b -> visitRightPadded(b, q)));
     }
 
@@ -583,7 +592,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withWhitespace(q.receive(space.getWhitespace()));
     }
 
-    private @Nullable <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container, RpcReceiveQueue q) {
+    private <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, RpcReceiveQueue q) {
         return container
                 .withBefore(q.receive(container.getBefore(), space -> visitSpace(space, q)))
                 .getPadding().withElements(q.receiveList(container.getPadding().getElements(),
@@ -591,13 +600,15 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withMarkers(q.receiveMarkers(container.getMarkers()));
     }
 
-    private @Nullable <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, RpcReceiveQueue q) {
+    private <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
         return left
                 .withBefore(q.receive(left.getBefore(), s -> visitSpace(s, q)))
                 .withElement(q.receive(left.getElement(), t -> {
                     if (t instanceof J) {
+                        //noinspection unchecked
                         return (T) visitNonNull((J) t, q);
                     } else if (t instanceof Space) {
+                        //noinspection unchecked
                         return (T) visitSpace((Space) t, q);
                     }
                     return t;
@@ -605,17 +616,25 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withMarkers(q.receiveMarkers(left.getMarkers()));
     }
 
-    private @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, RpcReceiveQueue q) {
+    private <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
         return right
                 .withElement(q.receive(right.getElement(), t -> {
                     if (t instanceof J) {
+                        //noinspection unchecked
                         return (T) visitNonNull((J) t, q);
                     } else if (t instanceof Space) {
+                        //noinspection unchecked
                         return (T) visitSpace((Space) t, q);
                     }
                     return t;
                 }))
                 .withAfter(q.receive(right.getAfter(), s -> visitSpace(s, q)))
                 .withMarkers(q.receiveMarkers(right.getMarkers()));
+    }
+
+    @Override
+    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType,
+                              RpcReceiveQueue rpcReceiveQueue) {
+        return requireNonNull(super.visitType(javaType, rpcReceiveQueue));
     }
 }

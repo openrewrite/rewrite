@@ -45,7 +45,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitAnnotatedType(J.AnnotatedType annotatedType, RpcSendQueue q) {
         q.getAndSendList(annotatedType, J.AnnotatedType::getAnnotations, Tree::getId, a -> visit(a, q));
         q.getAndSend(annotatedType, J.AnnotatedType::getTypeExpression, t -> visit(t, q));
-        q.getAndSend(annotatedType, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return annotatedType;
     }
 
