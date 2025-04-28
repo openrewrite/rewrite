@@ -46,9 +46,12 @@ class DependencyUseStringNotationTest implements RewriteTest {
               }  
                 
               dependencies {
-                  api( group: 'org.openrewrite', name: 'rewrite-gradle', version: 'latest.release' )
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
+                  api( group: 'org.openrewrite', name: 'rewrite-java', version: 'latest.release' ) {
+                      transitive = false
+                  }
+                  api( group: 'org.openrewrite', name: 'rewrite-gradle', version: 'latest.release' )
               }
               """,
             """
@@ -61,9 +64,12 @@ class DependencyUseStringNotationTest implements RewriteTest {
               }
                 
               dependencies {
-                  api( "org.openrewrite:rewrite-gradle:latest.release" )
                   api("org.openrewrite:rewrite-core:latest.release")
                   implementation "org.openrewrite:rewrite-core:latest.release"
+                  api( "org.openrewrite:rewrite-java:latest.release" ) {
+                      transitive = false
+                  }
+                  api( "org.openrewrite:rewrite-gradle:latest.release" )
               }
               """
           )
@@ -86,6 +92,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources')
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources'
+                  // The whitespaces are also kept
+                  api( group: 'org.openrewrite', name: 'rewrite-java', version: 'latest.release', classifier: 'sources' ) {
+                      transitive = false
+                  }
+                  api( group: 'org.openrewrite', name: 'rewrite-gradle', version: 'latest.release', classifier: 'sources' )
               }
               """,
             """
@@ -100,6 +111,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release:sources")
                   implementation "org.openrewrite:rewrite-core:latest.release:sources"
+                  // The whitespaces are also kept
+                  api( "org.openrewrite:rewrite-java:latest.release:sources" ) {
+                      transitive = false
+                  }
+                  api( "org.openrewrite:rewrite-gradle:latest.release:sources" )
               }
               """
           )

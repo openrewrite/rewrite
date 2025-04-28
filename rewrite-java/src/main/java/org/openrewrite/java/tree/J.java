@@ -42,6 +42,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
@@ -4034,6 +4035,10 @@ public interface J extends Tree {
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
 
+        //TODO: should be in MethodCall interface?
+        public MethodInvocation withArguments(Function<List<JRightPadded<Expression>>, List<JRightPadded<Expression>>> arguments) {
+            return getPadding().withArguments(JContainer.build(arguments.apply(this.arguments.getPadding().getElements())));
+        }
 
         @Getter
         JavaType.@Nullable Method methodType;

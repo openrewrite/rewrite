@@ -23,10 +23,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -109,12 +106,22 @@ public class DependencyUseStringNotation extends Recipe {
                         return m;
                     }
 
-                    Expression lastArg = m.getArguments().get(m.getArguments().size() - 1);
-                    if (lastArg instanceof J.Lambda) {
-                        m = m.withArguments(Arrays.asList(stringNotation, lastArg));
-                    } else {
-                        m = m.withArguments(Collections.singletonList(stringNotation));
-                    }
+                    m = m.withArguments(originalArgs -> {
+                        JRightPadded<Expression> lastArg = originalArgs.get(originalArgs.size() - 1);
+                        JRightPadded<Expression> lastMapArg = null;
+                        for (int i = originalArgs.size() - 1; i >= 0; i--) {
+                            JRightPadded<Expression> arg = originalArgs.get(i);
+                            if (arg.getElement() instanceof G.MapEntry) {
+                                lastMapArg = arg;
+                                break;
+                            }
+                        }
+                        if (lastArg.getElement() instanceof J.Lambda) {
+                            return Arrays.asList(JRightPadded.withElement(lastMapArg, stringNotation), lastArg);
+                        } else {
+                            return Collections.singletonList(JRightPadded.withElement(lastMapArg, stringNotation));
+                        }
+                    });
                 }
 
                 return m;
