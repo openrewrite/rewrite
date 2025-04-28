@@ -517,20 +517,26 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     private <T> void visitLeftPadded(JLeftPadded<T> left, RpcSendQueue q) {
         q.getAndSend(left, l -> asRef(l.getBefore()), space -> visitSpace(getValueNonNull(space), q));
-        q.getAndSend(left, JLeftPadded::getElement, elem -> {
-            if (elem instanceof J) {
-                visit((J) elem, q);
-            }
-        });
+        T element = left.getElement();
+        if (element instanceof J) {
+            q.getAndSend(left, JLeftPadded::getElement, elem -> visit((J) elem, q));
+        } else if (element instanceof Space) {
+            q.getAndSend(left, r -> asRef(element), space -> visitSpace(getValueNonNull(space), q));
+        } else {
+            q.getAndSend(left, JLeftPadded::getElement);
+        }
         q.sendMarkers(left, JLeftPadded::getMarkers);
     }
 
     private <T> void visitRightPadded(JRightPadded<T> right, RpcSendQueue q) {
-        q.getAndSend(right, JRightPadded::getElement, elem -> {
-            if (elem instanceof J) {
-                visit((J) elem, q);
-            }
-        });
+        T element = right.getElement();
+        if (element instanceof J) {
+            q.getAndSend(right, JRightPadded::getElement, elem -> visit((J) elem, q));
+        } else if (element instanceof Space) {
+            q.getAndSend(right, r -> asRef(element), space -> visitSpace(getValueNonNull(space), q));
+        } else {
+            q.getAndSend(right, JRightPadded::getElement);
+        }
         q.getAndSend(right, r -> asRef(r.getAfter()), space -> visitSpace(getValueNonNull(space), q));
         q.sendMarkers(right, JRightPadded::getMarkers);
     }

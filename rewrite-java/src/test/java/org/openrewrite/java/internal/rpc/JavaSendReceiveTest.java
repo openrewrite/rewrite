@@ -22,7 +22,6 @@ import lombok.SneakyThrows;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
@@ -55,11 +54,11 @@ class JavaSendReceiveTest implements RewriteTest {
 
         JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
           new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
+        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10)).traceGetObjectOutput();
 
         JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
           new HeaderDelimitedMessageHandler(clientIn, clientOut)));
-        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
+        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10)).traceGetObjectOutput();
     }
 
     @AfterEach
@@ -83,7 +82,6 @@ class JavaSendReceiveTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    @Disabled
     void sendReceiveIdempotence() {
         rewriteRun(
           java(

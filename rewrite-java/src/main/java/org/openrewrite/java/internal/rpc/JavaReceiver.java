@@ -107,8 +107,9 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitBlock(J.Block block, RpcReceiveQueue q) {
-        return block
-                .getPadding().withStatic(q.receive(block.getPadding().getStatic(), s -> visitRightPadded(s, q)))
+        J.Block block1 = block
+                .getPadding().withStatic(q.receive(block.getPadding().getStatic(), s -> visitRightPadded(s, q)));
+        return block1
                 .getPadding().withStatements(q.receiveList(block.getPadding().getStatements(), s -> visitRightPadded(s, q)))
                 .withEnd(q.receive(block.getEnd(), e -> visitSpace(e, q)));
     }
@@ -147,7 +148,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     private J.ClassDeclaration.Kind visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcReceiveQueue q) {
         J.ClassDeclaration.Kind k = (J.ClassDeclaration.Kind) preVisit(kind, q);
         k = k.withAnnotations(q.receiveList(kind.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
-                .withType(q.receive(kind.getType()));
+                .withType(J.ClassDeclaration.Kind.Type.valueOf(q.receiveAndGet(kind.getType(), Enum::name)));
         return k;
     }
 
@@ -530,7 +531,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, RpcReceiveQueue q) {
         return variable
                 .withName(q.receive(variable.getName(), n -> (J.Identifier) visitNonNull(n, q)))
-                .withDimensionsAfterName(q.receiveList(variable.getDimensionsAfterName(), d -> visitLeftPadded(d, q)))
+                // TODO what to do here
+//                .withDimensionsAfterName(q.receiveList(variable.getDimensionsAfterName(), d -> visitLeftPadded(d, q)))
                 .getPadding().withInitializer(q.receive(variable.getPadding().getInitializer(), i -> visitLeftPadded(i, q)))
                 .withVariableType(q.receive(variable.getVariableType(), t -> (JavaType.Variable) visitType(t, q)));
     }
@@ -592,13 +594,27 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     private @Nullable <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, RpcReceiveQueue q) {
         return left
                 .withBefore(q.receive(left.getBefore(), s -> visitSpace(s, q)))
-                .withElement(q.receive(left.getElement(), t -> (T) visitNonNull((J) t, q)))
+                .withElement(q.receive(left.getElement(), t -> {
+                    if (t instanceof J) {
+                        return (T) visitNonNull((J) t, q);
+                    } else if (t instanceof Space) {
+                        return (T) visitSpace((Space) t, q);
+                    }
+                    return t;
+                }))
                 .withMarkers(q.receiveMarkers(left.getMarkers()));
     }
 
     private @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, RpcReceiveQueue q) {
         return right
-                .withElement(q.receive(right.getElement(), t -> (T) visitNonNull((J) t, q)))
+                .withElement(q.receive(right.getElement(), t -> {
+                    if (t instanceof J) {
+                        return (T) visitNonNull((J) t, q);
+                    } else if (t instanceof Space) {
+                        return (T) visitSpace((Space) t, q);
+                    }
+                    return t;
+                }))
                 .withAfter(q.receive(right.getAfter(), s -> visitSpace(s, q)))
                 .withMarkers(q.receiveMarkers(right.getMarkers()));
     }
