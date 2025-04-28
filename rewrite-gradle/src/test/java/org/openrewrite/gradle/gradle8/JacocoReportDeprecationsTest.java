@@ -31,36 +31,6 @@ class JacocoReportDeprecationsTest implements RewriteTest {
     }
 
     @Test
-    void enabledDeprecatedInCollapsedSyntax() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-                  id "jacoco"
-              }
-
-              jacocoTestReport.reports.xml.enabled = false
-              jacocoTestReport.reports.csv.enabled = true
-              jacocoTestReport.reports.html.enabled = false
-
-              """,
-            """
-              plugins {
-                  id "java"
-                  id "jacoco"
-              }
-
-              jacocoTestReport.reports.xml.required = false
-              jacocoTestReport.reports.csv.required = true
-              jacocoTestReport.reports.html.required = false
-
-              """
-          )
-        );
-    }
-
-    @Test
     @DocumentExample
     void enabledDeprecatedInNormalSyntax() {
         rewriteRun(
@@ -93,6 +63,36 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       html.required = false
                   }
               }
+
+              """
+          )
+        );
+    }
+
+    @Test
+    void enabledDeprecatedInCollapsedSyntax() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+                  id "jacoco"
+              }
+
+              jacocoTestReport.reports.xml.enabled = false
+              jacocoTestReport.reports.csv.enabled = true
+              jacocoTestReport.reports.html.enabled = false
+
+              """,
+            """
+              plugins {
+                  id "java"
+                  id "jacoco"
+              }
+
+              jacocoTestReport.reports.xml.required = false
+              jacocoTestReport.reports.csv.required = true
+              jacocoTestReport.reports.html.required = false
 
               """
           )
@@ -336,7 +336,6 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       }
                   }
               }
-
               """,
             """
               plugins {
@@ -357,7 +356,6 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                       }
                   }
               }
-
               """
           )
         );
