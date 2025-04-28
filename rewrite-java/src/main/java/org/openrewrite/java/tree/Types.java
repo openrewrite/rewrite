@@ -24,21 +24,21 @@ import java.util.*;
 public class Types {
     private final Map<JavaType.GenericTypeVariable, JavaType.Intersection> boundsCache = new IdentityHashMap<>();
     private final Set<TypePair> visiting = new HashSet<>();
-    private final boolean capture;
+    private final boolean infer;
 
-    public Types(boolean capture) {
-        this.capture = capture;
+    public Types(boolean infer) {
+        this.infer = infer;
     }
 
     public boolean isOfType(@Nullable JavaType to, @Nullable JavaType from) {
-        return isOfType(normalize(to), normalize(from), capture ? CaptureSide.TO : CaptureSide.NONE);
+        return isOfType(normalize(to), normalize(from), infer ? InferSide.TO : InferSide.NONE);
     }
 
     public boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
-        return isAssignableTo(normalize(to), normalize(from), capture ? CaptureSide.TO : CaptureSide.NONE);
+        return isAssignableTo(normalize(to), normalize(from), infer ? InferSide.TO : InferSide.NONE);
     }
 
-    private boolean isOfType(@Nullable JavaType to, @Nullable JavaType from, CaptureSide mode) {
+    private boolean isOfType(@Nullable JavaType to, @Nullable JavaType from, InferSide mode) {
         if (isUnknown(to) || isUnknown(from)) {
             return false;
         } else if (to == from) {
@@ -58,10 +58,10 @@ public class Types {
         }
     }
 
-    private boolean isOfTypeCore(JavaType to, JavaType from, CaptureSide mode) {
+    private boolean isOfTypeCore(JavaType to, JavaType from, InferSide mode) {
         // Try to match captures
-        if (mode == CaptureSide.TO && isTypeVariable(to) ||
-                mode == CaptureSide.FROM && isTypeVariable(from)) {
+        if (mode == InferSide.TO && isTypeVariable(to) ||
+                mode == InferSide.FROM && isTypeVariable(from)) {
             return isAssignableTo(to, from, mode);
         }
 
@@ -84,7 +84,7 @@ public class Types {
         return false;
     }
 
-    private boolean isOfTypeFullyQualified(JavaType.FullyQualified to, JavaType.FullyQualified from, CaptureSide mode) {
+    private boolean isOfTypeFullyQualified(JavaType.FullyQualified to, JavaType.FullyQualified from, InferSide mode) {
         if (!TypeUtils.fullyQualifiedNamesAreEqual(to.getFullyQualifiedName(), from.getFullyQualifiedName())) {
             return false;
         }
@@ -106,11 +106,11 @@ public class Types {
         return false;
     }
 
-    private boolean isOfTypePrimitive(JavaType.Primitive to, JavaType.Primitive from, CaptureSide mode) {
+    private boolean isOfTypePrimitive(JavaType.Primitive to, JavaType.Primitive from, InferSide mode) {
         return to == from;
     }
 
-    private boolean isOfTypeArray(JavaType.Array to, JavaType.Array from, CaptureSide mode) {
+    private boolean isOfTypeArray(JavaType.Array to, JavaType.Array from, InferSide mode) {
         if (to.getElemType() instanceof JavaType.Primitive || from.getElemType() instanceof JavaType.Primitive) {
             // Avoid incorrect inference of array types
             return to.getElemType() == from.getElemType();
@@ -118,7 +118,7 @@ public class Types {
         return isOfType(to.getElemType(), from.getElemType(), mode);
     }
 
-    private boolean isOfTypeGeneric(JavaType.GenericTypeVariable to, JavaType.GenericTypeVariable from, CaptureSide mode) {
+    private boolean isOfTypeGeneric(JavaType.GenericTypeVariable to, JavaType.GenericTypeVariable from, InferSide mode) {
         if (!to.getName().equals(from.getName()) ||
                 to.getVariance() != from.getVariance() ||
                 to.getBounds().size() != from.getBounds().size()) {
@@ -132,7 +132,7 @@ public class Types {
         return true;
     }
 
-    private boolean isOfTypeList(List<JavaType> to, List<JavaType> from, CaptureSide mode) {
+    private boolean isOfTypeList(List<JavaType> to, List<JavaType> from, InferSide mode) {
         if (to.size() != from.size() ||
                 to.stream().anyMatch(e -> !(e instanceof JavaType.FullyQualified)) ||
                 from.stream().anyMatch(e -> !(e instanceof JavaType.FullyQualified))) {
@@ -155,7 +155,7 @@ public class Types {
         return true;
     }
 
-    private boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, CaptureSide mode) {
+    private boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, InferSide mode) {
         if (isUnknown(to) || isUnknown(from)) {
             return false;
         }
@@ -179,9 +179,9 @@ public class Types {
         }
     }
 
-    private boolean isAssignableToCore(@NotNull JavaType to, @NotNull JavaType from, CaptureSide mode) {
+    private boolean isAssignableToCore(@NotNull JavaType to, @NotNull JavaType from, InferSide mode) {
         // Handle generic type variables (e.g., T extends Collection<String>)
-        if (mode == CaptureSide.FROM && isTypeVariable(from)) {
+        if (mode == InferSide.FROM && isTypeVariable(from)) {
             // Is there anything we can validate?
             return true;
         } else if (to instanceof JavaType.GenericTypeVariable) {
@@ -222,8 +222,8 @@ public class Types {
         return false;
     }
 
-    private boolean isAssignableToGeneric(JavaType.GenericTypeVariable to, JavaType from, CaptureSide mode) {
-        if (isWildcard(to) || mode == CaptureSide.TO) {
+    private boolean isAssignableToGeneric(JavaType.GenericTypeVariable to, JavaType from, InferSide mode) {
+        if (isWildcard(to) || mode == InferSide.TO) {
             // If target "to" wildcard is unbounded, it accepts anything
             if (to.getBounds().isEmpty()) {
                 return true;
@@ -262,7 +262,7 @@ public class Types {
                 default:
                     // In Java, an invariant wildcard with bounds (e.g., ? T) is not valid syntax
                     // Could a capture come this way?
-                    assert mode == CaptureSide.TO;
+                    assert mode == InferSide.TO;
                     return isAssignableTo(target, source, mode);
             }
         }
@@ -287,7 +287,7 @@ public class Types {
     }
 
     // Handle cases
-    private boolean isAssignableFromGeneric(JavaType to, JavaType.GenericTypeVariable from, CaptureSide mode) {
+    private boolean isAssignableFromGeneric(JavaType to, JavaType.GenericTypeVariable from, InferSide mode) {
         if (from.getVariance() == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) {
             return isAssignableTo(getBounds(from), to, mode.reverse());
         } else {
@@ -296,7 +296,7 @@ public class Types {
     }
 
     // Contract, from is FullyQualified, Array or Primitive
-    private boolean isAssignableToFullyQualified(JavaType.FullyQualified to, @Nullable JavaType from, CaptureSide mode) {
+    private boolean isAssignableToFullyQualified(JavaType.FullyQualified to, @Nullable JavaType from, InferSide mode) {
         if (from instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
             if (!TypeUtils.fullyQualifiedNamesAreEqual(to.getFullyQualifiedName(), classFrom.getFullyQualifiedName())) {
@@ -382,7 +382,7 @@ public class Types {
     }
 
     // Contract: from is FullyQualified, Array or Primitive
-    private boolean isAssignableToArray(JavaType.Array to, JavaType from, CaptureSide mode) {
+    private boolean isAssignableToArray(JavaType.Array to, JavaType from, InferSide mode) {
         if (from instanceof JavaType.Array) {
             JavaType.Array fromArray = (JavaType.Array) from;
             if (to.getElemType() instanceof JavaType.Primitive || fromArray.getElemType() instanceof JavaType.Primitive) {
@@ -395,7 +395,7 @@ public class Types {
     }
 
     // Contract: from is FullyQualified, Array or Primitive
-    private boolean isAssignableToPrimitive(JavaType.Primitive to, @Nullable JavaType from, CaptureSide mode) {
+    private boolean isAssignableToPrimitive(JavaType.Primitive to, @Nullable JavaType from, InferSide mode) {
         if (from instanceof JavaType.FullyQualified) {
             // Account for auto-unboxing
             JavaType.FullyQualified fromFq = (JavaType.FullyQualified) from;
@@ -498,12 +498,12 @@ public class Types {
         IS_ASSIGNABLE_TO
     }
 
-    enum CaptureSide {
+    enum InferSide {
         NONE,
         TO,
         FROM;
 
-        CaptureSide reverse() {
+        InferSide reverse() {
             switch (this) {
                 case TO:
                     return FROM;
@@ -518,7 +518,7 @@ public class Types {
     @Value
     static class TypePair {
         Operation operation;
-        CaptureSide mode;
+        InferSide mode;
         JavaType to;
         JavaType from;
 

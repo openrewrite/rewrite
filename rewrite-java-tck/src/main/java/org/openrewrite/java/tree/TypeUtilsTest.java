@@ -390,7 +390,7 @@ class TypeUtilsTest implements RewriteTest {
                         J.Return return_ = (J.Return) method.getBody().getStatements().get(0);
                         J.TypeCast cast = (J.TypeCast) return_.getExpression();
                         assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType())).isFalse();
-//                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType())).isTrue();
+                        assertThat(new Types(true).isAssignableTo(cast.getType(), cast.getExpression().getType())).isTrue();
                     }
                     return method;
                 }
@@ -435,8 +435,8 @@ class TypeUtilsTest implements RewriteTest {
                         JavaType consumeClassParamType = ((J.VariableDeclarations) consumeClass.getParameters().get(0)).getVariables().get(0).getType();
                         JavaType consumeMethodParamType = ((J.VariableDeclarations) consumeMethod.getParameters().get(0)).getVariables().get(0).getType();
 
-//                        assertThat(TypeUtils.isAssignableTo(consumeClassParamType, list.getType())).isTrue();
-//                        assertThat(TypeUtils.isAssignableTo(consumeMethodParamType, list.getType())).isTrue();
+                        assertThat(new Types(true).isAssignableTo(consumeClassParamType, list.getType())).isTrue();
+                        assertThat(new Types(true).isAssignableTo(consumeMethodParamType, list.getType())).isTrue();
                     }
                     return method;
                 }
