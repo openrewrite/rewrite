@@ -356,7 +356,7 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitLiteral(literal: Literal, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(literal, l => l.value);
         await q.getAndSend(literal, l => l.valueSource);
-        await q.getAndSendList(literal, l => l.unicodeEscapes, e => e.valueSourceIndex);
+        await q.getAndSendList(literal, l => l.unicodeEscapes, e => e.valueSourceIndex + e.codePoint);
         await q.getAndSend(literal, l => l.type && asRef(l.type), type => this.visitType(type, q));
 
         return literal;
