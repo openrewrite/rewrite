@@ -580,9 +580,9 @@ class TypesTest implements RewriteTest {
                 @Override
                 public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
                     try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
-                        assertions.isOfType("Comp", "Comp", true).isTrue();
-                        assertions.isOfType("Ext", "Ext", true).isTrue();
-                        assertions.isOfType("EnumType", "EnumType", true).isTrue();
+                        assertions.isOfType("Comp", "Comp").isTrue();
+                        assertions.isOfType("Ext", "Ext").isTrue();
+                        assertions.isOfType("EnumType", "EnumType").isTrue();
 
                         assertions.isAssignableTo("E", "EnumType", false).isFalse();
                         assertions.isAssignableTo("E", "EnumType", true).isTrue();
@@ -620,6 +620,8 @@ class TypesTest implements RewriteTest {
                   void test() {
                       var intersection1 = (Cloneable & Serializable) null;
                       var intersection2 = (Serializable & Cloneable) null;
+                      Serializable serializable;
+                      Cloneable cloneable;
                       int[] arrayPrimitive;
                       DuplicateFormatFlagsException extendIllegal;
                       RuntimeException exception;
@@ -635,6 +637,8 @@ class TypesTest implements RewriteTest {
                         assertions.isOfType("intersection1", "intersection2").isTrue();
                         assertions.isAssignableTo("intersection1", "int[]").isTrue();
                         assertions.isAssignableTo("int[]", "intersection1").isFalse();
+                        assertions.isAssignableTo("Serializable", "intersection1").isTrue();
+                        assertions.isAssignableTo("Cloneable", "intersection1").isTrue();
 
                         assertions.isOfType("NullPointerException | IllegalArgumentException", "IllegalArgumentException | NullPointerException").isTrue();
                         assertions.isAssignableTo("NullPointerException | IllegalArgumentException", "DuplicateFormatFlagsException").isTrue();
