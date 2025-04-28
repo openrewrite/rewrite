@@ -25,6 +25,7 @@ recipeList:
   - org.openrewrite.recipes.JavaRecipeBestPracticesSubset
   - org.openrewrite.recipes.RecipeTestingBestPracticesSubset
   - org.openrewrite.recipes.RecipeNullabilityBestPracticesSubset
+  #- org.openrewrite.java.recipes.ExamplesExtractor
   #- org.openrewrite.java.OrderImports
   - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
   - org.openrewrite.staticanalysis.CompareEnumsWithEqualityOperator
@@ -67,6 +68,8 @@ recipeList:
   - org.openrewrite.java.testing.cleanup.TestsShouldNotBePublic
   - org.openrewrite.staticanalysis.NeedBraces
   #- org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+  - org.openrewrite.java.UseStaticImport:
+      methodPattern: 'org.openrewrite..Assertions *(..)'
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.recipes.RecipeNullabilityBestPracticesSubset
