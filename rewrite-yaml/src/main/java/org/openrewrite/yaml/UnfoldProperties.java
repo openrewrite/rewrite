@@ -18,15 +18,10 @@ package org.openrewrite.yaml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,7 +39,9 @@ public class UnfoldProperties extends Recipe {
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     @Option(displayName = "Exclusions",
-            description = "The keys which you do not want to unfold",
+            description = "Specifies keys that should not be unfolded. Supports glob expressions. " +
+                    "A special format `[<parent-regex>]->[<child-regex>]` can be used to exclude specific child keys under a parent. " +
+                    "For example, `[logging.level]->.*` excludes all child keys under 'logging.level'.",
             example = "org.springframework.security")
     List<String> exclusions;
 
@@ -92,17 +89,32 @@ public class UnfoldProperties extends Recipe {
             }
 
             private List<String> getParts(String key) {
+                String parentKey = getParentKey();
                 List<String> keepTogether = new ArrayList<>();
                 for (String ex : exclusions) {
+                    if (ex.startsWith("[") && ex.contains("]->") && !ex.endsWith("]->")) {
+                        if (parentKey == null) {
+                            continue;
+                        }
+                        String parentEx = ex.split("]->")[0].substring(1);
+                        Matcher m = Pattern.compile(".*(" + parentEx + ").*").matcher(parentKey);
+                        if (m.matches()) {
+                            ex = ex.split("]->")[1];
+                        } else {
+                            continue;
+                        }
+                    }
+
                     Matcher m = Pattern.compile(".*(" + ex + ").*").matcher(key);
                     if (m.matches()) {
-                        keepTogether.add(m.group(1));
+                        keepTogether.add(m.group(1).isEmpty() ? m.group(0) : m.group(1));
                     }
                 }
 
                 List<String> result = new ArrayList<>();
                 List<String> parts = Arrays.asList(key.split("\\."));
-                outer: for (int i = 0; i < parts.size();) {
+                outer:
+                for (int i = 0; i < parts.size(); ) {
                     for (String group : keepTogether) {
                         List<String> groupParts = Arrays.asList(group.split("\\."));
                         if (i + groupParts.size() <= parts.size()) {
@@ -121,6 +133,18 @@ public class UnfoldProperties extends Recipe {
                 return result;
             }
 
+            private @Nullable String getParentKey() {
+                StringBuilder parentKey = new StringBuilder();
+                Cursor c = getCursor().getParent();
+                while (c != null) {
+                    if (c.getValue() instanceof Yaml.Mapping.Entry) {
+                        parentKey.insert(0, ((Yaml.Mapping.Entry) c.getValue()).getKey().getValue() + ".");
+                    }
+                    c = c.getParent();
+                }
+                return parentKey.length() == 0 ? null : parentKey.substring(0, parentKey.length() - 1);
+            }
+
             private Yaml.Mapping.Entry createNestedEntry(List<String> keys, int index, Yaml.Block value) {
                 if (index != keys.size() - 1) {
                     Yaml.Mapping.Entry entry = createNestedEntry(keys, index + 1, value);
@@ -133,7 +157,7 @@ public class UnfoldProperties extends Recipe {
 
             private int getIndentLevel(Yaml.Mapping.Entry entry) {
                 String[] parts = entry.getPrefix().split("\\R");
-                return parts.length > 1 ? countOccurrences(parts[1], " "): 0;
+                return parts.length > 1 ? countOccurrences(parts[1], " ") : 0;
             }
 
             /**

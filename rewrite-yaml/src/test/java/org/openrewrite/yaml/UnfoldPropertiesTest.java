@@ -179,18 +179,24 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusionWithParentAndRegex() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("[logging.level]->.*"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("[log.*level]->.*"))),
           yaml(
             """
-              logging.level:
-                com.desjardins.financementengagementcreditrotatif.externe.sic.service: DEBUG
-                com.another.package: INFO
+              first:
+                logging.level:
+                  com.company.extern.service: DEBUG
+                  com.another.package: INFO
+              some.things.else: value
               """,
             """
-              logging:
-                level:
-                  com.desjardins.financementengagementcreditrotatif.externe.sic.service: DEBUG
-                  com.another.package: INFO
+              first:
+                logging:
+                  level:
+                    com.company.extern.service: DEBUG
+                    com.another.package: INFO
+              some:
+                things:
+                  else: value
               """
           )
         );
