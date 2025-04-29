@@ -57,6 +57,7 @@
 // import {JavaScriptTypeMapping} from "./typeMapping";
 // import path from "node:path";
 // import {ExpressionStatement, TypeTreeExpression} from "./tree";
+// import {createDraft, produce} from "immer";
 //
 // export class JavaScriptParser extends Parser<JS.CompilationUnit> {
 //
@@ -292,9 +293,13 @@
 //         if (bomAndTextEncoding.hasBom) {
 //             // If a node full text has a BOM marker, it becomes a part of the prefix, so we remove it
 //             if (bomAndTextEncoding.encoding === 'utf8') {
-//                 prefix = prefix.withWhitespace(prefix.whitespace!.slice(1));
+//                 prefix = produce(prefix, draft => {
+//                     draft.whitespace = prefix.whitespace!.slice(1);
+//                 });
 //             } else if (bomAndTextEncoding.encoding === 'utf16le') {
-//                 prefix = prefix.withWhitespace(prefix.whitespace!.slice(2));
+//                 prefix = produce(prefix, draft => {
+//                     draft.whitespace = prefix.whitespace!.slice(2);
+//                 });
 //             }
 //         }
 //
@@ -933,27 +938,27 @@
 //         let _arguments: JContainer<J.Expression> | undefined = undefined;
 //
 //         if (ts.isCallExpression(node.expression)) {
-//             annotationType = {
+//             annotationType = ({
 //                 kind: JavaScriptKind.ExpressionWithTypeArguments,
 //                 id: randomId(),
 //                 prefix: emptySpace,
 //                 markers: emptyMarkers,
 //                 clazz: this.convert(node.expression.expression),
 //                 typeArguments: node.expression.typeArguments && this.mapTypeArguments(this.suffix(node.expression.expression), node.expression.typeArguments)
-//             };
+//             });
 //             _arguments = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
 //         } else if (ts.isIdentifier(node.expression)) {
 //             annotationType = this.convert(node.expression);
 //         } else if (ts.isPropertyAccessExpression(node.expression)) {
 //             annotationType = this.convert(node.expression);
 //         } else if (ts.isParenthesizedExpression(node.expression)) {
-//             annotationType = {
+//             annotationType = ({
 //                 kind: JavaScriptKind.TypeTreeExpression,
 //                 id: randomId(),
 //                 prefix: this.prefix(node.expression),
 //                 markers: emptyMarkers,
 //                 expression: this.convert(node.expression)
-//             };
+//             });
 //         } else {
 //             return this.visitUnknown(node);
 //         }
@@ -1480,27 +1485,29 @@
 //     }
 //
 //     visitTypePredicate(node: ts.TypePredicateNode) {
-//         return new JS.TypePredicate(
-//             randomId(),
-//             this.prefix(node),
-//             emptyMarkers,
-//             node.assertsModifier ? this.leftPadded(this.prefix(node.assertsModifier), true) : this.leftPadded(emptySpace, false),
-//             this.visit(node.parameterName),
-//             node.type ? this.leftPadded(this.suffix(node.parameterName), this.convert(node.type)) : null,
-//             this.mapType(node)
-//         );
+//         return {
+//             kind: JavaScriptKind.TypePredicate,
+//             id: randomId(),
+//             prefix: this.prefix(node),
+//             markers: emptyMarkers,
+//             asserts: node.assertsModifier ? this.leftPadded(this.prefix(node.assertsModifier), true) : this.leftPadded(emptySpace, false),
+//             parameterName: this.visit(node.parameterName),
+//             expression: node.type && this.leftPadded(this.suffix(node.parameterName), this.convert(node.type)),
+//             type: this.mapType(node)
+//         };
 //     }
 //
 //     visitTypeReference(node: ts.TypeReferenceNode) {
 //         if (node.typeArguments) {
-//             return new J.ParameterizedType(
-//                 randomId(),
-//                 this.prefix(node),
-//                 emptyMarkers,
-//                 this.visit(node.typeName),
-//                 this.mapTypeArguments(this.suffix(node.typeName), node.typeArguments),
-//                 this.mapType(node)
-//             )
+//             return {
+//                 kind: JavaKind.ParameterizedType,
+//                 id: randomId(),
+//                 prefix: this.prefix(node),
+//                 markers: emptyMarkers,
+//                 clazz: this.visit(node.typeName),
+//                 typeParameters: this.mapTypeArguments(this.suffix(node.typeName), node.typeArguments),
+//                 type: this.mapType(node)
+//             }
 //         }
 //         return this.visit(node.typeName);
 //     }

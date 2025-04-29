@@ -488,8 +488,9 @@ export const enum TypeOperatorType {
 export interface TypePredicate extends JS {
     readonly kind: typeof JavaScriptKind.TypePredicate;
     readonly asserts: JLeftPadded<boolean>;
-    readonly parameterName: Expression;
+    readonly parameterName: Identifier;
     readonly expression?: JLeftPadded<Expression>;
+    readonly type?: JavaType;
 }
 
 export interface Union extends JS, TypeTree {

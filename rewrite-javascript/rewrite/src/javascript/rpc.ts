@@ -71,7 +71,18 @@ import {
     WithStatement,
     Yield
 } from "./tree";
-import {Annotation, isJava, isSpace, J, JavaType, JContainer, JLeftPadded, JRightPadded, Space} from "../java";
+import {
+    Annotation,
+    isJava,
+    isSpace,
+    J,
+    JavaType,
+    JContainer,
+    JLeftPadded,
+    JRightPadded,
+    Space,
+    TypeCast
+} from "../java";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft} from "immer";
 import {JavaReceiver, JavaSender} from "../java/rpc";
@@ -516,6 +527,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(typePredicate, t => t.asserts, asserts => this.visitLeftPadded(asserts, q));
         await q.getAndSend(typePredicate, t => t.parameterName, name => this.visit(name, q));
         await q.getAndSend(typePredicate, t => t.expression, expr => this.visitLeftPadded(expr, q));
+        await q.getAndSend(typePredicate, t => t.type && asRef(t.type), type => this.visitType(type, q));
 
         return typePredicate;
     }
@@ -1026,6 +1038,17 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
         draft.expression = await q.receive(typeOf.expression, expr => this.visit(expr, q));
         draft.type = await q.receive(typeOf.type, type => this.visitType(type, q));
+
+        return finishDraft(draft);
+    }
+
+    protected async visitTypePredicate(typePredicate: TypePredicate, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(typePredicate);
+
+        draft.asserts = await q.receive(typePredicate.asserts, expr => this.visitLeftPadded(expr, q));
+        draft.parameterName = await q.receive(typePredicate.parameterName, expr => this.visit(expr, q));
+        draft.expression = await q.receive(typePredicate.expression, expr => this.visitLeftPadded(expr, q));
+        draft.type = await q.receive(typePredicate.type, type => this.visitType(type, q));
 
         return finishDraft(draft);
     }

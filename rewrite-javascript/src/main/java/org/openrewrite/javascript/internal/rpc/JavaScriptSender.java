@@ -468,6 +468,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(typePredicate, t -> t.getPadding().getAsserts(), asserts -> visitLeftPadded(asserts, q));
         q.getAndSend(typePredicate, JS.TypePredicate::getParameterName, name -> visit(name, q));
         q.getAndSend(typePredicate, t -> t.getPadding().getExpression(), expr -> visitLeftPadded(expr, q));
+        q.getAndSend(typePredicate, JS.TypePredicate::getType, type -> visitType(type, q));
         return typePredicate;
     }
 

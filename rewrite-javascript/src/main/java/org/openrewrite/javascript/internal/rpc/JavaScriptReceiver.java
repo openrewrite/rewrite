@@ -547,7 +547,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return typePredicate
                 .getPadding().withAsserts(q.receive(typePredicate.getPadding().getAsserts(), asserts -> visitLeftPadded(asserts, q)))
                 .withParameterName(q.receive(typePredicate.getParameterName(), name -> (J.Identifier) visitNonNull(name, q)))
-                .getPadding().withExpression(q.receive(typePredicate.getPadding().getExpression(), expr -> visitLeftPadded(expr, q)));
+                .getPadding().withExpression(q.receive(typePredicate.getPadding().getExpression(), expr -> visitLeftPadded(expr, q)))
+                .withType(q.receive(typePredicate.getType(), type -> visitType(type, q)));
     }
 
     @Override

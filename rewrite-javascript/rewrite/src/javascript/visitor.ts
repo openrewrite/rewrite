@@ -17,8 +17,10 @@ import {mapAsync, SourceFile, ValidImmerRecipeReturnType} from "../";
 import {
     Annotation,
     ControlParentheses,
+    Identifier,
     J,
     JavaType,
+    JavaVisitor,
     LambdaParameters,
     Literal,
     Modifier,
@@ -27,7 +29,6 @@ import {
     Statement,
     TypeParameters,
     TypeTree,
-    JavaVisitor
 } from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
 import {
@@ -47,22 +48,21 @@ import {
     ImportAttributes,
     ImportType,
     ImportTypeAttributes,
+    IndexSignatureDeclaration,
     IndexedAccessType,
     IndexedAccessTypeIndexType,
-    IndexSignatureDeclaration,
     InferType,
     Intersection,
-    isJavaScript,
     JS,
+    JSMethodDeclaration,
+    JSNamedVariable,
+    JSVariableDeclarations,
     JavaScriptKind,
     JsAssignmentOperation,
     JsBinary,
     JsImport,
     JsImportClause,
     JsImportSpecifier,
-    JSMethodDeclaration,
-    JSNamedVariable,
-    JSVariableDeclarations,
     LiteralType,
     MappedType,
     MappedTypeKeysRemapping,
@@ -89,7 +89,8 @@ import {
     Union,
     Void,
     WithStatement,
-    Yield
+    Yield,
+    isJavaScript,
 } from "./tree";
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
@@ -566,8 +567,9 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     protected async visitTypePredicate(typePredicate: TypePredicate, p: P): Promise<J | undefined> {
         return this.produceJavaScript<TypePredicate>(typePredicate, p, async draft => {
             draft.asserts = await this.visitLeftPadded(typePredicate.asserts, p);
-            draft.parameterName = await this.visitDefined(typePredicate.parameterName, p) as Expression;
+            draft.parameterName = await this.visitDefined(typePredicate.parameterName, p) as Identifier;
             draft.expression = await this.visitOptionalLeftPadded(typePredicate.expression, p);
+            draft.type = await this.visitType(typePredicate.type, p);
         });
     }
     
