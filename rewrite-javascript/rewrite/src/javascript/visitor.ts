@@ -59,6 +59,7 @@ import {
     JsImport,
     JsImportClause,
     JsImportSpecifier,
+    JSMethodDeclaration,
     LiteralType,
     MappedType,
     MappedTypeKeysRemapping,
@@ -84,7 +85,7 @@ import {
     Union,
     Void,
     WithStatement,
-    Yield
+    Yield, JSVariableDeclarations, JSNamedVariable
 } from "./tree";
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
@@ -315,6 +316,37 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.importType = await this.visitLeftPadded(jsImportSpecifier.importType, p);
             draft.specifier = await this.visitDefined(jsImportSpecifier.specifier, p) as Expression;
             draft.type = await this.visitType(jsImportSpecifier.type, p);
+        });
+    }
+
+    protected async visitJSVariableDeclarations(varDecls: JSVariableDeclarations, p: P): Promise<J | undefined> {
+        return this.produceTree<JSVariableDeclarations>(varDecls, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(varDecls.leadingAnnotations, a => this.visitDefined<Annotation>(a, p));
+            draft.modifiers = await mapAsync(varDecls.modifiers, m => this.visitDefined<Modifier>(m, p));
+            draft.typeExpression = varDecls.typeExpression && await this.visit(varDecls.typeExpression, p);
+            draft.varargs = varDecls.varargs && await this.visitSpace(varDecls.varargs, p);
+            draft.variables = await mapAsync(varDecls.variables, v => this.visitRightPadded(v, p));
+        });
+    }
+
+        protected async visitJSNamedVariable(variable: JSNamedVariable, p: P): Promise<J | undefined> {
+        return this.produceTree<JSNamedVariable>(variable, p, async draft => {
+            draft.name = await this.visitDefined<Expression>(variable.name, p);
+            draft.dimensionsAfterName = await mapAsync(variable.dimensionsAfterName, d => this.visitLeftPadded(d, p));
+            draft.initializer = variable.initializer && await this.visitLeftPadded(variable.initializer, p);
+        });
+    }
+    
+    protected async visitJSMethodDeclaration(methodDecl: JSMethodDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JSMethodDeclaration>(methodDecl, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(methodDecl.leadingAnnotations, a => this.visitDefined<Annotation>(a, p));
+            draft.modifiers = await mapAsync(methodDecl.modifiers, m => this.visitDefined<Modifier>(m, p));
+            draft.returnTypeExpression = methodDecl.returnTypeExpression && await this.visitDefined(methodDecl.returnTypeExpression, p);
+            draft.name = await this.visitDefined(methodDecl.name, p) as Expression;
+            draft.parameters = await this.visitContainer(methodDecl.parameters, p);
+            draft.body = methodDecl.body && await this.visitRightPadded(methodDecl.body, p);
+            draft.defaultValue = methodDecl.defaultValue && await this.visitLeftPadded(methodDecl.defaultValue, p);
+            draft.methodType = await this.visitType(methodDecl.methodType, p) as JavaType.Method;
         });
     }
 
@@ -615,6 +647,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 return this.visitJsImport(t as JsImport, p);
             case JavaScriptKind.JsImportClause:
                 return this.visitJsImportClause(t as JsImportClause, p);
+            case JavaScriptKind.JSVariableDeclarations:
+                return this.visitJSVariableDeclarations(t as JSVariableDeclarations, p);
+            case JavaScriptKind.JSNamedVariable:
+                return this.visitJSNamedVariable(t as JSNamedVariable, p);
+            case JavaScriptKind.JSMethodDeclaration:
+                return this.visitJSMethodDeclaration(t as JSMethodDeclaration, p);
             case JavaScriptKind.NamedImports:
                 return this.visitNamedImports(t as NamedImports, p);
             case JavaScriptKind.JsImportSpecifier:

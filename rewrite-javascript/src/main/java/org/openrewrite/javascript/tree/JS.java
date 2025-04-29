@@ -4239,17 +4239,6 @@ public interface JS extends J {
             return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
         }
 
-        @Nullable
-        JContainer<NameTree> throwz;
-
-        public @Nullable List<NameTree> getThrowz() {
-            return throwz == null ? null : throwz.getElements();
-        }
-
-        public JSMethodDeclaration withThrowz(@Nullable List<NameTree> throwz) {
-            return getPadding().withThrowz(JContainer.withElementsNullable(this.throwz, throwz));
-        }
-
         /**
          * Null for abstract method declarations and interface method declarations.
          */
@@ -4279,7 +4268,7 @@ public interface JS extends J {
             if (type == this.methodType) {
                 return this;
             }
-            return new JSMethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, type);
+            return new JSMethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, body, defaultValue, type);
         }
 
         @Override
@@ -4347,15 +4336,7 @@ public interface JS extends J {
             }
 
             public JSMethodDeclaration withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new JSMethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throwz, t.body, t.defaultValue, t.methodType);
-            }
-
-            public @Nullable JContainer<NameTree> getThrowz() {
-                return t.throwz;
-            }
-
-            public JSMethodDeclaration withThrowz(@Nullable JContainer<NameTree> throwz) {
-                return t.throwz == throwz ? t : new JSMethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throwz, t.body, t.defaultValue, t.methodType);
+                return t.parameters == parameters ? t : new JSMethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.body, t.defaultValue, t.methodType);
             }
 
             public @Nullable JLeftPadded<Expression> getDefaultValue() {
@@ -4363,7 +4344,7 @@ public interface JS extends J {
             }
 
             public JSMethodDeclaration withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
-                return t.defaultValue == defaultValue ? t : new JSMethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.methodType);
+                return t.defaultValue == defaultValue ? t : new JSMethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.body, defaultValue, t.methodType);
             }
         }
     }

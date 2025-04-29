@@ -506,6 +506,18 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitJSMethodDeclaration(JS.JSMethodDeclaration methodDecl, RpcReceiveQueue q) {
+        return methodDecl.withLeadingAnnotations(q.receiveList(methodDecl.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
+                .withModifiers(q.receiveList(methodDecl.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
+                .withReturnTypeExpression(q.receive(methodDecl.getReturnTypeExpression(), type -> (TypeTree) visitNonNull(type, q)))
+                .withName(q.receive(methodDecl.getName(), name -> (Expression) visitNonNull(name, q)))
+                .getPadding().withParameters(q.receive(methodDecl.getPadding().getParameters(), params -> visitContainer(params, q)))
+                .withBody(q.receive(methodDecl.getBody(), body -> (J.Block) visitNonNull(body, q)))
+                .getPadding().withDefaultValue(q.receive(methodDecl.getPadding().getDefaultValue(), def -> visitLeftPadded(def, q)))
+                .withType(q.receive(methodDecl.getMethodType(), type -> (JavaType.Method) visitType(type, q)));
+    }
+
+    @Override
     public J visitTypeOf(JS.TypeOf typeOf, RpcReceiveQueue q) {
         try {
             return typeOf.withExpression(q.receive(typeOf.getExpression(), expr -> (Expression) visitNonNull(expr, q)))

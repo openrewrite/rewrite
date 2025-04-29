@@ -29,7 +29,7 @@ import {
     TypedTree
 } from '../java';
 import * as JS from '.';
-import {JavaScriptKind} from '.';
+import {Expression, JavaScriptKind} from '.';
 import {
     emptyMarkers,
     ExecutionContext,
@@ -359,7 +359,7 @@ export class JavaScriptParserVisitor {
         | ts.FunctionDeclaration | ts.ParameterDeclaration | ts.MethodDeclaration | ts.EnumDeclaration | ts.InterfaceDeclaration
         | ts.PropertySignature | ts.ConstructorDeclaration | ts.ModuleDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration
         | ts.ArrowFunction | ts.IndexSignatureDeclaration | ts.TypeAliasDeclaration | ts.ExportDeclaration | ts.ExportAssignment | ts.FunctionExpression
-        | ts.ConstructorTypeNode | ts.TypeParameterDeclaration | ts.ImportDeclaration | ts.ImportEqualsDeclaration) : J.Modifier[] {
+        | ts.ConstructorTypeNode | ts.TypeParameterDeclaration | ts.ImportDeclaration | ts.ImportEqualsDeclaration): J.Modifier[] {
         if (ts.isVariableStatement(node) || ts.isModuleDeclaration(node) || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)
             || ts.isInterfaceDeclaration(node) || ts.isPropertyDeclaration(node) || ts.isPropertySignature(node) || ts.isParameter(node)
             || ts.isMethodDeclaration(node) || ts.isConstructorDeclaration(node) || ts.isArrowFunction(node)
@@ -798,34 +798,45 @@ export class JavaScriptParserVisitor {
                         node.default ? this.rightPadded(this.visit(node.default), this.suffix(node.default)) : this.rightPadded(this.newJEmpty(), emptySpace)
                     ],
                     markers: emptyMarkers
-                }
-                : null
+                } : undefined
         };
     }
 
     visitParameter(node: ts.ParameterDeclaration) {
         if (node.questionToken) {
-            return new JS.JSVariableDeclarations(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                this.mapDecorators(node),
-                this.mapModifiers(node),
-                this.mapTypeInfo(node),
-                null,
-                [this.rightPadded(
-                    new JS.JSVariableDeclarations.JSNamedVariable(
-                        randomId(),
-                        this.prefix(node.name),
-                        emptyMarkers,
-                        this.getOptionalUnary(node),
-                        [],
-                        node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) : null,
-                        this.mapVariableType(node)
-                    ),
-                    this.suffix(node.name)
-                )]
-            );
+            return {
+                kind: JavaScriptKind.JSVariableDeclarations,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                decorators: this.mapDecorators(node),
+                modifiers: this.mapModifiers(node),
+                typeInfo: this.mapTypeInfo(node),
+                varargs: null,
+                variables: [
+                    this.rightPadded(
+                        {
+                            kind: JavaScriptKindJSNamedVariable,
+                            id: randomId(),
+                            prefix: this.prefix(node.name),
+                            markers: emptyMarkers,
+                            element: this.getOptionalUnary(node),
+                            annotations: [],
+                            initializer: node.initializer &&
+                                this.leftPadded(
+                                    this.prefix(
+                                        node.getChildAt(
+                                            node.getChildren().indexOf(node.initializer) - 1
+                                        )
+                                    ),
+                                    this.visit(node.initializer)
+                                ),
+                            variableType: this.mapVariableType(node)
+                        },
+                        this.suffix(node.name)
+                    )
+                ]
+            };
         }
 
         if (node.dotDotDotToken) {
@@ -911,40 +922,42 @@ export class JavaScriptParserVisitor {
 
     visitDecorator(node: ts.Decorator) {
         let annotationType: J.NameTree;
-        let _arguments: JContainer<J.Expression> | null = null;
+        let _arguments: JContainer<J.Expression> | undefined = undefined;
 
         if (ts.isCallExpression(node.expression)) {
-            annotationType = new JS.ExpressionWithTypeArguments(
-                randomId(),
-                emptySpace,
-                emptyMarkers,
-                this.convert(node.expression.expression),
-                node.expression.typeArguments ? this.mapTypeArguments(this.suffix(node.expression.expression), node.expression.typeArguments) : null,
-                null
-            );
+            annotationType = {
+                kind: JavaScriptKind.ExpressionWithTypeArguments,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                clazz: this.convert(node.expression.expression),
+                typeArguments: node.expression.typeArguments && this.mapTypeArguments(this.suffix(node.expression.expression), node.expression.typeArguments)
+            };
             _arguments = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
         } else if (ts.isIdentifier(node.expression)) {
             annotationType = this.convert(node.expression);
         } else if (ts.isPropertyAccessExpression(node.expression)) {
             annotationType = this.convert(node.expression);
         } else if (ts.isParenthesizedExpression(node.expression)) {
-            annotationType = new JS.TypeTreeExpression(
-                randomId(),
-                this.prefix(node.expression),
-                emptyMarkers,
-                this.convert(node.expression)
-            );
+            annotationType = {
+                kind: JavaScriptKind.TypeTreeExpression,
+                id: randomId(),
+                prefix: this.prefix(node.expression),
+                markers: emptyMarkers,
+                expression: this.convert<Expression>(node.expression)
+            };
         } else {
             return this.visitUnknown(node);
         }
 
-        return new J.Annotation(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            annotationType,
-            _arguments
-        );
+        return {
+            kind: JavaKind.Annotation,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            annotationType: annotationType,
+            arguments: _arguments
+        };
     }
 
     visitPropertySignature(node: ts.PropertySignature) {
@@ -976,7 +989,7 @@ export class JavaScriptParserVisitor {
 
         const nameExpression = this.visit(node.name)
 
-        if (nameExpression instanceof J.Identifier) {
+        if (nameExpression.kind == JavaKind.Identifier) {
             return new J.VariableDeclarations(
                 randomId(),
                 prefix,
@@ -1084,7 +1097,7 @@ export class JavaScriptParserVisitor {
 
         const nameExpression = this.visit(node.name)
 
-        if (nameExpression instanceof J.Identifier) {
+        if (nameExpression.kind == JavaKind.Identifier) {
             return new J.VariableDeclarations(
                 randomId(),
                 prefix,
@@ -1250,68 +1263,76 @@ export class JavaScriptParserVisitor {
             );
         }
 
-        return new J.MethodDeclaration(
-            randomId(),
-            prefix,
-            emptyMarkers,
-            this.mapDecorators(node),
-            this.mapModifiers(node),
-            this.mapTypeParametersAsObject(node),
-            this.mapTypeInfo(node),
-            new J.MethodDeclaration.IdentifierWithAnnotations(
-                name,
-                []
-            ),
-            this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-            null,
-            node.body ? this.convert<J.Block>(node.body) : null,
-            null,
-            this.mapMethodType(node)
-        );
+        return {
+            kind: JavaKind.MethodDeclaration,
+            id: randomId(),
+            prefix: prefix,
+            markers: emptyMarkers,
+            leadingAnnotations: this.mapDecorators(node),
+            modifiers: this.mapModifiers(node),
+            typeParameters: this.mapTypeParametersAsObject(node),
+            returnTypeExpression: this.mapTypeInfo(node),
+            name: {
+                kind: JavaKind.IdentifierWithAnnotations,
+                identifier: name,
+                annotations: []
+            },
+            parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            throws: null,
+            body: node.body ? this.convert<J.Block>(node.body) : null,
+            defaultValue: null,
+            methodType: this.mapMethodType(node)
+        };
     }
 
     private mapTypeInfo(node: ts.MethodDeclaration | ts.PropertyDeclaration | ts.VariableDeclaration | ts.ParameterDeclaration
         | ts.PropertySignature | ts.MethodSignature | ts.ArrowFunction | ts.CallSignatureDeclaration | ts.GetAccessorDeclaration
         | ts.FunctionDeclaration | ts.ConstructSignatureDeclaration | ts.FunctionExpression | ts.NamedTupleMember) {
-        return node.type ? new JS.TypeInfo(randomId(), this.prefix(node.getChildAt(node.getChildren().indexOf(node.type) - 1)), emptyMarkers, this.visit(node.type)) : null;
+        return node.type && {
+            kind: JavaScriptKind.TypeInfo,
+            id: randomId(),
+            prefix: this.prefix(node.getChildAt(node.getChildren().indexOf(node.type) - 1)),
+            markers: emptyMarkers,
+            type: this.visit(node.type)
+        };
     }
 
     visitClassStaticBlockDeclaration(node: ts.ClassStaticBlockDeclaration) {
-        return new J.Block(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            new JRightPadded(true, this.prefix(this.findChildNode(node.body, ts.SyntaxKind.OpenBraceToken)!), emptyMarkers),
-            node.body.statements.map(ce => new JRightPadded(
+        return {
+            kind: JavaKind.Block,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            static: this.rightPadded(true, this.prefix(this.findChildNode(node.body, ts.SyntaxKind.OpenBraceToken)!), emptyMarkers),
+            statements: node.body.statements.map(ce => this.rightPadded(
                 this.convert(ce),
                 ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
                 ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? Markers.build([new Semicolon(randomId())]) : emptyMarkers
             )),
-            this.prefix(node.getLastToken()!)
-        );
+            end: this.prefix(node.getLastToken()!)
+        };
     }
 
     visitConstructor(node: ts.ConstructorDeclaration) {
         // using string literal for the following case: class A { "constructor"() {} }
         const constructorKeyword = node.getChildren()
             .find(n => (n.kind === ts.SyntaxKind.ConstructorKeyword) || ((n.kind === ts.SyntaxKind.StringLiteral) && (n.getText().includes("constructor"))))!;
-        return new J.MethodDeclaration(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapDecorators(node),
-            this.mapModifiers(node),
-            null,
-            null,
-            new J.MethodDeclaration.IdentifierWithAnnotations(
-                this.mapIdentifier(constructorKeyword, constructorKeyword.getText()), []
-            ),
-            this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-            null,
-            node.body ? this.convert<J.Block>(node.body) : null,
-            null,
-            this.mapMethodType(node)
-        );
+        return {
+            kind: JavaKind.MethodDeclaration,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            leadingAnnotations: this.mapDecorators(node),
+            modifiers: this.mapModifiers(node),
+            name: {
+                kind: JavaKind.IdentifierWithAnnotations,
+                identifier: this.mapIdentifier(constructorKeyword, constructorKeyword.getText()),
+                annotations: []
+            },
+            parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            body: node.body && this.convert<J.Block>(node.body),
+            methodType: this.mapMethodType(node)
+        };
     }
 
     visitGetAccessor(node: ts.GetAccessorDeclaration) {

@@ -62,6 +62,9 @@ export const JavaScriptKind = {
     JsImport: "org.openrewrite.javascript.tree.JS$JsImport",
     JsImportClause: "org.openrewrite.javascript.tree.JS$JsImportClause",
     JsImportSpecifier: "org.openrewrite.javascript.tree.JS$JsImportSpecifier",
+    JSVariableDeclarations: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations",
+    JSNamedVariable: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations$JSNamedVariable",
+    JSMethodDeclaration: "org.openrewrite.javascript.tree.JS$JSMethodDeclaration",
     JsBinary: "org.openrewrite.javascript.tree.JS$JsBinary",
     LiteralType: "org.openrewrite.javascript.tree.JS$LiteralType",
     MappedType: "org.openrewrite.javascript.tree.JS$MappedType",
@@ -241,6 +244,23 @@ export interface JsImportSpecifier extends JS, TypedTree {
     readonly importType: JLeftPadded<boolean>;
     readonly specifier: Expression;
     readonly type?: JavaType;
+}
+
+export interface JSVariableDeclarations extends JS, Statement, TypedTree {
+    readonly kind: typeof JavaScriptKind.JSVariableDeclarations;
+    readonly leadingAnnotations: Annotation[];
+    readonly modifiers: Modifier[];
+    readonly typeExpression?: TypeTree;
+    readonly varargs?: Space;
+    readonly variables: JRightPadded<JSNamedVariable>[];
+}
+
+export interface JSNamedVariable extends JS, NameTree {
+    readonly kind: typeof JavaScriptKind.JSNamedVariable;
+    readonly name: Expression;
+    readonly dimensionsAfterName: JLeftPadded<Space>[];
+    readonly initializer?: JLeftPadded<Expression>;
+    readonly variableType?: JavaType.Variable;
 }
 
 export interface ImportAttributes extends JS {
@@ -497,4 +517,16 @@ export interface WithStatement extends JS, Statement {
     readonly kind: typeof JavaScriptKind.WithStatement;
     readonly expression: ControlParentheses<Expression>;
     readonly body: JRightPadded<Statement>;
+}
+
+export interface JSMethodDeclaration extends JS, Statement, TypedTree {
+    readonly kind: typeof JavaScriptKind.JSMethodDeclaration;
+    readonly leadingAnnotations: Annotation[];
+    readonly modifiers: Modifier[];
+    readonly returnTypeExpression?: TypeTree;
+    readonly name: Expression;
+    readonly parameters: JContainer<Statement>;
+    readonly body?: JRightPadded<Statement>;
+    readonly defaultValue?: JLeftPadded<Expression>;
+    readonly methodType?: JavaType.Method;
 }

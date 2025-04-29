@@ -991,9 +991,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
                         visitTypeName(m.getReturnTypeExpression(), p));
         m = m.withName(Objects.requireNonNull(this.visitAndCast(m.getName(), p)));
         m = m.getPadding().withParameters(Objects.requireNonNull(visitContainer(m.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, p)));
-        if (m.getPadding().getThrowz() != null) {
-            m = m.getPadding().withThrowz(visitContainer(m.getPadding().getThrowz(), JContainer.Location.THROWS, p));
-        }
         m = m.withBody(visitAndCast(m.getBody(), p));
         if (m.getPadding().getDefaultValue() != null) {
             m = m.getPadding().withDefaultValue(visitLeftPadded(m.getPadding().getDefaultValue(), JLeftPadded.Location.METHOD_DECLARATION_DEFAULT_VALUE, p));

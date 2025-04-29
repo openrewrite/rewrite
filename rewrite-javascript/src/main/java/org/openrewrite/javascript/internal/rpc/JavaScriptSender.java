@@ -280,6 +280,29 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitJSVariableDeclarations(JS.JSVariableDeclarations varDecls, RpcSendQueue q) {
+        q.getAndSendList(varDecls, JS.JSVariableDeclarations::getLeadingAnnotations, J::getId, annot -> visitAnnotation(annot, q));
+        q.getAndSendList(varDecls, JS.JSVariableDeclarations::getModifiers, J::getId, mod -> visitModifier(mod, q));
+        q.getAndSend(varDecls, JS.JSVariableDeclarations::getTypeExpression, type -> visit(type, q));
+        q.getAndSend(varDecls, JS.JSVariableDeclarations::getVarargs, space -> visitSpace(space, q));
+        q.getAndSendList(varDecls, v -> v.getPadding().getVariables(), variable -> variable.getElement().getId(),
+                variable -> visitRightPadded(variable, q));
+
+        return varDecls;
+    }
+
+    @Override
+    public J visitJSVariableDeclarationsJSNamedVariable(JS.JSVariableDeclarations.JSNamedVariable variable, RpcSendQueue q) {
+        q.getAndSend(variable, JS.JSVariableDeclarations.JSNamedVariable::getName, name -> visit(name, q));
+        q.getAndSendList(variable, JS.JSVariableDeclarations.JSNamedVariable::getDimensionsAfterName,
+                JLeftPadded::getElement, dim -> visitLeftPadded(dim, q));
+        q.getAndSend(variable, v -> v.getPadding().getInitializer(), init -> visitLeftPadded(init, q));
+        q.getAndSend(variable, JS.JSVariableDeclarations.JSNamedVariable::getVariableType, type -> visitType(type, q));
+
+        return variable;
+    }
+
+    @Override
     public J visitJsBinary(JS.JsBinary jsBinary, RpcSendQueue q) {
         q.getAndSend(jsBinary, JS.JsBinary::getLeft, left -> visit(left, q));
         q.getAndSend(jsBinary, b -> b.getPadding().getOperator(), op -> visitLeftPadded(op, q));
@@ -460,6 +483,20 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
                 type -> visitRightPadded(type, q));
         q.getAndSend(union, JS.Union::getType, type -> visitType(type, q));
         return union;
+    }
+
+    @Override
+    public J visitJSMethodDeclaration(JS.JSMethodDeclaration methodDecl, RpcSendQueue q) {
+        q.getAndSendList(methodDecl, JS.JSMethodDeclaration::getLeadingAnnotations, J.Annotation::getId, annot -> visit(annot, q));
+        q.getAndSendList(methodDecl, JS.JSMethodDeclaration::getModifiers, J.Modifier::getId, mod -> visit(mod, q));
+        q.getAndSend(methodDecl, JS.JSMethodDeclaration::getReturnTypeExpression, type -> visit(type, q));
+        q.getAndSend(methodDecl, JS.JSMethodDeclaration::getName, name -> visit(name, q));
+        q.getAndSend(methodDecl, m -> m.getPadding().getParameters(), params -> visitContainer(params, q));
+        q.getAndSend(methodDecl, JS.JSMethodDeclaration::getBody, body -> visit(body, q));
+        q.getAndSend(methodDecl, jsMethodDeclaration -> jsMethodDeclaration.getPadding().getDefaultValue(), def -> visitLeftPadded(def, q));
+        q.getAndSend(methodDecl, JS.JSMethodDeclaration::getMethodType, type -> visitType(type, q));
+
+        return methodDecl;
     }
 
     @Override
