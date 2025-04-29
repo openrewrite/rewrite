@@ -1,48 +1,48 @@
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Moderne Source Available License (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://docs.moderne.io/licensing/moderne-source-available-license
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-import * as ts from 'typescript';
-import * as J from '../java';
-import {
-    emptySpace,
-    FieldAccess,
-    JavaKind,
-    JavaType,
-    JContainer,
-    JLeftPadded,
-    JRightPadded,
-    Semicolon,
-    Space,
-    TrailingComma,
-    TypedTree
-} from '../java';
-import * as JS from '.';
-import {Expression, JavaScriptKind} from '.';
-import {
-    emptyMarkers,
-    ExecutionContext,
-    Markers,
-    MarkersKind,
-    ParseError,
-    ParseExceptionResult,
-    Parser,
-    ParserInput,
-    ParserSourceReader,
-    randomId,
-    SourceFile
-} from "..";
+// /*
+//  * Copyright 2025 the original author or authors.
+//  * <p>
+//  * Licensed under the Moderne Source Available License (the "License");
+//  * you may not use this file except in compliance with the License.
+//  * You may obtain a copy of the License at
+//  * <p>
+//  * https://docs.moderne.io/licensing/moderne-source-available-license
+//  * <p>
+//  * Unless required by applicable law or agreed to in writing, software
+//  * distributed under the License is distributed on an "AS IS" BASIS,
+//  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  * See the License for the specific language governing permissions and
+//  * limitations under the License.
+//  */
+// import * as ts from 'typescript';
+// import * as J from '../java';
+// import {
+//     emptySpace,
+//     FieldAccess,
+//     JavaKind,
+//     JavaType,
+//     JContainer,
+//     JLeftPadded,
+//     JRightPadded,
+//     Semicolon,
+//     Space,
+//     TrailingComma,
+//     TypedTree
+// } from '../java';
+// import * as JS from '.';
+// import {Expression, JavaScriptKind} from '.';
+// import {
+//     emptyMarkers,
+//     ExecutionContext,
+//     Markers,
+//     MarkersKind,
+//     ParseError,
+//     ParseExceptionResult,
+//     Parser,
+//     ParserInput,
+//     ParserSourceReader,
+//     randomId,
+//     SourceFile
+// } from "..";
 // import {
 //     binarySearch,
 //     checkSyntaxErrors,
@@ -55,9 +55,9 @@ import {
 //     TextSpan
 // } from "./parserUtils";
 // import {JavaScriptTypeMapping} from "./typeMapping";
-import path from "node:path";
-import {ExpressionStatement, TypeTreeExpression} from "./tree";
-
+// import path from "node:path";
+// import {ExpressionStatement, TypeTreeExpression} from "./tree";
+//
 // export class JavaScriptParser extends Parser<JS.CompilationUnit> {
 //
 //     private readonly compilerOptions: ts.CompilerOptions;
@@ -538,7 +538,11 @@ import {ExpressionStatement, TypeTreeExpression} from "./tree";
 //                 statements: node.members.map((ce: ts.ClassElement) => this.rightPadded(
 //                     this.convert(ce),
 //                     ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
-//                     ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? Markers.build([new Semicolon(randomId())]) : emptyMarkers
+//                     ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? {
+//                         kind: MarkersKind.Markers,
+//                         id: randomId(),
+//                         markers: [{kind: "org.openrewrite.java.marker.Semicolon", id: randomId()}]
+//                     } : emptyMarkers
 //                 )),
 //                 end: this.prefix(node.getLastToken()!)
 //             },
@@ -809,14 +813,14 @@ import {ExpressionStatement, TypeTreeExpression} from "./tree";
 //                 id: randomId(),
 //                 prefix: this.prefix(node),
 //                 markers: emptyMarkers,
-//                 decorators: this.mapDecorators(node),
+//                 leadingAnnotations: this.mapDecorators(node),
 //                 modifiers: this.mapModifiers(node),
 //                 typeInfo: this.mapTypeInfo(node),
 //                 varargs: null,
 //                 variables: [
 //                     this.rightPadded(
 //                         {
-//                             kind: JavaScriptKindJSNamedVariable,
+//                             kind: JavaScriptKind.JSNamedVariable,
 //                             id: randomId(),
 //                             prefix: this.prefix(node.name),
 //                             markers: emptyMarkers,
@@ -840,84 +844,88 @@ import {ExpressionStatement, TypeTreeExpression} from "./tree";
 //         }
 //
 //         if (node.dotDotDotToken) {
-//             return new JS.JSVariableDeclarations(
-//                 randomId(),
-//                 this.prefix(node),
-//                 emptyMarkers,
-//                 this.mapDecorators(node),
-//                 this.mapModifiers(node),
-//                 this.mapTypeInfo(node),
-//                 null,
-//                 [this.rightPadded(
-//                     new JS.JSVariableDeclarations.JSNamedVariable(
-//                         randomId(),
-//                         emptySpace,
-//                         emptyMarkers,
-//                         new JS.Unary(
-//                             randomId(),
-//                             emptySpace,
-//                             emptyMarkers,
-//                             this.leftPadded(this.prefix(node.dotDotDotToken), JS.Unary.Type.Spread),
-//                             this.visit(node.name),
-//                             this.mapType(node)
-//                         ),
-//                         [],
-//                         node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) : null,
-//                         this.mapVariableType(node)
-//                     ),
+//             return {
+//                 kind: JavaScriptKind.JSVariableDeclarations,
+//                 id: randomId(),
+//                 prefix: this.prefix(node),
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: this.mapDecorators(node),
+//                 modifiers: this.mapModifiers(node),
+//                 typeExpression: this.mapTypeInfo(node),
+//                 variables: [this.rightPadded(
+//                     {
+//                         kind: JavaScriptKind.JSNamedVariable,
+//                         id: randomId(),
+//                         prefix: emptySpace,
+//                         markers: emptyMarkers,
+//                         name: {
+//                             kind: JavaScriptKind.Unary,
+//                             id: randomId(),
+//                             prefix: emptySpace,
+//                             markers: emptyMarkers,
+//                             operator: this.leftPadded(this.prefix(node.dotDotDotToken), JS.UnaryOperator.Spread),
+//                             expression: this.visit(node.name),
+//                             type: this.mapType(node)
+//                         },
+//                         dimensions: [],
+//                         initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
+//                         variableType: this.mapVariableType(node)
+//                     },
 //                     this.suffix(node.name)
 //                 )]
-//             );
+//             };
 //         }
 //
 //         const nameExpression = this.visit(node.name)
 //
-//         if (nameExpression instanceof J.Identifier) {
-//             return new J.VariableDeclarations(
-//                 randomId(),
-//                 this.prefix(node),
-//                 emptyMarkers,
-//                 this.mapDecorators(node),
-//                 this.mapModifiers(node),
-//                 this.mapTypeInfo(node),
-//                 null,
-//                 [],
-//                 [this.rightPadded(
-//                     new J.VariableDeclarations.NamedVariable(
-//                         randomId(),
-//                         this.prefix(node.name),
-//                         emptyMarkers,
-//                         nameExpression,
-//                         [],
-//                         node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) : null,
-//                         this.mapVariableType(node)
-//                     ),
+//         if (nameExpression.kind == JavaKind.Identifier) {
+//             return {
+//                 kind: JavaKind.VariableDeclarations,
+//                 id: randomId(),
+//                 prefix: this.prefix(node),
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: this.mapDecorators(node),
+//                 modifiers: this.mapModifiers(node),
+//                 typeExpression: this.mapTypeInfo(node),
+//                 dimensionsBeforeName: [],
+//                 variables: [this.rightPadded(
+//                     {
+//                         kind: JavaKind.Variable,
+//                         id: randomId(),
+//                         prefix: this.prefix(node.name),
+//                         markers: emptyMarkers,
+//                         name: nameExpression,
+//                         dimensionsAfterName: [],
+//                         initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
+//                         variableType: this.mapVariableType(node)
+//                     },
 //                     this.suffix(node.name)
 //                 )]
-//             );
+//             };
 //         }
 //
-//         return new JS.JSVariableDeclarations(
-//             randomId(),
-//             this.prefix(node),
-//             emptyMarkers,
-//             this.mapDecorators(node),
-//             this.mapModifiers(node),
-//             this.mapTypeInfo(node),
-//             null,
-//             [this.rightPadded(
-//                 new JS.JSVariableDeclarations.JSNamedVariable(
-//                     randomId(),
-//                     this.prefix(node.name),
-//                     emptyMarkers,
-//                     nameExpression,
-//                     [],
-//                     node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) : null,
-//                     this.mapVariableType(node)
-//                 ),
+//         return {
+//             kind: JavaScriptKind.JSVariableDeclarations,
+//             id: randomId(),
+//             prefix: this.prefix(node),
+//             markers: emptyMarkers,
+//             leadingAnnotations: this.mapDecorators(node),
+//             modifiers: this.mapModifiers(node),
+//             typeExpression: this.mapTypeInfo(node),
+//             variables: [this.rightPadded(
+//                 {
+//                     kind: JavaScriptKind.JSNamedVariable,
+//                     id: randomId(),
+//                     prefix: this.prefix(node.name),
+//                     markers: emptyMarkers,
+//                     name: nameExpression,
+//                     dimensionsAfterName: [],
+//                     initializer: node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) : null,
+//                     variableType: this.mapVariableType(node)
+//                 },
 //                 this.suffix(node.name)
 //             )]
-//         );
+//         };
 //     }
 //
 //     visitDecorator(node: ts.Decorator) {
@@ -944,7 +952,7 @@ import {ExpressionStatement, TypeTreeExpression} from "./tree";
 //                 id: randomId(),
 //                 prefix: this.prefix(node.expression),
 //                 markers: emptyMarkers,
-//                 expression: this.convert<Expression>(node.expression)
+//                 expression: this.convert(node.expression)
 //             };
 //         } else {
 //             return this.visitUnknown(node);
@@ -964,76 +972,76 @@ import {ExpressionStatement, TypeTreeExpression} from "./tree";
 //         const prefix = this.prefix(node);
 //
 //         if (node.questionToken) {
-//             return new JS.JSVariableDeclarations(
-//                 randomId(),
-//                 prefix,
-//                 emptyMarkers,
-//                 [], // no decorators allowed
-//                 this.mapModifiers(node),
-//                 this.mapTypeInfo(node),
-//                 null,
-//                 [this.rightPadded(
-//                     new JS.JSVariableDeclarations.JSNamedVariable(
-//                         randomId(),
-//                         this.prefix(node.name),
-//                         emptyMarkers,
-//                         this.getOptionalUnary(node),
-//                         [],
-//                         null,
-//                         this.mapVariableType(node)
-//                     ),
+//             return {
+//                 kind: JavaScriptKind.JSVariableDeclarations,
+//                 id: randomId(),
+//                 prefix: prefix,
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: [], // no decorators allowed
+//                 modifiers: this.mapModifiers(node),
+//                 typeExpression: this.mapTypeInfo(node),
+//                 variables: [this.rightPadded(
+//                     {
+//                         kind: JavaScriptKind.JSNamedVariable,
+//                         id: randomId(),
+//                         prefix: this.prefix(node.name),
+//                         markers: emptyMarkers,
+//                         name: this.getOptionalUnary(node),
+//                         dimensionsAfterName: [],
+//                         variableType: this.mapVariableType(node)
+//                     },
 //                     emptySpace
 //                 )]
-//             );
+//             };
 //         }
 //
 //         const nameExpression = this.visit(node.name)
 //
 //         if (nameExpression.kind == JavaKind.Identifier) {
-//             return new J.VariableDeclarations(
-//                 randomId(),
-//                 prefix,
-//                 emptyMarkers,
-//                 [], // no decorators allowed
-//                 this.mapModifiers(node),
-//                 this.mapTypeInfo(node),
-//                 null,
-//                 [],
-//                 [this.rightPadded(
-//                     new J.VariableDeclarations.NamedVariable(
-//                         randomId(),
-//                         this.prefix(node.name),
-//                         emptyMarkers,
-//                         nameExpression,
-//                         [],
-//                         null,
-//                         this.mapVariableType(node)
-//                     ),
+//             return {
+//                 kind: JavaKind.VariableDeclarations,
+//                 id: randomId(),
+//                 prefix: prefix,
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: [], // no decorators allowed
+//                 modifiers: this.mapModifiers(node),
+//                 typeExpression: this.mapTypeInfo(node),
+//                 dimensionsBeforeName: [],
+//                 variables: [this.rightPadded(
+//                     {
+//                         kind: JavaKind.Variable,
+//                         id: randomId(),
+//                         prefix: this.prefix(node.name),
+//                         markers: emptyMarkers,
+//                         name: nameExpression,
+//                         dimensionsAfterName: [],
+//                         variableType: this.mapVariableType(node)
+//                     },
 //                     emptySpace
 //                 )]
-//             );
+//             };
 //         } else {
-//             return new JS.JSVariableDeclarations(
-//                 randomId(),
-//                 prefix,
-//                 emptyMarkers,
-//                 [], // no decorators allowed
-//                 this.mapModifiers(node),
-//                 this.mapTypeInfo(node),
-//                 null,
-//                 [this.rightPadded(
-//                     new JS.JSVariableDeclarations.JSNamedVariable(
-//                         randomId(),
-//                         this.prefix(node.name),
-//                         emptyMarkers,
-//                         nameExpression,
-//                         [],
-//                         null,
-//                         this.mapVariableType(node)
-//                     ),
+//             return {
+//                 kind: JavaScriptKind.JSVariableDeclarations,
+//                 id: randomId(),
+//                 prefix: prefix,
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: [], // no decorators allowed
+//                 modifiers: this.mapModifiers(node),
+//                 typeExpression: this.mapTypeInfo(node),
+//                 variables: [this.rightPadded(
+//                     {
+//                         kind: JavaScriptKind.JSNamedVariable,
+//                         id: randomId(),
+//                         prefix: this.prefix(node.name),
+//                         markers: emptyMarkers,
+//                         name: nameExpression,
+//                         dimensionsAfterName: [],
+//                         variableType: this.mapVariableType(node)
+//                     },
 //                     emptySpace
 //                 )]
-//             );
+//             };
 //         }
 //     }
 //
@@ -1041,147 +1049,148 @@ import {ExpressionStatement, TypeTreeExpression} from "./tree";
 //         const prefix = this.prefix(node);
 //
 //         if (node.questionToken) {
-//             return new JS.JSVariableDeclarations(
-//                 randomId(),
-//                 prefix,
-//                 emptyMarkers,
-//                 this.mapDecorators(node),
-//                 this.mapModifiers(node),
-//                 this.mapTypeInfo(node),
-//                 null,
-//                 [this.rightPadded(
-//                     new JS.JSVariableDeclarations.JSNamedVariable(
-//                         randomId(),
-//                         this.prefix(node.name),
-//                         emptyMarkers,
-//                         this.getOptionalUnary(node),
-//                         [],
-//                         node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) : null,
-//                         this.mapVariableType(node)
-//                     ),
+//             return {
+//                 kind: JavaScriptKind.JSVariableDeclarations,
+//                 id: randomId(),
+//                 prefix: prefix,
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: this.mapDecorators(node),
+//                 modifiers: this.mapModifiers(node),
+//                 typeExpression: this.mapTypeInfo(node),
+//                 variables: [this.rightPadded(
+//                     {
+//                         kind: JavaScriptKind.JSNamedVariable,
+//                         id: randomId(),
+//                         prefix: this.prefix(node.name),
+//                         markers: emptyMarkers,
+//                         name: this.getOptionalUnary(node),
+//                         dimensionsAfterName: [],
+//                         initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
+//                         variableType: this.mapVariableType(node)
+//                     },
 //                     emptySpace
 //                 )]
-//             );
+//             };
 //         }
 //
 //         if (node.exclamationToken) {
-//             return new JS.JSVariableDeclarations(
-//                 randomId(),
-//                 prefix,
-//                 emptyMarkers,
-//                 this.mapDecorators(node),
-//                 this.mapModifiers(node),
-//                 this.mapTypeInfo(node),
-//                 null,
-//                 [this.rightPadded(
-//                     new JS.JSVariableDeclarations.JSNamedVariable(
-//                         randomId(),
-//                         this.prefix(node.name),
-//                         emptyMarkers,
-//                         new JS.Unary(
-//                             randomId(),
-//                             emptySpace,
-//                             emptyMarkers,
-//                             this.leftPadded(this.suffix(node.name), JS.Unary.Type.Exclamation),
-//                             this.visit(node.name),
-//                             this.mapType(node)
-//                         ),
-//                         [],
-//                         node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) : null,
-//                         this.mapVariableType(node)
-//                     ),
+//             return {
+//                 kind: JavaScriptKind.JSVariableDeclarations,
+//                 id: randomId(),
+//                 prefix: prefix,
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: this.mapDecorators(node),
+//                 modifiers: this.mapModifiers(node),
+//                 typeExpression: this.mapTypeInfo(node),
+//                 variables: [this.rightPadded(
+//                     {
+//                         kind: JavaScriptKind.JSNamedVariable,
+//                         id: randomId(),
+//                         prefix: this.prefix(node.name),
+//                         markers: emptyMarkers,
+//                         name: {
+//                             kind: JavaScriptKind.Unary,
+//                             id: randomId(),
+//                             prefix: emptySpace,
+//                             markers: emptyMarkers,
+//                             operator: this.leftPadded(this.suffix(node.name), JS.UnaryOperator.Exclamation),
+//                             expression: this.visit(node.name),
+//                             type: this.mapType(node)
+//                         },
+//                         dimensionsAfterName: [],
+//                         initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
+//                         variableType: this.mapVariableType(node)
+//                     },
 //                     emptySpace
 //                 )]
-//             );
+//             };
 //         }
 //
 //         const nameExpression = this.visit(node.name)
 //
 //         if (nameExpression.kind == JavaKind.Identifier) {
-//             return new J.VariableDeclarations(
-//                 randomId(),
-//                 prefix,
-//                 emptyMarkers,
-//                 this.mapDecorators(node),
-//                 this.mapModifiers(node),
-//                 this.mapTypeInfo(node),
-//                 null,
-//                 [],
-//                 [this.rightPadded(
-//                     new J.VariableDeclarations.NamedVariable(
-//                         randomId(),
-//                         this.prefix(node.name),
-//                         emptyMarkers,
-//                         nameExpression,
-//                         [],
-//                         node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) : null,
-//                         this.mapVariableType(node)
-//                     ),
+//             return {
+//                 kind: JavaKind.VariableDeclarations,
+//                 id: randomId(),
+//                 prefix: prefix,
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: this.mapDecorators(node),
+//                 modifiers: this.mapModifiers(node),
+//                 typeExpression: this.mapTypeInfo(node),
+//                 dimensionsBeforeName: [],
+//                 variables: [this.rightPadded(
+//                     {
+//                         kind: JavaKind.Variable,
+//                         id: randomId(),
+//                         prefix: this.prefix(node.name),
+//                         markers: emptyMarkers,
+//                         name: nameExpression,
+//                         dimensionsAfterName: [],
+//                         initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
+//                         variableType: this.mapVariableType(node)
+//                     },
 //                     this.suffix(node.name)
 //                 )]
-//             );
+//             };
 //         }
 //
-//         return new JS.JSVariableDeclarations(
-//             randomId(),
-//             prefix,
-//             emptyMarkers,
-//             this.mapDecorators(node),
-//             this.mapModifiers(node),
-//             this.mapTypeInfo(node),
-//             null,
-//             [this.rightPadded(
-//                 new JS.JSVariableDeclarations.JSNamedVariable(
-//                     randomId(),
-//                     this.prefix(node.name),
-//                     emptyMarkers,
-//                     nameExpression,
-//                     [],
-//                     node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) : null,
-//                     this.mapVariableType(node)
-//                 ),
+//         return {
+//             kind: JavaScriptKind.JSVariableDeclarations,
+//             id: randomId(),
+//             prefix: prefix,
+//             markers: emptyMarkers,
+//             leadingAnnotations: this.mapDecorators(node),
+//             modifiers: this.mapModifiers(node),
+//             typeExpression: this.mapTypeInfo(node),
+//             variables: [this.rightPadded(
+//                 {
+//                     kind: JavaScriptKind.JSNamedVariable,
+//                     id: randomId(),
+//                     prefix: this.prefix(node.name),
+//                     markers: emptyMarkers,
+//                     name: nameExpression,
+//                     dimensionsAfterName: [],
+//                     initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
+//                     variableType: this.mapVariableType(node)
+//                 },
 //                 emptySpace
 //             )]
-//         );
+//         };
 //     }
 //
 //     visitMethodSignature(node: ts.MethodSignature) {
 //         const prefix = this.prefix(node);
 //
 //         if (node.questionToken) {
-//             return new JS.JSMethodDeclaration(
-//                 randomId(),
-//                 prefix,
-//                 emptyMarkers,
-//                 [], // no decorators allowed
-//                 [], // no modifiers allowed
-//                 this.mapTypeParametersAsObject(node),
-//                 this.mapTypeInfo(node),
-//                 this.getOptionalUnary(node),
-//                 this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//                 null,
-//                 null,
-//                 null,
-//                 this.mapMethodType(node)
-//             );
+//             return {
+//                 kind: JavaScriptKind.JSMethodDeclaration,
+//                 id: randomId(),
+//                 prefix: prefix,
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: [], // no decorators allowed
+//                 modifiers: [], // no modifiers allowed
+//                 typeParameters: this.mapTypeParametersAsObject(node),
+//                 returnTypeExpression: this.mapTypeInfo(node),
+//                 name: this.getOptionalUnary(node),
+//                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//                 methodType: this.mapMethodType(node)
+//             };
 //         }
 //
 //         if (ts.isComputedPropertyName(node.name)) {
-//             return new JS.JSMethodDeclaration(
-//                 randomId(),
-//                 prefix,
-//                 emptyMarkers,
-//                 [], // no decorators allowed
-//                 [], // no modifiers allowed
-//                 this.mapTypeParametersAsObject(node),
-//                 this.mapTypeInfo(node),
-//                 this.convert(node.name),
-//                 this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//                 null,
-//                 null,
-//                 null,
-//                 this.mapMethodType(node)
-//             );
+//             return {
+//                 kind: JavaScriptKind.JSMethodDeclaration,
+//                 id: randomId(),
+//                 prefix: prefix,
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: [], // no decorators allowed
+//                 modifiers: [], // no modifiers allowed
+//                 typeParameters: this.mapTypeParametersAsObject(node),
+//                 returnTypeExpression: this.mapTypeInfo(node),
+//                 name: this.convert(node.name),
+//                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//                 methodType: this.mapMethodType(node)
+//             };
 //         }
 //
 //         const name: J.Identifier = !node.name
@@ -1190,24 +1199,23 @@ import {ExpressionStatement, TypeTreeExpression} from "./tree";
 //                 ? this.mapIdentifier(node.name, node.name.getText())
 //                 : this.visit(node.name);
 //
-//         return new J.MethodDeclaration(
-//             randomId(),
-//             prefix,
-//             emptyMarkers,
-//             [], // no decorators allowed
-//             [], // no modifiers allowed
-//             this.mapTypeParametersAsObject(node),
-//             this.mapTypeInfo(node),
-//             new J.MethodDeclaration.IdentifierWithAnnotations(
-//                 name,
-//                 []
-//             ),
-//             this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//             null,
-//             null,
-//             null,
-//             this.mapMethodType(node)
-//         );
+//         return {
+//             kind: JavaKind.MethodDeclaration,
+//             id: randomId(),
+//             prefix: prefix,
+//             markers: emptyMarkers,
+//             decorators: [], // no decorators allowed
+//             modifiers: [], // no modifiers allowed
+//             typeParameters: this.mapTypeParametersAsObject(node),
+//             returnTypeExpression: this.mapTypeInfo(node),
+//             name: {
+//                 kind: JavaKind.IdentifierWithAnnotations,
+//                 identifier: name,
+//                 annotations: []
+//             },
+//             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//             methodType: this.mapMethodType(node)
+//         };
 //     }
 //
 //     visitMethodDeclaration(node: ts.MethodDeclaration) {
@@ -1217,50 +1225,49 @@ import {ExpressionStatement, TypeTreeExpression} from "./tree";
 //             let methodName = node.questionToken ? this.getOptionalUnary(node) : this.visit(node.name);
 //
 //             if (node.asteriskToken) {
-//                 methodName = new JS.Unary(
-//                     randomId(),
-//                     this.prefix(node.asteriskToken),
-//                     emptyMarkers,
-//                     this.leftPadded(this.prefix(node.name), JS.Unary.Type.Asterisk),
-//                     methodName,
-//                     this.mapType(node)
-//                 )
+//                 methodName = {
+//                     kind: JavaScriptKind.Unary,
+//                     id: randomId(),
+//                     prefix: this.prefix(node.asteriskToken),
+//                     markers: emptyMarkers,
+//                     operator: this.leftPadded(this.prefix(node.name), JS.UnaryOperator.Asterisk),
+//                     expression: methodName,
+//                     type: this.mapType(node)
+//                 }
 //             }
 //
-//             return new JS.JSMethodDeclaration(
-//                 randomId(),
-//                 prefix,
-//                 emptyMarkers,
-//                 this.mapDecorators(node),
-//                 this.mapModifiers(node),
-//                 this.mapTypeParametersAsObject(node),
-//                 this.mapTypeInfo(node),
-//                 methodName,
-//                 this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//                 null,
-//                 node.body ? this.convert<J.Block>(node.body) : null,
-//                 null,
-//                 this.mapMethodType(node)
-//             );
+//             return {
+//                 kind: JavaScriptKind.JSMethodDeclaration,
+//                 id: randomId(),
+//                 prefix: prefix,
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: this.mapDecorators(node),
+//                 modifiers: this.mapModifiers(node),
+//                 typeParameters: this.mapTypeParametersAsObject(node),
+//                 returnTypeExpression: this.mapTypeInfo(node),
+//                 name: methodName,
+//                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//                 body: node.body && this.convert<J.Block>(node.body),
+//                 methodType: this.mapMethodType(node)
+//             };
 //         }
 //
 //         const name = node.name ? this.visit(node.name) : this.mapIdentifier(node, "");
-//         if (!(name instanceof J.Identifier)) {
-//             return new JS.JSMethodDeclaration(
-//                 randomId(),
-//                 prefix,
-//                 emptyMarkers,
-//                 this.mapDecorators(node),
-//                 this.mapModifiers(node),
-//                 this.mapTypeParametersAsObject(node),
-//                 this.mapTypeInfo(node),
-//                 name,
-//                 this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//                 null,
-//                 node.body ? this.convert<J.Block>(node.body) : null,
-//                 null,
-//                 this.mapMethodType(node)
-//             );
+//         if (!(name.kind == JavaKind.Identifier)) {
+//             return {
+//                 kind: JavaScriptKind.JSMethodDeclaration,
+//                 id: randomId(),
+//                 prefix: prefix,
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: this.mapDecorators(node),
+//                 modifiers: this.mapModifiers(node),
+//                 typeParameters: this.mapTypeParametersAsObject(node),
+//                 returnTypeExpression: this.mapTypeInfo(node),
+//                 name: name,
+//                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//                 body: node.body && this.convert<J.Block>(node.body),
+//                 methodType: this.mapMethodType(node)
+//             };
 //         }
 //
 //         return {
@@ -1278,9 +1285,7 @@ import {ExpressionStatement, TypeTreeExpression} from "./tree";
 //                 annotations: []
 //             },
 //             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//             throws: null,
-//             body: node.body ? this.convert<J.Block>(node.body) : null,
-//             defaultValue: null,
+//             body: node.body && this.convert<J.Block>(node.body),
 //             methodType: this.mapMethodType(node)
 //         };
 //     }
@@ -1338,150 +1343,140 @@ import {ExpressionStatement, TypeTreeExpression} from "./tree";
 //     visitGetAccessor(node: ts.GetAccessorDeclaration) {
 //         const name = this.visit(node.name);
 //         if (!(name.kind == JavaKind.Identifier)) {
-//             return new JS.JSMethodDeclaration(
-//                 randomId(),
-//                 this.prefix(node),
-//                 emptyMarkers,
-//                 this.mapDecorators(node),
-//                 this.mapModifiers(node),
-//                 null,
-//                 this.mapTypeInfo(node),
-//                 name,
-//                 this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//                 null,
-//                 node.body ? this.convert<J.Block>(node.body) : null,
-//                 null,
-//                 this.mapMethodType(node)
-//             );
+//             return {
+//                 kind: JavaScriptKind.JSMethodDeclaration,
+//                 id: randomId(),
+//                 prefix: this.prefix(node),
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: this.mapDecorators(node),
+//                 modifiers: this.mapModifiers(node),
+//                 returnTypeExpression: this.mapTypeInfo(node),
+//                 name: name,
+//                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//                 body: node.body && this.convert<J.Block>(node.body),
+//                 methodType: this.mapMethodType(node)
+//             };
 //         }
 //
-//         return new J.MethodDeclaration(
-//             randomId(),
-//             this.prefix(node),
-//             emptyMarkers,
-//             this.mapDecorators(node),
-//             this.mapModifiers(node),
-//             null,
-//             this.mapTypeInfo(node),
-//             new J.MethodDeclaration.IdentifierWithAnnotations(
-//                 name,
-//                 []
-//             ),
-//             this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//             null,
-//             node.body ? this.convert<J.Block>(node.body) : null,
-//             null,
-//             this.mapMethodType(node)
-//         );
+//         return {
+//             kind: JavaKind.MethodDeclaration,
+//             id: randomId(),
+//             prefix: this.prefix(node),
+//             markers: emptyMarkers,
+//             leadingAnnotations: this.mapDecorators(node),
+//             modifiers: this.mapModifiers(node),
+//             returnTypeExpression: this.mapTypeInfo(node),
+//             name: {
+//                 kind: JavaKind.IdentifierWithAnnotations,
+//                 identifier: name,
+//                 annotations: []
+//             },
+//             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//             body: node.body && this.convert<J.Block>(node.body),
+//             methodType: this.mapMethodType(node)
+//         };
 //     }
 //
 //     visitSetAccessor(node: ts.SetAccessorDeclaration) {
 //         const name = this.visit(node.name);
 //         if (!(name.kind == JavaKind.Identifier)) {
-//             return new JS.JSMethodDeclaration(
-//                 randomId(),
-//                 this.prefix(node),
-//                 emptyMarkers,
-//                 this.mapDecorators(node),
-//                 this.mapModifiers(node),
-//                 null,
-//                 null,
-//                 name,
-//                 this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//                 null,
-//                 node.body ? this.convert<J.Block>(node.body) : null,
-//                 null,
-//                 this.mapMethodType(node)
-//             );
+//             return {
+//                 kind: JavaScriptKind.JSMethodDeclaration,
+//                 id: randomId(),
+//                 prefix: this.prefix(node),
+//                 markers: emptyMarkers,
+//                 leadingAnnotations: this.mapDecorators(node),
+//                 modifiers: this.mapModifiers(node),
+//                 name: name,
+//                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//                 body: node.body && this.convert<J.Block>(node.body),
+//                 methodType: this.mapMethodType(node)
+//             };
 //         }
 //
-//         return new J.MethodDeclaration(
-//             randomId(),
-//             this.prefix(node),
-//             emptyMarkers,
-//             this.mapDecorators(node),
-//             this.mapModifiers(node),
-//             null,
-//             null,
-//             new J.MethodDeclaration.IdentifierWithAnnotations(
-//                 name,
-//                 []
-//             ),
-//             this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//             null,
-//             node.body ? this.convert<J.Block>(node.body) : null,
-//             null,
-//             this.mapMethodType(node)
-//         );
+//         return {
+//             kind: JavaKind.MethodDeclaration,
+//             id: randomId(),
+//             prefix: this.prefix(node),
+//             markers: emptyMarkers,
+//             leadingAnnotations: this.mapDecorators(node),
+//             modifiers: this.mapModifiers(node),
+//             name: {
+//                 kind: JavaKind.IdentifierWithAnnotations,
+//                 identifier: name,
+//                 annotations: []
+//             },
+//             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//             body: node.body && this.convert<J.Block>(node.body),
+//             methodType: this.mapMethodType(node)
+//         };
 //     }
 //
 //     visitCallSignature(node: ts.CallSignatureDeclaration) {
-//         return new J.MethodDeclaration(
-//             randomId(),
-//             this.prefix(node),
-//             emptyMarkers,
-//             [],
-//             [],
-//             this.mapTypeParametersAsObject(node),
-//             this.mapTypeInfo(node),
-//             new J.MethodDeclaration.IdentifierWithAnnotations(
-//                 new J.Identifier(
-//                     randomId(),
-//                     emptySpace/* this.prefix(node.getChildren().find(n => n.kind == ts.SyntaxKind.OpenBraceToken)!) */,
-//                     emptyMarkers,
-//                     [], // FIXME decorators
-//                     "",
-//                     null,
-//                     null
-//                 ), []
-//             ),
-//             this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//             null,
-//             null,
-//             null,
-//             this.mapMethodType(node)
-//         );
+//         return {
+//             kind: JavaKind.MethodDeclaration,
+//             id: randomId(),
+//             prefix: this.prefix(node),
+//             markers: emptyMarkers,
+//             leadingAnnotations: [],
+//             modifiers: [],
+//             typeParameters: this.mapTypeParametersAsObject(node),
+//             returnTypeExpression: this.mapTypeInfo(node),
+//             name: {
+//                 kind: JavaKind.IdentifierWithAnnotations,
+//                 identifier: {
+//                     kind: JavaKind.Identifier,
+//                     id: randomId(),
+//                     prefix: emptySpace/* this.prefix(node.getChildren().find(n => n.kind == ts.SyntaxKind.OpenBraceToken)!) */,
+//                     markers: emptyMarkers,
+//                     annotations: [], // FIXME decorators
+//                     simpleName: "",
+//                 },
+//                 annotations: []
+//             },
+//             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//             methodType: this.mapMethodType(node)
+//         };
 //     }
 //
 //     visitConstructSignature(node: ts.ConstructSignatureDeclaration) {
-//         return new J.MethodDeclaration(
-//             randomId(),
-//             this.prefix(node),
-//             emptyMarkers,
-//             [], // no decorators allowed
-//             [], // no modifiers allowed
-//             this.mapTypeParametersAsObject(node),
-//             this.mapTypeInfo(node),
-//             new J.MethodDeclaration.IdentifierWithAnnotations(
-//                 new J.Identifier(
-//                     randomId(),
-//                     emptySpace,
-//                     emptyMarkers,
-//                     [],
-//                     'new',
-//                     null,
-//                     null
-//                 ),
-//                 []
-//             ),
-//             this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-//             null,
-//             null,
-//             null,
-//             this.mapMethodType(node)
-//         );
+//         return {
+//             kind: JavaKind.MethodDeclaration,
+//             id: randomId(),
+//             prefix: this.prefix(node),
+//             markers: emptyMarkers,
+//             leadingAnnotations: [], // no decorators allowed
+//             modifiers: [], // no modifiers allowed
+//             typeParameters: this.mapTypeParametersAsObject(node),
+//             returnTypeExpression: this.mapTypeInfo(node),
+//             name: {
+//                 kind: JavaKind.IdentifierWithAnnotations,
+//                 identifier: {
+//                     kind: JavaKind.Identifier,
+//                     id: randomId(),
+//                     prefix: emptySpace,
+//                     markers: emptyMarkers,
+//                     annotations: [],
+//                     simpleName: 'new'
+//                 },
+//                 annotations: []
+//             },
+//             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+//             methodType: this.mapMethodType(node)
+//         };
 //     }
 //
 //     visitIndexSignature(node: ts.IndexSignatureDeclaration) {
-//         return new JS.IndexSignatureDeclaration(
-//             randomId(),
-//             this.prefix(node),
-//             emptyMarkers,
-//             this.mapModifiers(node),
-//             this.mapCommaSeparatedList(this.getParameterListNodes(node, ts.SyntaxKind.OpenBracketToken)),
-//             this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.type) - 1)), this.convert(node.type)),
-//             this.mapType(node)
-//         );
+//         return {
+//             kind: JavaScriptKind.IndexSignatureDeclaration,
+//             id: randomId(),
+//             prefix: this.prefix(node),
+//             markers: emptyMarkers,
+//             modifiers: this.mapModifiers(node),
+//             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node, ts.SyntaxKind.OpenBracketToken)),
+//             typeExpression: this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.type) - 1)), this.convert(node.type)),
+//             type: this.mapType(node)
+//         };
 //     }
 //
 //     visitTypePredicate(node: ts.TypePredicateNode) {

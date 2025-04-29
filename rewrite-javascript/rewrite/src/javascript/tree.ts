@@ -57,6 +57,7 @@ export const JavaScriptKind = {
     ImportTypeAttributes: "org.openrewrite.javascript.tree.JS$ImportTypeAttributes",
     IndexedAccessType: "org.openrewrite.javascript.tree.JS$IndexedAccessType",
     IndexedAccessTypeIndexType: "org.openrewrite.javascript.tree.JS$IndexedAccessType$IndexType",
+    IndexSignatureDeclaration: "org.openrewrite.javascript.tree.JS$IndexSignatureDeclaration",
     InferType: "org.openrewrite.javascript.tree.JS$InferType",
     JsAssignmentOperation: "org.openrewrite.javascript.tree.JS$JsAssignmentOperation",
     JsImport: "org.openrewrite.javascript.tree.JS$JsImport",
@@ -88,6 +89,7 @@ export const JavaScriptKind = {
     TypeInfo: "org.openrewrite.javascript.tree.JS$TypeInfo",
     TypeOperator: "org.openrewrite.javascript.tree.JS$TypeOperator",
     TypePredicate: "org.openrewrite.javascript.tree.JS$TypePredicate",
+    Unary: "org.openrewrite.javascript.tree.JS$Unary",
     Union: "org.openrewrite.javascript.tree.JS$Union",
     Intersection: "org.openrewrite.javascript.tree.JS$Intersection",
     Void: "org.openrewrite.javascript.tree.JS$Void",
@@ -108,7 +110,7 @@ type JavaScriptExpressionBase = Alias | ArrowFunction | Await | ConditionalType 
     ImportType | IndexedAccessType | NamedImports | JsImportSpecifier | JsBinary | JsAssignmentOperation |
     LiteralType | MappedType | ObjectBindingDeclarations | SatisfiesExpression | StatementExpression | 
     TaggedTemplateExpression | TemplateExpression | Tuple | TypeOf | TypeTreeExpression | TypeQuery |
-    TypeInfo | TypeOperator | TypePredicate | Union | Intersection | Void | Yield;
+    TypeInfo | TypeOperator | TypePredicate | Unary | Union | Intersection | Void | Yield;
 
 export type Expression<T extends { kind: string } = never> = import("../java/tree").Expression<JavaScriptExpressionBase | T>;
 
@@ -507,6 +509,22 @@ export interface Void extends JS {
     readonly expression: Expression;
 }
 
+export interface Unary extends JS, TypedTree {
+    readonly kind: typeof JavaScriptKind.Unary;
+    readonly operator: JLeftPadded<UnaryOperator>;
+    readonly expression: Expression;
+    readonly type?: JavaType;
+}
+
+export const enum UnaryOperator {
+    Spread,
+    Optional,
+    Exclamation,
+    QuestionDot,
+    QuestionDotWithDot,
+    Asterisk,
+}
+
 export interface Yield extends JS {
     readonly kind: typeof JavaScriptKind.Yield;
     readonly delegated: JLeftPadded<boolean>;
@@ -519,10 +537,19 @@ export interface WithStatement extends JS, Statement {
     readonly body: JRightPadded<Statement>;
 }
 
+export interface IndexSignatureDeclaration extends JS, Statement, TypedTree {
+    readonly kind: typeof JavaScriptKind.IndexSignatureDeclaration;
+    readonly modifiers: Modifier[];
+    readonly parameters: JContainer<Statement>;
+    readonly typeExpression: JLeftPadded<Expression>;
+    readonly type?: JavaType;
+}
+
 export interface JSMethodDeclaration extends JS, Statement, TypedTree {
     readonly kind: typeof JavaScriptKind.JSMethodDeclaration;
     readonly leadingAnnotations: Annotation[];
     readonly modifiers: Modifier[];
+    readonly typeParameters?: TypeParameters;
     readonly returnTypeExpression?: TypeTree;
     readonly name: Expression;
     readonly parameters: JContainer<Statement>;

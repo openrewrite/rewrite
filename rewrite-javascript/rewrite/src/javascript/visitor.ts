@@ -49,6 +49,7 @@ import {
     ImportTypeAttributes,
     IndexedAccessType,
     IndexedAccessTypeIndexType,
+    IndexSignatureDeclaration,
     InferType,
     Intersection,
     isJavaScript,
@@ -60,6 +61,8 @@ import {
     JsImportClause,
     JsImportSpecifier,
     JSMethodDeclaration,
+    JSNamedVariable,
+    JSVariableDeclarations,
     LiteralType,
     MappedType,
     MappedTypeKeysRemapping,
@@ -82,10 +85,11 @@ import {
     TypePredicate,
     TypeQuery,
     TypeTreeExpression,
+    Unary,
     Union,
     Void,
     WithStatement,
-    Yield, JSVariableDeclarations, JSNamedVariable
+    Yield
 } from "./tree";
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
@@ -260,6 +264,15 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.type = await this.visitType(importType.type, p);
         });
     }
+    
+    protected async visitIndexSignatureDeclaration(indexSignature: IndexSignatureDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<IndexSignatureDeclaration>(indexSignature, p, async draft => {
+            draft.modifiers = await mapAsync(indexSignature.modifiers, m => this.visitDefined<Modifier>(m, p));
+            draft.parameters = await this.visitContainer(indexSignature.parameters, p);
+            draft.typeExpression = await this.visitLeftPadded(indexSignature.typeExpression, p);
+            draft.type = await this.visitType(indexSignature.type, p);
+        });
+    }
 
     protected async visitImportTypeAttributes(importTypeAttrs: ImportTypeAttributes, p: P): Promise<J | undefined> {
         return this.produceJavaScript<ImportTypeAttributes>(importTypeAttrs, p, async draft => {
@@ -341,6 +354,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return this.produceJavaScript<JSMethodDeclaration>(methodDecl, p, async draft => {
             draft.leadingAnnotations = await mapAsync(methodDecl.leadingAnnotations, a => this.visitDefined<Annotation>(a, p));
             draft.modifiers = await mapAsync(methodDecl.modifiers, m => this.visitDefined<Modifier>(m, p));
+            draft.typeParameters = methodDecl.typeParameters && await this.visit(methodDecl.typeParameters, p);
             draft.returnTypeExpression = methodDecl.returnTypeExpression && await this.visitDefined(methodDecl.returnTypeExpression, p);
             draft.name = await this.visitDefined(methodDecl.name, p) as Expression;
             draft.parameters = await this.visitContainer(methodDecl.parameters, p);
@@ -541,6 +555,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
     
+    protected async visitJsUnary(unary: Unary, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Unary>(unary, p, async draft => {
+            draft.operator = await this.visitLeftPadded(unary.operator, p);
+            draft.expression = await this.visitDefined(unary.expression, p) as Expression;
+            draft.type = await this.visitType(unary.type, p);
+        });
+    }
+    
     protected async visitTypePredicate(typePredicate: TypePredicate, p: P): Promise<J | undefined> {
         return this.produceJavaScript<TypePredicate>(typePredicate, p, async draft => {
             draft.asserts = await this.visitLeftPadded(typePredicate.asserts, p);
@@ -639,6 +661,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 return this.visitIndexedAccessType(t as IndexedAccessType, p);
             case JavaScriptKind.IndexedAccessTypeIndexType:
                 return this.visitIndexedAccessTypeIndexType(t as IndexedAccessTypeIndexType, p);
+            case JavaScriptKind.IndexSignatureDeclaration:
+                return this.visitIndexSignatureDeclaration(t as IndexSignatureDeclaration, p);
             case JavaScriptKind.InferType:
                 return this.visitInferType(t as InferType, p);
             case JavaScriptKind.JsAssignmentOperation:
@@ -699,6 +723,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 return this.visitTypeOperator(t as TypeOperator, p);
             case JavaScriptKind.TypePredicate:
                 return this.visitTypePredicate(t as TypePredicate, p);
+            case JavaScriptKind.Unary:
+                return this.visitJsUnary(t as Unary, p);
             case JavaScriptKind.Union:
                 return this.visitUnion(t as Union, p);
             case JavaScriptKind.Intersection:

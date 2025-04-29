@@ -217,6 +217,15 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return indexType;
     }
 
+    @Override
+    public J visitIndexSignatureDeclaration(JS.IndexSignatureDeclaration signatureDeclaration, RpcSendQueue q) {
+        q.getAndSendList(signatureDeclaration, JS.IndexSignatureDeclaration::getModifiers, Tree::getId, mod -> visit(mod, q));
+        q.getAndSend(signatureDeclaration, sd -> sd.getPadding().getParameters(), params -> visitContainer(params, q));
+        q.getAndSend(signatureDeclaration, sd -> sd.getPadding().getTypeExpression(), params -> visitLeftPadded(params, q));
+        q.getAndSend(signatureDeclaration, JS.IndexSignatureDeclaration::getType, type -> visitType(type, q));
+
+        return signatureDeclaration;
+    }
 
     @Override
     public J visitInferType(JS.InferType inferType, RpcSendQueue q) {
@@ -476,6 +485,14 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(typeTreeExpr, JS.TypeTreeExpression::getType, type -> visitType(type, q));
         return typeTreeExpr;
     }
+    
+    @Override
+    public J visitUnary(JS.Unary unary, RpcSendQueue q) {
+        q.getAndSend(unary, u -> u.getPadding().getOperator(), op -> visitLeftPadded(op, q));
+        q.getAndSend(unary, JS.Unary::getExpression, expr -> visit(expr, q));
+        q.getAndSend(unary, JS.Unary::getType, type -> visitType(type, q));
+        return unary;
+    }
 
     @Override
     public J visitUnion(JS.Union union, RpcSendQueue q) {
@@ -489,6 +506,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitJSMethodDeclaration(JS.JSMethodDeclaration methodDecl, RpcSendQueue q) {
         q.getAndSendList(methodDecl, JS.JSMethodDeclaration::getLeadingAnnotations, J.Annotation::getId, annot -> visit(annot, q));
         q.getAndSendList(methodDecl, JS.JSMethodDeclaration::getModifiers, J.Modifier::getId, mod -> visit(mod, q));
+        q.getAndSend(methodDecl, JS.JSMethodDeclaration::getTypeParameters, type -> visit(type, q));
         q.getAndSend(methodDecl, JS.JSMethodDeclaration::getReturnTypeExpression, type -> visit(type, q));
         q.getAndSend(methodDecl, JS.JSMethodDeclaration::getName, name -> visit(name, q));
         q.getAndSend(methodDecl, m -> m.getPadding().getParameters(), params -> visitContainer(params, q));

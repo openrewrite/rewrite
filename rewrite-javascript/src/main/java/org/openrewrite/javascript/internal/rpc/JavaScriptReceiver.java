@@ -258,6 +258,14 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
                 .withType(q.receive(indexType.getType(), type -> visitType(type, q)));
     }
 
+    @Override
+    public J visitIndexSignatureDeclaration(JS.IndexSignatureDeclaration signatureDeclaration, RpcReceiveQueue q) {
+        return signatureDeclaration
+                .withModifiers(q.receiveList(signatureDeclaration.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
+                .getPadding().withParameters(q.receive(signatureDeclaration.getPadding().getParameters(), param -> visitContainer(param, q)))
+                .getPadding().withTypeExpression(q.receive(signatureDeclaration.getPadding().getTypeExpression(), expr -> visitLeftPadded(expr, q)))
+                .withType(q.receive(signatureDeclaration.getType(), type -> visitType(type, q)));
+    }
 
     @Override
     public J visitInferType(JS.InferType inferType, RpcReceiveQueue q) {
@@ -509,6 +517,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitJSMethodDeclaration(JS.JSMethodDeclaration methodDecl, RpcReceiveQueue q) {
         return methodDecl.withLeadingAnnotations(q.receiveList(methodDecl.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
                 .withModifiers(q.receiveList(methodDecl.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
+                .withTypeParameters(q.receive(methodDecl.getTypeParameters(), type -> (J.TypeParameters) visitNonNull(type, q)))
                 .withReturnTypeExpression(q.receive(methodDecl.getReturnTypeExpression(), type -> (TypeTree) visitNonNull(type, q)))
                 .withName(q.receive(methodDecl.getName(), name -> (Expression) visitNonNull(name, q)))
                 .getPadding().withParameters(q.receive(methodDecl.getPadding().getParameters(), params -> visitContainer(params, q)))
@@ -554,6 +563,14 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return typeTreeExpr
                 .withExpression(q.receive(typeTreeExpr.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
                 .withType(q.receive(typeTreeExpr.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitUnary(JS.Unary unary, RpcReceiveQueue q) {
+        return unary
+                .getPadding().withOperator(q.receive(unary.getPadding().getOperator(), op -> visitLeftPadded(op, q)))
+                .withExpression(q.receive(unary.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(unary.getType(), type -> visitType(type, q)));
     }
 
     @Override
