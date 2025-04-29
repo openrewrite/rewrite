@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.trait;
 
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
@@ -24,7 +25,7 @@ import static org.openrewrite.java.trait.Traits.annotated;
 
 class AnnotatedTest implements RewriteTest {
 
-    @Test
+    @RepeatedTest(50)
     void attributes() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
@@ -74,7 +75,7 @@ class AnnotatedTest implements RewriteTest {
           java(
             //language=java
             """
-              import java.lang.annotation.ElementType; 
+              import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
