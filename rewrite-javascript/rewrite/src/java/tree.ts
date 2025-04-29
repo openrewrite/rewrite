@@ -553,17 +553,27 @@ export interface Modifier extends J {
 }
 
 export const enum ModifierType {
+    Default,
     Public,
     Protected,
     Private,
     Abstract,
     Static,
     Final,
+    Sealed,
+    NonSealed,
     Transient,
     Volatile,
     Synchronized,
     Native,
-    Strictfp
+    Strictfp,
+    Async,
+    Reified,
+    Inline,
+    /**
+     * For modifiers not seen in Java this is used in conjunction with "keyword"
+     */
+    LanguageExtension
 }
 
 export interface MultiCatch extends J, TypeTree {
