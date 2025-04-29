@@ -296,6 +296,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         public boolean causesAnotherCycle() {
             return delegate.causesAnotherCycle();
         }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
+        }
     }
 
     @Override
