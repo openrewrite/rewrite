@@ -39,7 +39,7 @@ public class UnfoldProperties extends Recipe {
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     @Option(displayName = "Exclusions",
-            description = "Specifies keys that should not be unfolded. Supports glob expressions. " +
+            description = "Specifies keys that should not be unfolded. Supports regex expressions. " +
                     "A special format `[<parent-regex>]->[<child-regex>]` can be used to exclude specific child keys under a parent. " +
                     "For example, `[logging.level]->.*` excludes all child keys under 'logging.level'.",
             example = "org.springframework.security")
