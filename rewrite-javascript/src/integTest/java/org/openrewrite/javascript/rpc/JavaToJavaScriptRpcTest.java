@@ -22,6 +22,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @Suite
 @SuiteDisplayName("Java LSTs sent to and from a JavaScript Rewrite RPC server")
 @SelectPackages("org.openrewrite.java.tree")
+//@IncludeClassNamePatterns(".*ProblemTest")
 @IncludeClassNamePatterns(".*TryCatchTest")
 @ExcludeClassNamePatterns(".*JavadocTest")
 public class JavaToJavaScriptRpcTest {

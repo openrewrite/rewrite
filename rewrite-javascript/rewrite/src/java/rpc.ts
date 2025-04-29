@@ -905,7 +905,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitEmpty(empty: Empty, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitEmpty(empty: Empty): Promise<J | undefined> {
         // no additional properties to receive
         return empty;
     }
@@ -1005,7 +1005,7 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitImport(importStmt: Import, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(importStmt);
 
-        draft.static = await q.receive(importStmt.static);
+        draft.static = await q.receive(importStmt.static, static_ => this.visitLeftPadded(static_, q));
         draft.qualid = await q.receive(importStmt.qualid, qualid => this.visit(qualid, q));
         draft.alias = await q.receive(importStmt.alias, alias => this.visitLeftPadded(alias, q));
 
@@ -1477,22 +1477,24 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     protected async visitSpace(space: Space, q: RpcReceiveQueue): Promise<Space> {
-        return produceAsync<Space>(space, async draft => {
-            draft.comments = await q.receiveListDefined(space.comments, async c => {
-                if (c.kind === JavaKind.TextComment) {
-                    const tc = c as TextComment;
-                    return await produceAsync(tc, async draft => {
-                        draft.multiline = await q.receive(tc.multiline);
-                        draft.text = await q.receive(tc.text);
-                        draft.suffix = await q.receive(c.suffix);
-                        draft.markers = await q.receiveMarkers(c.markers);
-                    });
-                } else {
-                    throw new Error(`Unexpected comment type ${c.kind}`);
-                }
-            });
-            draft.whitespace = await q.receive(space.whitespace);
+        const draft = createDraft(space);
+
+        draft.comments = await q.receiveListDefined(space.comments, async c => {
+            if (c.kind === JavaKind.TextComment) {
+                const tc = c as TextComment;
+                return await produceAsync(tc, async draft => {
+                    draft.multiline = await q.receive(tc.multiline);
+                    draft.text = await q.receive(tc.text);
+                    draft.suffix = await q.receive(c.suffix);
+                    draft.markers = await q.receiveMarkers(c.markers);
+                });
+            } else {
+                throw new Error(`Unexpected comment type ${c.kind}`);
+            }
         });
+        draft.whitespace = await q.receive(space.whitespace);
+
+        return finishDraft(draft);
     }
 
     protected async visitLeftPadded<T extends J | Space | number | boolean>(left: JLeftPadded<T>, q: RpcReceiveQueue): Promise<JLeftPadded<T>> {
@@ -1500,18 +1502,20 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty left padding");
         }
 
-        return produceAsync<JLeftPadded<T>>(left, async draft => {
-            draft.before = await q.receive(left.before, space => this.visitSpace(space, q));
-            draft.element = await q.receive(left.element, elem => {
-                if (isJava(elem)) {
-                    return this.visit(elem as J, q) as any as T;
-                } else if (isSpace(elem)) {
-                    return this.visitSpace(elem as Space, q) as any as T;
-                }
-                return elem;
-            }) as Draft<T>;
-            draft.markers = await q.receiveMarkers(left.markers);
-        });
+        const draft = createDraft(left);
+
+        draft.before = await q.receive(left.before, space => this.visitSpace(space, q));
+        draft.element = await q.receive(left.element, elem => {
+            if (isJava(elem)) {
+                return this.visit(elem as J, q) as any as T;
+            } else if (isSpace(elem)) {
+                return this.visitSpace(elem as Space, q) as any as T;
+            }
+            return elem;
+        }) as Draft<T>;
+        draft.markers = await q.receiveMarkers(left.markers);
+
+        return finishDraft(draft) as JLeftPadded<T>;
     }
 
     protected async visitRightPadded<T extends J | boolean>(right: JRightPadded<T>, q: RpcReceiveQueue): Promise<JRightPadded<T>> {
@@ -1519,26 +1523,30 @@ class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty right padding");
         }
 
-        return produceAsync<JRightPadded<T>>(right, async draft => {
-            draft.element = await q.receive(right.element, elem => {
-                if (isJava(elem)) {
-                    return this.visit(elem as J, q) as any as T;
-                } else if (isSpace(elem)) {
-                    return this.visitSpace(elem as Space, q) as any as T;
-                }
-                return elem as any as T;
-            }) as Draft<T>;
-            draft.after = await q.receive(right.after, space => this.visitSpace(space, q));
-            draft.markers = await q.receiveMarkers(right.markers);
-        });
+        const draft = createDraft(right);
+
+        draft.element = await q.receive(right.element, elem => {
+            if (isJava(elem)) {
+                return this.visit(elem as J, q) as any as T;
+            } else if (isSpace(elem)) {
+                return this.visitSpace(elem as Space, q) as any as T;
+            }
+            return elem as any as T;
+        }) as Draft<T>;
+        draft.after = await q.receive(right.after, space => this.visitSpace(space, q));
+        draft.markers = await q.receiveMarkers(right.markers);
+
+        return finishDraft(draft) as JRightPadded<T>;
     }
 
     protected async visitContainer<T extends J>(container: JContainer<T>, q: RpcReceiveQueue): Promise<JContainer<T>> {
-        return produceAsync<JContainer<T>>(container, async draft => {
-            draft.before = await q.receive(container.before, space => this.visitSpace(space, q));
-            draft.elements = await q.receiveListDefined(container.elements, elem => this.visitRightPadded(elem, q)) as Draft<JRightPadded<T>[]>;
-            draft.markers = await q.receiveMarkers(container.markers);
-        });
+        const draft = createDraft(container);
+
+        draft.before = await q.receive(container.before, space => this.visitSpace(space, q));
+        draft.elements = await q.receiveListDefined(container.elements, elem => this.visitRightPadded(elem, q)) as Draft<JRightPadded<T>[]>;
+        draft.markers = await q.receiveMarkers(container.markers);
+
+        return finishDraft(draft) as JContainer<T>;
     }
 }
 

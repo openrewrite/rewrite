@@ -158,7 +158,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(cu, J.CompilationUnit::getChecksum);
         q.getAndSend(cu, J.CompilationUnit::getFileAttributes);
         q.getAndSend(cu, J.CompilationUnit::getPackageDeclaration, pkg -> visit(pkg, q));
-        q.getAndSendList(cu, J.CompilationUnit::getImports, Tree::getId, j -> visit(j, q));
+        q.getAndSendList(cu, c -> c.getPadding().getImports(), r -> r.getElement().getId(), j -> visitRightPadded(j, q));
         q.getAndSendList(cu, J.CompilationUnit::getClasses, Tree::getId, j -> visit(j, q));
         q.getAndSend(cu, c -> asRef(c.getEof()), space -> visitSpace(getValueNonNull(space), q));
         return cu;

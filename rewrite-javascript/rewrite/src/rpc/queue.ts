@@ -256,13 +256,7 @@ export class RpcReceiveQueue {
     ): Promise<T> {
         return saveTrace(this.logFile, async () => {
             const message = await this.take();
-            if (this.logFile && message.trace) {
-                const sendTrace = message.trace;
-                delete message.trace;
-                this.logFile.write(`${JSON.stringify(message)}\n`);
-                this.logFile.write(`  ${sendTrace}\n`);
-                this.logFile.write(`  ${trace("Receiver")}\n`);
-            }
+            this.traceMessage(message);
             let ref: number | undefined;
             switch (message.state) {
                 case RpcObjectState.NO_CHANGE:
@@ -295,33 +289,49 @@ export class RpcReceiveQueue {
         return (await this.receiveList(before, onChange))!;
     }
 
-    async receiveList<T>(
+    receiveList<T>(
         before: T[] | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T[] | undefined> {
-        const msg = await this.take();
-        switch (msg.state) {
-            case RpcObjectState.NO_CHANGE:
-                return before;
-            case RpcObjectState.DELETE:
-                return undefined;
-            case RpcObjectState.ADD:
-                before = [];
-            // Intentional fall-through...
-            case RpcObjectState.CHANGE:
-                // The next message should be a CHANGE with a list of positions
-                const d = await this.take();
-                const positions = d.value as number[];
-                const after: T[] = new Array(positions.length);
-                for (let i = 0; i < positions.length; i++) {
-                    const beforeIdx = positions[i];
-                    const b: T = await (beforeIdx >= 0 ? before![beforeIdx] as T : undefined) as T;
-                    let received: Promise<T> = this.receive<T>(b, onChange);
-                    after[i] = await received;
-                }
-                return after;
-            default:
-                throw new Error(`${msg.state} is not supported for lists.`);
+        return saveTrace(this.logFile, async () => {
+            const message = await this.take();
+            this.traceMessage(message);
+            switch (message.state) {
+                case RpcObjectState.NO_CHANGE:
+                    return before;
+                case RpcObjectState.DELETE:
+                    return undefined;
+                case RpcObjectState.ADD:
+                    before = [];
+                // Intentional fall-through...
+                case RpcObjectState.CHANGE:
+                    // The next message should be a CHANGE with a list of positions
+                    const d = await this.take();
+                    const positions = d.value as number[];
+                    if (positions === undefined) {
+                        console.log("why?")
+                    }
+                    const after: T[] = new Array(positions.length);
+                    for (let i = 0; i < positions.length; i++) {
+                        const beforeIdx = positions[i];
+                        const b: T = await (beforeIdx >= 0 ? before![beforeIdx] as T : undefined) as T;
+                        let received: Promise<T> = this.receive<T>(b, onChange);
+                        after[i] = await received;
+                    }
+                    return after;
+                default:
+                    throw new Error(`${message.state} is not supported for lists.`);
+            }
+        });
+    }
+
+    private traceMessage(message: RpcObjectData) {
+        if (this.logFile && message.trace) {
+            const sendTrace = message.trace;
+            delete message.trace;
+            this.logFile.write(`${JSON.stringify(message)}\n`);
+            this.logFile.write(`  ${sendTrace}\n`);
+            this.logFile.write(`  ${trace("Receiver")}\n`);
         }
     }
 
