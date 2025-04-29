@@ -81,7 +81,7 @@ public class RpcSendQueue {
         U after = value.apply(parent);
         //noinspection unchecked
         U before = this.before == null ? null : value.apply((T) this.before);
-        send(after, before, onChange == null ? null : () -> onChange.accept(after));
+        send(after, before, onChange == null || after == null ? null : () -> onChange.accept(after));
     }
 
     public <T, U> void getAndSendList(@Nullable T parent,

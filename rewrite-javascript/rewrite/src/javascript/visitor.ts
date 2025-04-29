@@ -47,10 +47,14 @@ import {
     ImportAttributes,
     ImportType,
     ImportTypeAttributes,
+    IndexedAccessType,
+    IndexedAccessTypeIndexType,
     InferType,
+    Intersection,
     isJavaScript,
     JS,
     JavaScriptKind,
+    JsAssignmentOperation,
     JsBinary,
     JsImport,
     JsImportClause,
@@ -71,8 +75,16 @@ import {
     TrailingTokenStatement,
     Tuple,
     TypeDeclaration,
+    TypeInfo,
     TypeOf,
-    WithStatement
+    TypeOperator,
+    TypePredicate,
+    TypeQuery,
+    TypeTreeExpression,
+    Union,
+    Void,
+    WithStatement,
+    Yield
 } from "./tree";
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
@@ -445,6 +457,94 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.type = await this.visitType(typeOf.type, p);
         });
     }
+    
+    protected async visitTypeTreeExpression(typeTreeExpression: TypeTreeExpression, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeTreeExpression>(typeTreeExpression, p, async draft => {
+            draft.expression = await this.visitDefined(typeTreeExpression.expression, p) as Expression;
+            draft.type = await this.visitType(typeTreeExpression.type, p);
+        });
+    }
+    
+    protected async visitJsAssignmentOperation(assignOp: JsAssignmentOperation, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JsAssignmentOperation>(assignOp, p, async draft => {
+            draft.variable = await this.visitDefined(assignOp.variable, p) as Expression;
+            draft.operator = await this.visitLeftPadded(assignOp.operator, p);
+            draft.assignment = await this.visitDefined(assignOp.assignment, p) as Expression;
+            draft.type = await this.visitType(assignOp.type, p);
+        });
+    }
+    
+    protected async visitIndexedAccessType(indexedAccessType: IndexedAccessType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<IndexedAccessType>(indexedAccessType, p, async draft => {
+            draft.objectType = await this.visitDefined(indexedAccessType.objectType, p) as Expression;
+            draft.indexType = await this.visitDefined(indexedAccessType.indexType, p) as IndexedAccessTypeIndexType;
+            draft.type = await this.visitType(indexedAccessType.type, p);
+        });
+    }
+    
+    protected async visitIndexedAccessTypeIndexType(indexType: IndexedAccessTypeIndexType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<IndexedAccessTypeIndexType>(indexType, p, async draft => {
+            draft.element = await this.visitRightPadded(indexType.element, p);
+            draft.type = await this.visitType(indexType.type, p);
+        });
+    }
+    
+    protected async visitTypeQuery(typeQuery: TypeQuery, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeQuery>(typeQuery, p, async draft => {
+            draft.typeExpression = await this.visitDefined(typeQuery.typeExpression, p) as Expression;
+            draft.typeArguments = await this.visitOptionalContainer(typeQuery.typeArguments, p);
+            draft.type = await this.visitType(typeQuery.type, p);
+        });
+    }
+    
+    protected async visitTypeInfo(typeInfo: TypeInfo, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeInfo>(typeInfo, p, async draft => {
+            draft.typeIdentifier = await this.visitDefined(typeInfo.typeIdentifier, p) as Expression;
+        });
+    }
+    
+    protected async visitTypeOperator(typeOperator: TypeOperator, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeOperator>(typeOperator, p, async draft => {
+            draft.expression = await this.visitLeftPadded(typeOperator.expression, p);
+        });
+    }
+    
+    protected async visitTypePredicate(typePredicate: TypePredicate, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypePredicate>(typePredicate, p, async draft => {
+            draft.asserts = await this.visitLeftPadded(typePredicate.asserts, p);
+            draft.parameterName = await this.visitDefined(typePredicate.parameterName, p) as Expression;
+            draft.expression = await this.visitOptionalLeftPadded(typePredicate.expression, p);
+        });
+    }
+    
+    protected async visitUnion(union: Union, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Union>(union, p, async draft => {
+            draft.types = await mapAsync(union.types, t => this.visitRightPadded(t, p));
+            draft.type = await this.visitType(union.type, p);
+        });
+    }
+    
+    protected async visitIntersection(intersection: Intersection, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Intersection>(intersection, p, async draft => {
+            draft.types = await mapAsync(intersection.types, t => this.visitRightPadded(t, p));
+            draft.type = await this.visitType(intersection.type, p);
+        });
+    }
+    
+    protected async visitVoid(void_: Void, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Void>(void_, p, async draft => {
+            draft.expression = await this.visitDefined(void_.expression, p) as Expression;
+        });
+    }
+    
+    protected async visitJSYield(yield_: Yield, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Yield>(yield_, p, async draft => {
+            draft.delegated = await this.visitLeftPadded(yield_.delegated, p);
+            if (yield_.expression) {
+                draft.expression = await this.visitDefined(yield_.expression, p) as Expression;
+            }
+        });
+    }
 
     protected async visitWithStatement(withStmt: WithStatement, p: P): Promise<J | undefined> {
         return this.produceJavaScript<WithStatement>(withStmt, p, async draft => {
@@ -503,8 +603,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 return this.visitImportType(t as ImportType, p);
             case JavaScriptKind.ImportTypeAttributes:
                 return this.visitImportTypeAttributes(t as ImportTypeAttributes, p);
+            case JavaScriptKind.IndexedAccessType:
+                return this.visitIndexedAccessType(t as IndexedAccessType, p);
+            case JavaScriptKind.IndexedAccessTypeIndexType:
+                return this.visitIndexedAccessTypeIndexType(t as IndexedAccessTypeIndexType, p);
             case JavaScriptKind.InferType:
                 return this.visitInferType(t as InferType, p);
+            case JavaScriptKind.JsAssignmentOperation:
+                return this.visitJsAssignmentOperation(t as JsAssignmentOperation, p);
             case JavaScriptKind.JsImport:
                 return this.visitJsImport(t as JsImport, p);
             case JavaScriptKind.JsImportClause:
@@ -545,6 +651,24 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 return this.visitTypeDeclaration(t as TypeDeclaration, p);
             case JavaScriptKind.TypeOf:
                 return this.visitTypeOf(t as TypeOf, p);
+            case JavaScriptKind.TypeQuery:
+                return this.visitTypeQuery(t as TypeQuery, p);
+            case JavaScriptKind.TypeTreeExpression:
+                return this.visitTypeTreeExpression(t as TypeTreeExpression, p);
+            case JavaScriptKind.TypeInfo:
+                return this.visitTypeInfo(t as TypeInfo, p);
+            case JavaScriptKind.TypeOperator:
+                return this.visitTypeOperator(t as TypeOperator, p);
+            case JavaScriptKind.TypePredicate:
+                return this.visitTypePredicate(t as TypePredicate, p);
+            case JavaScriptKind.Union:
+                return this.visitUnion(t as Union, p);
+            case JavaScriptKind.Intersection:
+                return this.visitIntersection(t as Intersection, p);
+            case JavaScriptKind.Void:
+                return this.visitVoid(t as Void, p);
+            case JavaScriptKind.Yield:
+                return this.visitJSYield(t as Yield, p);
             case JavaScriptKind.WithStatement:
                 return this.visitWithStatement(t as WithStatement, p);
             default:

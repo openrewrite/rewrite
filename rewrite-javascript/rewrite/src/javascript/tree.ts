@@ -55,7 +55,10 @@ export const JavaScriptKind = {
     ImportAttributes: "org.openrewrite.javascript.tree.JS$ImportAttributes",
     ImportType: "org.openrewrite.javascript.tree.JS$ImportType",
     ImportTypeAttributes: "org.openrewrite.javascript.tree.JS$ImportTypeAttributes",
+    IndexedAccessType: "org.openrewrite.javascript.tree.JS$IndexedAccessType",
+    IndexedAccessTypeIndexType: "org.openrewrite.javascript.tree.JS$IndexedAccessType$IndexType",
     InferType: "org.openrewrite.javascript.tree.JS$InferType",
+    JsAssignmentOperation: "org.openrewrite.javascript.tree.JS$JsAssignmentOperation",
     JsImport: "org.openrewrite.javascript.tree.JS$JsImport",
     JsImportClause: "org.openrewrite.javascript.tree.JS$JsImportClause",
     JsImportSpecifier: "org.openrewrite.javascript.tree.JS$JsImportSpecifier",
@@ -77,6 +80,15 @@ export const JavaScriptKind = {
     Tuple: "org.openrewrite.javascript.tree.JS$Tuple",
     TypeDeclaration: "org.openrewrite.javascript.tree.JS$TypeDeclaration",
     TypeOf: "org.openrewrite.javascript.tree.JS$TypeOf",
+    TypeQuery: "org.openrewrite.javascript.tree.JS$TypeQuery",
+    TypeTreeExpression: "org.openrewrite.javascript.tree.JS$TypeTreeExpression",
+    TypeInfo: "org.openrewrite.javascript.tree.JS$TypeInfo",
+    TypeOperator: "org.openrewrite.javascript.tree.JS$TypeOperator",
+    TypePredicate: "org.openrewrite.javascript.tree.JS$TypePredicate",
+    Union: "org.openrewrite.javascript.tree.JS$Union",
+    Intersection: "org.openrewrite.javascript.tree.JS$Intersection",
+    Void: "org.openrewrite.javascript.tree.JS$Void",
+    Yield: "org.openrewrite.javascript.tree.JS$Yield",
     WithStatement: "org.openrewrite.javascript.tree.JS$WithStatement"
 } as const;
 
@@ -90,8 +102,10 @@ export interface JS extends J {}
 
 type JavaScriptExpressionBase = Alias | ArrowFunction | Await | ConditionalType | DefaultType | Delete |
     ExpressionStatement | TrailingTokenStatement | ExpressionWithTypeArguments | FunctionType | InferType |
-    ImportType | NamedImports | JsImportSpecifier | JsBinary | LiteralType | MappedType | ObjectBindingDeclarations |
-    SatisfiesExpression | StatementExpression | TaggedTemplateExpression | TemplateExpression | Tuple | TypeOf;
+    ImportType | IndexedAccessType | NamedImports | JsImportSpecifier | JsBinary | JsAssignmentOperation |
+    LiteralType | MappedType | ObjectBindingDeclarations | SatisfiesExpression | StatementExpression | 
+    TaggedTemplateExpression | TemplateExpression | Tuple | TypeOf | TypeTreeExpression | TypeQuery |
+    TypeInfo | TypeOperator | TypePredicate | Union | Intersection | Void | Yield;
 
 export type Expression<T extends { kind: string } = never> = import("../java/tree").Expression<JavaScriptExpressionBase | T>;
 
@@ -388,6 +402,95 @@ export interface TypeOf extends JS {
     readonly kind: typeof JavaScriptKind.TypeOf;
     readonly expression: Expression;
     readonly type?: JavaType;
+}
+
+export interface TypeTreeExpression extends JS, TypedTree {
+    readonly kind: typeof JavaScriptKind.TypeTreeExpression;
+    readonly expression: Expression;
+    readonly type?: JavaType;
+}
+
+export interface JsAssignmentOperation extends JS, Statement, TypedTree {
+    readonly kind: typeof JavaScriptKind.JsAssignmentOperation;
+    readonly variable: Expression;
+    readonly operator: JLeftPadded<JsAssignmentOperator>;
+    readonly assignment: Expression;
+    readonly type?: JavaType;
+}
+
+export const enum JsAssignmentOperator {
+    QuestionQuestion,
+    And,
+    Or,
+    Power,
+    Exp
+}
+
+export interface IndexedAccessType extends JS, TypeTree {
+    readonly kind: typeof JavaScriptKind.IndexedAccessType;
+    readonly objectType: Expression;
+    readonly indexType: IndexedAccessTypeIndexType;
+    readonly type?: JavaType;
+}
+
+export interface IndexedAccessTypeIndexType extends JS {
+    readonly kind: typeof JavaScriptKind.IndexedAccessTypeIndexType;
+    readonly element: JRightPadded<Expression>;
+    readonly type?: JavaType;
+}
+
+export interface TypeQuery extends JS, TypeTree {
+    readonly kind: typeof JavaScriptKind.TypeQuery;
+    readonly typeExpression: Expression;
+    readonly typeArguments?: JContainer<Expression>;
+    readonly type?: JavaType;
+}
+
+export interface TypeInfo extends JS {
+    readonly kind: typeof JavaScriptKind.TypeInfo;
+    readonly typeIdentifier: Expression;
+}
+
+export interface TypeOperator extends JS {
+    readonly kind: typeof JavaScriptKind.TypeOperator;
+    readonly operator: TypeOperatorType;
+    readonly expression: JLeftPadded<Expression>;
+}
+
+export const enum TypeOperatorType {
+    ReadOnly,
+    KeyOf,
+    Unique
+}
+
+export interface TypePredicate extends JS {
+    readonly kind: typeof JavaScriptKind.TypePredicate;
+    readonly asserts: JLeftPadded<boolean>;
+    readonly parameterName: Expression;
+    readonly expression?: JLeftPadded<Expression>;
+}
+
+export interface Union extends JS, TypeTree {
+    readonly kind: typeof JavaScriptKind.Union;
+    readonly types: JRightPadded<TypeTree>[];
+    readonly type?: JavaType;
+}
+
+export interface Intersection extends JS, TypeTree {
+    readonly kind: typeof JavaScriptKind.Intersection;
+    readonly types: JRightPadded<TypeTree>[];
+    readonly type?: JavaType;
+}
+
+export interface Void extends JS {
+    readonly kind: typeof JavaScriptKind.Void;
+    readonly expression: Expression;
+}
+
+export interface Yield extends JS {
+    readonly kind: typeof JavaScriptKind.Yield;
+    readonly delegated: JLeftPadded<boolean>;
+    readonly expression?: Expression;
 }
 
 export interface WithStatement extends JS, Statement {

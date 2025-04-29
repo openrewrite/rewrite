@@ -244,6 +244,22 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitIndexedAccessType(JS.IndexedAccessType indexedAccessType, RpcReceiveQueue q) {
+        return indexedAccessType
+                .withObjectType(q.receive(indexedAccessType.getObjectType(), expr -> (TypeTree) visitNonNull(expr, q)))
+                .withIndexType(q.receive(indexedAccessType.getIndexType(), indexType -> (TypeTree) visitNonNull(indexType, q)))
+                .withType(q.receive(indexedAccessType.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitIndexedAccessTypeIndexType(JS.IndexedAccessType.IndexType indexType, RpcReceiveQueue q) {
+        return indexType
+                .getPadding().withElement(q.receive(indexType.getPadding().getElement(), elem -> visitRightPadded(elem, q)))
+                .withType(q.receive(indexType.getType(), type -> visitType(type, q)));
+    }
+
+
+    @Override
     public J visitInferType(JS.InferType inferType, RpcReceiveQueue q) {
         try {
             return inferType.getPadding().withTypeParameter(q.receive(inferType.getPadding().getTypeParameter(), param -> visitLeftPadded(param, q)))
@@ -251,6 +267,22 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public J visitIntersection(JS.Intersection intersection, RpcReceiveQueue q) {
+        return intersection
+                .getPadding().withTypes(q.receiveList(intersection.getPadding().getTypes(), t -> visitRightPadded(t, q)))
+                .withType(q.receive(intersection.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitJsAssignmentOperation(JS.JsAssignmentOperation assignOp, RpcReceiveQueue q) {
+        return assignOp
+                .withVariable(q.receive(assignOp.getVariable(), var -> (Expression) visitNonNull(var, q)))
+                .getPadding().withOperator(q.receive(assignOp.getPadding().getOperator(), op -> visitLeftPadded(op, q)))
+                .withAssignment(q.receive(assignOp.getAssignment(), assign -> (Expression) visitNonNull(assign, q)))
+                .withType(q.receive(assignOp.getType(), type -> visitType(type, q)));
     }
 
     @Override
@@ -468,6 +500,12 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitTypeInfo(JS.TypeInfo typeInfo, RpcReceiveQueue q) {
+        return typeInfo
+                .withTypeIdentifier(q.receive(typeInfo.getTypeIdentifier(), id -> (TypeTree) visitNonNull(id, q)));
+    }
+
+    @Override
     public J visitTypeOf(JS.TypeOf typeOf, RpcReceiveQueue q) {
         try {
             return typeOf.withExpression(q.receive(typeOf.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
@@ -475,6 +513,48 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public J visitTypeOperator(JS.TypeOperator typeOperator, RpcReceiveQueue q) {
+        return typeOperator
+                .getPadding().withExpression(q.receive(typeOperator.getPadding().getExpression(), expr -> visitLeftPadded(expr, q)));
+    }
+
+    @Override
+    public J visitTypePredicate(JS.TypePredicate typePredicate, RpcReceiveQueue q) {
+        return typePredicate
+                .getPadding().withAsserts(q.receive(typePredicate.getPadding().getAsserts(), asserts -> visitLeftPadded(asserts, q)))
+                .withParameterName(q.receive(typePredicate.getParameterName(), name -> (J.Identifier) visitNonNull(name, q)))
+                .getPadding().withExpression(q.receive(typePredicate.getPadding().getExpression(), expr -> visitLeftPadded(expr, q)));
+    }
+
+    @Override
+    public J visitTypeQuery(JS.TypeQuery typeQuery, RpcReceiveQueue q) {
+        return typeQuery
+                .withTypeExpression(q.receive(typeQuery.getTypeExpression(), expr -> (TypeTree) visitNonNull(expr, q)))
+                .getPadding().withTypeArguments(q.receive(typeQuery.getPadding().getTypeArguments(), args -> visitContainer(args, q)))
+                .withType(q.receive(typeQuery.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitTypeTreeExpression(JS.TypeTreeExpression typeTreeExpr, RpcReceiveQueue q) {
+        return typeTreeExpr
+                .withExpression(q.receive(typeTreeExpr.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(typeTreeExpr.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitUnion(JS.Union union, RpcReceiveQueue q) {
+        return union
+                .getPadding().withTypes(q.receiveList(union.getPadding().getTypes(), t -> visitRightPadded(t, q)))
+                .withType(q.receive(union.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitVoid(JS.Void void_, RpcReceiveQueue q) {
+        return void_
+                .withExpression(q.receive(void_.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
     }
 
     @SuppressWarnings("unchecked")
@@ -486,6 +566,13 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public J visitYield(JS.Yield yield_, RpcReceiveQueue q) {
+        return yield_
+                .getPadding().withDelegated(q.receive(yield_.getPadding().getDelegated(), delegated -> visitLeftPadded(delegated, q)))
+                .withExpression(q.receive(yield_.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
     }
 
     public Space visitSpace(Space space, RpcReceiveQueue q) {
