@@ -392,6 +392,14 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitParameterizedType(J.ParameterizedType type, RpcSendQueue q) {
+        q.getAndSend(type, J.ParameterizedType::getClazz, clazz -> this.visit(clazz, q));
+        q.getAndSend(type, t -> t.getPadding().getTypeParameters(), params -> this.visitContainer(params, q));
+        q.getAndSend(type, t -> asRef(t.getType()), t -> this.visitType(getValueNonNull(t), q));
+        return type;
+    }
+
+    @Override
     public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parenthesizedType, RpcSendQueue q) {
         q.getAndSendList(parenthesizedType, J.ParenthesizedTypeTree::getAnnotations, Tree::getId, a -> visit(a, q));
         q.getAndSend(parenthesizedType, J.ParenthesizedTypeTree::getParenthesizedType, tree -> visit(tree, q));
@@ -410,6 +418,12 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitPrimitive(J.Primitive primitive, RpcSendQueue q) {
         q.getAndSend(primitive, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return primitive;
+    }
+
+    @Override
+    public J visitReturn(J.Return aReturn, RpcSendQueue q) {
+        q.getAndSend(aReturn, J.Return::getExpression, r -> visit(r, q));
+        return aReturn;
     }
 
     @Override
@@ -449,6 +463,14 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSendList(tryStmt, J.Try::getCatches, Tree::getId, c -> visit(c, q));
         q.getAndSend(tryStmt, t -> t.getPadding().getFinally(), fin -> visitLeftPadded(fin, q));
         return tryStmt;
+    }
+
+    @Override
+    public J visitTypeCast(J.TypeCast typeCast, RpcSendQueue q) {
+        q.getAndSend(typeCast, J.TypeCast::getClazz, clazz -> visit(clazz, q));
+        q.getAndSend(typeCast, J.TypeCast::getExpression, expr -> visit(expr, q));
+        q.getAndSend(typeCast, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
+        return typeCast;
     }
 
     @Override

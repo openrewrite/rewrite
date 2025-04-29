@@ -18,7 +18,7 @@ import {RpcCodecs} from "./codec";
 import {produceAsync} from "../visitor";
 import {randomId} from "../uuid";
 import {WriteStream} from "fs";
-import {trace, saveTrace} from "./trace";
+import {saveTrace, trace} from "./trace";
 
 const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
 
@@ -244,10 +244,12 @@ export class RpcReceiveQueue {
         if (markers === undefined) {
             markers = {kind: MarkersKind.Markers, id: randomId(), markers: []};
         }
-        return this.receive(markers, m => produceAsync(markers, async (draft) => {
-            draft.id = await this.receive(m.id);
-            draft.markers = (await this.receiveList(m.markers, m2 => this.receive(m2)))!;
-        }))
+        return this.receive(markers, m => {
+            return produceAsync(markers, async (draft) => {
+                draft.id = await this.receive(m.id);
+                draft.markers = (await this.receiveList(m.markers, m2 => this.receive(m2)))!;
+            });
+        })
     }
 
     receive<T extends any | undefined>(
