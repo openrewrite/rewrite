@@ -103,7 +103,7 @@ import {
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
 
-class JavaSender extends JavaVisitor<RpcSendQueue> {
+export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async preVisit(j: J, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
@@ -745,7 +745,7 @@ class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 }
 
-class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
+export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     protected async preVisit(j: J, q: RpcReceiveQueue): Promise<J | undefined> {
         try {

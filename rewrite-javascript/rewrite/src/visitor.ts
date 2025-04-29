@@ -42,11 +42,11 @@ export abstract class TreeVisitor<T extends Tree, P> {
     private visitCount: number = 0;
     private afterVisit?: TreeVisitor<any, P>[];
 
-    async visitDefined<R extends Tree>(tree: Tree, p: P, parent?: Cursor): Promise<R> {
+    async visitDefined<R extends T>(tree: Tree, p: P, parent?: Cursor): Promise<R> {
         return (await this.visit<R>(tree, p, parent))!;
     }
 
-    async visit<R extends Tree>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+    async visit<R extends T>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
         if (parent !== undefined) {
             this.cursor = parent;
         }

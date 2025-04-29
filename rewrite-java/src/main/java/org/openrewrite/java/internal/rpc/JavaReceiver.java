@@ -578,7 +578,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withValue(q.receive(yieldStmt.getValue(), v -> (Expression) visitNonNull(v, q)));
     }
 
-    private Space visitSpace(Space space, RpcReceiveQueue q) {
+    public Space visitSpace(Space space, RpcReceiveQueue q) {
         return space
                 .withComments(q.receiveList(space.getComments(), c -> {
                     if (c instanceof TextComment) {
@@ -592,7 +592,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withWhitespace(q.receive(space.getWhitespace()));
     }
 
-    private <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, RpcReceiveQueue q) {
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, RpcReceiveQueue q) {
         return container
                 .withBefore(q.receive(container.getBefore(), space -> visitSpace(space, q)))
                 .getPadding().withElements(q.receiveList(container.getPadding().getElements(),
@@ -600,7 +600,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withMarkers(q.receiveMarkers(container.getMarkers()));
     }
 
-    private <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
         return left
                 .withBefore(q.receive(left.getBefore(), s -> visitSpace(s, q)))
                 .withElement(q.receive(left.getElement(), t -> {
@@ -616,7 +616,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withMarkers(q.receiveMarkers(left.getMarkers()));
     }
 
-    private <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
+    public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
         return right
                 .withElement(q.receive(right.getElement(), t -> {
                     if (t instanceof J) {
