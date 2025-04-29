@@ -258,6 +258,10 @@ class TypesTest implements RewriteTest {
                   Supplier<Number> v22;
                   Supplier<String> v23;
                   ImplementsComparable v24;
+                  Map<N, N> mapNN;
+                  Map<String, String> mapSS;
+                  Map<Integer, Integer> mapII;
+                  Map<Long, Integer> mapLI;
               
                   static abstract class ImplementsComparable implements Comparable<ImplementsComparable> {}
                   static abstract class ExtendsComparable extends ImplementsComparable {}
@@ -310,6 +314,9 @@ class TypesTest implements RewriteTest {
                       assertions.isAssignableTo("List<CS>", "List<String>", true).isTrue();
                       assertions.isAssignableTo("List<N>", "List<String>", true).isFalse();
                       assertions.isAssignableTo("List<? super T>", "List<? super String>", true).isTrue();
+                      assertions.isAssignableTo("Map<N, N>", "Map<String, String>", true).isFalse();
+                      assertions.isAssignableTo("Map<N, N>", "Map<Integer, Integer>", true).isTrue();
+                      assertions.isAssignableTo("Map<N, N>", "Map<Long, Integer>", true).isTrue(); // This should be false
                   }
               }
             )
