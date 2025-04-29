@@ -203,14 +203,16 @@ class UnfoldPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void sameBlocks() {
+    void mergeDuplicatedSections() {
         rewriteRun(
           yaml(
             """
               logging.level:
                 com.first.package: INFO
-              
-              logging.level.com.another.package: DEBUG
+              some.thing: else
+              logging.level.com.second.package: DEBUG
+              other: thing
+              logging.level.com.third.package: DEBUG
               """,
             """
               logging:
@@ -218,8 +220,13 @@ class UnfoldPropertiesTest implements RewriteTest {
                   com:
                     first:
                       package: INFO
-                    another:
+                    second:
                       package: DEBUG
+                    third:
+                      package: DEBUG
+              some:
+                thing: else
+              other: thing
               """
           )
         );

@@ -63,6 +63,13 @@ public class UnfoldProperties extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext executionContext) {
+                Yaml.Document doc = super.visitDocument(document, executionContext);
+                doAfterVisit(new MergeDuplicateSectionsVisitor<>(doc));
+                return doc;
+            }
+
+            @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry e, ExecutionContext ctx) {
                 Yaml.Mapping.Entry entry = super.visitMappingEntry(e, ctx);
 
