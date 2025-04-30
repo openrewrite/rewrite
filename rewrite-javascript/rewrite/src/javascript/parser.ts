@@ -868,7 +868,7 @@
 //                             id: randomId(),
 //                             prefix: emptySpace,
 //                             markers: emptyMarkers,
-//                             operator: this.leftPadded(this.prefix(node.dotDotDotToken), JS.UnaryOperator.Spread),
+//                             operator: this.leftPadded(this.prefix(node.dotDotDotToken), JS.Unary.Type.Spread),
 //                             expression: this.visit(node.name),
 //                             type: this.mapType(node)
 //                         },
@@ -1098,7 +1098,7 @@
 //                             id: randomId(),
 //                             prefix: emptySpace,
 //                             markers: emptyMarkers,
-//                             operator: this.leftPadded(this.suffix(node.name), JS.UnaryOperator.Exclamation),
+//                             operator: this.leftPadded(this.suffix(node.name), JS.Unary.Type.Exclamation),
 //                             expression: this.visit(node.name),
 //                             type: this.mapType(node)
 //                         },
@@ -1213,11 +1213,8 @@
 //             modifiers: [], // no modifiers allowed
 //             typeParameters: this.mapTypeParametersAsObject(node),
 //             returnTypeExpression: this.mapTypeInfo(node),
-//             name: {
-//                 kind: JavaKind.IdentifierWithAnnotations,
-//                 identifier: name,
-//                 annotations: []
-//             },
+//             nameAnnotations: [],
+//             name: name,
 //             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
 //             methodType: this.mapMethodType(node)
 //         };
@@ -1235,7 +1232,7 @@
 //                     id: randomId(),
 //                     prefix: this.prefix(node.asteriskToken),
 //                     markers: emptyMarkers,
-//                     operator: this.leftPadded(this.prefix(node.name), JS.UnaryOperator.Asterisk),
+//                     operator: this.leftPadded(this.prefix(node.name), JS.Unary.Type.Asterisk),
 //                     expression: methodName,
 //                     type: this.mapType(node)
 //                 }
@@ -1284,11 +1281,8 @@
 //             modifiers: this.mapModifiers(node),
 //             typeParameters: this.mapTypeParametersAsObject(node),
 //             returnTypeExpression: this.mapTypeInfo(node),
-//             name: {
-//                 kind: JavaKind.IdentifierWithAnnotations,
-//                 identifier: name,
-//                 annotations: []
-//             },
+//             nameAnnotations: [],
+//             name: name,
 //             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
 //             body: node.body && this.convert<J.Block>(node.body),
 //             methodType: this.mapMethodType(node)
@@ -1334,11 +1328,8 @@
 //             markers: emptyMarkers,
 //             leadingAnnotations: this.mapDecorators(node),
 //             modifiers: this.mapModifiers(node),
-//             name: {
-//                 kind: JavaKind.IdentifierWithAnnotations,
-//                 identifier: this.mapIdentifier(constructorKeyword, constructorKeyword.getText()),
-//                 annotations: []
-//             },
+//             nameAnnotations: [],
+//             name: this.mapIdentifier(constructorKeyword, constructorKeyword.getText()),
 //             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
 //             body: node.body && this.convert<J.Block>(node.body),
 //             methodType: this.mapMethodType(node)
@@ -1371,11 +1362,8 @@
 //             leadingAnnotations: this.mapDecorators(node),
 //             modifiers: this.mapModifiers(node),
 //             returnTypeExpression: this.mapTypeInfo(node),
-//             name: {
-//                 kind: JavaKind.IdentifierWithAnnotations,
-//                 identifier: name,
-//                 annotations: []
-//             },
+//             nameAnnotations: [],
+//             name: name,
 //             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
 //             body: node.body && this.convert<J.Block>(node.body),
 //             methodType: this.mapMethodType(node)
@@ -1406,11 +1394,8 @@
 //             markers: emptyMarkers,
 //             leadingAnnotations: this.mapDecorators(node),
 //             modifiers: this.mapModifiers(node),
-//             name: {
-//                 kind: JavaKind.IdentifierWithAnnotations,
-//                 identifier: name,
-//                 annotations: []
-//             },
+//             nameAnnotations: [],
+//             name: name,
 //             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
 //             body: node.body && this.convert<J.Block>(node.body),
 //             methodType: this.mapMethodType(node)
@@ -1427,17 +1412,14 @@
 //             modifiers: [],
 //             typeParameters: this.mapTypeParametersAsObject(node),
 //             returnTypeExpression: this.mapTypeInfo(node),
+//             nameAnnotations: [],
 //             name: {
-//                 kind: JavaKind.IdentifierWithAnnotations,
-//                 identifier: {
-//                     kind: JavaKind.Identifier,
-//                     id: randomId(),
-//                     prefix: emptySpace/* this.prefix(node.getChildren().find(n => n.kind == ts.SyntaxKind.OpenBraceToken)!) */,
-//                     markers: emptyMarkers,
-//                     annotations: [], // FIXME decorators
-//                     simpleName: "",
-//                 },
-//                 annotations: []
+//                 kind: JavaKind.Identifier,
+//                 id: randomId(),
+//                 prefix: emptySpace/* this.prefix(node.getChildren().find(n => n.kind == ts.SyntaxKind.OpenBraceToken)!) */,
+//                 markers: emptyMarkers,
+//                 annotations: [], // FIXME decorators
+//                 simpleName: "",
 //             },
 //             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
 //             methodType: this.mapMethodType(node)
@@ -1454,17 +1436,14 @@
 //             modifiers: [], // no modifiers allowed
 //             typeParameters: this.mapTypeParametersAsObject(node),
 //             returnTypeExpression: this.mapTypeInfo(node),
+//             nameAnnotations: [],
 //             name: {
-//                 kind: JavaKind.IdentifierWithAnnotations,
-//                 identifier: {
-//                     kind: JavaKind.Identifier,
-//                     id: randomId(),
-//                     prefix: emptySpace,
-//                     markers: emptyMarkers,
-//                     annotations: [],
-//                     simpleName: 'new'
-//                 },
-//                 annotations: []
+//                 kind: JavaKind.Identifier,
+//                 id: randomId(),
+//                 prefix: emptySpace,
+//                 markers: emptyMarkers,
+//                 annotations: [],
+//                 simpleName: 'new'
 //             },
 //             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
 //             methodType: this.mapMethodType(node)
