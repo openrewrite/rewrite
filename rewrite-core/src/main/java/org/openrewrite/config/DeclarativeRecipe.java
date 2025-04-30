@@ -353,22 +353,6 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         return mappedRecipeList;
     }
 
-    @Override
-    public boolean isScanning() {
-        for (Recipe r : this.getPreconditions()) {
-            if (r.isScanning()) {
-                return true;
-            }
-        }
-        for (Recipe r : this.getRecipeList()) {
-            if (r.isScanning()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Can replace this with isScanning() once that has propagated everywhere in a real release
     private static boolean isScanningRequired(Recipe recipe) {
         if (recipe instanceof ScanningRecipe) {
             // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
