@@ -32,7 +32,7 @@ import {
     ImportType,
     ImportTypeAttributes,
     IndexedAccessType,
-    IndexedAccessTypeIndexType, IndexSignatureDeclaration,
+    IndexSignatureDeclaration,
     InferType,
     Intersection,
     isJavaScript,
@@ -42,11 +42,11 @@ import {
     JsBinary,
     JsImport,
     JsImportClause,
-    JsImportSpecifier, JSMethodDeclaration, JSNamedVariable, JSVariableDeclarations,
+    JsImportSpecifier,
+    JSMethodDeclaration,
+    JSVariableDeclarations,
     LiteralType,
     MappedType,
-    MappedTypeKeysRemapping,
-    MappedTypeMappedTypeParameter,
     NamedImports,
     ObjectBindingDeclarations,
     PropertyAssignment,
@@ -55,7 +55,6 @@ import {
     StatementExpression,
     TaggedTemplateExpression,
     TemplateExpression,
-    TemplateExpressionTemplateSpan,
     TrailingTokenStatement,
     Tuple,
     TypeDeclaration,
@@ -72,16 +71,15 @@ import {
     Yield
 } from "./tree";
 import {
-    Annotation,
+    Annotation, Block,
     isJava,
     isSpace,
     J,
     JavaType,
     JContainer,
     JLeftPadded,
-    JRightPadded,
+    JRightPadded, Literal,
     Space,
-    TypeCast
 } from "../java";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft} from "immer";
@@ -115,7 +113,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     protected async visitAlias(alias: Alias, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(alias, a => a.propertyName, propName => this.visitRightPadded(propName, q));
         await q.getAndSend(alias, a => a.alias, alias => this.visit(alias, q));
-        await q.getAndSend(alias, a => a.type && asRef(a.type), type => this.visitType(type, q));
 
         return alias;
     }
@@ -299,7 +296,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return varDecls;
     }
 
-    protected async visitJSNamedVariable(variable: JSNamedVariable, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitJSNamedVariable(variable: JSVariableDeclarations.JSNamedVariable, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(variable, v => v.name, name => this.visit(name, q));
         await q.getAndSendList(variable, v => v.dimensionsAfterName, dim => dim.element, dim => this.visitLeftPadded(dim, q));
         await q.getAndSend(variable, v => v.initializer, init => this.visitLeftPadded(init, q));
@@ -316,7 +313,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(methodDecl, m => m.returnTypeExpression, type => this.visit(type, q));
         await q.getAndSend(methodDecl, m => m.name, name => this.visit(name, q));
         await q.getAndSend(methodDecl, m => m.parameters, params => this.visitContainer(params, q));
-        await q.getAndSend(methodDecl, m => m.body, body => this.visitRightPadded(body, q));
+        await q.getAndSend(methodDecl, m => m.body, body => this.visit(body, q));
         await q.getAndSend(methodDecl, m => m.type && asRef(m.type), type => this.visitType(type, q));
 
         return methodDecl;
@@ -350,14 +347,14 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return mappedType;
     }
 
-    protected async visitMappedTypeKeysRemapping(keysRemapping: MappedTypeKeysRemapping, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitMappedTypeKeysRemapping(keysRemapping: MappedType.KeysRemapping, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(keysRemapping, k => k.typeParameter, param => this.visitRightPadded(param, q));
         await q.getAndSend(keysRemapping, k => k.nameType, nameType => this.visitRightPadded(nameType, q));
 
         return keysRemapping;
     }
 
-    protected async visitMappedTypeMappedTypeParameter(param: MappedTypeMappedTypeParameter, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitMappedTypeMappedTypeParameter(param: MappedType.MappedTypeParameter, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(param, p => p.name, name => this.visit(name, q));
         await q.getAndSend(param, p => p.iterateType, type => this.visitLeftPadded(type, q));
 
@@ -423,7 +420,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return template;
     }
 
-    protected async visitTemplateExpressionTemplateSpan(span: TemplateExpressionTemplateSpan, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitTemplateExpressionTemplateSpan(span: TemplateExpression.TemplateSpan, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(span, s => s.expression, expr => this.visit(expr, q));
         await q.getAndSend(span, s => s.tail, tail => this.visit(tail, q));
 
@@ -486,7 +483,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return indexedAccessType;
     }
 
-    protected async visitIndexedAccessTypeIndexType(indexType: IndexedAccessTypeIndexType, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitIndexedAccessTypeIndexType(indexType: IndexedAccessType.IndexType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(indexType, i => i.element, element => this.visitRightPadded(element, q));
         await q.getAndSend(indexType, i => i.type && asRef(i.type), type => this.visitType(type, q));
 
@@ -616,7 +613,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
         draft.propertyName = await q.receive(alias.propertyName, propName => this.visitRightPadded(propName, q));
         draft.alias = await q.receive(alias.alias, alias => this.visit(alias, q));
-        draft.type = await q.receive(alias.type, type => this.visitType(type, q));
 
         return finishDraft(draft);
     }
@@ -873,7 +869,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitMappedTypeKeysRemapping(keysRemapping: MappedTypeKeysRemapping, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitMappedTypeKeysRemapping(keysRemapping: MappedType.KeysRemapping, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(keysRemapping);
 
         draft.typeParameter = await q.receive(keysRemapping.typeParameter, param => this.visitRightPadded(param, q));
@@ -882,7 +878,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitMappedTypeMappedTypeParameter(param: MappedTypeMappedTypeParameter, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitMappedTypeMappedTypeParameter(param: MappedType.MappedTypeParameter, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(param);
 
         draft.name = await q.receive(param.name, name => this.visit(name, q));
@@ -938,7 +934,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitJSNamedVariable(variable: JSNamedVariable, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitJSNamedVariable(variable: JSVariableDeclarations.JSNamedVariable, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(variable);
 
         draft.name = await q.receive(variable.name, name => this.visit(name, q));
@@ -958,7 +954,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.returnTypeExpression = await q.receive(methodDecl.returnTypeExpression, type => this.visit(type, q));
         draft.name = await q.receive(methodDecl.name, name => this.visit(name, q));
         draft.parameters = await q.receive(methodDecl.parameters, params => this.visitContainer(params, q));
-        draft.body = await q.receive(methodDecl.body, body => this.visitRightPadded(body, q));
+        draft.body = await q.receive(methodDecl.body, body => this.visitDefined<Block>(body, q));
         draft.type = await q.receive(methodDecl.type, type => this.visitType(type, q));
 
         return finishDraft(draft);
@@ -1003,11 +999,11 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitTemplateExpressionTemplateSpan(span: TemplateExpressionTemplateSpan, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitTemplateExpressionTemplateSpan(span: TemplateExpression.TemplateSpan, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(span);
 
         draft.expression = await q.receive(span.expression, expr => this.visit(expr, q));
-        draft.tail = await q.receive(span.tail, tail => this.visit(tail, q));
+        draft.tail = await q.receive(span.tail, tail => this.visitDefined<Literal>(tail, q));
 
         return finishDraft(draft);
     }

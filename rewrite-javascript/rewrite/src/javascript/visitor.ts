@@ -1,11 +1,13 @@
+// noinspection JSUnusedGlobalSymbols
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,33 +18,41 @@
 import {mapAsync, SourceFile, ValidImmerRecipeReturnType} from "../";
 import {
     Annotation,
+    Block,
     ControlParentheses,
     Identifier,
     J,
     JavaType,
     JavaVisitor,
-    LambdaParameters,
+    Lambda, LambdaParameters,
     Literal,
     Modifier,
     NameTree,
     Space,
     Statement,
+    TypedTree,
     TypeParameters,
-    TypeTree,
+    TypeTree
 } from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
 import {
     Alias,
+    ArrayBindingPattern,
     ArrowFunction,
     Await,
+    BindingElement,
     CompilationUnit,
     ConditionalType,
     DefaultType,
     Delete,
     Export,
+    ExportAssignment,
+    ExportDeclaration,
+    ExportSpecifier,
     Expression,
     ExpressionStatement,
     ExpressionWithTypeArguments,
+    FunctionDeclaration,
     FunctionType,
     ImportAttribute,
     ImportAttributes,
@@ -50,14 +60,15 @@ import {
     ImportTypeAttributes,
     IndexSignatureDeclaration,
     IndexedAccessType,
-    IndexedAccessTypeIndexType,
     InferType,
     Intersection,
     JS,
+    JSForInLoop,
+    JSForInOfLoopControl,
+    JSForOfLoop,
     JSMethodDeclaration,
-    JSNamedVariable,
+    JSTry,
     JSVariableDeclarations,
-    JavaScriptKind,
     JsAssignmentOperation,
     JsBinary,
     JsImport,
@@ -65,9 +76,9 @@ import {
     JsImportSpecifier,
     LiteralType,
     MappedType,
-    MappedTypeKeysRemapping,
-    MappedTypeMappedTypeParameter,
+    NamedExports,
     NamedImports,
+    NamespaceDeclaration,
     ObjectBindingDeclarations,
     PropertyAssignment,
     SatisfiesExpression,
@@ -75,11 +86,11 @@ import {
     StatementExpression,
     TaggedTemplateExpression,
     TemplateExpression,
-    TemplateExpressionTemplateSpan,
     TrailingTokenStatement,
     Tuple,
     TypeDeclaration,
     TypeInfo,
+    TypeLiteral,
     TypeOf,
     TypeOperator,
     TypePredicate,
@@ -90,8 +101,13 @@ import {
     Void,
     WithStatement,
     Yield,
+    JavaScriptKind,
     isJavaScript,
 } from "./tree";
+import JSNamedVariable = JSVariableDeclarations.JSNamedVariable;
+import MappedTypeParameter = MappedType.MappedTypeParameter;
+import TemplateSpan = TemplateExpression.TemplateSpan;
+import IndexType = IndexedAccessType.IndexType;
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
@@ -124,491 +140,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return nameTree;
     }
 
-    protected async visitAlias(alias: Alias, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<Alias>(alias, p, async draft => {
-            draft.propertyName = await this.visitRightPadded(alias.propertyName, p);
-            draft.alias = await this.visitDefined(alias.alias, p) as Expression;
-            draft.type = await this.visitType(alias.type, p);
-        });
-    }
-
-    protected async visitArrowFunction(arrowFunction: ArrowFunction, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<ArrowFunction>(arrowFunction, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(arrowFunction.leadingAnnotations, a => this.visitDefined<Annotation>(a, p));
-            draft.modifiers = await mapAsync(arrowFunction.modifiers, m => this.visitDefined<Modifier>(m, p));
-
-            if (arrowFunction.typeParameters) {
-                draft.typeParameters = await this.visitDefined(arrowFunction.typeParameters, p) as TypeParameters;
-            }
-
-            draft.parameters = await this.visitDefined(arrowFunction.parameters, p) as LambdaParameters;
-
-            if (arrowFunction.returnTypeExpression) {
-                draft.returnTypeExpression = await this.visitDefined(arrowFunction.returnTypeExpression, p) as TypeTree;
-            }
-
-            draft.body = await this.visitLeftPadded(arrowFunction.body, p);
-            draft.type = await this.visitType(arrowFunction.type, p);
-        });
-    }
-
-    protected async visitAwait(await_: Await, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<Await>(await_, p, async draft => {
-            draft.expression = await this.visitDefined(await_.expression, p) as Expression;
-            draft.type = await this.visitType(await_.type, p);
-        });
-    }
-
-    protected async visitJSCompilationUnit(cu: CompilationUnit, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<CompilationUnit>(cu, p, async draft => {
-            draft.imports = await mapAsync(cu.imports, imp => this.visitRightPadded(imp, p));
-            draft.statements = await mapAsync(cu.statements, stmt => this.visitRightPadded(stmt, p));
-            draft.eof = await this.visitSpace(cu.eof, p);
-        });
-    }
-
-    protected async visitConditionalType(conditionalType: ConditionalType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<ConditionalType>(conditionalType, p, async draft => {
-            draft.checkType = await this.visitDefined(conditionalType.checkType, p) as Expression;
-            draft.condition = await this.visitContainer(conditionalType.condition, p);
-            draft.type = await this.visitType(conditionalType.type, p);
-        });
-    }
-
-    protected async visitDefaultType(defaultType: DefaultType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<DefaultType>(defaultType, p, async draft => {
-            draft.left = await this.visitDefined(defaultType.left, p) as Expression;
-            draft.beforeEquals = await this.visitSpace(defaultType.beforeEquals, p);
-            draft.right = await this.visitDefined(defaultType.right, p) as Expression;
-            draft.type = await this.visitType(defaultType.type, p);
-        });
-    }
-
-    protected async visitDelete(deleteExpr: Delete, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<Delete>(deleteExpr, p, async draft => {
-            draft.expression = await this.visitDefined(deleteExpr.expression, p) as Expression;
-            draft.type = await this.visitType(deleteExpr.type, p);
-        });
-    }
-
-    protected async visitExport(export_: Export, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<Export>(export_, p, async draft => {
-            draft.exports = await this.visitOptionalContainer(export_.exports, p);
-
-            if (export_.from) {
-                draft.from = await this.visitSpace(export_.from, p);
-            }
-
-            if (export_.target) {
-                draft.target = await this.visitDefined(export_.target, p) as Literal;
-            }
-
-            draft.initializer = await this.visitOptionalLeftPadded(export_.initializer, p);
-        });
-    }
-
-    protected async visitExpressionStatement(exprStmt: ExpressionStatement, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<ExpressionStatement>(exprStmt, p, async draft => {
-            draft.expression = await this.visitDefined(exprStmt.expression, p) as Expression;
-        });
-    }
-
-    protected async visitTrailingTokenStatement(trailStmt: TrailingTokenStatement, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TrailingTokenStatement>(trailStmt, p, async draft => {
-            draft.expression = await this.visitRightPadded(trailStmt.expression, p);
-            draft.type = await this.visitType(trailStmt.type, p);
-        });
-    }
-
-    protected async visitExpressionWithTypeArguments(exprType: ExpressionWithTypeArguments, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<ExpressionWithTypeArguments>(exprType, p, async draft => {
-            draft.clazz = await this.visitDefined(exprType.clazz, p) as J;
-            draft.typeArguments = await this.visitOptionalContainer(exprType.typeArguments, p);
-            draft.type = await this.visitType(exprType.type, p);
-        });
-    }
-
-    protected async visitFunctionType(functionType: FunctionType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<FunctionType>(functionType, p, async draft => {
-            draft.modifiers = await mapAsync(functionType.modifiers, m => this.visitDefined<Modifier>(m, p));
-            draft.constructorType = await this.visitLeftPadded(functionType.constructorType, p);
-
-            if (functionType.typeParameters) {
-                draft.typeParameters = await this.visitDefined(functionType.typeParameters, p) as TypeParameters;
-            }
-
-            draft.parameters = await this.visitContainer(functionType.parameters, p);
-            draft.returnType = await this.visitLeftPadded(functionType.returnType, p);
-            draft.type = await this.visitType(functionType.type, p);
-        });
-    }
-
-    protected async visitImportAttribute(importAttr: ImportAttribute, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<ImportAttribute>(importAttr, p, async draft => {
-            draft.name = await this.visitDefined(importAttr.name, p) as Expression;
-            draft.value = await this.visitLeftPadded(importAttr.value, p);
-        });
-    }
-
-    protected async visitImportAttributes(importAttrs: ImportAttributes, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<ImportAttributes>(importAttrs, p, async draft => {
-            draft.elements = await this.visitContainer(importAttrs.elements, p);
-        });
-    }
-
-    protected async visitImportType(importType: ImportType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<ImportType>(importType, p, async draft => {
-            draft.hasTypeof = await this.visitRightPadded(importType.hasTypeof, p);
-            draft.argumentAndAttributes = await this.visitContainer(importType.argumentAndAttributes, p);
-            draft.qualifier = await this.visitOptionalLeftPadded(importType.qualifier, p);
-            draft.typeArguments = await this.visitOptionalContainer(importType.typeArguments, p);
-            draft.type = await this.visitType(importType.type, p);
-        });
-    }
-    
-    protected async visitIndexSignatureDeclaration(indexSignature: IndexSignatureDeclaration, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<IndexSignatureDeclaration>(indexSignature, p, async draft => {
-            draft.modifiers = await mapAsync(indexSignature.modifiers, m => this.visitDefined<Modifier>(m, p));
-            draft.parameters = await this.visitContainer(indexSignature.parameters, p);
-            draft.typeExpression = await this.visitLeftPadded(indexSignature.typeExpression, p);
-            draft.type = await this.visitType(indexSignature.type, p);
-        });
-    }
-
-    protected async visitImportTypeAttributes(importTypeAttrs: ImportTypeAttributes, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<ImportTypeAttributes>(importTypeAttrs, p, async draft => {
-            draft.token = await this.visitRightPadded(importTypeAttrs.token, p);
-            draft.elements = await this.visitContainer(importTypeAttrs.elements, p);
-            draft.end = await this.visitSpace(importTypeAttrs.end, p);
-        });
-    }
-
-    protected async visitInferType(inferType: InferType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<InferType>(inferType, p, async draft => {
-            draft.typeParameter = await this.visitLeftPadded(inferType.typeParameter, p);
-            draft.type = await this.visitType(inferType.type, p);
-        });
-    }
-
-    protected async visitJsImport(jsImport: JsImport, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JsImport>(jsImport, p, async draft => {
-            draft.modifiers = await mapAsync(jsImport.modifiers, m => this.visitDefined<Modifier>(m, p));
-
-            if (jsImport.importClause) {
-                draft.importClause = await this.visitDefined(jsImport.importClause, p) as JsImportClause;
-            }
-
-            draft.moduleSpecifier = await this.visitLeftPadded(jsImport.moduleSpecifier, p);
-
-            if (jsImport.attributes) {
-                draft.attributes = await this.visitDefined(jsImport.attributes, p) as ImportAttributes;
-            }
-        });
-    }
-
-    protected async visitJsImportClause(jsImportClause: JsImportClause, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JsImportClause>(jsImportClause, p, async draft => {
-            if (jsImportClause.name) {
-                draft.name = await this.visitRightPadded(jsImportClause.name, p);
-            }
-
-            if (jsImportClause.namedBindings) {
-                draft.namedBindings = await this.visitDefined(jsImportClause.namedBindings, p) as Expression;
-            }
-        });
-    }
-
-    protected async visitNamedImports(namedImports: NamedImports, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<NamedImports>(namedImports, p, async draft => {
-            draft.elements = await this.visitContainer(namedImports.elements, p);
-            draft.type = await this.visitType(namedImports.type, p);
-        });
-    }
-
-    protected async visitJsImportSpecifier(jsImportSpecifier: JsImportSpecifier, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JsImportSpecifier>(jsImportSpecifier, p, async draft => {
-            draft.importType = await this.visitLeftPadded(jsImportSpecifier.importType, p);
-            draft.specifier = await this.visitDefined(jsImportSpecifier.specifier, p) as Expression;
-            draft.type = await this.visitType(jsImportSpecifier.type, p);
-        });
-    }
-
-    protected async visitJSVariableDeclarations(varDecls: JSVariableDeclarations, p: P): Promise<J | undefined> {
-        return this.produceTree<JSVariableDeclarations>(varDecls, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(varDecls.leadingAnnotations, a => this.visitDefined<Annotation>(a, p));
-            draft.modifiers = await mapAsync(varDecls.modifiers, m => this.visitDefined<Modifier>(m, p));
-            draft.typeExpression = varDecls.typeExpression && await this.visit(varDecls.typeExpression, p);
-            draft.varargs = varDecls.varargs && await this.visitSpace(varDecls.varargs, p);
-            draft.variables = await mapAsync(varDecls.variables, v => this.visitRightPadded(v, p));
-        });
-    }
-
-        protected async visitJSNamedVariable(variable: JSNamedVariable, p: P): Promise<J | undefined> {
-        return this.produceTree<JSNamedVariable>(variable, p, async draft => {
-            draft.name = await this.visitDefined<Expression>(variable.name, p);
-            draft.dimensionsAfterName = await mapAsync(variable.dimensionsAfterName, d => this.visitLeftPadded(d, p));
-            draft.initializer = variable.initializer && await this.visitLeftPadded(variable.initializer, p);
-        });
-    }
-    
-    protected async visitJSMethodDeclaration(methodDecl: JSMethodDeclaration, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JSMethodDeclaration>(methodDecl, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(methodDecl.leadingAnnotations, a => this.visitDefined<Annotation>(a, p));
-            draft.modifiers = await mapAsync(methodDecl.modifiers, m => this.visitDefined<Modifier>(m, p));
-            draft.typeParameters = methodDecl.typeParameters && await this.visit(methodDecl.typeParameters, p);
-            draft.returnTypeExpression = methodDecl.returnTypeExpression && await this.visitDefined(methodDecl.returnTypeExpression, p);
-            draft.name = await this.visitDefined(methodDecl.name, p) as Expression;
-            draft.parameters = await this.visitContainer(methodDecl.parameters, p);
-            draft.body = methodDecl.body && await this.visitRightPadded(methodDecl.body, p);
-            draft.defaultValue = methodDecl.defaultValue && await this.visitLeftPadded(methodDecl.defaultValue, p);
-            draft.methodType = await this.visitType(methodDecl.methodType, p) as JavaType.Method;
-        });
-    }
-
-    protected async visitJsBinary(jsBinary: JsBinary, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JsBinary>(jsBinary, p, async draft => {
-            draft.left = await this.visitDefined(jsBinary.left, p) as Expression;
-            draft.operator = await this.visitLeftPadded(jsBinary.operator, p);
-            draft.right = await this.visitDefined(jsBinary.right, p) as Expression;
-            draft.type = await this.visitType(jsBinary.type, p);
-        });
-    }
-
-    protected async visitLiteralType(literalType: LiteralType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<LiteralType>(literalType, p, async draft => {
-            draft.literal = await this.visitDefined(literalType.literal, p) as Expression;
-            draft.type = await this.visitType(literalType.type, p) as JavaType;
-        });
-    }
-
-    protected async visitMappedType(mappedType: MappedType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<MappedType>(mappedType, p, async draft => {
-            draft.prefixToken = await this.visitOptionalLeftPadded(mappedType.prefixToken, p);
-            draft.hasReadonly = await this.visitLeftPadded(mappedType.hasReadonly, p);
-            draft.keysRemapping = await this.visitDefined(mappedType.keysRemapping, p) as MappedTypeKeysRemapping;
-            draft.suffixToken = await this.visitOptionalLeftPadded(mappedType.suffixToken, p);
-            draft.hasQuestionToken = await this.visitLeftPadded(mappedType.hasQuestionToken, p);
-            draft.valueType = await this.visitContainer(mappedType.valueType, p);
-            draft.type = await this.visitType(mappedType.type, p);
-        });
-    }
-
-    protected async visitMappedTypeKeysRemapping(keysRemapping: MappedTypeKeysRemapping, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<MappedTypeKeysRemapping>(keysRemapping, p, async draft => {
-            draft.typeParameter = await this.visitRightPadded(keysRemapping.typeParameter, p);
-            draft.nameType = await this.visitOptionalRightPadded(keysRemapping.nameType, p);
-        });
-    }
-
-    protected async visitMappedTypeMappedTypeParameter(param: MappedTypeMappedTypeParameter, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<MappedTypeMappedTypeParameter>(param, p, async draft => {
-            draft.name = await this.visitDefined(param.name, p) as Expression;
-            draft.iterateType = await this.visitLeftPadded(param.iterateType, p);
-        });
-    }
-
-    protected async visitObjectBindingDeclarations(objectBindings: ObjectBindingDeclarations, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<ObjectBindingDeclarations>(objectBindings, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(objectBindings.leadingAnnotations, a => this.visitDefined<Annotation>(a, p));
-            draft.modifiers = await mapAsync(objectBindings.modifiers, m => this.visitDefined<Modifier>(m, p));
-
-            if (objectBindings.typeExpression) {
-                draft.typeExpression = await this.visitDefined(objectBindings.typeExpression, p) as TypeTree;
-            }
-
-            draft.bindings = await this.visitContainer(objectBindings.bindings, p);
-            draft.initializer = await this.visitOptionalLeftPadded(objectBindings.initializer, p);
-        });
-    }
-
-    protected async visitPropertyAssignment(propAssign: PropertyAssignment, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<PropertyAssignment>(propAssign, p, async draft => {
-            draft.name = await this.visitRightPadded(propAssign.name, p);
-
-            if (propAssign.initializer) {
-                draft.initializer = await this.visitDefined(propAssign.initializer, p) as Expression;
-            }
-        });
-    }
-
-    protected async visitSatisfiesExpression(satisfiesExpr: SatisfiesExpression, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<SatisfiesExpression>(satisfiesExpr, p, async draft => {
-            draft.expression = await this.visitDefined(satisfiesExpr.expression, p) as J;
-            draft.satisfiesType = await this.visitLeftPadded(satisfiesExpr.satisfiesType, p);
-            draft.type = await this.visitType(satisfiesExpr.type, p);
-        });
-    }
-
-    protected async visitScopedVariableDeclarations(scopedVarDecls: ScopedVariableDeclarations, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<ScopedVariableDeclarations>(scopedVarDecls, p, async draft => {
-            draft.modifiers = await mapAsync(scopedVarDecls.modifiers, m => this.visitDefined<Modifier>(m, p));
-            draft.scope = await this.visitOptionalLeftPadded(scopedVarDecls.scope, p);
-            draft.variables = await mapAsync(scopedVarDecls.variables, v => this.visitRightPadded(v, p));
-        });
-    }
-
-    protected async visitStatementExpression(stmtExpr: StatementExpression, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<StatementExpression>(stmtExpr, p, async draft => {
-            draft.statement = await this.visitDefined(stmtExpr.statement, p) as Statement;
-        });
-    }
-
-    protected async visitTaggedTemplateExpression(taggedTemplate: TaggedTemplateExpression, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TaggedTemplateExpression>(taggedTemplate, p, async draft => {
-            draft.tag = await this.visitOptionalRightPadded(taggedTemplate.tag, p);
-            draft.typeArguments = await this.visitOptionalContainer(taggedTemplate.typeArguments, p);
-            draft.templateExpression = await this.visitDefined(taggedTemplate.templateExpression, p) as Expression;
-            draft.type = await this.visitType(taggedTemplate.type, p);
-        });
-    }
-
-    protected async visitTemplateExpression(template: TemplateExpression, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TemplateExpression>(template, p, async draft => {
-            draft.head = await this.visitDefined(template.head, p) as Literal;
-            draft.templateSpans = await mapAsync(template.templateSpans, span => this.visitRightPadded(span, p));
-            draft.type = await this.visitType(template.type, p);
-        });
-    }
-
-    protected async visitTemplateExpressionTemplateSpan(span: TemplateExpressionTemplateSpan, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TemplateExpressionTemplateSpan>(span, p, async draft => {
-            draft.expression = await this.visitDefined(span.expression, p) as J;
-            draft.tail = await this.visitDefined(span.tail, p) as Literal;
-        });
-    }
-
-    protected async visitTuple(tuple: Tuple, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<Tuple>(tuple, p, async draft => {
-            draft.elements = await this.visitContainer(tuple.elements, p);
-            draft.type = await this.visitType(tuple.type, p);
-        });
-    }
-
-    protected async visitTypeDeclaration(typeDecl: TypeDeclaration, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TypeDeclaration>(typeDecl, p, async draft => {
-            draft.modifiers = await mapAsync(typeDecl.modifiers, m => this.visitDefined<Modifier>(m, p));
-            draft.name = await this.visitLeftPadded(typeDecl.name, p);
-
-            if (typeDecl.typeParameters) {
-                draft.typeParameters = await this.visitDefined(typeDecl.typeParameters, p) as TypeParameters;
-            }
-
-            draft.initializer = await this.visitLeftPadded(typeDecl.initializer, p);
-            draft.type = await this.visitType(typeDecl.type, p);
-        });
-    }
-
-    protected async visitTypeOf(typeOf: TypeOf, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TypeOf>(typeOf, p, async draft => {
-            draft.expression = await this.visitDefined(typeOf.expression, p) as Expression;
-            draft.type = await this.visitType(typeOf.type, p);
-        });
-    }
-    
-    protected async visitTypeTreeExpression(typeTreeExpression: TypeTreeExpression, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TypeTreeExpression>(typeTreeExpression, p, async draft => {
-            draft.expression = await this.visitDefined(typeTreeExpression.expression, p) as Expression;
-            draft.type = await this.visitType(typeTreeExpression.type, p);
-        });
-    }
-    
-    protected async visitJsAssignmentOperation(assignOp: JsAssignmentOperation, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JsAssignmentOperation>(assignOp, p, async draft => {
-            draft.variable = await this.visitDefined(assignOp.variable, p) as Expression;
-            draft.operator = await this.visitLeftPadded(assignOp.operator, p);
-            draft.assignment = await this.visitDefined(assignOp.assignment, p) as Expression;
-            draft.type = await this.visitType(assignOp.type, p);
-        });
-    }
-    
-    protected async visitIndexedAccessType(indexedAccessType: IndexedAccessType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<IndexedAccessType>(indexedAccessType, p, async draft => {
-            draft.objectType = await this.visitDefined(indexedAccessType.objectType, p) as Expression;
-            draft.indexType = await this.visitDefined(indexedAccessType.indexType, p) as IndexedAccessTypeIndexType;
-            draft.type = await this.visitType(indexedAccessType.type, p);
-        });
-    }
-    
-    protected async visitIndexedAccessTypeIndexType(indexType: IndexedAccessTypeIndexType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<IndexedAccessTypeIndexType>(indexType, p, async draft => {
-            draft.element = await this.visitRightPadded(indexType.element, p);
-            draft.type = await this.visitType(indexType.type, p);
-        });
-    }
-    
-    protected async visitTypeQuery(typeQuery: TypeQuery, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TypeQuery>(typeQuery, p, async draft => {
-            draft.typeExpression = await this.visitDefined(typeQuery.typeExpression, p) as Expression;
-            draft.typeArguments = await this.visitOptionalContainer(typeQuery.typeArguments, p);
-            draft.type = await this.visitType(typeQuery.type, p);
-        });
-    }
-    
-    protected async visitTypeInfo(typeInfo: TypeInfo, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TypeInfo>(typeInfo, p, async draft => {
-            draft.typeIdentifier = await this.visitDefined(typeInfo.typeIdentifier, p) as Expression;
-        });
-    }
-    
-    protected async visitTypeOperator(typeOperator: TypeOperator, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TypeOperator>(typeOperator, p, async draft => {
-            draft.expression = await this.visitLeftPadded(typeOperator.expression, p);
-        });
-    }
-    
-    protected async visitJsUnary(unary: Unary, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<Unary>(unary, p, async draft => {
-            draft.operator = await this.visitLeftPadded(unary.operator, p);
-            draft.expression = await this.visitDefined(unary.expression, p) as Expression;
-            draft.type = await this.visitType(unary.type, p);
-        });
-    }
-    
-    protected async visitTypePredicate(typePredicate: TypePredicate, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TypePredicate>(typePredicate, p, async draft => {
-            draft.asserts = await this.visitLeftPadded(typePredicate.asserts, p);
-            draft.parameterName = await this.visitDefined(typePredicate.parameterName, p) as Identifier;
-            draft.expression = await this.visitOptionalLeftPadded(typePredicate.expression, p);
-            draft.type = await this.visitType(typePredicate.type, p);
-        });
-    }
-    
-    protected async visitUnion(union: Union, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<Union>(union, p, async draft => {
-            draft.types = await mapAsync(union.types, t => this.visitRightPadded(t, p));
-            draft.type = await this.visitType(union.type, p);
-        });
-    }
-    
-    protected async visitIntersection(intersection: Intersection, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<Intersection>(intersection, p, async draft => {
-            draft.types = await mapAsync(intersection.types, t => this.visitRightPadded(t, p));
-            draft.type = await this.visitType(intersection.type, p);
-        });
-    }
-    
-    protected async visitVoid(void_: Void, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<Void>(void_, p, async draft => {
-            draft.expression = await this.visitDefined(void_.expression, p) as Expression;
-        });
-    }
-    
-    protected async visitJSYield(yield_: Yield, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<Yield>(yield_, p, async draft => {
-            draft.delegated = await this.visitLeftPadded(yield_.delegated, p);
-            if (yield_.expression) {
-                draft.expression = await this.visitDefined(yield_.expression, p) as Expression;
-            }
-        });
-    }
-
-    protected async visitWithStatement(withStmt: WithStatement, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<WithStatement>(withStmt, p, async draft => {
-            draft.expression = await this.visitDefined(withStmt.expression, p) as ControlParentheses<Expression>;
-            draft.body = await this.visitRightPadded(withStmt.body, p);
-        });
-    }
-
     protected async produceJavaScript<J2 extends JS>(
         before: JS | undefined,
         p: P,
@@ -625,120 +156,706 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return finishDraft(draft) as J2;
     }
 
-    override accept(t: J, p: P): Promise<J | undefined> {
-        switch (t.kind) {
-            case JavaScriptKind.Alias:
-                return this.visitAlias(t as Alias, p);
-            case JavaScriptKind.ArrowFunction:
-                return this.visitArrowFunction(t as ArrowFunction, p);
-            case JavaScriptKind.Await:
-                return this.visitAwait(t as Await, p);
-            case JavaScriptKind.CompilationUnit:
-                return this.visitJSCompilationUnit(t as CompilationUnit, p);
-            case JavaScriptKind.ConditionalType:
-                return this.visitConditionalType(t as ConditionalType, p);
-            case JavaScriptKind.DefaultType:
-                return this.visitDefaultType(t as DefaultType, p);
-            case JavaScriptKind.Delete:
-                return this.visitDelete(t as Delete, p);
-            case JavaScriptKind.Export:
-                return this.visitExport(t as Export, p);
-            case JavaScriptKind.ExpressionStatement:
-                return this.visitExpressionStatement(t as ExpressionStatement, p);
-            case JavaScriptKind.TrailingTokenStatement:
-                return this.visitTrailingTokenStatement(t as TrailingTokenStatement, p);
-            case JavaScriptKind.ExpressionWithTypeArguments:
-                return this.visitExpressionWithTypeArguments(t as ExpressionWithTypeArguments, p);
-            case JavaScriptKind.FunctionType:
-                return this.visitFunctionType(t as FunctionType, p);
-            case JavaScriptKind.ImportAttribute:
-                return this.visitImportAttribute(t as ImportAttribute, p);
-            case JavaScriptKind.ImportAttributes:
-                return this.visitImportAttributes(t as ImportAttributes, p);
-            case JavaScriptKind.ImportType:
-                return this.visitImportType(t as ImportType, p);
-            case JavaScriptKind.ImportTypeAttributes:
-                return this.visitImportTypeAttributes(t as ImportTypeAttributes, p);
-            case JavaScriptKind.IndexedAccessType:
-                return this.visitIndexedAccessType(t as IndexedAccessType, p);
-            case JavaScriptKind.IndexedAccessTypeIndexType:
-                return this.visitIndexedAccessTypeIndexType(t as IndexedAccessTypeIndexType, p);
-            case JavaScriptKind.IndexSignatureDeclaration:
-                return this.visitIndexSignatureDeclaration(t as IndexSignatureDeclaration, p);
-            case JavaScriptKind.InferType:
-                return this.visitInferType(t as InferType, p);
-            case JavaScriptKind.JsAssignmentOperation:
-                return this.visitJsAssignmentOperation(t as JsAssignmentOperation, p);
-            case JavaScriptKind.JsImport:
-                return this.visitJsImport(t as JsImport, p);
-            case JavaScriptKind.JsImportClause:
-                return this.visitJsImportClause(t as JsImportClause, p);
-            case JavaScriptKind.JSVariableDeclarations:
-                return this.visitJSVariableDeclarations(t as JSVariableDeclarations, p);
-            case JavaScriptKind.JSNamedVariable:
-                return this.visitJSNamedVariable(t as JSNamedVariable, p);
-            case JavaScriptKind.JSMethodDeclaration:
-                return this.visitJSMethodDeclaration(t as JSMethodDeclaration, p);
-            case JavaScriptKind.NamedImports:
-                return this.visitNamedImports(t as NamedImports, p);
-            case JavaScriptKind.JsImportSpecifier:
-                return this.visitJsImportSpecifier(t as JsImportSpecifier, p);
-            case JavaScriptKind.JsBinary:
-                return this.visitJsBinary(t as JsBinary, p);
-            case JavaScriptKind.LiteralType:
-                return this.visitLiteralType(t as LiteralType, p);
-            case JavaScriptKind.MappedType:
-                return this.visitMappedType(t as MappedType, p);
-            case JavaScriptKind.MappedTypeKeysRemapping:
-                return this.visitMappedTypeKeysRemapping(t as MappedTypeKeysRemapping, p);
-            case JavaScriptKind.MappedTypeMappedTypeParameter:
-                return this.visitMappedTypeMappedTypeParameter(t as MappedTypeMappedTypeParameter, p);
-            case JavaScriptKind.ObjectBindingDeclarations:
-                return this.visitObjectBindingDeclarations(t as ObjectBindingDeclarations, p);
-            case JavaScriptKind.PropertyAssignment:
-                return this.visitPropertyAssignment(t as PropertyAssignment, p);
-            case JavaScriptKind.SatisfiesExpression:
-                return this.visitSatisfiesExpression(t as SatisfiesExpression, p);
-            case JavaScriptKind.ScopedVariableDeclarations:
-                return this.visitScopedVariableDeclarations(t as ScopedVariableDeclarations, p);
-            case JavaScriptKind.StatementExpression:
-                return this.visitStatementExpression(t as StatementExpression, p);
-            case JavaScriptKind.TaggedTemplateExpression:
-                return this.visitTaggedTemplateExpression(t as TaggedTemplateExpression, p);
-            case JavaScriptKind.TemplateExpression:
-                return this.visitTemplateExpression(t as TemplateExpression, p);
-            case JavaScriptKind.TemplateExpressionTemplateSpan:
-                return this.visitTemplateExpressionTemplateSpan(t as TemplateExpressionTemplateSpan, p);
-            case JavaScriptKind.Tuple:
-                return this.visitTuple(t as Tuple, p);
-            case JavaScriptKind.TypeDeclaration:
-                return this.visitTypeDeclaration(t as TypeDeclaration, p);
-            case JavaScriptKind.TypeOf:
-                return this.visitTypeOf(t as TypeOf, p);
-            case JavaScriptKind.TypeQuery:
-                return this.visitTypeQuery(t as TypeQuery, p);
-            case JavaScriptKind.TypeTreeExpression:
-                return this.visitTypeTreeExpression(t as TypeTreeExpression, p);
-            case JavaScriptKind.TypeInfo:
-                return this.visitTypeInfo(t as TypeInfo, p);
-            case JavaScriptKind.TypeOperator:
-                return this.visitTypeOperator(t as TypeOperator, p);
-            case JavaScriptKind.TypePredicate:
-                return this.visitTypePredicate(t as TypePredicate, p);
-            case JavaScriptKind.Unary:
-                return this.visitJsUnary(t as Unary, p);
-            case JavaScriptKind.Union:
-                return this.visitUnion(t as Union, p);
-            case JavaScriptKind.Intersection:
-                return this.visitIntersection(t as Intersection, p);
-            case JavaScriptKind.Void:
-                return this.visitVoid(t as Void, p);
-            case JavaScriptKind.Yield:
-                return this.visitJSYield(t as Yield, p);
-            case JavaScriptKind.WithStatement:
-                return this.visitWithStatement(t as WithStatement, p);
-            default:
-                return super.accept(t, p);
+    protected async visitAlias(alias: Alias, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Alias>(alias, p, async draft => {
+            draft.propertyName = await this.visitRightPadded(alias.propertyName, p);
+            draft.alias = await this.visitDefined<Expression>(alias.alias, p);
+        });
+    }
+
+    protected async visitArrowFunction(arrowFunction: ArrowFunction, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ArrowFunction>(arrowFunction, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(arrowFunction.leadingAnnotations, item => this.visitDefined<Annotation>(item, p));
+            draft.modifiers = await mapAsync(arrowFunction.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.typeParameters = arrowFunction.typeParameters && await this.visitDefined<TypeParameters>(arrowFunction.typeParameters, p);
+            draft.parameters = await this.visitDefined<LambdaParameters>(arrowFunction.parameters, p);
+            draft.returnTypeExpression = arrowFunction.returnTypeExpression && await this.visitDefined<TypeTree>(arrowFunction.returnTypeExpression, p);
+            draft.body = await this.visitLeftPadded(arrowFunction.body, p);
+            draft.type = arrowFunction.type && await this.visitType(arrowFunction.type, p);
+        });
+    }
+
+    protected async visitAwait(await_: Await, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Await>(await_, p, async draft => {
+            draft.expression = await this.visitDefined<Expression>(await_.expression, p);
+            draft.type = await_.type && await this.visitType(await_.type, p);
+        });
+    }
+
+    protected async visitJsCompilationUnit(compilationUnit: CompilationUnit, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<CompilationUnit>(compilationUnit, p, async draft => {
+            draft.imports = await mapAsync(compilationUnit.imports, imp => this.visitRightPadded(imp, p));
+            draft.statements = await mapAsync(compilationUnit.statements, stmt => this.visitRightPadded(stmt, p));
+            draft.eof = await this.visitSpace(compilationUnit.eof, p);
+        });
+    }
+
+    protected async visitConditionalType(conditionalType: ConditionalType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ConditionalType>(conditionalType, p, async draft => {
+            draft.checkType = await this.visitDefined<Expression>(conditionalType.checkType, p);
+            draft.condition = await this.visitContainer(conditionalType.condition, p);
+            draft.type = conditionalType.type && await this.visitType(conditionalType.type, p);
+        });
+    }
+
+    protected async visitDefaultType(defaultType: DefaultType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<DefaultType>(defaultType, p, async draft => {
+            draft.left = await this.visitDefined<Expression>(defaultType.left, p);
+            draft.beforeEquals = await this.visitSpace(defaultType.beforeEquals, p);
+            draft.right = await this.visitDefined<Expression>(defaultType.right, p);
+            draft.type = defaultType.type && await this.visitType(defaultType.type, p);
+        });
+    }
+
+    protected async visitDelete(delete_: Delete, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Delete>(delete_, p, async draft => {
+            draft.expression = await this.visitDefined<Expression>(delete_.expression, p);
+            draft.type = delete_.type && await this.visitType(delete_.type, p);
+        });
+    }
+
+    protected async visitExport(export_: Export, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Export>(export_, p, async draft => {
+            draft.exports = export_.exports && await this.visitContainer(export_.exports, p);
+            draft.from = export_["from"] && await this.visitSpace(export_["from"], p);
+            draft.target = export_.target && await this.visitDefined<Literal>(export_.target, p);
+            draft.initializer = export_.initializer && await this.visitLeftPadded(export_.initializer, p);
+        });
+    }
+
+    protected async visitExpressionStatement(expressionStatement: ExpressionStatement, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ExpressionStatement>(expressionStatement, p, async draft => {
+            draft.expression = await this.visitDefined<Expression>(expressionStatement.expression, p);
+        });
+    }
+
+    protected async visitExpressionWithTypeArguments(expressionWithTypeArguments: ExpressionWithTypeArguments, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ExpressionWithTypeArguments>(expressionWithTypeArguments, p, async draft => {
+            draft.clazz = await this.visitDefined<J>(expressionWithTypeArguments.clazz, p);
+            draft.typeArguments = expressionWithTypeArguments.typeArguments && await this.visitContainer(expressionWithTypeArguments.typeArguments, p);
+            draft.type = expressionWithTypeArguments.type && await this.visitType(expressionWithTypeArguments.type, p);
+        });
+    }
+
+    protected async visitFunctionType(functionType: FunctionType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<FunctionType>(functionType, p, async draft => {
+            draft.modifiers = await mapAsync(functionType.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.constructorType = await this.visitLeftPadded(functionType.constructorType, p);
+            draft.typeParameters = functionType.typeParameters && await this.visitDefined<TypeParameters>(functionType.typeParameters, p);
+            draft.parameters = await this.visitContainer(functionType.parameters, p);
+            draft.returnType = await this.visitLeftPadded(functionType.returnType, p);
+            draft.type = functionType.type && await this.visitType(functionType.type, p);
+        });
+    }
+
+    protected async visitInferType(inferType: InferType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<InferType>(inferType, p, async draft => {
+            draft.typeParameter = await this.visitLeftPadded(inferType.typeParameter, p);
+            draft.type = inferType.type && await this.visitType(inferType.type, p);
+        });
+    }
+
+    protected async visitImportType(importType: ImportType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ImportType>(importType, p, async draft => {
+            draft.hasTypeof = await this.visitRightPadded(importType.hasTypeof, p);
+            draft.argumentAndAttributes = await this.visitContainer(importType.argumentAndAttributes, p);
+            draft.qualifier = importType.qualifier && await this.visitLeftPadded(importType.qualifier, p);
+            draft.typeArguments = importType.typeArguments && await this.visitContainer(importType.typeArguments, p);
+            draft.type = importType.type && await this.visitType(importType.type, p);
+        });
+    }
+
+    protected async visitJsImport(jsImport: JsImport, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JsImport>(jsImport, p, async draft => {
+            draft.modifiers = await mapAsync(jsImport.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.importClause = jsImport.importClause && await this.visitDefined<JsImportClause>(jsImport.importClause, p);
+            draft.moduleSpecifier = await this.visitLeftPadded(jsImport.moduleSpecifier, p);
+            draft.attributes = jsImport.attributes && await this.visitDefined<ImportAttributes>(jsImport.attributes, p);
+        });
+    }
+
+    protected async visitJsImportClause(jsImportClause: JsImportClause, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JsImportClause>(jsImportClause, p, async draft => {
+            draft.name = jsImportClause.name && await this.visitRightPadded(jsImportClause.name, p);
+            draft.namedBindings = jsImportClause.namedBindings && await this.visitDefined<Expression>(jsImportClause.namedBindings, p);
+        });
+    }
+
+    protected async visitNamedImports(namedImports: NamedImports, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<NamedImports>(namedImports, p, async draft => {
+            draft.elements = await this.visitContainer(namedImports.elements, p);
+            draft.type = namedImports.type && await this.visitType(namedImports.type, p);
+        });
+    }
+
+    protected async visitJsImportSpecifier(jsImportSpecifier: JsImportSpecifier, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JsImportSpecifier>(jsImportSpecifier, p, async draft => {
+            draft.importType = await this.visitLeftPadded(jsImportSpecifier.importType, p);
+            draft.specifier = await this.visitDefined<Expression>(jsImportSpecifier.specifier, p);
+            draft.type = jsImportSpecifier.type && await this.visitType(jsImportSpecifier.type, p);
+        });
+    }
+
+    protected async visitJSVariableDeclarations(jSVariableDeclarations: JSVariableDeclarations, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JSVariableDeclarations>(jSVariableDeclarations, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(jSVariableDeclarations.leadingAnnotations, item => this.visitDefined<Annotation>(item, p));
+            draft.modifiers = await mapAsync(jSVariableDeclarations.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.typeExpression = jSVariableDeclarations.typeExpression && await this.visitDefined<TypeTree>(jSVariableDeclarations.typeExpression, p);
+            draft.varargs = jSVariableDeclarations.varargs && await this.visitSpace(jSVariableDeclarations.varargs, p);
+            draft.variables = await mapAsync(jSVariableDeclarations.variables, item => this.visitRightPadded(item, p));
+        });
+    }
+
+    protected async visitJSNamedVariable(jSNamedVariable: JSNamedVariable, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JSNamedVariable>(jSNamedVariable, p, async draft => {
+            draft.name = await this.visitDefined<Expression>(jSNamedVariable.name, p);
+            draft.dimensionsAfterName = await mapAsync(jSNamedVariable.dimensionsAfterName, item => this.visitLeftPadded(item, p));
+            draft.initializer = jSNamedVariable.initializer && await this.visitLeftPadded(jSNamedVariable.initializer, p);
+            draft.variableType = jSNamedVariable.variableType && (await this.visitType(jSNamedVariable.variableType, p) as JavaType.Variable);
+        });
+    }
+
+    protected async visitImportAttributes(importAttributes: ImportAttributes, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ImportAttributes>(importAttributes, p, async draft => {
+            draft.elements = await this.visitContainer(importAttributes.elements, p);
+        });
+    }
+
+    protected async visitImportTypeAttributes(importTypeAttributes: ImportTypeAttributes, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ImportTypeAttributes>(importTypeAttributes, p, async draft => {
+            draft.token = await this.visitRightPadded(importTypeAttributes.token, p);
+            draft.elements = await this.visitContainer(importTypeAttributes.elements, p);
+            draft.end = await this.visitSpace(importTypeAttributes.end, p);
+        });
+    }
+
+    protected async visitImportAttribute(importAttribute: ImportAttribute, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ImportAttribute>(importAttribute, p, async draft => {
+            draft.name = await this.visitDefined<Expression>(importAttribute.name, p);
+            draft.value = await this.visitLeftPadded(importAttribute.value, p);
+        });
+    }
+
+    protected async visitJsBinary(jsBinary: JsBinary, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JsBinary>(jsBinary, p, async draft => {
+            draft.left = await this.visitDefined<Expression>(jsBinary.left, p);
+            draft.operator = await this.visitLeftPadded(jsBinary.operator, p);
+            draft.right = await this.visitDefined<Expression>(jsBinary.right, p);
+            draft.type = jsBinary.type && await this.visitType(jsBinary.type, p);
+        });
+    }
+
+    protected async visitLiteralType(literalType: LiteralType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<LiteralType>(literalType, p, async draft => {
+            draft.literal = await this.visitDefined<Expression>(literalType.literal, p);
+            draft.type = (await this.visitType(literalType.type, p))!;
+        });
+    }
+
+    protected async visitMappedType(mappedType: MappedType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<MappedType>(mappedType, p, async draft => {
+            draft.prefixToken = mappedType.prefixToken && await this.visitLeftPadded(mappedType.prefixToken, p);
+            draft.hasReadonly = await this.visitLeftPadded(mappedType.hasReadonly, p);
+            draft.keysRemapping = await this.visitDefined<MappedType.KeysRemapping>(mappedType.keysRemapping, p);
+            draft.suffixToken = mappedType.suffixToken && await this.visitLeftPadded(mappedType.suffixToken, p);
+            draft.hasQuestionToken = await this.visitLeftPadded(mappedType.hasQuestionToken, p);
+            draft.valueType = await this.visitContainer(mappedType.valueType, p);
+            draft.type = mappedType.type && await this.visitType(mappedType.type, p);
+        });
+    }
+
+    protected async visitKeysRemapping(keysRemapping: MappedType.KeysRemapping, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<MappedType.KeysRemapping>(keysRemapping, p, async draft => {
+            draft.typeParameter = await this.visitRightPadded(keysRemapping.typeParameter, p);
+            draft.nameType = keysRemapping.nameType && await this.visitRightPadded(keysRemapping.nameType, p);
+        });
+    }
+
+    protected async visitMappedTypeParameter(mappedTypeParameter: MappedTypeParameter, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<MappedTypeParameter>(mappedTypeParameter, p, async draft => {
+            draft.name = await this.visitDefined<Expression>(mappedTypeParameter.name, p);
+            draft.iterateType = await this.visitLeftPadded(mappedTypeParameter.iterateType, p);
+        });
+    }
+
+    protected async visitObjectBindingDeclarations(objectBindingDeclarations: ObjectBindingDeclarations, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ObjectBindingDeclarations>(objectBindingDeclarations, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(objectBindingDeclarations.leadingAnnotations, item => this.visitDefined<Annotation>(item, p));
+            draft.modifiers = await mapAsync(objectBindingDeclarations.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.typeExpression = objectBindingDeclarations.typeExpression && await this.visitDefined<TypeTree>(objectBindingDeclarations.typeExpression, p);
+            draft.bindings = await this.visitContainer(objectBindingDeclarations.bindings, p);
+            draft.initializer = objectBindingDeclarations.initializer && await this.visitLeftPadded(objectBindingDeclarations.initializer, p);
+        });
+    }
+
+    protected async visitPropertyAssignment(propertyAssignment: PropertyAssignment, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<PropertyAssignment>(propertyAssignment, p, async draft => {
+            draft.name = await this.visitRightPadded(propertyAssignment.name, p);
+            draft.initializer = propertyAssignment.initializer && await this.visitDefined<Expression>(propertyAssignment.initializer, p);
+        });
+    }
+
+    protected async visitSatisfiesExpression(satisfiesExpression: SatisfiesExpression, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<SatisfiesExpression>(satisfiesExpression, p, async draft => {
+            draft.expression = await this.visitDefined<J>(satisfiesExpression.expression, p);
+            draft.satisfiesType = await this.visitLeftPadded(satisfiesExpression.satisfiesType, p);
+            draft.type = satisfiesExpression.type && await this.visitType(satisfiesExpression.type, p);
+        });
+    }
+
+    protected async visitScopedVariableDeclarations(scopedVariableDeclarations: ScopedVariableDeclarations, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ScopedVariableDeclarations>(scopedVariableDeclarations, p, async draft => {
+            draft.modifiers = await mapAsync(scopedVariableDeclarations.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.scope = scopedVariableDeclarations.scope && await this.visitLeftPadded(scopedVariableDeclarations.scope, p);
+            draft.variables = await mapAsync(scopedVariableDeclarations.variables, item => this.visitRightPadded(item, p));
+        });
+    }
+
+    protected async visitStatementExpression(statementExpression: StatementExpression, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<StatementExpression>(statementExpression, p, async draft => {
+            draft.statement = await this.visitDefined<Statement>(statementExpression.statement, p);
+        });
+    }
+
+    protected async visitTaggedTemplateExpression(taggedTemplateExpression: TaggedTemplateExpression, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TaggedTemplateExpression>(taggedTemplateExpression, p, async draft => {
+            draft.tag = taggedTemplateExpression.tag && await this.visitRightPadded(taggedTemplateExpression.tag, p);
+            draft.typeArguments = taggedTemplateExpression.typeArguments && await this.visitContainer(taggedTemplateExpression.typeArguments, p);
+            draft.templateExpression = await this.visitDefined<Expression>(taggedTemplateExpression.templateExpression, p);
+            draft.type = taggedTemplateExpression.type && await this.visitType(taggedTemplateExpression.type, p);
+        });
+    }
+
+    protected async visitTemplateExpression(templateExpression: TemplateExpression, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TemplateExpression>(templateExpression, p, async draft => {
+            draft.head = await this.visitDefined<Literal>(templateExpression.head, p);
+            draft.templateSpans = await mapAsync(templateExpression.templateSpans, item => this.visitRightPadded(item, p));
+            draft.type = templateExpression.type && await this.visitType(templateExpression.type, p);
+        });
+    }
+
+    protected async visitTemplateSpan(templateSpan: TemplateSpan, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TemplateSpan>(templateSpan, p, async draft => {
+            draft.expression = await this.visitDefined<J>(templateSpan.expression, p);
+            draft.tail = await this.visitDefined<Literal>(templateSpan.tail, p);
+        });
+    }
+
+    protected async visitTrailingTokenStatement(trailingTokenStatement: TrailingTokenStatement, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TrailingTokenStatement>(trailingTokenStatement, p, async draft => {
+            draft.expression = await this.visitRightPadded(trailingTokenStatement.expression, p);
+            draft.type = trailingTokenStatement.type && await this.visitType(trailingTokenStatement.type, p);
+        });
+    }
+
+    protected async visitTuple(tuple: Tuple, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Tuple>(tuple, p, async draft => {
+            draft.elements = await this.visitContainer(tuple.elements, p);
+            draft.type = tuple.type && await this.visitType(tuple.type, p);
+        });
+    }
+
+    protected async visitTypeDeclaration(typeDeclaration: TypeDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeDeclaration>(typeDeclaration, p, async draft => {
+            draft.modifiers = await mapAsync(typeDeclaration.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.name = await this.visitLeftPadded(typeDeclaration.name, p);
+            draft.typeParameters = typeDeclaration.typeParameters && await this.visitDefined<TypeParameters>(typeDeclaration.typeParameters, p);
+            draft.initializer = await this.visitLeftPadded(typeDeclaration.initializer, p);
+            draft.type = typeDeclaration.type && await this.visitType(typeDeclaration.type, p);
+        });
+    }
+
+    protected async visitTypeOf(typeOf: TypeOf, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeOf>(typeOf, p, async draft => {
+            draft.expression = await this.visitDefined<Expression>(typeOf.expression, p);
+            draft.type = typeOf.type && await this.visitType(typeOf.type, p);
+        });
+    }
+
+    protected async visitTypeTreeExpression(typeTreeExpression: TypeTreeExpression, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeTreeExpression>(typeTreeExpression, p, async draft => {
+            draft.expression = await this.visitDefined<Expression>(typeTreeExpression.expression, p);
+        });
+    }
+
+    protected async visitJsAssignmentOperation(jsAssignmentOperation: JsAssignmentOperation, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JsAssignmentOperation>(jsAssignmentOperation, p, async draft => {
+            draft.variable = await this.visitDefined<Expression>(jsAssignmentOperation.variable, p);
+            draft.operator = await this.visitLeftPadded(jsAssignmentOperation.operator, p);
+            draft.assignment = await this.visitDefined<Expression>(jsAssignmentOperation.assignment, p);
+            draft.type = jsAssignmentOperation.type && await this.visitType(jsAssignmentOperation.type, p);
+        });
+    }
+
+    protected async visitIndexedAccessType(indexedAccessType: IndexedAccessType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<IndexedAccessType>(indexedAccessType, p, async draft => {
+            draft.objectType = await this.visitDefined<TypeTree>(indexedAccessType.objectType, p);
+            draft.indexType = await this.visitDefined<TypeTree>(indexedAccessType.indexType, p);
+            draft.type = indexedAccessType.type && await this.visitType(indexedAccessType.type, p);
+        });
+    }
+
+    protected async visitIndexType(indexType: IndexType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<IndexType>(indexType, p, async draft => {
+            draft.element = await this.visitRightPadded(indexType.element, p);
+            draft.type = indexType.type && await this.visitType(indexType.type, p);
+        });
+    }
+
+    protected async visitTypeQuery(typeQuery: TypeQuery, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeQuery>(typeQuery, p, async draft => {
+            draft.typeExpression = await this.visitDefined<TypeTree>(typeQuery.typeExpression, p);
+            draft.typeArguments = typeQuery.typeArguments && await this.visitContainer(typeQuery.typeArguments, p);
+            draft.type = typeQuery.type && await this.visitType(typeQuery.type, p);
+        });
+    }
+
+    protected async visitTypeInfo(typeInfo: TypeInfo, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeInfo>(typeInfo, p, async draft => {
+            draft.typeIdentifier = await this.visitDefined<TypeTree>(typeInfo.typeIdentifier, p);
+        });
+    }
+
+    protected async visitTypeOperator(typeOperator: TypeOperator, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeOperator>(typeOperator, p, async draft => {
+            draft.expression = await this.visitLeftPadded(typeOperator.expression, p);
+        });
+    }
+
+    protected async visitTypePredicate(typePredicate: TypePredicate, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypePredicate>(typePredicate, p, async draft => {
+            draft.asserts = await this.visitLeftPadded(typePredicate.asserts, p);
+            draft.parameterName = await this.visitDefined<Identifier>(typePredicate.parameterName, p);
+            draft.expression = typePredicate.expression && await this.visitLeftPadded(typePredicate.expression, p);
+            draft.type = typePredicate.type && await this.visitType(typePredicate.type, p);
+        });
+    }
+
+    protected async visitUnion(union: Union, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Union>(union, p, async draft => {
+            draft.types = await mapAsync(union.types, item => this.visitRightPadded(item, p));
+            draft.type = union.type && await this.visitType(union.type, p);
+        });
+    }
+
+    protected async visitIntersection(intersection: Intersection, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Intersection>(intersection, p, async draft => {
+            draft.types = await mapAsync(intersection.types, item => this.visitRightPadded(item, p));
+            draft.type = intersection.type && await this.visitType(intersection.type, p);
+        });
+    }
+
+    protected async visitVoid(void_: Void, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Void>(void_, p, async draft => {
+            draft.expression = await this.visitDefined<Expression>(void_.expression, p);
+        });
+    }
+
+    protected async visitJsUnary(unary: Unary, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Unary>(unary, p, async draft => {
+            draft.operator = await this.visitLeftPadded(unary.operator, p);
+            draft.expression = await this.visitDefined<Expression>(unary.expression, p);
+            draft.type = unary.type && await this.visitType(unary.type, p);
+        });
+    }
+
+    protected async visitJsYield(yield_: Yield, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<Yield>(yield_, p, async draft => {
+            draft.delegated = await this.visitLeftPadded(yield_.delegated, p);
+            draft.expression = yield_.expression && await this.visitDefined<Expression>(yield_.expression, p);
+            draft.type = yield_.type && await this.visitType(yield_.type, p);
+        });
+    }
+
+    protected async visitWithStatement(withStatement: WithStatement, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<WithStatement>(withStatement, p, async draft => {
+            draft.expression = await this.visitDefined<ControlParentheses<Expression>>(withStatement.expression, p);
+            draft.body = await this.visitRightPadded(withStatement.body, p);
+        });
+    }
+
+    protected async visitIndexSignatureDeclaration(indexSignatureDeclaration: IndexSignatureDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<IndexSignatureDeclaration>(indexSignatureDeclaration, p, async draft => {
+            draft.modifiers = await mapAsync(indexSignatureDeclaration.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.parameters = await this.visitContainer(indexSignatureDeclaration.parameters, p);
+            draft.typeExpression = await this.visitLeftPadded(indexSignatureDeclaration.typeExpression, p);
+            draft.type = indexSignatureDeclaration.type && await this.visitType(indexSignatureDeclaration.type, p);
+        });
+    }
+
+    protected async visitJSMethodDeclaration(jSMethodDeclaration: JSMethodDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JSMethodDeclaration>(jSMethodDeclaration, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(jSMethodDeclaration.leadingAnnotations, item => this.visitDefined<Annotation>(item, p));
+            draft.modifiers = await mapAsync(jSMethodDeclaration.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.typeParameters = jSMethodDeclaration.typeParameters && await this.visitDefined<TypeParameters>(jSMethodDeclaration.typeParameters, p);
+            draft.returnTypeExpression = jSMethodDeclaration.returnTypeExpression && await this.visitDefined<TypeTree>(jSMethodDeclaration.returnTypeExpression, p);
+            draft.name = await this.visitDefined<Expression>(jSMethodDeclaration.name, p);
+            draft.parameters = await this.visitContainer(jSMethodDeclaration.parameters, p);
+            draft.body = jSMethodDeclaration.body && await this.visitDefined<Block>(jSMethodDeclaration.body, p);
+            draft.defaultValue = jSMethodDeclaration.defaultValue && await this.visitLeftPadded(jSMethodDeclaration.defaultValue, p);
+            draft.methodType = jSMethodDeclaration.methodType && (await this.visitType(jSMethodDeclaration.methodType, p) as JavaType.Method);
+        });
+    }
+
+    protected async visitJSForOfLoop(jSForOfLoop: JSForOfLoop, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JSForOfLoop>(jSForOfLoop, p, async draft => {
+            draft.await = await this.visitLeftPadded(jSForOfLoop.await, p);
+            draft.control = await this.visitDefined<JSForInOfLoopControl>(jSForOfLoop.control, p);
+            draft.body = await this.visitRightPadded(jSForOfLoop.body, p);
+        });
+    }
+
+    protected async visitJSForInLoop(jSForInLoop: JSForInLoop, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JSForInLoop>(jSForInLoop, p, async draft => {
+            draft.control = await this.visitDefined<JSForInOfLoopControl>(jSForInLoop.control, p);
+            draft.body = await this.visitRightPadded(jSForInLoop.body, p);
+        });
+    }
+
+    protected async visitJSForInOfLoopControl(jSForInOfLoopControl: JSForInOfLoopControl, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JSForInOfLoopControl>(jSForInOfLoopControl, p, async draft => {
+            draft.variable = await this.visitRightPadded(jSForInOfLoopControl.variable, p);
+            draft.iterable = await this.visitRightPadded(jSForInOfLoopControl.iterable, p);
+        });
+    }
+
+    protected async visitJSTry(jSTry: JSTry, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JSTry>(jSTry, p, async draft => {
+            draft.body = await this.visitDefined<Block>(jSTry.body, p);
+            draft.catches = await this.visitDefined<JSTry.JSCatch>(jSTry.catches, p);
+            draft.finally = jSTry.finally && await this.visitLeftPadded(jSTry.finally, p);
+        });
+    }
+
+    protected async visitJSCatch(jSCatch: JSTry.JSCatch, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JSTry.JSCatch>(jSCatch, p, async draft => {
+            draft.parameter = await this.visitDefined<ControlParentheses<JSVariableDeclarations>>(jSCatch.parameter, p);
+            draft.body = await this.visitDefined<Block>(jSCatch.body, p);
+        });
+    }
+
+    protected async visitNamespaceDeclaration(namespaceDeclaration: NamespaceDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<NamespaceDeclaration>(namespaceDeclaration, p, async draft => {
+            draft.modifiers = await mapAsync(namespaceDeclaration.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.keywordType = await this.visitLeftPadded(namespaceDeclaration.keywordType, p);
+            draft.name = await this.visitRightPadded(namespaceDeclaration.name, p);
+            draft.body = namespaceDeclaration.body && await this.visitDefined<Block>(namespaceDeclaration.body, p);
+        });
+    }
+
+    protected async visitFunctionDeclaration(functionDeclaration: FunctionDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<FunctionDeclaration>(functionDeclaration, p, async draft => {
+            draft.modifiers = await mapAsync(functionDeclaration.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.asteriskToken = await this.visitLeftPadded(functionDeclaration.asteriskToken, p);
+            draft.name = await this.visitLeftPadded(functionDeclaration.name, p);
+            draft.typeParameters = functionDeclaration.typeParameters && await this.visitDefined<TypeParameters>(functionDeclaration.typeParameters, p);
+            draft.parameters = await this.visitContainer(functionDeclaration.parameters, p);
+            draft.returnTypeExpression = functionDeclaration.returnTypeExpression && await this.visitDefined<TypeTree>(functionDeclaration.returnTypeExpression, p);
+            draft.body = functionDeclaration.body && await this.visitDefined<J>(functionDeclaration.body, p);
+            draft.type = functionDeclaration.type && await this.visitType(functionDeclaration.type, p);
+        });
+    }
+
+    protected async visitTypeLiteral(typeLiteral: TypeLiteral, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<TypeLiteral>(typeLiteral, p, async draft => {
+            draft.members = await this.visitDefined<Block>(typeLiteral.members, p);
+            draft.type = typeLiteral.type && await this.visitType(typeLiteral.type, p);
+        });
+    }
+
+    protected async visitArrayBindingPattern(arrayBindingPattern: ArrayBindingPattern, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ArrayBindingPattern>(arrayBindingPattern, p, async draft => {
+            draft.elements = await this.visitContainer(arrayBindingPattern.elements, p);
+            draft.type = arrayBindingPattern.type && await this.visitType(arrayBindingPattern.type, p);
+        });
+    }
+
+    protected async visitBindingElement(bindingElement: BindingElement, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<BindingElement>(bindingElement, p, async draft => {
+            draft.propertyName = bindingElement.propertyName && await this.visitRightPadded(bindingElement.propertyName, p);
+            draft.name = await this.visitDefined<TypedTree>(bindingElement.name, p);
+            draft.initializer = bindingElement.initializer && await this.visitLeftPadded(bindingElement.initializer, p);
+            draft.variableType = bindingElement.variableType && (await this.visitType(bindingElement.variableType, p) as JavaType.Variable);
+        });
+    }
+
+    protected async visitExportDeclaration(exportDeclaration: ExportDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ExportDeclaration>(exportDeclaration, p, async draft => {
+            draft.modifiers = await mapAsync(exportDeclaration.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.typeOnly = await this.visitLeftPadded(exportDeclaration.typeOnly, p);
+            draft.exportClause = exportDeclaration.exportClause && await this.visitDefined<Expression>(exportDeclaration.exportClause, p);
+            draft.moduleSpecifier = exportDeclaration.moduleSpecifier && await this.visitLeftPadded(exportDeclaration.moduleSpecifier, p);
+            draft.attributes = exportDeclaration.attributes && await this.visitDefined<ImportAttributes>(exportDeclaration.attributes, p);
+        });
+    }
+
+    protected async visitExportAssignment(exportAssignment: ExportAssignment, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ExportAssignment>(exportAssignment, p, async draft => {
+            draft.modifiers = await mapAsync(exportAssignment.modifiers, item => this.visitDefined<Modifier>(item, p));
+            draft.exportEquals = await this.visitLeftPadded(exportAssignment.exportEquals, p);
+            draft.expression = exportAssignment.expression && await this.visitDefined<Expression>(exportAssignment.expression, p);
+        });
+    }
+
+    protected async visitNamedExports(namedExports: NamedExports, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<NamedExports>(namedExports, p, async draft => {
+            draft.elements = await this.visitContainer(namedExports.elements, p);
+            draft.type = namedExports.type && await this.visitType(namedExports.type, p);
+        });
+    }
+
+    protected async visitExportSpecifier(exportSpecifier: ExportSpecifier, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<ExportSpecifier>(exportSpecifier, p, async draft => {
+            draft.typeOnly = await this.visitLeftPadded(exportSpecifier.typeOnly, p);
+            draft.specifier = await this.visitDefined<Expression>(exportSpecifier.specifier, p);
+            draft.type = exportSpecifier.type && await this.visitType(exportSpecifier.type, p);
+        });
+    }
+
+    override async accept<J2 extends J, P2 extends P>(j: J2, p: P2): Promise<J | undefined> {
+        if (isJavaScript(j)) {
+            const tree = j as JS;
+            switch (tree.kind) {
+                case JavaScriptKind.Alias:
+                    return this.visitAlias(tree as unknown as Alias, p);
+                case JavaScriptKind.ArrowFunction:
+                    return this.visitArrowFunction(tree as unknown as ArrowFunction, p);
+                case JavaScriptKind.Await:
+                    return this.visitAwait(tree as unknown as Await, p);
+                case JavaScriptKind.CompilationUnit:
+                    return this.visitJsCompilationUnit(tree as unknown as CompilationUnit, p);
+                case JavaScriptKind.ConditionalType:
+                    return this.visitConditionalType(tree as unknown as ConditionalType, p);
+                case JavaScriptKind.DefaultType:
+                    return this.visitDefaultType(tree as unknown as DefaultType, p);
+                case JavaScriptKind.Delete:
+                    return this.visitDelete(tree as unknown as Delete, p);
+                case JavaScriptKind.Export:
+                    return this.visitExport(tree as unknown as Export, p);
+                case JavaScriptKind.ExpressionStatement:
+                    return this.visitExpressionStatement(tree as unknown as ExpressionStatement, p);
+                case JavaScriptKind.ExpressionWithTypeArguments:
+                    return this.visitExpressionWithTypeArguments(tree as unknown as ExpressionWithTypeArguments, p);
+                case JavaScriptKind.FunctionType:
+                    return this.visitFunctionType(tree as unknown as FunctionType, p);
+                case JavaScriptKind.InferType:
+                    return this.visitInferType(tree as unknown as InferType, p);
+                case JavaScriptKind.ImportType:
+                    return this.visitImportType(tree as unknown as ImportType, p);
+                case JavaScriptKind.JsImport:
+                    return this.visitJsImport(tree as unknown as JsImport, p);
+                case JavaScriptKind.JsImportClause:
+                    return this.visitJsImportClause(tree as unknown as JsImportClause, p);
+                case JavaScriptKind.NamedImports:
+                    return this.visitNamedImports(tree as unknown as NamedImports, p);
+                case JavaScriptKind.JsImportSpecifier:
+                    return this.visitJsImportSpecifier(tree as unknown as JsImportSpecifier, p);
+                case JavaScriptKind.JSVariableDeclarations:
+                    return this.visitJSVariableDeclarations(tree as unknown as JSVariableDeclarations, p);
+                case JavaScriptKind.JSNamedVariable:
+                    return this.visitJSNamedVariable(tree as unknown as JSNamedVariable, p);
+                case JavaScriptKind.ImportAttributes:
+                    return this.visitImportAttributes(tree as unknown as ImportAttributes, p);
+                case JavaScriptKind.ImportTypeAttributes:
+                    return this.visitImportTypeAttributes(tree as unknown as ImportTypeAttributes, p);
+                case JavaScriptKind.ImportAttribute:
+                    return this.visitImportAttribute(tree as unknown as ImportAttribute, p);
+                case JavaScriptKind.JsBinary:
+                    return this.visitJsBinary(tree as unknown as JsBinary, p);
+                case JavaScriptKind.LiteralType:
+                    return this.visitLiteralType(tree as unknown as LiteralType, p);
+                case JavaScriptKind.MappedType:
+                    return this.visitMappedType(tree as unknown as MappedType, p);
+                case JavaScriptKind.MappedTypeKeysRemapping:
+                    return this.visitKeysRemapping(tree as unknown as MappedType.KeysRemapping, p);
+                case JavaScriptKind.MappedTypeMappedTypeParameter:
+                    return this.visitMappedTypeParameter(tree as unknown as MappedTypeParameter, p);
+                case JavaScriptKind.ObjectBindingDeclarations:
+                    return this.visitObjectBindingDeclarations(tree as unknown as ObjectBindingDeclarations, p);
+                case JavaScriptKind.PropertyAssignment:
+                    return this.visitPropertyAssignment(tree as unknown as PropertyAssignment, p);
+                case JavaScriptKind.SatisfiesExpression:
+                    return this.visitSatisfiesExpression(tree as unknown as SatisfiesExpression, p);
+                case JavaScriptKind.ScopedVariableDeclarations:
+                    return this.visitScopedVariableDeclarations(tree as unknown as ScopedVariableDeclarations, p);
+                case JavaScriptKind.StatementExpression:
+                    return this.visitStatementExpression(tree as unknown as StatementExpression, p);
+                case JavaScriptKind.TaggedTemplateExpression:
+                    return this.visitTaggedTemplateExpression(tree as unknown as TaggedTemplateExpression, p);
+                case JavaScriptKind.TemplateExpression:
+                    return this.visitTemplateExpression(tree as unknown as TemplateExpression, p);
+                case JavaScriptKind.TemplateExpressionTemplateSpan:
+                    return this.visitTemplateSpan(tree as unknown as TemplateSpan, p);
+                case JavaScriptKind.TrailingTokenStatement:
+                    return this.visitTrailingTokenStatement(tree as unknown as TrailingTokenStatement, p);
+                case JavaScriptKind.Tuple:
+                    return this.visitTuple(tree as unknown as Tuple, p);
+                case JavaScriptKind.TypeDeclaration:
+                    return this.visitTypeDeclaration(tree as unknown as TypeDeclaration, p);
+                case JavaScriptKind.TypeOf:
+                    return this.visitTypeOf(tree as unknown as TypeOf, p);
+                case JavaScriptKind.TypeTreeExpression:
+                    return this.visitTypeTreeExpression(tree as unknown as TypeTreeExpression, p);
+                case JavaScriptKind.JsAssignmentOperation:
+                    return this.visitJsAssignmentOperation(tree as unknown as JsAssignmentOperation, p);
+                case JavaScriptKind.IndexedAccessType:
+                    return this.visitIndexedAccessType(tree as unknown as IndexedAccessType, p);
+                case JavaScriptKind.IndexType:
+                    return this.visitIndexType(tree as unknown as IndexedAccessType.IndexType, p);
+                case JavaScriptKind.TypeQuery:
+                    return this.visitTypeQuery(tree as unknown as TypeQuery, p);
+                case JavaScriptKind.TypeInfo:
+                    return this.visitTypeInfo(tree as unknown as TypeInfo, p);
+                case JavaScriptKind.TypeOperator:
+                    return this.visitTypeOperator(tree as unknown as TypeOperator, p);
+                case JavaScriptKind.TypePredicate:
+                    return this.visitTypePredicate(tree as unknown as TypePredicate, p);
+                case JavaScriptKind.Union:
+                    return this.visitUnion(tree as unknown as Union, p);
+                case JavaScriptKind.Intersection:
+                    return this.visitIntersection(tree as unknown as Intersection, p);
+                case JavaScriptKind.Void:
+                    return this.visitVoid(tree as unknown as Void, p);
+                case JavaScriptKind.Unary:
+                    return this.visitJsUnary(tree as unknown as Unary, p);
+                case JavaScriptKind.Yield:
+                    return this.visitJsYield(tree as unknown as Yield, p);
+                case JavaScriptKind.WithStatement:
+                    return this.visitWithStatement(tree as unknown as WithStatement, p);
+                case JavaScriptKind.IndexSignatureDeclaration:
+                    return this.visitIndexSignatureDeclaration(tree as unknown as IndexSignatureDeclaration, p);
+                case JavaScriptKind.JSMethodDeclaration:
+                    return this.visitJSMethodDeclaration(tree as unknown as JSMethodDeclaration, p);
+                case JavaScriptKind.JSForOfLoop:
+                    return this.visitJSForOfLoop(tree as unknown as JSForOfLoop, p);
+                case JavaScriptKind.JSForInLoop:
+                    return this.visitJSForInLoop(tree as unknown as JSForInLoop, p);
+                case JavaScriptKind.JSForInOfLoopControl:
+                    return this.visitJSForInOfLoopControl(tree as unknown as JSForInOfLoopControl, p);
+                case JavaScriptKind.JSTry:
+                    return this.visitJSTry(tree as unknown as JSTry, p);
+                case JavaScriptKind.JSCatch:
+                    return this.visitJSCatch(tree as unknown as JSTry.JSCatch, p);
+                case JavaScriptKind.NamespaceDeclaration:
+                    return this.visitNamespaceDeclaration(tree as unknown as NamespaceDeclaration, p);
+                case JavaScriptKind.FunctionDeclaration:
+                    return this.visitFunctionDeclaration(tree as unknown as FunctionDeclaration, p);
+                case JavaScriptKind.TypeLiteral:
+                    return this.visitTypeLiteral(tree as unknown as TypeLiteral, p);
+                case JavaScriptKind.ArrayBindingPattern:
+                    return this.visitArrayBindingPattern(tree as unknown as ArrayBindingPattern, p);
+                case JavaScriptKind.BindingElement:
+                    return this.visitBindingElement(tree as unknown as BindingElement, p);
+                case JavaScriptKind.ExportDeclaration:
+                    return this.visitExportDeclaration(tree as unknown as ExportDeclaration, p);
+                case JavaScriptKind.ExportAssignment:
+                    return this.visitExportAssignment(tree as unknown as ExportAssignment, p);
+                case JavaScriptKind.NamedExports:
+                    return this.visitNamedExports(tree as unknown as NamedExports, p);
+                case JavaScriptKind.ExportSpecifier:
+                    return this.visitExportSpecifier(tree as unknown as ExportSpecifier, p);
+            }
         }
+        return super.accept(j, p);
     }
 }
