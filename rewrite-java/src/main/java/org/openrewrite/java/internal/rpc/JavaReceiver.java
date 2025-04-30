@@ -54,8 +54,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitArrayAccess(J.ArrayAccess arrayAccess, RpcReceiveQueue q) {
         return arrayAccess
                 .withIndexed(q.receive(arrayAccess.getIndexed(), i -> (Expression) visitNonNull(i, q)))
-                .withDimension(q.receive(arrayAccess.getDimension(), d -> (J.ArrayDimension) visitNonNull(d, q)))
-                .withType(q.receive(arrayAccess.getType(), t -> visitType(t, q)));
+                .withDimension(q.receive(arrayAccess.getDimension(), d -> (J.ArrayDimension) visitNonNull(d, q)));
     }
 
     @Override
@@ -69,8 +68,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return arrayType
                 .withElementType(q.receive(arrayType.getElementType(), t -> (TypeTree) visitNonNull(t, q)))
                 .withAnnotations(q.receiveList(arrayType.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
-                .withDimension(q.receive(arrayType.getDimension(), d -> visitLeftPadded(d, q)))
-                .withType(q.receive(arrayType.getType(), t -> visitType(t, q)));
+                .withDimension(q.receive(arrayType.getDimension(), d -> visitLeftPadded(d, q)));
     }
 
     @Override
@@ -372,8 +370,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)))
                 .withName(q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q)))
                 .getPadding().withArguments(q.receive(method.getPadding().getArguments(), a -> visitContainer(a, q)))
-                .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)))
-                .withType(q.receive(method.getType(), t -> visitType(t, q)));
+                .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)));
     }
 
     @Override
@@ -385,8 +382,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitMultiCatch(J.MultiCatch multiCatch, RpcReceiveQueue q) {
         return multiCatch
-                .getPadding().withAlternatives(q.receiveList(multiCatch.getPadding().getAlternatives(), a -> visitRightPadded(a, q)))
-                .withType(q.receive(multiCatch.getType(), t -> visitType(t, q)));
+                .getPadding().withAlternatives(q.receiveList(multiCatch.getPadding().getAlternatives(), a -> visitRightPadded(a, q)));
     }
 
     @Override
@@ -410,6 +406,13 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitNullableType(J.NullableType nullableType, RpcReceiveQueue q) {
+        return nullableType
+                .withAnnotations(q.receiveList(nullableType.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
+                .withTypeTree(q.receive(nullableType.getPadding().getTypeTree(), t -> visitRightPadded(t, q)));
+    }
+
+    @Override
     public J visitPackage(J.Package pkg, RpcReceiveQueue q) {
         return pkg
                 .withAnnotations(q.receiveList(pkg.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
@@ -419,8 +422,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, RpcReceiveQueue q) {
         return parens
-                .getPadding().withTree(q.receive(parens.getPadding().getTree(), t -> visitRightPadded(t, q)))
-                .withType(q.receive(parens.getType(), t -> visitType(t, q)));
+                .getPadding().withTree(q.receive(parens.getPadding().getTree(), t -> visitRightPadded(t, q)));
     }
 
     @Override
@@ -527,8 +529,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         //noinspection unchecked
         return typeCast
                 .withClazz(q.receive(typeCast.getClazz(), c -> (J.ControlParentheses<@NonNull TypeTree>) visitNonNull(c, q)))
-                .withExpression(q.receive(typeCast.getExpression(), e -> (Expression) visitNonNull(e, q)))
-                .withType(q.receive(typeCast.getType(), t -> visitType(t, q)));
+                .withExpression(q.receive(typeCast.getExpression(), e -> (Expression) visitNonNull(e, q)));
     }
 
     @Override
@@ -571,8 +572,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitWildcard(J.Wildcard wildcard, RpcReceiveQueue q) {
         return wildcard
                 .withBound(q.receive(wildcard.getBound()))
-                .withBoundedType(q.receive(wildcard.getBoundedType(), b -> (TypeTree) visitNonNull(b, q)))
-                .withType(q.receive(wildcard.getType(), t -> visitType(t, q)));
+                .withBoundedType(q.receive(wildcard.getBoundedType(), b -> (TypeTree) visitNonNull(b, q)));
     }
 
     @Override

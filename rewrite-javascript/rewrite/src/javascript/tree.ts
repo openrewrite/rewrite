@@ -28,15 +28,12 @@ import {
     JContainer,
     JLeftPadded,
     JRightPadded,
-    Lambda, LambdaParameters,
+    LambdaParameters,
     Literal,
     Modifier,
-    NameTree,
     Space,
     Statement,
-    TypedTree,
-    TypeParameters,
-    TypeTree
+    TypeParameters
 } from "../java";
 
 export const JavaScriptKind = {
@@ -119,7 +116,8 @@ export function isJavaScript(tree: any): tree is JS {
     return javaScriptKindValues.has(tree["kind"]);
 }
 
-export interface JS extends J {}
+export interface JS extends J {
+}
 
 type JavaScriptExpressionBase = Alias | ArrowFunction | Await | ConditionalType | DefaultType | Delete |
     ExpressionStatement | TrailingTokenStatement | ExpressionWithTypeArguments | FunctionType | InferType |
@@ -128,11 +126,46 @@ type JavaScriptExpressionBase = Alias | ArrowFunction | Await | ConditionalType 
     TaggedTemplateExpression | TemplateExpression | Tuple | TypeOf | TypeTreeExpression | TypeQuery |
     TypeInfo | TypeOperator | TypePredicate | Unary | Union | Intersection | Void | Yield;
 
-export type Expression<T extends { kind: string } = never> = import("../java/tree").Expression<JavaScriptExpressionBase | T>;
+export type Expression<T extends {
+    kind: string
+} = never> = import("../java/tree").Expression<JavaScriptExpressionBase | T>;
+
+type JavaScriptTypedTreeBase = ArrowFunction | DefaultType | JsImportSpecifier | JsBinary | ObjectBindingDeclarations |
+    PropertyAssignment | TypeDeclaration | Unary | JSVariableDeclarations | JSMethodDeclaration | FunctionDeclaration |
+    IndexSignatureDeclaration | ArrayBindingPattern | JsAssignmentOperation;
+
+export type TypedTree<T extends {
+    kind: string
+} = never> = import("../java/tree").TypedTree<JavaScriptTypedTreeBase | T>;
+
+type JavaScriptTypeTreeBase = ConditionalType | ExpressionWithTypeArguments | FunctionType |
+    InferType | ImportType | LiteralType | MappedType | TemplateExpression | Tuple |
+    TypeQuery | TypeOperator | TypePredicate | Union | Intersection | TypeInfo | TypeLiteral |
+    BindingElement | IndexedAccessType;
+
+export type TypeTree<T extends {
+    kind: string
+} = never> = import("../java/tree").TypeTree<JavaScriptTypeTreeBase | T>;
 
 export interface JavaScriptSourceFile extends JS, SourceFile {
     readonly imports: JRightPadded<Import>[];
     readonly statements: JRightPadded<Statement>[];
+}
+
+export interface BindingElement extends JS {
+    // TODO implement me
+}
+
+export interface TypeLiteral extends JS {
+    // TODO implement me
+}
+
+export interface FunctionDeclaration extends JS {
+    // TODO implement me
+}
+
+export interface ArrayBindingPattern extends JS {
+    // TODO implement me
 }
 
 export interface CompilationUnit extends JavaScriptSourceFile, JS {
@@ -146,7 +179,7 @@ export interface Alias extends JS {
     readonly alias: Expression;
 }
 
-export interface ArrowFunction extends JS, Statement, TypedTree {
+export interface ArrowFunction extends JS, Statement {
     readonly kind: typeof JavaScriptKind.ArrowFunction;
     readonly leadingAnnotations: Annotation[];
     readonly modifiers: Modifier[];
@@ -163,14 +196,14 @@ export interface Await extends JS {
     readonly type?: JavaType;
 }
 
-export interface ConditionalType extends JS, TypeTree {
+export interface ConditionalType extends JS {
     readonly kind: typeof JavaScriptKind.ConditionalType;
     readonly checkType: Expression;
     readonly condition: JContainer<TypedTree>;
     readonly type?: JavaType;
 }
 
-export interface DefaultType extends JS, TypedTree, NameTree {
+export interface DefaultType extends JS {
     readonly kind: typeof JavaScriptKind.DefaultType;
     readonly left: Expression;
     readonly beforeEquals: Space;
@@ -197,14 +230,14 @@ export interface ExpressionStatement extends JS, Statement {
     readonly expression: Expression;
 }
 
-export interface ExpressionWithTypeArguments extends JS, TypeTree {
+export interface ExpressionWithTypeArguments extends JS {
     readonly kind: typeof JavaScriptKind.ExpressionWithTypeArguments;
     readonly clazz: J;
     readonly typeArguments?: JContainer<Expression>;
     readonly type?: JavaType;
 }
 
-export interface FunctionType extends JS, TypeTree {
+export interface FunctionType extends JS {
     readonly kind: typeof JavaScriptKind.FunctionType;
     readonly modifiers: Modifier[];
     readonly constructorType: JLeftPadded<boolean>;
@@ -214,13 +247,13 @@ export interface FunctionType extends JS, TypeTree {
     readonly type?: JavaType;
 }
 
-export interface InferType extends JS, TypeTree {
+export interface InferType extends JS {
     readonly kind: typeof JavaScriptKind.InferType;
     readonly typeParameter: JLeftPadded<J>;
     readonly type?: JavaType;
 }
 
-export interface ImportType extends JS, TypeTree {
+export interface ImportType extends JS {
     readonly kind: typeof JavaScriptKind.ImportType;
     readonly hasTypeof: JRightPadded<boolean>;
     readonly argumentAndAttributes: JContainer<J>;
@@ -250,14 +283,14 @@ export interface NamedImports extends JS {
     readonly type?: JavaType;
 }
 
-export interface JsImportSpecifier extends JS, TypedTree {
+export interface JsImportSpecifier extends JS {
     readonly kind: typeof JavaScriptKind.JsImportSpecifier;
     readonly importType: JLeftPadded<boolean>;
     readonly specifier: Expression;
     readonly type?: JavaType;
 }
 
-export interface JSVariableDeclarations extends JS, Statement, TypedTree {
+export interface JSVariableDeclarations extends JS, Statement {
     readonly kind: typeof JavaScriptKind.JSVariableDeclarations;
     readonly leadingAnnotations: Annotation[];
     readonly modifiers: Modifier[];
@@ -267,7 +300,7 @@ export interface JSVariableDeclarations extends JS, Statement, TypedTree {
 }
 
 export namespace JSVariableDeclarations {
-    export interface JSNamedVariable extends JS, NameTree {
+    export interface JSNamedVariable extends JS {
         readonly kind: typeof JavaScriptKind.JSNamedVariable;
         readonly name: Expression;
         readonly dimensionsAfterName: JLeftPadded<Space>[];
@@ -302,7 +335,7 @@ export interface ImportAttribute extends JS, Statement {
     readonly value: JLeftPadded<Expression>;
 }
 
-export interface JsBinary extends JS, TypedTree {
+export interface JsBinary extends JS {
     readonly kind: typeof JavaScriptKind.JsBinary;
     readonly left: Expression;
     readonly operator: JLeftPadded<JsBinary.Operator>;
@@ -321,13 +354,13 @@ export namespace JsBinary {
     }
 }
 
-export interface LiteralType extends JS, TypeTree {
+export interface LiteralType extends JS {
     readonly kind: typeof JavaScriptKind.LiteralType;
     readonly literal: Expression;
     readonly type: JavaType;
 }
 
-export interface MappedType extends JS, TypeTree {
+export interface MappedType extends JS {
     readonly kind: typeof JavaScriptKind.MappedType;
     readonly prefixToken?: JLeftPadded<Literal>;
     readonly hasReadonly: JLeftPadded<boolean>;
@@ -352,7 +385,7 @@ export namespace MappedType {
     }
 }
 
-export interface ObjectBindingDeclarations extends JS, TypedTree {
+export interface ObjectBindingDeclarations extends JS {
     readonly kind: typeof JavaScriptKind.ObjectBindingDeclarations;
     readonly leadingAnnotations: Annotation[];
     readonly modifiers: Modifier[];
@@ -361,7 +394,7 @@ export interface ObjectBindingDeclarations extends JS, TypedTree {
     readonly initializer?: JLeftPadded<Expression>;
 }
 
-export interface PropertyAssignment extends JS, Statement, TypedTree {
+export interface PropertyAssignment extends JS, Statement {
     readonly kind: typeof JavaScriptKind.PropertyAssignment;
     readonly name: JRightPadded<Expression>;
     readonly assigmentToken: PropertyAssignment.Token;
@@ -413,7 +446,7 @@ export interface TaggedTemplateExpression extends JS, Statement {
     readonly type?: JavaType;
 }
 
-export interface TemplateExpression extends JS, Statement, TypeTree {
+export interface TemplateExpression extends JS, Statement {
     readonly kind: typeof JavaScriptKind.TemplateExpression;
     readonly head: Literal;
     readonly templateSpans: JRightPadded<TemplateExpression.TemplateSpan>[];
@@ -434,13 +467,13 @@ export interface TrailingTokenStatement extends JS, Statement {
     readonly type?: JavaType;
 }
 
-export interface Tuple extends JS, TypeTree {
+export interface Tuple extends JS {
     readonly kind: typeof JavaScriptKind.Tuple;
     readonly elements: JContainer<J>;
     readonly type?: JavaType;
 }
 
-export interface TypeDeclaration extends JS, Statement, TypedTree {
+export interface TypeDeclaration extends JS, Statement {
     readonly kind: typeof JavaScriptKind.TypeDeclaration;
     readonly modifiers: Modifier[];
     readonly name: JLeftPadded<Identifier>;
@@ -455,12 +488,12 @@ export interface TypeOf extends JS {
     readonly type?: JavaType;
 }
 
-export interface TypeTreeExpression extends JS, TypedTree {
+export interface TypeTreeExpression extends JS {
     readonly kind: typeof JavaScriptKind.TypeTreeExpression;
     readonly expression: Expression;
 }
 
-export interface JsAssignmentOperation extends JS, Statement, TypedTree {
+export interface JsAssignmentOperation extends JS, Statement {
     readonly kind: typeof JavaScriptKind.JsAssignmentOperation;
     readonly variable: Expression;
     readonly operator: JLeftPadded<JsAssignmentOperation.Type>;
@@ -478,7 +511,7 @@ export namespace JsAssignmentOperation {
     }
 }
 
-export interface IndexedAccessType extends JS, TypeTree {
+export interface IndexedAccessType extends JS {
     readonly kind: typeof JavaScriptKind.IndexedAccessType;
     readonly objectType: TypeTree;
     readonly indexType: TypeTree;
@@ -486,14 +519,14 @@ export interface IndexedAccessType extends JS, TypeTree {
 }
 
 export namespace IndexedAccessType {
-    export interface IndexType extends JS, TypeTree {
+    export interface IndexType extends JS {
         readonly kind: typeof JavaScriptKind.IndexedAccessTypeIndexType;
         readonly element: JRightPadded<TypeTree>;
         readonly type?: JavaType;
     }
 }
 
-export interface TypeQuery extends JS, TypeTree {
+export interface TypeQuery extends JS {
     readonly kind: typeof JavaScriptKind.TypeQuery;
     readonly typeExpression: TypeTree;
     readonly typeArguments?: JContainer<Expression>;
@@ -505,7 +538,7 @@ export interface TypeInfo extends JS {
     readonly typeIdentifier: TypeTree;
 }
 
-export interface TypeOperator extends JS, TypeTree {
+export interface TypeOperator extends JS {
     readonly kind: typeof JavaScriptKind.TypeOperator;
     readonly operator: TypeOperator.Type;
     readonly expression: JLeftPadded<Expression>;
@@ -519,7 +552,7 @@ export namespace TypeOperator {
     }
 }
 
-export interface TypePredicate extends JS, TypeTree {
+export interface TypePredicate extends JS {
     readonly kind: typeof JavaScriptKind.TypePredicate;
     readonly asserts: JLeftPadded<boolean>;
     readonly parameterName: Identifier;
@@ -527,13 +560,13 @@ export interface TypePredicate extends JS, TypeTree {
     readonly type?: JavaType;
 }
 
-export interface Union extends JS, TypeTree {
+export interface Union extends JS {
     readonly kind: typeof JavaScriptKind.Union;
     readonly types: JRightPadded<Expression>[];
     readonly type?: JavaType;
 }
 
-export interface Intersection extends JS, TypeTree {
+export interface Intersection extends JS {
     readonly kind: typeof JavaScriptKind.Intersection;
     readonly types: JRightPadded<Expression>[];
     readonly type?: JavaType;
@@ -544,7 +577,7 @@ export interface Void extends JS {
     readonly expression: Expression;
 }
 
-export interface Unary extends JS, TypedTree {
+export interface Unary extends JS {
     readonly kind: typeof JavaScriptKind.Unary;
     readonly operator: JLeftPadded<Unary.Type>;
     readonly expression: Expression;
@@ -575,7 +608,7 @@ export interface WithStatement extends JS, Statement {
     readonly body: JRightPadded<Statement>;
 }
 
-export interface IndexSignatureDeclaration extends JS, Statement, TypedTree {
+export interface IndexSignatureDeclaration extends JS, Statement {
     readonly kind: typeof JavaScriptKind.IndexSignatureDeclaration;
     readonly modifiers: Modifier[];
     readonly parameters: JContainer<J>;
@@ -583,7 +616,7 @@ export interface IndexSignatureDeclaration extends JS, Statement, TypedTree {
     readonly type?: JavaType;
 }
 
-export interface JSMethodDeclaration extends JS, Statement, TypedTree {
+export interface JSMethodDeclaration extends JS, Statement {
     readonly kind: typeof JavaScriptKind.JSMethodDeclaration;
     readonly leadingAnnotations: Annotation[];
     readonly modifiers: Modifier[];
@@ -646,7 +679,7 @@ export namespace NamespaceDeclaration {
     }
 }
 
-export interface FunctionDeclaration extends JS, Statement, TypedTree {
+export interface FunctionDeclaration extends JS, Statement {
     readonly kind: typeof JavaScriptKind.FunctionDeclaration;
     readonly modifiers: Modifier[];
     readonly asteriskToken: JLeftPadded<boolean>;
@@ -658,19 +691,19 @@ export interface FunctionDeclaration extends JS, Statement, TypedTree {
     readonly type?: JavaType;
 }
 
-export interface TypeLiteral extends JS, TypeTree {
+export interface TypeLiteral extends JS {
     readonly kind: typeof JavaScriptKind.TypeLiteral;
     readonly members: Block;
     readonly type?: JavaType;
 }
 
-export interface ArrayBindingPattern extends JS, TypedTree {
+export interface ArrayBindingPattern extends JS {
     readonly kind: typeof JavaScriptKind.ArrayBindingPattern;
     readonly elements: JContainer<Expression>;
     readonly type?: JavaType;
 }
 
-export interface BindingElement extends JS, Statement, TypeTree {
+export interface BindingElement extends JS, Statement {
     readonly kind: typeof JavaScriptKind.BindingElement;
     readonly propertyName?: JRightPadded<Expression>;
     readonly name: TypedTree;
@@ -700,7 +733,7 @@ export interface NamedExports extends JS {
     readonly type?: JavaType;
 }
 
-export interface ExportSpecifier extends JS, TypedTree {
+export interface ExportSpecifier extends JS {
     readonly kind: typeof JavaScriptKind.ExportSpecifier;
     readonly typeOnly: JLeftPadded<boolean>;
     readonly specifier: Expression;

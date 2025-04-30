@@ -139,7 +139,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return this.produceJava<AnnotatedType>(annotatedType, p, async draft => {
             draft.annotations = await mapAsync(annotatedType.annotations, a => this.visitDefined<Annotation>(a, p));
             draft.typeExpression = await this.visitDefined(annotatedType.typeExpression, p) as TypeTree;
-            draft.type = await this.visitType(annotatedType.type, p);
         });
     }
 
@@ -147,7 +146,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return this.produceJava<Annotation>(annotation, p, async draft => {
             draft.annotationType = await this.visitTypeName(annotation.annotationType, p);
             draft.arguments = await this.visitOptionalContainer(annotation.arguments, p);
-            draft.type = await this.visitType(annotation.type, p);
         });
     }
 
@@ -155,7 +153,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return this.produceJava<ArrayAccess>(arrayAccess, p, async draft => {
             draft.indexed = await this.visitDefined(arrayAccess.indexed, p) as Expression;
             draft.dimension = await this.visitDefined(arrayAccess.dimension, p) as ArrayDimension;
-            draft.type = await this.visitType(arrayAccess.type, p);
         });
     }
 
@@ -171,7 +168,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             if (arrayType.annotations) {
                 draft.annotations = await mapAsync(arrayType.annotations, a => this.visitDefined<Annotation>(a, p));
             }
-            draft.type = await this.visitType(arrayType.type, p) as JavaType;
         });
     }
 
@@ -481,7 +477,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.name = await this.visitDefined(methodInv.name, p) as Identifier;
             draft.arguments = await this.visitContainer(methodInv.arguments, p);
             draft.methodType = await this.visitType(methodInv.methodType, p) as JavaType.Method | undefined;
-            draft.type = await this.visitType(methodInv.type, p);
         });
     }
 
@@ -494,7 +489,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitMultiCatch(multiCatch: MultiCatch, p: P): Promise<J | undefined> {
         return this.produceJava<MultiCatch>(multiCatch, p, async draft => {
             draft.alternatives = await mapAsync(multiCatch.alternatives, alt => this.visitRightPadded(alt, p));
-            draft.type = await this.visitType(multiCatch.type, p);
         });
     }
 
@@ -531,7 +525,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             }
 
             draft.constructorType = await this.visitType(newClass.constructorType, p) as JavaType.Method | undefined;
-            draft.type = await this.visitType(newClass.type, p);
         });
     }
 
@@ -539,7 +532,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return this.produceJava<NullableType>(nullableType, p, async draft => {
             draft.annotations = await mapAsync(nullableType.annotations, a => this.visitDefined<Annotation>(a, p));
             draft.typeTree = await this.visitRightPadded(nullableType.typeTree, p);
-            draft.type = await this.visitType(nullableType.type, p);
         });
     }
 
@@ -563,7 +555,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitParentheses<T extends J>(parentheses: Parentheses<T>, p: P): Promise<J | undefined> {
         return this.produceJava<Parentheses<T>>(parentheses, p, async draft => {
             (draft.tree as JRightPadded<J>) = await this.visitRightPadded(parentheses.tree, p);
-            draft.type = await this.visitType(parentheses.type, p);
         });
     }
 
@@ -652,7 +643,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return this.produceJava<TypeCast>(typeCast, p, async draft => {
             draft.clazz = await this.visitDefined(typeCast.clazz, p) as ControlParentheses<TypeTree>;
             draft.expression = await this.visitDefined(typeCast.expression, p) as Expression;
-            draft.type = await this.visitType(typeCast.type, p);
         });
     }
 
@@ -729,7 +719,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             if (wildcard.boundedType) {
                 draft.boundedType = await this.visitTypeName(wildcard.boundedType, p);
             }
-            draft.type = await this.visitType(wildcard.type, p) as JavaType;
         });
     }
 

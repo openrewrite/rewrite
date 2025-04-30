@@ -179,16 +179,6 @@ export interface JavaSourceFile extends J, SourceFile {
     readonly classes: ClassDeclaration[];
 }
 
-export interface TypedTree extends J {
-    readonly type?: JavaType;
-}
-
-export interface NameTree extends TypedTree {
-}
-
-export interface TypeTree extends NameTree {
-}
-
 export interface Statement extends J {
 }
 
@@ -199,28 +189,36 @@ type JavaExpressionBase = FieldAccess | Assignment | AssignmentOperation | Insta
 
 export type Expression<T extends { kind: string } = never> = JavaExpressionBase | T;
 
-// noinspection JSUnusedLocalSymbols
-type JavaExpression = Expression;
+type TypedTreeBase = ArrayAccess | Assignment | AssignmentOperation | Binary | ClassDeclaration |
+    InstanceOf | DeconstructionPattern | Lambda | Literal | MethodDeclaration | MethodInvocation |
+    NewArray | NewClass | SwitchExpression | Ternary | TypeCast | Unary | VariableDeclarations;
 
-export interface AnnotatedType extends J, TypeTree {
+export type TypedTree<T extends { kind: string } = never> = TypedTreeBase | T;
+
+export type NameTree = TypedTree;
+
+type TypeTreeBase = AnnotatedType | ArrayType | Empty | FieldAccess | ParenthesizedTypeTree |
+    Identifier | IntersectionType | MultiCatch | NullableType | ParameterizedType | Primitive |
+    Wildcard | Unknown;
+
+export type TypeTree<T extends { kind: string } = never> = TypeTreeBase | T;
+
+export interface AnnotatedType extends J {
     readonly kind: typeof JavaKind.AnnotatedType;
     readonly annotations: Annotation[];
     readonly typeExpression: TypeTree;
-    readonly type?: JavaType;
 }
 
 export interface Annotation extends J {
     readonly kind: typeof JavaKind.Annotation;
     readonly annotationType: NameTree;
     readonly arguments?: JContainer<Expression>;
-    readonly type?: JavaType;
 }
 
-export interface ArrayAccess extends J, TypedTree {
+export interface ArrayAccess extends J {
     readonly kind: typeof JavaKind.ArrayAccess;
     readonly indexed: Expression;
     readonly dimension: ArrayDimension;
-    readonly type?: JavaType;
 }
 
 export interface ArrayDimension extends J {
@@ -228,11 +226,10 @@ export interface ArrayDimension extends J {
     readonly index: JRightPadded<Expression>;
 }
 
-export interface ArrayType extends J, TypeTree {
+export interface ArrayType extends J {
     readonly kind: typeof JavaKind.ArrayType;
     readonly elementType: TypeTree;
     readonly annotations?: Annotation[];
-    readonly type: JavaType;
 }
 
 export interface Assert extends J, Statement {
@@ -241,14 +238,14 @@ export interface Assert extends J, Statement {
     readonly detail?: JLeftPadded<Expression>;
 }
 
-export interface Assignment extends J, Statement, TypedTree {
+export interface Assignment extends J, Statement {
     readonly kind: typeof JavaKind.Assignment;
     readonly variable: Expression;
     readonly assignment: JLeftPadded<Expression>;
     readonly type?: JavaType;
 }
 
-export interface AssignmentOperation extends J, Statement, TypedTree {
+export interface AssignmentOperation extends J, Statement {
     readonly kind: typeof JavaKind.AssignmentOperation;
     readonly variable: Expression;
     readonly operator: JLeftPadded<AssignmentOperationType>;
@@ -273,7 +270,7 @@ export const enum AssignmentOperationType {
     UnsignedRightShift
 }
 
-export interface Binary extends J, TypedTree {
+export interface Binary extends J {
     readonly kind: typeof JavaKind.Binary;
     readonly left: Expression;
     readonly operator: JLeftPadded<BinaryOperator>;
@@ -366,7 +363,7 @@ export interface DoWhileLoop extends J, Statement {
     readonly whileCondition: JLeftPadded<ControlParentheses<Expression>>;
 }
 
-export interface Empty extends J, Statement, TypeTree {
+export interface Empty extends J, Statement {
     readonly kind: typeof JavaKind.Empty;
 }
 
@@ -383,7 +380,7 @@ export interface EnumValueSet extends J, Statement {
     readonly terminatedWithSemicolon: boolean;
 }
 
-export interface FieldAccess extends Statement, TypedTree {
+export interface FieldAccess extends Statement {
     readonly kind: typeof JavaKind.FieldAccess;
     readonly target: Expression;
     readonly name: JLeftPadded<Identifier>;
@@ -415,14 +412,14 @@ export interface ForLoopControl extends J {
     readonly update: JRightPadded<Statement>[];
 }
 
-export interface ParenthesizedTypeTree extends J, TypeTree {
+export interface ParenthesizedTypeTree extends J {
     readonly kind: typeof JavaKind.ParenthesizedTypeTree;
     readonly annotations: Annotation[];
     readonly parenthesizedType: Parentheses<TypeTree>;
     readonly type?: JavaType;
 }
 
-export interface Identifier extends J, TypeTree {
+export interface Identifier extends J {
     readonly kind: typeof JavaKind.Identifier;
     readonly annotations: Annotation[];
     readonly simpleName: string;
@@ -449,7 +446,7 @@ export interface Import extends J {
     readonly alias?: JLeftPadded<Identifier>;
 }
 
-export interface InstanceOf extends J, TypedTree {
+export interface InstanceOf extends J {
     readonly kind: typeof JavaKind.InstanceOf;
     readonly expression: JRightPadded<Expression>;
     readonly clazz: J;
@@ -458,14 +455,14 @@ export interface InstanceOf extends J, TypedTree {
     readonly modifier?: Modifier;
 }
 
-export interface DeconstructionPattern extends J, TypedTree {
+export interface DeconstructionPattern extends J {
     readonly kind: typeof JavaKind.DeconstructionPattern;
     readonly deconstructor: Expression;
     readonly nested: JContainer<J>;
     readonly type?: JavaType;
 }
 
-export interface IntersectionType extends J, TypeTree {
+export interface IntersectionType extends J {
     readonly kind: typeof JavaKind.IntersectionType;
     readonly bounds: JContainer<TypeTree>;
     readonly type?: JavaType;
@@ -477,7 +474,7 @@ export interface Label extends J, Statement {
     readonly statement: Statement;
 }
 
-export interface Lambda extends J, Statement, TypedTree {
+export interface Lambda extends J, Statement {
     readonly kind: typeof JavaKind.Lambda;
     readonly parameters: LambdaParameters;
     readonly arrow: Space;
@@ -504,7 +501,7 @@ export interface LiteralUnicodeEscape {
     readonly codePoint: string;
 }
 
-export interface MemberReference extends J, TypedTree {
+export interface MemberReference extends J {
     readonly kind: typeof JavaKind.MemberReference;
     readonly containing: JRightPadded<Expression>;
     readonly typeParameters?: JContainer<Expression>;
@@ -529,14 +526,13 @@ export interface MethodDeclaration extends J {
     readonly methodType?: JavaType.Method;
 }
 
-export interface MethodInvocation extends J, TypedTree {
+export interface MethodInvocation extends J {
     readonly kind: typeof JavaKind.MethodInvocation;
     readonly select?: JRightPadded<Expression>;
     readonly typeParameters?: JContainer<Expression>;
     readonly name: Identifier;
     readonly arguments: JContainer<Expression>;
     readonly methodType?: JavaType.Method;
-    readonly type?: JavaType;
 }
 
 export interface Modifier extends J {
@@ -570,13 +566,12 @@ export const enum ModifierType {
     LanguageExtension
 }
 
-export interface MultiCatch extends J, TypeTree {
+export interface MultiCatch extends J {
     readonly kind: typeof JavaKind.MultiCatch;
     readonly alternatives: JRightPadded<NameTree>[];
-    readonly type?: JavaType;
 }
 
-export interface NewArray extends J, TypedTree {
+export interface NewArray extends J {
     readonly kind: typeof JavaKind.NewArray;
     readonly typeExpression?: TypeTree;
     readonly dimensions: ArrayDimension[];
@@ -584,7 +579,7 @@ export interface NewArray extends J, TypedTree {
     readonly type?: JavaType;
 }
 
-export interface NewClass extends J, TypedTree {
+export interface NewClass extends J {
     readonly kind: typeof JavaKind.NewClass;
     readonly enclosing?: JRightPadded<Expression>;
     readonly new: Space;
@@ -592,14 +587,12 @@ export interface NewClass extends J, TypedTree {
     readonly arguments: JContainer<Expression>;
     readonly body?: Block;
     readonly constructorType?: JavaType.Method;
-    readonly type?: JavaType;
 }
 
-export interface NullableType extends J, TypeTree {
+export interface NullableType extends J {
     readonly kind: typeof JavaKind.NullableType;
     readonly annotations: Annotation[];
     readonly typeTree: JRightPadded<TypeTree>;
-    readonly type?: JavaType;
 }
 
 export interface Package extends J {
@@ -608,17 +601,16 @@ export interface Package extends J {
     readonly annotations?: Annotation[];
 }
 
-export interface ParameterizedType extends J, TypeTree {
+export interface ParameterizedType extends J {
     readonly kind: typeof JavaKind.ParameterizedType;
     readonly clazz: NameTree;
     readonly typeParameters?: JContainer<Expression>;
     readonly type?: JavaType;
 }
 
-export interface Parentheses<J2 extends J> extends J, TypedTree {
+export interface Parentheses<J2 extends J> extends J {
     readonly kind: typeof JavaKind.Parentheses;
     readonly tree: JRightPadded<J2>;
-    readonly type?: JavaType;
 }
 
 export interface ControlParentheses<J2 extends J> extends J {
@@ -626,7 +618,7 @@ export interface ControlParentheses<J2 extends J> extends J {
     readonly tree: JRightPadded<J2>;
 }
 
-export interface Primitive extends TypeTree {
+export interface Primitive extends J {
     readonly kind: typeof JavaKind.Primitive;
     readonly type: JavaType.Primitive;
 }
@@ -642,7 +634,7 @@ export interface Switch extends J, Statement {
     readonly cases: Block;
 }
 
-export interface SwitchExpression extends J, TypedTree {
+export interface SwitchExpression extends J {
     readonly kind: typeof JavaKind.SwitchExpression;
     readonly selector: ControlParentheses<Expression>;
     readonly cases: Block;
@@ -655,7 +647,7 @@ export interface Synchronized extends J, Statement {
     readonly body: Block;
 }
 
-export interface Ternary extends J, TypedTree, Statement {
+export interface Ternary extends J, Statement {
     readonly kind: typeof JavaKind.Ternary;
     readonly condition: Expression;
     readonly truePart: JLeftPadded<Expression>;
@@ -688,11 +680,10 @@ export interface TryCatch extends J {
     readonly body: Block;
 }
 
-export interface TypeCast extends J, TypedTree {
+export interface TypeCast extends J {
     readonly kind: typeof JavaKind.TypeCast;
     readonly clazz: ControlParentheses<TypeTree>;
     readonly expression: Expression;
-    readonly type?: JavaType;
 }
 
 export interface TypeParameter extends J {
@@ -709,7 +700,7 @@ export interface TypeParameters extends J {
     readonly typeParameters: JRightPadded<TypeParameter>[];
 }
 
-export interface Unary extends J, TypedTree, Statement {
+export interface Unary extends J, Statement {
     readonly kind: typeof JavaKind.Unary;
     readonly operator: JLeftPadded<UnaryOperator>;
     readonly expression: Expression;
@@ -750,11 +741,10 @@ export interface WhileLoop extends J, Statement {
     readonly body: JRightPadded<Statement>;
 }
 
-export interface Wildcard extends J, TypeTree {
+export interface Wildcard extends J {
     readonly kind: typeof JavaKind.Wildcard;
     readonly bound?: JLeftPadded<WildcardBound>;
     readonly boundedType?: NameTree;
-    readonly type: JavaType;
 }
 
 export const enum WildcardBound {
@@ -768,7 +758,7 @@ export interface Yield extends J, Statement {
     readonly value: Expression;
 }
 
-export interface Unknown extends J, Statement, TypeTree {
+export interface Unknown extends J, Statement {
     readonly kind: typeof JavaKind.Unknown;
     readonly source: UnknownSource;
 }

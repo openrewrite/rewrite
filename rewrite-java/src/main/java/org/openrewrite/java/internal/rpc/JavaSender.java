@@ -37,7 +37,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitAnnotation(J.Annotation annotation, RpcSendQueue q) {
         q.getAndSend(annotation, J.Annotation::getAnnotationType, type -> visit(type, q));
         q.getAndSend(annotation, a -> a.getPadding().getArguments(), args -> visitContainer(args, q));
-        q.getAndSend(annotation, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return annotation;
     }
 
@@ -52,7 +51,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitArrayAccess(J.ArrayAccess arrayAccess, RpcSendQueue q) {
         q.getAndSend(arrayAccess, J.ArrayAccess::getIndexed, indexed -> visit(indexed, q));
         q.getAndSend(arrayAccess, J.ArrayAccess::getDimension, dim -> visit(dim, q));
-        q.getAndSend(arrayAccess, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return arrayAccess;
     }
 
@@ -66,7 +64,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitArrayType(J.ArrayType arrayType, RpcSendQueue q) {
         q.getAndSend(arrayType, J.ArrayType::getElementType, type -> visit(type, q));
         q.getAndSendList(arrayType, J.ArrayType::getAnnotations, Tree::getId, a -> visit(a, q));
-        q.getAndSend(arrayType, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return arrayType;
     }
 
@@ -368,7 +365,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(methodInvocation, J.MethodInvocation::getName, name -> visit(name, q));
         q.getAndSend(methodInvocation, m -> m.getPadding().getArguments(), args -> visitContainer(args, q));
         q.getAndSend(methodInvocation, m -> asRef(m.getMethodType()), type -> visitType(getValueNonNull(type), q));
-        q.getAndSend(methodInvocation, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return methodInvocation;
     }
 
@@ -381,7 +377,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     @Override
     public J visitMultiCatch(J.MultiCatch multiCatch, RpcSendQueue q) {
         q.getAndSendList(multiCatch, m -> m.getPadding().getAlternatives(), r -> r.getElement().getId(), alt -> visitRightPadded(alt, q));
-        q.getAndSend(multiCatch, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return multiCatch;
     }
 
@@ -409,7 +404,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitNullableType(J.NullableType nullableType, RpcSendQueue q) {
         q.getAndSendList(nullableType, J.NullableType::getAnnotations, J.Annotation::getId, annot -> visit(annot, q));
         q.getAndSend(nullableType, n -> n.getPadding().getTypeTree(), type -> visitRightPadded(type, q));
-        q.getAndSend(nullableType, n -> asRef(n.getType()), type -> visitType(getValueNonNull(type), q));
         return nullableType;
     }
 
@@ -439,7 +433,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parentheses, RpcSendQueue q) {
         q.getAndSend(parentheses, p -> p.getPadding().getTree(), tree -> visitRightPadded(tree, q));
-        q.getAndSend(parentheses, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return parentheses;
     }
 
@@ -505,7 +498,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitTypeCast(J.TypeCast typeCast, RpcSendQueue q) {
         q.getAndSend(typeCast, J.TypeCast::getClazz, clazz -> visit(clazz, q));
         q.getAndSend(typeCast, J.TypeCast::getExpression, expr -> visit(expr, q));
-        q.getAndSend(typeCast, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return typeCast;
     }
 
@@ -578,7 +570,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitWildcard(J.Wildcard wildcard, RpcSendQueue q) {
         q.getAndSend(wildcard, w -> w.getPadding().getBound(), bound -> visitLeftPadded(bound, q));
         q.getAndSend(wildcard, J.Wildcard::getBoundedType, type -> visit(type, q));
-        q.getAndSend(wildcard, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return wildcard;
     }
 

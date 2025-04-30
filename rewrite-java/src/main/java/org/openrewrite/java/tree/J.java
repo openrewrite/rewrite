@@ -6456,7 +6456,7 @@ public interface J extends Tree, RpcCodec<J> {
         }
 
         @Override
-        public @Nullable JavaType getType() {
+        public JavaType getType() {
             return JavaType.Unknown.getInstance();
         }
 
