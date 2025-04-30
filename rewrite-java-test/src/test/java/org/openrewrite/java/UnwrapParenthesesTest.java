@@ -268,6 +268,7 @@ class UnwrapParenthesesTest implements RewriteTest {
                     }).length();
                }
             }
-            """));
+            """
+          ));
     }
 }
