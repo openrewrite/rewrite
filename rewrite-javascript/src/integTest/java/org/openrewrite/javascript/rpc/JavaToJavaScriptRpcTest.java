@@ -39,7 +39,12 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SelectPackages("org.openrewrite.java.tree")
 @IncludeClassNamePatterns(".*ProblemTest")
 //@IncludeClassNamePatterns(".*AnnotationTest")
-@ExcludeClassNamePatterns({ ".*JavadocTest", ".*TypeUtilsTest"})
+@ExcludeClassNamePatterns({
+  ".*JavadocTest",
+  ".*TypeUtilsTest",
+  ".*RecordPatternMatchingTest",
+  ".*SwitchPatternMatchingTest"
+})
 public class JavaToJavaScriptRpcTest {
 
     @BeforeSuite

@@ -101,6 +101,7 @@ import {
 } from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
+import {saveTrace} from "../rpc/trace";
 
 export class JavaSender extends JavaVisitor<RpcSendQueue> {
 

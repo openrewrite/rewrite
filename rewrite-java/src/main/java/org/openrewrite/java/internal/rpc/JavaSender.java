@@ -577,7 +577,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     @Override
     public J visitWildcard(J.Wildcard wildcard, RpcSendQueue q) {
-        q.getAndSend(wildcard, J.Wildcard::getBound);
+        q.getAndSend(wildcard, w -> w.getPadding().getBound(), bound -> visitLeftPadded(bound, q));
         q.getAndSend(wildcard, J.Wildcard::getBoundedType, type -> visit(type, q));
         q.getAndSend(wildcard, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return wildcard;
