@@ -16,7 +16,7 @@
 import {TreeVisitor} from "../visitor";
 import {SourceFile, Tree} from "../tree";
 import {mapAsync} from "../util";
-import {isPlainText, PlainText, PlainTextKind, Snippet} from "./tree";
+import {isPlainText, PlainText} from "./tree";
 
 export class PlainTextVisitor<P> extends TreeVisitor<Tree, P> {
     isAcceptable(sourceFile: SourceFile): boolean {
@@ -29,16 +29,16 @@ export class PlainTextVisitor<P> extends TreeVisitor<Tree, P> {
         })
     }
 
-    protected async visitSnippet(snippet: Snippet, p: P): Promise<Snippet | undefined> {
-        return this.produceTree<Snippet>(snippet, p)
+    protected async visitSnippet(snippet: PlainText.Snippet, p: P): Promise<PlainText.Snippet | undefined> {
+        return this.produceTree<PlainText.Snippet>(snippet, p)
     }
 
     protected async accept(t: Tree, p: P): Promise<Tree | undefined> {
         switch (t.kind) {
-            case PlainTextKind.PlainText:
+            case PlainText.Kind.PlainText:
                 return this.visitText(t as PlainText, p);
-            case PlainTextKind.Snippet:
-                return this.visitSnippet(t as Snippet, p);
+            case PlainText.Kind.Snippet:
+                return this.visitSnippet(t as PlainText.Snippet, p);
             default:
                 throw new Error(`Unexpected text kind ${t.kind}`);
         }

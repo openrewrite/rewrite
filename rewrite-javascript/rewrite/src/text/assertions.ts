@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 import {AfterRecipe, dedentAfter, SourceSpec} from "../test";
-import {PlainText, PlainTextKind, PlainTextParser} from ".";
+import {PlainText, PlainTextParser} from ".";
 
 export function text(before: string | null, after?: AfterRecipe): SourceSpec<PlainText> {
     return {
-        kind: PlainTextKind.PlainText,
+        kind: PlainText.Kind.PlainText,
         before: before,
         after: dedentAfter(after),
         ext: 'txt',

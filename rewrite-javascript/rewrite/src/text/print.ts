@@ -15,7 +15,7 @@
  */
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {PlainTextVisitor} from "./visitor";
-import {PlainText, PlainTextKind, Snippet} from "./tree";
+import {PlainText} from "./tree";
 import {Cursor} from "../tree";
 import {Markers} from "../markers";
 
@@ -32,7 +32,7 @@ class PlainTextPrinter extends PlainTextVisitor<PrintOutputCapture> {
         return text;
     }
 
-    async visitSnippet(snippet: Snippet, p: PrintOutputCapture): Promise<Snippet | undefined> {
+    async visitSnippet(snippet: PlainText.Snippet, p: PrintOutputCapture): Promise<PlainText.Snippet | undefined> {
         await this.visitMarkableText(snippet.markers, snippet.text, p);
         return snippet;
     }
@@ -52,4 +52,4 @@ class PlainTextPrinter extends PlainTextVisitor<PrintOutputCapture> {
     }
 }
 
-TreePrinters.register(PlainTextKind.PlainText, new PlainTextPrinter());
+TreePrinters.register(PlainText.Kind.PlainText, new PlainTextPrinter());

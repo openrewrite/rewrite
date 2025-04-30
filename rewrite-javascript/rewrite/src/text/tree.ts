@@ -15,25 +15,27 @@
  */
 import {SourceFile, Tree, TreeKind} from "../tree";
 
-export const PlainTextKind = {
-    ...TreeKind,
-    PlainText: "org.openrewrite.text.PlainText",
-    Snippet: "org.openrewrite.text.PlainText$Snippet"
-} as const
+export interface PlainText extends SourceFile {
+    readonly kind: typeof PlainText.Kind.PlainText
+    readonly text: string
+    readonly snippets: PlainText.Snippet[]
+}
 
-const textKindValues = new Set(Object.values(PlainTextKind));
+export namespace PlainText {
+    export const Kind = {
+        ...TreeKind,
+        PlainText: "org.openrewrite.text.PlainText",
+        Snippet: "org.openrewrite.text.PlainText$Snippet"
+    } as const
+
+    export interface Snippet extends Tree {
+        readonly kind: typeof PlainText.Kind.Snippet
+        readonly text: string
+    }
+}
+
+const textKindValues = new Set(Object.values(PlainText.Kind));
 
 export function isPlainText(tree: any): tree is PlainText {
     return textKindValues.has(tree["kind"]);
-}
-
-export interface PlainText extends SourceFile {
-    readonly kind: typeof PlainTextKind.PlainText
-    readonly text: string
-    readonly snippets: Snippet[]
-}
-
-export interface Snippet extends Tree {
-    readonly kind: typeof PlainTextKind.Snippet
-    readonly text: string
 }

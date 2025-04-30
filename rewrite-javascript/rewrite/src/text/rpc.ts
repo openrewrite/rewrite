@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {PlainText, PlainTextKind, Snippet} from "./tree";
+import {PlainText} from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
 
-async function receiveSnippet(before: Snippet, q: RpcReceiveQueue): Promise<Snippet | undefined> {
-    const draft: Draft<Snippet> = createDraft(before);
+async function receiveSnippet(before: PlainText.Snippet, q: RpcReceiveQueue): Promise<PlainText.Snippet | undefined> {
+    const draft: Draft<PlainText.Snippet> = createDraft(before);
     draft.id = await q.receive(before.id);
     draft.markers = await q.receiveMarkers(before.markers);
     draft.text = await q.receive(before.text);
@@ -57,6 +57,6 @@ const textCodec: RpcCodec<PlainText> = {
     }
 }
 
-Object.values(PlainTextKind).forEach(kind => {
+Object.values(PlainText.Kind).forEach(kind => {
     RpcCodecs.registerCodec(kind, textCodec);
 });
