@@ -73,6 +73,42 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
+    void IncludedDefaultConfigurationsReceiveRuntimeConstraints() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("implementation", "runtimeOnly"))),
+          buildGradle(
+            """
+              plugins {
+                  id 'info.solidsoft.pitest' version '1.15.0'
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+              }
+              """,
+                """
+              plugins {
+                  id 'info.solidsoft.pitest' version '1.15.0'
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  constraints {
+                      implementation('org.apache.commons:commons-lang3:3.14.0')
+                  }
+              
+                  compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void customConfiguration() {
         rewriteRun(
           buildGradle(
@@ -603,42 +639,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @DocumentExample
-    void IncludedDefaultConfigurationsReceiveRuntimeConstraints() {
-        rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("implementation", "runtimeOnly"))),
-          buildGradle(
-            """
-              plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
-                  id 'java'
-              }
-              repositories { mavenCentral() }
-              dependencies {
-                  compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
-              }
-              """,
-                """
-              plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
-                  id 'java'
-              }
-              repositories { mavenCentral() }
-              dependencies {
-                  constraints {
-                      implementation('org.apache.commons:commons-lang3:3.14.0')
-                  }
-              
-                  compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void useResolutionStrategyWhenSpringDependencyManagementPluginIsPresent() {
         rewriteRun(
           buildGradle(
@@ -672,6 +672,25 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
               
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangesIfDependencyIsAlsoPresentOnProject() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  implementation('com.fasterxml.jackson.core:jackson-core:2.12.0')
+                  implementation('com.fasterxml.jackson.core:jackson-databind:2.12.0')
               }
               """
           )

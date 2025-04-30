@@ -24,6 +24,44 @@ import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({"UnnecessaryCallToStringValueOf", "UnnecessaryBoxing", "RedundantTypeArguments", "rawtypes"})
 class UseStaticImportTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void junit5Assertions() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
+            .recipe(new UseStaticImport("org.junit.jupiter.api.Assertions assert*(..)")),
+          java(
+            """
+              package org.openrewrite;
+
+              import org.junit.jupiter.api.Test;
+              import org.junit.jupiter.api.Assertions;
+
+              class SampleTest {
+                  @Test
+                  void sample() {
+                      Assertions.assertEquals(42, 21*2);
+                  }
+              }
+              """,
+            """
+              package org.openrewrite;
+
+              import org.junit.jupiter.api.Test;
+
+              import static org.junit.jupiter.api.Assertions.assertEquals;
+
+              class SampleTest {
+                  @Test
+                  void sample() {
+                      assertEquals(42, 21*2);
+                  }
+              }
+              """
+          )
+        );
+    }
     @Test
     void replaceWithStaticImports() {
         rewriteRun(
@@ -193,44 +231,6 @@ class UseStaticImportTest implements RewriteTest {
               class SameMethodNameLocally {
                   void avoidCollision() {
                       List<Object> list = emptyList();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void junit5Assertions() {
-        rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
-            .recipe(new UseStaticImport("org.junit.jupiter.api.Assertions assert*(..)")),
-          java(
-            """
-              package org.openrewrite;
-
-              import org.junit.jupiter.api.Test;
-              import org.junit.jupiter.api.Assertions;
-
-              class SampleTest {
-                  @Test
-                  void sample() {
-                      Assertions.assertEquals(42, 21*2);
-                  }
-              }
-              """,
-            """
-              package org.openrewrite;
-
-              import org.junit.jupiter.api.Test;
-
-              import static org.junit.jupiter.api.Assertions.assertEquals;
-
-              class SampleTest {
-                  @Test
-                  void sample() {
-                      assertEquals(42, 21*2);
                   }
               }
               """

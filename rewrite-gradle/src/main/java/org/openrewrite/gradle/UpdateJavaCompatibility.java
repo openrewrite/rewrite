@@ -132,7 +132,10 @@ public class UpdateJavaCompatibility extends Recipe {
                 } else if (a.getVariable() instanceof J.FieldAccess) {
                     J.FieldAccess fieldAccess = (J.FieldAccess) a.getVariable();
                     if (compatibilityType == null) {
-                        if (!("sourceCompatibility".equals(fieldAccess.getSimpleName()) || "targetCompatibility".equals(fieldAccess.getSimpleName()))) {
+                        if (!("sourceCompatibility".equals(fieldAccess.getSimpleName()) || "targetCompatibility".equals(fieldAccess.getSimpleName()) ||
+                                ("release".equals(fieldAccess.getSimpleName()) &&
+                                        ((fieldAccess.getTarget() instanceof J.Identifier && "options".equals(((J.Identifier) fieldAccess.getTarget()).getSimpleName()))
+                                                || (fieldAccess.getTarget() instanceof J.FieldAccess && "options".equals(((J.FieldAccess) fieldAccess.getTarget()).getSimpleName())))))) {
                             return a;
                         }
                     } else if (!(compatibilityType.toString().toLowerCase() + "Compatibility").equals(fieldAccess.getSimpleName())) {
@@ -217,7 +220,7 @@ public class UpdateJavaCompatibility extends Recipe {
             }
 
             private int getMajorVersion(@Nullable String version) {
-                if(version == null) {
+                if (version == null) {
                     return -1;
                 }
                 try {

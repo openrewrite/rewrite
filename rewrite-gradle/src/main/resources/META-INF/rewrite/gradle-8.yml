@@ -23,6 +23,8 @@ recipeList:
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 8.x
       addIfMissing: false
+  # https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup
+  - org.openrewrite.gradle.gradle8.JacocoReportDeprecations
 
   # https://docs.gradle.org/8.11.1/userguide/upgrading_version_8.html#test_framework_implementation_dependencies
   - org.openrewrite.gradle.AddJUnitPlatformLauncher

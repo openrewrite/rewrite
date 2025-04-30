@@ -49,6 +49,49 @@ class TabsAndIndentsTest implements RewriteTest {
         spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(IntelliJ.tabsAndIndents(), IntelliJ.wrappingAndBraces())));
     }
 
+    // https://rules.sonarsource.com/java/tag/confusing/RSPEC-S3973
+    @DocumentExample
+    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
+    @Test
+    void rspec3973() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test { init {
+                  if (true == false)
+                  doTheThing();
+                            
+                  doTheOtherThing();
+                  somethingElseEntirely();
+                            
+                  foo();
+              }
+                  fun doTheThing() {}
+                  fun doTheOtherThing() {}
+                  fun somethingElseEntirely() {}
+                  fun foo() {}
+              }
+              """,
+            """
+              class Test { init {
+                  if (true == false)
+                      doTheThing();
+                            
+                  doTheOtherThing();
+                  somethingElseEntirely();
+                            
+                  foo();
+              }
+                  fun doTheThing() {}
+                  fun doTheOtherThing() {}
+                  fun somethingElseEntirely() {}
+                  fun foo() {}
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
         return spec -> spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(with.apply(IntelliJ.tabsAndIndents()), IntelliJ.wrappingAndBraces())))
           .parser(KotlinParser.builder().styles(singletonList(
@@ -228,49 +271,6 @@ class TabsAndIndentsTest implements RewriteTest {
             	}
             }
             """
-          )
-        );
-    }
-
-    // https://rules.sonarsource.com/java/tag/confusing/RSPEC-S3973
-    @DocumentExample
-    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
-    @Test
-    void rspec3973() {
-        rewriteRun(
-          kotlin(
-            """
-              class Test { init {
-                  if (true == false)
-                  doTheThing();
-                            
-                  doTheOtherThing();
-                  somethingElseEntirely();
-                            
-                  foo();
-              }
-                  fun doTheThing() {}
-                  fun doTheOtherThing() {}
-                  fun somethingElseEntirely() {}
-                  fun foo() {}
-              }
-              """,
-            """
-              class Test { init {
-                  if (true == false)
-                      doTheThing();
-                            
-                  doTheOtherThing();
-                  somethingElseEntirely();
-                            
-                  foo();
-              }
-                  fun doTheThing() {}
-                  fun doTheOtherThing() {}
-                  fun somethingElseEntirely() {}
-                  fun foo() {}
-              }
-              """
           )
         );
     }

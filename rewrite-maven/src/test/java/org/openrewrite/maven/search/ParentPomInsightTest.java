@@ -32,24 +32,6 @@ class ParentPomInsightTest implements RewriteTest {
         spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-parent", null, null));
     }
 
-    @Test
-    void noParent() {
-        rewriteRun(
-          pomXml(
-            //language=xml
-            """
-              <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              </project>
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void findParent() {
@@ -100,6 +82,24 @@ class ParentPomInsightTest implements RewriteTest {
                 </project>
                 """
             )
+          )
+        );
+    }
+
+    @Test
+    void noParent() {
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              </project>
+              """
           )
         );
     }

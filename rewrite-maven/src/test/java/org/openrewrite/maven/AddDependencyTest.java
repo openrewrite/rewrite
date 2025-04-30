@@ -50,6 +50,34 @@ class AddDependencyTest implements RewriteTest {
           }
       """;
 
+    @DocumentExample
+    @Test
+    void addDependenciesOnEmptyProject() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null)),
+          pomXml("""
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              </project>""",
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                      </dependency>
+                  </dependencies>
+              </project>"""
+          )
+        );
+    }
+
     @Test
     void dontAddDuplicateIfUpdateModelOnPriorRecipeCycleFailed() {
         rewriteRun(
@@ -1259,34 +1287,6 @@ class AddDependencyTest implements RewriteTest {
                 </project>"""
             )
           ));
-    }
-
-    @DocumentExample
-    @Test
-    void addDependenciesOnEmptyProject() {
-        rewriteRun(
-          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null)),
-          pomXml("""
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-              </project>""",
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>29.0-jre</version>
-                      </dependency>
-                  </dependencies>
-              </project>"""
-          )
-        );
     }
 
     @Test
