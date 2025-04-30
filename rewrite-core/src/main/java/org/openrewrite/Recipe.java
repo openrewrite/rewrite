@@ -491,21 +491,6 @@ public abstract class Recipe implements Cloneable {
         return getClass().getName();
     }
 
-    /**
-     * @return Returns true if this recipe or any of its sub-recipes require the scanning and generate phases of the recipe run cycle.
-     */
-    public boolean isScanning() {
-        if (this instanceof ScanningRecipe) {
-            return true;
-        }
-        for (Recipe r : this.getRecipeList()) {
-            if (r.isScanning()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) {
