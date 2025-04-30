@@ -316,13 +316,14 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitLambda(J.Lambda lambda, RpcReceiveQueue q) {
         return lambda
-                .withParameters(q.receive(lambda.getParameters(), p -> visitLambdaParameters(p, q)))
+                .withParameters(q.receive(lambda.getParameters(), p -> (J.Lambda.Parameters) visitNonNull(p, q)))
                 .withArrow(q.receive(lambda.getArrow(), a -> visitSpace(a, q)))
                 .withBody(q.receive(lambda.getBody(), b -> visitNonNull(b, q)))
                 .withType(q.receive(lambda.getType(), t -> visitType(t, q)));
     }
 
-    private J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, RpcReceiveQueue q) {
+    @Override
+    public J visitLambdaParameters(J.Lambda.Parameters parameters, RpcReceiveQueue q) {
         return parameters
                 .getPadding().withParameters(q.receiveList(parameters.getPadding().getParameters(), p -> visitRightPadded(p, q)))
                 .withParenthesized(q.receive(parameters.isParenthesized()));

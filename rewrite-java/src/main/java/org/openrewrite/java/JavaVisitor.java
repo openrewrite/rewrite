@@ -790,23 +790,23 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             l = (J.Lambda) temp;
         }
-        l = l.withParameters(
-                l.getParameters().withPrefix(
-                        visitSpace(l.getParameters().getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p)
-                )
-        );
-        l = l.withParameters(
-                l.getParameters().getPadding().withParameters(
-                        ListUtils.map(l.getParameters().getPadding().getParameters(),
-                                param -> visitRightPadded(param, JRightPadded.Location.LAMBDA_PARAM, p)
-                        )
-                )
-        );
         l = l.withParameters(visitAndCast(l.getParameters(), p));
         l = l.withArrow(visitSpace(l.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p));
         l = l.withBody(visitAndCast(l.getBody(), p));
         l = l.withType(visitType(l.getType(), p));
         return l;
+    }
+
+    public J visitLambdaParameters(J.Lambda.Parameters parameters, P p) {
+        J.Lambda.Parameters params = parameters;
+        params = params.withPrefix(visitSpace(params.getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p));
+        params = params.withMarkers(visitMarkers(params.getMarkers(), p));
+        params = params.getPadding().withParameters(
+                ListUtils.map(params.getPadding().getParameters(),
+                        param -> visitRightPadded(param, JRightPadded.Location.LAMBDA_PARAM, p)
+                )
+        );
+        return params;
     }
 
     public J visitLiteral(J.Literal literal, P p) {

@@ -215,6 +215,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, P p) {
+        return (J.Lambda.Parameters) super.visitLambdaParameters(parameters, p);
+    }
+
+    @Override
     public J.Literal visitLiteral(J.Literal literal, P p) {
         return (J.Literal) super.visitLiteral(literal, p);
     }

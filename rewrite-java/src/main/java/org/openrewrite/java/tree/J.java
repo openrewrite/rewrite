@@ -3405,6 +3405,11 @@ public interface J extends Tree, RpcCodec<J> {
                 return getPadding().withParameters(JRightPadded.withElements(this.parameters, parameters));
             }
 
+            @Override
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
+                return v.visitLambdaParameters(this, p);
+            }
+
             @Transient
             public CoordinateBuilder.Lambda.Parameters getCoordinates() {
                 return new CoordinateBuilder.Lambda.Parameters(this);
