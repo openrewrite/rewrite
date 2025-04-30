@@ -152,22 +152,6 @@ export interface JavaScriptSourceFile extends JS, SourceFile {
     readonly statements: JRightPadded<Statement>[];
 }
 
-export interface BindingElement extends JS {
-    // TODO implement me
-}
-
-export interface TypeLiteral extends JS {
-    // TODO implement me
-}
-
-export interface FunctionDeclaration extends JS {
-    // TODO implement me
-}
-
-export interface ArrayBindingPattern extends JS {
-    // TODO implement me
-}
-
 export interface CompilationUnit extends JavaScriptSourceFile, JS {
     readonly kind: typeof JavaScriptKind.CompilationUnit;
     readonly eof: Space;
