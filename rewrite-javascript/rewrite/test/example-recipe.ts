@@ -26,7 +26,7 @@ import {
     TreeVisitor
 } from "../src";
 import {PlainText, PlainTextParser, PlainTextVisitor} from "../src/text";
-import {Json, JsonDocument, JsonKind, JsonVisitor, Member} from "../src/json";
+import {Json, JsonVisitor} from "../src/json";
 
 export function activate(registry: RecipeRegistry) {
     registry.register(ChangeText);
@@ -150,7 +150,7 @@ export class ChangeVersion extends Recipe {
     get editor(): JsonVisitor<ExecutionContext> {
         const v = this.version;
         return new class extends JsonVisitor<ExecutionContext> {
-            protected async visitDocument(document: JsonDocument, p: ExecutionContext): Promise<Json | undefined> {
+            protected async visitDocument(document: Json.Document, p: ExecutionContext): Promise<Json | undefined> {
                 // Only visit package.json and package-lock.json files
                 if (!(document.sourcePath.endsWith("package.json") || document.sourcePath.endsWith("package-lock.json"))) {
                     return document;
@@ -158,11 +158,11 @@ export class ChangeVersion extends Recipe {
                 return super.visitDocument(document, p);
             }
 
-            protected async visitMember(member: Member, p: ExecutionContext): Promise<Json | undefined> {
-                return this.produceJson<Member>(await super.visitMember(member, p), p, draft => {
+            protected async visitMember(member: Json.Member, p: ExecutionContext): Promise<Json | undefined> {
+                return this.produceJson<Json.Member>(await super.visitMember(member, p), p, draft => {
                     let key = member.key.element;
-                    if (key.kind === JsonKind.Literal && key.value === "version") {
-                        if (draft.value.kind === JsonKind.Literal) {
+                    if (key.kind === Json.Kind.Literal && key.value === "version") {
+                        if (draft.value.kind === Json.Kind.Literal) {
                             draft.value.value = v;
                             draft.value.source = `"${v}"`;
                         }

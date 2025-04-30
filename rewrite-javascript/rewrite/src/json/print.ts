@@ -15,25 +15,13 @@
  */
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {JsonVisitor} from "./visitor";
-import {
-    Empty,
-    Identifier,
-    Json,
-    JsonArray,
-    JsonDocument,
-    JsonKind,
-    JsonObject,
-    JsonRightPadded,
-    Literal,
-    Member,
-    Space
-} from "./tree";
+import {Json} from "./tree";
 import {Cursor} from "../tree";
 import {Markers} from "../markers";
 
 class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
-    protected async visitArray(array: JsonArray, p: PrintOutputCapture): Promise<Json | undefined> {
-        this.beforeSyntax(array, p);
+    protected async visitArray(array: Json.Array, p: PrintOutputCapture): Promise<Json | undefined> {
+        await this.beforeSyntax(array, p);
         p.append('[');
         await this.visitRightPaddedWithSuffix(array.values, ",", p);
         p.append(']');
@@ -41,36 +29,36 @@ class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
         return array;
     }
 
-    protected async visitDocument(document: JsonDocument, p: PrintOutputCapture): Promise<Json | undefined> {
-        this.beforeSyntax(document, p);
+    protected async visitDocument(document: Json.Document, p: PrintOutputCapture): Promise<Json | undefined> {
+        await this.beforeSyntax(document, p);
         await this.visit(document.value, p);
         await this.visitSpace(document.eof, p);
         this.afterSyntax(document, p);
         return document;
     }
 
-    protected async visitEmpty(empty: Empty, p: PrintOutputCapture): Promise<Json | undefined> {
-        this.beforeSyntax(empty, p);
+    protected async visitEmpty(empty: Json.Empty, p: PrintOutputCapture): Promise<Json | undefined> {
+        await this.beforeSyntax(empty, p);
         this.afterSyntax(empty, p);
         return empty;
     }
 
-    protected async visitIdentifier(identifier: Identifier, p: PrintOutputCapture): Promise<Json | undefined> {
-        this.beforeSyntax(identifier, p);
+    protected async visitIdentifier(identifier: Json.Identifier, p: PrintOutputCapture): Promise<Json | undefined> {
+        await this.beforeSyntax(identifier, p);
         p.append(identifier.name);
         this.afterSyntax(identifier, p);
         return identifier;
     }
 
-    protected async visitLiteral(literal: Literal, p: PrintOutputCapture): Promise<Json | undefined> {
-        this.beforeSyntax(literal, p);
+    protected async visitLiteral(literal: Json.Literal, p: PrintOutputCapture): Promise<Json | undefined> {
+        await this.beforeSyntax(literal, p);
         p.append(literal.source);
         this.afterSyntax(literal, p);
         return literal;
     }
 
-    protected async visitMember(member: Member, p: PrintOutputCapture): Promise<Json | undefined> {
-        this.beforeSyntax(member, p);
+    protected async visitMember(member: Json.Member, p: PrintOutputCapture): Promise<Json | undefined> {
+        await this.beforeSyntax(member, p);
         await this.visitRightPadded(member.key, p);
         p.append(':');
         await this.visit(member.value, p);
@@ -78,8 +66,8 @@ class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
         return member;
     }
 
-    protected async visitObject(jsonObject: JsonObject, p: PrintOutputCapture): Promise<Json | undefined> {
-        this.beforeSyntax(jsonObject, p);
+    protected async visitObject(jsonObject: Json.Object, p: PrintOutputCapture): Promise<Json | undefined> {
+        await this.beforeSyntax(jsonObject, p);
         p.append('{');
         await this.visitRightPaddedWithSuffix(jsonObject.members, ",", p);
         p.append('}');
@@ -87,7 +75,7 @@ class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
         return jsonObject;
     }
 
-    protected async visitSpace(space: Space, p: PrintOutputCapture): Promise<Space> {
+    protected async visitSpace(space: Json.Space, p: PrintOutputCapture): Promise<Json.Space> {
         p.append(space.whitespace);
         for (const comment of space.comments) {
             await this.visitMarkers(comment.markers, p);
@@ -101,7 +89,7 @@ class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
         return space;
     }
 
-    private async visitRightPaddedWithSuffix(nodes: JsonRightPadded<Json>[], suffixBetween: string, p: PrintOutputCapture): Promise<void> {
+    private async visitRightPaddedWithSuffix(nodes: Json.RightPadded<Json>[], suffixBetween: string, p: PrintOutputCapture): Promise<void> {
         for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
             await this.visit(node.element, p);
@@ -112,16 +100,16 @@ class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
         }
     }
 
-    private beforeSyntax(json: Json, p: PrintOutputCapture): void {
-        this.beforeSyntaxWithMarkers(json.prefix, json.markers, p);
+    private async beforeSyntax(json: Json, p: PrintOutputCapture): Promise<void> {
+        await this.beforeSyntaxWithMarkers(json.prefix, json.markers, p);
     }
 
-    private beforeSyntaxWithMarkers(prefix: Space, markers: Markers, p: PrintOutputCapture): void {
+    private async beforeSyntaxWithMarkers(prefix: Json.Space, markers: Markers, p: PrintOutputCapture): Promise<void> {
         for (const marker of markers.markers) {
             p.append(p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), this.jsonMarkerWrapper));
         }
-        this.visitSpace(prefix, p);
-        this.visitMarkers(markers, p);
+        await this.visitSpace(prefix, p);
+        await this.visitMarkers(markers, p);
         for (const marker of markers.markers) {
             p.append(p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), this.jsonMarkerWrapper));
         }
@@ -140,4 +128,4 @@ class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
     private jsonMarkerWrapper = (out: string): string => `/*~~${out}${out ? "~~" : ""}*/`;
 }
 
-TreePrinters.register(JsonKind.Document, new JsonPrinter());
+TreePrinters.register(Json.Kind.Document, new JsonPrinter());

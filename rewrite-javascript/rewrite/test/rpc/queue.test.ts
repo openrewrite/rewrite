@@ -1,10 +1,10 @@
-import {JsonKind} from "../../src/json";
+import {Json} from "../../src/json";
 import {asRef} from "../../src/rpc";
 
 describe("RPC queues", () => {
 
     test("asRef doesn't create a new instance", () => {
-        const space = {kind: JsonKind.Space, comments: [], whitespace: "\n"};
+        const space = {kind: Json.Kind.Space, comments: [], whitespace: "\n"};
 
         const ref1 = asRef(space);
         const ref2 = asRef(space);

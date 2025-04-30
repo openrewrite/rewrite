@@ -14,23 +14,11 @@
  * limitations under the License.
  */
 import {emptyMarkers, Parser, ParserInput, ParserSourceReader, randomId} from "../";
-import {
-    emptySpace,
-    Json,
-    JsonArray,
-    JsonDocument,
-    JsonKind,
-    JsonObject,
-    JsonRightPadded,
-    JsonValue,
-    Literal,
-    Member,
-    space
-} from "./tree";
+import {emptySpace, Json, space} from "./tree";
 
-export class JsonParser extends Parser<JsonDocument> {
+export class JsonParser extends Parser<Json.Document> {
 
-    async parse(...sourcePaths: ParserInput[]): Promise<JsonDocument[]> {
+    async parse(...sourcePaths: ParserInput[]): Promise<Json.Document[]> {
         return sourcePaths.map(sourcePath => {
             return {
                 ...new ParseJsonReader(sourcePath).parse(),
@@ -49,13 +37,13 @@ class ParseJsonReader extends ParserSourceReader {
         return space(this.whitespace());
     }
 
-    parse(): Omit<JsonDocument, "sourcePath"> {
+    parse(): Omit<Json.Document, "sourcePath"> {
         return {
-            kind: JsonKind.Document,
+            kind: Json.Kind.Document,
             id: randomId(),
             prefix: this.prefix(),
             markers: emptyMarkers,
-            value: this.json(JSON.parse(this.source)) as JsonValue,
+            value: this.json(JSON.parse(this.source)) as Json.Value,
             eof: space(this.source.slice(this.cursor))
         }
     }
@@ -69,49 +57,51 @@ class ParseJsonReader extends ParserSourceReader {
         if (Array.isArray(parsed)) {
             this.cursor++; // skip '['
             return {
-                kind: JsonKind.Array,
+                kind: Json.Kind.Array,
                 ...base,
                 values: parsed.map(p => {
                     const value = {
-                        kind: JsonKind.RightPadded,
+                        kind: Json.Kind.RightPadded,
                         element: this.json(p),
-                        after: space(this.whitespace())
+                        after: space(this.whitespace()),
+                        markers: emptyMarkers
                     };
                     this.cursor++;
                     return value;
                 })
-            } as JsonArray;
+            } as Json.Array;
         } else if (parsed !== null && typeof parsed === "object") {
             this.cursor++; // skip '{'
             return {
-                kind: JsonKind.Object,
+                kind: Json.Kind.Object,
                 ...base,
                 members: Object.keys(parsed).map(key => {
                     const member = {
-                        kind: JsonKind.RightPadded,
+                        kind: Json.Kind.RightPadded,
                         element: this.member(parsed, key),
-                        after: space(this.whitespace())
-                    } as JsonRightPadded<Member>;
+                        after: space(this.whitespace()),
+                        markers: emptyMarkers
+                    } as Json.RightPadded<Json.Member>;
                     this.cursor++;
                     return member;
                 })
-            } as JsonObject;
+            } as Json.Object;
         } else if (typeof parsed === "string") {
             this.cursor += parsed.length + 2;
             return {
-                kind: JsonKind.Literal,
+                kind: Json.Kind.Literal,
                 ...base,
                 source: `"${parsed}"`,
                 value: parsed
-            } as Literal;
+            } as Json.Literal;
         } else if (typeof parsed === "number") {
             this.cursor += parsed.toString().length;
             return {
-                kind: JsonKind.Literal,
+                kind: Json.Kind.Literal,
                 ...base,
                 source: parsed.toString(),
-                value: parsed.toString(),
-            } as Literal;
+                value: parsed,
+            } as Json.Literal;
         } else {
             throw new Error(`Unsupported JSON type: ${parsed}`);
         }
@@ -119,17 +109,17 @@ class ParseJsonReader extends ParserSourceReader {
 
     private member(parsed: any, key: string) {
         return {
-            kind: JsonKind.Member,
+            kind: Json.Kind.Member,
             id: randomId(),
             prefix: emptySpace,
             markers: emptyMarkers,
             key: {
-                kind: JsonKind.RightPadded,
+                kind: Json.Kind.RightPadded,
                 markers: emptyMarkers,
                 element: this.json(key),
                 after: space(this.sourceBefore(":")),
             },
             value: this.json(parsed[key])
-        } as Member;
+        } as Json.Member;
     }
 }

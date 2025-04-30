@@ -121,9 +121,11 @@ export abstract class TreeVisitor<T extends Tree, P> {
     }
 
     protected async visitMarkers(markers: Markers, p: P): Promise<Markers> {
-        if (markers === emptyMarkers) {
+        if (markers === undefined) {
             return emptyMarkers;
-        } else if (markers.markers.length === 0) {
+        } else if (markers === emptyMarkers) {
+            return emptyMarkers;
+        } else if (markers.markers?.length || 0 === 0) {
             return markers;
         }
         return produceAsync<Markers>(markers, async (draft) => {

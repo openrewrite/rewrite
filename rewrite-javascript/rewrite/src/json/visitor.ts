@@ -14,20 +14,7 @@
  * limitations under the License.
  */
 import {mapAsync, produceAsync, SourceFile, TreeVisitor, ValidImmerRecipeReturnType} from "../";
-import {
-    Empty,
-    Identifier,
-    isJson,
-    Json,
-    JsonArray,
-    JsonDocument,
-    JsonKind,
-    JsonObject,
-    JsonRightPadded,
-    Literal,
-    Member,
-    Space
-} from "./tree";
+import {isJson, Json} from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
 
 export class JsonVisitor<P> extends TreeVisitor<Json, P> {
@@ -35,53 +22,53 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
         return isJson(sourceFile);
     }
 
-    protected async visitArray(array: JsonArray, p: P): Promise<Json | undefined> {
-        return this.produceJson<JsonArray>(array, p, async draft => {
+    protected async visitArray(array: Json.Array, p: P): Promise<Json | undefined> {
+        return this.produceJson<Json.Array>(array, p, async draft => {
             draft.values = await mapAsync(array.values, value => this.visitRightPadded(value, p));
         })
     }
 
-    protected async visitDocument(document: JsonDocument, p: P): Promise<Json | undefined> {
-        return this.produceJson<JsonDocument>(document, p, async draft => {
+    protected async visitDocument(document: Json.Document, p: P): Promise<Json | undefined> {
+        return this.produceJson<Json.Document>(document, p, async draft => {
             draft.value = await this.visitDefined(document.value, p);
             draft.eof = await this.visitSpace(document.eof, p);
         })
     }
 
-    protected async visitEmpty(empty: Empty, p: P): Promise<Json | undefined> {
+    protected async visitEmpty(empty: Json.Empty, p: P): Promise<Json | undefined> {
         return this.produceJson(empty, p)
     }
 
-    protected async visitIdentifier(identifier: Identifier, p: P): Promise<Json | undefined> {
+    protected async visitIdentifier(identifier: Json.Identifier, p: P): Promise<Json | undefined> {
         return this.produceJson(identifier, p)
     }
 
-    protected async visitLiteral(literal: Literal, p: P): Promise<Json | undefined> {
+    protected async visitLiteral(literal: Json.Literal, p: P): Promise<Json | undefined> {
         return this.produceJson(literal, p)
     }
 
-    protected async visitMember(member: Member, p: P): Promise<Json | undefined> {
-        return this.produceJson<Member>(member, p, async draft => {
+    protected async visitMember(member: Json.Member, p: P): Promise<Json | undefined> {
+        return this.produceJson<Json.Member>(member, p, async draft => {
             draft.key = (await this.visitRightPadded(member.key, p))!;
             draft.value = await this.visitDefined(member.value, p);
         });
     }
 
-    protected async visitObject(jsonObject: JsonObject, p: P): Promise<Json | undefined> {
-        return this.produceJson<JsonObject>(jsonObject, p, async draft => {
+    protected async visitObject(jsonObject: Json.Object, p: P): Promise<Json | undefined> {
+        return this.produceJson<Json.Object>(jsonObject, p, async draft => {
             draft.members = await mapAsync(jsonObject.members, member => this.visitRightPadded(member, p));
         });
     }
 
-    protected async visitRightPadded<T extends Json>(right: JsonRightPadded<T>, p: P):
-        Promise<JsonRightPadded<T> | undefined> {
-        return produceAsync<JsonRightPadded<T>>(right, async draft => {
+    protected async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: P):
+        Promise<Json.RightPadded<T> | undefined> {
+        return produceAsync<Json.RightPadded<T>>(right, async draft => {
             draft.element = await this.visitDefined(right.element, p);
             draft.after = await this.visitSpace(right.after, p)
         });
     }
 
-    protected async visitSpace(space: Space, p: P): Promise<Space> {
+    protected async visitSpace(space: Json.Space, p: P): Promise<Json.Space> {
         return space;
     }
 
@@ -91,7 +78,10 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
         recipe?: (draft: Draft<J>) =>
             ValidImmerRecipeReturnType<Draft<J>> |
             PromiseLike<ValidImmerRecipeReturnType<Draft<J>>>
-    ): Promise<J> {
+    ): Promise<J | undefined> {
+        if (before === undefined) {
+            return undefined;
+        }
         const draft: Draft<J> = createDraft(before as J);
         (draft as Draft<Json>).prefix = await this.visitSpace(before!.prefix, p);
         (draft as Draft<Json>).markers = await this.visitMarkers(before!.markers, p);
@@ -103,20 +93,20 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
 
     protected accept(t: Json, p: P): Promise<Json | undefined> {
         switch (t.kind) {
-            case JsonKind.Array:
-                return this.visitArray(t as JsonArray, p);
-            case JsonKind.Document:
-                return this.visitDocument(t as JsonDocument, p);
-            case JsonKind.Empty:
-                return this.visitEmpty(t as Empty, p);
-            case JsonKind.Identifier:
-                return this.visitIdentifier(t as Identifier, p);
-            case JsonKind.Literal:
-                return this.visitLiteral(t as Literal, p);
-            case JsonKind.Member:
-                return this.visitMember(t as Member, p);
-            case JsonKind.Object:
-                return this.visitObject(t as JsonObject, p);
+            case Json.Kind.Array:
+                return this.visitArray(t as Json.Array, p);
+            case Json.Kind.Document:
+                return this.visitDocument(t as Json.Document, p);
+            case Json.Kind.Empty:
+                return this.visitEmpty(t as Json.Empty, p);
+            case Json.Kind.Identifier:
+                return this.visitIdentifier(t as Json.Identifier, p);
+            case Json.Kind.Literal:
+                return this.visitLiteral(t as Json.Literal, p);
+            case Json.Kind.Member:
+                return this.visitMember(t as Json.Member, p);
+            case Json.Kind.Object:
+                return this.visitObject(t as Json.Object, p);
             default:
                 throw new Error(`Unexpected JSON kind ${t.kind}`);
         }

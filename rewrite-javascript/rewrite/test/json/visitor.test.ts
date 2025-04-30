@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Empty, emptySpace, Json, JsonDocument, JsonKind, JsonVisitor} from "../../src/json";
+import {emptySpace, Json, JsonVisitor} from "../../src/json";
 import {emptyMarkers, randomId, Tree} from "../../src";
 
 class SetEmptySpace extends JsonVisitor<number> {
-    protected async visitEmpty(empty: Empty, p: number): Promise<Json | undefined> {
-        return this.produceJson<Empty>(
+    protected async visitEmpty(empty: Json.Empty, p: number): Promise<Json | undefined> {
+        return this.produceJson<Json.Empty>(
             await super.visitEmpty(empty, p), p,
             draft => {
                 draft.prefix.whitespace = " "
@@ -30,7 +30,7 @@ class SetEmptySpace extends JsonVisitor<number> {
 describe('visiting JSON', () => {
 
     test('preVisit', async () => {
-        const partialDocument = {kind: JsonKind.Document};
+        const partialDocument = {kind: Json.Kind.Document};
         const visitor = new class extends JsonVisitor<number> {
             protected async preVisit(j: Json, p: number): Promise<Json | undefined> {
                 return this.produceJson<Json>(j, p, async draft => {
@@ -42,15 +42,15 @@ describe('visiting JSON', () => {
     });
 
     test('calls super', async () => {
-        const empty: Empty = {
-            kind: JsonKind.Empty,
+        const empty: Json.Empty = {
+            kind: Json.Kind.Empty,
             id: randomId(),
             prefix: emptySpace,
             markers: emptyMarkers,
         }
 
-        const json: JsonDocument = {
-            kind: JsonKind.Document,
+        const json: Json.Document = {
+            kind: Json.Kind.Document,
             id: randomId(),
             prefix: emptySpace,
             markers: emptyMarkers,
@@ -59,7 +59,7 @@ describe('visiting JSON', () => {
             eof: emptySpace,
         }
 
-        const after = await new SetEmptySpace().visit<JsonDocument>(json, 0)
+        const after = await new SetEmptySpace().visit<Json.Document>(json, 0)
         expect(after!.value.prefix.whitespace).toBe(' ')
     });
 });

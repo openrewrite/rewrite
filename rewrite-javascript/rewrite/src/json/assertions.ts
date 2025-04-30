@@ -15,11 +15,11 @@
  */
 import {AfterRecipe, dedentAfter, SourceSpec} from "../test";
 import {JsonParser} from "./parser";
-import {JsonDocument, JsonKind} from "./tree";
+import {Json} from "./tree";
 
-export function json(before: string | null, after?: AfterRecipe): SourceSpec<JsonDocument> {
+export function json(before: string | null, after?: AfterRecipe): SourceSpec<Json.Document> {
     return {
-        kind: JsonKind.Document,
+        kind: Json.Kind.Document,
         before: before,
         after: dedentAfter(after),
         ext: 'json',
