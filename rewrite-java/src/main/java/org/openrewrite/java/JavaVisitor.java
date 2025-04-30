@@ -856,22 +856,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         m = m.withLeadingAnnotations(ListUtils.map(m.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         m = m.withModifiers(ListUtils.map(m.getModifiers(), e -> visitAndCast(e, p)));
-        J.TypeParameters typeParameters = m.getAnnotations().getTypeParameters();
-        if (typeParameters != null) {
-            m = m.getAnnotations().withTypeParameters(typeParameters.withAnnotations(
-                    ListUtils.map(typeParameters.getAnnotations(), a -> visitAndCast(a, p))
-            ));
-        }
-        typeParameters = m.getAnnotations().getTypeParameters();
-        if (typeParameters != null) {
-            m = m.getAnnotations().withTypeParameters(
-                    typeParameters.getPadding().withTypeParameters(
-                            ListUtils.map(typeParameters.getPadding().getTypeParameters(),
-                                    tp -> visitRightPadded(tp, JRightPadded.Location.TYPE_PARAMETER, p)
-                            )
-                    )
-            );
-        }
+        m = m.getAnnotations().withTypeParameters((J.TypeParameters) visit(m.getAnnotations().getTypeParameters(), p));
         m = m.withReturnTypeExpression(visitAndCast(m.getReturnTypeExpression(), p));
         m = m.withReturnTypeExpression(
                 m.getReturnTypeExpression() == null ?
@@ -1258,6 +1243,19 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             t = t.getPadding().withBounds(visitContainer(t.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, p));
         }
         t = t.getPadding().withBounds(visitTypeNames(t.getPadding().getBounds(), p));
+        return t;
+    }
+
+    public J visitTypeParameters(J.TypeParameters typeParameters, P p) {
+        J.TypeParameters t = typeParameters;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.TYPE_PARAMETERS_PREFIX, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.withAnnotations(ListUtils.map(t.getAnnotations(), a -> visitAndCast(a, p)));
+        t = t.getPadding().withTypeParameters(
+                ListUtils.map(t.getPadding().getTypeParameters(),
+                        tp -> visitRightPadded(tp, JRightPadded.Location.TYPE_PARAMETER, p)
+                )
+        );
         return t;
     }
 

@@ -344,7 +344,6 @@ public interface J extends Tree, RpcCodec<J> {
         @Nullable
         List<J.Annotation> annotations;
 
-        @Nullable // nullable for backwards compatibility only
         JLeftPadded<Space> dimension;
 
         JavaType type;
@@ -5745,6 +5744,11 @@ public interface J extends Tree, RpcCodec<J> {
         List<Annotation> annotations;
 
         List<JRightPadded<TypeParameter>> typeParameters;
+
+        @Override
+        public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitTypeParameters(this, p);
+        }
 
         public List<TypeParameter> getTypeParameters() {
             return JRightPadded.getElements(typeParameters);

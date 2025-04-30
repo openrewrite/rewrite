@@ -356,6 +356,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withModifiers(q.receiveList(method.getModifiers(), m -> (J.Modifier) visitNonNull(m, q)))
                 .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitTypeParameters(tp, q)))
                 .withReturnTypeExpression(q.receive(method.getReturnTypeExpression(), rt -> (TypeTree) visitNonNull(rt, q)))
+                .getAnnotations().withName(method.getAnnotations().getName().withAnnotations(q.receiveList(method.getAnnotations().getName().getAnnotations(), a -> (J.Annotation) visitNonNull(a, q))))
                 .withName(q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q)))
                 .getPadding().withParameters(q.receive(method.getPadding().getParameters(), p -> visitContainer(p, q)))
                 .getPadding().withThrows(q.receive(method.getPadding().getThrows(), t -> visitContainer(t, q)))
@@ -514,8 +515,10 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getPadding().withBounds(q.receive(typeParam.getPadding().getBounds(), b -> visitContainer(b, q)));
     }
 
-    private J.TypeParameters visitTypeParameters(J.TypeParameters typeParameters, RpcReceiveQueue q) {
+    @Override
+    public J.TypeParameters visitTypeParameters(J.TypeParameters typeParameters, RpcReceiveQueue q) {
         return typeParameters
+                .withAnnotations(q.receiveList(typeParameters.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .getPadding().withTypeParameters(q.receiveList(typeParameters.getPadding().getTypeParameters(), p -> visitRightPadded(p, q)));
     }
 

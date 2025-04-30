@@ -341,6 +341,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.TypeParameters visitTypeParameters(J.TypeParameters typeParameters, P p) {
+        return (J.TypeParameters) super.visitTypeParameters(typeParameters, p);
+    }
+
+    @Override
     public J.Unary visitUnary(J.Unary unary, P p) {
         return (J.Unary) super.visitUnary(unary, p);
     }

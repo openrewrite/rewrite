@@ -46,7 +46,6 @@ import {
     ForLoop,
     ForLoopControl,
     Identifier,
-    IdentifierWithAnnotations,
     If,
     IfElse,
     Import,
@@ -648,6 +647,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSendList(method, m => m.modifiers, mod => mod.id, mod => this.visit(mod, q));
         await q.getAndSend(method, m => m.typeParameters, params => this.visit(params, q));
         await q.getAndSend(method, m => m.returnTypeExpression, type => this.visit(type, q));
+        await q.getAndSendList(method, m => m.nameAnnotations, name => this.visit(name, q));
         await q.getAndSend(method, m => m.name, name => this.visit(name, q));
         await q.getAndSend(method, m => m.parameters, params => this.visitContainer(params, q));
         await q.getAndSend(method, m => m.throws, throws => this.visitContainer(throws, q));
@@ -655,13 +655,6 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(method, m => m.defaultValue, def => this.visitLeftPadded(def, q));
 
         return method;
-    }
-
-    protected async visitIdentifierWithAnnotations(identWithAnnot: IdentifierWithAnnotations, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(identWithAnnot, i => i.identifier, identifier => this.visit(identifier, q));
-        await q.getAndSendList(identWithAnnot, i => i.annotations, annot => annot.id, annot => this.visit(annot, q));
-
-        return identWithAnnot;
     }
 
     protected async visitVariableDeclarations(varDecls: VariableDeclarations, q: RpcSendQueue): Promise<J | undefined> {
@@ -1339,6 +1332,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const draft = createDraft(typeParameter);
 
         draft.annotations = await q.receiveListDefined(typeParameter.annotations, annot => this.visit(annot, q));
+        draft.modifiers = await q.receiveListDefined(typeParameter.modifiers, annot => this.visit(annot, q));
         draft.name = await q.receive(typeParameter.name, name => this.visit(name, q));
         draft.bounds = await q.receive(typeParameter.bounds, bounds => this.visitContainer(bounds, q));
 
@@ -1432,20 +1426,12 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         draft.modifiers = await q.receiveListDefined(method.modifiers, mod => this.visit(mod, q));
         draft.typeParameters = await q.receive(method.typeParameters, params => this.visit(params, q));
         draft.returnTypeExpression = await q.receive(method.returnTypeExpression, type => this.visit(type, q));
+        draft.nameAnnotations = (await q.receiveList(method.nameAnnotations, name => this.visit(name, q)))!;
         draft.name = await q.receive(method.name, name => this.visit(name, q));
         draft.parameters = await q.receive(method.parameters, params => this.visitContainer(params, q));
         draft.throws = await q.receive(method.throws, throws => this.visitContainer(throws, q));
         draft.body = await q.receive(method.body, body => this.visit(body, q));
         draft.defaultValue = await q.receive(method.defaultValue, def => this.visitLeftPadded(def, q));
-
-        return finishDraft(draft);
-    }
-
-    protected async visitIdentifierWithAnnotations(idWithAnn: IdentifierWithAnnotations, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(idWithAnn);
-
-        draft.identifier = await q.receive(idWithAnn.identifier, id => this.visit(id, q));
-        draft.annotations = await q.receiveListDefined(idWithAnn.annotations, annot => this.visit(annot, q));
 
         return finishDraft(draft);
     }

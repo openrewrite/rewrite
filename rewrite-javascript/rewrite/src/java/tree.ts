@@ -60,7 +60,6 @@ export const JavaKind = {
     Literal: "org.openrewrite.java.tree.J$Literal",
     MemberReference: "org.openrewrite.java.tree.J$MemberReference",
     MethodDeclaration: "org.openrewrite.java.tree.J$MethodDeclaration",
-    IdentifierWithAnnotations: "org.openrewrite.java.tree.J$MethodDeclaration$IdentifierWithAnnotations",
     MethodInvocation: "org.openrewrite.java.tree.J$MethodInvocation",
     Modifier: "org.openrewrite.java.tree.J$Modifier",
     MultiCatch: "org.openrewrite.java.tree.J$MultiCatch",
@@ -521,18 +520,13 @@ export interface MethodDeclaration extends J {
     readonly modifiers: Modifier[];
     readonly typeParameters?: TypeParameters;
     readonly returnTypeExpression?: TypeTree;
-    readonly name: IdentifierWithAnnotations;
+    readonly nameAnnotations: Annotation[];
+    readonly name: Identifier;
     readonly parameters: JContainer<Statement>;
     readonly throws: JContainer<NameTree>;
     readonly body?: Block;
     readonly defaultValue?: JLeftPadded<Expression>;
     readonly methodType?: JavaType.Method;
-}
-
-export interface IdentifierWithAnnotations extends J {
-    readonly kind: typeof JavaKind.IdentifierWithAnnotations;
-    readonly identifier: Identifier;
-    readonly annotations: Annotation[];
 }
 
 export interface MethodInvocation extends J, TypedTree {

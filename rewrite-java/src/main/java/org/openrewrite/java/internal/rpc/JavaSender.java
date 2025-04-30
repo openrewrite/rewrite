@@ -350,8 +350,9 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitMethodDeclaration(J.MethodDeclaration method, RpcSendQueue q) {
         q.getAndSendList(method, J.MethodDeclaration::getLeadingAnnotations, Tree::getId, a -> visit(a, q));
         q.getAndSendList(method, J.MethodDeclaration::getModifiers, Tree::getId, m -> visit(m, q));
-        q.getAndSend(method, J.MethodDeclaration::getTypeParameters, params -> visit(params, q));
+        q.getAndSend(method, m -> m.getPadding().getTypeParameters(), params -> visit(params, q));
         q.getAndSend(method, J.MethodDeclaration::getReturnTypeExpression, type -> visit(type, q));
+        q.getAndSendList(method, m -> m.getAnnotations().getName().getAnnotations(), J.Annotation::getId, name -> visit(name, q));
         q.getAndSend(method, J.MethodDeclaration::getName, name -> visit(name, q));
         q.getAndSend(method, m -> m.getPadding().getParameters(), params -> visitContainer(params, q));
         q.getAndSend(method, m -> m.getPadding().getThrows(), thr -> visitContainer(thr, q));
@@ -515,6 +516,14 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(typeParam, J.TypeParameter::getName, name -> visit(name, q));
         q.getAndSend(typeParam, t -> t.getPadding().getBounds(), bounds -> visitContainer(bounds, q));
         return typeParam;
+    }
+
+    @Override
+    public J visitTypeParameters(J.TypeParameters typeParameters, RpcSendQueue q) {
+        q.getAndSendList(typeParameters, J.TypeParameters::getAnnotations, J.Annotation::getId, annot -> visit(annot, q));
+        q.getAndSendList(typeParameters, t -> t.getPadding().getTypeParameters(), r -> r.getElement().getId(),
+                mod -> visitRightPadded(mod, q));
+        return typeParameters;
     }
 
     @Override

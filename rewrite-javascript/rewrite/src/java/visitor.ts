@@ -45,7 +45,6 @@ import {
     ForLoop,
     ForLoopControl,
     Identifier,
-    IdentifierWithAnnotations,
     If,
     IfElse,
     Import,
@@ -365,13 +364,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitIdentifierWithAnnotations(idWithAnn: IdentifierWithAnnotations, p: P): Promise<J | undefined> {
-        return this.produceJava<IdentifierWithAnnotations>(idWithAnn, p, async draft => {
-            draft.identifier = await this.visitDefined(idWithAnn.identifier, p) as Identifier;
-            draft.annotations = await mapAsync(idWithAnn.annotations, a => this.visitDefined<Annotation>(a, p));
-        });
-    }
-
     protected async visitIf(iff: If, p: P): Promise<J | undefined> {
         return this.produceJava<If>(iff, p, async draft => {
             draft.ifCondition = await this.visitDefined(iff.ifCondition, p) as ControlParentheses<Expression>;
@@ -468,7 +460,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
                 draft.returnTypeExpression = await this.visitDefined(methodDecl.returnTypeExpression, p) as TypeTree;
             }
 
-            draft.name = await this.visitDefined(methodDecl.name, p) as IdentifierWithAnnotations;
+            draft.nameAnnotations = await mapAsync(methodDecl.nameAnnotations, a => this.visitDefined<Annotation>(a, p));
+            draft.name = await this.visitDefined(methodDecl.name, p);
             draft.parameters = await this.visitContainer(methodDecl.parameters, p);
             draft.throws = await this.visitContainer(methodDecl.throws, p);
 
@@ -862,8 +855,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
                 return this.visitForLoopControl(t as ForLoopControl, p);
             case JavaKind.Identifier:
                 return this.visitIdentifier(t as Identifier, p);
-            case JavaKind.IdentifierWithAnnotations:
-                return this.visitIdentifierWithAnnotations(t as IdentifierWithAnnotations, p);
             case JavaKind.If:
                 return this.visitIf(t as If, p);
             case JavaKind.IfElse:
