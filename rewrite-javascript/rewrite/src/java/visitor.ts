@@ -15,90 +15,14 @@
  */
 import {mapAsync, produceAsync, SourceFile, TreeVisitor, ValidImmerRecipeReturnType} from "../";
 import {
-    Annotation,
-    AnnotatedType,
-    ArrayAccess,
-    ArrayDimension,
-    ArrayType,
-    Assert,
-    Assignment,
-    AssignmentOperation,
-    Binary,
-    Block,
-    Break,
-    Case,
-    ClassDeclaration,
-    ClassDeclarationKind,
-    CompilationUnit,
-    Continue,
-    ControlParentheses,
-    DeconstructionPattern,
-    DoWhileLoop,
-    Empty,
-    EnumValue,
-    EnumValueSet,
-    Erroneous,
     Expression,
-    FieldAccess,
-    ForEachLoop,
-    ForEachLoopControl,
-    ForLoop,
-    ForLoopControl,
-    Identifier,
-    If,
-    IfElse,
-    Import,
-    InstanceOf,
-    IntersectionType,
     isJava,
     isSpace,
     J,
-    JavaKind,
-    JLeftPadded,
-    JRightPadded,
-    JContainer,
-    Label,
-    Lambda,
-    LambdaParameters,
-    Literal,
-    MemberReference,
-    MethodDeclaration,
-    MethodInvocation,
-    Modifier,
-    MultiCatch,
     NameTree,
-    NewArray,
-    NewClass,
-    NullableType,
-    Package,
-    ParameterizedType,
-    Parentheses,
-    ParenthesizedTypeTree,
-    Primitive,
-    Return,
-    Space,
     Statement,
-    Switch,
-    SwitchExpression,
-    Synchronized,
-    Ternary,
-    Throw,
-    Try,
-    TryResource,
-    TryCatch,
-    TypeCast,
-    TypeParameter,
-    TypeParameters,
     TypeTree,
     TypedTree,
-    Unary,
-    Unknown,
-    UnknownSource,
-    VariableDeclarations,
-    Variable,
-    WhileLoop,
-    Wildcard,
-    Yield,
     JavaType
 } from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
@@ -121,7 +45,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected async visitSpace(space: Space, _p: P): Promise<Space> {
+    protected async visitSpace(space: J.Space, _p: P): Promise<J.Space> {
         return space;
     }
 
@@ -135,59 +59,59 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return nameTree;
     }
 
-    protected async visitAnnotatedType(annotatedType: AnnotatedType, p: P): Promise<J | undefined> {
-        return this.produceJava<AnnotatedType>(annotatedType, p, async draft => {
-            draft.annotations = await mapAsync(annotatedType.annotations, a => this.visitDefined<Annotation>(a, p));
+    protected async visitAnnotatedType(annotatedType: J.AnnotatedType, p: P): Promise<J | undefined> {
+        return this.produceJava<J.AnnotatedType>(annotatedType, p, async draft => {
+            draft.annotations = await mapAsync(annotatedType.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.typeExpression = await this.visitDefined(annotatedType.typeExpression, p) as TypeTree;
         });
     }
 
-    protected async visitAnnotation(annotation: Annotation, p: P): Promise<J | undefined> {
-        return this.produceJava<Annotation>(annotation, p, async draft => {
+    protected async visitAnnotation(annotation: J.Annotation, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Annotation>(annotation, p, async draft => {
             draft.annotationType = await this.visitTypeName(annotation.annotationType, p);
             draft.arguments = await this.visitOptionalContainer(annotation.arguments, p);
         });
     }
 
-    protected async visitArrayAccess(arrayAccess: ArrayAccess, p: P): Promise<J | undefined> {
-        return this.produceJava<ArrayAccess>(arrayAccess, p, async draft => {
+    protected async visitArrayAccess(arrayAccess: J.ArrayAccess, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ArrayAccess>(arrayAccess, p, async draft => {
             draft.indexed = await this.visitDefined(arrayAccess.indexed, p) as Expression;
-            draft.dimension = await this.visitDefined(arrayAccess.dimension, p) as ArrayDimension;
+            draft.dimension = await this.visitDefined(arrayAccess.dimension, p) as J.ArrayDimension;
         });
     }
 
-    protected async visitArrayDimension(arrayDimension: ArrayDimension, p: P): Promise<J | undefined> {
-        return this.produceJava<ArrayDimension>(arrayDimension, p, async draft => {
+    protected async visitArrayDimension(arrayDimension: J.ArrayDimension, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ArrayDimension>(arrayDimension, p, async draft => {
             draft.index = await this.visitRightPadded(arrayDimension.index, p);
         });
     }
 
-    protected async visitArrayType(arrayType: ArrayType, p: P): Promise<J | undefined> {
-        return this.produceJava<ArrayType>(arrayType, p, async draft => {
+    protected async visitArrayType(arrayType: J.ArrayType, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ArrayType>(arrayType, p, async draft => {
             draft.elementType = await this.visitDefined(arrayType.elementType, p) as TypeTree;
             if (arrayType.annotations) {
-                draft.annotations = await mapAsync(arrayType.annotations, a => this.visitDefined<Annotation>(a, p));
+                draft.annotations = await mapAsync(arrayType.annotations, a => this.visitDefined<J.Annotation>(a, p));
             }
         });
     }
 
-    protected async visitAssert(assert_: Assert, p: P): Promise<J | undefined> {
-        return this.produceJava<Assert>(assert_, p, async draft => {
+    protected async visitAssert(assert_: J.Assert, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Assert>(assert_, p, async draft => {
             draft.condition = await this.visitDefined(assert_.condition, p) as Expression;
             draft.detail = await this.visitOptionalLeftPadded(assert_.detail, p);
         });
     }
 
-    protected async visitAssignment(assignment: Assignment, p: P): Promise<J | undefined> {
-        return this.produceJava<Assignment>(assignment, p, async draft => {
+    protected async visitAssignment(assignment: J.Assignment, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Assignment>(assignment, p, async draft => {
             draft.variable = await this.visitDefined(assignment.variable, p) as Expression;
             draft.assignment = await this.visitLeftPadded(assignment.assignment, p);
             draft.type = await this.visitType(assignment.type, p);
         });
     }
 
-    protected async visitAssignmentOperation(assignOp: AssignmentOperation, p: P): Promise<J | undefined> {
-        return this.produceJava<AssignmentOperation>(assignOp, p, async draft => {
+    protected async visitAssignmentOperation(assignOp: J.AssignmentOperation, p: P): Promise<J | undefined> {
+        return this.produceJava<J.AssignmentOperation>(assignOp, p, async draft => {
             draft.variable = await this.visitDefined(assignOp.variable, p) as Expression;
             draft.operator = await this.visitLeftPadded(assignOp.operator, p);
             draft.assignment = await this.visitDefined(assignOp.assignment, p) as Expression;
@@ -195,8 +119,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitBinary(binary: Binary, p: P): Promise<J | undefined> {
-        return this.produceJava<Binary>(binary, p, async draft => {
+    protected async visitBinary(binary: J.Binary, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Binary>(binary, p, async draft => {
             draft.left = await this.visitDefined(binary.left, p) as Expression;
             draft.operator = await this.visitLeftPadded(binary.operator, p);
             draft.right = await this.visitDefined(binary.right, p) as Expression;
@@ -204,24 +128,24 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitBlock(block: Block, p: P): Promise<J | undefined> {
-        return this.produceJava<Block>(block, p, async draft => {
+    protected async visitBlock(block: J.Block, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Block>(block, p, async draft => {
             draft.static = await this.visitRightPadded(block.static, p);
             draft.statements = await mapAsync(block.statements, stmt => this.visitRightPadded(stmt, p));
             draft.end = await this.visitSpace(block.end, p);
         });
     }
 
-    protected async visitBreak(breakStatement: Break, p: P): Promise<J | undefined> {
-        return this.produceJava<Break>(breakStatement, p, async draft => {
+    protected async visitBreak(breakStatement: J.Break, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Break>(breakStatement, p, async draft => {
             if (breakStatement.label) {
-                draft.label = await this.visitDefined(breakStatement.label, p) as Identifier;
+                draft.label = await this.visitDefined(breakStatement.label, p) as J.Identifier;
             }
         });
     }
 
-    protected async visitCase(case_: Case, p: P): Promise<J | undefined> {
-        return this.produceJava<Case>(case_, p, async draft => {
+    protected async visitCase(case_: J.Case, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Case>(case_, p, async draft => {
             draft.caseLabels = await this.visitContainer(case_.caseLabels, p);
             draft.statements = await this.visitContainer(case_.statements, p);
             draft.body = await this.visitOptionalRightPadded(case_.body, p);
@@ -231,161 +155,161 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitClassDeclaration(classDecl: ClassDeclaration, p: P): Promise<J | undefined> {
-        return this.produceJava<ClassDeclaration>(classDecl, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(classDecl.leadingAnnotations, a => this.visitDefined<Annotation>(a, p));
-            draft.modifiers = await mapAsync(classDecl.modifiers, m => this.visitDefined<Modifier>(m, p));
-            draft.classKind = await this.visitDefined(classDecl.classKind, p) as ClassDeclarationKind;
-            draft.name = await this.visitDefined(classDecl.name, p) as Identifier;
+    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ClassDeclaration>(classDecl, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(classDecl.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p));
+            draft.modifiers = await mapAsync(classDecl.modifiers, m => this.visitDefined<J.Modifier>(m, p));
+            draft.classKind = await this.visitDefined(classDecl.classKind, p) as J.ClassDeclarationKind;
+            draft.name = await this.visitDefined(classDecl.name, p) as J.Identifier;
             draft.typeParameters = await this.visitOptionalContainer(classDecl.typeParameters, p);
             draft.primaryConstructor = await this.visitOptionalContainer(classDecl.primaryConstructor, p);
             draft.extends = await this.visitOptionalLeftPadded(classDecl.extends, p);
             draft.implements = await this.visitOptionalContainer(classDecl.implements, p);
             draft.permitting = await this.visitOptionalContainer(classDecl.permitting, p);
-            draft.body = await this.visitDefined(classDecl.body, p) as Block;
+            draft.body = await this.visitDefined(classDecl.body, p) as J.Block;
             draft.type = await this.visitType(classDecl.type, p) as JavaType.Class | undefined;
         });
     }
 
-    protected async visitClassDeclarationKind(kind: ClassDeclarationKind, p: P): Promise<J | undefined> {
-        return this.produceJava<ClassDeclarationKind>(kind, p, async draft => {
-            draft.annotations = await mapAsync(kind.annotations, a => this.visitDefined<Annotation>(a, p));
+    protected async visitClassDeclarationKind(kind: J.ClassDeclarationKind, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ClassDeclarationKind>(kind, p, async draft => {
+            draft.annotations = await mapAsync(kind.annotations, a => this.visitDefined<J.Annotation>(a, p));
         });
     }
 
-    protected async visitCompilationUnit(cu: CompilationUnit, p: P): Promise<J | undefined> {
-        return this.produceJava<CompilationUnit>(cu, p, async draft => {
-            draft.packageDeclaration = await this.visitRightPadded(cu.packageDeclaration, p) as JRightPadded<Package>;
+    protected async visitCompilationUnit(cu: J.CompilationUnit, p: P): Promise<J | undefined> {
+        return this.produceJava<J.CompilationUnit>(cu, p, async draft => {
+            draft.packageDeclaration = await this.visitRightPadded(cu.packageDeclaration, p) as J.RightPadded<J.Package>;
             draft.imports = await mapAsync(cu.imports, imp => this.visitRightPadded(imp, p));
-            draft.classes = await mapAsync(cu.classes, cls => this.visitDefined(cls, p) as Promise<ClassDeclaration>);
+            draft.classes = await mapAsync(cu.classes, cls => this.visitDefined(cls, p) as Promise<J.ClassDeclaration>);
             draft.eof = await this.visitSpace(cu.eof, p);
         });
     }
 
-    protected async visitContinue(continueStatement: Continue, p: P): Promise<J | undefined> {
-        return this.produceJava<Continue>(continueStatement, p, async draft => {
+    protected async visitContinue(continueStatement: J.Continue, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Continue>(continueStatement, p, async draft => {
             if (continueStatement.label) {
-                draft.label = await this.visitDefined(continueStatement.label, p) as Identifier;
+                draft.label = await this.visitDefined(continueStatement.label, p) as J.Identifier;
             }
         });
     }
 
-    protected async visitControlParentheses<T extends J>(controlParens: ControlParentheses<T>, p: P): Promise<J | undefined> {
-        return this.produceJava<ControlParentheses<T>>(controlParens, p, async draft => {
-            (draft.tree as JRightPadded<J>) = await this.visitRightPadded(controlParens.tree, p);
+    protected async visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ControlParentheses<T>>(controlParens, p, async draft => {
+            (draft.tree as J.RightPadded<J>) = await this.visitRightPadded(controlParens.tree, p);
         });
     }
 
-    protected async visitDeconstructionPattern(pattern: DeconstructionPattern, p: P): Promise<J | undefined> {
-        return this.produceJava<DeconstructionPattern>(pattern, p, async draft => {
+    protected async visitDeconstructionPattern(pattern: J.DeconstructionPattern, p: P): Promise<J | undefined> {
+        return this.produceJava<J.DeconstructionPattern>(pattern, p, async draft => {
             draft.deconstructor = await this.visitDefined(pattern.deconstructor, p) as Expression;
             draft.nested = await this.visitContainer(pattern.nested, p);
             draft.type = await this.visitType(pattern.type, p);
         });
     }
 
-    protected async visitDoWhileLoop(doWhileLoop: DoWhileLoop, p: P): Promise<J | undefined> {
-        return this.produceJava<DoWhileLoop>(doWhileLoop, p, async draft => {
+    protected async visitDoWhileLoop(doWhileLoop: J.DoWhileLoop, p: P): Promise<J | undefined> {
+        return this.produceJava<J.DoWhileLoop>(doWhileLoop, p, async draft => {
             draft.body = await this.visitRightPadded(doWhileLoop.body, p);
             draft.whileCondition = await this.visitLeftPadded(doWhileLoop.whileCondition, p);
         });
     }
 
-    protected async visitEmpty(empty: Empty, p: P): Promise<J | undefined> {
-        return this.produceJava<Empty>(empty, p);
+    protected async visitEmpty(empty: J.Empty, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Empty>(empty, p);
     }
 
-    protected async visitEnumValue(enumValue: EnumValue, p: P): Promise<J | undefined> {
-        return this.produceJava<EnumValue>(enumValue, p, async draft => {
-            draft.annotations = await mapAsync(enumValue.annotations, a => this.visitDefined<Annotation>(a, p));
-            draft.name = await this.visitDefined(enumValue.name, p) as Identifier;
+    protected async visitEnumValue(enumValue: J.EnumValue, p: P): Promise<J | undefined> {
+        return this.produceJava<J.EnumValue>(enumValue, p, async draft => {
+            draft.annotations = await mapAsync(enumValue.annotations, a => this.visitDefined<J.Annotation>(a, p));
+            draft.name = await this.visitDefined(enumValue.name, p) as J.Identifier;
             if (enumValue.initializer) {
-                draft.initializer = await this.visitDefined(enumValue.initializer, p) as NewClass;
+                draft.initializer = await this.visitDefined(enumValue.initializer, p) as J.NewClass;
             }
         });
     }
 
-    protected async visitEnumValueSet(enumValueSet: EnumValueSet, p: P): Promise<J | undefined> {
-        return this.produceJava<EnumValueSet>(enumValueSet, p, async draft => {
+    protected async visitEnumValueSet(enumValueSet: J.EnumValueSet, p: P): Promise<J | undefined> {
+        return this.produceJava<J.EnumValueSet>(enumValueSet, p, async draft => {
             draft.enums = await mapAsync(enumValueSet.enums, e => this.visitRightPadded(e, p));
         });
     }
 
-    protected async visitErroneous(erroneous: Erroneous, p: P): Promise<J | undefined> {
-        return this.produceJava<Erroneous>(erroneous, p);
+    protected async visitErroneous(erroneous: J.Erroneous, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Erroneous>(erroneous, p);
     }
 
-    protected async visitFieldAccess(fieldAccess: FieldAccess, p: P): Promise<J | undefined> {
-        return this.produceJava<FieldAccess>(fieldAccess, p, async draft => {
+    protected async visitFieldAccess(fieldAccess: J.FieldAccess, p: P): Promise<J | undefined> {
+        return this.produceJava<J.FieldAccess>(fieldAccess, p, async draft => {
             draft.target = await this.visitDefined(fieldAccess.target, p) as Expression;
             draft.name = await this.visitLeftPadded(fieldAccess.name, p);
             draft.type = await this.visitType(fieldAccess.type, p);
         });
     }
 
-    protected async visitForEachLoop(forLoop: ForEachLoop, p: P): Promise<J | undefined> {
-        return this.produceJava<ForEachLoop>(forLoop, p, async draft => {
-            draft.control = await this.visitDefined(forLoop.control, p) as ForEachLoopControl;
+    protected async visitForEachLoop(forLoop: J.ForEachLoop, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ForEachLoop>(forLoop, p, async draft => {
+            draft.control = await this.visitDefined(forLoop.control, p) as J.ForEachLoopControl;
             draft.body = await this.visitRightPadded(forLoop.body, p);
         });
     }
 
-    protected async visitForEachLoopControl(control: ForEachLoopControl, p: P): Promise<J | undefined> {
-        return this.produceJava<ForEachLoopControl>(control, p, async draft => {
+    protected async visitForEachLoopControl(control: J.ForEachLoopControl, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ForEachLoopControl>(control, p, async draft => {
             draft.variable = await this.visitRightPadded(control.variable, p);
             draft.iterable = await this.visitRightPadded(control.iterable, p);
         });
     }
 
-    protected async visitForLoop(forLoop: ForLoop, p: P): Promise<J | undefined> {
-        return this.produceJava<ForLoop>(forLoop, p, async draft => {
-            draft.control = await this.visitDefined(forLoop.control, p) as ForLoopControl;
+    protected async visitForLoop(forLoop: J.ForLoop, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ForLoop>(forLoop, p, async draft => {
+            draft.control = await this.visitDefined(forLoop.control, p) as J.ForLoopControl;
             draft.body = await this.visitRightPadded(forLoop.body, p);
         });
     }
 
-    protected async visitForLoopControl(control: ForLoopControl, p: P): Promise<J | undefined> {
-        return this.produceJava<ForLoopControl>(control, p, async draft => {
+    protected async visitForLoopControl(control: J.ForLoopControl, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ForLoopControl>(control, p, async draft => {
             draft.init = await mapAsync(control.init, i => this.visitRightPadded(i, p));
             draft.condition = await this.visitOptionalRightPadded(control.condition, p);
             draft.update = await mapAsync(control.update, u => this.visitRightPadded(u, p));
         });
     }
 
-    protected async visitIdentifier(ident: Identifier, p: P): Promise<J | undefined> {
-        return this.produceJava<Identifier>(ident, p, async draft => {
-            draft.annotations = await mapAsync(ident.annotations, a => this.visitDefined<Annotation>(a, p));
+    protected async visitIdentifier(ident: J.Identifier, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Identifier>(ident, p, async draft => {
+            draft.annotations = await mapAsync(ident.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.type = await this.visitType(ident.type, p);
             draft.fieldType = await this.visitType(ident.fieldType, p) as JavaType.Variable | undefined;
         });
     }
 
-    protected async visitIf(iff: If, p: P): Promise<J | undefined> {
-        return this.produceJava<If>(iff, p, async draft => {
-            draft.ifCondition = await this.visitDefined(iff.ifCondition, p) as ControlParentheses<Expression>;
+    protected async visitIf(iff: J.If, p: P): Promise<J | undefined> {
+        return this.produceJava<J.If>(iff, p, async draft => {
+            draft.ifCondition = await this.visitDefined(iff.ifCondition, p) as J.ControlParentheses<Expression>;
             draft.thenPart = await this.visitRightPadded(iff.thenPart, p);
             if (iff.elsePart) {
-                draft.elsePart = await this.visitDefined(iff.elsePart, p) as IfElse;
+                draft.elsePart = await this.visitDefined(iff.elsePart, p) as J.IfElse;
             }
         });
     }
 
-    protected async visitElse(else_: IfElse, p: P): Promise<J | undefined> {
-        return this.produceJava<IfElse>(else_, p, async draft => {
+    protected async visitElse(else_: J.IfElse, p: P): Promise<J | undefined> {
+        return this.produceJava<J.IfElse>(else_, p, async draft => {
             draft.body = await this.visitRightPadded(else_.body, p);
         });
     }
 
-    protected async visitImport(import_: Import, p: P): Promise<J | undefined> {
-        return this.produceJava<Import>(import_, p, async draft => {
+    protected async visitImport(import_: J.Import, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Import>(import_, p, async draft => {
             draft.static = await this.visitLeftPadded(import_.static, p);
-            draft.qualid = await this.visitDefined(import_.qualid, p) as FieldAccess;
+            draft.qualid = await this.visitDefined(import_.qualid, p) as J.FieldAccess;
             draft.alias = await this.visitOptionalLeftPadded(import_.alias, p);
         });
     }
 
-    protected async visitInstanceOf(instanceOf: InstanceOf, p: P): Promise<J | undefined> {
-        return this.produceJava<InstanceOf>(instanceOf, p, async draft => {
+    protected async visitInstanceOf(instanceOf: J.InstanceOf, p: P): Promise<J | undefined> {
+        return this.produceJava<J.InstanceOf>(instanceOf, p, async draft => {
             draft.expression = await this.visitRightPadded(instanceOf.expression, p);
             draft.clazz = await this.visitDefined(instanceOf.clazz, p) as J;
             if (instanceOf.pattern) {
@@ -393,47 +317,47 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             }
             draft.type = await this.visitType(instanceOf.type, p);
             if (instanceOf.modifier) {
-                draft.modifier = await this.visitDefined(instanceOf.modifier, p) as Modifier;
+                draft.modifier = await this.visitDefined(instanceOf.modifier, p) as J.Modifier;
             }
         });
     }
 
-    protected async visitIntersectionType(intersectionType: IntersectionType, p: P): Promise<J | undefined> {
-        return this.produceJava<IntersectionType>(intersectionType, p, async draft => {
+    protected async visitIntersectionType(intersectionType: J.IntersectionType, p: P): Promise<J | undefined> {
+        return this.produceJava<J.IntersectionType>(intersectionType, p, async draft => {
             draft.bounds = await this.visitContainer(intersectionType.bounds, p);
         });
     }
 
-    protected async visitLabel(label: Label, p: P): Promise<J | undefined> {
-        return this.produceJava<Label>(label, p, async draft => {
+    protected async visitLabel(label: J.Label, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Label>(label, p, async draft => {
             draft.label = await this.visitRightPadded(label.label, p);
             draft.statement = await this.visitDefined(label.statement, p) as Statement;
         });
     }
 
-    protected async visitLambda(lambda: Lambda, p: P): Promise<J | undefined> {
-        return this.produceJava<Lambda>(lambda, p, async draft => {
-            draft.parameters = await this.visitDefined(lambda.parameters, p) as LambdaParameters;
+    protected async visitLambda(lambda: J.Lambda, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Lambda>(lambda, p, async draft => {
+            draft.parameters = await this.visitDefined(lambda.parameters, p) as J.LambdaParameters;
             draft.arrow = await this.visitSpace(lambda.arrow, p);
             draft.body = await this.visitDefined(lambda.body, p) as Statement | Expression;
             draft.type = await this.visitType(lambda.type, p);
         });
     }
 
-    protected async visitLambdaParameters(params: LambdaParameters, p: P): Promise<J | undefined> {
-        return this.produceJava<LambdaParameters>(params, p, async draft => {
+    protected async visitLambdaParameters(params: J.LambdaParameters, p: P): Promise<J | undefined> {
+        return this.produceJava<J.LambdaParameters>(params, p, async draft => {
             draft.parameters = await mapAsync(params.parameters, param => this.visitRightPadded(param, p));
         });
     }
 
-    protected async visitLiteral(literal: Literal, p: P): Promise<J | undefined> {
-        return this.produceJava<Literal>(literal, p, async draft => {
+    protected async visitLiteral(literal: J.Literal, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Literal>(literal, p, async draft => {
             draft.type = await this.visitType(literal.type, p) as JavaType.Primitive | undefined;
         });
     }
 
-    protected async visitMemberReference(memberRef: MemberReference, p: P): Promise<J | undefined> {
-        return this.produceJava<MemberReference>(memberRef, p, async draft => {
+    protected async visitMemberReference(memberRef: J.MemberReference, p: P): Promise<J | undefined> {
+        return this.produceJava<J.MemberReference>(memberRef, p, async draft => {
             draft.containing = await this.visitRightPadded(memberRef.containing, p);
             draft.typeParameters = await this.visitOptionalContainer(memberRef.typeParameters, p);
             draft.reference = await this.visitLeftPadded(memberRef.reference, p);
@@ -443,26 +367,26 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitMethodDeclaration(methodDecl: MethodDeclaration, p: P): Promise<J | undefined> {
-        return this.produceJava<MethodDeclaration>(methodDecl, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(methodDecl.leadingAnnotations, a => this.visitDefined<Annotation>(a, p));
-            draft.modifiers = await mapAsync(methodDecl.modifiers, m => this.visitDefined<Modifier>(m, p));
+    protected async visitMethodDeclaration(methodDecl: J.MethodDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJava<J.MethodDeclaration>(methodDecl, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(methodDecl.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p));
+            draft.modifiers = await mapAsync(methodDecl.modifiers, m => this.visitDefined<J.Modifier>(m, p));
 
             if (methodDecl.typeParameters) {
-                draft.typeParameters = await this.visitDefined(methodDecl.typeParameters, p) as TypeParameters;
+                draft.typeParameters = await this.visitDefined(methodDecl.typeParameters, p) as J.TypeParameters;
             }
 
             if (methodDecl.returnTypeExpression) {
                 draft.returnTypeExpression = await this.visitDefined(methodDecl.returnTypeExpression, p) as TypeTree;
             }
 
-            draft.nameAnnotations = await mapAsync(methodDecl.nameAnnotations, a => this.visitDefined<Annotation>(a, p));
+            draft.nameAnnotations = await mapAsync(methodDecl.nameAnnotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.name = await this.visitDefined(methodDecl.name, p);
             draft.parameters = await this.visitContainer(methodDecl.parameters, p);
             draft.throws = await this.visitContainer(methodDecl.throws, p);
 
             if (methodDecl.body) {
-                draft.body = await this.visitDefined(methodDecl.body, p) as Block;
+                draft.body = await this.visitDefined(methodDecl.body, p) as J.Block;
             }
 
             draft.defaultValue = await this.visitOptionalLeftPadded(methodDecl.defaultValue, p);
@@ -470,44 +394,44 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitMethodInvocation(methodInv: MethodInvocation, p: P): Promise<J | undefined> {
-        return this.produceJava<MethodInvocation>(methodInv, p, async draft => {
+    protected async visitMethodInvocation(methodInv: J.MethodInvocation, p: P): Promise<J | undefined> {
+        return this.produceJava<J.MethodInvocation>(methodInv, p, async draft => {
             draft.select = await this.visitOptionalRightPadded(methodInv.select, p);
             draft.typeParameters = await this.visitOptionalContainer(methodInv.typeParameters, p);
-            draft.name = await this.visitDefined(methodInv.name, p) as Identifier;
+            draft.name = await this.visitDefined(methodInv.name, p) as J.Identifier;
             draft.arguments = await this.visitContainer(methodInv.arguments, p);
             draft.methodType = await this.visitType(methodInv.methodType, p) as JavaType.Method | undefined;
         });
     }
 
-    protected async visitModifier(modifier: Modifier, p: P): Promise<J | undefined> {
-        return this.produceJava<Modifier>(modifier, p, async draft => {
-            draft.annotations = await mapAsync(modifier.annotations, a => this.visitDefined<Annotation>(a, p));
+    protected async visitModifier(modifier: J.Modifier, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Modifier>(modifier, p, async draft => {
+            draft.annotations = await mapAsync(modifier.annotations, a => this.visitDefined<J.Annotation>(a, p));
         });
     }
 
-    protected async visitMultiCatch(multiCatch: MultiCatch, p: P): Promise<J | undefined> {
-        return this.produceJava<MultiCatch>(multiCatch, p, async draft => {
+    protected async visitMultiCatch(multiCatch: J.MultiCatch, p: P): Promise<J | undefined> {
+        return this.produceJava<J.MultiCatch>(multiCatch, p, async draft => {
             draft.alternatives = await mapAsync(multiCatch.alternatives, alt => this.visitRightPadded(alt, p));
         });
     }
 
-    protected async visitNewArray(newArray: NewArray, p: P): Promise<J | undefined> {
-        return this.produceJava<NewArray>(newArray, p, async draft => {
+    protected async visitNewArray(newArray: J.NewArray, p: P): Promise<J | undefined> {
+        return this.produceJava<J.NewArray>(newArray, p, async draft => {
             if (newArray.typeExpression) {
                 draft.typeExpression = await this.visitDefined(newArray.typeExpression, p) as TypeTree;
             }
 
             draft.dimensions = await mapAsync(newArray.dimensions, dim =>
-                this.visitDefined<ArrayDimension>(dim, p));
+                this.visitDefined<J.ArrayDimension>(dim, p));
 
             draft.initializer = await this.visitOptionalContainer(newArray.initializer, p);
             draft.type = await this.visitType(newArray.type, p);
         });
     }
 
-    protected async visitNewClass(newClass: NewClass, p: P): Promise<J | undefined> {
-        return this.produceJava<NewClass>(newClass, p, async draft => {
+    protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
+        return this.produceJava<J.NewClass>(newClass, p, async draft => {
             if (newClass.enclosing) {
                 draft.enclosing = await this.visitRightPadded(newClass.enclosing, p);
             }
@@ -521,89 +445,89 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.arguments = await this.visitContainer(newClass.arguments, p);
 
             if (newClass.body) {
-                draft.body = await this.visitDefined(newClass.body, p) as Block;
+                draft.body = await this.visitDefined(newClass.body, p) as J.Block;
             }
 
             draft.constructorType = await this.visitType(newClass.constructorType, p) as JavaType.Method | undefined;
         });
     }
 
-    protected async visitNullableType(nullableType: NullableType, p: P): Promise<J | undefined> {
-        return this.produceJava<NullableType>(nullableType, p, async draft => {
-            draft.annotations = await mapAsync(nullableType.annotations, a => this.visitDefined<Annotation>(a, p));
+    protected async visitNullableType(nullableType: J.NullableType, p: P): Promise<J | undefined> {
+        return this.produceJava<J.NullableType>(nullableType, p, async draft => {
+            draft.annotations = await mapAsync(nullableType.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.typeTree = await this.visitRightPadded(nullableType.typeTree, p);
         });
     }
 
-    protected async visitPackage(package_: Package, p: P): Promise<J | undefined> {
-        return this.produceJava<Package>(package_, p, async draft => {
+    protected async visitPackage(package_: J.Package, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Package>(package_, p, async draft => {
             draft.expression = await this.visitDefined(package_.expression, p) as Expression;
             if (package_.annotations) {
-                draft.annotations = await mapAsync(package_.annotations, a => this.visitDefined<Annotation>(a, p));
+                draft.annotations = await mapAsync(package_.annotations, a => this.visitDefined<J.Annotation>(a, p));
             }
         });
     }
 
-    protected async visitParameterizedType(parameterizedType: ParameterizedType, p: P): Promise<J | undefined> {
-        return this.produceJava<ParameterizedType>(parameterizedType, p, async draft => {
+    protected async visitParameterizedType(parameterizedType: J.ParameterizedType, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ParameterizedType>(parameterizedType, p, async draft => {
             draft.clazz = await this.visitTypeName(parameterizedType.clazz, p);
             draft.typeParameters = await this.visitOptionalContainer(parameterizedType.typeParameters, p);
             draft.type = await this.visitType(parameterizedType.type, p);
         });
     }
 
-    protected async visitParentheses<T extends J>(parentheses: Parentheses<T>, p: P): Promise<J | undefined> {
-        return this.produceJava<Parentheses<T>>(parentheses, p, async draft => {
-            (draft.tree as JRightPadded<J>) = await this.visitRightPadded(parentheses.tree, p);
+    protected async visitParentheses<T extends J>(parentheses: J.Parentheses<T>, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Parentheses<T>>(parentheses, p, async draft => {
+            (draft.tree as J.RightPadded<J>) = await this.visitRightPadded(parentheses.tree, p);
         });
     }
 
-    protected async visitParenthesizedTypeTree(parTypeTree: ParenthesizedTypeTree, p: P): Promise<J | undefined> {
-        return this.produceJava<ParenthesizedTypeTree>(parTypeTree, p, async draft => {
-            draft.annotations = await mapAsync(parTypeTree.annotations, a => this.visitDefined<Annotation>(a, p));
-            draft.parenthesizedType = await this.visitDefined(parTypeTree.parenthesizedType, p) as Parentheses<TypeTree>;
+    protected async visitParenthesizedTypeTree(parTypeTree: J.ParenthesizedTypeTree, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ParenthesizedTypeTree>(parTypeTree, p, async draft => {
+            draft.annotations = await mapAsync(parTypeTree.annotations, a => this.visitDefined<J.Annotation>(a, p));
+            draft.parenthesizedType = await this.visitDefined(parTypeTree.parenthesizedType, p) as J.Parentheses<TypeTree>;
             draft.type = await this.visitType(parTypeTree.type, p);
         });
     }
 
-    protected async visitPrimitive(primitive: Primitive, p: P): Promise<J | undefined> {
-        return this.produceJava<Primitive>(primitive, p, async draft => {
+    protected async visitPrimitive(primitive: J.Primitive, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Primitive>(primitive, p, async draft => {
             draft.type = await this.visitType(primitive.type, p) as JavaType.Primitive;
         });
     }
 
-    protected async visitReturn(ret: Return, p: P): Promise<J | undefined> {
-        return this.produceJava<Return>(ret, p, async draft => {
+    protected async visitReturn(ret: J.Return, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Return>(ret, p, async draft => {
             if (ret.expression) {
                 draft.expression = await this.visitDefined(ret.expression, p) as Expression;
             }
         });
     }
 
-    protected async visitSwitch(switch_: Switch, p: P): Promise<J | undefined> {
-        return this.produceJava<Switch>(switch_, p, async draft => {
-            draft.selector = await this.visitDefined(switch_.selector, p) as ControlParentheses<Expression>;
-            draft.cases = await this.visitDefined(switch_.cases, p) as Block;
+    protected async visitSwitch(switch_: J.Switch, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Switch>(switch_, p, async draft => {
+            draft.selector = await this.visitDefined(switch_.selector, p) as J.ControlParentheses<Expression>;
+            draft.cases = await this.visitDefined(switch_.cases, p) as J.Block;
         });
     }
 
-    protected async visitSwitchExpression(switchExpr: SwitchExpression, p: P): Promise<J | undefined> {
-        return this.produceJava<SwitchExpression>(switchExpr, p, async draft => {
-            draft.selector = await this.visitDefined(switchExpr.selector, p) as ControlParentheses<Expression>;
-            draft.cases = await this.visitDefined(switchExpr.cases, p) as Block;
+    protected async visitSwitchExpression(switchExpr: J.SwitchExpression, p: P): Promise<J | undefined> {
+        return this.produceJava<J.SwitchExpression>(switchExpr, p, async draft => {
+            draft.selector = await this.visitDefined(switchExpr.selector, p) as J.ControlParentheses<Expression>;
+            draft.cases = await this.visitDefined(switchExpr.cases, p) as J.Block;
             draft.type = await this.visitType(switchExpr.type, p);
         });
     }
 
-    protected async visitSynchronized(sync: Synchronized, p: P): Promise<J | undefined> {
-        return this.produceJava<Synchronized>(sync, p, async draft => {
-            draft.lock = await this.visitDefined(sync.lock, p) as ControlParentheses<Expression>;
-            draft.body = await this.visitDefined(sync.body, p) as Block;
+    protected async visitSynchronized(sync: J.Synchronized, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Synchronized>(sync, p, async draft => {
+            draft.lock = await this.visitDefined(sync.lock, p) as J.ControlParentheses<Expression>;
+            draft.body = await this.visitDefined(sync.body, p) as J.Block;
         });
     }
 
-    protected async visitTernary(ternary: Ternary, p: P): Promise<J | undefined> {
-        return this.produceJava<Ternary>(ternary, p, async draft => {
+    protected async visitTernary(ternary: J.Ternary, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Ternary>(ternary, p, async draft => {
             draft.condition = await this.visitDefined(ternary.condition, p) as Expression;
             draft.truePart = await this.visitLeftPadded(ternary.truePart, p);
             draft.falsePart = await this.visitLeftPadded(ternary.falsePart, p);
@@ -611,79 +535,79 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitThrow(thrown: Throw, p: P): Promise<J | undefined> {
-        return this.produceJava<Throw>(thrown, p, async draft => {
+    protected async visitThrow(thrown: J.Throw, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Throw>(thrown, p, async draft => {
             draft.exception = await this.visitDefined(thrown.exception, p) as Expression;
         });
     }
 
-    protected async visitTry(tryable: Try, p: P): Promise<J | undefined> {
-        return this.produceJava<Try>(tryable, p, async draft => {
+    protected async visitTry(tryable: J.Try, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Try>(tryable, p, async draft => {
             draft.resources = await this.visitOptionalContainer(tryable.resources, p);
-            draft.body = await this.visitDefined(tryable.body, p) as Block;
-            draft.catches = await mapAsync(tryable.catches, c => this.visitDefined<TryCatch>(c, p));
+            draft.body = await this.visitDefined(tryable.body, p) as J.Block;
+            draft.catches = await mapAsync(tryable.catches, c => this.visitDefined<J.TryCatch>(c, p));
             draft.finally = await this.visitOptionalLeftPadded(tryable.finally, p);
         });
     }
 
-    protected async visitTryResource(resource: TryResource, p: P): Promise<J | undefined> {
-        return this.produceJava<TryResource>(resource, p, async draft => {
+    protected async visitTryResource(resource: J.TryResource, p: P): Promise<J | undefined> {
+        return this.produceJava<J.TryResource>(resource, p, async draft => {
             draft.variableDeclarations = await this.visitDefined(resource.variableDeclarations, p) as TypedTree;
         });
     }
 
-    protected async visitTryCatch(tryCatch: TryCatch, p: P): Promise<J | undefined> {
-        return this.produceJava<TryCatch>(tryCatch, p, async draft => {
-            draft.parameter = await this.visitDefined(tryCatch.parameter, p) as ControlParentheses<VariableDeclarations>;
-            draft.body = await this.visitDefined(tryCatch.body, p) as Block;
+    protected async visitTryCatch(tryCatch: J.TryCatch, p: P): Promise<J | undefined> {
+        return this.produceJava<J.TryCatch>(tryCatch, p, async draft => {
+            draft.parameter = await this.visitDefined(tryCatch.parameter, p) as J.ControlParentheses<J.VariableDeclarations>;
+            draft.body = await this.visitDefined(tryCatch.body, p) as J.Block;
         });
     }
 
-    protected async visitTypeCast(typeCast: TypeCast, p: P): Promise<J | undefined> {
-        return this.produceJava<TypeCast>(typeCast, p, async draft => {
-            draft.clazz = await this.visitDefined(typeCast.clazz, p) as ControlParentheses<TypeTree>;
+    protected async visitTypeCast(typeCast: J.TypeCast, p: P): Promise<J | undefined> {
+        return this.produceJava<J.TypeCast>(typeCast, p, async draft => {
+            draft.clazz = await this.visitDefined(typeCast.clazz, p) as J.ControlParentheses<TypeTree>;
             draft.expression = await this.visitDefined(typeCast.expression, p) as Expression;
         });
     }
 
-    protected async visitTypeParameter(typeParam: TypeParameter, p: P): Promise<J | undefined> {
-        return this.produceJava<TypeParameter>(typeParam, p, async draft => {
-            draft.annotations = await mapAsync(typeParam.annotations, a => this.visitDefined<Annotation>(a, p));
-            draft.modifiers = await mapAsync(typeParam.modifiers, m => this.visitDefined<Modifier>(m, p));
-            draft.name = await this.visitDefined(typeParam.name, p) as Identifier;
+    protected async visitTypeParameter(typeParam: J.TypeParameter, p: P): Promise<J | undefined> {
+        return this.produceJava<J.TypeParameter>(typeParam, p, async draft => {
+            draft.annotations = await mapAsync(typeParam.annotations, a => this.visitDefined<J.Annotation>(a, p));
+            draft.modifiers = await mapAsync(typeParam.modifiers, m => this.visitDefined<J.Modifier>(m, p));
+            draft.name = await this.visitDefined(typeParam.name, p) as J.Identifier;
             draft.bounds = await this.visitOptionalContainer(typeParam.bounds, p);
         });
     }
 
-    protected async visitTypeParameters(typeParams: TypeParameters, p: P): Promise<J | undefined> {
-        return this.produceJava<TypeParameters>(typeParams, p, async draft => {
-            draft.annotations = await mapAsync(typeParams.annotations, a => this.visitDefined<Annotation>(a, p));
+    protected async visitTypeParameters(typeParams: J.TypeParameters, p: P): Promise<J | undefined> {
+        return this.produceJava<J.TypeParameters>(typeParams, p, async draft => {
+            draft.annotations = await mapAsync(typeParams.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.typeParameters = await mapAsync(typeParams.typeParameters, tp => this.visitRightPadded(tp, p));
         });
     }
 
-    protected async visitUnary(unary: Unary, p: P): Promise<J | undefined> {
-        return this.produceJava<Unary>(unary, p, async draft => {
+    protected async visitUnary(unary: J.Unary, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Unary>(unary, p, async draft => {
             draft.operator = await this.visitLeftPadded(unary.operator, p);
             draft.expression = await this.visitDefined(unary.expression, p) as Expression;
             draft.type = await this.visitType(unary.type, p);
         });
     }
 
-    protected async visitUnknown(unknown: Unknown, p: P): Promise<J | undefined> {
-        return this.produceJava<Unknown>(unknown, p, async draft => {
-            draft.source = await this.visitDefined(unknown.source, p) as UnknownSource;
+    protected async visitUnknown(unknown: J.Unknown, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Unknown>(unknown, p, async draft => {
+            draft.source = await this.visitDefined(unknown.source, p) as J.UnknownSource;
         });
     }
 
-    protected async visitUnknownSource(source: UnknownSource, p: P): Promise<J | undefined> {
-        return this.produceJava<UnknownSource>(source, p);
+    protected async visitUnknownSource(source: J.UnknownSource, p: P): Promise<J | undefined> {
+        return this.produceJava<J.UnknownSource>(source, p);
     }
 
-    protected async visitVariableDeclarations(varDecls: VariableDeclarations, p: P): Promise<J | undefined> {
-        return this.produceJava<VariableDeclarations>(varDecls, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(varDecls.leadingAnnotations, a => this.visitDefined<Annotation>(a, p));
-            draft.modifiers = await mapAsync(varDecls.modifiers, m => this.visitDefined<Modifier>(m, p));
+    protected async visitVariableDeclarations(varDecls: J.VariableDeclarations, p: P): Promise<J | undefined> {
+        return this.produceJava<J.VariableDeclarations>(varDecls, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(varDecls.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p));
+            draft.modifiers = await mapAsync(varDecls.modifiers, m => this.visitDefined<J.Modifier>(m, p));
 
             if (varDecls.typeExpression) {
                 draft.typeExpression = await this.visitDefined(varDecls.typeExpression, p) as TypeTree;
@@ -697,24 +621,24 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitVariable(variable: Variable, p: P): Promise<J | undefined> {
-        return this.produceJava<Variable>(variable, p, async draft => {
-            draft.name = await this.visitDefined(variable.name, p) as Identifier;
+    protected async visitVariable(variable: J.Variable, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Variable>(variable, p, async draft => {
+            draft.name = await this.visitDefined(variable.name, p) as J.Identifier;
             draft.dimensionsAfterName = await mapAsync(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, p));
             draft.initializer = await this.visitOptionalLeftPadded(variable.initializer, p);
             draft.variableType = await this.visitType(variable.variableType, p) as JavaType.Variable | undefined;
         });
     }
 
-    protected async visitWhileLoop(whileLoop: WhileLoop, p: P): Promise<J | undefined> {
-        return this.produceJava<WhileLoop>(whileLoop, p, async draft => {
-            draft.condition = await this.visitDefined(whileLoop.condition, p) as ControlParentheses<Expression>;
+    protected async visitWhileLoop(whileLoop: J.WhileLoop, p: P): Promise<J | undefined> {
+        return this.produceJava<J.WhileLoop>(whileLoop, p, async draft => {
+            draft.condition = await this.visitDefined(whileLoop.condition, p) as J.ControlParentheses<Expression>;
             draft.body = await this.visitRightPadded(whileLoop.body, p);
         });
     }
 
-    protected async visitWildcard(wildcard: Wildcard, p: P): Promise<J | undefined> {
-        return this.produceJava<Wildcard>(wildcard, p, async draft => {
+    protected async visitWildcard(wildcard: J.Wildcard, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Wildcard>(wildcard, p, async draft => {
             draft.bound = await this.visitOptionalLeftPadded(wildcard.bound, p);
             if (wildcard.boundedType) {
                 draft.boundedType = await this.visitTypeName(wildcard.boundedType, p);
@@ -722,18 +646,18 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitYield(yield_: Yield, p: P): Promise<J | undefined> {
-        return this.produceJava<Yield>(yield_, p, async draft => {
+    protected async visitYield(yield_: J.Yield, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Yield>(yield_, p, async draft => {
             draft.value = await this.visitDefined(yield_.value, p) as Expression;
         });
     }
 
-    protected async visitOptionalRightPadded<T extends J | boolean>(right: JRightPadded<T> | undefined, p: P): Promise<JRightPadded<T> | undefined> {
+    protected async visitOptionalRightPadded<T extends J | boolean>(right: J.RightPadded<T> | undefined, p: P): Promise<J.RightPadded<T> | undefined> {
         return right ? this.visitRightPadded(right, p) : undefined;
     }
 
-    protected async visitRightPadded<T extends J | boolean>(right: JRightPadded<T>, p: P): Promise<JRightPadded<T>> {
-        return produceAsync<JRightPadded<T>>(right, async draft => {
+    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T>> {
+        return produceAsync<J.RightPadded<T>>(right, async draft => {
             if (isJava(right.element)) {
                 (draft.element as J) = await this.visitDefined(right.element, p);
             }
@@ -741,12 +665,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitOptionalLeftPadded<T extends J | Space | number | boolean>(left: JLeftPadded<T> | undefined, p: P): Promise<JLeftPadded<T> | undefined> {
+    protected async visitOptionalLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T> | undefined, p: P): Promise<J.LeftPadded<T> | undefined> {
         return left ? this.visitLeftPadded(left, p) : undefined;
     }
 
-    protected async visitLeftPadded<T extends J | Space | number | boolean>(left: JLeftPadded<T>, p: P): Promise<JLeftPadded<T>> {
-        return produceAsync<JLeftPadded<T>>(left, async draft => {
+    protected async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
+        return produceAsync<J.LeftPadded<T>>(left, async draft => {
             draft.before = await this.visitSpace(left.before, p);
             if (isJava(left.element)) {
                 draft.element = await this.visitDefined(left.element, p) as Draft<T>;
@@ -756,14 +680,14 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitOptionalContainer<T extends J>(container: JContainer<T> | undefined, p: P): Promise<JContainer<T> | undefined> {
+    protected async visitOptionalContainer<T extends J>(container: J.Container<T> | undefined, p: P): Promise<J.Container<T> | undefined> {
         return container ? this.visitContainer(container, p) : undefined;
     }
 
-    protected async visitContainer<T extends J>(container: JContainer<T>, p: P): Promise<JContainer<T>> {
-        return produceAsync<JContainer<T>>(container, async draft => {
+    protected async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
+        return produceAsync<J.Container<T>>(container, async draft => {
             draft.before = await this.visitSpace(container.before, p);
-            (draft.elements as JRightPadded<J>[]) = await mapAsync(container.elements, e => this.visitRightPadded(e, p));
+            (draft.elements as J.RightPadded<J>[]) = await mapAsync(container.elements, e => this.visitRightPadded(e, p));
             draft.markers = await this.visitMarkers(container.markers, p);
         });
     }
@@ -786,148 +710,148 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected accept(t: J, p: P): Promise<J | undefined> {
         switch (t.kind) {
-            case JavaKind.AnnotatedType:
-                return this.visitAnnotatedType(t as AnnotatedType, p);
-            case JavaKind.Annotation:
-                return this.visitAnnotation(t as Annotation, p);
-            case JavaKind.ArrayAccess:
-                return this.visitArrayAccess(t as ArrayAccess, p);
-            case JavaKind.ArrayDimension:
-                return this.visitArrayDimension(t as ArrayDimension, p);
-            case JavaKind.ArrayType:
-                return this.visitArrayType(t as ArrayType, p);
-            case JavaKind.Assert:
-                return this.visitAssert(t as Assert, p);
-            case JavaKind.Assignment:
-                return this.visitAssignment(t as Assignment, p);
-            case JavaKind.AssignmentOperation:
-                return this.visitAssignmentOperation(t as AssignmentOperation, p);
-            case JavaKind.Binary:
-                return this.visitBinary(t as Binary, p);
-            case JavaKind.Block:
-                return this.visitBlock(t as Block, p);
-            case JavaKind.Break:
-                return this.visitBreak(t as Break, p);
-            case JavaKind.Case:
-                return this.visitCase(t as Case, p);
-            case JavaKind.ClassDeclaration:
-                return this.visitClassDeclaration(t as ClassDeclaration, p);
-            case JavaKind.ClassDeclarationKind:
-                return this.visitClassDeclarationKind(t as ClassDeclarationKind, p);
-            case JavaKind.CompilationUnit:
-                return this.visitCompilationUnit(t as CompilationUnit, p);
-            case JavaKind.Continue:
-                return this.visitContinue(t as Continue, p);
-            case JavaKind.ControlParentheses:
-                return this.visitControlParentheses(t as ControlParentheses<J>, p);
-            case JavaKind.DeconstructionPattern:
-                return this.visitDeconstructionPattern(t as DeconstructionPattern, p);
-            case JavaKind.DoWhileLoop:
-                return this.visitDoWhileLoop(t as DoWhileLoop, p);
-            case JavaKind.Empty:
-                return this.visitEmpty(t as Empty, p);
-            case JavaKind.EnumValue:
-                return this.visitEnumValue(t as EnumValue, p);
-            case JavaKind.EnumValueSet:
-                return this.visitEnumValueSet(t as EnumValueSet, p);
-            case JavaKind.Erroneous:
-                return this.visitErroneous(t as Erroneous, p);
-            case JavaKind.FieldAccess:
-                return this.visitFieldAccess(t as FieldAccess, p);
-            case JavaKind.ForEachLoop:
-                return this.visitForEachLoop(t as ForEachLoop, p);
-            case JavaKind.ForEachLoopControl:
-                return this.visitForEachLoopControl(t as ForEachLoopControl, p);
-            case JavaKind.ForLoop:
-                return this.visitForLoop(t as ForLoop, p);
-            case JavaKind.ForLoopControl:
-                return this.visitForLoopControl(t as ForLoopControl, p);
-            case JavaKind.Identifier:
-                return this.visitIdentifier(t as Identifier, p);
-            case JavaKind.If:
-                return this.visitIf(t as If, p);
-            case JavaKind.IfElse:
-                return this.visitElse(t as IfElse, p);
-            case JavaKind.Import:
-                return this.visitImport(t as Import, p);
-            case JavaKind.InstanceOf:
-                return this.visitInstanceOf(t as InstanceOf, p);
-            case JavaKind.IntersectionType:
-                return this.visitIntersectionType(t as IntersectionType, p);
-            case JavaKind.Label:
-                return this.visitLabel(t as Label, p);
-            case JavaKind.Lambda:
-                return this.visitLambda(t as Lambda, p);
-            case JavaKind.LambdaParameters:
-                return this.visitLambdaParameters(t as LambdaParameters, p);
-            case JavaKind.Literal:
-                return this.visitLiteral(t as Literal, p);
-            case JavaKind.MemberReference:
-                return this.visitMemberReference(t as MemberReference, p);
-            case JavaKind.MethodDeclaration:
-                return this.visitMethodDeclaration(t as MethodDeclaration, p);
-            case JavaKind.MethodInvocation:
-                return this.visitMethodInvocation(t as MethodInvocation, p);
-            case JavaKind.Modifier:
-                return this.visitModifier(t as Modifier, p);
-            case JavaKind.MultiCatch:
-                return this.visitMultiCatch(t as MultiCatch, p);
-            case JavaKind.NewArray:
-                return this.visitNewArray(t as NewArray, p);
-            case JavaKind.NewClass:
-                return this.visitNewClass(t as NewClass, p);
-            case JavaKind.NullableType:
-                return this.visitNullableType(t as NullableType, p);
-            case JavaKind.Package:
-                return this.visitPackage(t as Package, p);
-            case JavaKind.ParameterizedType:
-                return this.visitParameterizedType(t as ParameterizedType, p);
-            case JavaKind.Parentheses:
-                return this.visitParentheses(t as Parentheses<J>, p);
-            case JavaKind.ParenthesizedTypeTree:
-                return this.visitParenthesizedTypeTree(t as ParenthesizedTypeTree, p);
-            case JavaKind.Primitive:
-                return this.visitPrimitive(t as Primitive, p);
-            case JavaKind.Return:
-                return this.visitReturn(t as Return, p);
-            case JavaKind.Switch:
-                return this.visitSwitch(t as Switch, p);
-            case JavaKind.SwitchExpression:
-                return this.visitSwitchExpression(t as SwitchExpression, p);
-            case JavaKind.Synchronized:
-                return this.visitSynchronized(t as Synchronized, p);
-            case JavaKind.Ternary:
-                return this.visitTernary(t as Ternary, p);
-            case JavaKind.Throw:
-                return this.visitThrow(t as Throw, p);
-            case JavaKind.Try:
-                return this.visitTry(t as Try, p);
-            case JavaKind.TryResource:
-                return this.visitTryResource(t as TryResource, p);
-            case JavaKind.TryCatch:
-                return this.visitTryCatch(t as TryCatch, p);
-            case JavaKind.TypeCast:
-                return this.visitTypeCast(t as TypeCast, p);
-            case JavaKind.TypeParameter:
-                return this.visitTypeParameter(t as TypeParameter, p);
-            case JavaKind.TypeParameters:
-                return this.visitTypeParameters(t as TypeParameters, p);
-            case JavaKind.Unary:
-                return this.visitUnary(t as Unary, p);
-            case JavaKind.Unknown:
-                return this.visitUnknown(t as Unknown, p);
-            case JavaKind.UnknownSource:
-                return this.visitUnknownSource(t as UnknownSource, p);
-            case JavaKind.VariableDeclarations:
-                return this.visitVariableDeclarations(t as VariableDeclarations, p);
-            case JavaKind.Variable:
-                return this.visitVariable(t as Variable, p);
-            case JavaKind.WhileLoop:
-                return this.visitWhileLoop(t as WhileLoop, p);
-            case JavaKind.Wildcard:
-                return this.visitWildcard(t as Wildcard, p);
-            case JavaKind.Yield:
-                return this.visitYield(t as Yield, p);
+            case J.Kind.AnnotatedType:
+                return this.visitAnnotatedType(t as J.AnnotatedType, p);
+            case J.Kind.Annotation:
+                return this.visitAnnotation(t as J.Annotation, p);
+            case J.Kind.ArrayAccess:
+                return this.visitArrayAccess(t as J.ArrayAccess, p);
+            case J.Kind.ArrayDimension:
+                return this.visitArrayDimension(t as J.ArrayDimension, p);
+            case J.Kind.ArrayType:
+                return this.visitArrayType(t as J.ArrayType, p);
+            case J.Kind.Assert:
+                return this.visitAssert(t as J.Assert, p);
+            case J.Kind.Assignment:
+                return this.visitAssignment(t as J.Assignment, p);
+            case J.Kind.AssignmentOperation:
+                return this.visitAssignmentOperation(t as J.AssignmentOperation, p);
+            case J.Kind.Binary:
+                return this.visitBinary(t as J.Binary, p);
+            case J.Kind.Block:
+                return this.visitBlock(t as J.Block, p);
+            case J.Kind.Break:
+                return this.visitBreak(t as J.Break, p);
+            case J.Kind.Case:
+                return this.visitCase(t as J.Case, p);
+            case J.Kind.ClassDeclaration:
+                return this.visitClassDeclaration(t as J.ClassDeclaration, p);
+            case J.Kind.ClassDeclarationKind:
+                return this.visitClassDeclarationKind(t as J.ClassDeclarationKind, p);
+            case J.Kind.CompilationUnit:
+                return this.visitCompilationUnit(t as J.CompilationUnit, p);
+            case J.Kind.Continue:
+                return this.visitContinue(t as J.Continue, p);
+            case J.Kind.ControlParentheses:
+                return this.visitControlParentheses(t as J.ControlParentheses<J>, p);
+            case J.Kind.DeconstructionPattern:
+                return this.visitDeconstructionPattern(t as J.DeconstructionPattern, p);
+            case J.Kind.DoWhileLoop:
+                return this.visitDoWhileLoop(t as J.DoWhileLoop, p);
+            case J.Kind.Empty:
+                return this.visitEmpty(t as J.Empty, p);
+            case J.Kind.EnumValue:
+                return this.visitEnumValue(t as J.EnumValue, p);
+            case J.Kind.EnumValueSet:
+                return this.visitEnumValueSet(t as J.EnumValueSet, p);
+            case J.Kind.Erroneous:
+                return this.visitErroneous(t as J.Erroneous, p);
+            case J.Kind.FieldAccess:
+                return this.visitFieldAccess(t as J.FieldAccess, p);
+            case J.Kind.ForEachLoop:
+                return this.visitForEachLoop(t as J.ForEachLoop, p);
+            case J.Kind.ForEachLoopControl:
+                return this.visitForEachLoopControl(t as J.ForEachLoopControl, p);
+            case J.Kind.ForLoop:
+                return this.visitForLoop(t as J.ForLoop, p);
+            case J.Kind.ForLoopControl:
+                return this.visitForLoopControl(t as J.ForLoopControl, p);
+            case J.Kind.Identifier:
+                return this.visitIdentifier(t as J.Identifier, p);
+            case J.Kind.If:
+                return this.visitIf(t as J.If, p);
+            case J.Kind.IfElse:
+                return this.visitElse(t as J.IfElse, p);
+            case J.Kind.Import:
+                return this.visitImport(t as J.Import, p);
+            case J.Kind.InstanceOf:
+                return this.visitInstanceOf(t as J.InstanceOf, p);
+            case J.Kind.IntersectionType:
+                return this.visitIntersectionType(t as J.IntersectionType, p);
+            case J.Kind.Label:
+                return this.visitLabel(t as J.Label, p);
+            case J.Kind.Lambda:
+                return this.visitLambda(t as J.Lambda, p);
+            case J.Kind.LambdaParameters:
+                return this.visitLambdaParameters(t as J.LambdaParameters, p);
+            case J.Kind.Literal:
+                return this.visitLiteral(t as J.Literal, p);
+            case J.Kind.MemberReference:
+                return this.visitMemberReference(t as J.MemberReference, p);
+            case J.Kind.MethodDeclaration:
+                return this.visitMethodDeclaration(t as J.MethodDeclaration, p);
+            case J.Kind.MethodInvocation:
+                return this.visitMethodInvocation(t as J.MethodInvocation, p);
+            case J.Kind.Modifier:
+                return this.visitModifier(t as J.Modifier, p);
+            case J.Kind.MultiCatch:
+                return this.visitMultiCatch(t as J.MultiCatch, p);
+            case J.Kind.NewArray:
+                return this.visitNewArray(t as J.NewArray, p);
+            case J.Kind.NewClass:
+                return this.visitNewClass(t as J.NewClass, p);
+            case J.Kind.NullableType:
+                return this.visitNullableType(t as J.NullableType, p);
+            case J.Kind.Package:
+                return this.visitPackage(t as J.Package, p);
+            case J.Kind.ParameterizedType:
+                return this.visitParameterizedType(t as J.ParameterizedType, p);
+            case J.Kind.Parentheses:
+                return this.visitParentheses(t as J.Parentheses<J>, p);
+            case J.Kind.ParenthesizedTypeTree:
+                return this.visitParenthesizedTypeTree(t as J.ParenthesizedTypeTree, p);
+            case J.Kind.Primitive:
+                return this.visitPrimitive(t as J.Primitive, p);
+            case J.Kind.Return:
+                return this.visitReturn(t as J.Return, p);
+            case J.Kind.Switch:
+                return this.visitSwitch(t as J.Switch, p);
+            case J.Kind.SwitchExpression:
+                return this.visitSwitchExpression(t as J.SwitchExpression, p);
+            case J.Kind.Synchronized:
+                return this.visitSynchronized(t as J.Synchronized, p);
+            case J.Kind.Ternary:
+                return this.visitTernary(t as J.Ternary, p);
+            case J.Kind.Throw:
+                return this.visitThrow(t as J.Throw, p);
+            case J.Kind.Try:
+                return this.visitTry(t as J.Try, p);
+            case J.Kind.TryResource:
+                return this.visitTryResource(t as J.TryResource, p);
+            case J.Kind.TryCatch:
+                return this.visitTryCatch(t as J.TryCatch, p);
+            case J.Kind.TypeCast:
+                return this.visitTypeCast(t as J.TypeCast, p);
+            case J.Kind.TypeParameter:
+                return this.visitTypeParameter(t as J.TypeParameter, p);
+            case J.Kind.TypeParameters:
+                return this.visitTypeParameters(t as J.TypeParameters, p);
+            case J.Kind.Unary:
+                return this.visitUnary(t as J.Unary, p);
+            case J.Kind.Unknown:
+                return this.visitUnknown(t as J.Unknown, p);
+            case J.Kind.UnknownSource:
+                return this.visitUnknownSource(t as J.UnknownSource, p);
+            case J.Kind.VariableDeclarations:
+                return this.visitVariableDeclarations(t as J.VariableDeclarations, p);
+            case J.Kind.Variable:
+                return this.visitVariable(t as J.Variable, p);
+            case J.Kind.WhileLoop:
+                return this.visitWhileLoop(t as J.WhileLoop, p);
+            case J.Kind.Wildcard:
+                return this.visitWildcard(t as J.Wildcard, p);
+            case J.Kind.Yield:
+                return this.visitYield(t as J.Yield, p);
             default:
                 return Promise.resolve(t);
         }

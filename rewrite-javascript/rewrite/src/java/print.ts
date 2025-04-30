@@ -1,5 +1,5 @@
 import {PrintOutputCapture, TreePrinters} from "../print";
-import {J, JavaKind} from "./tree";
+import {J} from "./tree";
 import {JavaVisitor} from "./visitor";
 
 class JavaPrinter extends JavaVisitor<PrintOutputCapture> {
@@ -8,4 +8,4 @@ class JavaPrinter extends JavaVisitor<PrintOutputCapture> {
     }
 }
 
-TreePrinters.register(JavaKind.CompilationUnit, new JavaPrinter());
+TreePrinters.register(J.Kind.CompilationUnit, new JavaPrinter());

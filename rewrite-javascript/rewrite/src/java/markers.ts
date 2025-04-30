@@ -1,5 +1,5 @@
 import {Marker} from "../markers";
-import {Space} from "./tree";
+import {J} from "./tree";
 
 export interface Semicolon extends Marker {
     kind: "org.openrewrite.java.marker.Semicolon"
@@ -7,7 +7,7 @@ export interface Semicolon extends Marker {
 
 export interface TrailingComma extends Marker {
     kind: "org.openrewrite.java.marker.TrailingComma"
-    readonly suffix: Space;
+    readonly suffix: J.Space;
 }
 
 export interface OmitParentheses extends Marker {

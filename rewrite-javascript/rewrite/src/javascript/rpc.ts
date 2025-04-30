@@ -71,15 +71,10 @@ import {
     Yield
 } from "./tree";
 import {
-    Annotation, Block,
     isJava,
     isSpace,
     J,
-    JavaType,
-    JContainer,
-    JLeftPadded,
-    JRightPadded, Literal,
-    Space
+    JavaType
 } from "../java";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft} from "immer";
@@ -843,7 +838,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     protected async visitObjectBindingDeclarations(objectBindings: ObjectBindingDeclarations, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(objectBindings);
 
-        draft.leadingAnnotations = await q.receiveListDefined(objectBindings.leadingAnnotations, annot => this.visitDefined<Annotation>(annot, q));
+        draft.leadingAnnotations = await q.receiveListDefined(objectBindings.leadingAnnotations, annot => this.visitDefined<J.Annotation>(annot, q));
         draft.modifiers = await q.receiveListDefined(objectBindings.modifiers, mod => this.visit(mod, q));
         draft.typeExpression = await q.receive(objectBindings.typeExpression, expr => this.visit(expr, q));
         draft.bindings = await q.receive(objectBindings.bindings, bindings => this.visitContainer(bindings, q));
@@ -904,7 +899,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.returnTypeExpression = await q.receive(methodDecl.returnTypeExpression, type => this.visit(type, q));
         draft.name = await q.receive(methodDecl.name, name => this.visit(name, q));
         draft.parameters = await q.receive(methodDecl.parameters, params => this.visitContainer(params, q));
-        draft.body = await q.receive(methodDecl.body, body => this.visitDefined<Block>(body, q));
+        draft.body = await q.receive(methodDecl.body, body => this.visitDefined<J.Block>(body, q));
 
         return finishDraft(draft);
     }
@@ -952,7 +947,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         const draft = createDraft(span);
 
         draft.expression = await q.receive(span.expression, expr => this.visit(expr, q));
-        draft.tail = await q.receive(span.tail, tail => this.visitDefined<Literal>(tail, q));
+        draft.tail = await q.receive(span.tail, tail => this.visitDefined<J.Literal>(tail, q));
 
         return finishDraft(draft);
     }
@@ -1034,18 +1029,18 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitLeftPadded<T extends J | Space | number | boolean>(left: JLeftPadded<T>, q: RpcReceiveQueue): Promise<JLeftPadded<T>> {
+    protected async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
         if (!left) {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty left padding");
         }
 
-        return produceAsync<JLeftPadded<T>>(left, async draft => {
+        return produceAsync<J.LeftPadded<T>>(left, async draft => {
             draft.before = await q.receive(left.before, space => this.visitSpace(space, q));
             draft.element = await q.receive(left.element, elem => {
                 if (isJava(elem) || isJavaScript(elem)) {
                     return this.visit(elem as J, q) as any as T;
                 } else if (isSpace(elem)) {
-                    return this.visitSpace(elem as Space, q) as any as T;
+                    return this.visitSpace(elem as J.Space, q) as any as T;
                 }
                 return elem;
             }) as Draft<T>;
@@ -1053,17 +1048,17 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         });
     }
 
-    protected async visitRightPadded<T extends J | boolean>(right: JRightPadded<T>, q: RpcReceiveQueue): Promise<JRightPadded<T>> {
+    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {
         if (!right) {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty right padding");
         }
 
-        return produceAsync<JRightPadded<T>>(right, async draft => {
+        return produceAsync<J.RightPadded<T>>(right, async draft => {
             draft.element = await q.receive(right.element, elem => {
                 if (isJava(elem) || isJavaScript(elem)) {
                     return this.visit(elem as J, q) as any as T;
                 } else if (isSpace(elem)) {
-                    return this.visitSpace(elem as Space, q) as any as T;
+                    return this.visitSpace(elem as J.Space, q) as any as T;
                 }
                 return elem as any as T;
             }) as Draft<T>;
@@ -1072,10 +1067,10 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         });
     }
 
-    protected async visitContainer<T extends J>(container: JContainer<T>, q: RpcReceiveQueue): Promise<JContainer<T>> {
-        return produceAsync<JContainer<T>>(container, async draft => {
+    protected async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
+        return produceAsync<J.Container<T>>(container, async draft => {
             draft.before = await q.receive(container.before, space => this.visitSpace(space, q));
-            draft.elements = await q.receiveListDefined(container.elements, elem => this.visitRightPadded(elem, q)) as Draft<JRightPadded<T>[]>;
+            draft.elements = await q.receiveListDefined(container.elements, elem => this.visitRightPadded(elem, q)) as Draft<J.RightPadded<T>[]>;
             draft.markers = await q.receiveMarkers(container.markers);
         });
     }

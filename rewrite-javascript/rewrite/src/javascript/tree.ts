@@ -18,22 +18,9 @@
 
 import {SourceFile, TreeKind} from "../";
 import {
-    Annotation,
-    Block,
-    ControlParentheses,
-    Identifier,
-    Import,
     J,
     JavaType,
-    JContainer,
-    JLeftPadded,
-    JRightPadded,
-    LambdaParameters,
-    Literal,
-    Modifier,
-    Space,
     Statement,
-    TypeParameters
 } from "../java";
 
 export const JavaScriptKind = {
@@ -148,29 +135,29 @@ export type TypeTree<T extends {
 } = never> = import("../java/tree").TypeTree<JavaScriptTypeTreeBase | T>;
 
 export interface JavaScriptSourceFile extends JS, SourceFile {
-    readonly imports: JRightPadded<Import>[];
-    readonly statements: JRightPadded<Statement>[];
+    readonly imports: J.RightPadded<J.Import>[];
+    readonly statements: J.RightPadded<Statement>[];
 }
 
 export interface CompilationUnit extends JavaScriptSourceFile, JS {
     readonly kind: typeof JavaScriptKind.CompilationUnit;
-    readonly eof: Space;
+    readonly eof: J.Space;
 }
 
 export interface Alias extends JS {
     readonly kind: typeof JavaScriptKind.Alias;
-    readonly propertyName: JRightPadded<Identifier>;
+    readonly propertyName: J.RightPadded<J.Identifier>;
     readonly alias: Expression;
 }
 
 export interface ArrowFunction extends JS, Statement {
     readonly kind: typeof JavaScriptKind.ArrowFunction;
-    readonly leadingAnnotations: Annotation[];
-    readonly modifiers: Modifier[];
-    readonly typeParameters?: TypeParameters;
-    readonly parameters: LambdaParameters;
+    readonly leadingAnnotations: J.Annotation[];
+    readonly modifiers: J.Modifier[];
+    readonly typeParameters?: J.TypeParameters;
+    readonly parameters: J.LambdaParameters;
     readonly returnTypeExpression?: TypeTree;
-    readonly body: JLeftPadded<J>;
+    readonly body: J.LeftPadded<J>;
     readonly type?: JavaType;
 }
 
@@ -183,14 +170,14 @@ export interface Await extends JS {
 export interface ConditionalType extends JS {
     readonly kind: typeof JavaScriptKind.ConditionalType;
     readonly checkType: Expression;
-    readonly condition: JContainer<TypedTree>;
+    readonly condition: J.Container<TypedTree>;
     readonly type?: JavaType;
 }
 
 export interface DefaultType extends JS {
     readonly kind: typeof JavaScriptKind.DefaultType;
     readonly left: Expression;
-    readonly beforeEquals: Space;
+    readonly beforeEquals: J.Space;
     readonly right: Expression;
     readonly type?: JavaType;
 }
@@ -203,10 +190,10 @@ export interface Delete extends JS, Statement {
 
 export interface Export extends JS, Statement {
     readonly kind: typeof JavaScriptKind.Export;
-    readonly exports?: JContainer<Expression>;
-    readonly from?: Space;
-    readonly target?: Literal;
-    readonly initializer?: JLeftPadded<Expression>;
+    readonly exports?: J.Container<Expression>;
+    readonly from?: J.Space;
+    readonly target?: J.Literal;
+    readonly initializer?: J.LeftPadded<Expression>;
 }
 
 export interface ExpressionStatement extends JS, Statement {
@@ -217,78 +204,78 @@ export interface ExpressionStatement extends JS, Statement {
 export interface ExpressionWithTypeArguments extends JS {
     readonly kind: typeof JavaScriptKind.ExpressionWithTypeArguments;
     readonly clazz: J;
-    readonly typeArguments?: JContainer<Expression>;
+    readonly typeArguments?: J.Container<Expression>;
     readonly type?: JavaType;
 }
 
 export interface FunctionType extends JS {
     readonly kind: typeof JavaScriptKind.FunctionType;
-    readonly modifiers: Modifier[];
-    readonly constructorType: JLeftPadded<boolean>;
-    readonly typeParameters?: TypeParameters;
-    readonly parameters: JContainer<Statement>;
-    readonly returnType: JLeftPadded<Expression>;
+    readonly modifiers: J.Modifier[];
+    readonly constructorType: J.LeftPadded<boolean>;
+    readonly typeParameters?: J.TypeParameters;
+    readonly parameters: J.Container<Statement>;
+    readonly returnType: J.LeftPadded<Expression>;
     readonly type?: JavaType;
 }
 
 export interface InferType extends JS {
     readonly kind: typeof JavaScriptKind.InferType;
-    readonly typeParameter: JLeftPadded<J>;
+    readonly typeParameter: J.LeftPadded<J>;
     readonly type?: JavaType;
 }
 
 export interface ImportType extends JS {
     readonly kind: typeof JavaScriptKind.ImportType;
-    readonly hasTypeof: JRightPadded<boolean>;
-    readonly argumentAndAttributes: JContainer<J>;
-    readonly qualifier?: JLeftPadded<Expression>;
-    readonly typeArguments?: JContainer<Expression>;
+    readonly hasTypeof: J.RightPadded<boolean>;
+    readonly argumentAndAttributes: J.Container<J>;
+    readonly qualifier?: J.LeftPadded<Expression>;
+    readonly typeArguments?: J.Container<Expression>;
     readonly type?: JavaType;
 }
 
 export interface JsImport extends JS, Statement {
     readonly kind: typeof JavaScriptKind.JsImport;
-    readonly modifiers: Modifier[];
+    readonly modifiers: J.Modifier[];
     readonly importClause?: JsImportClause;
-    readonly moduleSpecifier: JLeftPadded<Expression>;
+    readonly moduleSpecifier: J.LeftPadded<Expression>;
     readonly attributes?: ImportAttributes;
 }
 
 export interface JsImportClause extends JS {
     readonly kind: typeof JavaScriptKind.JsImportClause;
     readonly typeOnly: boolean;
-    readonly name?: JRightPadded<Identifier>;
+    readonly name?: J.RightPadded<J.Identifier>;
     readonly namedBindings?: Expression;
 }
 
 export interface NamedImports extends JS {
     readonly kind: typeof JavaScriptKind.NamedImports;
-    readonly elements: JContainer<Expression>;
+    readonly elements: J.Container<Expression>;
     readonly type?: JavaType;
 }
 
 export interface JsImportSpecifier extends JS {
     readonly kind: typeof JavaScriptKind.JsImportSpecifier;
-    readonly importType: JLeftPadded<boolean>;
+    readonly importType: J.LeftPadded<boolean>;
     readonly specifier: Expression;
     readonly type?: JavaType;
 }
 
 export interface JSVariableDeclarations extends JS, Statement {
     readonly kind: typeof JavaScriptKind.JSVariableDeclarations;
-    readonly leadingAnnotations: Annotation[];
-    readonly modifiers: Modifier[];
+    readonly leadingAnnotations: J.Annotation[];
+    readonly modifiers: J.Modifier[];
     readonly typeExpression?: TypeTree;
-    readonly varargs?: Space;
-    readonly variables: JRightPadded<JSVariableDeclarations.JSNamedVariable>[];
+    readonly varargs?: J.Space;
+    readonly variables: J.RightPadded<JSVariableDeclarations.JSNamedVariable>[];
 }
 
 export namespace JSVariableDeclarations {
     export interface JSNamedVariable extends JS {
         readonly kind: typeof JavaScriptKind.JSNamedVariable;
         readonly name: Expression;
-        readonly dimensionsAfterName: JLeftPadded<Space>[];
-        readonly initializer?: JLeftPadded<Expression>;
+        readonly dimensionsAfterName: J.LeftPadded<J.Space>[];
+        readonly initializer?: J.LeftPadded<Expression>;
         readonly variableType?: JavaType.Variable;
     }
 }
@@ -296,7 +283,7 @@ export namespace JSVariableDeclarations {
 export interface ImportAttributes extends JS {
     readonly kind: typeof JavaScriptKind.ImportAttributes;
     readonly token: ImportAttributes.Token;
-    readonly elements: JContainer<Statement>;
+    readonly elements: J.Container<Statement>;
 }
 
 export namespace ImportAttributes {
@@ -308,21 +295,21 @@ export namespace ImportAttributes {
 
 export interface ImportTypeAttributes extends JS {
     readonly kind: typeof JavaScriptKind.ImportTypeAttributes;
-    readonly token: JRightPadded<Expression>;
-    readonly elements: JContainer<ImportAttribute>;
-    readonly end: Space;
+    readonly token: J.RightPadded<Expression>;
+    readonly elements: J.Container<ImportAttribute>;
+    readonly end: J.Space;
 }
 
 export interface ImportAttribute extends JS, Statement {
     readonly kind: typeof JavaScriptKind.ImportAttribute;
     readonly name: Expression;
-    readonly value: JLeftPadded<Expression>;
+    readonly value: J.LeftPadded<Expression>;
 }
 
 export interface JsBinary extends JS {
     readonly kind: typeof JavaScriptKind.JsBinary;
     readonly left: Expression;
-    readonly operator: JLeftPadded<JsBinary.Operator>;
+    readonly operator: J.LeftPadded<JsBinary.Operator>;
     readonly right: Expression;
     readonly type?: JavaType;
 }
@@ -346,41 +333,41 @@ export interface LiteralType extends JS {
 
 export interface MappedType extends JS {
     readonly kind: typeof JavaScriptKind.MappedType;
-    readonly prefixToken?: JLeftPadded<Literal>;
-    readonly hasReadonly: JLeftPadded<boolean>;
+    readonly prefixToken?: J.LeftPadded<J.Literal>;
+    readonly hasReadonly: J.LeftPadded<boolean>;
     readonly keysRemapping: MappedType.KeysRemapping;
-    readonly suffixToken?: JLeftPadded<Literal>;
-    readonly hasQuestionToken: JLeftPadded<boolean>;
-    readonly valueType: JContainer<TypeTree>;
+    readonly suffixToken?: J.LeftPadded<J.Literal>;
+    readonly hasQuestionToken: J.LeftPadded<boolean>;
+    readonly valueType: J.Container<TypeTree>;
     readonly type?: JavaType;
 }
 
 export namespace MappedType {
     export interface KeysRemapping extends JS, Statement {
         readonly kind: typeof JavaScriptKind.MappedTypeKeysRemapping;
-        readonly typeParameter: JRightPadded<MappedType.MappedTypeParameter>;
-        readonly nameType?: JRightPadded<Expression>;
+        readonly typeParameter: J.RightPadded<MappedType.MappedTypeParameter>;
+        readonly nameType?: J.RightPadded<Expression>;
     }
 
     export interface MappedTypeParameter extends JS, Statement {
         readonly kind: typeof JavaScriptKind.MappedTypeMappedTypeParameter;
         readonly name: Expression;
-        readonly iterateType: JLeftPadded<TypeTree>;
+        readonly iterateType: J.LeftPadded<TypeTree>;
     }
 }
 
 export interface ObjectBindingDeclarations extends JS {
     readonly kind: typeof JavaScriptKind.ObjectBindingDeclarations;
-    readonly leadingAnnotations: Annotation[];
-    readonly modifiers: Modifier[];
+    readonly leadingAnnotations: J.Annotation[];
+    readonly modifiers: J.Modifier[];
     readonly typeExpression?: TypeTree;
-    readonly bindings: JContainer<J>;
-    readonly initializer?: JLeftPadded<Expression>;
+    readonly bindings: J.Container<J>;
+    readonly initializer?: J.LeftPadded<Expression>;
 }
 
 export interface PropertyAssignment extends JS, Statement {
     readonly kind: typeof JavaScriptKind.PropertyAssignment;
-    readonly name: JRightPadded<Expression>;
+    readonly name: J.RightPadded<Expression>;
     readonly assigmentToken: PropertyAssignment.Token;
     readonly initializer?: Expression;
 }
@@ -396,15 +383,15 @@ export namespace PropertyAssignment {
 export interface SatisfiesExpression extends JS {
     readonly kind: typeof JavaScriptKind.SatisfiesExpression;
     readonly expression: J;
-    readonly satisfiesType: JLeftPadded<Expression>;
+    readonly satisfiesType: J.LeftPadded<Expression>;
     readonly type?: JavaType;
 }
 
 export interface ScopedVariableDeclarations extends JS, Statement {
     readonly kind: typeof JavaScriptKind.ScopedVariableDeclarations;
-    readonly modifiers: Modifier[];
-    readonly scope?: JLeftPadded<ScopedVariableDeclarations.Scope>;
-    readonly variables: JRightPadded<J>[];
+    readonly modifiers: J.Modifier[];
+    readonly scope?: J.LeftPadded<ScopedVariableDeclarations.Scope>;
+    readonly variables: J.RightPadded<J>[];
 }
 
 export namespace ScopedVariableDeclarations {
@@ -424,16 +411,16 @@ export interface StatementExpression extends JS, Statement {
 
 export interface TaggedTemplateExpression extends JS, Statement {
     readonly kind: typeof JavaScriptKind.TaggedTemplateExpression;
-    readonly tag?: JRightPadded<Expression>;
-    readonly typeArguments?: JContainer<Expression>;
+    readonly tag?: J.RightPadded<Expression>;
+    readonly typeArguments?: J.Container<Expression>;
     readonly templateExpression: Expression;
     readonly type?: JavaType;
 }
 
 export interface TemplateExpression extends JS, Statement {
     readonly kind: typeof JavaScriptKind.TemplateExpression;
-    readonly head: Literal;
-    readonly templateSpans: JRightPadded<TemplateExpression.TemplateSpan>[];
+    readonly head: J.Literal;
+    readonly templateSpans: J.RightPadded<TemplateExpression.TemplateSpan>[];
     readonly type?: JavaType;
 }
 
@@ -441,28 +428,28 @@ export namespace TemplateExpression {
     export interface TemplateSpan extends JS {
         readonly kind: typeof JavaScriptKind.TemplateExpressionTemplateSpan;
         readonly expression: J;
-        readonly tail: Literal;
+        readonly tail: J.Literal;
     }
 }
 
 export interface TrailingTokenStatement extends JS, Statement {
     readonly kind: typeof JavaScriptKind.TrailingTokenStatement;
-    readonly expression: JRightPadded<J>;
+    readonly expression: J.RightPadded<J>;
     readonly type?: JavaType;
 }
 
 export interface Tuple extends JS {
     readonly kind: typeof JavaScriptKind.Tuple;
-    readonly elements: JContainer<J>;
+    readonly elements: J.Container<J>;
     readonly type?: JavaType;
 }
 
 export interface TypeDeclaration extends JS, Statement {
     readonly kind: typeof JavaScriptKind.TypeDeclaration;
-    readonly modifiers: Modifier[];
-    readonly name: JLeftPadded<Identifier>;
-    readonly typeParameters?: TypeParameters;
-    readonly initializer: JLeftPadded<Expression>;
+    readonly modifiers: J.Modifier[];
+    readonly name: J.LeftPadded<J.Identifier>;
+    readonly typeParameters?: J.TypeParameters;
+    readonly initializer: J.LeftPadded<Expression>;
     readonly type?: JavaType;
 }
 
@@ -480,7 +467,7 @@ export interface TypeTreeExpression extends JS {
 export interface JsAssignmentOperation extends JS, Statement {
     readonly kind: typeof JavaScriptKind.JsAssignmentOperation;
     readonly variable: Expression;
-    readonly operator: JLeftPadded<JsAssignmentOperation.Type>;
+    readonly operator: J.LeftPadded<JsAssignmentOperation.Type>;
     readonly assignment: Expression;
     readonly type?: JavaType;
 }
@@ -505,7 +492,7 @@ export interface IndexedAccessType extends JS {
 export namespace IndexedAccessType {
     export interface IndexType extends JS {
         readonly kind: typeof JavaScriptKind.IndexedAccessTypeIndexType;
-        readonly element: JRightPadded<TypeTree>;
+        readonly element: J.RightPadded<TypeTree>;
         readonly type?: JavaType;
     }
 }
@@ -513,7 +500,7 @@ export namespace IndexedAccessType {
 export interface TypeQuery extends JS {
     readonly kind: typeof JavaScriptKind.TypeQuery;
     readonly typeExpression: TypeTree;
-    readonly typeArguments?: JContainer<Expression>;
+    readonly typeArguments?: J.Container<Expression>;
     readonly type?: JavaType;
 }
 
@@ -525,7 +512,7 @@ export interface TypeInfo extends JS {
 export interface TypeOperator extends JS {
     readonly kind: typeof JavaScriptKind.TypeOperator;
     readonly operator: TypeOperator.Type;
-    readonly expression: JLeftPadded<Expression>;
+    readonly expression: J.LeftPadded<Expression>;
 }
 
 export namespace TypeOperator {
@@ -538,21 +525,21 @@ export namespace TypeOperator {
 
 export interface TypePredicate extends JS {
     readonly kind: typeof JavaScriptKind.TypePredicate;
-    readonly asserts: JLeftPadded<boolean>;
-    readonly parameterName: Identifier;
-    readonly expression?: JLeftPadded<Expression>;
+    readonly asserts: J.LeftPadded<boolean>;
+    readonly parameterName: J.Identifier;
+    readonly expression?: J.LeftPadded<Expression>;
     readonly type?: JavaType;
 }
 
 export interface Union extends JS {
     readonly kind: typeof JavaScriptKind.Union;
-    readonly types: JRightPadded<Expression>[];
+    readonly types: J.RightPadded<Expression>[];
     readonly type?: JavaType;
 }
 
 export interface Intersection extends JS {
     readonly kind: typeof JavaScriptKind.Intersection;
-    readonly types: JRightPadded<Expression>[];
+    readonly types: J.RightPadded<Expression>[];
     readonly type?: JavaType;
 }
 
@@ -563,7 +550,7 @@ export interface Void extends JS {
 
 export interface Unary extends JS {
     readonly kind: typeof JavaScriptKind.Unary;
-    readonly operator: JLeftPadded<Unary.Type>;
+    readonly operator: J.LeftPadded<Unary.Type>;
     readonly expression: Expression;
     readonly type?: JavaType;
 }
@@ -581,78 +568,78 @@ export namespace Unary {
 
 export interface Yield extends JS {
     readonly kind: typeof JavaScriptKind.Yield;
-    readonly delegated: JLeftPadded<boolean>;
+    readonly delegated: J.LeftPadded<boolean>;
     readonly expression?: Expression;
     readonly type?: JavaType;
 }
 
 export interface WithStatement extends JS, Statement {
     readonly kind: typeof JavaScriptKind.WithStatement;
-    readonly expression: ControlParentheses<Expression>;
-    readonly body: JRightPadded<Statement>;
+    readonly expression: J.ControlParentheses<Expression>;
+    readonly body: J.RightPadded<Statement>;
 }
 
 export interface IndexSignatureDeclaration extends JS, Statement {
     readonly kind: typeof JavaScriptKind.IndexSignatureDeclaration;
-    readonly modifiers: Modifier[];
-    readonly parameters: JContainer<J>;
-    readonly typeExpression: JLeftPadded<Expression>;
+    readonly modifiers: J.Modifier[];
+    readonly parameters: J.Container<J>;
+    readonly typeExpression: J.LeftPadded<Expression>;
     readonly type?: JavaType;
 }
 
 export interface JSMethodDeclaration extends JS, Statement {
     readonly kind: typeof JavaScriptKind.JSMethodDeclaration;
-    readonly leadingAnnotations: Annotation[];
-    readonly modifiers: Modifier[];
-    readonly typeParameters?: TypeParameters;
+    readonly leadingAnnotations: J.Annotation[];
+    readonly modifiers: J.Modifier[];
+    readonly typeParameters?: J.TypeParameters;
     readonly returnTypeExpression?: TypeTree;
     readonly name: Expression;
-    readonly parameters: JContainer<Statement>;
-    readonly body?: Block;
-    readonly defaultValue?: JLeftPadded<Expression>;
+    readonly parameters: J.Container<Statement>;
+    readonly body?: J.Block;
+    readonly defaultValue?: J.LeftPadded<Expression>;
     readonly methodType?: JavaType.Method;
 }
 
 export interface JSForOfLoop extends JS {
     readonly kind: typeof JavaScriptKind.JSForOfLoop;
-    readonly await: JLeftPadded<boolean>;
+    readonly await: J.LeftPadded<boolean>;
     readonly control: JSForInOfLoopControl;
-    readonly body: JRightPadded<Statement>;
+    readonly body: J.RightPadded<Statement>;
 }
 
 export interface JSForInLoop extends JS {
     readonly kind: typeof JavaScriptKind.JSForInLoop;
     readonly control: JSForInOfLoopControl;
-    readonly body: JRightPadded<Statement>;
+    readonly body: J.RightPadded<Statement>;
 }
 
 export interface JSForInOfLoopControl extends JS {
     readonly kind: typeof JavaScriptKind.JSForInOfLoopControl;
-    readonly variable: JRightPadded<J>;
-    readonly iterable: JRightPadded<Expression>;
+    readonly variable: J.RightPadded<J>;
+    readonly iterable: J.RightPadded<Expression>;
 }
 
 export interface JSTry extends JS, Statement {
     readonly kind: typeof JavaScriptKind.JSTry;
-    readonly body: Block;
+    readonly body: J.Block;
     readonly catches: JSTry.JSCatch;
-    readonly finally?: JLeftPadded<Block>;
+    readonly finally?: J.LeftPadded<J.Block>;
 }
 
 export namespace JSTry {
     export interface JSCatch extends JS {
         readonly kind: typeof JavaScriptKind.JSCatch;
-        readonly parameter: ControlParentheses<JSVariableDeclarations>;
-        readonly body: Block;
+        readonly parameter: J.ControlParentheses<JSVariableDeclarations>;
+        readonly body: J.Block;
     }
 }
 
 export interface NamespaceDeclaration extends JS, Statement {
     readonly kind: typeof JavaScriptKind.NamespaceDeclaration;
-    readonly modifiers: Modifier[];
-    readonly keywordType: JLeftPadded<NamespaceDeclaration.KeywordType>;
-    readonly name: JRightPadded<Expression>;
-    readonly body?: Block;
+    readonly modifiers: J.Modifier[];
+    readonly keywordType: J.LeftPadded<NamespaceDeclaration.KeywordType>;
+    readonly name: J.RightPadded<Expression>;
+    readonly body?: J.Block;
 }
 
 export namespace NamespaceDeclaration {
@@ -665,11 +652,11 @@ export namespace NamespaceDeclaration {
 
 export interface FunctionDeclaration extends JS, Statement {
     readonly kind: typeof JavaScriptKind.FunctionDeclaration;
-    readonly modifiers: Modifier[];
-    readonly asteriskToken: JLeftPadded<boolean>;
-    readonly name: JLeftPadded<Identifier>;
-    readonly typeParameters?: TypeParameters;
-    readonly parameters: JContainer<Statement>;
+    readonly modifiers: J.Modifier[];
+    readonly asteriskToken: J.LeftPadded<boolean>;
+    readonly name: J.LeftPadded<J.Identifier>;
+    readonly typeParameters?: J.TypeParameters;
+    readonly parameters: J.Container<Statement>;
     readonly returnTypeExpression?: TypeTree;
     readonly body?: J;
     readonly type?: JavaType;
@@ -677,49 +664,49 @@ export interface FunctionDeclaration extends JS, Statement {
 
 export interface TypeLiteral extends JS {
     readonly kind: typeof JavaScriptKind.TypeLiteral;
-    readonly members: Block;
+    readonly members: J.Block;
     readonly type?: JavaType;
 }
 
 export interface ArrayBindingPattern extends JS {
     readonly kind: typeof JavaScriptKind.ArrayBindingPattern;
-    readonly elements: JContainer<Expression>;
+    readonly elements: J.Container<Expression>;
     readonly type?: JavaType;
 }
 
 export interface BindingElement extends JS, Statement {
     readonly kind: typeof JavaScriptKind.BindingElement;
-    readonly propertyName?: JRightPadded<Expression>;
+    readonly propertyName?: J.RightPadded<Expression>;
     readonly name: TypedTree;
-    readonly initializer?: JLeftPadded<Expression>;
+    readonly initializer?: J.LeftPadded<Expression>;
     readonly variableType?: JavaType.Variable;
 }
 
 export interface ExportDeclaration extends JS, Statement {
     readonly kind: typeof JavaScriptKind.ExportDeclaration;
-    readonly modifiers: Modifier[];
-    readonly typeOnly: JLeftPadded<boolean>;
+    readonly modifiers: J.Modifier[];
+    readonly typeOnly: J.LeftPadded<boolean>;
     readonly exportClause?: Expression;
-    readonly moduleSpecifier?: JLeftPadded<Expression>;
+    readonly moduleSpecifier?: J.LeftPadded<Expression>;
     readonly attributes?: ImportAttributes;
 }
 
 export interface ExportAssignment extends JS, Statement {
     readonly kind: typeof JavaScriptKind.ExportAssignment;
-    readonly modifiers: Modifier[];
-    readonly exportEquals: JLeftPadded<boolean>;
+    readonly modifiers: J.Modifier[];
+    readonly exportEquals: J.LeftPadded<boolean>;
     readonly expression?: Expression;
 }
 
 export interface NamedExports extends JS {
     readonly kind: typeof JavaScriptKind.NamedExports;
-    readonly elements: JContainer<Expression>;
+    readonly elements: J.Container<Expression>;
     readonly type?: JavaType;
 }
 
 export interface ExportSpecifier extends JS {
     readonly kind: typeof JavaScriptKind.ExportSpecifier;
-    readonly typeOnly: JLeftPadded<boolean>;
+    readonly typeOnly: J.LeftPadded<boolean>;
     readonly specifier: Expression;
     readonly type?: JavaType;
 }
