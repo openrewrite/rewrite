@@ -40,7 +40,7 @@ public class UnfoldProperties extends Recipe {
 
     @Option(displayName = "Exclusions",
             description = "Specifies keys that should not be unfolded. Supports regex expressions. " +
-                    "A special format `[<parent-regex>]->[<child-regex>]` can be used to exclude specific child keys under a parent. " +
+                    "A special format `[<parent-regex>]-><child-regex>` can be used to exclude specific child keys under a parent. " +
                     "For example, `[logging.level]->.*` excludes all child keys under 'logging.level'.",
             example = "org.springframework.security")
     List<String> exclusions;
