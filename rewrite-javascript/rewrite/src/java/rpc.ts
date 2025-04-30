@@ -66,7 +66,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitAssignment(assignment: J.Assignment, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(assignment, a => a.variable, variable => this.visit(variable, q));
         await q.getAndSend(assignment, a => a.assignment, assign => this.visitLeftPadded(assign, q));
-        await q.getAndSend(assignment, a => a.type && asRef(a.type), type => this.visitType(type, q));
+        await q.getAndSend(assignment, a => asRef(a.type), type => this.visitType(type, q));
         return assignment;
     }
 
@@ -74,7 +74,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(assignOp, a => a.variable, variable => this.visit(variable, q));
         await q.getAndSend(assignOp, a => a.operator, op => this.visitLeftPadded(op, q));
         await q.getAndSend(assignOp, a => a.assignment, assign => this.visit(assign, q));
-        await q.getAndSend(assignOp, a => a.type && asRef(a.type), type => this.visitType(type, q));
+        await q.getAndSend(assignOp, a => asRef(a.type), type => this.visitType(type, q));
         return assignOp;
     }
 
@@ -82,7 +82,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(binary, b => b.left, left => this.visit(left, q));
         await q.getAndSend(binary, b => b.operator, op => this.visitLeftPadded(op, q));
         await q.getAndSend(binary, b => b.right, right => this.visit(right, q));
-        await q.getAndSend(binary, a => a.type && asRef(a.type), type => this.visitType(type, q));
+        await q.getAndSend(binary, a => asRef(a.type), type => this.visitType(type, q));
         return binary;
     }
 
@@ -113,7 +113,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitDeconstructionPattern(pattern: J.DeconstructionPattern, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(pattern, p => p.deconstructor, deconstructor => this.visit(deconstructor, q));
         await q.getAndSend(pattern, p => p.nested, nested => this.visitContainer(nested, q));
-        await q.getAndSend(pattern, p => p.type && asRef(p.type), type => this.visitType(type, q));
+        await q.getAndSend(pattern, p => asRef(p.type), type => this.visitType(type, q));
         return pattern;
     }
 
@@ -149,7 +149,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitFieldAccess(fieldAccess: J.FieldAccess, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(fieldAccess, f => f.target, target => this.visit(target, q));
         await q.getAndSend(fieldAccess, f => f.name, name => this.visitLeftPadded(name, q));
-        await q.getAndSend(fieldAccess, a => a.type && asRef(a.type), type => this.visitType(type, q));
+        await q.getAndSend(fieldAccess, a => asRef(a.type), type => this.visitType(type, q));
         return fieldAccess;
     }
 
@@ -201,14 +201,14 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(instanceOf, i => i.expression, expr => this.visitRightPadded(expr, q));
         await q.getAndSend(instanceOf, i => i.clazz, clazz => this.visit(clazz, q));
         await q.getAndSend(instanceOf, i => i.pattern, pattern => this.visit(pattern, q));
-        await q.getAndSend(instanceOf, i => i.type && asRef(i.type), type => this.visitType(type, q));
+        await q.getAndSend(instanceOf, i => asRef(i.type), type => this.visitType(type, q));
         await q.getAndSend(instanceOf, i => i.modifier, modifier => this.visit(modifier, q));
         return instanceOf;
     }
 
     protected async visitIntersectionType(intersectionType: J.IntersectionType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(intersectionType, i => i.bounds, bounds => this.visitContainer(bounds, q));
-        await q.getAndSend(intersectionType, i => i.type && asRef(i.type), type => this.visitType(type, q));
+        await q.getAndSend(intersectionType, i => asRef(i.type), type => this.visitType(type, q));
         return intersectionType;
     }
 
@@ -222,7 +222,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(lambda, l => l.parameters, params => this.visit(params, q));
         await q.getAndSend(lambda, l => l.arrow, arrow => this.visitSpace(arrow, q));
         await q.getAndSend(lambda, l => l.body, body => this.visit(body, q));
-        await q.getAndSend(lambda, l => l.type && asRef(l.type), type => this.visitType(type, q));
+        await q.getAndSend(lambda, l => asRef(l.type), type => this.visitType(type, q));
         return lambda;
     }
 
@@ -236,7 +236,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(literal, l => l.value);
         await q.getAndSend(literal, l => l.valueSource);
         await q.getAndSendList(literal, l => l.unicodeEscapes, e => e.valueSourceIndex + e.codePoint);
-        await q.getAndSend(literal, l => l.type && asRef(l.type), type => this.visitType(type, q));
+        await q.getAndSend(literal, l => asRef(l.type), type => this.visitType(type, q));
         return literal;
     }
 
@@ -244,9 +244,9 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(memberRef, m => m.containing, cont => this.visitRightPadded(cont, q));
         await q.getAndSend(memberRef, m => m.typeParameters, params => this.visitContainer(params, q));
         await q.getAndSend(memberRef, m => m.reference, ref => this.visitLeftPadded(ref, q));
-        await q.getAndSend(memberRef, m => m.type && asRef(m.type), type => this.visitType(type, q));
-        await q.getAndSend(memberRef, m => m.methodType && asRef(m.methodType), type => this.visitType(type, q));
-        await q.getAndSend(memberRef, m => m.variableType && asRef(m.variableType), type => this.visitType(type, q));
+        await q.getAndSend(memberRef, m => asRef(m.type), type => this.visitType(type, q));
+        await q.getAndSend(memberRef, m => asRef(m.methodType), type => this.visitType(type, q));
+        await q.getAndSend(memberRef, m => asRef(m.variableType), type => this.visitType(type, q));
         return memberRef;
     }
 
@@ -255,7 +255,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(invocation, m => m.typeParameters, params => this.visitContainer(params, q));
         await q.getAndSend(invocation, m => m.name, name => this.visit(name, q));
         await q.getAndSend(invocation, m => m.arguments, args => this.visitContainer(args, q));
-        await q.getAndSend(invocation, m => m.methodType && asRef(m.methodType), type => this.visitType(type, q));
+        await q.getAndSend(invocation, m => asRef(m.methodType), type => this.visitType(type, q));
         return invocation;
     }
 
@@ -273,7 +273,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(newArray, n => n.typeExpression, type => this.visit(type, q));
         await q.getAndSendList(newArray, n => n.dimensions, dim => dim.id, dim => this.visit(dim, q));
         await q.getAndSend(newArray, n => n.initializer, init => this.visitContainer(init, q));
-        await q.getAndSend(newArray, n => n.type && asRef(n.type), type => this.visitType(type, q));
+        await q.getAndSend(newArray, n => asRef(n.type), type => this.visitType(type, q));
         return newArray;
     }
 
@@ -283,7 +283,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(newClass, n => n.clazz, clazz => this.visit(clazz, q));
         await q.getAndSend(newClass, n => n.arguments, args => this.visitContainer(args, q));
         await q.getAndSend(newClass, n => n.body, body => this.visit(body, q));
-        await q.getAndSend(newClass, n => n.constructorType && asRef(n.constructorType), type => this.visitType(type, q));
+        await q.getAndSend(newClass, n => asRef(n.constructorType), type => this.visitType(type, q));
         return newClass;
     }
 
@@ -296,7 +296,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitParameterizedType(paramType: J.ParameterizedType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(paramType, p => p.clazz, clazz => this.visit(clazz, q));
         await q.getAndSend(paramType, p => p.typeParameters, params => this.visitContainer(params, q));
-        await q.getAndSend(paramType, p => p.type && asRef(p.type), type => this.visitType(type, q));
+        await q.getAndSend(paramType, p => asRef(p.type), type => this.visitType(type, q));
         return paramType;
     }
 
@@ -308,12 +308,12 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitParenthesizedTypeTree(parenthesizedType: J.ParenthesizedTypeTree, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(parenthesizedType, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
         await q.getAndSend(parenthesizedType, p => p.parenthesizedType, tree => this.visit(tree, q));
-        await q.getAndSend(parenthesizedType, p => p.type && asRef(p.type), type => this.visitType(type, q));
+        await q.getAndSend(parenthesizedType, p => asRef(p.type), type => this.visitType(type, q));
         return parenthesizedType;
     }
 
     protected async visitPrimitive(primitive: J.Primitive, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(primitive, p => p.type && asRef(p.type), type => this.visitType(type, q));
+        await q.getAndSend(primitive, p => asRef(p.type), type => this.visitType(type, q));
         return primitive;
     }
 
@@ -331,7 +331,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitSwitchExpression(switchExpr: J.SwitchExpression, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(switchExpr, s => s.selector, sel => this.visit(sel, q));
         await q.getAndSend(switchExpr, s => s.cases, block => this.visit(block, q));
-        await q.getAndSend(switchExpr, s => s.type && asRef(s.type), type => this.visitType(type, q));
+        await q.getAndSend(switchExpr, s => asRef(s.type), type => this.visitType(type, q));
         return switchExpr;
     }
 
@@ -345,7 +345,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(ternary, t => t.condition, cond => this.visit(cond, q));
         await q.getAndSend(ternary, t => t.truePart, truePart => this.visitLeftPadded(truePart, q));
         await q.getAndSend(ternary, t => t.falsePart, falsePart => this.visitLeftPadded(falsePart, q));
-        await q.getAndSend(ternary, t => t.type && asRef(t.type), type => this.visitType(type, q));
+        await q.getAndSend(ternary, t => asRef(t.type), type => this.visitType(type, q));
         return ternary;
     }
 
@@ -397,7 +397,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitUnary(unary: J.Unary, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(unary, u => u.operator);
         await q.getAndSend(unary, u => u.expression, expr => this.visit(expr, q));
-        await q.getAndSend(unary, u => u.type && asRef(u.type), type => this.visitType(type, q));
+        await q.getAndSend(unary, u => asRef(u.type), type => this.visitType(type, q));
         return unary;
     }
 
@@ -405,7 +405,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(variable, v => v.name, name => this.visit(name, q));
         await q.getAndSendList(variable, v => v.dimensionsAfterName, d => JSON.stringify(d.element), dims => this.visitLeftPadded(dims, q));
         await q.getAndSend(variable, v => v.initializer, init => this.visitLeftPadded(init, q));
-        await q.getAndSend(variable, v => v.variableType && asRef(v.variableType), type => this.visitType(type, q));
+        await q.getAndSend(variable, v => asRef(v.variableType), type => this.visitType(type, q));
         return variable;
     }
 
@@ -501,7 +501,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSendList(varDecls, v => v.leadingAnnotations, annot => annot.id, annot => this.visit(annot, q));
         await q.getAndSendList(varDecls, v => v.modifiers, mod => mod.id, mod => this.visit(mod, q));
         await q.getAndSend(varDecls, v => v.typeExpression, type => this.visit(type, q));
-        await q.getAndSend(varDecls, v => v.varargs && asRef(v.varargs), space => this.visitSpace(space, q));
+        await q.getAndSend(varDecls, v => asRef(v.varargs), space => this.visitSpace(space, q));
         await q.getAndSendList(varDecls, v => v.variables, variable => variable.element.id, variable => this.visitRightPadded(variable, q));
         return varDecls;
     }

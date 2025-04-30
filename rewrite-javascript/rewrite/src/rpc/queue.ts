@@ -26,7 +26,10 @@ export interface Reference {
     [REFERENCE_KEY]: true;
 }
 
-export function asRef<T extends {}>(obj: T): T & Reference {
+export function asRef<T extends {}>(obj: T | undefined): T & Reference | undefined {
+    if(obj === undefined) {
+        return undefined;
+    }
     try {
         // Spread would create a new object. This can be used multiple times on the
         // same object without changing the reference.
