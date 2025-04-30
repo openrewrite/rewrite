@@ -17,6 +17,7 @@ package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.io.PrintStream;
@@ -72,7 +73,13 @@ public class RpcReceiveQueue {
     public Markers receiveMarkers(Markers markers) {
         return receive(markers, m -> m
                 .withId(UUID.fromString(receiveAndGet(m.getId(), UUID::toString)))
-                .withMarkers(receiveList(m.getMarkers(), null)));
+                .withMarkers(receiveList(m.getMarkers(), m2 -> {
+                    if (m2 instanceof RpcCodec) {
+                        //noinspection unchecked
+                        return (Marker) ((RpcCodec<Object>) m2).rpcReceive(m2, this);
+                    }
+                    return m2;
+                })));
     }
 
     /**

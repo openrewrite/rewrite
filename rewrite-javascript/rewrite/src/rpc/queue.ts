@@ -15,10 +15,10 @@
  */
 import {Marker, Markers, MarkersKind} from "../markers";
 import {RpcCodecs} from "./codec";
-import {produceAsync} from "../visitor";
 import {randomId} from "../uuid";
 import {WriteStream} from "fs";
 import {saveTrace, trace} from "./trace";
+import {createDraft, finishDraft} from "immer";
 
 const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
 
@@ -245,10 +245,15 @@ export class RpcReceiveQueue {
             markers = {kind: MarkersKind.Markers, id: randomId(), markers: []};
         }
         return this.receive(markers, m => {
-            return produceAsync(markers, async (draft) => {
+            return saveTrace(this.logFile, async () => {
+                const draft = createDraft(markers);
                 draft.id = await this.receive(m.id);
-                draft.markers = (await this.receiveList(m.markers, m2 => this.receive(m2)))!;
-            });
+                draft.markers = (await this.receiveList(m.markers, async m2 => {
+                    const afterCodec = RpcCodecs.forInstance(m2);
+                    return afterCodec ? afterCodec.rpcReceive(m2, this) : m2;
+                }))!;
+                return finishDraft(draft);
+            })
         })
     }
 
@@ -310,9 +315,6 @@ export class RpcReceiveQueue {
                     // The next message should be a CHANGE with a list of positions
                     const d = await this.take();
                     const positions = d.value as number[];
-                    if (positions === undefined) {
-                        console.log("why?")
-                    }
                     const after: T[] = new Array(positions.length);
                     for (let i = 0; i < positions.length; i++) {
                         const beforeIdx = positions[i];
