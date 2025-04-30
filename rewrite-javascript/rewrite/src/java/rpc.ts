@@ -551,8 +551,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitVariable(variable: Variable, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(variable, v => v.name, name => this.visit(name, q));
-        // TODO what to do here
-        // await q.getAndSendList(variable, v => v.dimensionsAfterName, d => d.element, dims => this.visitLeftPadded(dims, q));
+        await q.getAndSendList(variable, v => v.dimensionsAfterName, d => JSON.stringify(d.element), dims => this.visitLeftPadded(dims, q));
         await q.getAndSend(variable, v => v.initializer, init => this.visitLeftPadded(init, q));
         await q.getAndSend(variable, v => v.variableType && asRef(v.variableType), type => this.visitType(type, q));
 
@@ -1276,8 +1275,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const draft = createDraft(variable);
 
         draft.name = await q.receive(variable.name, name => this.visit(name, q));
-        // TODO what to do here
-        // draft.dimensionsAfterName = await q.receiveListDefined(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, q));
+        draft.dimensionsAfterName = await q.receiveListDefined(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, q));
         draft.initializer = await q.receive(variable.initializer, init => this.visitOptionalLeftPadded(init, q));
         draft.variableType = await q.receive(variable.variableType, type => this.visitType(type, q) as unknown as JavaType.Variable);
 

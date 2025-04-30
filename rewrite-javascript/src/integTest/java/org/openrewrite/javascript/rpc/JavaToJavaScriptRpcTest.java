@@ -37,7 +37,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @Suite
 @SuiteDisplayName("Java LSTs sent to and from a JavaScript Rewrite RPC server")
 @SelectPackages("org.openrewrite.java.tree")
-@IncludeClassNamePatterns(".*ProblemTest")
+// If you need to narrow down the suite to debug one test
 //@IncludeClassNamePatterns(".*AnnotationTest")
 @ExcludeClassNamePatterns({
   ".*JavadocTest",

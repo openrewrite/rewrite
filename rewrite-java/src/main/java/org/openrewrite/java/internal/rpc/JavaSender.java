@@ -551,8 +551,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, RpcSendQueue q) {
         q.getAndSend(variable, J.VariableDeclarations.NamedVariable::getName, name -> visit(name, q));
-        // TODO what to do here
-//        q.getAndSendList(variable, J.VariableDeclarations.NamedVariable::getDimensionsAfterName, l -> l.getElement(), dim -> visitLeftPadded(dim, q));
+        q.getAndSendList(variable, J.VariableDeclarations.NamedVariable::getDimensionsAfterName, l -> l.getElement().toString(), dim -> visitLeftPadded(dim, q));
         q.getAndSend(variable, n -> n.getPadding().getInitializer(), init -> visitLeftPadded(init, q));
         q.getAndSend(variable, a -> asRef(a.getVariableType()), type -> visitType(getValueNonNull(type), q));
         return variable;
