@@ -157,7 +157,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(cu, J.CompilationUnit::isCharsetBomMarked);
         q.getAndSend(cu, J.CompilationUnit::getChecksum);
         q.getAndSend(cu, J.CompilationUnit::getFileAttributes);
-        q.getAndSend(cu, J.CompilationUnit::getPackageDeclaration, pkg -> visit(pkg, q));
+        q.getAndSend(cu, c -> c.getPadding().getPackageDeclaration(), pkg -> visitRightPadded(pkg, q));
         q.getAndSendList(cu, c -> c.getPadding().getImports(), r -> r.getElement().getId(), j -> visitRightPadded(j, q));
         q.getAndSendList(cu, J.CompilationUnit::getClasses, Tree::getId, j -> visit(j, q));
         q.getAndSend(cu, c -> asRef(c.getEof()), space -> visitSpace(getValueNonNull(space), q));
@@ -189,6 +189,12 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(doWhileLoop, d -> d.getPadding().getBody(), body -> visitRightPadded(body, q));
         q.getAndSend(doWhileLoop, d -> d.getPadding().getWhileCondition(), cond -> visitLeftPadded(cond, q));
         return doWhileLoop;
+    }
+
+    @Override
+    public J visitElse(J.If.Else anElse, RpcSendQueue q) {
+        q.getAndSend(anElse, J.If.Else::getBody, body -> visit(body, q));
+        return anElse;
     }
 
     @Override
@@ -399,6 +405,21 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitNullableType(J.NullableType nullableType, RpcSendQueue q) {
+        q.getAndSendList(nullableType, J.NullableType::getAnnotations, J.Annotation::getId, annot -> visit(annot, q));
+        q.getAndSend(nullableType, n -> n.getPadding().getTypeTree(), type -> visitRightPadded(type, q));
+        q.getAndSend(nullableType, n -> asRef(n.getType()), type -> visitType(getValueNonNull(type), q));
+        return nullableType;
+    }
+
+    @Override
+    public J visitPackage(J.Package pkg, RpcSendQueue q) {
+        q.getAndSend(pkg, J.Package::getExpression, expr -> visit(expr, q));
+        q.getAndSendList(pkg, J.Package::getAnnotations, Tree::getId, a -> visit(a, q));
+        return pkg;
+    }
+
+    @Override
     public J visitParameterizedType(J.ParameterizedType type, RpcSendQueue q) {
         q.getAndSend(type, J.ParameterizedType::getClazz, clazz -> this.visit(clazz, q));
         q.getAndSend(type, t -> t.getPadding().getTypeParameters(), params -> this.visitContainer(params, q));
@@ -449,6 +470,13 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitSynchronized(J.Synchronized synch, RpcSendQueue q) {
+        q.getAndSend(synch, J.Synchronized::getLock, lock -> visit(lock, q));
+        q.getAndSend(synch, J.Synchronized::getBody, body -> visit(body, q));
+        return synch;
+    }
+
+    @Override
     public J visitTernary(J.Ternary ternary, RpcSendQueue q) {
         q.getAndSend(ternary, J.Ternary::getCondition, cond -> visit(cond, q));
         q.getAndSend(ternary, t -> t.getPadding().getTruePart(), truePart -> visitLeftPadded(truePart, q));
@@ -478,6 +506,15 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(typeCast, J.TypeCast::getExpression, expr -> visit(expr, q));
         q.getAndSend(typeCast, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return typeCast;
+    }
+
+    @Override
+    public J visitTypeParameter(J.TypeParameter typeParam, RpcSendQueue q) {
+        q.getAndSendList(typeParam, J.TypeParameter::getAnnotations, J.Annotation::getId, annot -> visit(annot, q));
+        q.getAndSendList(typeParam, J.TypeParameter::getModifiers, Tree::getId, mod -> visit(mod, q));
+        q.getAndSend(typeParam, J.TypeParameter::getName, name -> visit(name, q));
+        q.getAndSend(typeParam, t -> t.getPadding().getBounds(), bounds -> visitContainer(bounds, q));
+        return typeParam;
     }
 
     @Override

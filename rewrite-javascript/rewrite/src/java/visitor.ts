@@ -382,7 +382,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitIfElse(else_: IfElse, p: P): Promise<J | undefined> {
+    protected async visitElse(else_: IfElse, p: P): Promise<J | undefined> {
         return this.produceJava<IfElse>(else_, p, async draft => {
             draft.body = await this.visitRightPadded(else_.body, p);
         });
@@ -867,7 +867,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             case JavaKind.If:
                 return this.visitIf(t as If, p);
             case JavaKind.IfElse:
-                return this.visitIfElse(t as IfElse, p);
+                return this.visitElse(t as IfElse, p);
             case JavaKind.Import:
                 return this.visitImport(t as Import, p);
             case JavaKind.InstanceOf:

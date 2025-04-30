@@ -297,7 +297,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return ifStmt;
     }
 
-    protected async visitIfElse(ifElse: IfElse, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitElse(ifElse: IfElse, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(ifElse, e => e.body, body => this.visitRightPadded(body, q));
 
         return ifElse;
@@ -528,8 +528,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitTypeParameter(typeParam: TypeParameter, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(typeParam, t => t.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSendList(typeParam, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSendList(typeParam, a => a.modifiers, mod => mod.id, mod => this.visit(mod, q));
+        await q.getAndSendList(typeParam, t => t.modifiers, mod => mod.id, mod => this.visit(mod, q));
         await q.getAndSend(typeParam, t => t.name, name => this.visit(name, q));
         await q.getAndSend(typeParam, t => t.bounds, bounds => this.visitContainer(bounds, q));
 
@@ -994,7 +993,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitIfElse(ifElse: IfElse, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitElse(ifElse: IfElse, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(ifElse);
 
         draft.body = await q.receive(ifElse.body, body => this.visitRightPadded(body, q));
