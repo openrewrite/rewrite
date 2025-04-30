@@ -159,7 +159,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return forEach;
     }
 
-    protected async visitForEachLoopControl(control: J.ForEachLoopControl, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitForEachLoopControl(control: J.ForEachLoop.Control, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(control, c => c.variable, variable => this.visitRightPadded(variable, q));
         await q.getAndSend(control, c => c.iterable, iterable => this.visitRightPadded(iterable, q));
         return control;
@@ -171,7 +171,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return forLoop;
     }
 
-    protected async visitForLoopControl(control: J.ForLoopControl, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitForLoopControl(control: J.ForLoop.Control, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(control, c => c.init, init => this.visitRightPadded(init, q));
         await q.getAndSend(control, c => c.condition, cond => this.visitRightPadded(cond, q));
         await q.getAndSendList(control, c => c.update, update => this.visitRightPadded(update, q));
@@ -185,7 +185,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return ifStmt;
     }
 
-    protected async visitElse(ifElse: J.IfElse, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitElse(ifElse: J.If.Else, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(ifElse, e => e.body, body => this.visitRightPadded(body, q));
         return ifElse;
     }
@@ -226,7 +226,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return lambda;
     }
 
-    protected async visitLambdaParameters(params: J.LambdaParameters, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitLambdaParameters(params: J.Lambda.Parameters, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(params, p => p.parenthesized);
         await q.getAndSendList(params, p => p.parameters, param => param.element.id, param => this.visitRightPadded(param, q));
         return params;
@@ -401,7 +401,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return unary;
     }
 
-    protected async visitVariable(variable: J.Variable, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(variable, v => v.name, name => this.visit(name, q));
         await q.getAndSendList(variable, v => v.dimensionsAfterName, d => JSON.stringify(d.element), dims => this.visitLeftPadded(dims, q));
         await q.getAndSend(variable, v => v.initializer, init => this.visitLeftPadded(init, q));
@@ -776,7 +776,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitForEachLoopControl(control: J.ForEachLoopControl, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitForEachLoopControl(control: J.ForEachLoop.Control, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(control);
 
         draft.variable = await q.receive(control.variable, variable => this.visitRightPadded(variable, q));
@@ -794,7 +794,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitForLoopControl(control: J.ForLoopControl, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitForLoopControl(control: J.ForLoop.Control, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(control);
 
         draft.init = await q.receiveListDefined(control.init, init => this.visitRightPadded(init, q));
@@ -814,7 +814,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitElse(ifElse: J.IfElse, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitElse(ifElse: J.If.Else, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(ifElse);
 
         draft.body = await q.receive(ifElse.body, body => this.visitRightPadded(body, q));
@@ -873,7 +873,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitLambdaParameters(params: J.LambdaParameters, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitLambdaParameters(params: J.Lambda.Parameters, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(params);
 
         draft.parameters = await q.receiveListDefined(params.parameters, param => this.visitRightPadded(param, q));
@@ -1097,7 +1097,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitVariable(variable: J.Variable, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(variable);
 
         draft.name = await q.receive(variable.name, name => this.visit(name, q));

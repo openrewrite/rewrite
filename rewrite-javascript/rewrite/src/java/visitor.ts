@@ -249,13 +249,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected async visitForEachLoop(forLoop: J.ForEachLoop, p: P): Promise<J | undefined> {
         return this.produceJava<J.ForEachLoop>(forLoop, p, async draft => {
-            draft.control = await this.visitDefined(forLoop.control, p) as J.ForEachLoopControl;
+            draft.control = await this.visitDefined(forLoop.control, p) as J.ForEachLoop.Control;
             draft.body = await this.visitRightPadded(forLoop.body, p);
         });
     }
 
-    protected async visitForEachLoopControl(control: J.ForEachLoopControl, p: P): Promise<J | undefined> {
-        return this.produceJava<J.ForEachLoopControl>(control, p, async draft => {
+    protected async visitForEachLoopControl(control: J.ForEachLoop.Control, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ForEachLoop.Control>(control, p, async draft => {
             draft.variable = await this.visitRightPadded(control.variable, p);
             draft.iterable = await this.visitRightPadded(control.iterable, p);
         });
@@ -263,13 +263,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected async visitForLoop(forLoop: J.ForLoop, p: P): Promise<J | undefined> {
         return this.produceJava<J.ForLoop>(forLoop, p, async draft => {
-            draft.control = await this.visitDefined(forLoop.control, p) as J.ForLoopControl;
+            draft.control = await this.visitDefined(forLoop.control, p) as J.ForLoop.Control;
             draft.body = await this.visitRightPadded(forLoop.body, p);
         });
     }
 
-    protected async visitForLoopControl(control: J.ForLoopControl, p: P): Promise<J | undefined> {
-        return this.produceJava<J.ForLoopControl>(control, p, async draft => {
+    protected async visitForLoopControl(control: J.ForLoop.Control, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ForLoop.Control>(control, p, async draft => {
             draft.init = await mapAsync(control.init, i => this.visitRightPadded(i, p));
             draft.condition = await this.visitOptionalRightPadded(control.condition, p);
             draft.update = await mapAsync(control.update, u => this.visitRightPadded(u, p));
@@ -289,13 +289,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.ifCondition = await this.visitDefined(iff.ifCondition, p) as J.ControlParentheses<Expression>;
             draft.thenPart = await this.visitRightPadded(iff.thenPart, p);
             if (iff.elsePart) {
-                draft.elsePart = await this.visitDefined(iff.elsePart, p) as J.IfElse;
+                draft.elsePart = await this.visitDefined(iff.elsePart, p) as J.If.Else;
             }
         });
     }
 
-    protected async visitElse(else_: J.IfElse, p: P): Promise<J | undefined> {
-        return this.produceJava<J.IfElse>(else_, p, async draft => {
+    protected async visitElse(else_: J.If.Else, p: P): Promise<J | undefined> {
+        return this.produceJava<J.If.Else>(else_, p, async draft => {
             draft.body = await this.visitRightPadded(else_.body, p);
         });
     }
@@ -337,15 +337,15 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected async visitLambda(lambda: J.Lambda, p: P): Promise<J | undefined> {
         return this.produceJava<J.Lambda>(lambda, p, async draft => {
-            draft.parameters = await this.visitDefined(lambda.parameters, p) as J.LambdaParameters;
+            draft.parameters = await this.visitDefined(lambda.parameters, p) as J.Lambda.Parameters;
             draft.arrow = await this.visitSpace(lambda.arrow, p);
             draft.body = await this.visitDefined(lambda.body, p) as Statement | Expression;
             draft.type = await this.visitType(lambda.type, p);
         });
     }
 
-    protected async visitLambdaParameters(params: J.LambdaParameters, p: P): Promise<J | undefined> {
-        return this.produceJava<J.LambdaParameters>(params, p, async draft => {
+    protected async visitLambdaParameters(params: J.Lambda.Parameters, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Lambda.Parameters>(params, p, async draft => {
             draft.parameters = await mapAsync(params.parameters, param => this.visitRightPadded(param, p));
         });
     }
@@ -621,8 +621,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitVariable(variable: J.Variable, p: P): Promise<J | undefined> {
-        return this.produceJava<J.Variable>(variable, p, async draft => {
+    protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: P): Promise<J | undefined> {
+        return this.produceJava<J.VariableDeclarations.NamedVariable>(variable, p, async draft => {
             draft.name = await this.visitDefined(variable.name, p) as J.Identifier;
             draft.dimensionsAfterName = await mapAsync(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, p));
             draft.initializer = await this.visitOptionalLeftPadded(variable.initializer, p);
@@ -761,17 +761,17 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             case J.Kind.ForEachLoop:
                 return this.visitForEachLoop(t as J.ForEachLoop, p);
             case J.Kind.ForEachLoopControl:
-                return this.visitForEachLoopControl(t as J.ForEachLoopControl, p);
+                return this.visitForEachLoopControl(t as J.ForEachLoop.Control, p);
             case J.Kind.ForLoop:
                 return this.visitForLoop(t as J.ForLoop, p);
             case J.Kind.ForLoopControl:
-                return this.visitForLoopControl(t as J.ForLoopControl, p);
+                return this.visitForLoopControl(t as J.ForLoop.Control, p);
             case J.Kind.Identifier:
                 return this.visitIdentifier(t as J.Identifier, p);
             case J.Kind.If:
                 return this.visitIf(t as J.If, p);
             case J.Kind.IfElse:
-                return this.visitElse(t as J.IfElse, p);
+                return this.visitElse(t as J.If.Else, p);
             case J.Kind.Import:
                 return this.visitImport(t as J.Import, p);
             case J.Kind.InstanceOf:
@@ -783,7 +783,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             case J.Kind.Lambda:
                 return this.visitLambda(t as J.Lambda, p);
             case J.Kind.LambdaParameters:
-                return this.visitLambdaParameters(t as J.LambdaParameters, p);
+                return this.visitLambdaParameters(t as J.Lambda.Parameters, p);
             case J.Kind.Literal:
                 return this.visitLiteral(t as J.Literal, p);
             case J.Kind.MemberReference:
@@ -844,8 +844,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
                 return this.visitUnknownSource(t as J.UnknownSource, p);
             case J.Kind.VariableDeclarations:
                 return this.visitVariableDeclarations(t as J.VariableDeclarations, p);
-            case J.Kind.Variable:
-                return this.visitVariable(t as J.Variable, p);
+            case J.Kind.NamedVariable:
+                return this.visitVariable(t as J.VariableDeclarations.NamedVariable, p);
             case J.Kind.WhileLoop:
                 return this.visitWhileLoop(t as J.WhileLoop, p);
             case J.Kind.Wildcard:

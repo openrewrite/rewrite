@@ -156,7 +156,7 @@ export namespace JS {
         readonly leadingAnnotations: J.Annotation[];
         readonly modifiers: J.Modifier[];
         readonly typeParameters?: J.TypeParameters;
-        readonly parameters: J.LambdaParameters;
+        readonly parameters: J.Lambda.Parameters;
         readonly returnTypeExpression?: TypeTree;
         readonly body: J.LeftPadded<J>;
         readonly type?: JavaType;

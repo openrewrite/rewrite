@@ -19,10 +19,10 @@
 import {Markers, SourceFile, Tree, TreeKind} from "../";
 
 
-type JavaExpressionBase = J.FieldAccess | J.Assignment | J.AssignmentOperation | J.InstanceOf | J.Binary | J.Unary | 
-    J.Ternary | J.Parentheses<J> | J.ArrayAccess | J.MethodInvocation | J.NewArray | J.NewClass | J.Lambda | 
-    J.TypeCast | J.ParenthesizedTypeTree | J.MemberReference | J.AnnotatedType | J.ArrayType | J.Literal | 
-    J.Annotation | J.SwitchExpression | J.Primitive | J.Wildcard | J.IntersectionType | J.NullableType | 
+type JavaExpressionBase = J.FieldAccess | J.Assignment | J.AssignmentOperation | J.InstanceOf | J.Binary | J.Unary |
+    J.Ternary | J.Parentheses<J> | J.ArrayAccess | J.MethodInvocation | J.NewArray | J.NewClass | J.Lambda |
+    J.TypeCast | J.ParenthesizedTypeTree | J.MemberReference | J.AnnotatedType | J.ArrayType | J.Literal |
+    J.Annotation | J.SwitchExpression | J.Primitive | J.Wildcard | J.IntersectionType | J.NullableType |
     J.ControlParentheses<J> | J.Empty | J.Unknown | J.Erroneous;
 
 export type Expression<T extends { kind: string } = never> = JavaExpressionBase | T;
@@ -100,6 +100,7 @@ export namespace J {
         MethodInvocation: "org.openrewrite.java.tree.J$MethodInvocation",
         Modifier: "org.openrewrite.java.tree.J$Modifier",
         MultiCatch: "org.openrewrite.java.tree.J$MultiCatch",
+        NamedVariable: "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable",
         NewArray: "org.openrewrite.java.tree.J$NewArray",
         NewClass: "org.openrewrite.java.tree.J$NewClass",
         NullableType: "org.openrewrite.java.tree.J$NullableType",
@@ -125,7 +126,6 @@ export namespace J {
         Unknown: "org.openrewrite.java.tree.J$Unknown",
         UnknownSource: "org.openrewrite.java.tree.J$Unknown$Source",
         VariableDeclarations: "org.openrewrite.java.tree.J$VariableDeclarations",
-        Variable: "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable",
         WhileLoop: "org.openrewrite.java.tree.J$WhileLoop",
         Wildcard: "org.openrewrite.java.tree.J$Wildcard",
         Yield: "org.openrewrite.java.tree.J$Yield",
@@ -322,27 +322,31 @@ export namespace J {
 
     export interface ForEachLoop extends J, Statement {
         readonly kind: typeof Kind.ForEachLoop;
-        readonly control: ForEachLoopControl;
+        readonly control: ForEachLoop.Control;
         readonly body: RightPadded<Statement>;
     }
 
-    export interface ForEachLoopControl extends J {
-        readonly kind: typeof Kind.ForEachLoopControl;
-        readonly variable: RightPadded<VariableDeclarations>;
-        readonly iterable: RightPadded<Expression>;
+    export namespace ForEachLoop {
+        export interface Control extends J {
+            readonly kind: typeof Kind.ForEachLoopControl;
+            readonly variable: RightPadded<VariableDeclarations>;
+            readonly iterable: RightPadded<Expression>;
+        }
     }
 
     export interface ForLoop extends J, Statement {
         readonly kind: typeof Kind.ForLoop;
-        readonly control: ForLoopControl;
+        readonly control: ForLoop.Control;
         readonly body: RightPadded<Statement>;
     }
 
-    export interface ForLoopControl extends J {
-        readonly kind: typeof Kind.ForLoopControl;
-        readonly init: RightPadded<Statement>[];
-        readonly condition?: RightPadded<Expression>;
-        readonly update: RightPadded<Statement>[];
+    export namespace ForLoop {
+        export interface Control extends J {
+            readonly kind: typeof Kind.ForLoopControl;
+            readonly init: RightPadded<Statement>[];
+            readonly condition?: RightPadded<Expression>;
+            readonly update: RightPadded<Statement>[];
+        }
     }
 
     export interface ParenthesizedTypeTree extends J {
@@ -364,12 +368,14 @@ export namespace J {
         readonly kind: typeof Kind.If;
         readonly ifCondition: ControlParentheses<Expression>;
         readonly thenPart: RightPadded<Statement>;
-        readonly elsePart?: IfElse;
+        readonly elsePart?: If.Else;
     }
 
-    export interface IfElse extends J {
-        readonly kind: typeof Kind.IfElse;
-        readonly body: RightPadded<Statement>;
+    export namespace If {
+        export interface Else extends J {
+            readonly kind: typeof Kind.IfElse;
+            readonly body: RightPadded<Statement>;
+        }
     }
 
     export interface Import extends J {
@@ -409,16 +415,18 @@ export namespace J {
 
     export interface Lambda extends J, Statement {
         readonly kind: typeof Kind.Lambda;
-        readonly parameters: LambdaParameters;
+        readonly parameters: Lambda.Parameters;
         readonly arrow: Space;
         readonly body: Statement | Expression;
         readonly type?: JavaType;
     }
 
-    export interface LambdaParameters extends J {
-        readonly kind: typeof Kind.LambdaParameters;
-        readonly parenthesized: boolean;
-        readonly parameters: RightPadded<J>[];
+    export namespace Lambda {
+        export interface Parameters extends J {
+            readonly kind: typeof Kind.LambdaParameters;
+            readonly parenthesized: boolean;
+            readonly parameters: RightPadded<J>[];
+        }
     }
 
     export interface Literal extends J {
@@ -657,15 +665,17 @@ export namespace J {
         readonly modifiers: Modifier[];
         readonly typeExpression?: TypeTree;
         readonly varargs?: Space;
-        readonly variables: RightPadded<Variable>[];
+        readonly variables: RightPadded<VariableDeclarations.NamedVariable>[];
     }
 
-    export interface Variable extends J {
-        readonly kind: typeof Kind.Variable;
-        readonly name: Identifier;
-        readonly dimensionsAfterName: LeftPadded<Space>[];
-        readonly initializer?: LeftPadded<Expression>;
-        readonly variableType?: JavaType.Variable;
+    export namespace VariableDeclarations {
+        export interface NamedVariable extends J {
+            readonly kind: typeof Kind.NamedVariable;
+            readonly name: Identifier;
+            readonly dimensionsAfterName: LeftPadded<Space>[];
+            readonly initializer?: LeftPadded<Expression>;
+            readonly variableType?: JavaType.Variable;
+        }
     }
 
     export interface WhileLoop extends J, Statement {

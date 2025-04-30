@@ -83,7 +83,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.leadingAnnotations = await mapAsync(arrowFunction.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
             draft.modifiers = await mapAsync(arrowFunction.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.typeParameters = arrowFunction.typeParameters && await this.visitDefined<J.TypeParameters>(arrowFunction.typeParameters, p);
-            draft.parameters = await this.visitDefined<J.LambdaParameters>(arrowFunction.parameters, p);
+            draft.parameters = await this.visitDefined<J.Lambda.Parameters>(arrowFunction.parameters, p);
             draft.returnTypeExpression = arrowFunction.returnTypeExpression && await this.visitDefined<TypeTree>(arrowFunction.returnTypeExpression, p);
             draft.body = await this.visitLeftPadded(arrowFunction.body, p);
             draft.type = arrowFunction.type && await this.visitType(arrowFunction.type, p);
