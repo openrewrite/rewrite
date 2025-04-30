@@ -140,7 +140,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public Accumulator getInitialValue(ExecutionContext ctx) {
         Accumulator acc = new Accumulator();
         for (Recipe precondition : preconditions) {
-            if(precondition instanceof ScanningRecipe) {
+            if(isScanningRequired(precondition)) {
                 acc.recipeToAccumulator.put(precondition, ((ScanningRecipe<?>) precondition).getInitialValue(ctx));
             }
         }
@@ -155,7 +155,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 for (Recipe precondition : preconditions) {
-                    if (precondition instanceof ScanningRecipe) {
+                    if (isScanningRequired(precondition)) {
                         ScanningRecipe preconditionRecipe = (ScanningRecipe) precondition;
                         Object preconditionAcc = acc.recipeToAccumulator.get(precondition);
                         preconditionRecipe.getScanner(preconditionAcc)
@@ -344,13 +344,51 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {
         List<Recipe> mappedRecipeList = new ArrayList<>(recipeList.size());
         for (Recipe recipe : recipeList) {
-            if (recipe instanceof ScanningRecipe) {
+            if (isScanningRequired(recipe)) {
                 mappedRecipeList.add(new BellwetherDecoratedScanningRecipe<>(bellwether, (ScanningRecipe<?>) recipe));
             } else {
                 mappedRecipeList.add(new BellwetherDecoratedRecipe(bellwether, recipe));
             }
         }
         return mappedRecipeList;
+    }
+
+    @Override
+    public boolean isScanning() {
+        for (Recipe r : this.getPreconditions()) {
+            if (r.isScanning()) {
+                return true;
+            }
+        }
+        for (Recipe r : this.getRecipeList()) {
+            if (r.isScanning()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Can replace this with isScanning() once that has propagated everywhere in a real release
+    private static boolean isScanningRequired(Recipe recipe) {
+        if (recipe instanceof ScanningRecipe) {
+            // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
+            // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
+            if(recipe instanceof DeclarativeRecipe) {
+                for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
+                    if (isScanningRequired(precondition)) {
+                        return true;
+                    }
+                }
+            } else {
+                return true;
+            }
+        }
+        for (Recipe r : recipe.getRecipeList()) {
+            if (isScanningRequired(r)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void addUninitialized(Recipe recipe) {
