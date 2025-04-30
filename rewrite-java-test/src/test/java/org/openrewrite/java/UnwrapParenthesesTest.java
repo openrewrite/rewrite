@@ -254,4 +254,20 @@ class UnwrapParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parensAroundSwitchAreNecessary() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+            public class Foo {
+                public int foo(int i) {
+                    return (switch(i) {
+                        default -> "foo";
+                    }).length();
+               }
+            }
+            """));
+    }
 }
