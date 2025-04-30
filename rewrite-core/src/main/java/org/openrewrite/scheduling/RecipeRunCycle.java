@@ -316,7 +316,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }
         return isScanningRecipe;
     }
-    // Can replace this with recipe.isScanning() once that has propagated everywhere in a real release
+
     private static boolean isScanningRequired(Recipe recipe) {
         if (recipe instanceof ScanningRecipe) {
             // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
