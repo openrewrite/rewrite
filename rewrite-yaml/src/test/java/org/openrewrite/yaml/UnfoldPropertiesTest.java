@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -73,7 +74,8 @@ class UnfoldPropertiesTest implements RewriteTest {
                       # Comment 2
                       7.8.10:
                         # Comment 3
-                        11.12: false
+                        11.12: false # Comment 4
+              # Comment 5
               add.more: value
               """,
             """
@@ -95,7 +97,8 @@ class UnfoldPropertiesTest implements RewriteTest {
                               10:
                                 # Comment 3
                                 11:
-                                  12: false
+                                  12: false # Comment 4
+              # Comment 5
               add:
                 more: value
               """
@@ -213,6 +216,8 @@ class UnfoldPropertiesTest implements RewriteTest {
               logging.level.com.second.package: DEBUG
               other: thing
               logging.level.com.third.package: DEBUG
+              logging.level.com:
+                fourth.package: DEBUG
               """,
             """
               logging:
@@ -224,6 +229,83 @@ class UnfoldPropertiesTest implements RewriteTest {
                       package: DEBUG
                     third:
                       package: DEBUG
+                    fourth:
+                      package: DEBUG
+              some:
+                thing: else
+              other: thing
+              """
+          )
+        );
+    }
+
+    @Test
+    // TODO implement handling of comments, remove this test and enable the `mergeDuplicatedSectionsWitComments` test
+    void mergeDuplicatedSectionsCommentsAreIgnored() {
+        rewriteRun(
+          yaml(
+            """
+              logging.level:
+                 # unaltered comment
+                com.first.package: INFO
+              logging.level.com.second.package: DEBUG # comment 1
+              logging.level.com.third.package: DEBUG # comment 2
+              """,
+            """
+              logging:
+                level:
+                  # unaltered comment
+                  com:
+                    first:
+                      package: INFO
+              logging:
+                level:
+                  com:
+                    second:
+                      package: DEBUG # comment 1
+              logging:
+                level:
+                  com:
+                    third:
+                      package: DEBUG # comment 2
+              """
+          )
+        );
+    }
+
+    @Test
+    @ExpectedToFail("Comments are not supported yet")
+    void mergeDuplicatedSectionsWitComments() {
+        rewriteRun(
+          yaml(
+            """
+              # comment 1
+              logging.level:
+                # comment 4
+                com.first.package: INFO # comment 5
+              some.thing: else
+              # comment 2
+              logging.level.com.second.package: DEBUG  # comment 6
+              other: thing
+              # comment 3
+              logging.level.com.third.package: DEBUG  # comment 7
+              logging.level.com:
+                fourth.package: DEBUG  # comment 8
+              """,
+            """
+              # comment 1
+              # comment 2
+              # comment 3
+              logging:
+                level:
+                  # comment 4
+                  com:
+                    first:
+                      package: INFO # comment 5
+                    second:
+                      package: DEBUG # comment 6
+                    third:
+                      package: DEBUG # comment 7
               some:
                 thing: else
               other: thing
