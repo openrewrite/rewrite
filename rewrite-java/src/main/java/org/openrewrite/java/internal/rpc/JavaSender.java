@@ -193,7 +193,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     @Override
     public J visitElse(J.If.Else anElse, RpcSendQueue q) {
-        q.getAndSend(anElse, J.If.Else::getBody, body -> visit(body, q));
+        q.getAndSend(anElse, e -> e.getPadding().getBody(), body -> visitRightPadded(body, q));
         return anElse;
     }
 

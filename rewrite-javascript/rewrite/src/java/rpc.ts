@@ -116,7 +116,6 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitAnnotatedType(annotatedType: AnnotatedType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(annotatedType, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
         await q.getAndSend(annotatedType, a => a.typeExpression, type => this.visit(type, q));
-        await q.getAndSend(annotatedType, a => a.type && asRef(a.type), type => this.visitType(type, q));
 
         return annotatedType;
     }
@@ -765,7 +764,6 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.annotations = await q.receiveListDefined(annotatedType.annotations, annot => this.visit(annot, q));
         draft.typeExpression = await q.receive(annotatedType.typeExpression, type => this.visit(type, q));
-        draft.type = await q.receive(annotatedType.type, type => this.visitType(type, q));
 
         return finishDraft(draft);
     }
