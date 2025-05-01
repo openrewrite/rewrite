@@ -1963,6 +1963,46 @@ export namespace JavaType {
         readonly annotations: JavaType.Annotation[];
     }
 
+
+    export class Primitive implements JavaType {
+        private constructor(
+            public readonly keyword: string,
+            public readonly kind = JavaType.Kind.Primitive
+        ) {}
+
+        static readonly Boolean = new Primitive('boolean');
+        static readonly Byte    = new Primitive('byte');
+        static readonly Char    = new Primitive('char');
+        static readonly Double  = new Primitive('double');
+        static readonly Float   = new Primitive('float');
+        static readonly Int     = new Primitive('int');
+        static readonly Long    = new Primitive('long');
+        static readonly Short   = new Primitive('short');
+        static readonly String   = new Primitive('String');
+        static readonly Void    = new Primitive('void');
+        static readonly Null    = new Primitive('null');
+        static readonly None    = new Primitive('');
+
+        private static _all = [
+            Primitive.Boolean,
+            Primitive.Byte,
+            Primitive.Char,
+            Primitive.Double,
+            Primitive.Float,
+            Primitive.Int,
+            Primitive.Long,
+            Primitive.Short,
+            Primitive.String,
+            Primitive.Void,
+            Primitive.Null,
+            Primitive.None
+        ];
+
+        static values(): Primitive[] {
+            return Primitive._all.slice();
+        }
+    }
+
     export interface Primitive extends JavaType {
         readonly kind: typeof Kind.Primitive;
         readonly keyword: string;
@@ -1982,9 +2022,20 @@ export namespace JavaType {
         readonly kind: typeof Kind.ShallowClass;
     }
 
-    export interface Unknown extends JavaType {
-        readonly kind: typeof Kind.Unknown;
-        readonly message: string;
+    export const unknownType: JavaType = {
+        kind: JavaType.Kind.Unknown
+    };
+
+    export function isPrimitive(type?: JavaType): type is JavaType.Primitive {
+        return type?.kind === JavaType.Kind.Primitive;
+    }
+
+    export function isClass(type?: JavaType): type is JavaType.Class {
+        return type?.kind === JavaType.Kind.Class;
+    }
+
+    export function isArray(type?: JavaType): type is JavaType.Array {
+        return type?.kind === JavaType.Kind.Array;
     }
 }
 

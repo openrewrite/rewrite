@@ -18,7 +18,7 @@ import '../java';
 import {JavaScriptVisitor, JS} from ".";
 import {PrintOutputCapture} from "../print";
 import {Cursor, Tree} from "../tree";
-import {Comment, emptySpace, J, JavaMarkers, Statement, TextComment, TrailingComma, TypeTree} from "../java";
+import {Comment, emptySpace, J, JavaMarkers, JavaType, Statement, TextComment, TrailingComma, TypeTree} from "../java";
 import {Marker, Markers} from "../markers";
 import Space = J.Space;
 import NamespaceDeclaration = JS.NamespaceDeclaration;
@@ -299,7 +299,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntax(arrayType, p);
         let type: TypeTree = arrayType;
 
-        while (type.kind == J.Kind.ArrayType) {
+        while (type.kind === J.Kind.ArrayType) {
             type = (type as J.ArrayType).elementType;
         }
 
@@ -312,7 +312,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitSpace(arrayType.dimension.element, p);
             p.append("]");
 
-            if (arrayType.elementType.kind == J.Kind.ArrayType) {
+            if (arrayType.elementType.kind === J.Kind.ArrayType) {
                 this.printDimensions(arrayType.elementType as J.ArrayType, p);
             }
         }
@@ -330,7 +330,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visitSpace(arrayType.dimension?.element ?? emptySpace, p);
         p.append("]");
 
-        if (arrayType.elementType.kind == J.Kind.ArrayType) {
+        if (arrayType.elementType.kind === J.Kind.ArrayType) {
             this.printDimensions(arrayType.elementType as J.ArrayType, p);
         }
 
