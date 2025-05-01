@@ -22,7 +22,17 @@ export function javascript(before: string | null, after?: AfterRecipe): SourceSp
         kind: JS.Kind.CompilationUnit,
         before: before,
         after: dedentAfter(after),
-        ext: 'json',
+        ext: 'js',
+        parser: () => new JavaScriptParser()
+    };
+}
+
+export function typescript(before: string | null, after?: AfterRecipe): SourceSpec<JS.CompilationUnit> {
+    return {
+        kind: JS.Kind.CompilationUnit,
+        before: before,
+        after: dedentAfter(after),
+        ext: 'ts',
         parser: () => new JavaScriptParser()
     };
 }

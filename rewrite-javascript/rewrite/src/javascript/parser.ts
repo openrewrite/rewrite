@@ -86,7 +86,7 @@ export class JavaScriptParser extends Parser {
 
         // Populate inputFiles map and remove from cache if necessary
         for (const input of inputs) {
-            const sourcePath = parserInputRead(input);
+            const sourcePath = parserInputFile(input);
             inputFiles.set(sourcePath, input);
             // Remove from cache if previously cached
             this.sourceFileCache.delete(sourcePath);

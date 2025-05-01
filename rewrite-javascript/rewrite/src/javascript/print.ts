@@ -16,7 +16,7 @@
 import '../tree';
 import '../java';
 import {JavaScriptVisitor, JS} from ".";
-import {PrintOutputCapture} from "../print";
+import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, Tree} from "../tree";
 import {Comment, emptySpace, J, JavaMarkers, JavaType, Statement, TextComment, TrailingComma, TypeTree} from "../java";
 import {Marker, Markers} from "../markers";
@@ -26,11 +26,6 @@ import NamespaceDeclaration = JS.NamespaceDeclaration;
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     JAVA_SCRIPT_MARKER_WRAPPER: (out: string) => string = (out) => `/*~~${out}${out.length === 0 ? "" : "~~"}>*/`;
-
-    constructor(cursor: Cursor) {
-        super();
-        this.cursor = cursor;
-    }
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(cu, p);
@@ -1974,3 +1969,5 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return controlParens;
     }
 }
+
+TreePrinters.register(JS.Kind.CompilationUnit, new JavaScriptPrinter());
