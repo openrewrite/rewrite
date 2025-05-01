@@ -382,7 +382,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node!),
             markers: emptyMarkers,
-            keyword: kind == J.ModifierType.LanguageExtension ? node.getText() : undefined,
+            keyword: kind === J.ModifierType.LanguageExtension ? node.getText() : undefined,
             type: kind,
             annotations: []
         };
@@ -453,20 +453,19 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             leadingAnnotations: this.mapDecorators(node),
             modifiers: this.mapModifiers(node),
-            kindKeyword: {
+            classKind: {
                 kind: J.Kind.ClassDeclarationKind,
                 id: randomId(),
                 prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
                 markers: emptyMarkers,
                 annotations: [],
-                classType: J.ClassType.Class
+                type: J.ClassType.Class
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
             typeParameters: this.mapTypeParametersAsJContainer(node),
             primaryConstructor: undefined, // FIXME primary constructor
             extends: this.mapExtends(node),
             implements: this.mapImplements(node),
-            permits: undefined,
             body: {
                 kind: J.Kind.Block,
                 id: randomId(),
@@ -706,7 +705,6 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            typeExpression: undefined,
             dimensions: [],
             initializer: {
                 kind: J.Kind.JContainer,
@@ -727,8 +725,7 @@ export class JavaScriptParserVisitor {
             annotations: [],
             modifiers: this.mapModifiers(node),
             name: this.visit(node.name),
-            bounds: (node.constraint || node.default) ?
-                {
+            bounds: (node.constraint || node.default) && {
                     kind: J.Kind.JContainer,
                     before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExtendsKeyword) ?? this.findChildNode(node, ts.SyntaxKind.EqualsToken)!),
                     elements: [
@@ -736,7 +733,7 @@ export class JavaScriptParserVisitor {
                         node.default ? this.rightPadded(this.visit(node.default), this.suffix(node.default)) : this.rightPadded(this.newJEmpty(), emptySpace)
                     ],
                     markers: emptyMarkers
-                } : undefined
+                }
         };
     }
 
@@ -750,7 +747,6 @@ export class JavaScriptParserVisitor {
                 leadingAnnotations: this.mapDecorators(node),
                 modifiers: this.mapModifiers(node),
                 typeInfo: this.mapTypeInfo(node),
-                varargs: undefined,
                 variables: [
                     this.rightPadded(
                         {
@@ -854,7 +850,7 @@ export class JavaScriptParserVisitor {
                     markers: emptyMarkers,
                     name: nameExpression,
                     dimensionsAfterName: [],
-                    initializer: node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) : undefined,
+                    initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) ,
                     variableType: this.mapVariableType(node)
                 },
                 this.suffix(node.name)
@@ -1476,7 +1472,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             typeExpression: this.convert(node.exprName),
-            typeArguments: node.typeArguments ? this.mapTypeArguments(this.suffix(node.exprName), node.typeArguments) : undefined,
+            typeArguments: node.typeArguments && this.mapTypeArguments(this.suffix(node.exprName), node.typeArguments),
             type: this.mapType(node)
         }
     }
@@ -1512,7 +1508,6 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             elementType: this.convert(node.elementType),
-            annotations: undefined,
             dimension: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBracketToken)!), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseBracketToken)!)),
             type: this.mapType(node)!
         }
@@ -1708,17 +1703,16 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            prefixToken: hasPrefixToken(node.readonlyToken) ? this.leftPadded(this.prefix(node.readonlyToken!),
+            prefixToken: hasPrefixToken(node.readonlyToken) && this.leftPadded(this.prefix(node.readonlyToken!),
                 {
                     kind: J.Kind.Literal,
                     id: randomId(),
                     prefix: this.prefix(node.readonlyToken!),
                     markers: emptyMarkers,
-                    value: undefined,
+                    value: undefined, // FIXME verify
                     valueSource: node.readonlyToken!.getText(),
-                    unicodeEscapes: undefined,
                     type: this.mapPrimitiveType(node.readonlyToken!)
-                }) : undefined,
+                }),
             hasReadonly: node.readonlyToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.ReadonlyKeyword)!), true) : this.leftPadded(emptySpace, false),
             keysRemapping: {
                 kind: JS.Kind.MappedTypeKeysRemapping,
@@ -1735,20 +1729,19 @@ export class JavaScriptParserVisitor {
                         iterateType: this.leftPadded(this.suffix(node.typeParameter.name), this.visit(node.typeParameter.constraint!)),
                     },
                     this.suffix(node.typeParameter)),
-                nameType: node.nameType ? this.rightPadded(this.visit(node.nameType), this.suffix(node.nameType)) : undefined
+                nameType: node.nameType && this.rightPadded(this.visit(node.nameType), this.suffix(node.nameType))
             },
-            suffixToken: hasSuffixToken(node.questionToken) ? this.leftPadded(this.prefix(node.questionToken!),
+            suffixToken: hasSuffixToken(node.questionToken) && this.leftPadded(this.prefix(node.questionToken!),
                 {
                     kind: J.Kind.Literal,
                     id: randomId(),
                     prefix: this.prefix(node.questionToken!),
                     markers: emptyMarkers,
-                    value: undefined,
+                    value: undefined, // FIXME verify
                     valueSource: node.questionToken!.getText(),
-                    unicodeEscapes: undefined,
                     type: this.mapPrimitiveType(node.questionToken!)
                 }
-            ) : undefined,
+            ),
             hasQuestionToken: node.questionToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.QuestionToken)!), true) : this.leftPadded(emptySpace, false),
             valueType: node.type ? {
                 kind: J.Kind.JContainer,
@@ -1799,7 +1792,6 @@ export class JavaScriptParserVisitor {
                 leadingAnnotations: [],
                 modifiers: [],
                 typeExpression: this.mapTypeInfo(node),
-                varargs: undefined,
                 variables: [this.rightPadded(
                     {
                         kind: JS.Kind.JSNamedVariable,
@@ -1808,7 +1800,6 @@ export class JavaScriptParserVisitor {
                         markers: emptyMarkers,
                         name: this.getOptionalUnary(node),
                         dimensionsAfterName: [],
-                        initializer: undefined,
                         variableType: this.mapVariableType(node),
                     },
                     this.suffix(node.name)
@@ -1825,7 +1816,6 @@ export class JavaScriptParserVisitor {
                 leadingAnnotations: [],
                 modifiers: [],
                 typeExpression: this.mapTypeInfo(node),
-                varargs: undefined,
                 variables: [this.rightPadded(
                     {
                         kind: JS.Kind.JSNamedVariable,
@@ -1842,7 +1832,6 @@ export class JavaScriptParserVisitor {
                             type: this.mapType(node)
                         },
                         dimensionsAfterName: [],
-                        initializer: undefined,
                         variableType: this.mapVariableType(node),
                     },
                     this.suffix(node.name)
@@ -1927,8 +1916,8 @@ export class JavaScriptParserVisitor {
                 elements: [this.rightPadded(this.visit(node.argument), this.suffix(node.argument))].concat(importTypeAttributes ? [this.rightPadded(importTypeAttributes, this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))] : []),
                 markers: emptyMarkers
             },
-            qualifier: node.qualifier ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.DotToken)!), this.visit(node.qualifier)) : undefined,
-            typeArguments: node.typeArguments ? this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments) : undefined,
+            qualifier: node.qualifier && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.DotToken)!), this.visit(node.qualifier)),
+            typeArguments: node.typeArguments && this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments),
             type: this.mapType(node)
         };
     }
@@ -1941,7 +1930,6 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             leadingAnnotations: [],
             modifiers: [],
-            typeExpression: undefined,
             bindings: this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
             initializer: undefined
         };
@@ -1964,7 +1952,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            propertyName: node.propertyName ? this.rightPadded(this.convert<J.Identifier>(node.propertyName), this.suffix(node.propertyName)) : undefined,
+            propertyName: node.propertyName && this.rightPadded(this.convert<J.Identifier>(node.propertyName), this.suffix(node.propertyName)),
             name: node.dotDotDotToken ? {
                 kind: JS.Kind.Unary,
                 id: randomId(),
@@ -1974,7 +1962,7 @@ export class JavaScriptParserVisitor {
                 expression: this.convert<Expression>(node.name),
                 type: undefined
             } : this.convert<TypedTree>(node.name),
-            initializer: node.initializer ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert<Expression>(node.initializer)) : undefined,
+            initializer: node.initializer && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert<Expression>(node.initializer)),
             variableType: this.mapVariableType(node)
         };
     }
@@ -1985,7 +1973,6 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            typeExpression: undefined,
             dimensions: [],
             initializer: this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
             type: this.mapType(node)
@@ -1998,9 +1985,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            enclosing: undefined,
             new: emptySpace,
-            clazz: undefined,
             arguments: emptyContainer(),
             body: this.convertPropertyAssignments(node.getChildren(this.sourceFile).slice(-3)),
             constructorType: this.mapMethodType(node)
@@ -2081,7 +2066,7 @@ export class JavaScriptParserVisitor {
 
     visitCallExpression(node: ts.CallExpression) {
         const prefix = this.prefix(node);
-        const typeArguments = node.typeArguments ? this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments) : undefined;
+        const typeArguments = node.typeArguments && this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments);
 
         let select: J.RightPadded<Expression> | undefined;
         let name: J.Identifier = {
@@ -2137,7 +2122,6 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            enclosing: undefined,
             new: emptySpace,
             clazz: node.typeArguments ? {
                 kind: J.Kind.ParameterizedType,
@@ -2168,7 +2152,6 @@ export class JavaScriptParserVisitor {
                         id: randomId()
                     })
                 },
-            body: undefined,
             constructorType: this.mapMethodType(node)
         };
     }
@@ -2180,7 +2163,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             tag: this.rightPadded(this.visit(node.tag), this.suffix(node.tag)),
-            typeArguments: node.typeArguments ? this.mapTypeArguments(emptySpace, node.typeArguments) : undefined,
+            typeArguments: node.typeArguments && this.mapTypeArguments(emptySpace, node.typeArguments),
             templateExpression: this.convert(node.template),
             type: this.mapType(node)
         }
@@ -2249,7 +2232,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             leadingAnnotations: [],
             modifiers: this.mapModifiers(node),
-            typeParameters: node.typeParameters ? this.mapTypeParametersAsObject(node) : undefined,
+            typeParameters: node.typeParameters && this.mapTypeParametersAsObject(node),
             parameters: {
                 kind: J.Kind.LambdaParameters,
                 id: randomId(),
@@ -2416,9 +2399,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 expression: this.rightPadded(this.convert(node.left), this.prefix(node.operatorToken)),
                 clazz: this.convert(node.right),
-                pattern: undefined,
                 type: this.mapType(node),
-                modifier: undefined
             };
         }
 
@@ -2619,7 +2600,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             delegated: node.asteriskToken ? this.leftPadded(this.prefix(node.asteriskToken), true) : this.leftPadded(emptySpace, false),
-            expression: node.expression ? this.visit(node.expression) : undefined,
+            expression: node.expression && this.visit(node.expression),
             _type: this.mapType(node),
         };
     }
@@ -2636,11 +2617,13 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitClassExpression(node: ts.ClassExpression) {
+    visitClassExpression(node: ts.ClassExpression) : JS.StatementExpression {
         return {
             kind: JS.Kind.StatementExpression,
             id: randomId(),
-            prefix: {
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            statement: {
                 kind: J.Kind.ClassDeclaration,
                 id: randomId(),
                 prefix: this.prefix(node),
@@ -2657,10 +2640,8 @@ export class JavaScriptParserVisitor {
                 },
                 name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
                 typeParameters: this.mapTypeParametersAsJContainer(node),
-                primaryConstructor: undefined,
                 extends: this.mapExtends(node),
                 implements: this.mapImplements(node),
-                permitting: undefined,
                 body: {
                     kind: J.Kind.Block,
                     id: randomId(),
@@ -2679,9 +2660,7 @@ export class JavaScriptParserVisitor {
                     end: this.prefix(node.getLastToken()!)
                 },
                 type: this.mapType(node)
-            },
-            markers: undefined,
-            statement: undefined
+            } as J.ClassDeclaration,
         }
     }
 
@@ -2830,7 +2809,7 @@ export class JavaScriptParserVisitor {
                 semicolonAfterThen ? this.prefix(node.thenStatement.getLastToken()!) : emptySpace,
                 semicolonAfterThen ? markers({kind: JavaMarkers.Semicolon, id: randomId()}) : emptyMarkers
             ),
-            elsePart: node.elseStatement ? {
+            elsePart: node.elseStatement && {
                 kind: J.Kind.IfElse,
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.ElseKeyword)!),
@@ -2840,7 +2819,7 @@ export class JavaScriptParserVisitor {
                     semicolonAfterElse ? this.prefix(node.elseStatement.getLastToken()!) : emptySpace,
                     semicolonAfterElse ? markers({kind: JavaMarkers.Semicolon, id: randomId()}) : emptyMarkers
                 )
-            } : undefined
+            }
         };
     }
 
@@ -2993,7 +2972,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            label: node.label ? this.visit(node.label) : undefined
+            label: node.label && this.visit(node.label)
         };
     }
 
@@ -3003,7 +2982,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            label: node.label ? this.visit(node.label) : undefined
+            label: node.label && this.visit(node.label)
         };
     }
 
@@ -3013,7 +2992,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            expression: node.expression ? this.convert<Expression>(node.expression) : undefined
+            expression: node.expression && this.convert<Expression>(node.expression)
         };
     }
 
@@ -3102,7 +3081,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 body: this.visit(node.tryBlock),
                 catches: this.visit(node.catchClause),
-                finally: node.finallyBlock ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FinallyKeyword)!), this.visit(node.finallyBlock)) : undefined
+                finally: node.finallyBlock && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FinallyKeyword)!), this.visit(node.finallyBlock))
             };
         }
 
@@ -3111,10 +3090,9 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            resources: undefined,
             body: this.visit(node.tryBlock),
             catches: node.catchClause ? [this.visit(node.catchClause)] : [],
-            finally: node.finallyBlock ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FinallyKeyword)!), this.visit(node.finallyBlock)) : undefined
+            finally: node.finallyBlock && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FinallyKeyword)!), this.visit(node.finallyBlock))
         };
     }
 
@@ -3162,7 +3140,7 @@ export class JavaScriptParserVisitor {
                 type: this.mapType(node)
             } : nameExpression,
             dimensionsAfterName: [],
-            initializer: node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)) : undefined,
+            initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)),
             variableType: this.mapVariableType(node),
         };
     }
@@ -3213,7 +3191,6 @@ export class JavaScriptParserVisitor {
                             leadingAnnotations: [],
                             modifiers: [],
                             typeExpression: this.mapTypeInfo(declaration),
-                            varargs: undefined,
                             variables: [this.rightPadded(declarationExpression as JS.JSVariableDeclarations.JSNamedVariable, emptySpace)],
                         }
                         : {
@@ -3224,7 +3201,6 @@ export class JavaScriptParserVisitor {
                             leadingAnnotations: [],
                             modifiers: [],
                             typeExpression: this.mapTypeInfo(declaration),
-                            varargs: undefined,
                             variables: [this.rightPadded(declarationExpression, emptySpace)]
                         },
                     this.suffix(declaration)
@@ -3254,7 +3230,7 @@ export class JavaScriptParserVisitor {
             typeParameters: this.mapTypeParametersAsObject(node),
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             returnTypeExpression: this.mapTypeInfo(node),
-            body: node.body ? this.convert(node.body) : undefined,
+            body: node.body && this.convert(node.body),
             type: this.mapMethodType(node)
         };
     }
@@ -3287,10 +3263,7 @@ export class JavaScriptParserVisitor {
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
             typeParameters: this.mapTypeParametersAsJContainer(node),
-            primaryConstructor: undefined,
-            extends: undefined,
             implements: this.mapInterfaceExtends(node),
-            permitting: undefined,
             body: {
                 kind: J.Kind.Block,
                 id: randomId(),
@@ -3317,7 +3290,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             modifiers: this.mapModifiers(node),
             name: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!), this.visit(node.name)),
-            typeParameters: node.typeParameters ? this.mapTypeParametersAsObject(node) : undefined,
+            typeParameters: node.typeParameters && this.mapTypeParametersAsObject(node),
             initializer: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert(node.type)),
             type: this.mapType(node)
         };
@@ -3340,11 +3313,6 @@ export class JavaScriptParserVisitor {
                 type: J.ClassType.Enum
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
-            typeParameters: undefined,
-            primaryConstructor: undefined,
-            extends: undefined,
-            implements: undefined,
-            permitting: undefined,
             body: {
                 kind: J.Kind.Block,
                 id: randomId(),
@@ -3368,7 +3336,7 @@ export class JavaScriptParserVisitor {
     }
 
     visitModuleDeclaration(node: ts.ModuleDeclaration) {
-        const body = node.body ? this.visit(node.body as ts.Node) : undefined;
+        const body = node.body && this.visit(node.body as ts.Node);
 
         let namespaceKeyword = this.findChildNode(node, ts.SyntaxKind.NamespaceKeyword) ?? this.findChildNode(node, ts.SyntaxKind.ModuleKeyword);
         let keywordType: JS.NamespaceDeclaration.KeywordType;
@@ -3519,7 +3487,6 @@ export class JavaScriptParserVisitor {
             ],
             keywordType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.NamespaceKeyword)!), JS.NamespaceDeclaration.KeywordType.Namespace),
             name: this.rightPadded(this.convert(node.name), this.suffix(node.name)),
-            body: undefined
         };
     }
 
@@ -3552,8 +3519,6 @@ export class JavaScriptParserVisitor {
                         type: J.ModifierType.LanguageExtension,
                         annotations: []
                     }] : [],
-                    typeExpression: undefined,
-                    varargs: undefined,
                     variables: []
                 }, emptySpace)
             ]
@@ -3572,9 +3537,9 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             modifiers: this.mapModifiers(node),
-            importClause: node.importClause ? this.visit(node.importClause) : undefined,
+            importClause: node.importClause && this.visit(node.importClause),
             moduleSpecifier: this.leftPadded(node.importClause ? this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!) : emptySpace, this.visit(node.moduleSpecifier)),
-            attributes: node.attributes ? this.visit(node.attributes) : undefined
+            attributes: node.attributes && this.visit(node.attributes)
         };
     }
 
@@ -3585,8 +3550,8 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             typeOnly: node.isTypeOnly,
-            name: node.name ? this.rightPadded(this.visit(node.name), this.suffix(node.name)) : undefined,
-            namedBindings: node.namedBindings ? this.visit(node.namedBindings) : undefined
+            name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
+            namedBindings: node.namedBindings && this.visit(node.namedBindings)
         };
     }
 
@@ -3657,8 +3622,8 @@ export class JavaScriptParserVisitor {
             modifiers: this.mapModifiers(node),
             typeOnly: this.leftPadded(node.isTypeOnly ? this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!) : emptySpace, node.isTypeOnly),
             exportClause: node.exportClause ? this.visit(node.exportClause) : this.mapIdentifier(this.findChildNode(node, ts.SyntaxKind.AsteriskToken)!, "*"),
-            moduleSpecifier: node.moduleSpecifier ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!), this.visit(node.moduleSpecifier)) : undefined,
-            attributes: node.attributes ? this.visit(node.attributes) : undefined
+            moduleSpecifier: node.moduleSpecifier && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!), this.visit(node.moduleSpecifier)),
+            attributes: node.attributes && this.visit(node.attributes)
         };
     }
 
@@ -3715,8 +3680,6 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            select: undefined,
-            typeParameters: undefined,
             name: this.mapIdentifier(node, "require"),
             arguments: {
                 kind: J.Kind.JContainer,
@@ -3798,8 +3761,6 @@ export class JavaScriptParserVisitor {
                 elements: this.semicolonPaddedStatementList(node.statements),
                 markers: emptyMarkers
             },
-            body: undefined,
-            guard: undefined
         };
     }
 
@@ -3822,8 +3783,6 @@ export class JavaScriptParserVisitor {
                 elements: this.semicolonPaddedStatementList(node.statements),
                 markers: emptyMarkers
             },
-            body: undefined,
-            guard: undefined
         };
     }
 
@@ -3852,7 +3811,6 @@ export class JavaScriptParserVisitor {
                             leadingAnnotations: [],
                             modifiers: [],
                             typeExpression: this.mapTypeInfo(node.variableDeclaration),
-                            varargs: undefined,
                             variables: [this.rightPadded(this.visit(node.variableDeclaration), emptySpace)],
                         },
                         this.suffix(node.variableDeclaration))
@@ -3881,7 +3839,6 @@ export class JavaScriptParserVisitor {
                             leadingAnnotations: [],
                             modifiers: [],
                             typeExpression: this.mapTypeInfo(node.variableDeclaration),
-                            varargs: undefined,
                             variables: []
                         },
                         this.suffix(node.variableDeclaration))
@@ -3899,8 +3856,6 @@ export class JavaScriptParserVisitor {
                         markers: emptyMarkers,
                         leadingAnnotations: [],
                         modifiers: [],
-                        typeExpression: undefined,
-                        varargs: undefined,
                         variables: []
                     }, emptySpace)
                 },
@@ -3952,7 +3907,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             name: this.rightPadded(this.visit(node.name), this.suffix(node.name)),
             assigmentToken: JS.PropertyAssignment.Token.Equals,
-            initializer: node.objectAssignmentInitializer ? this.visit(node.objectAssignmentInitializer) : undefined
+            initializer: node.objectAssignmentInitializer && this.visit(node.objectAssignmentInitializer)
         };
     }
 
@@ -3978,7 +3933,6 @@ export class JavaScriptParserVisitor {
                 this.suffix(node.expression)
             ),
             assigmentToken: JS.PropertyAssignment.Token.Empty,
-            initializer: undefined
         };
     }
 
@@ -3990,23 +3944,20 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             annotations: [],
             name: node.name ? ts.isStringLiteral(node.name) ? this.mapIdentifier(node.name, node.name.getText()) : this.convert(node.name) : this.mapIdentifier(node, ""),
-            initializer: node.initializer ? {
+            initializer: node.initializer && {
                 kind: J.Kind.NewClass,
                 id: randomId(),
                 prefix: this.suffix(node.name),
                 markers: emptyMarkers,
-                enclosing: undefined,
                 new: emptySpace,
-                clazz: undefined,
                 arguments: {
                     kind: J.Kind.JContainer,
                     before: emptySpace,
                     elements: [this.rightPadded(this.visit(node.initializer), emptySpace)],
                     markers: emptyMarkers
                 },
-                body: undefined,
                 constructorType: this.mapMethodType(node)
-            } : undefined
+            }
         }
     }
 
@@ -4330,8 +4281,8 @@ export class JavaScriptParserVisitor {
     }
 
     private mapTypeParametersAsJContainer(node: ts.ClassDeclaration | ts.InterfaceDeclaration | ts.ClassExpression): J.Container<J.TypeParameter> | undefined {
-        return node.typeParameters
-            ? {
+        return node.typeParameters &&
+            {
                 kind: J.Kind.JContainer,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!),
                 elements: this.mapTypeParametersList(node.typeParameters)
@@ -4344,12 +4295,10 @@ export class JavaScriptParserVisitor {
                             annotations: [],
                             modifiers: [],
                             name: this.newJEmpty(),
-                            bounds: undefined,
                         },
                         this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!)) : []),
                 markers: emptyMarkers
-            }
-            : undefined;
+            };
     }
 
     private mapTypeParametersAsObject(node: ts.MethodDeclaration | ts.MethodSignature | ts.FunctionDeclaration
@@ -4372,7 +4321,6 @@ export class JavaScriptParserVisitor {
                     annotations: [],
                     modifiers: [],
                     name: this.newJEmpty(),
-                    bounds: undefined,
                 }, this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!))]
                 : typeParameters.map(tp => this.rightPadded(this.visit(tp), this.suffix(tp)))
                     .concat(typeParameters.hasTrailingComma ? this.rightPadded(
@@ -4384,7 +4332,6 @@ export class JavaScriptParserVisitor {
                             annotations: [],
                             modifiers: [],
                             name: this.newJEmpty(),
-                            bounds: undefined,
                         },
                         this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!)) : []),
         };
