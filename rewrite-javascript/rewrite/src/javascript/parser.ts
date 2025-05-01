@@ -15,20 +15,21 @@
  */
 import * as ts from 'typescript';
 import {
+    Comment,
+    emptyContainer,
     emptySpace,
     J,
     JavaMarkers,
     JavaType,
     NameTree,
-    Comment,
     Statement,
     TrailingComma,
-    emptyContainer
 } from '../java';
-import {Expression, JS, TypedTree, TypeTree} from '.';
+import {Expression, isJavaScript, JS, TypeTree, TypedTree} from '.';
 import {
     emptyMarkers,
-    ExecutionContext, markers,
+    ExecutionContext,
+    markers,
     Markers,
     MarkersKind,
     ParseError,
@@ -53,6 +54,7 @@ import {
 import {JavaScriptTypeMapping} from "./typeMapping";
 import path from "node:path";
 import {produce} from "immer";
+import Kind = JS.Kind;
 
 export class JavaScriptParser extends Parser<JS.CompilationUnit> {
 
@@ -459,7 +461,7 @@ export class JavaScriptParserVisitor {
     //     return nodes.map(n => this.rightPadded(this.convert(n), trailing(n), markers?.(n)));
     // }
 
-    private rightPaddedList<N extends ts.Node, T extends J>(nodes: N[], trailing: (node: N) => Space, markers?: (node: N) => Markers): J.RightPadded<T>[] {
+    private rightPaddedList<N extends ts.Node, T extends J>(nodes: N[], trailing: (node: N) => J.Space, markers?: (node: N) => Markers): J.RightPadded<T>[] {
         return nodes.map(n => this.rightPadded(this.convert(n), trailing(n), markers?.(n)));
     }
 
@@ -557,7 +559,7 @@ export class JavaScriptParserVisitor {
         for (let heritageClause of node.heritageClauses) {
             if (heritageClause.token == ts.SyntaxKind.ExtendsKeyword) {
                 const expression = this.visit(heritageClause.types[0]);
-                return this.leftPadded(this.prefix(heritageClause.getFirstToken()!), {
+                return this.leftPadded<TypeTree>(this.prefix(heritageClause.getFirstToken()!), {
                     kind: JS.Kind.TypeTreeExpression,
                     id: randomId(),
                     prefix: emptySpace,
@@ -659,8 +661,8 @@ export class JavaScriptParserVisitor {
         return this.mapLiteral(node, false);
     }
 
-    visitundefinedKeyword(node: ts.undefinedLiteral) {
-        return this.mapLiteral(node, undefined);
+    visitNullKeyword(node: ts.NullLiteral) {
+        return this.mapLiteral(node, null);
     }
 
     visitNeverKeyword(node: ts.Node) {
@@ -675,7 +677,7 @@ export class JavaScriptParserVisitor {
         return this.mapIdentifier(node, 'bigint');
     }
 
-    private mapLiteral(node: ts.LiteralExpression | ts.TrueLiteral | ts.FalseLiteral | ts.undefinedLiteral | ts.Identifier
+    private mapLiteral(node: ts.LiteralExpression | ts.TrueLiteral | ts.FalseLiteral | ts.NullLiteral | ts.Identifier
         | ts.TemplateHead | ts.TemplateMiddle | ts.TemplateTail, value: any): J.Literal {
 
         let valueSource = node.getText();
@@ -929,18 +931,18 @@ export class JavaScriptParserVisitor {
     }
 
     visitDecorator(node: ts.Decorator) {
-        let annotationType: NameTree;
+        let annotationType: NameTree | TypeTree;
         let _arguments: J.Container<Expression> | undefined = undefined;
 
         if (ts.isCallExpression(node.expression)) {
-            annotationType = ({
+            annotationType = {
                 kind: JS.Kind.ExpressionWithTypeArguments,
                 id: randomId(),
                 prefix: emptySpace,
                 markers: emptyMarkers,
-                clazz: this.convert(node.expression.expression),
+                clazz: this.convert<J>(node.expression.expression),
                 typeArguments: node.expression.typeArguments && this.mapTypeArguments(this.suffix(node.expression.expression), node.expression.typeArguments)
-            });
+            };
             _arguments = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
         } else if (ts.isIdentifier(node.expression)) {
             annotationType = this.convert(node.expression);
@@ -1490,14 +1492,15 @@ export class JavaScriptParserVisitor {
     }
 
     visitFunctionType(node: ts.FunctionTypeNode) {
-        return JS.newFunctionType(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            [],
-            this.leftPadded(emptySpace, false),
-            this.mapTypeParametersAsObject(node),
-            {
+        return {
+            kind: JS.Kind.FunctionType,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            modifiers: [],
+            constructorType: this.leftPadded(emptySpace, false),
+            typeParameters: this.mapTypeParametersAsObject(node),
+            parameters: {
                 kind: J.Kind.JContainer,
                 before: this.prefix(node.getChildAt(node.getChildren().findIndex(n => n.pos === node.parameters.pos) - 1)),
                 elements: node.parameters.length == 0 ?
@@ -1506,19 +1509,21 @@ export class JavaScriptParserVisitor {
                         .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newJEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []),
                 markers: emptyMarkers
             },
-            this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type)),
-            undefined);
+            returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type)),
+            type: undefined
+        };
     }
 
     visitConstructorType(node: ts.ConstructorTypeNode) {
-        return JS.newFunctionType(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapModifiers(node),
-            this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.NewKeyword)!), true),
-            this.mapTypeParametersAsObject(node),
-            {
+        return {
+            kind: JS.Kind.FunctionType,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
+            constructorType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.NewKeyword)!), true),
+            typeParameters: this.mapTypeParametersAsObject(node),
+            parameters: {
                 kind: J.Kind.JContainer,
                 before: this.prefix(node.getChildAt(node.getChildren().findIndex(n => n.pos === node.parameters.pos) - 1)),
                 elements: node.parameters.length == 0 ?
@@ -1527,61 +1532,67 @@ export class JavaScriptParserVisitor {
                         .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newJEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []),
                 markers: emptyMarkers
             },
-            this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type)),
-            undefined);
+            returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type)),
+            type: undefined
+        };
     }
 
     visitTypeQuery(node: ts.TypeQueryNode) {
-        return JS.newTypeQuery(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.convert(node.exprName),
-            node.typeArguments ? this.mapTypeArguments(this.suffix(node.exprName), node.typeArguments) : undefined,
-            this.mapType(node)
-        )
+        return {
+            kind: JS.Kind.TypeQuery,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            typeExpression: this.convert(node.exprName),
+            typeArguments: node.typeArguments ? this.mapTypeArguments(this.suffix(node.exprName), node.typeArguments) : undefined,
+            type: this.mapType(node)
+        }
     }
 
     visitTypeLiteral(node: ts.TypeLiteralNode) {
-        return JS.newTypeLiteral(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            J.newBlock(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
-                emptyMarkers,
-                this.rightPadded(false, emptySpace),
-                node.members.map(te => ({
+        return {
+            kind: JS.Kind.TypeLiteral,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            members: {
+                kind: J.Kind.Block,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
+                markers: emptyMarkers,
+                static: this.rightPadded(false, emptySpace),
+                statements: node.members.map(te => ({
                     kind: J.Kind.JRightPadded,
                     element: this.convert(te),
                     after: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(te.getLastToken()!) : emptySpace,
                     markers: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(te.getLastToken())!) : emptyMarkers
                 })),
-                this.prefix(node.getLastToken()!)
-            ),
-            this.mapType(node)
-        );
+                end: this.prefix(node.getLastToken()!)
+            },
+            type: this.mapType(node)
+        };
     }
 
     visitArrayType(node: ts.ArrayTypeNode) {
-        return J.newArrayType(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.convert(node.elementType),
-            undefined,
-            this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBracketToken)!), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseBracketToken)!)),
-            this.mapType(node)!
-        )
+        return {
+            kind: J.Kind.ArrayType,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            elementType: this.convert(node.elementType),
+            annotations: undefined,
+            dimension: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBracketToken)!), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseBracketToken)!)),
+            type: this.mapType(node)!
+        }
     }
 
     visitTupleType(node: ts.TupleTypeNode) {
-        return JS.newTuple(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            {
+        return {
+            kind: JS.Kind.Tuple,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            elements: {
                 kind: J.Kind.JContainer,
                 before: emptySpace,
                 elements: node.elements.length > 0 ?
@@ -1590,109 +1601,120 @@ export class JavaScriptParserVisitor {
                     : [this.rightPadded(this.newJEmpty(this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseBracketToken)!)), emptySpace)],
                 markers: emptyMarkers
             },
-            this.mapType(node)
-        );
+            type: this.mapType(node)
+        };
     }
 
     visitOptionalType(node: ts.OptionalTypeNode) {
-        return JS.newUnary(
-            randomId(),
-            emptySpace,
-            emptyMarkers,
-            this.leftPadded(this.suffix(node.type), JS.Unary.Type.Optional),
-            this.visit(node.type),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.Unary,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            operator: this.leftPadded(this.suffix(node.type), JS.Unary.Type.Optional),
+            expression: this.visit(node.type),
+            type: this.mapType(node)
+        };
     }
 
     visitRestType(node: ts.RestTypeNode) {
-        return JS.newUnary(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.leftPadded(emptySpace, JS.Unary.Type.Spread),
-            this.convert(node.type),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.Unary,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            operator: this.leftPadded(emptySpace, JS.Unary.Type.Spread),
+            expression: this.convert(node.type),
+            type: this.mapType(node)
+        };
     }
 
     visitUnionType(node: ts.UnionTypeNode) {
         const initialBar = getPreviousSibling(node.types[0]);
-        return JS.newUnion(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            [
+        return {
+            kind: JS.Kind.Union,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            types: [
                 ...(initialBar?.kind == ts.SyntaxKind.BarToken ? [this.rightPadded<Expression>(this.newJEmpty(), this.prefix(initialBar))] : []),
                 ...this.rightPaddedList<ts.Node, Expression>([...node.types], (n) => this.keywordPrefix(ts.SyntaxKind.BarToken, getNextSibling)(n))
             ],
-            this.mapType(node),
-        );
+            type: this.mapType(node)
+        };
     }
 
     visitIntersectionType(node: ts.IntersectionTypeNode) {
         const initialAmpersand = getPreviousSibling(node.types[0]);
-        return JS.newIntersection(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            [
+        return {
+            kind: JS.Kind.Intersection,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            types: [
                 ...(initialAmpersand?.kind == ts.SyntaxKind.AmpersandToken ? [this.rightPadded<Expression>(this.newJEmpty(), this.prefix(initialAmpersand))] : []),
                 ...this.rightPaddedList<ts.Node, Expression>([...node.types], (n) => this.keywordPrefix(ts.SyntaxKind.AmpersandToken, getNextSibling)(n))
             ],
-            this.mapType(node),
-        );
+            type: this.mapType(node)
+        };
     }
 
     visitConditionalType(node: ts.ConditionalTypeNode) {
-        return JS.newConditionalType(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.visit(node.checkType),
-            {
+        return {
+            kind: JS.Kind.ConditionalType,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            checkType: this.visit(node.checkType),
+            condition: {
                 kind: J.Kind.JContainer,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExtendsKeyword)!),
                 elements: [this.rightPadded(
-                    J.newTernary(
-                        randomId(),
-                        emptySpace,
-                        emptyMarkers,
-                        this.convert(node.extendsType),
-                        this.leftPadded(this.suffix(node.extendsType), this.convert(node.trueType)),
-                        this.leftPadded(this.suffix(node.trueType), this.convert(node.falseType)),
-                        this.mapType(node)),
+                    {
+                        kind: J.Kind.Ternary,
+                        id: randomId(),
+                        prefix: emptySpace,
+                        markers: emptyMarkers,
+                        condition: this.convert(node.extendsType),
+                        truePart: this.leftPadded(this.suffix(node.extendsType), this.convert(node.trueType)),
+                        falsePart: this.leftPadded(this.suffix(node.trueType), this.convert(node.falseType)),
+                        type: this.mapType(node)
+                    },
                     emptySpace
                 )],
                 markers: emptyMarkers
             },
-            this.mapType(node)
-        );
+            type: this.mapType(node)
+        };
     }
 
     visitInferType(node: ts.InferTypeNode) {
-        return JS.newInferType(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.leftPadded(emptySpace, this.convert(node.typeParameter)),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.InferType,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            typeParameter: this.leftPadded(emptySpace, this.convert(node.typeParameter)),
+            type: this.mapType(node)
+        };
     }
 
     visitParenthesizedType(node: ts.ParenthesizedTypeNode) {
-        return J.newParenthesizedTypeTree(
-            randomId(),
-            emptySpace,
-            emptyMarkers,
-            [],
-            J.newParentheses(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                this.rightPadded(this.convert(node.type), this.prefix(node.getLastToken()!))
-            )
-        );
+        return {
+            kind: J.Kind.ParenthesizedTypeTree,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            annotations: [],
+            parenthesizedType: {
+                kind: J.Kind.Parentheses,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                tree: this.rightPadded(this.convert(node.type), this.prefix(node.getLastToken()!))
+            },
+            type: undefined
+        };
     }
 
     visitThisType(node: ts.ThisTypeNode) {
@@ -1711,30 +1733,33 @@ export class JavaScriptParserVisitor {
             }
         }
 
-        return JS.newTypeOperator(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            mapTypeOperator(node.operator)!,
-            this.leftPadded(this.prefix(node.type), this.visit(node.type))
-        );
+        return {
+            kind: JS.Kind.TypeOperator,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            operator: mapTypeOperator(node.operator)!,
+            expression: this.leftPadded(this.prefix(node.type), this.visit(node.type))
+        };
     }
 
     visitIndexedAccessType(node: ts.IndexedAccessTypeNode) {
-        return JS.newIndexedAccessType(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.convert(node.objectType),
-            JS.newIndexedAccessType.IndexType(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBracketToken)!),
-                emptyMarkers,
-                this.rightPadded(this.convert(node.indexType), this.suffix(node.indexType)),
-                this.mapType(node.indexType)
-            ),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.IndexedAccessType,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            objectType: this.convert(node.objectType),
+            indexType: {
+                kind: JS.Kind.IndexedAccessTypeIndexType,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBracketToken)!),
+                markers: emptyMarkers,
+                element: this.rightPadded(this.convert(node.indexType), this.suffix(node.indexType)),
+                type: this.mapType(node.indexType)
+            },
+            type: this.mapType(node)
+        };
     }
 
     visitMappedType(node: ts.MappedTypeNode) {
@@ -1746,49 +1771,54 @@ export class JavaScriptParserVisitor {
             return !!(questionToken && (questionToken.kind == ts.SyntaxKind.PlusToken || questionToken.kind == ts.SyntaxKind.MinusToken));
         }
 
-        return JS.newMappedType(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            hasPrefixToken(node.readonlyToken) ? this.leftPadded(this.prefix(node.readonlyToken!),
-                J.newLiteral(
-                    randomId(),
-                    this.prefix(node.readonlyToken!),
-                    emptyMarkers,
-                    undefined,
-                    node.readonlyToken!.getText(),
-                    undefined,
-                    this.mapPrimitiveType(node.readonlyToken!)
-                )) : undefined,
-            node.readonlyToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.ReadonlyKeyword)!), true) : this.leftPadded(emptySpace, false),
-            JS.newMappedTypeKeysRemapping(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBracketToken)!),
-                emptyMarkers,
-                this.rightPadded(
-                    JS.newMappedType.MappedTypeParameter(
-                        randomId(),
-                        this.prefix(node.typeParameter),
-                        emptyMarkers,
-                        this.visit(node.typeParameter.name),
-                        this.leftPadded(this.suffix(node.typeParameter.name), this.visit(node.typeParameter.constraint!))
-                    ),
+        return {
+            kind: JS.Kind.MappedType,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            prefixToken: hasPrefixToken(node.readonlyToken) ? this.leftPadded(this.prefix(node.readonlyToken!),
+                {
+                    kind: J.Kind.Literal,
+                    id: randomId(),
+                    prefix: this.prefix(node.readonlyToken!),
+                    markers: emptyMarkers,
+                    value: undefined,
+                    valueSource: node.readonlyToken!.getText(),
+                    unicodeEscapes: undefined,
+                    type: this.mapPrimitiveType(node.readonlyToken!)
+                }) : undefined,
+            hasReadonly: node.readonlyToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.ReadonlyKeyword)!), true) : this.leftPadded(emptySpace, false),
+            keysRemapping: {
+                kind: JS.Kind.MappedTypeKeysRemapping,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBracketToken)!),
+                markers: emptyMarkers,
+                typeParameter: this.rightPadded(
+                    {
+                        kind: Kind.MappedTypeMappedTypeParameter,
+                        id: randomId(),
+                        prefix: this.prefix(node.typeParameter),
+                        markers: emptyMarkers,
+                        name: this.visit(node.typeParameter.name),
+                        iterateType: this.leftPadded(this.suffix(node.typeParameter.name), this.visit(node.typeParameter.constraint!)),
+                    },
                     this.suffix(node.typeParameter)),
-                node.nameType ? this.rightPadded(this.visit(node.nameType), this.suffix(node.nameType)) : undefined,
-            ),
-            hasSuffixToken(node.questionToken) ? this.leftPadded(this.prefix(node.questionToken!),
-                J.newLiteral(
-                    randomId(),
-                    this.prefix(node.questionToken!),
-                    emptyMarkers,
-                    undefined,
-                    node.questionToken!.getText(),
-                    undefined,
-                    this.mapPrimitiveType(node.questionToken!)
-                )
+                nameType: node.nameType ? this.rightPadded(this.visit(node.nameType), this.suffix(node.nameType)) : undefined
+            },
+            suffixToken: hasSuffixToken(node.questionToken) ? this.leftPadded(this.prefix(node.questionToken!),
+                {
+                    kind: J.Kind.Literal,
+                    id: randomId(),
+                    prefix: this.prefix(node.questionToken!),
+                    markers: emptyMarkers,
+                    value: undefined,
+                    valueSource: node.questionToken!.getText(),
+                    unicodeEscapes: undefined,
+                    type: this.mapPrimitiveType(node.questionToken!)
+                }
             ) : undefined,
-            node.questionToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.QuestionToken)!), true) : this.leftPadded(emptySpace, false),
-            node.type ? {
+            hasQuestionToken: node.questionToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.QuestionToken)!), true) : this.leftPadded(emptySpace, false),
+            valueType: node.type ? {
                 kind: J.Kind.JContainer,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ColonToken)!),
                 elements: [this.rightPadded(this.visit(node.type), this.suffix(node.type)),
@@ -1812,118 +1842,126 @@ export class JavaScriptParserVisitor {
                 ],
                 markers: emptyMarkers
             },
-            this.mapType(node)
-        );
+            type: this.mapType(node)
+        };
     }
 
     visitLiteralType(node: ts.LiteralTypeNode) {
-        return JS.newLiteralType(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.visit(node.literal),
-            this.mapType(node)!
-        );
+        return {
+            kind: JS.Kind.LiteralType,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            literal: this.visit(node.literal),
+            _type: this.mapType(node)!,
+        };
     }
 
     visitNamedTupleMember(node: ts.NamedTupleMember) {
         if (node.questionToken) {
-            return JS.newJSVariableDeclarations(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                [],
-                [],
-                this.mapTypeInfo(node),
-                undefined,
-                [this.rightPadded(
-                    JS.newJSVariableDeclarations.JSNamedVariable(
-                        randomId(),
-                        this.prefix(node.name),
-                        emptyMarkers,
-                        this.getOptionalUnary(node),
-                        [],
-                        undefined,
-                        this.mapVariableType(node)
-                    ),
+            return {
+                kind: JS.Kind.JSVariableDeclarations,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                leadingAnnotations: [],
+                modifiers: [],
+                typeExpression: this.mapTypeInfo(node),
+                varargs: undefined,
+                variables: [this.rightPadded(
+                    {
+                        kind: JS.Kind.JSNamedVariable,
+                        id: randomId(),
+                        prefix: this.prefix(node.name),
+                        markers: emptyMarkers,
+                        name: this.getOptionalUnary(node),
+                        dimensionsAfterName: [],
+                        initializer: undefined,
+                        variableType: this.mapVariableType(node),
+                    },
                     this.suffix(node.name)
-                )]
-            );
+                )],
+            };
         }
 
         if (node.dotDotDotToken) {
-            return JS.newJSVariableDeclarations(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                [],
-                [],
-                this.mapTypeInfo(node),
-                undefined,
-                [this.rightPadded(
-                    JS.newJSVariableDeclarations.JSNamedVariable(
-                        randomId(),
-                        emptySpace,
-                        emptyMarkers,
-                        JS.newUnary(
-                            randomId(),
-                            emptySpace,
-                            emptyMarkers,
-                            this.leftPadded(emptySpace, JS.Unary.Type.Spread),
-                            this.visit(node.name),
-                            this.mapType(node)
-                        ),
-                        [],
-                        undefined,
-                        this.mapVariableType(node)
-                    ),
+            return {
+                kind: JS.Kind.JSVariableDeclarations,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                leadingAnnotations: [],
+                modifiers: [],
+                typeExpression: this.mapTypeInfo(node),
+                varargs: undefined,
+                variables: [this.rightPadded(
+                    {
+                        kind: JS.Kind.JSNamedVariable,
+                        id: randomId(),
+                        prefix: emptySpace,
+                        markers: emptyMarkers,
+                        name: {
+                            kind: JS.Kind.Unary,
+                            id: randomId(),
+                            prefix: emptySpace,
+                            markers: emptyMarkers,
+                            operator: this.leftPadded(emptySpace, JS.Unary.Type.Spread),
+                            expression: this.visit(node.name),
+                            type: this.mapType(node)
+                        },
+                        dimensionsAfterName: [],
+                        initializer: undefined,
+                        variableType: this.mapVariableType(node),
+                    },
                     this.suffix(node.name)
-                )]
-            );
+                )],
+            };
         }
 
-        return J.newVariableDeclarations(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            [],
-            [],
-            this.mapTypeInfo(node),
-            undefined,
-            [this.rightPadded(
-                J.newNamedVariable(
-                    randomId(),
-                    this.prefix(node.name),
-                    emptyMarkers,
-                    this.visit(node.name),
-                    [],
-                    undefined,
-                    this.mapVariableType(node)
-                ),
+        return {
+            kind: J.Kind.VariableDeclarations,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            leadingAnnotations: [],
+            modifiers: [],
+            typeExpression: this.mapTypeInfo(node),
+            variables: [this.rightPadded(
+                {
+                    kind: J.Kind.NamedVariable,
+                    id: randomId(),
+                    prefix: this.prefix(node.name),
+                    markers: emptyMarkers,
+                    name: this.visit(node.name),
+                    dimensionsAfterName: [],
+                    variableType: this.mapVariableType(node)
+                },
                 this.suffix(node.name)
             )]
-        );
+        };
     }
 
     visitTemplateLiteralType(node: ts.TemplateLiteralTypeNode) {
-        return JS.newTemplateExpression(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.visit(node.head),
-            node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
-            this.mapType(node)
-        )
+        return {
+            kind: JS.Kind.TemplateExpression,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            head: this.visit(node.head),
+            templateSpans: node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
+            type: this.mapType(node)
+        }
     }
 
     visitTemplateLiteralTypeSpan(node: ts.TemplateLiteralTypeSpan) {
-        return JS.newTemplateExpression.TemplateSpan(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.convert(node.type),
-            this.visit(node.literal)
-        )
+        return {
+            kind: JS.Kind.TemplateExpressionTemplateSpan,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: this.convert(node.type),
+            tail: this.visit(node.literal)
+        }
     }
 
     visitImportType(node: ts.ImportTypeNode) {
@@ -1931,102 +1969,110 @@ export class JavaScriptParserVisitor {
         if (node.attributes) {
             const openBraceIndex = node.attributes.getChildren().findIndex(n => n.kind === ts.SyntaxKind.OpenBraceToken);
             const attributes = this.mapCommaSeparatedList<JS.ImportAttribute>(node.attributes.getChildren(this.sourceFile).slice(openBraceIndex, openBraceIndex + 3));
-            importTypeAttributes = JS.newImportTypeAttributes(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
-                emptyMarkers,
-                this.rightPadded(
+            importTypeAttributes = {
+                kind: JS.Kind.ImportTypeAttributes,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
+                markers: emptyMarkers,
+                token: this.rightPadded(
                     this.mapIdentifier(this.findChildNode(node, node.attributes.token)!,
                         ts.SyntaxKind.WithKeyword === node.attributes.token ? "with" : "assert"),
                     this.prefix(this.findChildNode(node, ts.SyntaxKind.ColonToken)!)),
-                attributes,
-                this.suffix(node.attributes)
-            )
+                elements: attributes,
+                end: this.suffix(node.attributes),
+            }
         }
 
-        return JS.newImportType(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.isTypeOf ? this.rightPadded(true, this.suffix(this.findChildNode(node, ts.SyntaxKind.TypeOfKeyword)!)) : this.rightPadded(false, emptySpace),
-            {
+        return {
+            kind: JS.Kind.ImportType,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            hasTypeof: node.isTypeOf ? this.rightPadded(true, this.suffix(this.findChildNode(node, ts.SyntaxKind.TypeOfKeyword)!)) : this.rightPadded(false, emptySpace),
+            argumentAndAttributes: {
                 kind: J.Kind.JContainer,
                 before: this.suffix(this.findChildNode(node, ts.SyntaxKind.ImportKeyword)!),
                 elements: [this.rightPadded(this.visit(node.argument), this.suffix(node.argument))].concat(importTypeAttributes ? [this.rightPadded(importTypeAttributes, this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))] : []),
                 markers: emptyMarkers
             },
-            node.qualifier ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.DotToken)!), this.visit(node.qualifier)) : undefined,
-            node.typeArguments ? this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments) : undefined,
-            this.mapType(node)
-        );
+            qualifier: node.qualifier ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.DotToken)!), this.visit(node.qualifier)) : undefined,
+            typeArguments: node.typeArguments ? this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments) : undefined,
+            type: this.mapType(node)
+        };
     }
 
     visitObjectBindingPattern(node: ts.ObjectBindingPattern) {
-        return JS.newObjectBindingDeclarations(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            [],
-            [],
-            undefined,
-            this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
-            undefined
-        );
+        return {
+            kind: JS.Kind.ObjectBindingDeclarations,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            leadingAnnotations: [],
+            modifiers: [],
+            typeExpression: undefined,
+            bindings: this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
+            initializer: undefined
+        };
     }
 
     visitArrayBindingPattern(node: ts.ArrayBindingPattern) {
-        return JS.newArrayBindingPattern(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.ArrayBindingPattern,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            elements: this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
+            type: this.mapType(node)
+        };
     }
 
     visitBindingElement(node: ts.BindingElement) {
-        return JS.newBindingElement(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.propertyName ? this.rightPadded(this.convert<J.Identifier>(node.propertyName), this.suffix(node.propertyName)) : undefined,
-            node.dotDotDotToken ? JS.newUnary(
-                randomId(),
-                this.prefix(node.dotDotDotToken),
-                emptyMarkers,
-                this.leftPadded(emptySpace, JS.Unary.Type.Spread),
-                this.convert<Expression>(node.name),
-                undefined
-            ) : this.convert<TypedTree>(node.name),
-            node.initializer ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert<Expression>(node.initializer)) : undefined,
-            this.mapVariableType(node),
-        );
+        return {
+            kind: JS.Kind.BindingElement,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            propertyName: node.propertyName ? this.rightPadded(this.convert<J.Identifier>(node.propertyName), this.suffix(node.propertyName)) : undefined,
+            name: node.dotDotDotToken ? {
+                kind: JS.Kind.Unary,
+                id: randomId(),
+                prefix: this.prefix(node.dotDotDotToken),
+                markers: emptyMarkers,
+                operator: this.leftPadded(emptySpace, JS.Unary.Type.Spread),
+                expression: this.convert<Expression>(node.name),
+                type: undefined
+            } : this.convert<TypedTree>(node.name),
+            initializer: node.initializer ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert<Expression>(node.initializer)) : undefined,
+            variableType: this.mapVariableType(node)
+        };
     }
 
     visitArrayLiteralExpression(node: ts.ArrayLiteralExpression) {
-        return J.newNewArray(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            undefined,
-            [],
-            this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
-            this.mapType(node)
-        );
+        return {
+            kind: J.Kind.NewArray,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            typeExpression: undefined,
+            dimensions: [],
+            initializer: this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
+            type: this.mapType(node)
+        };
     }
 
     visitObjectLiteralExpression(node: ts.ObjectLiteralExpression) {
-        return J.newNewClass(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            undefined,
-            emptySpace,
-            undefined,
-            emptyContainer(),
-            this.convertPropertyAssignments(node.getChildren(this.sourceFile).slice(-3)),
-            this.mapMethodType(node)
-        );
+        return {
+            kind: J.Kind.NewClass,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            enclosing: undefined,
+            new: emptySpace,
+            clazz: undefined,
+            arguments: emptyContainer(),
+            body: this.convertPropertyAssignments(node.getChildren(this.sourceFile).slice(-3)),
+            constructorType: this.mapMethodType(node)
+        };
     }
 
     private convertPropertyAssignments(nodes: ts.Node[]): J.Block {
@@ -2043,58 +2089,63 @@ export class JavaScriptParserVisitor {
             } as TrailingComma) : emptyMarkers
         );
 
-        return J.newBlock(
-            randomId(),
+        return {
+            kind: J.Kind.Block,
+            id: randomId(),
             prefix,
-            emptyMarkers,
-            this.rightPadded(false, emptySpace),
+            markers: emptyMarkers,
+            static: this.rightPadded(false, emptySpace),
             statements,
-            this.prefix(nodes[nodes.length - 1])
-        );
+            end: this.prefix(nodes[nodes.length - 1])
+        };
     }
 
     visitPropertyAccessExpression(node: ts.PropertyAccessExpression) {
-        return J.newFieldAccess(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.questionDotToken ?
-                JS.newUnary(
-                    randomId(),
-                    emptySpace,
-                    emptyMarkers,
-                    this.leftPadded(this.suffix(node.expression), JS.Unary.Type.QuestionDot),
-                    this.visit(node.expression),
-                    this.mapType(node)
-                ) : this.convert(node.expression),
-            this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), this.convert(node.name)),
-            this.mapType(node)
-        );
+        return {
+            kind: J.Kind.FieldAccess,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            target: node.questionDotToken ?
+                {
+                    kind: JS.Kind.Unary,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    operator: this.leftPadded(this.suffix(node.expression), JS.Unary.Type.QuestionDot),
+                    expression: this.visit(node.expression),
+                    type: this.mapType(node)
+                } : this.convert(node.expression),
+            name: this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), this.convert(node.name)),
+            type: this.mapType(node)
+        };
     }
 
     visitElementAccessExpression(node: ts.ElementAccessExpression) {
-        return J.newArrayAccess(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.questionDotToken ?
-                JS.newUnary(
-                    randomId(),
-                    emptySpace,
-                    emptyMarkers,
-                    this.leftPadded(this.suffix(node.expression), JS.Unary.Type.QuestionDotWithDot),
-                    this.visit(node.expression),
-                    this.mapType(node)
-                ) :
+        return {
+            kind: J.Kind.ArrayAccess,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            indexed: node.questionDotToken ?
+                {
+                    kind: JS.Kind.Unary,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    operator: this.leftPadded(this.suffix(node.expression), JS.Unary.Type.QuestionDotWithDot),
+                    expression: this.visit(node.expression),
+                    type: this.mapType(node)
+                } :
                 this.convert(node.expression),
-            J.newArrayDimension(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBracketToken)!),
-                emptyMarkers,
-                this.rightPadded(this.convert(node.argumentExpression), this.suffix(node.argumentExpression))
-            ),
-            this.mapType(node)
-        );
+            dimension: {
+                kind: J.Kind.ArrayDimension,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBracketToken)!),
+                markers: emptyMarkers,
+                index: this.rightPadded(this.convert(node.argumentExpression), this.suffix(node.argumentExpression))
+            }
+        };
     }
 
     visitCallExpression(node: ts.CallExpression) {
@@ -2102,36 +2153,47 @@ export class JavaScriptParserVisitor {
         const typeArguments = node.typeArguments ? this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments) : undefined;
 
         let select: J.RightPadded<Expression> | undefined;
-        let name: J.Identifier = J.newIdentifier(randomId(), emptySpace, emptyMarkers, [], "", undefined, undefined);
+        let name: J.Identifier = {
+            kind: J.Kind.Identifier,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            annotations: [],
+            simpleName: "",
+            type: undefined,
+            fieldType: undefined
+        };
 
         if (ts.isIdentifier(node.expression) && !node.questionDotToken) {
             select = undefined;
             name = this.convert(node.expression);
         } else if (node.questionDotToken) {
-            select = this.rightPadded(JS.newUnary(
-                    randomId(),
-                    emptySpace,
-                    emptyMarkers,
-                    this.leftPadded(this.suffix(node.expression), JS.Unary.Type.QuestionDotWithDot),
-                    this.visit(node.expression),
-                    this.mapType(node)
-                ),
+            select = this.rightPadded({
+                    kind: JS.Kind.Unary,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    operator: this.leftPadded(this.suffix(node.expression), JS.Unary.Type.QuestionDotWithDot),
+                    expression: this.visit(node.expression),
+                    type: this.mapType(node)
+                },
                 emptySpace
             )
         } else {
             select = this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
         }
 
-        return J.newMethodInvocation(
-            randomId(),
+        return {
+            kind: J.Kind.MethodInvocation,
+            id: randomId(),
             prefix,
-            emptyMarkers,
+            markers: emptyMarkers,
             select,
-            typeArguments,
+            typeParameters: typeArguments,
             name,
-            this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
-            this.mapMethodType(node)
-        )
+            arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
+            methodType: this.mapMethodType(node)
+        }
     }
 
     visitSuperKeyword(node: ts.KeywordToken<ts.SyntaxKind.SuperKeyword>) {
@@ -2139,54 +2201,71 @@ export class JavaScriptParserVisitor {
     }
 
     visitNewExpression(node: ts.NewExpression) {
-        return J.newNewClass(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            undefined,
-            emptySpace,
-            node.typeArguments ? J.newParameterizedType(
-                randomId(),
-                emptySpace,
-                emptyMarkers,
-                new JS.TypeTreeExpression(randomId(), emptySpace, emptyMarkers, this.visit(node.expression)),
-                this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments),
-                undefined
-            ) : new JS.TypeTreeExpression(randomId(), emptySpace, emptyMarkers, this.visit(node.expression)),
-            node.arguments ? this.mapCommaSeparatedList(this.getParameterListNodes(node)) : J.Container.empty<Expression>().withMarkers(markers({
+        return {
+            kind: J.Kind.NewClass,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            enclosing: undefined,
+            new: emptySpace,
+            clazz: node.typeArguments ? {
+                kind: J.Kind.ParameterizedType,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                clazz: {
+                    kind: JS.Kind.TypeTreeExpression,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    expression: this.visit(node.expression),
+                },
+                typeParameters: this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments),
+                type: undefined
+            } : {
+                kind: JS.Kind.TypeTreeExpression,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                expression: this.visit(node.expression),
+            },
+            arguments: node.arguments ? this.mapCommaSeparatedList(this.getParameterListNodes(node)) : emptyContainer<Expression>().withMarkers(markers({
                 kind: JavaMarkers.OmitParentheses,
                 id: randomId()
             })),
-            undefined,
-            this.mapMethodType(node)
-        );
+            body: undefined,
+            constructorType: this.mapMethodType(node)
+        };
     }
 
     visitTaggedTemplateExpression(node: ts.TaggedTemplateExpression) {
-        return JS.newTaggedTemplateExpression(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.rightPadded(this.visit(node.tag), this.suffix(node.tag)),
-            node.typeArguments ? this.mapTypeArguments(emptySpace, node.typeArguments) : undefined,
-            this.convert(node.template),
-            this.mapType(node)
-        )
+        return {
+            kind: JS.Kind.TaggedTemplateExpression,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            tag: this.rightPadded(this.visit(node.tag), this.suffix(node.tag)),
+            typeArguments: node.typeArguments ? this.mapTypeArguments(emptySpace, node.typeArguments) : undefined,
+            templateExpression: this.convert(node.template),
+            type: this.mapType(node)
+        }
     }
 
     visitTypeAssertionExpression(node: ts.TypeAssertion) {
-        return J.newTypeCast(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            J.newControlParentheses(
-                randomId(),
-                this.prefix(node.getFirstToken()!),
-                emptyMarkers,
-                this.rightPadded(this.convert(node.type), this.prefix(node.getChildAt(2, this.sourceFile)))
-            ),
-            this.convert(node.expression)
-        );
+        return {
+            kind: J.Kind.TypeCast,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            clazz: {
+                kind: J.Kind.ControlParentheses,
+                id: randomId(),
+                prefix: this.prefix(node.getFirstToken()!),
+                markers: emptyMarkers,
+                tree: this.rightPadded(this.convert(node.type), this.prefix(node.getChildAt(2, this.sourceFile)))
+            },
+            expression: this.convert(node.expression),
+        };
     }
 
     visitParenthesizedExpression(node: ts.ParenthesizedExpression) {
@@ -2200,19 +2279,29 @@ export class JavaScriptParserVisitor {
     }
 
     visitFunctionExpression(node: ts.FunctionExpression) {
-        return JS.newFunctionDeclaration(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapModifiers(node),
-            this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FunctionKeyword)!), !!node.asteriskToken),
-            this.leftPadded(node.asteriskToken ? this.prefix(node.asteriskToken) : emptySpace, node.name ? this.visit(node.name) : J.newIdentifier(randomId(), emptySpace, emptyMarkers, [], "", undefined, undefined)),
-            this.mapTypeParametersAsObject(node),
-            this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-            this.mapTypeInfo(node),
-            this.convert(node.body),
-            this.mapMethodType(node)
-        );
+        return {
+            kind: JS.Kind.FunctionDeclaration,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
+            asteriskToken: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FunctionKeyword)!), !!node.asteriskToken),
+            name: this.leftPadded(node.asteriskToken ? this.prefix(node.asteriskToken) : emptySpace, node.name ? this.visit(node.name) : {
+                kind: J.Kind.Identifier,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                annotations: [],
+                simpleName: "",
+                type: undefined,
+                fieldType: undefined
+            }),
+            typeParameters: this.mapTypeParametersAsObject(node),
+            parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            returnTypeExpression: this.mapTypeInfo(node),
+            body: this.convert(node.body),
+            type: this.mapMethodType(node)
+        };
     }
 
     visitArrowFunction(node: ts.ArrowFunction) {
@@ -2246,17 +2335,6 @@ export class JavaScriptParserVisitor {
     visitDeleteExpression(node: ts.DeleteExpression) {
         return {
             kind: JS.Kind.Delete,
-            id: randomId(),
-            prefix: this.prefix(node),
-            markers: emptyMarkers,
-            expression: this.convert(node.expression),
-            type: this.mapType(node)
-        };
-    }
-
-    visitTypeOfExpression(node: ts.TypeOfExpression) {
-        return {
-            kind: JS.Kind.TypeOf,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
@@ -2338,27 +2416,29 @@ export class JavaScriptParserVisitor {
             return this.visitUnknown(node);
         }
 
-        return J.newUnary(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.leftPadded(this.suffix(node.operand), unaryOperator),
-            this.convert(node.operand),
-            this.mapType(node)
-        );
+        return {
+            kind: J.Kind.Unary,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            operator: this.leftPadded(this.suffix(node.operand), unaryOperator),
+            expression: this.convert(node.operand),
+            _type: this.mapType(node),
+        };
     }
 
     visitBinaryExpression(node: ts.BinaryExpression) {
         if (node.operatorToken.kind == ts.SyntaxKind.EqualsToken) {
             // assignment is also represented as `ts.BinaryExpression`
-            return J.newAssignment(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                this.convert(node.left),
-                this.leftPadded(this.suffix(node.left), this.convert(node.right)),
-                this.mapType(node)
-            );
+            return {
+                kind: J.Kind.Assignment,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                variable: this.convert(node.left),
+                assignment: this.leftPadded(this.suffix(node.left), this.convert(node.right)),
+                type: this.mapType(node)
+            };
         }
 
         let binaryOperator: J.Binary.Type | JS.JsBinary.Type | undefined;
@@ -2381,27 +2461,30 @@ export class JavaScriptParserVisitor {
         }
 
         if (binaryOperator !== undefined) {
-            return JS.newJsBinary(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                this.convert(node.left),
-                this.leftPadded(this.prefix(node.operatorToken), binaryOperator as JS.JsBinary.Type),
-                this.convert(node.right),
-                this.mapType(node)
-            );
+            return {
+                kind: JS.Kind.JsBinary,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                left: this.convert(node.left),
+                operator: this.leftPadded(this.prefix(node.operatorToken), binaryOperator as JS.JsBinary.Type),
+                right: this.convert(node.right),
+                _type: this.mapType(node),
+            };
         }
 
         if (node.operatorToken.kind == ts.SyntaxKind.InstanceOfKeyword) {
-            return J.newInstanceOf(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                this.rightPadded(this.convert(node.left), this.prefix(node.operatorToken)),
-                this.convert(node.right),
-                undefined,
-                this.mapType(node)
-            );
+            return {
+                kind: J.Kind.InstanceOf,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                expression: this.rightPadded(this.convert(node.left), this.prefix(node.operatorToken)),
+                clazz: this.convert(node.right),
+                pattern: undefined,
+                type: this.mapType(node),
+                modifier: undefined
+            };
         }
 
         binaryOperator = this.mapBinaryOperator(node);
@@ -2427,41 +2510,44 @@ export class JavaScriptParserVisitor {
             }
 
             if (assignmentOperation !== undefined) {
-                return JS.newJsAssignmentOperation(
-                    randomId(),
-                    this.prefix(node),
-                    emptyMarkers,
-                    this.convert(node.left),
-                    this.leftPadded(this.prefix(node.operatorToken), assignmentOperation),
-                    this.convert(node.right),
-                    this.mapType(node)
-                )
+                return {
+                    kind: JS.Kind.JsAssignmentOperation,
+                    id: randomId(),
+                    prefix: this.prefix(node),
+                    markers: emptyMarkers,
+                    variable: this.convert(node.left),
+                    operator: this.leftPadded(this.prefix(node.operatorToken), assignmentOperation),
+                    assignment: this.convert(node.right),
+                    _type: this.mapType(node),
+                }
             }
 
             assignmentOperation = this.mapAssignmentOperation(node);
             if (assignmentOperation === undefined) {
                 return this.visitUnknown(node);
             }
-            return J.newAssignmentOperation(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                this.convert(node.left),
-                this.leftPadded(this.prefix(node.operatorToken), assignmentOperation),
-                this.convert(node.right),
-                this.mapType(node)
-            )
+            return {
+                kind: J.Kind.AssignmentOperation,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                variable: this.convert(node.left),
+                operator: this.leftPadded(this.prefix(node.operatorToken), assignmentOperation),
+                assignment: this.convert(node.right),
+                type: this.mapType(node)
+            }
         }
 
-        return J.newBinary(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.convert(node.left),
-            this.leftPadded(this.prefix(node.operatorToken), binaryOperator),
-            this.convert(node.right),
-            this.mapType(node)
-        )
+        return {
+            kind: J.Kind.Binary,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            left: this.convert(node.left),
+            operator: this.leftPadded(this.prefix(node.operatorToken), binaryOperator),
+            right: this.convert(node.right),
+            type: this.mapType(node)
+        }
     }
 
     private mapBinaryOperator(node: ts.BinaryExpression): J.Binary.Type | undefined {
@@ -2567,78 +2653,86 @@ export class JavaScriptParserVisitor {
     }
 
     visitConditionalExpression(node: ts.ConditionalExpression) {
-        return J.newTernary(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.convert(node.condition),
-            this.leftPadded(this.suffix(node.condition), this.convert(node.whenTrue)),
-            this.leftPadded(this.suffix(node.whenTrue), this.convert(node.whenFalse)),
-            this.mapType(node)
-        );
+        return {
+            kind: J.Kind.Ternary,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            condition: this.convert(node.condition),
+            truePart: this.leftPadded(this.suffix(node.condition), this.convert(node.whenTrue)),
+            falsePart: this.leftPadded(this.suffix(node.whenTrue), this.convert(node.whenFalse)),
+            type: this.mapType(node)
+        };
     }
 
     visitTemplateExpression(node: ts.TemplateExpression) {
-        return JS.newTemplateExpression(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.visit(node.head),
-            node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
-            this.mapType(node)
-        )
+        return {
+            kind: JS.Kind.TemplateExpression,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            head: this.visit(node.head),
+            templateSpans: node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
+            type: this.mapType(node)
+        }
     }
 
     visitYieldExpression(node: ts.YieldExpression) {
-        return JS.newYield(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.asteriskToken ? this.leftPadded(this.prefix(node.asteriskToken), true) : this.leftPadded(emptySpace, false),
-            node.expression ? this.visit(node.expression) : undefined,
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.Yield,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            delegated: node.asteriskToken ? this.leftPadded(this.prefix(node.asteriskToken), true) : this.leftPadded(emptySpace, false),
+            expression: node.expression ? this.visit(node.expression) : undefined,
+            _type: this.mapType(node),
+        };
     }
 
     visitSpreadElement(node: ts.SpreadElement) {
-        return JS.newUnary(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.leftPadded(emptySpace, JS.Unary.Type.Spread),
-            this.convert(node.expression),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.Unary,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            operator: this.leftPadded(emptySpace, JS.Unary.Type.Spread),
+            expression: this.convert(node.expression),
+            type: this.mapType(node)
+        };
     }
 
     visitClassExpression(node: ts.ClassExpression) {
-        return JS.newStatementExpression(
-            randomId(),
-            J.newClassDeclaration(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                this.mapDecorators(node),
-                [], //this.mapModifiers(node),
-                J.newClassDeclarationKind(
-                    randomId(),
-                    node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
-                    emptyMarkers,
-                    [],
-                    J.ClassType.Class
-                ),
-                node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
-                this.mapTypeParametersAsJContainer(node),
-                undefined, // FIXME primary constructor
-                this.mapExtends(node),
-                this.mapImplements(node),
-                undefined,
-                J.newBlock(
-                    randomId(),
-                    this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
-                    emptyMarkers,
-                    this.rightPadded(false, emptySpace),
-                    node.members.map(ce => ({
+        return {
+            kind: JS.Kind.StatementExpression,
+            id: randomId(),
+            prefix: {
+                kind: J.Kind.ClassDeclaration,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                leadingAnnotations: this.mapDecorators(node),
+                modifiers: [],
+                classKind: {
+                    kind: J.Kind.ClassDeclarationKind,
+                    id: randomId(),
+                    prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
+                    markers: emptyMarkers,
+                    annotations: [],
+                    type: J.ClassType.Class
+                },
+                name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
+                typeParameters: this.mapTypeParametersAsJContainer(node),
+                primaryConstructor: undefined,
+                extends: this.mapExtends(node),
+                implements: this.mapImplements(node),
+                permitting: undefined,
+                body: {
+                    kind: J.Kind.Block,
+                    id: randomId(),
+                    prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
+                    markers: emptyMarkers,
+                    static: this.rightPadded(false, emptySpace),
+                    statements: node.members.map(ce => ({
                         kind: J.Kind.JRightPadded,
                         element: this.convert(ce),
                         after: ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
@@ -2647,11 +2741,13 @@ export class JavaScriptParserVisitor {
                             id: randomId()
                         }) : emptyMarkers
                     })),
-                    this.prefix(node.getLastToken()!)
-                ),
-                this.mapType(node)
-            )
-        )
+                    end: this.prefix(node.getLastToken()!)
+                },
+                type: this.mapType(node)
+            },
+            markers: undefined,
+            statement: undefined
+        }
     }
 
     visitOmittedExpression(node: ts.OmittedExpression) {
@@ -2660,50 +2756,54 @@ export class JavaScriptParserVisitor {
 
     visitExpressionWithTypeArguments(node: ts.ExpressionWithTypeArguments) {
         if (node.typeArguments) {
-            return JS.newExpressionWithTypeArguments(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                this.visit(node.expression),
-                this.mapTypeArguments(this.suffix(node.expression), node.typeArguments),
-                this.mapType(node)
-            )
+            return {
+                kind: JS.Kind.ExpressionWithTypeArguments,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                clazz: this.visit(node.expression),
+                typeArguments: this.mapTypeArguments(this.suffix(node.expression), node.typeArguments),
+                type: this.mapType(node)
+            }
         }
         return this.visit(node.expression);
     }
 
     visitAsExpression(node: ts.AsExpression) {
-        return JS.newJsBinary(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.convert(node.expression),
-            this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), JS.JsBinary.Type.As),
-            this.convert(node.type),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.JsBinary,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            left: this.convert(node.expression),
+            operator: this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), JS.JsBinary.Type.As),
+            right: this.convert(node.type),
+            _type: this.mapType(node),
+        };
     }
 
-    visitNonundefinedExpression(node: ts.NonundefinedExpression) {
-        return JS.newUnary(
-            randomId(),
-            emptySpace,
-            emptyMarkers,
-            this.leftPadded(this.suffix(node.expression), JS.Unary.Type.Exclamation),
-            this.visit(node.expression),
-            this.mapType(node)
-        )
+    visitNonNullExpression(node: ts.NonNullExpression) {
+        return {
+            kind: JS.Kind.Unary,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            operator: this.leftPadded(this.suffix(node.expression), JS.Unary.Type.Exclamation),
+            expression: this.visit(node.expression),
+            type: this.mapType(node)
+        }
     }
 
     visitMetaProperty(node: ts.MetaProperty) {
-        return J.newFieldAccess(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.keywordToken === ts.SyntaxKind.NewKeyword ? this.mapIdentifier(node, 'new') : this.mapIdentifier(node, 'import'),
-            this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), this.convert(node.name)),
-            this.mapType(node)
-        );
+        return {
+            kind: J.Kind.FieldAccess,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            target: node.keywordToken === ts.SyntaxKind.NewKeyword ? this.mapIdentifier(node, 'new') : this.mapIdentifier(node, 'import'),
+            name: this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), this.convert(node.name)),
+            type: this.mapType(node)
+        };
     }
 
     visitSyntheticExpression(node: ts.SyntheticExpression) {
@@ -2712,24 +2812,26 @@ export class JavaScriptParserVisitor {
     }
 
     visitSatisfiesExpression(node: ts.SatisfiesExpression) {
-        return JS.newSatisfiesExpression(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.visit(node.expression),
-            this.leftPadded(this.suffix(node.expression), this.visit(node.type)),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.SatisfiesExpression,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: this.visit(node.expression),
+            satisfiesType: this.leftPadded(this.suffix(node.expression), this.visit(node.type)),
+            type: this.mapType(node)
+        };
     }
 
     visitTemplateSpan(node: ts.TemplateSpan) {
-        return JS.newTemplateExpression.TemplateSpan(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.convert(node.expression),
-            this.visit(node.literal)
-        )
+        return {
+            kind: JS.Kind.TemplateExpressionTemplateSpan,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: this.convert(node.expression),
+            tail: this.visit(node.literal)
+        }
     }
 
     visitSemicolonClassElement(node: ts.SemicolonClassElement) {
@@ -2737,14 +2839,15 @@ export class JavaScriptParserVisitor {
     }
 
     visitBlock(node: ts.Block) {
-        return J.newBlock(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.rightPadded(false, emptySpace),
-            this.semicolonPaddedStatementList(node.statements),
-            this.prefix(node.getLastToken()!)
-        );
+        return {
+            kind: J.Kind.Block,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            static: this.rightPadded(false, emptySpace),
+            statements: this.semicolonPaddedStatementList(node.statements),
+            end: this.prefix(node.getLastToken()!)
+        };
     }
 
     visitEmptyStatement(node: ts.EmptyStatement) {
@@ -2761,107 +2864,119 @@ export class JavaScriptParserVisitor {
         if (isStatement(expression)) {
             return expression as Statement;
         }
-        return JS.newExpressionStatement(
-            randomId(),
-            expression
-        )
+        return {
+            kind: JS.Kind.ExpressionStatement,
+            id: randomId(),
+            prefix: expression,
+            markers: emptyMarkers,
+            expression: expression
+        }
     }
 
     visitIfStatement(node: ts.IfStatement) {
         const semicolonAfterThen = (node.thenStatement.getChildAt(node.thenStatement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken);
         const semicolonAfterElse = (node.elseStatement?.getChildAt(node.elseStatement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken);
-        return J.newIf(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            J.newControlParentheses(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
-                emptyMarkers,
-                this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
-            ),
-            this.rightPadded(
+        return {
+            kind: J.Kind.If,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            ifCondition: {
+                kind: J.Kind.ControlParentheses,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                markers: emptyMarkers,
+                tree: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
+            },
+            thenPart: this.rightPadded(
                 this.convert(node.thenStatement),
                 semicolonAfterThen ? this.prefix(node.thenStatement.getLastToken()!) : emptySpace,
                 semicolonAfterThen ? markers({kind: JavaMarkers.Semicolon, id: randomId()}) : emptyMarkers
             ),
-            node.elseStatement ? J.newIfElse(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.ElseKeyword)!),
-                emptyMarkers,
-                this.rightPadded(
+            elsePart: node.elseStatement ? {
+                kind: J.Kind.IfElse,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.ElseKeyword)!),
+                markers: emptyMarkers,
+                body: this.rightPadded(
                     this.convert(node.elseStatement),
                     semicolonAfterElse ? this.prefix(node.elseStatement.getLastToken()!) : emptySpace,
                     semicolonAfterElse ? markers({kind: JavaMarkers.Semicolon, id: randomId()}) : emptyMarkers
                 )
-            ) : undefined
-        );
+            } : undefined
+        };
     }
 
     visitDoStatement(node: ts.DoStatement) {
-        return J.newDoWhileLoop(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.rightPadded(this.visit(node.statement),
+        return {
+            kind: J.Kind.DoWhileLoop,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            body: this.rightPadded(this.visit(node.statement),
                 this.semicolonPrefix(node.statement),
                 node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
                     kind: JavaMarkers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers),
-            this.leftPadded(
+            whileCondition: this.leftPadded(
                 this.prefix(this.findChildNode(node, ts.SyntaxKind.WhileKeyword)!),
-                J.newControlParentheses(
-                    randomId(),
-                    this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
-                    emptyMarkers,
-                    this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
-                )
+                {
+                    kind: J.Kind.ControlParentheses,
+                    id: randomId(),
+                    prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                    markers: emptyMarkers,
+                    tree: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
+                }
             )
-        );
+        };
     }
 
     visitWhileStatement(node: ts.WhileStatement) {
-        return J.newWhileLoop(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            J.newControlParentheses(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
-                emptyMarkers,
-                this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
-            ),
-            this.rightPadded(
+        return {
+            kind: J.Kind.WhileLoop,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            condition: {
+                kind: J.Kind.ControlParentheses,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                markers: emptyMarkers,
+                tree: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
+            },
+            body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
                 node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
                     kind: JavaMarkers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
-            )
-        );
+            ),
+        };
     }
 
     visitForStatement(node: ts.ForStatement) {
-        return J.newForLoop(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            J.newForLoopControl(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
-                emptyMarkers,
-                [node.initializer ?
+        return {
+            kind: J.Kind.ForLoop,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            control: {
+                kind: J.Kind.ForLoopControl,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                markers: emptyMarkers,
+                init: [node.initializer ?
                     (ts.isVariableDeclarationList(node.initializer) ? this.rightPadded(this.visit(node.initializer), emptySpace) :
-                        this.rightPadded(ts.isStatement(node.initializer) ? this.visit(node.initializer) : new ExpressionStatement(randomId(), this.visit(node.initializer)), this.suffix(node.initializer))) :
-                    this.rightPadded(this.newJEmpty(), this.suffix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!))],  // to handle for (/*_*/; ; );
-                node.condition ? this.rightPadded(this.visit(node.condition), this.suffix(node.condition)) :
-                    this.rightPadded(this.newJEmpty(), this.suffix(this.findChildNode(node, ts.SyntaxKind.SemicolonToken)!)),  // to handle for ( ;/*_*/; );
-                [node.incrementor ? this.rightPadded(ts.isStatement(node.incrementor) ? this.visit(node.incrementor) : new ExpressionStatement(randomId(), this.visit(node.incrementor)), this.suffix(node.incrementor)) :
-                    this.rightPadded(this.newJEmpty(this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)), emptySpace)],  // to handle for ( ; ;/*_*/);
-            ),
-            this.rightPadded(
+                        this.rightPadded(ts.isStatement(node.initializer) ? this.visit(node.initializer) : JS.newExpressionStatement(randomId(), this.visit(node.initializer)), this.suffix(node.initializer))) :
+                    this.rightPadded(this.newJEmpty(), this.suffix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!))],
+                condition: node.condition ? this.rightPadded(this.visit(node.condition), this.suffix(node.condition)) :
+                    this.rightPadded(this.newJEmpty(), this.suffix(this.findChildNode(node, ts.SyntaxKind.SemicolonToken)!)),
+                update: [node.incrementor ? this.rightPadded(ts.isStatement(node.incrementor) ? this.visit(node.incrementor) : JS.newExpressionStatement(randomId(), this.visit(node.incrementor)), this.suffix(node.incrementor)) :
+                    this.rightPadded(this.newJEmpty(this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)), emptySpace)]
+            },
+            body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
                 node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
@@ -2869,7 +2984,7 @@ export class JavaScriptParserVisitor {
                     id: randomId()
                 }) : emptyMarkers
             )
-        );
+        };
     }
 
     visitForInStatement(node: ts.ForInStatement) {
@@ -2898,12 +3013,13 @@ export class JavaScriptParserVisitor {
     }
 
     visitForOfStatement(node: ts.ForOfStatement) {
-        return JS.newJSForOfLoop(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.awaitModifier ? this.leftPadded(this.prefix(node.awaitModifier), true) : this.leftPadded(emptySpace, false),
-            {
+        return {
+            kind: JS.Kind.JSForOfLoop,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            await: node.awaitModifier ? this.leftPadded(this.prefix(node.awaitModifier), true) : this.leftPadded(emptySpace, false),
+            control: {
                 kind: JS.Kind.JSForInOfLoopControl,
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
@@ -2911,7 +3027,7 @@ export class JavaScriptParserVisitor {
                 variable: this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)),
                 iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
             },
-            this.rightPadded(
+            body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
                 node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
@@ -2919,84 +3035,93 @@ export class JavaScriptParserVisitor {
                     id: randomId()
                 }) : emptyMarkers
             )
-        );
+        };
     }
 
     visitContinueStatement(node: ts.ContinueStatement) {
-        return J.newContinue(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.label ? this.visit(node.label) : undefined
-        );
+        return {
+            kind: J.Kind.Continue,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            label: node.label ? this.visit(node.label) : undefined
+        };
     }
 
     visitBreakStatement(node: ts.BreakStatement) {
-        return J.newBreak(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.label ? this.visit(node.label) : undefined
-        );
+        return {
+            kind: J.Kind.Break,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            label: node.label ? this.visit(node.label) : undefined
+        };
     }
 
     visitReturnStatement(node: ts.ReturnStatement) {
-        return J.newReturn(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.expression ? this.convert<Expression>(node.expression) : undefined
-        );
+        return {
+            kind: J.Kind.Return,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: node.expression ? this.convert<Expression>(node.expression) : undefined
+        };
     }
 
     visitWithStatement(node: ts.WithStatement) {
-        return JS.newWithStatement(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            J.newControlParentheses(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
-                emptyMarkers,
-                this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
-            ),
-            this.rightPadded(
+        return {
+            kind: JS.Kind.WithStatement,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: {
+                kind: J.Kind.ControlParentheses,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                markers: emptyMarkers,
+                tree: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
+            },
+            body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
                 node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
                     kind: JavaMarkers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
-            )
-        );
+            ),
+        };
     }
 
     visitSwitchStatement(node: ts.SwitchStatement) {
-        return J.newSwitch(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            J.newControlParentheses(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
-                emptyMarkers,
-                this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
-            ),
-            this.visit(node.caseBlock)
-        );
+        return {
+            kind: J.Kind.Switch,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            selector: {
+                kind: J.Kind.ControlParentheses,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                markers: emptyMarkers,
+                tree: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
+            },
+            cases: this.visit(node.caseBlock)
+        };
     }
 
     visitLabeledStatement(node: ts.LabeledStatement) {
-        return J.newLabel(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.rightPadded(this.visit(node.label), this.suffix(node.label)),
-            JS.newTrailingTokenStatement(
-                randomId(),
-                emptySpace,
-                emptyMarkers,
-                this.rightPadded(
+        return {
+            kind: J.Kind.Label,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            label: this.rightPadded(this.visit(node.label), this.suffix(node.label)),
+            statement: {
+                kind: JS.Kind.TrailingTokenStatement,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                expression: this.rightPadded(
                     this.visit(node.statement),
                     this.semicolonPrefix(node.statement),
                     node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
@@ -3004,45 +3129,48 @@ export class JavaScriptParserVisitor {
                         id: randomId()
                     }) : emptyMarkers
                 ),
-                this.mapType(node.statement)
-            )
-        );
+                type: this.mapType(node.statement)
+            }
+        };
     }
 
     visitThrowStatement(node: ts.ThrowStatement) {
-        return J.newThrow(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.visit(node.expression)
-        );
+        return {
+            kind: J.Kind.Throw,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            exception: this.visit(node.expression)
+        };
     }
 
     visitTryStatement(node: ts.TryStatement) {
         if (node.catchClause?.variableDeclaration?.name && !ts.isIdentifier(node.catchClause?.variableDeclaration?.name)) {
-            return JS.newJSTry(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                this.visit(node.tryBlock),
-                this.visit(node.catchClause),
-                node.finallyBlock ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FinallyKeyword)!), this.visit(node.finallyBlock)) : undefined
-            );
+            return {
+                kind: JS.Kind.JSTry,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                body: this.visit(node.tryBlock),
+                catches: this.visit(node.catchClause),
+                finally: node.finallyBlock ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FinallyKeyword)!), this.visit(node.finallyBlock)) : undefined
+            };
         }
 
-        return J.newTry(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            undefined,
-            this.visit(node.tryBlock),
-            node.catchClause ? [this.visit(node.catchClause)] : [],
-            node.finallyBlock ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FinallyKeyword)!), this.visit(node.finallyBlock)) : undefined
-        );
+        return {
+            kind: J.Kind.Try,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            resources: undefined,
+            body: this.visit(node.tryBlock),
+            catches: node.catchClause ? [this.visit(node.catchClause)] : [],
+            finally: node.finallyBlock ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FinallyKeyword)!), this.visit(node.finallyBlock)) : undefined
+        };
     }
 
     visitDebuggerStatement(node: ts.DebuggerStatement) {
-        return new ExpressionStatement(
+        return JS.newExpressionStatement(
             randomId(),
             this.mapIdentifier(node, 'debugger')
         );
@@ -3051,37 +3179,40 @@ export class JavaScriptParserVisitor {
     visitVariableDeclaration(node: ts.VariableDeclaration) {
         const nameExpression = this.visit(node.name);
 
-        if (nameExpression instanceof J.Identifier && !node.exclamationToken) {
-            return J.newVariableDeclarations.NamedVariable(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                nameExpression,
-                [],
-                node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)) : undefined,
-                this.mapVariableType(node)
-            );
+        if (nameExpression.kind == J.Kind.Identifier && !node.exclamationToken) {
+            return {
+                kind: J.Kind.NamedVariable,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                name: nameExpression,
+                dimensionsAfterName: [],
+                initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)),
+                variableType: this.mapVariableType(node),
+            };
         }
 
-        return JS.newJSVariableDeclarations.JSNamedVariable(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.exclamationToken ? JS.newUnary(
-                randomId(),
-                emptySpace,
-                emptyMarkers,
-                this.leftPadded(
+        return {
+            kind: JS.Kind.JSNamedVariable,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            name: node.exclamationToken ? {
+                kind: JS.Kind.Unary,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                operator: this.leftPadded(
                     this.suffix(node.name),
                     JS.Unary.Type.Exclamation
                 ),
-                nameExpression,
-                this.mapType(node)
-            ) : nameExpression,
-            [],
-            node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)) : undefined,
-            this.mapVariableType(node)
-        );
+                expression: nameExpression,
+                type: this.mapType(node)
+            } : nameExpression,
+            dimensionsAfterName: [],
+            initializer: node.initializer ? this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)) : undefined,
+            variableType: this.mapVariableType(node),
+        };
     }
 
     visitVariableDeclarationList(node: ts.VariableDeclarationList) {
@@ -3090,22 +3221,24 @@ export class JavaScriptParserVisitor {
         // to parse the declaration case: await using db = ...
         let modifier;
         if (kind?.kind === ts.SyntaxKind.AwaitKeyword) {
-            modifier = J.newModifier(
-                randomId(),
-                this.prefix(kind),
-                emptyMarkers,
-                'await',
-                J.ModifierType.LanguageExtension,
-                []
-            );
+            modifier = {
+                kind: J.Kind.Modifier,
+                id: randomId(),
+                prefix: this.prefix(kind),
+                markers: emptyMarkers,
+                keyword: 'await',
+                type: J.ModifierType.LanguageExtension,
+                annotations: []
+            };
             kind = node.getChildAt(1);
         }
-        return JS.newScopedVariableDeclarations(
-            randomId(),
-            emptySpace,
-            emptyMarkers,
-            modifier ? [modifier] : [],
-            this.leftPadded(
+        return {
+            kind: JS.Kind.ScopedVariableDeclarations,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            modifiers: modifier ? [modifier] : [],
+            scope: this.leftPadded(
                 kind ? this.prefix(kind) : this.prefix(node),
                 kind?.kind === ts.SyntaxKind.LetKeyword
                     ? JS.ScopedVariableDeclarations.Scope.Let
@@ -3115,52 +3248,63 @@ export class JavaScriptParserVisitor {
                             ? JS.ScopedVariableDeclarations.Scope.Using
                             : JS.ScopedVariableDeclarations.Scope.Var
             ),
-            node.declarations.map((declaration) => {
+            variables: node.declarations.map((declaration) => {
                 const declarationExpression = this.visit(declaration);
 
                 return this.rightPadded(
-                    JS.isJavaScript(declarationExpression)
-                        ? JS.newJSVariableDeclarations(
-                            randomId(),
-                            this.prefix(declaration),
-                            emptyMarkers,
-                            [], // FIXME decorators?
-                            [], // FIXME modifiers?
-                            this.mapTypeInfo(declaration),
-                            undefined, // FIXME varargs
-                            [this.rightPadded(declarationExpression as JS.JSVariableDeclarations.JSNamedVariable, emptySpace)]
-                        )
-                        : J.newVariableDeclarations(
-                            randomId(),
-                            this.prefix(declaration),
-                            emptyMarkers,
-                            [], // FIXME decorators?
-                            [], // FIXME modifiers?
-                            this.mapTypeInfo(declaration),
-                            undefined, // FIXME varargs
-                            [],
-                            [this.rightPadded(declarationExpression, emptySpace)]
-                        ),
+                    isJavaScript(declarationExpression)
+                        ? {
+                            kind: JS.Kind.JSVariableDeclarations,
+                            id: randomId(),
+                            prefix: this.prefix(declaration),
+                            markers: emptyMarkers,
+                            leadingAnnotations: [],
+                            modifiers: [],
+                            typeExpression: this.mapTypeInfo(declaration),
+                            varargs: undefined,
+                            variables: [this.rightPadded(declarationExpression as JS.JSVariableDeclarations.JSNamedVariable, emptySpace)],
+                        }
+                        : {
+                            kind: J.Kind.VariableDeclarations,
+                            id: randomId(),
+                            prefix: this.prefix(declaration),
+                            markers: emptyMarkers,
+                            leadingAnnotations: [],
+                            modifiers: [],
+                            typeExpression: this.mapTypeInfo(declaration),
+                            varargs: undefined,
+                            variables: []
+                        },
                     this.suffix(declaration)
                 );
             })
-        );
+        };
     }
 
     visitFunctionDeclaration(node: ts.FunctionDeclaration) {
-        return JS.newFunctionDeclaration(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapModifiers(node),
-            this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FunctionKeyword)!), !!node.asteriskToken),
-            this.leftPadded(node.asteriskToken ? this.prefix(node.asteriskToken) : emptySpace, node.name ? this.visit(node.name) : J.newIdentifier(randomId(), emptySpace, emptyMarkers, [], "", undefined, undefined)),
-            this.mapTypeParametersAsObject(node),
-            this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-            this.mapTypeInfo(node),
-            node.body ? this.convert(node.body) : undefined,
-            this.mapMethodType(node)
-        );
+        return {
+            kind: JS.Kind.FunctionDeclaration,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
+            asteriskToken: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FunctionKeyword)!), !!node.asteriskToken),
+            name: this.leftPadded(node.asteriskToken ? this.prefix(node.asteriskToken) : emptySpace, node.name ? this.visit(node.name) : {
+                kind: J.Kind.Identifier,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                annotations: [],
+                simpleName: "",
+                type: undefined,
+                fieldType: undefined
+            }),
+            typeParameters: this.mapTypeParametersAsObject(node),
+            parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            returnTypeExpression: this.mapTypeInfo(node),
+            body: node.body ? this.convert(node.body) : undefined,
+            type: this.mapMethodType(node)
+        };
     }
 
     private getParameterListNodes(node: ts.SignatureDeclarationBase | ts.NewExpression, openToken: ts.SyntaxKind = ts.SyntaxKind.OpenParenToken) {
@@ -3174,92 +3318,101 @@ export class JavaScriptParserVisitor {
     }
 
     visitInterfaceDeclaration(node: ts.InterfaceDeclaration) {
-        return J.newClassDeclaration(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            [], // interface has no decorators
-            this.mapModifiers(node),
-            J.newClassDeclarationKind(
-                randomId(),
-                node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
-                emptyMarkers,
-                [],
-                J.ClassType.Interface
-            ),
-            node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
-            this.mapTypeParametersAsJContainer(node),
-            undefined, // interface has no constructor
-            undefined, // implements should be used
-            this.mapInterfaceExtends(node), // interface extends modeled as implements
-            undefined,
-            J.newBlock(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
-                emptyMarkers,
-                this.rightPadded(false, emptySpace),
-                node.members.map(te => ({
+        return {
+            kind: J.Kind.ClassDeclaration,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            leadingAnnotations: [],
+            modifiers: this.mapModifiers(node),
+            classKind: {
+                kind: J.Kind.ClassDeclarationKind,
+                id: randomId(),
+                prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
+                markers: emptyMarkers,
+                annotations: [],
+                type: J.ClassType.Interface
+            },
+            name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
+            typeParameters: this.mapTypeParametersAsJContainer(node),
+            primaryConstructor: undefined,
+            extends: undefined,
+            implements: this.mapInterfaceExtends(node),
+            permitting: undefined,
+            body: {
+                kind: J.Kind.Block,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
+                markers: emptyMarkers,
+                static: this.rightPadded(false, emptySpace),
+                statements: node.members.map(te => ({
                     kind: J.Kind.JRightPadded,
                     element: this.convert(te),
                     after: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(te.getLastToken()!) : emptySpace,
                     markers: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(te.getLastToken())!) : emptyMarkers
                 })),
-                this.prefix(node.getLastToken()!)
-            ),
-            this.mapType(node)
-        );
+                end: this.prefix(node.getLastToken()!)
+            },
+            type: this.mapType(node)
+        };
     }
 
     visitTypeAliasDeclaration(node: ts.TypeAliasDeclaration) {
-        return JS.newTypeDeclaration(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapModifiers(node),
-            this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!), this.visit(node.name)),
-            node.typeParameters ? this.mapTypeParametersAsObject(node) : undefined,
-            this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert(node.type)),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.TypeDeclaration,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
+            name: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!), this.visit(node.name)),
+            typeParameters: node.typeParameters ? this.mapTypeParametersAsObject(node) : undefined,
+            initializer: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert(node.type)),
+            type: this.mapType(node)
+        };
     }
 
     visitEnumDeclaration(node: ts.EnumDeclaration) {
-        return J.newClassDeclaration(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            [], // enum has no decorators
-            this.mapModifiers(node),
-            J.newClassDeclarationKind(
-                randomId(),
-                node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
-                emptyMarkers,
-                [],
-                J.ClassType.Enum
-            ),
-            node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
-            undefined, // enum has no type parameters
-            undefined, // enum has no constructor
-            undefined, // enum can't extend smth.
-            undefined, // enum can't implement smth.
-            undefined,
-            J.newBlock(
-                randomId(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
-                emptyMarkers,
-                this.rightPadded(false, emptySpace),
-                [this.rightPadded(
-                    J.newEnumValueSet(
-                        randomId(),
-                        emptySpace,
-                        emptyMarkers,
-                        node.members.map(em => this.rightPadded(this.visit(em), this.suffix(em))),
-                        node.members.hasTrailingComma),
+        return {
+            kind: J.Kind.ClassDeclaration,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            leadingAnnotations: [],
+            modifiers: this.mapModifiers(node),
+            classKind: {
+                kind: J.Kind.ClassDeclarationKind,
+                id: randomId(),
+                prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
+                markers: emptyMarkers,
+                annotations: [],
+                type: J.ClassType.Enum
+            },
+            name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
+            typeParameters: undefined,
+            primaryConstructor: undefined,
+            extends: undefined,
+            implements: undefined,
+            permitting: undefined,
+            body: {
+                kind: J.Kind.Block,
+                id: randomId(),
+                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
+                markers: emptyMarkers,
+                static: this.rightPadded(false, emptySpace),
+                statements: [this.rightPadded(
+                    {
+                        kind: J.Kind.EnumValueSet,
+                        id: randomId(),
+                        prefix: emptySpace,
+                        markers: emptyMarkers,
+                        enums: node.members.map(em => this.rightPadded(this.visit(em), this.suffix(em))),
+                        terminatedWithSemicolon: node.members.hasTrailingComma
+                    },
                     emptySpace)],
-                this.prefix(node.getLastToken()!)
-            ),
-            this.mapType(node) as JavaType.Class
-        );
+                end: this.prefix(node.getLastToken()!)
+            },
+            type: this.mapType(node) as JavaType.Class
+        };
     }
 
     visitModuleDeclaration(node: ts.ModuleDeclaration) {
@@ -3274,180 +3427,185 @@ export class JavaScriptParserVisitor {
         } else {
             keywordType = JS.NamespaceDeclaration.KeywordType.Module;
         }
-        if (body instanceof JS.NamespaceDeclaration) {
-            return JS.newNamespaceDeclaration(
-                randomId(),
-                emptySpace,
-                emptyMarkers,
-                this.mapModifiers(node),
-                this.leftPadded(
+        if (body.kind === JS.Kind.NamespaceDeclaration) {
+            return {
+                kind: JS.Kind.NamespaceDeclaration,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                modifiers: this.mapModifiers(node),
+                keywordType: this.leftPadded(
                     namespaceKeyword ? this.prefix(namespaceKeyword) : emptySpace,
                     keywordType
                 ),
-                this.rightPadded(
-                    (body.name instanceof J.FieldAccess)
+                name: this.rightPadded(
+                    (body.name.kind === J.Kind.FieldAccess)
                         ? this.remapFieldAccess(body.name, node.name)
-                        : J.newFieldAccess(
-                            randomId(),
-                            emptySpace,
-                            emptyMarkers,
-                            this.visit(node.name),
-                            {
+                        : {
+                            kind: J.Kind.FieldAccess,
+                            id: randomId(),
+                            prefix: emptySpace,
+                            markers: emptyMarkers,
+                            target: this.visit(node.name),
+                            name: {
                                 kind: J.Kind.JLeftPadded,
                                 before: this.suffix(node.name),
                                 element: body.name as J.Identifier,
                                 markers: emptyMarkers
                             },
-                            undefined
-                        ),
-                    body.padding.name.after
+                            type: undefined
+                        },
+                    body.name.after
                 ),
-                body.body
-            );
+                body: body.body
+            };
         } else {
-            return JS.newNamespaceDeclaration(
-                randomId(),
-                node.parent.kind === ts.SyntaxKind.ModuleBlock ? this.prefix(node) : emptySpace,
-                emptyMarkers,
-                this.mapModifiers(node),
-                this.leftPadded(
+            return {
+                kind: JS.Kind.NamespaceDeclaration,
+                id: randomId(),
+                prefix: node.parent.kind === ts.SyntaxKind.ModuleBlock ? this.prefix(node) : emptySpace,
+                markers: emptyMarkers,
+                modifiers: this.mapModifiers(node),
+                keywordType: this.leftPadded(
                     namespaceKeyword ? this.prefix(namespaceKeyword) : emptySpace,
                     keywordType
                 ),
-                this.rightPadded(this.convert(node.name), this.suffix(node.name)), // J.FieldAccess
-                body // J.Block
-            );
+                name: this.rightPadded(this.convert(node.name), this.suffix(node.name)),
+                body
+            };
         }
     }
 
     private remapFieldAccess(fa: J.FieldAccess, name: ts.ModuleName): J.FieldAccess {
-        if (fa.target instanceof J.Identifier) {
-            return J.newFieldAccess(
-                randomId(),
-                emptySpace,
-                emptyMarkers,
-                J.newFieldAccess(
-                    randomId(),
-                    emptySpace,
-                    emptyMarkers,
-                    this.visit(name),
-                    this.leftPadded(
+        if (fa.target.kind === J.Kind.Identifier) {
+            return {
+                kind: J.Kind.FieldAccess,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                target: {
+                    kind: J.Kind.FieldAccess,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    target: this.visit(name),
+                    name: this.leftPadded(
                         this.suffix(name),
                         fa.target
                     ),
-                    undefined
-                ),
-                fa.padding.name,
-                undefined
-            );
+                    type: undefined
+                },
+                name: fa.name,
+                type: undefined
+            };
         }
 
-        return J.newFieldAccess(
-            randomId(),
-            emptySpace,
-            emptyMarkers,
-            this.remapFieldAccess(fa.target as J.FieldAccess, name),
-            fa.padding.name,
-            undefined
-        );
+        return {
+            kind: J.Kind.FieldAccess,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            target: this.remapFieldAccess(fa.target as J.FieldAccess, name),
+            name: fa.name,
+            type: undefined
+        };
     }
 
     visitModuleBlock(node: ts.ModuleBlock) {
-        return J.newBlock(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.rightPadded(false, emptySpace),
-            this.semicolonPaddedStatementList(node.statements),
-            this.prefix(node.getLastToken()!)
-        );
+        return {
+            kind: J.Kind.Block,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            static: this.rightPadded(false, emptySpace),
+            statements: this.semicolonPaddedStatementList(node.statements),
+            end: this.prefix(node.getLastToken()!)
+        };
     }
 
     visitCaseBlock(node: ts.CaseBlock) {
-        return J.newBlock(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.rightPadded(false, emptySpace),
-            node.clauses.map(clause =>
+        return {
+            kind: J.Kind.Block,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            static: this.rightPadded(false, emptySpace),
+            statements: node.clauses.map(clause =>
                 this.rightPadded(
                     this.visit(clause),
                     this.suffix(clause)
                 )),
-            this.prefix(node.getLastToken()!)
-        )
+            end: this.prefix(node.getLastToken()!)
+        }
     }
 
     visitNamespaceExportDeclaration(node: ts.NamespaceExportDeclaration) {
-        return JS.newNamespaceDeclaration(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            [
-                J.newModifier(
-                    randomId(),
-                    emptySpace,
-                    emptyMarkers,
-                    'export',
-                    J.ModifierType.LanguageExtension,
-                    []
-                ),
-                J.newModifier(
-                    randomId(),
-                    this.prefix(this.findChildNode(node, ts.SyntaxKind.AsKeyword)!),
-                    emptyMarkers,
-                    'as',
-                    J.ModifierType.LanguageExtension,
-                    []
-                )
+        return {
+            kind: JS.Kind.NamespaceDeclaration,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            modifiers: [
+                {
+                    kind: J.Kind.Modifier,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    keyword: 'export',
+                    type: J.ModifierType.LanguageExtension,
+                    annotations: []
+                },
+                {
+                    kind: J.Kind.Modifier,
+                    id: randomId(),
+                    prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.AsKeyword)!),
+                    markers: emptyMarkers,
+                    keyword: 'as',
+                    type: J.ModifierType.LanguageExtension,
+                    annotations: []
+                }
             ],
-            this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.NamespaceKeyword)!), JS.NamespaceDeclaration.KeywordType.Namespace),
-            this.rightPadded(this.convert(node.name), this.suffix(node.name)),
-            undefined
-        );
+            keywordType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.NamespaceKeyword)!), JS.NamespaceDeclaration.KeywordType.Namespace),
+            name: this.rightPadded(this.convert(node.name), this.suffix(node.name)),
+            body: undefined
+        };
     }
 
     visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration) {
         const kind = this.findChildNode(node, ts.SyntaxKind.ImportKeyword)!;
 
-        return JS.newScopedVariableDeclarations(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapModifiers(node),
-            this.leftPadded(
+        return {
+            kind: JS.Kind.ScopedVariableDeclarations,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
+            scope: this.leftPadded(
                 this.prefix(kind),
                 JS.ScopedVariableDeclarations.Scope.Import
             ),
-            [
-                this.rightPadded(J.newVariableDeclarations(
-                    randomId(),
-                    emptySpace,
-                    emptyMarkers,
-                    [],
-                    node.isTypeOnly ? [J.newModifier(
-                        randomId(),
-                        this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!),
-                        emptyMarkers,
-                        "type",
-                        J.ModifierType.LanguageExtension,
-                        []
-                    )] : [],
-                    undefined,
-                    undefined,
-                    [],
-                    [this.rightPadded(J.newVariableDeclarations.NamedVariable(
-                        randomId(),
-                        emptySpace,
-                        emptyMarkers,
-                        this.visit(node.name),
-                        [],
-                        this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference)),
-                        this.mapVariableType(node)
-                    ), emptySpace)]
-                ), emptySpace)
+            variables: [
+                this.rightPadded({
+                    kind: J.Kind.VariableDeclarations,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    leadingAnnotations: [],
+                    modifiers: node.isTypeOnly ? [{
+                        kind: J.Kind.Modifier,
+                        id: randomId(),
+                        prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!),
+                        markers: emptyMarkers,
+                        keyword: "type",
+                        type: J.ModifierType.LanguageExtension,
+                        annotations: []
+                    }] : [],
+                    typeExpression: undefined,
+                    varargs: undefined,
+                    variables: []
+                }, emptySpace)
             ]
-        )
+        }
     }
 
     visitImportKeyword(node: ts.ImportExpression) {
@@ -3456,26 +3614,28 @@ export class JavaScriptParserVisitor {
     }
 
     visitImportDeclaration(node: ts.ImportDeclaration) {
-        return JS.newJsImport(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapModifiers(node),
-            node.importClause ? this.visit(node.importClause) : undefined,
-            this.leftPadded(node.importClause ? this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!) : emptySpace, this.visit(node.moduleSpecifier)),
-            node.attributes ? this.visit(node.attributes) : undefined
-        );
+        return {
+            kind: JS.Kind.JsImport,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
+            importClause: node.importClause ? this.visit(node.importClause) : undefined,
+            moduleSpecifier: this.leftPadded(node.importClause ? this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!) : emptySpace, this.visit(node.moduleSpecifier)),
+            attributes: node.attributes ? this.visit(node.attributes) : undefined
+        };
     }
 
     visitImportClause(node: ts.ImportClause) {
-        return JS.newJsImportClause(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.isTypeOnly,
-            node.name ? this.rightPadded(this.visit(node.name), this.suffix(node.name)) : undefined,
-            node.namedBindings ? this.visit(node.namedBindings) : undefined
-        );
+        return {
+            kind: JS.Kind.JsImportClause,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            typeOnly: node.isTypeOnly,
+            name: node.name ? this.rightPadded(this.visit(node.name), this.suffix(node.name)) : undefined,
+            namedBindings: node.namedBindings ? this.visit(node.namedBindings) : undefined
+        };
     }
 
     visitNamespaceImport(node: ts.NamespaceImport) {
@@ -3490,98 +3650,107 @@ export class JavaScriptParserVisitor {
     }
 
     visitNamedImports(node: ts.NamedImports) {
-        return JS.newNamedImports(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
-            undefined
-        );
+        return {
+            kind: JS.Kind.NamedImports,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            elements: this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
+            type: undefined
+        };
     }
 
     visitImportSpecifier(node: ts.ImportSpecifier) {
-        return JS.newJsImportSpecifier(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.leftPadded(
+        return {
+            kind: JS.Kind.JsImportSpecifier,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            importType: this.leftPadded(
                 node.isTypeOnly ? this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!) : emptySpace,
                 node.isTypeOnly
             ),
-            node.propertyName
-                ? JS.newAlias(
-                    randomId(),
-                    this.prefix(node.propertyName),
-                    emptyMarkers,
-                    this.rightPadded(this.convert(node.propertyName), this.suffix(node.propertyName)),
-                    this.convert(node.name)
-                )
+            specifier: node.propertyName
+                ? {
+                    kind: JS.Kind.Alias,
+                    id: randomId(),
+                    prefix: this.prefix(node.propertyName),
+                    markers: emptyMarkers,
+                    propertyName: this.rightPadded(this.convert(node.propertyName), this.suffix(node.propertyName)),
+                    alias: this.convert(node.name)
+                }
                 : this.convert(node.name),
-            this.mapType(node)
-        );
+            _type: this.mapType(node),
+        };
     }
 
     visitExportAssignment(node: ts.ExportAssignment) {
-        return JS.newExportAssignment(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapModifiers(node),
-            this.leftPadded(node.isExportEquals ? this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!) : emptySpace, (!!node.isExportEquals)),
-            this.visit(node.expression)
-        );
+        return {
+            kind: JS.Kind.ExportAssignment,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
+            exportEquals: this.leftPadded(node.isExportEquals ? this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!) : emptySpace, (!!node.isExportEquals)),
+            expression: this.visit(node.expression)
+        };
     }
 
     visitExportDeclaration(node: ts.ExportDeclaration) {
-        return JS.newExportDeclaration(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapModifiers(node),
-            this.leftPadded(node.isTypeOnly ? this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!) : emptySpace, node.isTypeOnly),
-            node.exportClause ? this.visit(node.exportClause) : this.mapIdentifier(this.findChildNode(node, ts.SyntaxKind.AsteriskToken)!, "*"),
-            node.moduleSpecifier ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!), this.visit(node.moduleSpecifier)) : undefined,
-            node.attributes ? this.visit(node.attributes) : undefined
-        );
+        return {
+            kind: JS.Kind.ExportDeclaration,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
+            typeOnly: this.leftPadded(node.isTypeOnly ? this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!) : emptySpace, node.isTypeOnly),
+            exportClause: node.exportClause ? this.visit(node.exportClause) : this.mapIdentifier(this.findChildNode(node, ts.SyntaxKind.AsteriskToken)!, "*"),
+            moduleSpecifier: node.moduleSpecifier ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!), this.visit(node.moduleSpecifier)) : undefined,
+            attributes: node.attributes ? this.visit(node.attributes) : undefined
+        };
     }
 
     visitNamedExports(node: ts.NamedExports) {
-        return JS.newNamedExports(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.mapCommaSeparatedList(node.getChildren()),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.NamedExports,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            elements: this.mapCommaSeparatedList(node.getChildren()),
+            type: this.mapType(node)
+        };
     }
 
     visitNamespaceExport(node: ts.NamespaceExport) {
-        return JS.newAlias(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.rightPadded(this.mapIdentifier(this.findChildNode(node, ts.SyntaxKind.AsteriskToken)!, "*"), this.prefix(this.findChildNode(node, ts.SyntaxKind.AsKeyword)!)),
-            this.visit(node.name)
-        )
+        return {
+            kind: JS.Kind.Alias,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            propertyName: this.rightPadded(this.mapIdentifier(this.findChildNode(node, ts.SyntaxKind.AsteriskToken)!, "*"), this.prefix(this.findChildNode(node, ts.SyntaxKind.AsKeyword)!)),
+            alias: this.visit(node.name)
+        }
     }
 
     visitExportSpecifier(node: ts.ExportSpecifier) {
-        return JS.newExportSpecifier(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.leftPadded(node.isTypeOnly ? this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!) : emptySpace, node.isTypeOnly),
-            node.propertyName
-                ? JS.newAlias(
-                    randomId(),
-                    this.prefix(node.propertyName),
-                    emptyMarkers,
-                    this.rightPadded(this.convert(node.propertyName), this.suffix(node.propertyName)),
-                    this.convert(node.name)
-                )
+        return {
+            kind: JS.Kind.ExportSpecifier,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            typeOnly: this.leftPadded(node.isTypeOnly ? this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!) : emptySpace, node.isTypeOnly),
+            specifier: node.propertyName
+                ? {
+                    kind: JS.Kind.Alias,
+                    id: randomId(),
+                    prefix: this.prefix(node.propertyName),
+                    markers: emptyMarkers,
+                    propertyName: this.rightPadded(this.convert(node.propertyName), this.suffix(node.propertyName)),
+                    alias: this.convert(node.name)
+                }
                 : this.convert(node.name),
-            this.mapType(node)
-        );
+            type: this.mapType(node)
+        };
     }
 
     visitMissingDeclaration(node: ts.MissingDeclaration) {
@@ -3589,20 +3758,22 @@ export class JavaScriptParserVisitor {
     }
 
     visitExternalModuleReference(node: ts.ExternalModuleReference) {
-        return J.newMethodInvocation(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            undefined,
-            undefined,
-            this.mapIdentifier(node, "require"),
-            J.newJContainer(
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
-                [this.rightPadded(this.visit(node.expression), this.suffix(node.expression))],
-                emptyMarkers
-            ),
-            this.mapMethodType(node)
-        )
+        return {
+            kind: J.Kind.MethodInvocation,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            select: undefined,
+            typeParameters: undefined,
+            name: this.mapIdentifier(node, "require"),
+            arguments: {
+                kind: J.Kind.JContainer,
+                before: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                elements: [this.rightPadded(this.visit(node.expression), this.suffix(node.expression))],
+                markers: emptyMarkers
+            },
+            methodType: this.mapMethodType(node)
+        }
     }
 
     visitJsxElement(node: ts.JsxElement) {
@@ -3654,12 +3825,13 @@ export class JavaScriptParserVisitor {
     }
 
     visitCaseClause(node: ts.CaseClause) {
-        return J.newCase(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            J.Case.Type.Statement,
-            {
+        return {
+            kind: J.Kind.Case,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            type: J.Case.Type.Statement,
+            caseLabels: {
                 kind: J.Kind.JContainer,
                 before: this.prefix(node.expression),
                 elements: [this.rightPadded(
@@ -3668,38 +3840,39 @@ export class JavaScriptParserVisitor {
                 )],
                 markers: emptyMarkers
             },
-            {
+            statements: {
                 kind: J.Kind.JContainer,
                 before: this.prefix(node),
                 elements: this.semicolonPaddedStatementList(node.statements),
                 markers: emptyMarkers
             },
-            undefined,
-            undefined
-        );
+            body: undefined,
+            guard: undefined
+        };
     }
 
     visitDefaultClause(node: ts.DefaultClause) {
-        return J.newCase(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            J.Case.Type.Statement,
-            {
+        return {
+            kind: J.Kind.Case,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            type: J.Case.Type.Statement,
+            caseLabels: {
                 kind: J.Kind.JContainer,
                 before: this.prefix(node),
                 elements: [this.rightPadded(this.mapIdentifier(node, 'default'), this.suffix(this.findChildNode(node, ts.SyntaxKind.DefaultKeyword)!))],
                 markers: emptyMarkers
             },
-            {
+            statements: {
                 kind: J.Kind.JContainer,
                 before: this.prefix(node),
                 elements: this.semicolonPaddedStatementList(node.statements),
                 markers: emptyMarkers
             },
-            undefined,
-            undefined
-        );
+            body: undefined,
+            guard: undefined
+        };
     }
 
     visitHeritageClause(node: ts.HeritageClause) {
@@ -3708,157 +3881,181 @@ export class JavaScriptParserVisitor {
 
     visitCatchClause(node: ts.CatchClause) {
         if (node.variableDeclaration?.name && !ts.isIdentifier(node.variableDeclaration?.name)) {
-            return JS.newJSTryJSCatch(
-                randomId(),
-                this.prefix(node),
-                emptyMarkers,
-                J.newControlParentheses(
-                    randomId(),
-                    this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
-                    emptyMarkers,
-                    this.rightPadded(
-                        JS.newJSVariableDeclarations(
-                            randomId(),
-                            this.prefix(node.variableDeclaration),
-                            emptyMarkers,
-                            [],
-                            [],
-                            this.mapTypeInfo(node.variableDeclaration),
-                            undefined,
-                            [this.rightPadded(this.visit(node.variableDeclaration), emptySpace)]
-                        ),
+            return {
+                kind: JS.Kind.JSCatch,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                parameter: {
+                    kind: J.Kind.ControlParentheses,
+                    id: randomId(),
+                    prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                    markers: emptyMarkers,
+                    tree: this.rightPadded(
+                        {
+                            kind: JS.Kind.JSVariableDeclarations,
+                            id: randomId(),
+                            prefix: this.prefix(node.variableDeclaration),
+                            markers: emptyMarkers,
+                            leadingAnnotations: [],
+                            modifiers: [],
+                            typeExpression: this.mapTypeInfo(node.variableDeclaration),
+                            varargs: undefined,
+                            variables: [this.rightPadded(this.visit(node.variableDeclaration), emptySpace)],
+                        },
                         this.suffix(node.variableDeclaration))
-                ),
-                this.visit(node.block)
-            )
+                },
+                body: this.visit(node.block)
+            }
         }
 
-        return J.newTryCatch(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            node.variableDeclaration ?
-                J.newControlParentheses(
-                    randomId(),
-                    this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
-                    emptyMarkers,
-                    this.rightPadded(
-                        J.newVariableDeclarations(
-                            randomId(),
-                            this.prefix(node.variableDeclaration),
-                            emptyMarkers,
-                            [],
-                            [],
-                            this.mapTypeInfo(node.variableDeclaration),
-                            undefined,
-                            [],
-                            [this.rightPadded(this.visit(node.variableDeclaration), emptySpace)]
-                        ),
+        return {
+            kind: J.Kind.TryCatch,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            parameter: node.variableDeclaration ?
+                {
+                    kind: J.Kind.ControlParentheses,
+                    id: randomId(),
+                    prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                    markers: emptyMarkers,
+                    tree: this.rightPadded(
+                        {
+                            kind: J.Kind.VariableDeclarations,
+                            id: randomId(),
+                            prefix: this.prefix(node.variableDeclaration),
+                            markers: emptyMarkers,
+                            leadingAnnotations: [],
+                            modifiers: [],
+                            typeExpression: this.mapTypeInfo(node.variableDeclaration),
+                            varargs: undefined,
+                            variables: []
+                        },
                         this.suffix(node.variableDeclaration))
-                ) :
+                } :
                 // should return empty variables list to handle: try { } catch { }
-                J.newControlParentheses(
-                    randomId(),
-                    emptySpace,
-                    emptyMarkers,
-                    this.rightPadded(J.newVariableDeclarations(randomId(), emptySpace, emptyMarkers, [], [], undefined, undefined, [], []), emptySpace)
-                ),
-            this.visit(node.block)
-        )
+                {
+                    kind: J.Kind.ControlParentheses,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    tree: this.rightPadded({
+                        kind: J.Kind.VariableDeclarations,
+                        id: randomId(),
+                        prefix: emptySpace,
+                        markers: emptyMarkers,
+                        leadingAnnotations: [],
+                        modifiers: [],
+                        typeExpression: undefined,
+                        varargs: undefined,
+                        variables: []
+                    }, emptySpace)
+                },
+            body: this.visit(node.block),
+        }
     }
 
     visitImportAttributes(node: ts.ImportAttributes) {
         const openBraceIndex = node.getChildren().findIndex(n => n.kind === ts.SyntaxKind.OpenBraceToken);
         const elements = this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(openBraceIndex, openBraceIndex + 3));
-        return JS.newImportAttributes(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            ts.SyntaxKind.WithKeyword === node.token ? JS.ImportAttributes.Token.With : JS.ImportAttributes.Token.Assert,
-            elements
-        );
+        return {
+            kind: JS.Kind.ImportAttributes,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            token: ts.SyntaxKind.WithKeyword === node.token ? JS.ImportAttributes.Token.With : JS.ImportAttributes.Token.Assert,
+            elements: elements,
+        };
     }
 
     visitImportAttribute(node: ts.ImportAttribute) {
-        return JS.newImportAttribute(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.visit(node.name),
-            this.leftPadded(this.suffix(node.name), this.visit(node.value))
-        );
+        return {
+            kind: JS.Kind.ImportAttribute,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            name: this.visit(node.name),
+            value: this.leftPadded(this.suffix(node.name), this.visit(node.value)),
+        };
     }
 
     visitPropertyAssignment(node: ts.PropertyAssignment) {
-        return JS.newPropertyAssignment(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.rightPadded(this.visit(node.name), this.suffix(node.name)),
-            JS.PropertyAssignment.Token.Colon,
-            this.visit(node.initializer)
-        );
+        return {
+            kind: JS.Kind.PropertyAssignment,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            name: this.rightPadded(this.visit(node.name), this.suffix(node.name)),
+            assigmentToken: JS.PropertyAssignment.Token.Colon,
+            initializer: this.visit(node.initializer)
+        };
     }
 
     visitShorthandPropertyAssignment(node: ts.ShorthandPropertyAssignment) {
-        return JS.newPropertyAssignment(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.rightPadded(this.visit(node.name), this.suffix(node.name)),
-            JS.PropertyAssignment.Token.Equals,
-            node.objectAssignmentInitializer ? this.visit(node.objectAssignmentInitializer) : undefined
-        );
+        return {
+            kind: JS.Kind.PropertyAssignment,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            name: this.rightPadded(this.visit(node.name), this.suffix(node.name)),
+            assigmentToken: JS.PropertyAssignment.Token.Equals,
+            initializer: node.objectAssignmentInitializer ? this.visit(node.objectAssignmentInitializer) : undefined
+        };
     }
 
     visitSpreadAssignment(node: ts.SpreadAssignment) {
-        return JS.newPropertyAssignment(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            this.rightPadded(
-                JS.newUnary(
-                    randomId(),
-                    emptySpace,
-                    emptyMarkers,
-                    this.leftPadded(
+        return {
+            kind: JS.Kind.PropertyAssignment,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            name: this.rightPadded(
+                {
+                    kind: JS.Kind.Unary,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    operator: this.leftPadded(
                         emptySpace,
                         JS.Unary.Type.Spread
                     ),
-                    this.visit(node.expression),
-                    this.mapType(node.expression)
-                ),
+                    expression: this.visit(node.expression),
+                    type: this.mapType(node.expression)
+                },
                 this.suffix(node.expression)
             ),
-            JS.PropertyAssignment.Token.Empty,
-            undefined
-        );
+            assigmentToken: JS.PropertyAssignment.Token.Empty,
+            initializer: undefined
+        };
     }
 
     visitEnumMember(node: ts.EnumMember) {
-        return J.newEnumValue(
-            randomId(),
-            this.prefix(node),
-            emptyMarkers,
-            [],
-            node.name ? ts.isStringLiteral(node.name) ? this.mapIdentifier(node.name, node.name.getText()) : this.convert(node.name) : this.mapIdentifier(node, ""),
-            node.initializer ? J.newNewClass(
-                randomId(),
-                this.suffix(node.name),
-                emptyMarkers,
-                undefined,
-                emptySpace,
-                undefined,
-                {
+        return {
+            kind: J.Kind.EnumValue,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            annotations: [],
+            name: node.name ? ts.isStringLiteral(node.name) ? this.mapIdentifier(node.name, node.name.getText()) : this.convert(node.name) : this.mapIdentifier(node, ""),
+            initializer: node.initializer ? {
+                kind: J.Kind.NewClass,
+                id: randomId(),
+                prefix: this.suffix(node.name),
+                markers: emptyMarkers,
+                enclosing: undefined,
+                new: emptySpace,
+                clazz: undefined,
+                arguments: {
                     kind: J.Kind.JContainer,
                     before: emptySpace,
                     elements: [this.rightPadded(this.visit(node.initializer), emptySpace)],
                     markers: emptyMarkers
                 },
-                undefined,
-                this.mapMethodType(node)
-            ) : undefined
-        )
+                body: undefined,
+                constructorType: this.mapMethodType(node)
+            } : undefined
+        }
     }
 
     visitBundle(node: ts.Bundle) {
@@ -3885,11 +4082,11 @@ export class JavaScriptParserVisitor {
         return this.visitUnknown(node);
     }
 
-    visitJSDocundefinedableType(node: ts.JSDocundefinedableType) {
+    visitJSDocNullableType(node: ts.JSDocNullableType) {
         return this.visitUnknown(node);
     }
 
-    visitJSDocNonundefinedableType(node: ts.JSDocNonundefinedableType) {
+    visitJSDocNonNullableType(node: ts.JSDocNonNullableType) {
         return this.visitUnknown(node);
     }
 
@@ -4187,8 +4384,17 @@ export class JavaScriptParserVisitor {
                 kind: J.Kind.JContainer,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!),
                 elements: this.mapTypeParametersList(node.typeParameters)
-                    .concat(node.typeParameters.hasTrailingComma ? this.rightPadded(
-                        J.newTypeParameter(randomId(), emptySpace, emptyMarkers, [], [], this.newJEmpty(), undefined),
+                    .concat(node.typeParameters.hasTrailingComma ? this.rightPadded<J.TypeParameter>(
+                        {
+                            kind: J.Kind.TypeParameter,
+                            id: randomId(),
+                            prefix: emptySpace,
+                            markers: emptyMarkers,
+                            annotations: [],
+                            modifiers: [],
+                            name: this.newJEmpty(),
+                            bounds: undefined,
+                        },
                         this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!)) : []),
                 markers: emptyMarkers
             }
@@ -4200,18 +4406,37 @@ export class JavaScriptParserVisitor {
         const typeParameters = node.typeParameters;
         if (!typeParameters) return undefined;
 
-        return J.newTypeParameters(
-            randomId(),
-            this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!),
-            emptyMarkers,
-            [],
-            typeParameters.length == 0 ?
-                [this.rightPadded(J.newTypeParameter(randomId(), emptySpace, emptyMarkers, [], [], this.newJEmpty(), undefined), this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!))]
+        return {
+            kind: J.Kind.TypeParameters,
+            id: randomId(),
+            prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!),
+            markers: emptyMarkers,
+            annotations: [],
+            typeParameters: typeParameters.length == 0 ?
+                [this.rightPadded({
+                    kind: J.Kind.TypeParameter,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    annotations: [],
+                    modifiers: [],
+                    name: this.newJEmpty(),
+                    bounds: undefined,
+                }, this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!))]
                 : typeParameters.map(tp => this.rightPadded(this.visit(tp), this.suffix(tp)))
                     .concat(typeParameters.hasTrailingComma ? this.rightPadded(
-                        J.newTypeParameter(randomId(), emptySpace, emptyMarkers, [], [], this.newJEmpty(), undefined),
+                        {
+                            kind: J.Kind.TypeParameter,
+                            id: randomId(),
+                            prefix: emptySpace,
+                            markers: emptyMarkers,
+                            annotations: [],
+                            modifiers: [],
+                            name: this.newJEmpty(),
+                            bounds: undefined,
+                        },
                         this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!)) : []),
-        );
+        };
     }
 
     private mapTypeParametersList(typeParamsNodeArray: ts.NodeArray<ts.TypeParameterDeclaration>): J.RightPadded<J.TypeParameter>[] {
@@ -4237,19 +4462,20 @@ export class JavaScriptParserVisitor {
         return undefined;
     }
 
-    private newJEmpty(prefix: J.Space = emptySpace, markers?: Markers) {
+    private newJEmpty(prefix: J.Space = emptySpace, markers?: Markers): J.Empty {
         return {kind: J.Kind.Empty, id: randomId(), prefix: prefix, markers: markers ?? emptyMarkers};
     }
 
     private getOptionalUnary(node: ts.MethodSignature | ts.MethodDeclaration | ts.ParameterDeclaration | ts.PropertySignature | ts.PropertyDeclaration | ts.NamedTupleMember) {
-        return JS.newUnary(
-            randomId(),
-            emptySpace,
-            emptyMarkers,
-            this.leftPadded(this.suffix(node.name), JS.Unary.Type.Optional),
-            this.visit(node.name),
-            this.mapType(node)
-        );
+        return {
+            kind: JS.Kind.Unary,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            operator: this.leftPadded(this.suffix(node.name), JS.Unary.Type.Optional),
+            expression: this.visit(node.name),
+            type: this.mapType(node)
+        };
     }
 }
 
@@ -4279,7 +4505,13 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
         const commentBody = text.slice(commentStart, commentEnd);  // Extract comment body
         const suffix = text.slice(end, suffixEnd);  // Extract suffix (whitespace after comment)
 
-        comments.push(J.newTextComment(isMultiline, commentBody, suffix, emptyMarkers));
+        comments.push({
+            kind: J.Kind.TextComment,
+            multiline: isMultiline,
+            text: commentBody,
+            suffix: suffix,
+            markers: emptyMarkers
+        });
     });
 
     // Step 3: Extract leading whitespace (before the first comment)

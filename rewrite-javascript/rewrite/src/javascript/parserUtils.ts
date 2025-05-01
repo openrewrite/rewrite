@@ -154,10 +154,10 @@ export function isExpression(expression: J):  expression is Expression {
     return is_expressions.includes(expression.kind);
 }
 
-export function getNextSibling(node: ts.Node): ts.Node | null {
+export function getNextSibling(node: ts.Node): ts.Node | undefined {
     const parent = node.parent;
     if (!parent) {
-        return null;
+        return undefined;
     }
 
     const syntaxList = findContainingSyntaxList(node);
@@ -178,7 +178,7 @@ export function getNextSibling(node: ts.Node): ts.Node | null {
             }
             const parentNextSibling = getNextSibling(parent);
             if (!parentNextSibling) {
-                return null;
+                return undefined;
             }
 
             // Return the first child of the parent's next sibling
@@ -206,7 +206,7 @@ export function getNextSibling(node: ts.Node): ts.Node | null {
     if (nodeIndex === parentChildren.length - 1) {
         const parentNextSibling = getNextSibling(parent);
         if (!parentNextSibling) {
-            return null;
+            return undefined;
         }
 
         // Return the first child of the parent's next sibling
@@ -217,10 +217,10 @@ export function getNextSibling(node: ts.Node): ts.Node | null {
     return parentChildren[nodeIndex + 1];
 }
 
-export function getPreviousSibling(node: ts.Node): ts.Node | null {
+export function getPreviousSibling(node: ts.Node): ts.Node | undefined {
     const parent = node.parent;
     if (!parent) {
-        return null;
+        return undefined;
     }
 
     const syntaxList = findContainingSyntaxList(node);
@@ -237,7 +237,7 @@ export function getPreviousSibling(node: ts.Node): ts.Node | null {
         if (nodeIndex === 0) {
             const parentPreviousSibling = getPreviousSibling(parent);
             if (!parentPreviousSibling) {
-                return null;
+                return undefined;
             }
 
             // Return the last child of the parent's previous sibling
@@ -265,7 +265,7 @@ export function getPreviousSibling(node: ts.Node): ts.Node | null {
     if (nodeIndex === 0) {
         const parentPreviousSibling = getPreviousSibling(parent);
         if (!parentPreviousSibling) {
-            return null;
+            return undefined;
         }
 
         // Return the last child of the parent's previous sibling
@@ -276,10 +276,10 @@ export function getPreviousSibling(node: ts.Node): ts.Node | null {
     return parentChildren[nodeIndex - 1];
 }
 
-function findContainingSyntaxList(node: ts.Node): ts.SyntaxList | null {
+function findContainingSyntaxList(node: ts.Node): ts.SyntaxList | undefined {
     const parent = node.parent;
     if (!parent) {
-        return null;
+        return undefined;
     }
 
     const children = parent.getChildren();
@@ -289,7 +289,7 @@ function findContainingSyntaxList(node: ts.Node): ts.SyntaxList | null {
         }
     }
 
-    return null;
+    return undefined;
 }
 
 export type TextSpan = [number, number];
