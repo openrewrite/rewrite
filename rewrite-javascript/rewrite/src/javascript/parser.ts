@@ -3233,7 +3233,7 @@ export class JavaScriptParserVisitor {
                             modifiers: [],
                             typeExpression: this.mapTypeInfo(declaration),
                             varargs: undefined,
-                            variables: []
+                            variables: [this.rightPadded(declarationExpression, emptySpace)]
                         },
                     this.suffix(declaration)
                 );

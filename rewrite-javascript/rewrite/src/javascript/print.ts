@@ -18,7 +18,7 @@ import '../java';
 import {JavaScriptVisitor, JS} from ".";
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, Tree} from "../tree";
-import {Comment, emptySpace, J, JavaMarkers, JavaType, Statement, TextComment, TrailingComma, TypeTree} from "../java";
+import {Comment, emptySpace, J, JavaMarkers, Statement, TextComment, TrailingComma, TypeTree} from "../java";
 import {Marker, Markers} from "../markers";
 import Space = J.Space;
 import NamespaceDeclaration = JS.NamespaceDeclaration;
@@ -30,7 +30,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(cu, p);
 
-        this.visitJsRightPaddedLocal(cu.statements, "", p);
+        await this.visitJsRightPaddedLocal(cu.statements, "", p);
 
         await this.visitSpace(cu.eof, p);
         await this.afterSyntax(cu, p);
@@ -308,7 +308,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             p.append("]");
 
             if (arrayType.elementType.kind === J.Kind.ArrayType) {
-                this.printDimensions(arrayType.elementType as J.ArrayType, p);
+                await this.printDimensions(arrayType.elementType as J.ArrayType, p);
             }
         }
 
@@ -326,7 +326,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         p.append("]");
 
         if (arrayType.elementType.kind === J.Kind.ArrayType) {
-            this.printDimensions(arrayType.elementType as J.ArrayType, p);
+            await this.printDimensions(arrayType.elementType as J.ArrayType, p);
         }
 
         await this.afterSyntax(arrayType, p);
@@ -456,7 +456,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             }
         }
 
-        this.visitJsRightPaddedLocal(variableDeclarations.variables, ",", p);
+        await this.visitJsRightPaddedLocal(variableDeclarations.variables, ",", p);
 
         await this.afterSyntax(variableDeclarations, p);
         return variableDeclarations;
@@ -558,7 +558,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         }
 
         p.append("{");
-        this.visitStatements(block.statements, p);
+        await this.visitStatements(block.statements, p);
         await this.visitSpace(block.end, p);
         p.append("}");
 
@@ -1846,17 +1846,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             if (i < nodes.length - 1) {
                 p.append(suffixBetween);
             }
-        }
-    }
-
-    private async visitJsRightPaddedLocalSingle(node: J.RightPadded<J>, suffix: string, p: PrintOutputCapture) {
-        if (node) {
-            await this.visit(node.element, p);
-
-            await this.visitSpace(node.after, p);
-            await this.visitMarkers(node.markers, p);
-
-            p.append(suffix);
         }
     }
 
