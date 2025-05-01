@@ -55,7 +55,6 @@ import {
 import {JavaScriptTypeMapping} from "./typeMapping";
 import {produce} from "immer";
 import Kind = JS.Kind;
-import ExpressionStatement = JS.ExpressionStatement;
 
 export class JavaScriptParser extends Parser {
 
@@ -2782,10 +2781,10 @@ export class JavaScriptParserVisitor {
         return {
             kind: JS.Kind.ExpressionStatement,
             id: randomId(),
-            prefix: expression,
+            prefix: emptySpace,
             markers: emptyMarkers,
             expression: expression
-        } as ExpressionStatement;
+        } as JS.ExpressionStatement;
     }
 
     visitIfStatement(node: ts.IfStatement) {
