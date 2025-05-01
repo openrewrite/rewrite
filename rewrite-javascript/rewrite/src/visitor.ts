@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {emptyMarkers, Markers} from "./markers";
+import {emptyMarkers, Marker, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
 import {createDraft, Draft, finishDraft, Objectish} from "immer";
 import {mapAsync} from "./util";
@@ -133,7 +133,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
         });
     }
 
-    protected async visitMarker<M>(marker: M, p: P): Promise<M> {
+    protected async visitMarker<M extends Marker>(marker: M, p: P): Promise<M> {
         return marker;
     }
 
