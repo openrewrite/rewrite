@@ -737,7 +737,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitParameter(node: ts.ParameterDeclaration) {
+    visitParameter(node: ts.ParameterDeclaration): J.VariableDeclarations | JS.JSVariableDeclarations {
         if (node.questionToken) {
             return {
                 kind: JS.Kind.JSVariableDeclarations,
@@ -746,7 +746,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 leadingAnnotations: this.mapDecorators(node),
                 modifiers: this.mapModifiers(node),
-                typeInfo: this.mapTypeInfo(node),
+                typeExpression: this.mapTypeInfo(node),
                 variables: [
                     this.rightPadded(
                         {
@@ -754,8 +754,8 @@ export class JavaScriptParserVisitor {
                             id: randomId(),
                             prefix: this.prefix(node.name),
                             markers: emptyMarkers,
-                            element: this.getOptionalUnary(node),
-                            annotations: [],
+                            name: this.getOptionalUnary(node),
+                            dimensionsAfterName: [],
                             initializer: node.initializer &&
                                 this.leftPadded(
                                     this.prefix(
@@ -797,7 +797,7 @@ export class JavaScriptParserVisitor {
                             expression: this.visit(node.name),
                             type: this.mapType(node)
                         },
-                        dimensions: [],
+                        dimensionsAfterName: [],
                         initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
                         variableType: this.mapVariableType(node)
                     },
@@ -817,7 +817,6 @@ export class JavaScriptParserVisitor {
                 leadingAnnotations: this.mapDecorators(node),
                 modifiers: this.mapModifiers(node),
                 typeExpression: this.mapTypeInfo(node),
-                dimensionsBeforeName: [],
                 variables: [this.rightPadded(
                     {
                         kind: J.Kind.NamedVariable,
@@ -831,7 +830,7 @@ export class JavaScriptParserVisitor {
                     },
                     this.suffix(node.name)
                 )]
-            };
+            } as J.VariableDeclarations;
         }
 
         return {
