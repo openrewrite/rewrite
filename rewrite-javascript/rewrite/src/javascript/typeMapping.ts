@@ -68,9 +68,7 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        if (type.flags === ts.TypeFlags.undefined) {
-            return JavaType.unknownType;
-        } else if (type.flags === ts.TypeFlags.Undefined) {
+        if (type.flags === ts.TypeFlags.Undefined) {
             return JavaType.unknownType;
         } else if (
             type.flags === ts.TypeFlags.Number ||
@@ -112,12 +110,14 @@ export class JavaScriptTypeMapping {
         }
 
         if (type.isUnion()) {
-            let result = new JavaType.Union();
-            this.typeCache.set(signature, result);
-
-            const types = type.types.map((t) => this.getType(t));
-            result.unsafeSet(types);
-            return result;
+            // FIXME
+            throw new Error("What to do about Union types?");
+            // let result = new JavaType.Union();
+            // this.typeCache.set(signature, result);
+            //
+            // const types = type.types.map((t) => this.getType(t));
+            // result.unsafeSet(types);
+            // return result;
         } else if (type.isClass()) {
             // FIXME flags
             let result = {

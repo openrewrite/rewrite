@@ -29,7 +29,7 @@ export interface SourceSpec<T extends SourceFile> {
     before: string | null,
     after?: AfterRecipe
     path?: string,
-    parser: (ctx: ExecutionContext) => Parser<T>,
+    parser: (ctx: ExecutionContext) => Parser,
     beforeRecipe?: (sourceFile: T) => T | void | Promise<T>,
     ext: string
 }

@@ -18,7 +18,7 @@ import {PlainText} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers} from "../markers";
 
-export class PlainTextParser extends Parser<PlainText> {
+export class PlainTextParser extends Parser {
     async parse(...sourcePaths: ParserInput[]): Promise<PlainText[]> {
         return sourcePaths.map(sourcePath => ({
             kind: PlainText.Kind.PlainText,
