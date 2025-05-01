@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import {SourceFile, TreeKind} from "../";
+import {Checksum, FileAttributes, Markers, SourceFile, TreeKind, UUID} from "../";
 import {
     J,
     JavaType,
@@ -304,13 +304,13 @@ export namespace JS {
     export interface JsBinary extends JS {
         readonly kind: typeof Kind.JsBinary;
         readonly left: Expression;
-        readonly operator: J.LeftPadded<JsBinary.Operator>;
+        readonly operator: J.LeftPadded<JsBinary.Type>;
         readonly right: Expression;
         readonly type?: JavaType;
     }
 
     export namespace JsBinary {
-        export const enum Operator {
+        export const enum Type {
             As,
             IdentityEquals,
             IdentityNotEquals,
@@ -484,6 +484,25 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    export function newIndexedAccessType(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        objectType: Expression,
+        indexType: JS.IndexedAccessType.IndexType,
+        type?: JavaType
+    ): JS.IndexedAccessType {
+        return {
+            kind: JS.Kind.IndexedAccessType,
+            id,
+            prefix,
+            markers,
+            objectType,
+            indexType,
+            type
+        };
+    }
+
     export namespace IndexedAccessType {
         export interface IndexType extends JS {
             readonly kind: typeof Kind.IndexedAccessTypeIndexType;
@@ -600,6 +619,1010 @@ export namespace JS {
         readonly await: J.LeftPadded<boolean>;
         readonly control: JSForInOfLoopControl;
         readonly body: J.RightPadded<Statement>;
+    }
+
+    export function newObjectBindingDeclarations(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        leadingAnnotations: J.Annotation[],
+        modifiers: J.Modifier[],
+        typeExpression: TypeTree | undefined,
+        bindings: J.Container<J>,
+        initializer: J.LeftPadded<Expression> | undefined
+    ): JS.ObjectBindingDeclarations {
+        return {
+            kind: JS.Kind.ObjectBindingDeclarations,
+            id,
+            prefix,
+            markers,
+            leadingAnnotations,
+            modifiers,
+            typeExpression,
+            bindings,
+            initializer
+        };
+    }
+
+    export function newPropertyAssignment(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        name: J.RightPadded<Expression>,
+        assigmentToken: PropertyAssignment.Token,
+        initializer: Expression | undefined
+    ): JS.PropertyAssignment {
+        return {
+            kind: JS.Kind.PropertyAssignment,
+            id,
+            prefix,
+            markers,
+            name,
+            assigmentToken,
+            initializer
+        };
+    }
+
+    export function newSatisfiesExpression(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        expression: J,
+        satisfiesType: J.LeftPadded<Expression>,
+        type: JavaType | undefined
+    ): JS.SatisfiesExpression {
+        return {
+            kind: JS.Kind.SatisfiesExpression,
+            id,
+            prefix,
+            markers,
+            expression,
+            satisfiesType,
+            type
+        };
+    }
+
+    export function newScopedVariableDeclarations(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        modifiers: J.Modifier[],
+        scope: J.LeftPadded<ScopedVariableDeclarations.Scope> | undefined,
+        variables: J.RightPadded<J>[]
+    ): JS.ScopedVariableDeclarations {
+        return {
+            kind: JS.Kind.ScopedVariableDeclarations,
+            id,
+            prefix,
+            markers,
+            modifiers,
+            scope,
+            variables
+        };
+    }
+
+    export function newStatementExpression(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        statement: Statement
+    ): JS.StatementExpression {
+        return {
+            kind: JS.Kind.StatementExpression,
+            id,
+            prefix,
+            markers,
+            statement
+        };
+    }
+
+    export function newTaggedTemplateExpression(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        tag: J.RightPadded<Expression> | undefined,
+        typeArguments: J.Container<Expression> | undefined,
+        templateExpression: Expression,
+        type: JavaType | undefined
+    ): JS.TaggedTemplateExpression {
+        return {
+            kind: JS.Kind.TaggedTemplateExpression,
+            id,
+            prefix,
+            markers,
+            tag,
+            typeArguments,
+            templateExpression,
+            type
+        };
+    }
+
+    export function newTemplateExpression(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        head: J.Literal,
+        templateSpans: J.RightPadded<TemplateExpression.TemplateSpan>[],
+        type: JavaType | undefined
+    ): JS.TemplateExpression {
+        return {
+            kind: JS.Kind.TemplateExpression,
+            id,
+            prefix,
+            markers,
+            head,
+            templateSpans,
+            type
+        };
+    }
+
+    export function newTemplateExpressionTemplateSpan(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        expression: J,
+        tail: J.Literal
+    ): JS.TemplateExpression.TemplateSpan {
+        return {
+            kind: JS.Kind.TemplateExpressionTemplateSpan,
+            id,
+            prefix,
+            markers,
+            expression,
+            tail
+        };
+    }
+
+    export function newTrailingTokenStatement(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        expression: J.RightPadded<J>,
+        type: JavaType | undefined
+    ): JS.TrailingTokenStatement {
+        return {
+            kind: JS.Kind.TrailingTokenStatement,
+            id,
+            prefix,
+            markers,
+            expression,
+            type
+        };
+    }
+
+    export function newTuple(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        elements: J.Container<J>,
+        type: JavaType | undefined
+    ): JS.Tuple {
+        return {
+            kind: JS.Kind.Tuple,
+            id,
+            prefix,
+            markers,
+            elements,
+            type
+        };
+    }
+
+    export function newTypeDeclaration(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        modifiers: J.Modifier[],
+        name: J.LeftPadded<J.Identifier>,
+        typeParameters?: J.TypeParameters,
+        initializer: J.LeftPadded<Expression>,
+        type?: JavaType
+    ): JS.TypeDeclaration {
+        return {
+            kind: JS.Kind.TypeDeclaration,
+            id,
+            prefix,
+            markers,
+            modifiers,
+            name,
+            typeParameters,
+            initializer,
+            type
+        };
+    }
+
+    export function newTypeInfo(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        typeIdentifier: TypeTree
+    ): JS.TypeInfo {
+        return {
+            kind: JS.Kind.TypeInfo,
+            id,
+            prefix,
+            markers,
+            typeIdentifier
+        };
+    }
+
+    export function newTypeOf(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        expression: Expression,
+        type?: JavaType
+    ): JS.TypeOf {
+        return {
+            kind: JS.Kind.TypeOf,
+            id,
+            prefix,
+            markers,
+            expression,
+            type
+        };
+    }
+
+    export function newTypeOperator(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        operator: JS.TypeOperator.Type,
+        expression: J.LeftPadded<Expression>
+    ): JS.TypeOperator {
+        return {
+            kind: JS.Kind.TypeOperator,
+            id,
+            prefix,
+            markers,
+            operator,
+            expression
+        };
+    }
+
+    export function newTypePredicate(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        asserts: J.LeftPadded<boolean>,
+        parameterName: J.Identifier,
+        expression?: J.LeftPadded<Expression>,
+        type?: JavaType
+    ): JS.TypePredicate {
+        return {
+            kind: JS.Kind.TypePredicate,
+            id,
+            prefix,
+            markers,
+            asserts,
+            parameterName,
+            expression,
+            type
+        };
+    }
+
+    export function newTypeQuery(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        typeExpression: TypeTree,
+        typeArguments?: J.Container<Expression>,
+        type?: JavaType
+    ): JS.TypeQuery {
+        return {
+            kind: JS.Kind.TypeQuery,
+            id,
+            prefix,
+            markers,
+            typeExpression,
+            typeArguments,
+            type
+        };
+    }
+
+    export function newTypeTreeExpression(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        expression: Expression
+    ): JS.TypeTreeExpression {
+        return {
+            kind: JS.Kind.TypeTreeExpression,
+            id,
+            prefix,
+            markers,
+            expression
+        };
+    }
+
+    export function newUnion(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        types: J.RightPadded<Expression>[],
+        type?: JavaType
+    ): JS.Union {
+        return {
+            kind: JS.Kind.Union,
+            id,
+            prefix,
+            markers,
+            types,
+            type
+        };
+    }
+
+    export function newIntersection(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        types: J.RightPadded<Expression>[],
+        type?: JavaType
+    ): JS.Intersection {
+        return {
+            kind: JS.Kind.Intersection,
+            id,
+            prefix,
+            markers,
+            types,
+            type
+        };
+    }
+
+    export function newVoid(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        expression: Expression
+    ): JS.Void {
+        return {
+            kind: JS.Kind.Void,
+            id,
+            prefix,
+            markers,
+            expression
+        };
+    }
+
+    export function newUnary(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        operator: J.LeftPadded<JS.Unary.Type>,
+        expression: Expression,
+        type?: JavaType
+    ): JS.Unary {
+        return {
+            kind: JS.Kind.Unary,
+            id,
+            prefix,
+            markers,
+            operator,
+            expression,
+            type
+        };
+    }
+
+    export function newJSForOfLoop(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        await_: J.LeftPadded<boolean>,
+        control: JSForInOfLoopControl,
+        body: J.RightPadded<Statement>
+    ): JS.JSForOfLoop {
+        return {
+            kind: JS.Kind.JSForOfLoop,
+            id,
+            prefix,
+            markers,
+            await: await_,
+            control,
+            body
+        };
+    }
+
+    export function newJSTry(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        body: J.Block,
+        catches: JSTry.JSCatch,
+        finally_?: J.LeftPadded<J.Block>
+    ): JS.JSTry {
+        return {
+            kind: JS.Kind.JSTry,
+            id,
+            prefix,
+            markers,
+            body,
+            catches,
+            finally: finally_
+        };
+    }
+
+    export function newJSTryJSCatch(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        parameter: J.ControlParentheses<JSVariableDeclarations>,
+        body: J.Block
+    ): JS.JSTry.JSCatch {
+        return {
+            kind: JS.Kind.JSCatch,
+            id,
+            prefix,
+            markers,
+            parameter,
+            body
+        };
+    }
+
+    export function newNamespaceDeclaration(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        modifiers: J.Modifier[],
+        keywordType: J.LeftPadded<NamespaceDeclaration.KeywordType>,
+        name: J.RightPadded<Expression>,
+        body?: J.Block
+    ): JS.NamespaceDeclaration {
+        return {
+            kind: JS.Kind.NamespaceDeclaration,
+            id,
+            prefix,
+            markers,
+            modifiers,
+            keywordType,
+            name,
+            body
+        };
+    }
+
+    export function newFunctionDeclaration(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        modifiers: J.Modifier[],
+        asteriskToken: J.LeftPadded<boolean>,
+        name: J.LeftPadded<J.Identifier>,
+        typeParameters: J.TypeParameters | undefined,
+        parameters: J.Container<Statement>,
+        returnTypeExpression?: TypeTree,
+        body?: J,
+        type?: JavaType
+    ): JS.FunctionDeclaration {
+        return {
+            kind: JS.Kind.FunctionDeclaration,
+            id,
+            prefix,
+            markers,
+            modifiers,
+            asteriskToken,
+            name,
+            typeParameters,
+            parameters,
+            returnTypeExpression,
+            body,
+            type
+        };
+    }
+
+    export function newTypeLiteral(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        members: J.Block,
+        type?: JavaType
+    ): JS.TypeLiteral {
+        return {
+            kind: JS.Kind.TypeLiteral,
+            id,
+            prefix,
+            markers,
+            members,
+            type
+        };
+    }
+
+    export function newArrayBindingPattern(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        elements: J.Container<Expression>,
+        type?: JavaType
+    ): JS.ArrayBindingPattern {
+        return {
+            kind: JS.Kind.ArrayBindingPattern,
+            id,
+            prefix,
+            markers,
+            elements,
+            type
+        };
+    }
+
+    export function newBindingElement(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        propertyName: J.RightPadded<Expression> | undefined,
+        name: TypedTree,
+        initializer?: J.LeftPadded<Expression>,
+        variableType?: JavaType.Variable
+    ): JS.BindingElement {
+        return {
+            kind: JS.Kind.BindingElement,
+            id,
+            prefix,
+            markers,
+            propertyName,
+            name,
+            initializer,
+            variableType
+        };
+    }
+
+    export function newExportDeclaration(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        modifiers: J.Modifier[],
+        typeOnly: J.LeftPadded<boolean>,
+        exportClause?: Expression,
+        moduleSpecifier?: J.LeftPadded<Expression>,
+        attributes?: ImportAttributes
+    ): JS.ExportDeclaration {
+        return {
+            kind: JS.Kind.ExportDeclaration,
+            id,
+            prefix,
+            markers,
+            modifiers,
+            typeOnly,
+            exportClause,
+            moduleSpecifier,
+            attributes
+        };
+    }
+
+    export function newExportAssignment(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        modifiers: J.Modifier[],
+        exportEquals: J.LeftPadded<boolean>,
+        expression: Expression | undefined
+    ): JS.ExportAssignment {
+        return {
+            kind: JS.Kind.ExportAssignment,
+            id,
+            prefix,
+            markers,
+            modifiers,
+            exportEquals,
+            expression
+        };
+    }
+
+    export function newNamedExports(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        elements: J.Container<Expression>,
+        type: JavaType | undefined
+    ): JS.NamedExports {
+        return {
+            kind: JS.Kind.NamedExports,
+            id,
+            prefix,
+            markers,
+            elements,
+            type
+        };
+    }
+
+    export function newExportSpecifier(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        typeOnly: J.LeftPadded<boolean>,
+        specifier: Expression,
+        type: JavaType | undefined
+    ): JS.ExportSpecifier {
+        return {
+            kind: JS.Kind.ExportSpecifier,
+            id,
+            prefix,
+            markers,
+            typeOnly,
+            specifier,
+            type
+        };
+    }
+
+    export function newCompilationUnit(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        sourcePath: string,
+        charsetBomMarked: boolean,
+        charsetName: string,
+        checksum: Checksum | undefined,
+        fileAttributes: FileAttributes | undefined,
+        imports: J.RightPadded<J.Import>[],
+        statements: J.RightPadded<Statement>[],
+        eof: J.Space
+    ): JS.CompilationUnit {
+        return {
+            kind: JS.Kind.CompilationUnit,
+            id,
+            prefix,
+            markers,
+            sourcePath: sourcePath,
+            charsetBomMarked: charsetBomMarked,
+            charsetName: charsetName,
+            checksum: checksum,
+            fileAttributes: fileAttributes,
+            imports: imports,
+            statements: statements,
+            eof
+        };
+    }
+
+    export function newAlias(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        propertyName: J.RightPadded<J.Identifier>,
+        alias: Expression
+    ): JS.Alias {
+        return {
+            kind: JS.Kind.Alias,
+            id,
+            prefix,
+            markers,
+            propertyName,
+            alias
+        };
+    }
+
+    export function newArrowFunction(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        leadingAnnotations: J.Annotation[],
+        modifiers: J.Modifier[],
+        typeParameters: J.TypeParameters | undefined,
+        parameters: J.Lambda.Parameters,
+        returnTypeExpression: TypeTree | undefined,
+        body: J.LeftPadded<J>,
+        type: JavaType | undefined
+    ): JS.ArrowFunction {
+        return {
+            kind: JS.Kind.ArrowFunction,
+            id,
+            prefix,
+            markers,
+            leadingAnnotations,
+            modifiers,
+            typeParameters,
+            parameters,
+            returnTypeExpression,
+            body,
+            type
+        };
+    }
+
+    export function newAwait(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        expression: Expression,
+        type: JavaType | undefined
+    ): JS.Await {
+        return {
+            kind: JS.Kind.Await,
+            id,
+            prefix,
+            markers,
+            expression,
+            type
+        };
+    }
+
+    export function newConditionalType(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        checkType: Expression,
+        condition: J.Container<TypedTree>,
+        type: JavaType | undefined
+    ): JS.ConditionalType {
+        return {
+            kind: JS.Kind.ConditionalType,
+            id,
+            prefix,
+            markers,
+            checkType,
+            condition,
+            type
+        };
+    }
+
+    export function newDefaultType(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        left: Expression,
+        beforeEquals: J.Space,
+        right: Expression,
+        type: JavaType | undefined
+    ): JS.DefaultType {
+        return {
+            kind: JS.Kind.DefaultType,
+            id,
+            prefix,
+            markers,
+            left,
+            beforeEquals,
+            right,
+            type
+        };
+    }
+
+    export function newDelete(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        expression: Expression,
+        type?: JavaType
+    ): JS.Delete {
+        return {
+            kind: JS.Kind.Delete,
+            id,
+            prefix,
+            markers,
+            expression,
+            type
+        };
+    }
+
+    export function newExport(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        exports?: J.Container<Expression>,
+        from?: J.Space,
+        target?: J.Literal,
+        initializer?: J.LeftPadded<Expression>
+    ): JS.Export {
+        return {
+            kind: JS.Kind.Export,
+            id,
+            prefix,
+            markers,
+            exports,
+            from,
+            target,
+            initializer
+        };
+    }
+
+    export function newExpressionStatement(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        expression: Expression
+    ): JS.ExpressionStatement {
+        return {
+            kind: JS.Kind.ExpressionStatement,
+            id,
+            prefix,
+            markers,
+            expression
+        };
+    }
+
+    export function newExpressionWithTypeArguments(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        clazz: J,
+        typeArguments?: J.Container<Expression>,
+        type?: JavaType
+    ): JS.ExpressionWithTypeArguments {
+        return {
+            kind: JS.Kind.ExpressionWithTypeArguments,
+            id,
+            prefix,
+            markers,
+            clazz,
+            typeArguments,
+            type
+        };
+    }
+
+    export function newFunctionType(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        modifiers: J.Modifier[],
+        constructorType: J.LeftPadded<boolean>,
+        typeParameters: J.TypeParameters | undefined,
+        parameters: J.Container<Statement>,
+        returnType: J.LeftPadded<Expression>,
+        type?: JavaType
+    ): JS.FunctionType {
+        return {
+            kind: JS.Kind.FunctionType,
+            id,
+            prefix,
+            markers,
+            modifiers,
+            constructorType,
+            typeParameters,
+            parameters,
+            returnType,
+            type
+        };
+    }
+
+    export function newInferType(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        typeParameter: J.LeftPadded<J>,
+        type?: JavaType
+    ): JS.InferType {
+        return {
+            kind: JS.Kind.InferType,
+            id,
+            prefix,
+            markers,
+            typeParameter,
+            type
+        };
+    }
+
+    export function newImportType(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        hasTypeof: J.RightPadded<boolean>,
+        argumentAndAttributes: J.Container<J>,
+        qualifier?: J.LeftPadded<Expression>,
+        typeArguments?: J.Container<Expression>,
+        type?: JavaType
+    ): JS.ImportType {
+        return {
+            kind: JS.Kind.ImportType,
+            id,
+            prefix,
+            markers,
+            hasTypeof,
+            argumentAndAttributes,
+            qualifier,
+            typeArguments,
+            type
+        };
+    }
+
+    export function newJsImport(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        modifiers: J.Modifier[],
+        importClause: JS.JsImportClause | undefined,
+        moduleSpecifier: J.LeftPadded<Expression>,
+        attributes?: ImportAttributes
+    ): JS.JsImport {
+        return {
+            kind: JS.Kind.JsImport,
+            id,
+            prefix,
+            markers,
+            modifiers,
+            importClause,
+            moduleSpecifier,
+            attributes
+        };
+    }
+
+    export function newJSIndexedAccessTypeIndexType(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        tree: J.RightPadded<Expression>,
+        type?: JavaType
+    ): JS.IndexedAccessType.IndexType {
+        return {
+            kind: JS.Kind.IndexedAccessTypeIndexType,
+            id,
+            prefix,
+            markers,
+            tree,
+            type
+        };
+    }
+
+    export function newMappedType(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        prefixToken: J.LeftPadded<J.Literal> | undefined,
+        hasReadonly: J.LeftPadded<boolean>,
+        keysRemapping: JS.MappedType.KeysRemapping,
+        suffixToken: J.LeftPadded<J.Literal> | undefined,
+        hasQuestionToken: J.LeftPadded<boolean>,
+        valueType: J.Container<TypeTree>,
+        type?: JavaType
+    ): JS.MappedType {
+        return {
+            kind: JS.Kind.MappedType,
+            id,
+            prefix,
+            markers,
+            prefixToken,
+            hasReadonly,
+            keysRemapping,
+            suffixToken,
+            hasQuestionToken,
+            valueType,
+            type
+        };
+    }
+
+    export function newMappedTypeKeysRemapping(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        typeParameter: J.RightPadded<JS.MappedType.MappedTypeParameter>,
+        nameType?: J.RightPadded<Expression>
+    ): JS.MappedType.KeysRemapping {
+        return {
+            kind: JS.Kind.MappedTypeKeysRemapping,
+            id,
+            prefix,
+            markers,
+            typeParameter,
+            nameType
+        };
+    }
+
+    export function newJsImportClause(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        typeOnly: boolean,
+        name?: J.RightPadded<J.Identifier>,
+        namedBindings?: Expression
+    ): JS.JsImportClause {
+        return {
+            kind: JS.Kind.JsImportClause,
+            id,
+            prefix,
+            markers,
+            typeOnly,
+            name,
+            namedBindings
+        };
+    }
+
+    export function newNamedImports(
+        id: UUID,
+        prefix: J.Space,
+        markers: Markers,
+        elements: J.Container<Expression>,
+        type?: JavaType
+    ): JS.NamedImports {
+        return {
+            kind: JS.Kind.NamedImports,
+            id,
+            prefix,
+            markers,
+            elements,
+            type
+        };
     }
 
     export interface JSForInLoop extends JS {

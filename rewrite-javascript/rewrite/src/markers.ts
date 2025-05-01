@@ -35,6 +35,14 @@ export function marker(id: UUID, data?: {}): Marker {
     }
 }
 
+export function markers(... markers: Marker[]): Markers {
+    return {
+        kind: MarkersKind.Markers,
+        id: randomId(),
+        markers
+    }
+}
+
 export interface Markers {
     readonly kind: typeof MarkersKind.Markers
     readonly id: UUID
