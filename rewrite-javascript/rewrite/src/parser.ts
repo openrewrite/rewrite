@@ -15,24 +15,56 @@
  */
 import {ExecutionContext} from "./execution";
 import {SourceFile} from "./tree";
-import {readFileSync} from "node:fs";
+import fs, {readFileSync} from "node:fs";
 import {relative} from "path";
+import {ParseError, ParseErrorKind} from "./parse-error";
+import {markers, MarkersKind, ParseExceptionResult} from "./markers";
+import {randomId} from "./uuid";
 
 export type SourcePath = string
 export type ParserInput = SourcePath | { text: string, sourcePath: string }
 
-export abstract class Parser<S extends SourceFile> {
+export function parserInputRead(input: ParserInput): string {
+    if (typeof input === "object") {
+        return input.text;
+    }
+    return fs.readFileSync(input).toString()
+}
+
+export function parserInputFile(input: ParserInput): string {
+    if (typeof input === "object") {
+        return input.sourcePath;
+    }
+    return input;
+}
+
+export abstract class Parser {
     constructor(protected ctx: ExecutionContext = new ExecutionContext(),
                 protected readonly relativeTo?: string) {
     }
 
-    abstract parse(...sourcePaths: ParserInput[]): Promise<S[]>
+    abstract parse(...sourcePaths: ParserInput[]): Promise<SourceFile[]>
 
     protected relativePath(sourcePath: ParserInput): string {
         if (typeof sourcePath === "string") {
             return relative(this.relativeTo || "", sourcePath);
         }
         return sourcePath.sourcePath;
+    }
+
+    protected error(input: ParserInput, e: Error): ParseError {
+        return {
+            kind: ParseErrorKind,
+            id: randomId(),
+            markers: markers({
+                kind: MarkersKind.ParseExceptionResult,
+                parserType: this.constructor.name,
+                exceptionType: e.name,
+                message: e.message + ':\n' + e.stack,
+            } as ParseExceptionResult),
+            text: parserInputRead(input),
+            sourcePath: this.relativePath(input),
+        }
     }
 }
 

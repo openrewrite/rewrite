@@ -63,6 +63,7 @@ export interface SearchResult extends Marker {
 export interface ParseExceptionResult extends Marker {
     readonly kind: typeof MarkersKind.ParseExceptionResult
     readonly parserType: string
-    readonly exceptionType?: string
-    readonly message?: string
+    readonly exceptionType: string
+    readonly message: string
+    readonly treeType?: string;
 }

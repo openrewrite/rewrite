@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {emptyMarkers, Parser, ParserInput, ParserSourceReader, randomId} from "../";
+import {emptyMarkers, Parser, ParserInput, ParserSourceReader, randomId, SourceFile} from "../";
 import {emptySpace, Json, space} from "./tree";
 
-export class JsonParser extends Parser<Json.Document> {
+export class JsonParser extends Parser {
 
-    async parse(...sourcePaths: ParserInput[]): Promise<Json.Document[]> {
+    async parse(...sourcePaths: ParserInput[]): Promise<SourceFile[]> {
         return sourcePaths.map(sourcePath => {
             return {
                 ...new ParseJsonReader(sourcePath).parse(),

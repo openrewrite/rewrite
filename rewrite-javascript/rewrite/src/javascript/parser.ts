@@ -29,17 +29,17 @@ import {
 import {Expression, isJavaScript, JS, TypedTree, TypeTree} from '.';
 import {
     emptyMarkers,
-    ExecutionContext,
     markers,
     Markers,
     MarkersKind,
-    ParseError,
     ParseExceptionResult,
     Parser,
     ParserInput,
-    ParserSourceReader,
+    parserInputFile,
+    parserInputRead,
     randomId,
-    SourceFile
+    SourceFile,
+    SourcePath
 } from "..";
 import {
     binarySearch,
@@ -53,16 +53,15 @@ import {
     TextSpan
 } from "./parserUtils";
 import {JavaScriptTypeMapping} from "./typeMapping";
-import path from "node:path";
 import {produce} from "immer";
 import Kind = JS.Kind;
 import ExpressionStatement = JS.ExpressionStatement;
 
-export class JavaScriptParser extends Parser<JS.CompilationUnit> {
+export class JavaScriptParser extends Parser {
 
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly sourceFileCache: Map<string, ts.SourceFile> = new Map();
-    private oldProgram: ts.Program | undefined;
+    private oldProgram?: ts.Program;
 
     constructor() {
         super();
@@ -82,40 +81,15 @@ export class JavaScriptParser extends Parser<JS.CompilationUnit> {
         return this;
     }
 
-    parseProgramSources(program: ts.Program, relativeTo: string | undefined, ctx: ExecutionContext): Iterable<SourceFile> {
-        const typeChecker = program.getTypeChecker();
-
-        const result: SourceFile[] = [];
-        for (const filePath of program.getRootFileNames()) {
-            const sourceFile = program.getSourceFile(filePath)!;
-            const input = new ParserInput(filePath, undefined, false, () => Buffer.from(ts.sys.readFile(filePath)!));
-            try {
-                const parsed = new JavaScriptParserVisitor(this, sourceFile, typeChecker).visit(sourceFile) as SourceFile;
-                result.push(parsed.withSourcePath(relativeTo != undefined ? path.relative(relativeTo, input.path) : input.path));
-            } catch (error) {
-                result.push(ParseError.build(this, input, relativeTo, ctx, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error), undefined));
-            }
-        }
-        return result;
-    }
-
-    async parse(...sourcePaths: ParserInput[]): Promise<JS.CompilationUnit[]> {
-        return sourcePaths.map(sourcePath => {
-            return {
-                ...new ParseJavaScriptReader(sourcePath).parse(),
-                sourcePath: this.relativePath(sourcePath)
-            };
-        });
-    }
-
-    parse(...inputs: ParserInput[]): Promise<JS.CompilationUnit[]> {
-        const inputFiles = new Map<string, ParserInput>();
+    async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
+        const inputFiles = new Map<SourcePath, ParserInput>();
 
         // Populate inputFiles map and remove from cache if necessary
         for (const input of inputs) {
-            inputFiles.set(input.path, input);
+            const sourcePath = parserInputRead(input);
+            inputFiles.set(sourcePath, input);
             // Remove from cache if previously cached
-            this.sourceFileCache.delete(input.path);
+            this.sourceFileCache.delete(sourcePath);
         }
 
         // Create a new CompilerHost within parseInputs
@@ -135,7 +109,7 @@ export class JavaScriptParser extends Parser<JS.CompilationUnit> {
             // For input files
             const input = inputFiles.get(fileName);
             if (input) {
-                sourceText = input.text.toString('utf8');
+                sourceText = parserInputRead(input);
             } else {
                 // For dependency files
                 sourceText = ts.sys.readFile(fileName);
@@ -162,9 +136,7 @@ export class JavaScriptParser extends Parser<JS.CompilationUnit> {
         // Override readFile
         host.readFile = (fileName) => {
             const input = inputFiles.get(fileName);
-            return input
-                ? input.source().toString('utf8')
-                : ts.sys.readFile(fileName);
+            return input ? parserInputRead(input) : ts.sys.readFile(fileName);
         };
 
         // Create a new Program, passing the oldProgram for incremental parsing
@@ -177,61 +149,34 @@ export class JavaScriptParser extends Parser<JS.CompilationUnit> {
 
         const result: SourceFile[] = [];
         for (const input of inputFiles.values()) {
-            const filePath = input.path;
+            const filePath = parserInputFile(input);
             const sourceFile = program.getSourceFile(filePath);
             if (!sourceFile) {
-                result.push(ParseError.build(this, input, this.relativeTo, this.ctx, new Error('Parser returned undefined'), undefined));
+                result.push(this.error(input, new Error('Parser returned undefined')));
                 continue;
             }
 
             if (hasFlowAnnotation(sourceFile)) {
-                result.push(ParseError.build(this, input, this.relativeTo, this.ctx, new FlowSyntaxNotSupportedError(`Flow syntax not supported: ${input.path}`), undefined));
+                result.push(this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported")));
                 continue;
             }
 
             const syntaxErrors = checkSyntaxErrors(program, sourceFile);
             if (syntaxErrors.length > 0) {
                 let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                result.push(ParseError.build(this, input, this.relativeTo, this.ctx, new SyntaxError(`Compiler error(s) for ${sourceFile.fileName}: ${errors}`), undefined))
+                result.push(this.error(input, new SyntaxError(`Compiler error(s): ${errors}`)))
                 continue;
             }
 
             try {
-                const parsed = new JavaScriptParserVisitor(this, sourceFile, typeChecker).visit(sourceFile) as SourceFile;
-                result.push(parsed.withSourcePath(this.relativeTo != undefined ? path.relative(this.relativeTo, input.path) : input.path));
+                result.push(new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker).visit(sourceFile) as SourceFile);
             } catch (error) {
-                result.push(ParseError.build(this, input, this.relativeTo, this.ctx, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error), undefined));
+                result.push(this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error)));
             }
         }
+
         return result;
     }
-}
-
-class ParseJavaScriptReader extends ParserSourceReader {
-    constructor(sourcePath: ParserInput) {
-        super(sourcePath);
-    }
-
-    parse(): Omit<JS.CompilationUnit, "sourcePath"> {
-        return {
-            kind: JS.Kind.CompilationUnit,
-            id: randomId(),
-            markers: emptyMarkers,
-            prefix: emptySpace,
-            imports: [],
-            statements: [],
-            eof: emptySpace
-        };
-    }
-
-    accept(path: string): boolean {
-        return path.endsWith('.ts') || path.endsWith('.tsx') || path.endsWith('.js') || path.endsWith('.jsx');
-    }
-
-    sourcePathFromSourceText(prefix: string, sourceCode: string): string {
-        return prefix + "/source.ts";
-    }
-
 }
 
 // we use this instead of `ts.SyntaxKind[node.kind]` because the numeric values are not unique, and we want
@@ -248,8 +193,8 @@ export class JavaScriptParserVisitor {
     private readonly typeMapping: JavaScriptTypeMapping;
 
     constructor(
-        private readonly parser: Parser<JS.CompilationUnit>,
         private readonly sourceFile: ts.SourceFile,
+        private readonly sourcePath: string,
         typeChecker: ts.TypeChecker) {
         this.typeMapping = new JavaScriptTypeMapping(typeChecker);
     }
@@ -307,7 +252,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: prefix,
             markers: emptyMarkers,
-            sourcePath: this.sourceFile.fileName,
+            sourcePath: this.sourcePath,
             charsetName: bomAndTextEncoding.encoding,
             charsetBomMarked: bomAndTextEncoding.hasBom,
             imports: [],
@@ -344,16 +289,13 @@ export class JavaScriptParserVisitor {
                 kind: J.Kind.UnknownSource,
                 id: randomId(),
                 prefix: emptySpace,
-                markers: {
-                    kind: MarkersKind,
-                    id: randomId(),
-                    markers: [
-                        ParseExceptionResult.build(
-                            this.parser,
-                            new Error("Unsupported AST element: " + node)
-                        ).withTreeType(visitMethodMap.get(node.kind)!.substring(5))
-                    ]
-                },
+                markers: markers({
+                    kind: MarkersKind.ParseExceptionResult,
+                    parserType: "JavaScriptParser",
+                    exceptionType: "Error",
+                    message: "Unsupported AST element: " + node,
+                    treeType: visitMethodMap.get(node.kind)!.substring(5)
+                } as ParseExceptionResult),
                 text: node.getFullText()
             }
         };
@@ -467,7 +409,7 @@ export class JavaScriptParserVisitor {
         return nodes.map(n => this.rightPadded(this.convert(n), trailing(n), markers?.(n)));
     }
 
-    private rightPaddedSeparatedList<N extends ts.Node, T extends J>(nodes: N[], separator: ts.PunctuationSyntaxKind, markers?: (nodes: N[], i: number) => Markers): J.RightPadded<T>[] {
+    private rightPaddedSeparatedList<N extends ts.Node, T extends J>(nodes: N[], markers?: (nodes: N[], i: number) => Markers): J.RightPadded<T>[] {
         if (nodes.length === 0) {
             return [];
         }
@@ -495,10 +437,6 @@ export class JavaScriptParserVisitor {
             element: t,
             markers: markers ?? emptyMarkers
         };
-    }
-
-    private leftPaddedList<N extends ts.Node, T extends J>(before: (node: N) => J.Space, nodes: ts.NodeArray<N>, markers?: (node: N) => Markers): J.LeftPadded<T>[] {
-        return nodes.map(n => this.leftPadded(before(n), this.convert(n), markers?.(n)));
     }
 
     private semicolonPrefix = (node: ts.Node) => {
@@ -2083,7 +2021,6 @@ export class JavaScriptParserVisitor {
 
         const statements: J.RightPadded<Statement>[] = this.rightPaddedSeparatedList(
             [...statementList.getChildren(this.sourceFile)],
-            ts.SyntaxKind.CommaToken,
             (nodes, i) => i == nodes.length - 2 && nodes[i + 1].kind == ts.SyntaxKind.CommaToken ? markers({
                 kind: JavaMarkers.TrailingComma,
                 id: randomId(),
@@ -2231,10 +2168,14 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 expression: this.visit(node.expression),
             },
-            arguments: node.arguments ? this.mapCommaSeparatedList(this.getParameterListNodes(node)) : emptyContainer<Expression>().withMarkers(markers({
-                kind: JavaMarkers.OmitParentheses,
-                id: randomId()
-            })),
+            arguments: node.arguments ?
+                this.mapCommaSeparatedList(this.getParameterListNodes(node)) : {
+                    ...emptyContainer<Expression>(),
+                    markers: markers({
+                        kind: JavaMarkers.OmitParentheses,
+                        id: randomId()
+                    })
+                },
             body: undefined,
             constructorType: this.mapMethodType(node)
         };
@@ -3234,7 +3175,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitVariableDeclarationList(node: ts.VariableDeclarationList) {
+    visitVariableDeclarationList(node: ts.VariableDeclarationList): JS.ScopedVariableDeclarations {
         let kind = node.getFirstToken();
 
         // to parse the declaration case: await using db = ...
@@ -4296,7 +4237,6 @@ export class JavaScriptParserVisitor {
             this._seenTriviaSpans.splice(idx, 0, span);
         }
         return prefixFromNode(node, this.sourceFile);
-        // return Space.format(this.sourceFile.text, node.getFullStart(), node.getFullStart() + node.getLeadingTriviaWidth());
     }
 
     private suffix = (node: ts.Node, consume: boolean = true): J.Space => {

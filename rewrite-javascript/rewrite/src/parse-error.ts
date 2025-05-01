@@ -13,23 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, SourceFile, Tree, TreeKind} from "./tree";
+import {Cursor, SourceFile, Tree} from "./tree";
 import {TreeVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "./print";
 
-const ParseErrorKind = {
-    ...TreeKind,
-    ParseError: "org.openrewrite.tree.ParseError"
-} as const
+export const ParseErrorKind = "org.openrewrite.tree.ParseError";
 
 export interface ParseError extends SourceFile {
-    readonly kind: typeof ParseErrorKind.ParseError
-    readonly text: string
-    readonly erroneous?: SourceFile
+    readonly kind: typeof ParseErrorKind;
+    readonly text: string;
+    readonly erroneous?: SourceFile;
 }
 
 export function isParseError(tree: any): tree is ParseError {
-    return tree["kind"] in ParseErrorKind;
+    return tree["kind"] === ParseErrorKind;
 }
 
 export class ParseErrorVisitor<P> extends TreeVisitor<Tree, P> {
@@ -38,7 +35,7 @@ export class ParseErrorVisitor<P> extends TreeVisitor<Tree, P> {
     }
 
     protected async accept(t: Tree, p: P): Promise<Tree | undefined> {
-        if (t.kind === ParseErrorKind.ParseError) {
+        if (t.kind === ParseErrorKind) {
             return this.visitParseError(t as ParseError, p);
         }
         throw new Error("Unexpected tree kind: " + t.kind);
@@ -49,7 +46,7 @@ export class ParseErrorVisitor<P> extends TreeVisitor<Tree, P> {
     }
 }
 
-TreePrinters.register(ParseErrorKind.ParseError, new class extends ParseErrorVisitor<PrintOutputCapture> {
+TreePrinters.register(ParseErrorKind, new class extends ParseErrorVisitor<PrintOutputCapture> {
     protected async visitParseError(e: ParseError, p: PrintOutputCapture): Promise<ParseError | undefined> {
         for (let marker of e.markers.markers) {
             p.append(p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), it => it))
