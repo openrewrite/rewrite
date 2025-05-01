@@ -1,3 +1,5 @@
+// noinspection DuplicatedCode
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -967,15 +969,15 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return iat;
     }
 
-    override async visitIndexType(iatit: JS.IndexedAccessType.IndexType, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(iatit, p);
+    override async visitIndexType(indexType: JS.IndexedAccessType.IndexType, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(indexType, p);
 
         p.append("[");
-        await this.visitRightPadded(iatit.element, p);
+        await this.visitRightPadded(indexType.element, p);
         p.append("]");
 
-        await this.afterSyntax(iatit, p);
-        return iatit;
+        await this.afterSyntax(indexType, p);
+        return indexType;
     }
 
     override async visitWithStatement(withStatement: JS.WithStatement, p: PrintOutputCapture): Promise<J | undefined> {
@@ -1126,7 +1128,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitTemplateExpression(templateExpression: JS.TemplateExpression, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(templateExpression, p);
         await this.visit(templateExpression.head, p);
-        this.visitJsRightPaddedLocal(templateExpression.templateSpans, "", p);
+        await this.visitJsRightPaddedLocal(templateExpression.templateSpans, "", p);
         await this.afterSyntax(templateExpression, p);
         return templateExpression;
     }
@@ -1269,7 +1271,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visitSpace(case_.statements.before, p);
         p.append(case_.type === J.Case.Type.Statement ? ":" : "->");
 
-        this.visitStatements(case_.statements.elements, p);
+        await this.visitStatements(case_.statements.elements, p);
 
         await this.afterSyntax(case_, p);
         return case_;
@@ -1347,7 +1349,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visitRightPadded(propertyAssignment.name, p);
 
         if (propertyAssignment.initializer) {
-            // if property is not null, we should print it like `{ a: b }`
+            // if the property is not null, we should print it like `{ a: b }`
             // otherwise, it is a shorthand assignment where we have stuff like `{ a }` only
             if (propertyAssignment.assigmentToken === JS.PropertyAssignment.Token.Colon) {
                 p.append(':');
@@ -1664,7 +1666,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitUnion(union: JS.Union, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(union, p);
 
-        this.visitJsRightPaddedLocal(union.types, "|", p);
+        await this.visitJsRightPaddedLocal(union.types, "|", p);
 
         await this.afterSyntax(union, p);
         return union;
@@ -1673,7 +1675,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitIntersection(intersection: JS.Intersection, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(intersection, p);
 
-        this.visitJsRightPaddedLocal(intersection.types, "&", p);
+        await this.visitJsRightPaddedLocal(intersection.types, "&", p);
 
         await this.afterSyntax(intersection, p);
         return intersection;
@@ -1774,7 +1776,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     private async beforeSyntax(j: J, p: PrintOutputCapture) {
-        this.beforeSyntaxExt(j.prefix, j.markers, p);
+        await this.beforeSyntaxExt(j.prefix, j.markers, p);
     }
 
     private async beforeSyntaxExt(prefix: Space, markers: Markers, p: PrintOutputCapture) {
@@ -1867,7 +1869,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async visitJsLeftPaddedLocal(prefix: string | undefined, leftPadded: J.LeftPadded<J> | J.LeftPadded<boolean> | undefined, p: PrintOutputCapture) {
         if (leftPadded) {
-            this.beforeSyntaxExt(leftPadded.before, leftPadded.markers, p);
+            await this.beforeSyntaxExt(leftPadded.before, leftPadded.markers, p);
 
             if (prefix) {
                 p.append(prefix);
