@@ -488,8 +488,8 @@ export namespace JS {
         id: UUID,
         prefix: J.Space,
         markers: Markers,
-        objectType: Expression,
-        indexType: JS.IndexedAccessType.IndexType,
+        objectType: TypeTree,
+        indexType: TypeTree,
         type?: JavaType
     ): JS.IndexedAccessType {
         return {
@@ -813,7 +813,7 @@ export namespace JS {
         markers: Markers,
         modifiers: J.Modifier[],
         name: J.LeftPadded<J.Identifier>,
-        typeParameters?: J.TypeParameters,
+        typeParameters: J.TypeParameters | undefined,
         initializer: J.LeftPadded<Expression>,
         type?: JavaType
     ): JS.TypeDeclaration {
@@ -1532,7 +1532,7 @@ export namespace JS {
         id: UUID,
         prefix: J.Space,
         markers: Markers,
-        tree: J.RightPadded<Expression>,
+        element: J.RightPadded<TypeTree>,
         type?: JavaType
     ): JS.IndexedAccessType.IndexType {
         return {
@@ -1540,7 +1540,7 @@ export namespace JS {
             id,
             prefix,
             markers,
-            tree,
+            element,
             type
         };
     }
