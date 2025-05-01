@@ -13,35 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('enum mapping', () => {
     const spec = new RecipeSpec();
 
     test('enum declaration', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               enum Test {
@@ -51,8 +30,7 @@ describe('enum mapping', () => {
     });
 
     test('enum empty declaration with modifiers', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               declare const enum Test {
@@ -62,8 +40,7 @@ describe('enum mapping', () => {
     });
 
     test('enum member', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               enum Test {
@@ -74,8 +51,7 @@ describe('enum mapping', () => {
     });
 
     test('enum member with coma', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               enum Test {
@@ -86,8 +62,7 @@ describe('enum mapping', () => {
     });
 
     test('enum members', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               enum Test {
@@ -100,8 +75,7 @@ describe('enum mapping', () => {
     });
 
     test('enum with const modifier', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               const enum Test {
@@ -114,8 +88,7 @@ describe('enum mapping', () => {
     });
 
     test('enum with declare modifier', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               declare enum Test {
@@ -128,8 +101,7 @@ describe('enum mapping', () => {
     });
 
     test('enum with declare const modifier', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               declare const enum Test {
@@ -142,8 +114,7 @@ describe('enum mapping', () => {
     });
 
     test('enum with declare const modifier and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 /*a*/ declare /*b*/ const /*c*/ enum Test {
@@ -156,8 +127,7 @@ describe('enum mapping', () => {
     });
 
     test('enum members with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
                enum Test /*xx*/ {
@@ -170,8 +140,7 @@ describe('enum mapping', () => {
     });
 
     test('enum members with initializer', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               enum Test {
@@ -183,8 +152,7 @@ describe('enum mapping', () => {
     });
 
     test('enum mixed members with initializer', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               enum Test {
@@ -200,8 +168,7 @@ describe('enum mapping', () => {
     });
 
     test('enum members with initializer and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               enum Test {
@@ -214,8 +181,7 @@ describe('enum mapping', () => {
     });
 
     test('enum complex members with initializer', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               const baseValue = 10;
@@ -230,8 +196,7 @@ describe('enum mapping', () => {
     });
 
     test('enum with string literals', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               enum CustomizableCompilers {
@@ -242,8 +207,7 @@ describe('enum mapping', () => {
     });
 
     test.skip('enum with non identifier name', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               enum A { ['baz'] }

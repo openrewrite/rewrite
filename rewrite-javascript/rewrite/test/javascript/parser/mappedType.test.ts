@@ -13,35 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('mapped type mapping', () => {
     const spec = new RecipeSpec();
 
     test('simple', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type OptionsFlags<Type> = {
@@ -52,8 +31,7 @@ describe('mapped type mapping', () => {
     });
 
     test('with readonly', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               type ReadonlyType<T> = {
@@ -64,8 +42,7 @@ describe('mapped type mapping', () => {
     });
 
     test('with -readonly', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               type CreateMutable<Type> = {
@@ -76,8 +53,7 @@ describe('mapped type mapping', () => {
     });
 
     test('with suffix +?', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               type Concrete<Type> = {
@@ -88,8 +64,7 @@ describe('mapped type mapping', () => {
     });
 
     test('with suffix -?', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Concrete<Type> = {
@@ -100,8 +75,7 @@ describe('mapped type mapping', () => {
     });
 
     test('record mapped type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               type Record<K extends keyof any, T> = {
@@ -113,8 +87,7 @@ describe('mapped type mapping', () => {
     });
 
     test('record mapped type with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Record<K extends keyof any, T> = /*a*/{ /*b*/
@@ -125,8 +98,7 @@ describe('mapped type mapping', () => {
     });
 
     test('mapped type with "as" nameType', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               type ReadonlyRenamed<T> = {
@@ -137,8 +109,7 @@ describe('mapped type mapping', () => {
     });
 
     test('recursive mapped types', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               type DeepPartial<T> = {
@@ -149,8 +120,7 @@ describe('mapped type mapping', () => {
     });
 
     test('with function type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               type Getters<Type> = {
@@ -161,8 +131,7 @@ describe('mapped type mapping', () => {
     });
 
     test('with repeating tokens', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type EventConfig<Events extends { kind: string }> = {
@@ -173,8 +142,7 @@ describe('mapped type mapping', () => {
     });
 
     test('with conditional', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type ExtractPII<Type> = {
@@ -185,8 +153,7 @@ describe('mapped type mapping', () => {
     });
 
     test('mapped types intersection', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type MakeSpecificKeysReadonly<T, K extends keyof T> = {
@@ -199,8 +166,7 @@ describe('mapped type mapping', () => {
     });
 
     test('specific type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type UnionMapper<T> = {
@@ -211,8 +177,7 @@ describe('mapped type mapping', () => {
     });
 
     test('complex key remapping', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type SnakeCaseKeys<T> = {
@@ -227,8 +192,7 @@ describe('mapped type mapping', () => {
     });
 
     test('no node type ', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Type = {
@@ -240,8 +204,7 @@ describe('mapped type mapping', () => {
     });
 
     test('no node type with ;', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Type = {

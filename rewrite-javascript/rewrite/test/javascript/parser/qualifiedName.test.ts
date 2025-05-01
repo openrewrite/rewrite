@@ -13,59 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('qualified name mapping', () => {
     const spec = new RecipeSpec();
 
     test('globalThis qualified name', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('const value: globalThis.Number = 1')
         );
     });
 
     test('globalThis qualified name with generic', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('const value: globalThis.Promise  <    string  > = null')
         );
     });
 
     test('globalThis qualified name with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('const value /*a123*/ : globalThis. globalThis . /*asda*/ globalThis.Promise<string> = null;')
         );
     });
 
     test.skip('nested class qualified name', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               class OuterClass {
@@ -77,8 +53,7 @@ describe('qualified name mapping', () => {
     });
 
     test('nested class qualified name', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class OuterClass {
@@ -90,8 +65,7 @@ describe('qualified name mapping', () => {
     });
 
     test('namespace qualified name', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               namespace TestNamespace {
@@ -103,8 +77,7 @@ describe('qualified name mapping', () => {
     });
 
     test('enum qualified name', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               enum Test {

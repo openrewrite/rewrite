@@ -13,35 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('type-query operator mapping', () => {
     const spec = new RecipeSpec();
 
     test('typeof', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               type UserType = typeof Number;
@@ -50,8 +29,7 @@ describe('type-query operator mapping', () => {
     });
 
     test('typeof with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type UserType = /*a*/ typeof /*b*/ Number /*c*/;
@@ -60,8 +38,7 @@ describe('type-query operator mapping', () => {
     });
 
     test('typeof as a type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const createUser: typeof Number = Number;
@@ -70,8 +47,7 @@ describe('type-query operator mapping', () => {
     });
 
     test('typeof as a type with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const createUser: /*a*/ typeof /*b*/ Number /*c*/ = /*d*/ Number /*e*/;
@@ -80,8 +56,7 @@ describe('type-query operator mapping', () => {
     });
 
     test('typeof as a type as function', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function greet(name: string) {
@@ -96,8 +71,7 @@ describe('type-query operator mapping', () => {
     });
 
     test('typeof as a type as array', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const numbers = [];
@@ -108,8 +82,7 @@ describe('type-query operator mapping', () => {
     });
 
     test('typeof as a type as a union', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const obj1 = { type: "type1", value: 42 };
@@ -121,8 +94,7 @@ describe('type-query operator mapping', () => {
     });
 
     test('index access type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type DatabaseConfig = typeof config["database"];
@@ -131,8 +103,7 @@ describe('type-query operator mapping', () => {
     });
 
     test('index access type with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type DatabaseConfig = /*a*/typeof /*b*/ config/*c*/[/*d*/"database"/*e*/]/*f*/;
@@ -141,8 +112,7 @@ describe('type-query operator mapping', () => {
     });
 
     test('index access type nested', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 interface Company {
@@ -158,8 +128,7 @@ describe('type-query operator mapping', () => {
     });
 
     test('typeof with generics', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type MyStructReturnType<X extends S.Schema.All> = S.Schema.Type<ReturnType<typeof MyStruct/*a*/</*c*/X/*d*/>/*b*/>>

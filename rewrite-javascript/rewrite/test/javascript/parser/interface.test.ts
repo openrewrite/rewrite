@@ -13,35 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('interface mapping', () => {
     const spec = new RecipeSpec();
 
     test('empty interface', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
                 interface Empty {}
@@ -50,8 +29,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with export modifier', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               export interface Empty {
@@ -62,8 +40,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with declare modifier', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               declare interface Empty {
@@ -74,8 +51,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with extends', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Animal {
@@ -90,8 +66,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with extending multiple interfaces', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface HasLegs {
@@ -110,8 +85,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
                 interface Person {
@@ -123,8 +97,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties with semicolons', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -136,8 +109,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties with coma', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -149,8 +121,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties with semicolons and comma', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -162,8 +133,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties with semicolons, comma and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -175,8 +145,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with methods', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -190,8 +159,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with methods and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -206,8 +174,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties and methods', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -222,8 +189,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with get/set methods', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -236,8 +202,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with constructor signature', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 interface Constructible {
@@ -248,8 +213,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with constructor signature with type parameters', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 interface GenericConstructor {
@@ -260,8 +224,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with constructor signature with type parameters and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 interface GenericConstructor {
@@ -272,8 +235,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties and methods with modifiers ', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -285,8 +247,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with optional property signature', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 interface Person {
@@ -298,8 +259,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with optional properties and methods ', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -312,8 +272,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties, methods and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Person {
@@ -328,8 +287,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with function type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Add {
@@ -340,8 +298,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with function type and zero param', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Add {
@@ -352,8 +309,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with function type and several return types', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Add {
@@ -364,8 +320,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with function type and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Add {
@@ -376,8 +331,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with call signature', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Add {
@@ -389,8 +343,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with call signature and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Add {
@@ -403,8 +356,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with indexable type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Add {
@@ -415,8 +367,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with hybrid types', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface Counter {
@@ -431,8 +382,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with generics', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface GenericIdentityFn<   T >   {
@@ -444,8 +394,7 @@ describe('interface mapping', () => {
     });
 
     test('interface with generics', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               interface X {
@@ -456,8 +405,7 @@ describe('interface mapping', () => {
     });
 
     test('function type with empty args', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export interface ProxyCursorHooks {

@@ -13,35 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('template expression mapping', () => {
     const spec = new RecipeSpec();
 
     test('simple template', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const v = \`\${42}\`;
@@ -50,8 +29,7 @@ describe('template expression mapping', () => {
     });
 
     test('simple template with literal', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const v = \`\${42}\`;
@@ -60,8 +38,7 @@ describe('template expression mapping', () => {
     });
 
     test('simple template with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const v = /*a*/\`\/*b*/${/*c*/42/*d*/}/*e*/\`;
@@ -70,8 +47,7 @@ describe('template expression mapping', () => {
     });
 
     test('simple template with text', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const a = 5;
@@ -81,8 +57,7 @@ describe('template expression mapping', () => {
     });
 
     test('simple template with expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
             const a = 5;
@@ -93,8 +68,7 @@ describe('template expression mapping', () => {
     });
 
     test('simple template with ternary', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const isAdmin = true;
@@ -104,8 +78,7 @@ describe('template expression mapping', () => {
     });
 
     test('simple template with function', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function greet(name: string): string {
@@ -119,8 +92,7 @@ describe('template expression mapping', () => {
     });
 
     test('template tag', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function tag(strings: TemplateStringsArray, ...values: any[]) {
@@ -135,8 +107,7 @@ describe('template expression mapping', () => {
     });
 
     test('template tag with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const result = /*a*/tag/*b*/\` My name is \${name} and I am \${age} years old.\`;
@@ -145,8 +116,7 @@ describe('template expression mapping', () => {
     });
 
     test('template tag with type arguments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function genericTag<T>(
@@ -163,8 +133,7 @@ describe('template expression mapping', () => {
     });
 
     test('template tag with type arguments and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const result = /*a*/genericTag/*b*/</*c*/number/*d*/>/*e*/\`The sum is \${42}\`;
@@ -173,8 +142,7 @@ describe('template expression mapping', () => {
     });
 
     test('template LiteralType ', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Name = "Alice";
@@ -184,8 +152,7 @@ describe('template expression mapping', () => {
     });
 
     test('template yield LiteralType ', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 Effect.gen(function* () {
@@ -200,8 +167,7 @@ describe('template expression mapping', () => {
     });
 
     test('template LiteralType union', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Action = "create" | "update";
@@ -214,8 +180,7 @@ describe('template expression mapping', () => {
     });
 
     test('template LiteralType with conditional', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Role = "admin" | "editor" | "viewer";

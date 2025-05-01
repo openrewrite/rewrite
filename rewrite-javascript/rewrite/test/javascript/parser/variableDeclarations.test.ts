@@ -13,35 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('variable declaration mapping', () => {
     const spec = new RecipeSpec();
 
     test('const', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           typescript(
             //language=javascript
             `
@@ -62,8 +41,7 @@ describe('variable declaration mapping', () => {
         );
     });
     test('const2', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           typescript(
             //language=javascript
             `
@@ -84,43 +62,37 @@ describe('variable declaration mapping', () => {
         );
     });
     test('typed', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('let a : number =2')
         );
     });
     test('typed unknown', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('const a : unknown')
         );
     });
     test('typed any', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('let a : any = 2;')
         );
     });
     test('multi', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('let a=2, b=2 ')
         );
     });
     test('multi typed', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('  /*0.1*/  let  /*0.2*/    a   /*1*/ :      /*2*/  number =2    /*3*/ , /*4*/   b   /*5*/:/*6*/    /*7*/string  /*8*/   =/*9*/    "2" /*10*/  ; //11')
         );
     });
     test('a b c', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
 
             typescript(`
@@ -131,32 +103,28 @@ describe('variable declaration mapping', () => {
     });
 
     test('exported variables', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(' export /*0.1*/  let  /*0.2*/    a   /*1*/ :      /*2*/  number =2    /*3*/ , /*4*/   b   /*5*/:/*6*/    /*7*/string  /*8*/   =/*9*/    "2" /*10*/  ; //11')
         );
     });
 
     test('unique symbol', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('declare const unset: unique symbol;')
         );
     });
 
     test('bigint', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('type res3 = Call<Objects.PartialDeep, bigint>;\n')
         );
     });
 
     test('property signature as an array', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
               export type Apply<fn extends Fn, args extends unknown[]> = (fn & {
@@ -167,8 +135,7 @@ describe('variable declaration mapping', () => {
     });
 
     test('declaration with destruction', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 /*0*/
@@ -217,8 +184,7 @@ describe('variable declaration mapping', () => {
     });
 
     test('variable with exclamation token', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 let schema/*a*/!/*b*/: number;
@@ -227,8 +193,7 @@ describe('variable declaration mapping', () => {
     });
 
     test('variable with using keyword', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 using unrefTimer = stub(Deno, 'unrefTimer');
@@ -237,8 +202,7 @@ describe('variable declaration mapping', () => {
     });
 
     test('variable with await using keyword', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const getDb = async () => {
@@ -255,8 +219,7 @@ describe('variable declaration mapping', () => {
     });
 
     test.skip('variable declaration with decorator', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export namespace process {

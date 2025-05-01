@@ -13,115 +13,84 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('import mapping', () => {
     const spec = new RecipeSpec();
 
     test('simple', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('import {foo} from "bar"')
         );
     });
 
     test('for side effect', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('import "foo"')
         );
     });
 
     test('space', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('import {foo} /*1*/ from /*2*/ "bar"/*3*/;')
         );
     });
 
     test('multiple', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('import {foo, bar} from "baz"')
         );
     });
 
     test('trailing comma', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('import {foo, } from "baz"')
         );
     });
 
     test('default', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('import foo from "bar"')
         );
     });
 
     test('namespace', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('import *  as foo  from "bar"')
         );
     });
 
     test('default and namespace', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('import baz, * as foo from "bar"')
         );
     });
 
     test('default and others', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('import baz, {foo1, } from "bar"')
         );
     });
 
     test('dynamic import', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('export {};const module = await import("module-name");')
         )
     });
 
     test('type import and others', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`import {
                 Client,
@@ -134,16 +103,14 @@ describe('import mapping', () => {
     });
 
     test('type imports only', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`import type { Component } from "react";`)
         );
     });
 
     test('experimental: import with import attributes', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 import Package from 'module-name' assert { type: "json" }
@@ -154,8 +121,7 @@ describe('import mapping', () => {
     });
 
     test('import with import attributes', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 import type { SpyInstance } from 'jest';
@@ -166,8 +132,7 @@ describe('import mapping', () => {
     });
 
     test('external module import', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 import mongodb = /*a*/require/*b*/(/*c*/'mongodb'/*d*/)/*e*/;

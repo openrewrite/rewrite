@@ -13,35 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('type alias mapping', () => {
     const spec = new RecipeSpec();
 
     test('simple alias', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type StringAlias = string;
@@ -50,8 +29,7 @@ describe('type alias mapping', () => {
     });
 
     test('simple alias with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 /*a*/type /*b*/ StringAlias /*c*/= /*d*/string /*e*/;/*f*/
@@ -60,8 +38,7 @@ describe('type alias mapping', () => {
     });
 
     test('function type alias', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type MyFunctionType = (x: number, y: number) => string;
@@ -70,8 +47,7 @@ describe('type alias mapping', () => {
     });
 
     test('generic function type alias', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Response<T, R, Y> = (x: T, y: R) => Y;;
@@ -80,8 +56,7 @@ describe('type alias mapping', () => {
     });
 
     test('generic type alias with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 /*a*/type/*b*/ Response/*c*/</*d*/T/*e*/> /*f*/ = /*g*/(x: T, y: number) => string;;
@@ -90,8 +65,7 @@ describe('type alias mapping', () => {
     });
 
     test('union type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type ID = /*a*/ number /*b*/ | /*c*/ string /*d*/;
@@ -100,8 +74,7 @@ describe('type alias mapping', () => {
     });
 
     test('union type with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type ID = number | string;
@@ -110,8 +83,7 @@ describe('type alias mapping', () => {
     });
 
     test('construct function type alias', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type MyConstructor = abstract new (arg: string) => string;
@@ -120,8 +92,7 @@ describe('type alias mapping', () => {
     });
 
     test('construct function type alias with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type MyConstructor = /*a*/new/*b*/ (/*c*/arg: string) => string;
@@ -130,8 +101,7 @@ describe('type alias mapping', () => {
     });
 
     test('construct function type alias with abstract and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type MyConstructor = /*0*/ abstract /*a*/new/*b*/ (/*c*/arg: string) => string;
@@ -140,8 +110,7 @@ describe('type alias mapping', () => {
     });
 
     test('recursive array type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type NestedArray<T> = T | NestedArray<T[]>;
@@ -150,8 +119,7 @@ describe('type alias mapping', () => {
     });
 
     test('construct function type alias with generic', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type GenericConstructor<T> = new (/*a*/.../*b*/args: any[]) => T;
@@ -160,8 +128,7 @@ describe('type alias mapping', () => {
     });
 
     test('tuple type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type MyTuple = [number, string, boolean];
@@ -170,8 +137,7 @@ describe('type alias mapping', () => {
     });
 
     test('tuple type with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type MyTuple = /*a*/[/*b*/number/*c*/, /*d*/string/*e*/, /*f*/boolean/*g*/, /*h*/]/*j*/;
@@ -180,8 +146,7 @@ describe('type alias mapping', () => {
     });
 
     test('tuple type empty', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type MyTuple = [/*a*/];
@@ -190,8 +155,7 @@ describe('type alias mapping', () => {
     });
 
     test('nested tuple type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type NestedTuple = [number, [string, boolean]];
@@ -200,8 +164,7 @@ describe('type alias mapping', () => {
     });
 
     test('optional tuple type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type OptionalTuple = [string, /*a*/number/*b*/?/*c*/];
@@ -210,8 +173,7 @@ describe('type alias mapping', () => {
     });
 
     test('tuple rest type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type FlexibleTuple = [string, ...number[]];
@@ -220,8 +182,7 @@ describe('type alias mapping', () => {
     });
 
     test('readonly operator tuple type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type ReadonlyTuple = readonly [string, number];
@@ -230,8 +191,7 @@ describe('type alias mapping', () => {
     });
 
     test('readonly operator tuple type with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type ReadonlyTuple = /*a*/keyof /*b*/ [string, number];
@@ -240,8 +200,7 @@ describe('type alias mapping', () => {
     });
 
     test('basic conditional type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type IsString<T> = T extends string ? 'Yes' : 'No';
@@ -250,8 +209,7 @@ describe('type alias mapping', () => {
     });
 
     test('basic conditional type with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type IsString<T> = /*a*/T/*b*/ extends /*c*/string /*d*/? /*e*/'Yes' /*f*/:/*g*/ 'No'/*h*/;
@@ -260,8 +218,7 @@ describe('type alias mapping', () => {
     });
 
     test('conditional type with parenthesized type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Flatten<T> = T extends (infer R)[] ? Flatten<R> : T;
@@ -270,8 +227,7 @@ describe('type alias mapping', () => {
     });
 
     test('conditional type with parenthesized type and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Flatten<T> = T extends /*a*/(/*b*/infer/*c*/ R/*d*/)/*e*/[] ? Flatten<R> : T;
@@ -280,8 +236,7 @@ describe('type alias mapping', () => {
     });
 
     test('conditional type with parenthesized type and never', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type GetReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
@@ -290,8 +245,7 @@ describe('type alias mapping', () => {
     });
 
     test('named tuple member type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Coordinate = [x: number, y: number, z?: number];
@@ -301,8 +255,7 @@ describe('type alias mapping', () => {
     });
 
     test('trailing comma in params', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type RichText = (
@@ -313,8 +266,7 @@ describe('type alias mapping', () => {
     });
 
     test('trailing comma in type args', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export type AfterReadRichTextHookArgs<
@@ -325,8 +277,7 @@ describe('type alias mapping', () => {
     });
 
     test('type with empty type argument', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type A/*a*/</*b*/>/*c*/ = {/*d*/}
@@ -335,8 +286,7 @@ describe('type alias mapping', () => {
     });
 
     test('type with intrinsic keyword', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Uppercase<S extends string> = intrinsic
@@ -345,8 +295,7 @@ describe('type alias mapping', () => {
     });
 
     test('constructor type with trailing coma', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type ElementConstructor<P> =
@@ -359,8 +308,7 @@ describe('type alias mapping', () => {
     });
 
     test('constructor type with empty param', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type ElementConstructor<P> =

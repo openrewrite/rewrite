@@ -13,91 +13,63 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('for mapping', () => {
     const spec = new RecipeSpec();
 
     test('empty for', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript('for (;;);')
         );
     });
 
     test('empty for with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript('/*a*/for /*b*/ (/*c*/;/*d*/;/*e*/)/*f*/;/*g*/')
         );
     });
 
     test('for indexed', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('for (let i = 0; i < 10; i++) ;')
         );
     });
 
     test('for with assigment condition', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('for(var r,a=0;r=t[a++];);')
         );
     });
 
     test('for indexed multiple variables', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('for (let /*0*/ i /*1*/ = /*2*/ 0 /*3*/ , j = 0/*4*/; /*5*/ i /*6*/ < 10 /*7*/; /*8*/i++/*9*/)/*10*/ ;/*11*/')
         );
     });
 
     test('for indexed with empty body', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript('for (let i = 0; i < 10; i++) /*a*/ {/*b*/} /*c*/;')
         );
     });
 
     test('for indexed with body', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript('for (let i = 0; i < 10; i++) { console.log(i); };')
         );
     });
 
     test('for with continue', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 for (let i = 0; i < 5; i++) {
@@ -111,8 +83,7 @@ describe('for mapping', () => {
     });
 
     test('for with break', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 for (let i = 0; i < 5; i++) {
@@ -126,8 +97,7 @@ describe('for mapping', () => {
     });
 
     test('for with labeled break', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 /*a*/labelName/*b*/:/*c*/ for (let i = 0; i < 5; i++) {
@@ -142,24 +112,21 @@ describe('for mapping', () => {
     });
 
     test('for-of empty', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript('for (let char of "text") ;')
         );
     });
 
     test('for-of empty with array', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript('for (let i of [0, 1, 2, [3, 4, 5]]) ;')
         );
     });
 
     test('for-of with object binding pattern', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const list : any = [];
@@ -171,40 +138,35 @@ describe('for mapping', () => {
     });
 
     test('for-of with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript('/*a*/for/*b*/ (/*c*/const /*d*/char /*e*/of /*f*/ "text"/*g*/)/*h*/ {/*j*/} /*k*/;/*l*/')
         );
     });
 
     test('for-of with await and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript('export {};/*a*/for/*b*/ await/*bb*/(/*c*/const /*d*/char /*e*/of /*f*/ "text"/*g*/)/*h*/ {/*j*/} /*k*/;/*l*/')
         );
     });
 
     test('for-in empty', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript('for (const index in []) ;')
         );
     });
 
     test('for-in with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript('/*a*/for/*b*/ (/*c*/const /*d*/index /*e*/in /*f*/ []/*g*/)/*h*/ {/*j*/} /*k*/;/*l*/')
         );
     });
 
     test('for-in with keyof typeof TypeOperator', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const person = {
@@ -221,8 +183,7 @@ describe('for mapping', () => {
     });
 
     test('for-in with dynamic object', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const dynamicObject: { [key: string]: any } = {
@@ -239,8 +200,7 @@ describe('for mapping', () => {
     });
 
     test('for with expression instead of statement', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function foo () {
@@ -257,8 +217,7 @@ describe('for mapping', () => {
     });
 
     test('for-of with await', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const asyncIterable = {
@@ -286,8 +245,7 @@ describe('for mapping', () => {
     });
 
     test('for with bool condition', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 let bit = true

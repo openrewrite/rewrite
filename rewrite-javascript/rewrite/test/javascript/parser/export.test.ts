@@ -1,21 +1,4 @@
 /*
- * Copyright 2023 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-
-/*
  * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,14 +17,11 @@ import {RecipeSpec} from "../../../src/test";
 
 import {typescript} from "../../../src/javascript";
 
-
-
 describe('export keyword tests', () => {
     const spec = new RecipeSpec();
 
     test('module.export', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const nxPreset = require('@nx/jest/preset').default;
@@ -52,8 +32,7 @@ describe('export keyword tests', () => {
     });
 
     test('type export', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export type ObjectMetadataItemWithFieldMaps = ObjectMetadataInterface & {
@@ -70,8 +49,7 @@ describe('export keyword tests', () => {
     });
 
     test('class export', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
 
@@ -87,8 +65,7 @@ describe('export keyword tests', () => {
     });
 
     test('namespace export', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export namespace MyNamespace {
@@ -102,8 +79,7 @@ describe('export keyword tests', () => {
     });
 
     test('enum export', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export enum RemoteServerType {
@@ -115,8 +91,7 @@ describe('export keyword tests', () => {
     });
 
     test('object export', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function foo() {};
@@ -138,8 +113,7 @@ describe('export keyword tests', () => {
     });
 
     test('re-export', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 // Re-exporting everything from another module
@@ -153,8 +127,7 @@ describe('export keyword tests', () => {
     });
 
     test('single statement export', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 // Exporting a single item as default using \`export =\`
@@ -164,8 +137,7 @@ describe('export keyword tests', () => {
     });
 
     test('e2e', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 // Exporting declarations
@@ -204,8 +176,7 @@ describe('export keyword tests', () => {
     });
 
     test('empty named export', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export {/*a*/}
@@ -214,8 +185,7 @@ describe('export keyword tests', () => {
     });
 
     test('export with attributes', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export type { A } from "A" with { type: "json" };
@@ -226,8 +196,7 @@ describe('export keyword tests', () => {
     });
 
     test('export/import with empty attributes', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export * as foo from "foo.json"

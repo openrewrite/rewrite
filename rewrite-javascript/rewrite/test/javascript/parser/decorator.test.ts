@@ -13,23 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
 import {typescript} from "../../../src/javascript";
 
@@ -39,36 +22,31 @@ describe('class decorator mapping', () => {
     const spec = new RecipeSpec();
 
     test('unqualified', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('@foo class A {}')
         );
     });
     test('unqualified parens', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('@foo( ) class A {}')
         );
     });
     test('qualified', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('@foo . bar class A {}')
         );
     });
     test('qualified parens', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('@foo . bar ( ) class A {}')
         );
     });
     test('parameter decorator with params', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               export class WorkspaceMemberWorkspaceEntity extends BaseWorkspaceEntity {
@@ -85,8 +63,7 @@ describe('class decorator mapping', () => {
         );
     });
     test('decorator with type params', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               @StaticInterfaceImplement/*a*/<ISpriteAssembler>/*b*/()
@@ -95,8 +72,7 @@ describe('class decorator mapping', () => {
         );
     });
     test('decorator with parenthesized expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               class SimpleSpriteAssembler {
@@ -109,8 +85,7 @@ describe('class decorator mapping', () => {
         );
     });
     test.skip('decorator on class expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               const Foo = (x => x)(@dec('') class { })
@@ -118,8 +93,7 @@ describe('class decorator mapping', () => {
         );
     });
     test('class / method / params / properties decorators', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               @UseGuards(WorkspaceAuthGuard)
@@ -152,8 +126,7 @@ describe('class decorator mapping', () => {
     });
 
     test.skip('decorator after modifiers', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export @decorator() class Foo {}

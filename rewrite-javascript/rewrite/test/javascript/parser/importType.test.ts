@@ -13,75 +13,49 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('import type mapping', () => {
     const spec = new RecipeSpec();
 
     test('simple import', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`type ModuleType = import('fs');`)
         );
     });
 
     test('simple import with isTypeOf', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`type MyType = typeof import("module-name");`)
         );
     });
 
     test('simple import with isTypeOf and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`type MyType = /*a*/typeof /*b*/ import/*c*/(/*d*/"module-name"/*e*/)/*f*/;`)
         );
     });
 
     test('import with qualifier', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`type ReadStream = import("fs").ReadStream;`)
         );
     });
 
     test('import with qualifier and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`type ReadStream = import("fs")/*a*/./*b*/ReadStream/*c*/;`)
         );
     });
 
     test('import with sub qualifiers', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export default class Utils {
@@ -97,8 +71,7 @@ describe('import type mapping', () => {
     });
 
     test('function with import type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function useModule(module: import("fs")): void {
@@ -109,8 +82,7 @@ describe('import type mapping', () => {
     });
 
     test('import type with type argument', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type AnotherType = import("module-name").GenericType<string>;
@@ -119,8 +91,7 @@ describe('import type mapping', () => {
     });
 
     test('import type with type argument adv1', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export namespace Shapes {
@@ -135,8 +106,7 @@ describe('import type mapping', () => {
     });
 
     test('import type with type argument adv2', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export namespace Models {
@@ -153,8 +123,7 @@ describe('import type mapping', () => {
     });
 
     test('import with attributes', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type A = import("foo", {with: {type: "json"}})
@@ -163,8 +132,7 @@ describe('import type mapping', () => {
     });
 
     test('import with attributes with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type A = import("foo"/*0*/, /*a*/{/*b*/assert/*c*/:/*d*/ {type: "json"}/*e*/}/*f*/)
@@ -173,8 +141,7 @@ describe('import type mapping', () => {
     });
 
     test('import with attributes and qualifiers', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export type LocalInterface =
@@ -188,8 +155,7 @@ describe('import type mapping', () => {
     });
 
     test('import type without qualifier an with type argument', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 declare module "ContextUtils" {

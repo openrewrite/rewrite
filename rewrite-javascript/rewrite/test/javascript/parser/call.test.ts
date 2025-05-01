@@ -20,48 +20,42 @@ describe('call mapping', () => {
     const spec = new RecipeSpec();
 
     test('single', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('parseInt("42")')
         );
     });
 
     test('multiple', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('setTimeout(null, 2000, \'Hello\');')
         );
     });
 
     test('with array literal receiver', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('[1] . splice(0)')
         );
     });
 
     test('with call receiver', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('"1" . substring(0) . substring(0)')
         );
     });
 
     test('trailing comma', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('parseInt("42" , )')
         );
     });
 
     test('with optional chaining operator', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const func = (message: string) => message;
@@ -72,8 +66,7 @@ describe('call mapping', () => {
     });
 
     test('call expression with type parameters', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function identity<T>(value: T): T {
@@ -86,8 +79,7 @@ describe('call mapping', () => {
     });
 
     test('call expression with type parameters and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function identity<T>(value: T): T {
@@ -100,8 +92,7 @@ describe('call mapping', () => {
     });
 
     test('call expression with type parameters and optional chaining operator', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function identity<T>(value: T): T {
@@ -116,8 +107,7 @@ describe('call mapping', () => {
     });
 
     test('call expression with type parameters and optional chaining operator with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function identity<T>(value: T): T {
@@ -131,8 +121,7 @@ describe('call mapping', () => {
     });
 
     test('call expression with mapping', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Operation = (a: number, b: number) => number;
@@ -150,8 +139,7 @@ describe('call mapping', () => {
     });
 
     test('call expression with mapping and ?.', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Operation = (a: number, b: number) => number;
@@ -169,8 +157,7 @@ describe('call mapping', () => {
     });
 
     test('call expression with mapping adv', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const arr: { [key: string]: (x: number, y: number) => number }[] = [
@@ -186,8 +173,7 @@ describe('call mapping', () => {
 
     // need a way to distinguish new class calls with empty braces and without braces
     test('call new expression without braces', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 var d = (new Date).getTime()
@@ -199,8 +185,7 @@ describe('call mapping', () => {
     // perhaps a bug in a Node parser
     // node.getChildren() skips token '/*a*/<'
     test.skip('call expression with sequential <<', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 expectTypeOf(o.get).toMatchTypeOf/*a*/<<K extends keyof EmberObject>(key: K) => EmberObject[K]>();

@@ -13,99 +13,69 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('class mapping', () => {
     const spec = new RecipeSpec();
 
     test('empty', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('class A {}')
         );
     });
     test('type parameter', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('class A   <   T   ,   G> {}')
         );
     });
     test('body', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('class A { foo: number; }')
         );
     });
     test('extends', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('class A extends Object {}')
         );
     });
     test('implements single', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('class A implements B {}')
         );
     });
     test('implements multiple', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('class A implements B , C,D {}')
         );
     });
     test('extends and implements', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('class A extends Object implements B , C,D {}')
         );
     });
     test('export', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('export class A {}')
         );
     });
     test('export default', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript('export default class A {}')
         );
     });
 
     test('class with properties', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
                 class X {
@@ -117,8 +87,7 @@ describe('class mapping', () => {
     });
 
     test('class with properties and semicolon', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
                class X {
@@ -131,8 +100,7 @@ describe('class mapping', () => {
     });
 
     test('class with mixed properties with semicolons', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               class X {
@@ -149,8 +117,7 @@ describe('class mapping', () => {
     });
 
     test('class with properties, semicolon, methods, comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
                 class X {
@@ -173,8 +140,7 @@ describe('class mapping', () => {
     });
 
     test('class with several typed properties', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
                 class X {
@@ -190,8 +156,7 @@ describe('class mapping', () => {
     });
 
     test('class with reference-typed property', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               class X {
@@ -207,8 +172,7 @@ describe('class mapping', () => {
     });
 
     test('class with typed properties, modifiers, comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`
               class X /*abc*/ {
@@ -225,8 +189,7 @@ describe('class mapping', () => {
     });
 
     test('class with simple ctor', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`class A {
               constructor() {
@@ -236,8 +199,7 @@ describe('class mapping', () => {
     });
 
     test('class with ctor as literal', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
           //language=typescript
           typescript(`class A {
               "constructor"() {
@@ -247,8 +209,7 @@ describe('class mapping', () => {
     });
 
     test('class with private ctor', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`class A {
               /*0*/     private      /*1*/   constructor  /*2*/    (    /*3*/  )  /*4*/     {
@@ -258,8 +219,7 @@ describe('class mapping', () => {
     });
 
     test('class with parametrized ctor', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`class A {
                     /*1*/   constructor  /*2*/    (  a,  /*3*/   b   :     string, /*4*/    c     /*5*/     ) {
@@ -269,8 +229,7 @@ describe('class mapping', () => {
     });
 
     test('class with type parameters', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class A<T> {
@@ -280,8 +239,7 @@ describe('class mapping', () => {
     });
 
     test('anonymous class expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const MyClass = class {
@@ -293,8 +251,7 @@ describe('class mapping', () => {
     });
 
     test('anonymous class expression with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const MyClass = /*a*/class/*b*/ {/*c*/
@@ -306,8 +263,7 @@ describe('class mapping', () => {
     });
 
     test('named class expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const Employee = class EmployeeClass {
@@ -319,8 +275,7 @@ describe('class mapping', () => {
     });
 
     test('class extends expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class OuterClass extends (class extends Number { }) {
@@ -330,8 +285,7 @@ describe('class mapping', () => {
     });
 
     test('class extends expression with constructor', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class OuterClass extends (class extends Number {
@@ -348,8 +302,7 @@ describe('class mapping', () => {
     });
 
     test('class expressions inline', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 function createInstance(ClassType: new () => any) {
@@ -367,7 +320,6 @@ describe('class mapping', () => {
 
     test('inner class declaration with extends', () => {
      spec.rewriteRun(
-
         //language=typescript
         typescript(`
             class OuterClass {
@@ -378,8 +330,7 @@ describe('class mapping', () => {
     });
 
     test('class with optional properties, ctor and modifiers', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class Employee {
@@ -398,8 +349,7 @@ describe('class mapping', () => {
     });
 
     test('class with optional properties and methods', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class Person {
@@ -413,8 +363,7 @@ describe('class mapping', () => {
     });
 
     test('class with optional methods with generics', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class Person {
@@ -427,8 +376,7 @@ describe('class mapping', () => {
     });
 
     test('class with get/set accessors', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class Person {
@@ -449,8 +397,7 @@ describe('class mapping', () => {
     });
 
     test('class with get/set accessors with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class Person {
@@ -471,8 +418,7 @@ describe('class mapping', () => {
     });
 
     test('class with static blocks', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class Example {
@@ -494,8 +440,7 @@ describe('class mapping', () => {
     });
 
     test('class with static blocks and comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class Example {
@@ -517,8 +462,7 @@ describe('class mapping', () => {
     });
 
     test('class with SemicolonClassElement', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class MyClass {
@@ -532,8 +476,7 @@ describe('class mapping', () => {
     });
 
     test('this type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class FluentAPI {
@@ -546,8 +489,7 @@ describe('class mapping', () => {
     });
 
     test('new class with type arguments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const _onDidChangeEnvironment = /*a*/new/*b*/ EventEmitter/*c*/</*d*/string/*e*/>/*f*/(/*g*/)/*h*/;
@@ -556,8 +498,7 @@ describe('class mapping', () => {
     });
 
     test('property declaration', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export class CodeLoopbackClient {
@@ -568,8 +509,7 @@ describe('class mapping', () => {
     });
 
     test('static method with asterisk', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class A {
@@ -581,8 +521,7 @@ describe('class mapping', () => {
     });
 
     test('new expression parentheses', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class Base {
@@ -601,8 +540,7 @@ describe('class mapping', () => {
     });
 
     test('get/set accessor with a name as expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export function mochaGlobalSetup() {
@@ -624,8 +562,7 @@ describe('class mapping', () => {
     });
 
     test('class with type param with trailing comma', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export class APIError<
@@ -636,8 +573,7 @@ describe('class mapping', () => {
     });
 
     test('new anonymous class with type params', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 new (class/*a*/<T extends object> extends WeakRef<T> {

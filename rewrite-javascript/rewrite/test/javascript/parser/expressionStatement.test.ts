@@ -13,28 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {RecipeSpec} from "../../../src/test";
-
 import {typescript} from "../../../src/javascript";
-
-
 
 describe('expression statement mapping', () => {
     const spec = new RecipeSpec();
@@ -60,8 +40,7 @@ describe('expression statement mapping', () => {
     });
 
     test('simple non-null expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const length = user ! . profile ! . username ! . length ;
@@ -70,8 +49,7 @@ describe('expression statement mapping', () => {
     });
 
     test('simple non-null expression with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const length = /*0*/user/*a*/!/*b*/./*c*/ profile /*d*/!/*e*/ ./*f*/ username /*g*/!/*h*/ ./*j*/ length/*l*/ ;
@@ -80,8 +58,7 @@ describe('expression statement mapping', () => {
     });
 
     test('simple question-dot expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const length = user ?. profile ?. username ?. length ;
@@ -90,8 +67,7 @@ describe('expression statement mapping', () => {
     });
 
     test('simple question-dot expression with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const length = /*0*/user/*a*/ ?./*b*/ profile/*c*/ ?./*d*/ username /*e*/?./*f*/ length /*g*/;
@@ -100,8 +76,7 @@ describe('expression statement mapping', () => {
     });
 
     test('simple default expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const length = user ?? 'default' ;
@@ -110,8 +85,7 @@ describe('expression statement mapping', () => {
     });
 
     test('simple default expression with comments', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const length = user /*a*/??/*b*/ 'default' /*c*/;
@@ -120,8 +94,7 @@ describe('expression statement mapping', () => {
     });
 
     test('mixed expression with special tokens', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 class Profile {
@@ -148,8 +121,7 @@ describe('expression statement mapping', () => {
     });
 
     test('mixed expression with methods with special tokens', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 interface Profile {
@@ -174,8 +146,7 @@ describe('expression statement mapping', () => {
     });
 
     test('optional chaining operator with ?.', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
             const func1 = (msg: string) => {
@@ -190,8 +161,7 @@ describe('expression statement mapping', () => {
     });
 
     test('optional chaining operator with ?. and custom type', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const func1: ((msg: string) => { func2: (greeting: string) => string }) | undefined = undefined;
@@ -201,8 +171,7 @@ describe('expression statement mapping', () => {
     });
 
     test('satisfies expression', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type Person = {
@@ -220,8 +189,7 @@ describe('expression statement mapping', () => {
     });
 
     test('atisfies expression with complex type ', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 type ApiResponse<T> = {
@@ -238,8 +206,7 @@ describe('expression statement mapping', () => {
     });
 
     test('debugging statement', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
               function calculate(value: number) {
@@ -251,8 +218,7 @@ describe('expression statement mapping', () => {
     });
 
     test('shorthand property assignment with initializer', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 ({
@@ -264,8 +230,7 @@ describe('expression statement mapping', () => {
     });
 
     test('new expression with array access', () => {
-       spec.rewriteRun(
-
+       return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const results = new this.constructor[Symbol.species]<Key, Value>();
