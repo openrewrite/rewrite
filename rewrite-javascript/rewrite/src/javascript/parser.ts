@@ -3837,7 +3837,7 @@ export class JavaScriptParserVisitor {
                             leadingAnnotations: [],
                             modifiers: [],
                             typeExpression: this.mapTypeInfo(node.variableDeclaration),
-                            variables: []
+                            variables: [this.rightPadded(this.visit(node.variableDeclaration), emptySpace)]
                         },
                         this.suffix(node.variableDeclaration))
                 } :

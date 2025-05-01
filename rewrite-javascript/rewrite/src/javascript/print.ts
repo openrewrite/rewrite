@@ -19,7 +19,7 @@ import '../tree';
 import '../java';
 import {JavaScriptVisitor, JS} from ".";
 import {PrintOutputCapture, TreePrinters} from "../print";
-import {Cursor, Tree} from "../tree";
+import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, JavaMarkers, Statement, TextComment, TrailingComma, TypeTree} from "../java";
 import {Marker, Markers} from "../markers";
 import Space = J.Space;
@@ -1857,6 +1857,16 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 p.append(suffixBetween);
             }
         }
+    }
+
+    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: PrintOutputCapture): Promise<J.RightPadded<T>> {
+        if (isTree(right.element)) {
+            await this.visit(right.element, p);
+        }
+
+        await this.visitSpace(right.after, p);
+        await this.visitMarkers(right.markers, p);
+        return right;
     }
 
     private async visitJRightPaddedLocalSingle(node: J.RightPadded<J> | undefined, suffix: string, p: PrintOutputCapture) {

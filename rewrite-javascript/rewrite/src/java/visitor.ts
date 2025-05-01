@@ -670,6 +670,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
                 (draft.element as J) = await this.visitDefined(right.element, p);
             }
             draft.after = await this.visitSpace(right.after, p);
+            draft.markers = await this.visitMarkers(right.markers, p);
         });
     }
 
@@ -685,6 +686,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             } else if (isSpace(left.element)) {
                 draft.element = await this.visitSpace(left.element, p) as Draft<T>;
             }
+            draft.markers = await this.visitMarkers(left.markers, p);
         });
     }
 
