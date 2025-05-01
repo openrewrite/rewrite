@@ -493,7 +493,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
             if (i < variables.length - 1) {
                 p.append(",");
-            } else if (variable.markers.markers.find(m => m.kind == JavaMarkers.Semicolon)) {
+            } else if (variable.markers.markers.find(m => m.kind === JavaMarkers.Semicolon)) {
                 p.append(";");
             }
         }
@@ -791,13 +791,13 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitSpace(bounds.before, p);
             const constraintType = bounds.elements[0];
 
-            if (!(constraintType.element.kind == J.Kind.Empty)) {
+            if (!(constraintType.element.kind === J.Kind.Empty)) {
                 p.append("extends");
                 await this.visitRightPadded(constraintType, p);
             }
 
             const defaultType = bounds.elements[1];
-            if (!(defaultType.element.kind == J.Kind.Empty)) {
+            if (!(defaultType.element.kind === J.Kind.Empty)) {
                 p.append("=");
                 await this.visitRightPadded(defaultType, p);
             }
@@ -1071,7 +1071,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitJsLeftPaddedLocal("?", mappedType.hasQuestionToken, p);
         }
 
-        const colon = mappedType.valueType.elements[0].element.kind == J.Kind.Empty ? "" : ":";
+        const colon = mappedType.valueType.elements[0].element.kind === J.Kind.Empty ? "" : ":";
         await this.visitJsContainerLocal(colon, mappedType.valueType, "", "", p);
 
         p.append("}");
@@ -1237,7 +1237,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             p.append("new");
             await this.visit(newClass.clazz, p);
 
-            if (!newClass.arguments.markers.markers.find(m => m.kind == JavaMarkers.OmitParentheses)) {
+            if (!newClass.arguments.markers.markers.find(m => m.kind === JavaMarkers.OmitParentheses)) {
                 await this.visitJContainerLocal("(", newClass.arguments, ",", ")", p);
             }
         }
@@ -1734,8 +1734,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async visitStatements(statements: J.RightPadded<Statement>[], p: PrintOutputCapture) {
         const objectLiteral =
-            this.getParentCursor(0)?.value.kind == J.Kind.Block &&
-            this.getParentCursor(1)?.value.kind == J.Kind.NewClass;
+            this.getParentCursor(0)?.value.kind === J.Kind.Block &&
+            this.getParentCursor(1)?.value.kind === J.Kind.NewClass;
 
         for (let i = 0; i < statements.length; i++) {
             const paddedStat = statements[i];
@@ -1910,10 +1910,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     override async visitMarker<M extends Marker>(marker: M, p: PrintOutputCapture): Promise<M> {
-        if (marker.kind == JavaMarkers.Semicolon) {
+        if (marker.kind === JavaMarkers.Semicolon) {
             p.append(';');
         }
-        if (marker.kind == JavaMarkers.TrailingComma) {
+        if (marker.kind === JavaMarkers.TrailingComma) {
             p.append(',');
             await this.visitSpace((marker as unknown as TrailingComma).suffix, p);
         }
@@ -1925,7 +1925,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             p.append(p.markerPrinter.beforeSyntax(marker, new Cursor(this, cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
         }
 
-        if (comment.kind == J.Kind.TextComment) {
+        if (comment.kind === J.Kind.TextComment) {
             const textComment = comment as TextComment;
             p.append(textComment.multiline ? `/*${textComment.text}*/` : `//${textComment.text}`);
         }
@@ -1946,7 +1946,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(controlParens, p);
 
-        if (this.getParentCursor(1)?.value.kind == J.Kind.TypeCast) {
+        if (this.getParentCursor(1)?.value.kind === J.Kind.TypeCast) {
             p.append('<');
             await this.visitJRightPaddedLocalSingle(controlParens.tree, ">", p);
         } else {

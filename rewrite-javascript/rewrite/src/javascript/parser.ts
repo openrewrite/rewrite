@@ -270,11 +270,7 @@ export class JavaScriptParserVisitor {
             }
             return this.rightPadded(j, this.semicolonPrefix(n), (n => {
                 const last = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile);
-                return last?.kind == ts.SyntaxKind.SemicolonToken ? {
-                    kind: MarkersKind.Markers,
-                    id: randomId(),
-                    markers: [{kind: "org.openrewrite.java.marker.Semicolon", id: randomId()}]
-                } : emptyMarkers;
+                return last?.kind == ts.SyntaxKind.SemicolonToken ? markers({kind: JavaMarkers.Semicolon, id: randomId()}) : emptyMarkers;
             })?.(n));
         });
     }
@@ -480,11 +476,7 @@ export class JavaScriptParserVisitor {
                 statements: node.members.map((ce: ts.ClassElement) => this.rightPadded(
                     this.convert(ce),
                     ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
-                    ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? {
-                        kind: MarkersKind.Markers,
-                        id: randomId(),
-                        markers: [{kind: "org.openrewrite.java.marker.Semicolon", id: randomId()}]
-                    } : emptyMarkers
+                    ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({kind: JavaMarkers.Semicolon, id: randomId()}) : emptyMarkers
                 )),
                 end: this.prefix(node.getLastToken()!)
             },

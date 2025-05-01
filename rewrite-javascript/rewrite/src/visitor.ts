@@ -125,7 +125,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
             return emptyMarkers;
         } else if (markers === emptyMarkers) {
             return emptyMarkers;
-        } else if (markers.markers?.length || 0 === 0) {
+        } else if ((markers.markers?.length || 0) === 0) {
             return markers;
         }
         return produceAsync<Markers>(markers, async (draft) => {
