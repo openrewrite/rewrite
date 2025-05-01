@@ -13,7 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {mapAsync, produceAsync, SourceFile, TreeVisitor, ValidImmerRecipeReturnType} from "../";
+import {isTree,
+    mapAsync,
+    produceAsync,
+    SourceFile,
+    TreeVisitor,
+    ValidImmerRecipeReturnType
+} from "../";
 import {
     Expression,
     isJava,
@@ -660,7 +666,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T>> {
         return produceAsync<J.RightPadded<T>>(right, async draft => {
-            if (isJava(right.element)) {
+            if (isTree(right.element)) {
                 (draft.element as J) = await this.visitDefined(right.element, p);
             }
             draft.after = await this.visitSpace(right.after, p);
@@ -674,7 +680,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
         return produceAsync<J.LeftPadded<T>>(left, async draft => {
             draft.before = await this.visitSpace(left.before, p);
-            if (isJava(left.element)) {
+            if (isTree(left.element)) {
                 draft.element = await this.visitDefined(left.element, p) as Draft<T>;
             } else if (isSpace(left.element)) {
                 draft.element = await this.visitSpace(left.element, p) as Draft<T>;
