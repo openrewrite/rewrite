@@ -471,7 +471,7 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
                 markers: emptyMarkers,
-                statik: this.rightPadded(false, emptySpace, emptyMarkers),
+                static: this.rightPadded(false, emptySpace, emptyMarkers),
                 statements: node.members.map((ce: ts.ClassElement) => this.rightPadded(
                     this.convert(ce),
                     ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,

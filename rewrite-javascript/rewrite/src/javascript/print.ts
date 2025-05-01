@@ -194,7 +194,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         p.append("yield");
 
-        if (yield_.delegated) {
+        if (yield_.delegated.element) {
             await this.visitJsLeftPaddedLocal("*", yield_.delegated, p);
         }
 
@@ -542,7 +542,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         await this.visitJsLeftPaddedLocal("function", functionDeclaration.asteriskToken, p);
 
-        await this.visitJsLeftPaddedLocal(functionDeclaration.asteriskToken ? "*" : "", functionDeclaration.name, p);
+        await this.visitJsLeftPaddedLocal(functionDeclaration.asteriskToken.element ? "*" : "", functionDeclaration.name, p);
 
         const typeParameters = functionDeclaration.typeParameters;
         if (typeParameters) {
@@ -662,7 +662,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitModifier(m, p);
         }
 
-        if (functionType.constructorType) {
+        if (functionType.constructorType.element) {
             await this.visitJsLeftPaddedLocal("new", functionType.constructorType, p);
         }
 
@@ -886,7 +886,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitImportType(importType: JS.ImportType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(importType, p);
 
-        if (importType.hasTypeof) {
+        if (importType.hasTypeof.element) {
             p.append("typeof");
             await this.visitRightPadded(importType.hasTypeof, p);
         }
@@ -942,7 +942,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitJsImportSpecifier(jis: JS.JsImportSpecifier, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(jis, p);
 
-        if (jis.importType) {
+        if (jis.importType.element) {
             await this.visitJsLeftPaddedLocal("type", jis.importType, p);
         }
 
@@ -959,7 +959,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitModifier(it, p);
         }
 
-        if (ed.typeOnly) {
+        if (ed.typeOnly.element) {
             await this.visitJsLeftPaddedLocal("type", ed.typeOnly, p);
         }
 
@@ -978,7 +978,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitModifier(it, p);
         }
 
-        if (es.exportEquals) {
+        if (es.exportEquals.element) {
             await this.visitJsLeftPaddedLocal("=", es.exportEquals, p);
         }
 
@@ -1021,7 +1021,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitExportSpecifier(es: JS.ExportSpecifier, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(es, p);
-        if (es.typeOnly) {
+        if (es.typeOnly.element) {
             await this.visitJsLeftPaddedLocal("type", es.typeOnly, p);
         }
 
@@ -1089,7 +1089,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitLeftPadded(mappedType.prefixToken, p);
         }
 
-        if (mappedType.hasReadonly) {
+        if (mappedType.hasReadonly.element) {
             await this.visitJsLeftPaddedLocal("readonly", mappedType.hasReadonly, p);
         }
 
@@ -1099,7 +1099,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitLeftPadded(mappedType.suffixToken, p);
         }
 
-        if (mappedType.hasQuestionToken) {
+        if (mappedType.hasQuestionToken.element) {
             await this.visitJsLeftPaddedLocal("?", mappedType.hasQuestionToken, p);
         }
 
@@ -1220,7 +1220,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitTypePredicate(typePredicate: JS.TypePredicate, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(typePredicate, p);
 
-        if (typePredicate.asserts) {
+        if (typePredicate.asserts.element) {
             await this.visitJsLeftPaddedLocal("asserts", typePredicate.asserts, p);
         }
 
@@ -1734,7 +1734,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitJSForOfLoop(loop: JS.JSForOfLoop, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(loop, p);
         p.append("for");
-        if (loop.await) {
+        if (loop.await.element) {
             await this.visitJsLeftPaddedLocal("await", loop.await, p);
         }
 
