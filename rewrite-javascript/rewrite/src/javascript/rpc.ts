@@ -17,7 +17,6 @@ import {JavaScriptVisitor} from "./visitor";
 import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {
     isJavaScript,
-    JavaScriptKind,
     JS,
 } from "./tree";
 import {
@@ -1053,6 +1052,6 @@ const javaScriptCodec: RpcCodec<JS> = {
 }
 
 // Register codec for all JavaScript AST node types
-Object.values(JavaScriptKind).forEach(kind => {
+Object.values(JS.Kind).forEach(kind => {
     RpcCodecs.registerCodec(kind, javaScriptCodec);
 });
