@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {AfterRecipe, dedentAfter, SourceSpec} from "../test";
+import {AfterRecipeText, dedentAfter, SourceSpec} from "../test";
 import {JavaScriptParser} from "./parser";
 import {JS} from "./tree";
 
-export function javascript(before: string | null, after?: AfterRecipe): SourceSpec<JS.CompilationUnit> {
+export function javascript(before: string | null, after?: AfterRecipeText): SourceSpec<JS.CompilationUnit> {
     return {
         kind: JS.Kind.CompilationUnit,
         before: before,
@@ -27,7 +27,7 @@ export function javascript(before: string | null, after?: AfterRecipe): SourceSp
     };
 }
 
-export function typescript(before: string | null, after?: AfterRecipe): SourceSpec<JS.CompilationUnit> {
+export function typescript(before: string | null, after?: AfterRecipeText): SourceSpec<JS.CompilationUnit> {
     return {
         kind: JS.Kind.CompilationUnit,
         before: before,

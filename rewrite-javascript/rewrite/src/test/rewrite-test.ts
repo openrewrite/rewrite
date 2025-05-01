@@ -27,10 +27,11 @@ import {mapAsync} from "../util";
 export interface SourceSpec<T extends SourceFile> {
     kind: string,
     before: string | null,
-    after?: AfterRecipe
+    after?: AfterRecipeText
     path?: string,
     parser: (ctx: ExecutionContext) => Parser,
     beforeRecipe?: (sourceFile: T) => T | void | Promise<T>,
+    afterRecipe?: (sourceFile: T) => T | void | Promise<T>,
     ext: string
 }
 
@@ -126,6 +127,9 @@ export class RecipeSpec {
         const afterSource = typeof spec.after === "function" ?
             (spec.after as (actual: string) => string)(actualAfter) : spec.after as string;
         expect(actualAfter).toEqual(afterSource);
+        if (spec.afterRecipe) {
+            spec.afterRecipe(actualAfter);
+        }
     }
 
     /**
@@ -164,9 +168,9 @@ class NoopRecipe extends Recipe {
     }
 }
 
-export type AfterRecipe = string | ((actual: string) => string | undefined) | undefined | null;
+export type AfterRecipeText = string | ((actual: string) => string | undefined) | undefined | null;
 
-export function dedentAfter(s?: AfterRecipe): AfterRecipe {
+export function dedentAfter(s?: AfterRecipeText): AfterRecipeText {
     if (s !== null) {
         if (s === undefined) {
             return undefined;

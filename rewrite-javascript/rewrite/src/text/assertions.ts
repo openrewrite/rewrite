@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {AfterRecipe, dedentAfter, SourceSpec} from "../test";
+import {AfterRecipeText, dedentAfter, SourceSpec} from "../test";
 import {PlainText, PlainTextParser} from ".";
 
-export function text(before: string | null, after?: AfterRecipe): SourceSpec<PlainText> {
+export function text(before: string | null, after?: AfterRecipeText): SourceSpec<PlainText> {
     return {
         kind: PlainText.Kind.PlainText,
         before: before,

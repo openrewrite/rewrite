@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {AfterRecipe, dedentAfter, SourceSpec} from "../test";
+import {AfterRecipeText, dedentAfter, SourceSpec} from "../test";
 import {JsonParser} from "./parser";
 import {Json} from "./tree";
 
-export function json(before: string | null, after?: AfterRecipe): SourceSpec<Json.Document> {
+export function json(before: string | null, after?: AfterRecipeText): SourceSpec<Json.Document> {
     return {
         kind: Json.Kind.Document,
         before: before,
