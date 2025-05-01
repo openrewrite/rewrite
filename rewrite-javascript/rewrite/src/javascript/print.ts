@@ -552,7 +552,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitBlock(block: J.Block, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(block, p);
 
-        if (block.static) {
+        if (block.static.element) {
             p.append("static");
             await this.visitRightPadded(block.static, p);
         }
