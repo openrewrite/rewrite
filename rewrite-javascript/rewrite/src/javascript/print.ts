@@ -42,10 +42,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return cu;
     }
 
-    // override async visitCompilationUnit(cu: J.CompilationUnit, p: PrintOutputCapture): J | null {
+    // override async visitCompilationUnit(cu: J.CompilationUnit, p: PrintOutputCapture): Promise<J | undefined> {
     //     await this.beforeSyntax(cu, p);
     //
-    //     //this.visitJRightPadded(cu.getStatements(), "", p);
+    //     //await this.visitJRightPadded(cu.getStatements(), "", p);
     //
     //     await this.visitSpace(cu.eof, p);
     //     await this.afterSyntax(cu, p);
@@ -1058,7 +1058,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntax(mappedType, p);
         p.append("{");
 
-        if (mappedType.prefixToken != null) {
+        if (mappedType.prefixToken) {
             await this.visitLeftPadded(mappedType.prefixToken, p);
         }
 
@@ -1068,7 +1068,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         await this.visitKeysRemapping(mappedType.keysRemapping, p);
 
-        if (mappedType.suffixToken != null) {
+        if (mappedType.suffixToken) {
             await this.visitLeftPadded(mappedType.suffixToken, p);
         }
 
@@ -1089,7 +1089,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         p.append("[");
         await this.visitRightPadded(mappedTypeKeys.typeParameter, p);
 
-        if (mappedTypeKeys.nameType != null) {
+        if (mappedTypeKeys.nameType) {
             p.append("as");
             await this.visitRightPadded(mappedTypeKeys.nameType, p);
         }
@@ -1828,7 +1828,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         }
     }
 
-    private async visitJRightPaddedLocalSingle(node: J.RightPadded<J> | null, suffix: string, p: PrintOutputCapture) {
+    private async visitJRightPaddedLocalSingle(node: J.RightPadded<J> | undefined, suffix: string, p: PrintOutputCapture) {
         if (node) {
             await this.visit(node.element, p);
 
@@ -1951,7 +1951,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         }
     }
 
-    private async visitNodes<T extends Tree>(nodes: T[] | null | undefined, p: PrintOutputCapture): Promise<void> {
+    private async visitNodes<T extends Tree>(nodes: T[] | undefined, p: PrintOutputCapture): Promise<void> {
         if (nodes) {
             for (const node of nodes) {
                 await this.visit(node, p);
