@@ -1880,10 +1880,10 @@ export namespace JavaType {
         Primitive: "org.openrewrite.java.tree.JavaType$Primitive",
         Array: "org.openrewrite.java.tree.JavaType$Array",
         Method: "org.openrewrite.java.tree.JavaType$Method",
-        MultiCatch: "org.openrewrite.java.tree.JavaType$MultiCatch",
         Intersection: "org.openrewrite.java.tree.JavaType$Intersection",
         GenericTypeVariable: "org.openrewrite.java.tree.JavaType$GenericTypeVariable",
         ShallowClass: "org.openrewrite.java.tree.JavaType$ShallowClass",
+        Union: "org.openrewrite.java.tree.JavaType$MultiCatch",
         Unknown: "org.openrewrite.java.tree.JavaType$Unknown",
         Variable: "org.openrewrite.java.tree.JavaType$Variable",
     }
@@ -2008,9 +2008,9 @@ export namespace JavaType {
         readonly keyword: string;
     }
 
-    export interface MultiCatch extends JavaType {
-        readonly kind: typeof Kind.MultiCatch;
-        readonly throwableTypes: JavaType[];
+    export interface Union extends JavaType {
+        readonly kind: typeof Kind.Union;
+        readonly bounds: JavaType[];
     }
 
     export interface Intersection extends JavaType {
