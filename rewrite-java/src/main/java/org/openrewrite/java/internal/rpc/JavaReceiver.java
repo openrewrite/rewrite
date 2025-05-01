@@ -68,7 +68,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return arrayType
                 .withElementType(q.receive(arrayType.getElementType(), t -> (TypeTree) visitNonNull(t, q)))
                 .withAnnotations(q.receiveList(arrayType.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
-                .withDimension(q.receive(arrayType.getDimension(), d -> visitLeftPadded(d, q)));
+                .withDimension(q.receive(arrayType.getDimension(), d -> visitLeftPadded(d, q)))
+                .withType(q.receive(arrayType.getType(), t -> visitType(t, q)));
     }
 
     @Override

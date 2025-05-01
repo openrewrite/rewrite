@@ -92,6 +92,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             if (arrayType.annotations) {
                 draft.annotations = await mapAsync(arrayType.annotations, a => this.visitDefined<J.Annotation>(a, p));
             }
+            draft.dimension = await this.visitLeftPadded(arrayType.dimension, p);
+            draft.type = await this.visitType(arrayType.type, p);
         });
     }
 

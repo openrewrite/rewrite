@@ -163,6 +163,8 @@ export namespace J {
         readonly kind: typeof Kind.ArrayType;
         readonly elementType: TypeTree;
         readonly annotations?: Annotation[];
+        readonly dimension: LeftPadded<Space>;
+        readonly type?: JavaType;
     }
 
     export interface Assert extends J, Statement {
@@ -1309,7 +1311,7 @@ export namespace J {
             resources,
             body,
             catches,
-            finally_
+            finally: finally_
         };
     }
 
@@ -1335,7 +1337,7 @@ export namespace J {
         prefix: J.Space,
         markers: Markers,
         annotationType: NameTree,
-        arguments: J.Container<Expression> | undefined
+        arguments_: J.Container<Expression> | undefined
     ): J.Annotation {
         return {
             kind: J.Kind.Annotation,
@@ -1343,7 +1345,7 @@ export namespace J {
             prefix,
             markers,
             annotationType,
-            arguments
+            arguments: arguments_
         };
     }
 
@@ -1384,7 +1386,9 @@ export namespace J {
         prefix: J.Space,
         markers: Markers,
         elementType: TypeTree,
-        annotations?: J.Annotation[]
+        annotations: J.Annotation[] | undefined,
+        dimension: LeftPadded<Space>,
+        type?: JavaType
     ): J.ArrayType {
         return {
             kind: J.Kind.ArrayType,
@@ -1392,7 +1396,9 @@ export namespace J {
             prefix,
             markers,
             elementType,
-            annotations
+            annotations,
+            dimension,
+            type
         };
     }
 
@@ -1730,7 +1736,7 @@ export namespace J {
         select: J.RightPadded<Expression> | undefined,
         typeParameters: J.Container<Expression> | undefined,
         name: J.Identifier,
-        arguments: J.Container<Expression>,
+        arguments_: J.Container<Expression>,
         methodType?: JavaType.Method
     ): J.MethodInvocation {
         return {
@@ -1741,7 +1747,7 @@ export namespace J {
             select,
             typeParameters,
             name,
-            arguments,
+            arguments: arguments_,
             methodType
         };
     }
@@ -1808,7 +1814,7 @@ export namespace J {
         enclosing: J.RightPadded<Expression> | undefined,
         new_: J.Space,
         clazz: TypeTree | undefined,
-        arguments: J.Container<Expression>,
+        arguments_: J.Container<Expression>,
         body?: J.Block,
         constructorType?: JavaType.Method
     ): J.NewClass {
@@ -1820,7 +1826,7 @@ export namespace J {
             enclosing,
             new: new_,
             clazz,
-            arguments,
+            arguments: arguments_,
             body,
             constructorType
         };

@@ -64,6 +64,8 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitArrayType(J.ArrayType arrayType, RpcSendQueue q) {
         q.getAndSend(arrayType, J.ArrayType::getElementType, type -> visit(type, q));
         q.getAndSendList(arrayType, J.ArrayType::getAnnotations, Tree::getId, a -> visit(a, q));
+        q.getAndSend(arrayType, J.ArrayType::getDimension, d -> visitLeftPadded(d, q));
+        q.getAndSend(arrayType, J.ArrayType::getType, type -> visitType(type, q));
         return arrayType;
     }
 
