@@ -102,7 +102,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitJsImport(jsImport: JS.JsImport, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(jsImport, p);
-        jsImport.modifiers.forEach(m => this.visitModifier(m, p));
+        for (const m of jsImport.modifiers) {
+            await this.visitModifier(m, p);
+        }
         p.append("import");
         jsImport.importClause && await this.visit(jsImport.importClause, p);
 
@@ -145,7 +147,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(namespaceDeclaration, p);
-        namespaceDeclaration.modifiers.forEach(it => this.visitModifier(it, p));
+        for (const it of namespaceDeclaration.modifiers) {
+            await this.visitModifier(it, p);
+        }
         await this.visitSpace(namespaceDeclaration.keywordType.before, p);
 
         switch (namespaceDeclaration.keywordType.element) {
@@ -243,7 +247,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitJSVariableDeclarations(multiVariable: JS.JSVariableDeclarations, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(multiVariable, p);
         await this.visitNodes(multiVariable.leadingAnnotations, p);
-        multiVariable.modifiers.forEach(it => this.visitModifier(it, p));
+        for (const it of multiVariable.modifiers) {
+            await this.visitModifier(it, p);
+        }
 
         const variables = multiVariable.variables;
         for (let i = 0; i < variables.length; i++) {
@@ -433,7 +439,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitScopedVariableDeclarations(variableDeclarations: JS.ScopedVariableDeclarations, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(variableDeclarations, p);
 
-        variableDeclarations.modifiers.forEach(m => this.visitModifier(m, p));
+        for (const m of variableDeclarations.modifiers) {
+            await this.visitModifier(m, p);
+        }
 
         const scope = variableDeclarations.scope;
         if (scope) {
@@ -468,7 +476,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntax(multiVariable, p);
         await this.visitNodes(multiVariable.leadingAnnotations, p);
 
-        multiVariable.modifiers.forEach(it => this.visitModifier(it, p));
+        for (const it of multiVariable.modifiers) {
+            await this.visitModifier(it, p);
+        }
 
         const variables = multiVariable.variables;
         for (let i = 0; i < variables.length; i++) {
@@ -526,7 +536,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitFunctionDeclaration(functionDeclaration: JS.FunctionDeclaration, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(functionDeclaration, p);
 
-        functionDeclaration.modifiers.forEach((m) => this.visitModifier(m, p));
+        for (const m of functionDeclaration.modifiers) {
+            await this.visitModifier(m, p);
+        }
 
         await this.visitJsLeftPaddedLocal("function", functionDeclaration.asteriskToken, p);
 
@@ -646,7 +658,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitFunctionType(functionType: JS.FunctionType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(functionType, p);
-        functionType.modifiers.forEach(m => this.visitModifier(m, p));
+        for (const m of functionType.modifiers) {
+            await this.visitModifier(m, p);
+        }
 
         if (functionType.constructorType) {
             await this.visitJsLeftPaddedLocal("new", functionType.constructorType, p);
@@ -692,7 +706,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntax(classDecl, p);
         await this.visitSpace(emptySpace, p);
         await this.visitNodes(classDecl.leadingAnnotations, p);
-        classDecl.modifiers.forEach(m => this.visitModifier(m, p));
+        for (const m of classDecl.modifiers) {
+            await this.visitModifier(m, p);
+        }
         await this.visitNodes(classDecl.classKind.annotations, p);
         await this.visitSpace(classDecl.classKind.prefix, p);
         p.append(kind);
@@ -712,7 +728,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntax(method, p);
         await this.visitSpace(emptySpace, p);
         await this.visitNodes(method.leadingAnnotations, p);
-        method.modifiers.forEach(m => this.visitModifier(m, p));
+        for (const m of method.modifiers) {
+            await this.visitModifier(m, p);
+        }
 
         await this.visit(method.name, p);
 
@@ -741,7 +759,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntax(method, p);
         await this.visitSpace(emptySpace, p);
         await this.visitNodes(method.leadingAnnotations, p);
-        method.modifiers.forEach(it => this.visitModifier(it, p));
+        for (const it of method.modifiers) {
+            await this.visitModifier(it, p);
+        }
 
         await this.visit(method.name, p);
 
@@ -785,7 +805,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitTypeParameter(typeParameter: J.TypeParameter, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(typeParameter, p);
         await this.visitNodes(typeParameter.annotations, p);
-        typeParameter.modifiers.forEach(m => this.visitModifier(m, p));
+        for (const m of typeParameter.modifiers) {
+            await this.visitModifier(m, p);
+        }
         await this.visit(typeParameter.name, p);
 
         const bounds = typeParameter.bounds;
@@ -812,7 +834,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitArrowFunction(arrowFunction: JS.ArrowFunction, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(arrowFunction, p);
         await this.visitNodes(arrowFunction.leadingAnnotations, p);
-        arrowFunction.modifiers.forEach(m => this.visitModifier(m, p));
+        for (const m of arrowFunction.modifiers) {
+            await this.visitModifier(m, p);
+        }
 
         const typeParameters = arrowFunction.typeParameters;
         if (typeParameters) {
@@ -879,7 +903,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(typeDeclaration, p);
 
-        typeDeclaration.modifiers.forEach(m => this.visitModifier(m, p));
+        for (const m of typeDeclaration.modifiers) {
+            await this.visitModifier(m, p);
+        }
 
         await this.visitJsLeftPaddedLocal("type", typeDeclaration.name, p);
 
@@ -929,7 +955,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitExportDeclaration(ed: JS.ExportDeclaration, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(ed, p);
         p.append("export");
-        ed.modifiers.forEach(it => this.visitModifier(it, p));
+        for (const it of ed.modifiers) {
+            await this.visitModifier(it, p);
+        }
 
         if (ed.typeOnly) {
             await this.visitJsLeftPaddedLocal("type", ed.typeOnly, p);
@@ -946,7 +974,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitExportAssignment(es: JS.ExportAssignment, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(es, p);
         p.append("export");
-        es.modifiers.forEach(it => this.visitModifier(it, p));
+        for (const it of es.modifiers) {
+            await this.visitModifier(it, p);
+        }
 
         if (es.exportEquals) {
             await this.visitJsLeftPaddedLocal("=", es.exportEquals, p);
@@ -1107,7 +1137,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitObjectBindingDeclarations(objectBindingDeclarations: JS.ObjectBindingDeclarations, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(objectBindingDeclarations, p);
         await this.visitNodes(objectBindingDeclarations.leadingAnnotations, p);
-        objectBindingDeclarations.modifiers.forEach(m => this.visitModifier(m, p));
+        for (const m of objectBindingDeclarations.modifiers) {
+            await this.visitModifier(m, p);
+        }
 
         objectBindingDeclarations.typeExpression && await this.visit(objectBindingDeclarations.typeExpression, p);
         await this.visitJsContainerLocal("{", objectBindingDeclarations.bindings, ",", "}", p);
@@ -1202,7 +1234,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitIndexSignatureDeclaration(isd: JS.IndexSignatureDeclaration, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(isd, p);
 
-        isd.modifiers.forEach(m => this.visitModifier(m, p));
+        for (const m of isd.modifiers) {
+            await this.visitModifier(m, p);
+        }
         await this.visitJsContainerLocal("[", isd.parameters, "", "]", p);
         await this.visitJsLeftPaddedLocal(":", isd.typeExpression, p);
 
