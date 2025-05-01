@@ -1,53 +1,93 @@
-import * as J from "../../../dist/src/java";
-import * as JS from "../../../dist/src/javascript/tree";
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('object literal mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('empty', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('const c = {}')
+          typescript('const c = {}')
         );
     });
 
     test('single', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('const c = { foo: 1 }')
+          typescript('const c = { foo: 1 }')
         );
     });
 
     test('multiple', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('const c = { foo: 1, bar: 2 }')
+          typescript('const c = { foo: 1, bar: 2 }')
         );
     });
     test('trailing comma', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('const c = { foo: 1, /*1*/ }')
+          typescript('const c = { foo: 1, /*1*/ }')
         );
     });
     test('string key', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('const c = { "foo": 1 }')
+          typescript('const c = { "foo": 1 }')
         );
     });
     test('undefined key', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('const c = { undefined: 1 }')
+          typescript('const c = { undefined: 1 }')
         );
     });
     test('computed property', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(
+          typescript(
             'const c = { [ 1 + 1 ] : 1 }', undefined,
             cu => {
                 const literal = (<J.NewClass>(<J.VariableDeclarations>(<JS.ScopedVariableDeclarations>cu.statements[0]).variables[0]).variables[0].initializer);

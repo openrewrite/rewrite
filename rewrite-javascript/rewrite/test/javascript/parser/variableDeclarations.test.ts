@@ -1,14 +1,48 @@
-import * as J from "../../../dist/src/java";
-import * as JS from "../../../dist/src/javascript";
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('variable declaration mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('const', () => {
-        rewriteRun(
-          typeScript(
+       spec.rewriteRun(
+
+          typescript(
             //language=javascript
             `
                 const c = 1;
@@ -28,8 +62,9 @@ describe('variable declaration mapping', () => {
         );
     });
     test('const2', () => {
-        rewriteRun(
-          typeScript(
+       spec.rewriteRun(
+
+          typescript(
             //language=javascript
             `
                 const c = 1;
@@ -49,40 +84,46 @@ describe('variable declaration mapping', () => {
         );
     });
     test('typed', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('let a : number =2')
+          typescript('let a : number =2')
         );
     });
     test('typed unknown', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('const a : unknown')
+          typescript('const a : unknown')
         );
     });
     test('typed any', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('let a : any = 2;')
+          typescript('let a : any = 2;')
         );
     });
     test('multi', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('let a=2, b=2 ')
+          typescript('let a=2, b=2 ')
         );
     });
     test('multi typed', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('  /*0.1*/  let  /*0.2*/    a   /*1*/ :      /*2*/  number =2    /*3*/ , /*4*/   b   /*5*/:/*6*/    /*7*/string  /*8*/   =/*9*/    "2" /*10*/  ; //11')
+          typescript('  /*0.1*/  let  /*0.2*/    a   /*1*/ :      /*2*/  number =2    /*3*/ , /*4*/   b   /*5*/:/*6*/    /*7*/string  /*8*/   =/*9*/    "2" /*10*/  ; //11')
         );
     });
     test('a b c', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
 
-            typeScript(`
+            typescript(`
                const obj : any | undefined = {}
                obj ?. a ?. b ?. c
             `)
@@ -90,30 +131,34 @@ describe('variable declaration mapping', () => {
     });
 
     test('exported variables', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(' export /*0.1*/  let  /*0.2*/    a   /*1*/ :      /*2*/  number =2    /*3*/ , /*4*/   b   /*5*/:/*6*/    /*7*/string  /*8*/   =/*9*/    "2" /*10*/  ; //11')
+          typescript(' export /*0.1*/  let  /*0.2*/    a   /*1*/ :      /*2*/  number =2    /*3*/ , /*4*/   b   /*5*/:/*6*/    /*7*/string  /*8*/   =/*9*/    "2" /*10*/  ; //11')
         );
     });
 
     test('unique symbol', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('declare const unset: unique symbol;')
+          typescript('declare const unset: unique symbol;')
         );
     });
 
     test('bigint', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('type res3 = Call<Objects.PartialDeep, bigint>;\n')
+          typescript('type res3 = Call<Objects.PartialDeep, bigint>;\n')
         );
     });
 
     test('property signature as an array', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
               export type Apply<fn extends Fn, args extends unknown[]> = (fn & {
                   [rawArgs]: args;
               })["return"];
@@ -122,14 +167,15 @@ describe('variable declaration mapping', () => {
     });
 
     test('declaration with destruction', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 /*0*/
                 const /*1*/  {   Client   ,  Status }  /*2*/ =/*3*/  require("../src");
             `),
             //language=typescript
-            typeScript(`
+            typescript(`
                 const obj =  {  a   :   1, b       : { c: 2 } };
                 const { a } = obj; // a is constant
                 let {
@@ -137,13 +183,13 @@ describe('variable declaration mapping', () => {
                 } = obj; // d is re-assignable
             `),
             //language=typescript
-            typeScript(`
+            typescript(`
                 const numbers = [];
                 const obj = { a: 1, b: 2 };
                 ({ a: numbers[0], b: numbers[1] } = obj);
             `),
             //language=typescript
-            typeScript(`
+            typescript(`
                 const {
                     size = "big",
                     coords = { x: 0, y: 0 },
@@ -151,7 +197,7 @@ describe('variable declaration mapping', () => {
                 } = {}
             `),
             //language=typescript
-            typeScript(`
+            typescript(`
                 const key = "test";
                 const obj = {};
                 const aDefault = {};
@@ -164,34 +210,37 @@ describe('variable declaration mapping', () => {
                 const { [key]: a } = obj;
             `),
             //language=typescript
-            typeScript(`
+            typescript(`
                 /*1*/ const /*2*/  {  /*3*/ a/*4*/  :/*5*/  aa /*6*/  = /*7*/  10 /*8*/ , /*9*/  b /*10*/ :  /*11*/ bb = {  } /*12*/ ,  /*13*/ } = { a: 3 };
             `),
         );
     });
 
     test('variable with exclamation token', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 let schema/*a*/!/*b*/: number;
           `)
         );
     });
 
     test('variable with using keyword', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 using unrefTimer = stub(Deno, 'unrefTimer');
             `)
         );
     });
 
     test('variable with await using keyword', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const getDb = async () => {
                     return {async createUser(data) {
                             const user = to<AdapterUser>(data)
@@ -206,9 +255,10 @@ describe('variable declaration mapping', () => {
     });
 
     test.skip('variable declaration with decorator', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export namespace process {
                     // @ts-ignore: decorator
                     @lazy export const platform = "wasm";

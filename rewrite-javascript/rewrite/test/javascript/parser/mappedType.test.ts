@@ -1,13 +1,49 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('mapped type mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('simple', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type OptionsFlags<Type> = {
                     [Property in keyof Type]: /*a*/boolean/*b*/
                 };
@@ -16,9 +52,10 @@ describe('mapped type mapping', () => {
     });
 
     test('with readonly', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               type ReadonlyType<T> = {
                   /*a*/readonly/*b*/ [K in keyof T]: T[K];
               };
@@ -27,9 +64,10 @@ describe('mapped type mapping', () => {
     });
 
     test('with -readonly', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               type CreateMutable<Type> = {
                   /*a*/-/*b*/readonly/*c*/[Property in keyof Type]: Type[Property];
               };
@@ -38,9 +76,10 @@ describe('mapped type mapping', () => {
     });
 
     test('with suffix +?', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               type Concrete<Type> = {
                   [Property in keyof Type]+?: Type[Property];
               };
@@ -49,9 +88,10 @@ describe('mapped type mapping', () => {
     });
 
     test('with suffix -?', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Concrete<Type> = {
                     [Property in keyof Type]/*a*/-/*b*/?/*c*/: Type[Property];
                 };
@@ -60,9 +100,10 @@ describe('mapped type mapping', () => {
     });
 
     test('record mapped type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               type Record<K extends keyof any, T> = {
                   [P in K]: T;
                   /*a*/}/*b*/
@@ -72,9 +113,10 @@ describe('mapped type mapping', () => {
     });
 
     test('record mapped type with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Record<K extends keyof any, T> = /*a*/{ /*b*/
                     /*0*/[/*1*/P /*2*/in /*3*/K/*4*/]/*c*/:/*d*/ T/*e*/;/*f*/
                 }/*g*/;
@@ -83,9 +125,10 @@ describe('mapped type mapping', () => {
     });
 
     test('mapped type with "as" nameType', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               type ReadonlyRenamed<T> = {
                   + readonly [K in keyof T as \`readonly_\${string & K\}\`]: T[K];
               };
@@ -94,9 +137,10 @@ describe('mapped type mapping', () => {
     });
 
     test('recursive mapped types', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               type DeepPartial<T> = {
                   [K in keyof T]/*a*/?/*b*/: T[K] extends object /*c*/? DeepPartial<T[K]> /*d*/: T[K];
               };
@@ -105,9 +149,10 @@ describe('mapped type mapping', () => {
     });
 
     test('with function type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               type Getters<Type> = {
                   [Property in keyof Type as \`get\${Capitalize<string & Property>/*a*/}\`]: () => Type[Property] /*b*/
               };
@@ -116,9 +161,10 @@ describe('mapped type mapping', () => {
     });
 
     test('with repeating tokens', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type EventConfig<Events extends { kind: string }> = {
                     /*a*/[/*b*/E /*c*/in /*d*/Events as /*e*/E/*f*/[/*g*/"kind"/*h*/]/*i*/]/*j*/:/*k*/ (/*l*/event/*m*/: /*n*/E)/*o*/ => void;
                 }
@@ -127,9 +173,10 @@ describe('mapped type mapping', () => {
     });
 
     test('with conditional', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type ExtractPII<Type> = {
                     [Property in keyof Type]: Type[Property] extends { pii: true } ? true : false;
                 };
@@ -138,9 +185,10 @@ describe('mapped type mapping', () => {
     });
 
     test('mapped types intersection', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type MakeSpecificKeysReadonly<T, K extends keyof T> = {
                     readonly [P in K]: T[P];
                 } & {
@@ -151,9 +199,10 @@ describe('mapped type mapping', () => {
     });
 
     test('specific type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type UnionMapper<T> = {
                     [K in T]: { type: K };
                 }[T];
@@ -162,9 +211,10 @@ describe('mapped type mapping', () => {
     });
 
     test('complex key remapping', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type SnakeCaseKeys<T> = {
                     [K in keyof T as K extends string
                         ? \`\${K extends \`\${infer First}\${infer Rest}\`
@@ -177,9 +227,10 @@ describe('mapped type mapping', () => {
     });
 
     test('no node type ', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Type = {
                     // comment
                     readonly [T in number] /*a*/
@@ -189,9 +240,10 @@ describe('mapped type mapping', () => {
     });
 
     test('no node type with ;', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Type = {
                     // comment
                     readonly [T in number] /*a*/;/*b*/
@@ -199,5 +251,4 @@ describe('mapped type mapping', () => {
           `)
         );
     });
-
 });

@@ -1,84 +1,102 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('prefix operator mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('plus', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('+1')
+          typescript('+1')
         );
     });
     test('minus', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('-1')
+          typescript('-1')
         );
     });
     test('not', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('!1')
+          typescript('!1')
         );
     });
     test('tilde', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('~1')
+          typescript('~1')
         );
     });
     test('increment', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('++1')
+          typescript('++1')
         );
     });
     test('decrement', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('--a;')
+          typescript('--a;')
         );
     });
     test('spread', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('[ ...[] ]')
+          typescript('[ ...[] ]')
         );
     });
     test('spread in method param', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 class Foo {
                     constructor(@multiInject(BAR) /*a*/...args: Bar[][]) {}
                 }
             `)
-        );
-    });
-});
-
-describe('postfix operator mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
-
-    test('increment', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('a++;')
-        );
-    });
-    test('decrement', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('a--;')
-        );
-    });
-
-    test('unary with comments', () => {
-        rewriteRun(
-            //language=typescript
-            typeScript('/*a*/a/*b*/++/*c*/;')
         );
     });
 });

@@ -1,34 +1,73 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('do-while mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('empty do-while', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('do {} while (true);')
+          typescript('do {} while (true);')
         );
     });
 
     test('empty do-while with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('/*a*/ do /*b*/{/*c*/} /*d*/while/*e*/ (/*f*/true/*g*/)/*h*/;')
+            typescript('/*a*/ do /*b*/{/*c*/} /*d*/while/*e*/ (/*f*/true/*g*/)/*h*/;')
         );
     });
 
     test('empty do-while with expression and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('/*a*/ do /*b*/{/*c*/} /*d*/while/*e*/ (/*f*/Math/*0*/./*1*/random(/*2*/) /*3*/ > /*4*/0.7/*g*/)/*h*/;')
+            typescript('/*a*/ do /*b*/{/*c*/} /*d*/while/*e*/ (/*f*/Math/*0*/./*1*/random(/*2*/) /*3*/ > /*4*/0.7/*g*/)/*h*/;')
         );
     });
 
     test('do-while with statements', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 let count = 0;
                 do {
                     console.log(count)
@@ -40,9 +79,10 @@ describe('do-while mapping', () => {
     });
 
     test('do-while with labeled statement and semicolon', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function foo() {
                     partition: do {
                         break partition;
@@ -53,9 +93,10 @@ describe('do-while mapping', () => {
     });
 
     test('do-while statement with semicolon', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export function getMarkoRoot(path: t.NodePath<t.Node>) {
                     do curPath = curPath.parentPath/*a*/;/*b*/
                     while (curPath && !isMarko(curPath));
@@ -64,5 +105,4 @@ describe('do-while mapping', () => {
             `)
         );
     });
-
 });

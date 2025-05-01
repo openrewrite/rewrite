@@ -1,57 +1,100 @@
-import {connect, disconnect, rewriteRun, rewriteRunWithOptions, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('function mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('simple', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('function f () /*a*/{/*b*/ let c = 1; }')
+          typescript('function f () /*a*/{/*b*/ let c = 1; }')
         );
     });
     test('single parameter', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('function f(a) {}')
+          typescript('function f(a) {}')
         );
     });
     test('single typed parameter', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('function f(a : number) {}')
+          typescript('function f(a : number) {}')
         );
     });
     test('single typed parameter with initializer', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('function f(a /*0*/ : /*1*/ number /*2*/ = /*3*/ 2 /*4*/ ) {}')
+          typescript('function f(a /*0*/ : /*1*/ number /*2*/ = /*3*/ 2 /*4*/ ) {}')
         );
     });
     test('single parameter with initializer', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('function f(a =  2) {}')
+          typescript('function f(a =  2) {}')
         );
     });
     test('two parameters', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('function f(a =  2 , b) {}')
+          typescript('function f(a =  2 , b) {}')
         );
     });
 
     test('parameter with trailing comma', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('function f(a  , ) {}')
+          typescript('function f(a  , ) {}')
         );
     });
 
     test('function with type params', () => {
-      rewriteRun(
+     spec.rewriteRun(
+
         //language=typescript
-        typeScript(`
+        typescript(`
            function  /*1*/   identity  /*2*/    <  Type  , G    ,   C   >       (arg: Type)  /*3*/ :     G  {
             return arg;
           }
@@ -60,65 +103,74 @@ describe('function mapping', () => {
     });
 
     test('function with modifiers', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('export async function f (a =  2 , b) {}')
+            typescript('export async function f (a =  2 , b) {}')
         );
     });
 
     test('function with modifiers and without name', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('export default function(hljs) {}')
+            typescript('export default function(hljs) {}')
         );
     });
 
     test('function with modifiers and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('/*a*/ export /*b*/ async /*c*/ function /*d*/f /*e*/ (a =  2 , b) {}')
+            typescript('/*a*/ export /*b*/ async /*c*/ function /*d*/f /*e*/ (a =  2 , b) {}')
         );
     });
 
     test('function expression', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('const greet = function  (name: string) : string { return name; }')
+            typescript('const greet = function  (name: string) : string { return name; }')
         );
     });
 
     test('function expression with type parameter', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('const greet = function<T> (name: T): number { return 1; }')
+            typescript('const greet = function<T> (name: T): number { return 1; }')
         );
     });
 
     test('function expression with type parameter and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('const greet = /*a*/ function/*b*/ </*c*/T/*d*/>/*e*/(/*g*/name/*h*/:/*j*/T)/*k*/:/*l*/ number /*m*/{ return 1; }')
+            typescript('const greet = /*a*/ function/*b*/ </*c*/T/*d*/>/*e*/(/*g*/name/*h*/:/*j*/T)/*k*/:/*l*/ number /*m*/{ return 1; }')
         );
     });
 
     test('function with void return type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('function f ( a : string ) : void {}')
+            typescript('function f ( a : string ) : void {}')
         );
     });
 
     test('function type expressions', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('function greeter(fn: (a: string) => void) { fn("Hello, World"); }')
+            typescript('function greeter(fn: (a: string) => void) { fn("Hello, World"); }')
         );
     });
 
     test('function with type ref', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function getLength(arr: Array<string>): number {
                     return arr.length;
                 }
@@ -127,9 +179,10 @@ describe('function mapping', () => {
     });
 
     test('function declaration with obj binding params', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export function reverseGeocode(
                     {
                         params,
@@ -153,16 +206,18 @@ describe('function mapping', () => {
     });
 
     test('function type with parameter', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('type Transformer<T> = (input: T) => T;')
+            typescript('type Transformer<T> = (input: T) => T;')
         );
     });
 
     test('parameter with anonymous type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                function create<Type>(c: { new (): Type }): Type {
                   return new c();
                }
@@ -171,9 +226,10 @@ describe('function mapping', () => {
     });
 
     test('immediately invoked anonymous function', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 (function() {
                     console.log('IIFE');
                 })/*a*/();
@@ -182,9 +238,10 @@ describe('function mapping', () => {
     });
 
     test('immediately invoked anonymous function with ?.', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 (function() {
                     console.log('IIFE');
                 })/*a*/?./*b*/();
@@ -193,9 +250,10 @@ describe('function mapping', () => {
     });
 
     test('function expression with name assigment', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 var helloString = 'Hello world!';
 
                 var hello = function hello() {
@@ -206,9 +264,10 @@ describe('function mapping', () => {
     });
 
     test('function expression with name assigment with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 var helloString = 'Hello world!';
 
                 var hello = /*a*/function/*b*/ hello /*c*/(/*d*/) {
@@ -219,36 +278,40 @@ describe('function mapping', () => {
     });
 
     test('function with simple type bound', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function greet<T extends Number>(person: T): void {}
             `)
         );
     });
 
     test('function with simple type bound and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function /*a*/greet/*b*/</*c*/T /*d*/ extends /*e*/ Number/*f*/>/*g*/(person: T): void {}
             `)
         );
     });
 
     test('function with union type bound', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function getLength<T extends string | number>(input: T) : void {}
             `)
         );
     });
 
     test('function with multiple type bound', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function merge<T extends object, U extends object>(obj1: T, obj2: U): T & U {
                     return { ...obj1, ...obj2 };
                 }
@@ -257,9 +320,10 @@ describe('function mapping', () => {
     });
 
     test('function with default type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function createArray<T = string>(value: T, count: number): T[] {
                     return Array(count).fill(value);
                 }
@@ -268,9 +332,10 @@ describe('function mapping', () => {
     });
 
     test('function with default type and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function createArray<T /*a*/ = /*b*/string /*c*/>(value: T, count: number): T[] {
                     return Array(count).fill(value);
                 }
@@ -279,9 +344,10 @@ describe('function mapping', () => {
     });
 
     test('function with multiple default types', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function createMap<K = string, V = number>(key: K, value: V): [K, V] {
                     return [key, value];
                 }
@@ -290,9 +356,10 @@ describe('function mapping', () => {
     });
 
     test('function with extends and default type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function createArray<T extends string | number = string>(value: T, length: number): T[] {
                     return Array(length).fill(value);
                 }
@@ -301,9 +368,10 @@ describe('function mapping', () => {
     });
 
     test('function with extends and default type with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function createArray<T /*-2*/extends/*-1*/ string | number /*0*/ = /*1*/ string/*2*/>/*3*/(value: T, length: number): /*a*/T/*b*/[/*c*/]/*d*/ {
                     return Array(length).fill(value);
                 }
@@ -312,36 +380,40 @@ describe('function mapping', () => {
     });
 
     test('function with constrained type literal ', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function logLength<T extends { length: number }>(input: T): void {}
             `)
         );
     });
 
     test('function with rest type parameters ', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function f(...args: any[]): void {}
             `)
         );
     });
 
     test('function with rest type parameters and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function /*a*/f/*b*/(/*c*/.../*d*/args/*e*/: /*f*/any[]): void {}
             `)
         );
     });
 
     test('unnamed function', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 /*1*/ export /*2*/ default /*3*/ function /*4*/(/*5*/hljs/*6*/) /*7*/ {
                 }
             `)
@@ -349,9 +421,10 @@ describe('function mapping', () => {
     });
 
     test('function with type predicate simple', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function isString(value: unknown): value is string {
                     return typeof value === 'string';
                 }
@@ -360,9 +433,10 @@ describe('function mapping', () => {
     });
 
     test('function with type predicate simple with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function isString(value: unknown): /*a*/value /*b*/is/*c*/ string/*d*/ {
                     return typeof value === 'string';
                 }
@@ -371,9 +445,10 @@ describe('function mapping', () => {
     });
 
     test('function with type predicate and asserts', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function assertIsString(value: unknown): asserts value is string {
                     if (typeof value !== "string") {
                         throw new Error("Value is not a string");
@@ -384,9 +459,10 @@ describe('function mapping', () => {
     });
 
     test('function with type predicate and asserts with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function assertIsString(value: unknown): /*a*/asserts/*b*/ value /*c*/is/*d*/ string /*e*/{
                     if (typeof value !== "string") {
                         throw new Error("Value is not a string");
@@ -397,9 +473,10 @@ describe('function mapping', () => {
     });
 
     test('function with type predicate, asserts and without type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function assert(value: unknown, message: string): asserts /*a*/value/*b*/ {
                     if (!value) {
                         throw new Error(message);
@@ -410,9 +487,10 @@ describe('function mapping', () => {
     });
 
     test('function with type predicate, asserts and complex type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Animal = { kind: "dog"; bark(): void } | { kind: "cat"; purr(): void };
 
                 function isDog(animal: Animal): animal is { kind: "dog"; bark(): void } {
@@ -423,9 +501,10 @@ describe('function mapping', () => {
     });
 
     test('no additional comma test', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 new Promise(function() {
                    let x;
                    let y;
@@ -435,18 +514,20 @@ describe('function mapping', () => {
     });
 
     test('empty body function', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export function getHeader(headers: ResponseHeaders, name: string): ResponseHeaderValue;
             `)
         );
     });
 
     test('function invocation', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 !function(e, t) {
                     console.log("This is an IIFE", e, t);
                 }("Hello", "World");

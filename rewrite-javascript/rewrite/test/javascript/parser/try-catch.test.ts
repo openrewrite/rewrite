@@ -1,13 +1,49 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('try-catch mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('try-catch empty', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               try {
               } catch (error) {
               }
@@ -16,9 +52,10 @@ describe('try-catch mapping', () => {
     });
 
     test('try-finally empty', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               try {
               } finally {
               }
@@ -27,9 +64,10 @@ describe('try-catch mapping', () => {
     });
 
     test('try-catch-finally empty', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               try {
               } catch (error) {
               } finally {
@@ -39,9 +77,10 @@ describe('try-catch mapping', () => {
     });
 
     test('try-catch-finally empty comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               /*a*/ try /*b*/ {
               } /*c*/ catch /*d*/ ( /*e*/ error /*f*/) { /*g*/
               } /*h*/ finally /*i*/ { /*j*/
@@ -51,9 +90,10 @@ describe('try-catch mapping', () => {
     });
 
     test('try-catch without error', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 try {
                     // Code that may throw an error
                 } /*a*/ catch /*b*/ {
@@ -64,9 +104,10 @@ describe('try-catch mapping', () => {
     });
 
     test('try-catch with typed unknown error', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               try {
                   // error
               } catch (error: unknown) {
@@ -77,9 +118,10 @@ describe('try-catch mapping', () => {
     });
 
     test('try-catch with typed any error', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               try {
                   // error
               } catch (error: any) {
@@ -90,9 +132,10 @@ describe('try-catch mapping', () => {
     });
 
     test('try-catch with typed error and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               try {
                   // error
               } catch (/*a*/ error /*b*/: /*c*/ unknown /*d*/) {
@@ -103,9 +146,10 @@ describe('try-catch mapping', () => {
     });
 
     test('try-catch-finally with body', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               try {
                   // Try to parse JSON string
                   const data = JSON.parse('{ "name": "Alice" }');
@@ -124,9 +168,10 @@ describe('try-catch mapping', () => {
     });
 
     test('try-catch-finally with throw', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
                   try {
                       throw new Error("Failed to perform database operation.");
                   } catch (error) {
@@ -139,9 +184,10 @@ describe('try-catch mapping', () => {
     });
 
     test('catch with ObjectBindingPattern as a name', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 class A {
                     public async connect() {
                         try {
@@ -156,9 +202,10 @@ describe('try-catch mapping', () => {
     });
 
     test('catch with ObjectBindingPattern as a name with finally', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 class A {
                     public async connect() {
                         try {
@@ -173,5 +220,4 @@ describe('try-catch mapping', () => {
             `)
         );
     });
-
 });

@@ -1,13 +1,49 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('array literal mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('access by index', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
                 const numbers = [10, 20, 30, 40];
                 const v = numbers[2];
           `)
@@ -15,9 +51,10 @@ describe('array literal mapping', () => {
     });
 
     test('access by index with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const numbers = [10, 20, 30, 40];
                 const v = /*a*/ numbers/*b*/[/*c*/2/*d*/]/*e*/;/*f*/
             `)
@@ -25,9 +62,10 @@ describe('array literal mapping', () => {
     });
 
     test('access by index with !', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const numbers = [10, 20, 30, 40];
                 const v = numbers[2]!;
             `)
@@ -35,9 +73,10 @@ describe('array literal mapping', () => {
     });
 
     test('access by index with ! and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const numbers = [10, 20, 30, 40];
                 const v = numbers[2]/*a*/!/*b*/;
             `)
@@ -45,9 +84,10 @@ describe('array literal mapping', () => {
     });
 
     test('access by key', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const data = { a: 100, b: 200, c: 300 };
                 const v = /*a*/data/*b*/[/*c*/'a'/*d*/]/*e*/;/*f*/
           `)
@@ -55,9 +95,10 @@ describe('array literal mapping', () => {
     });
 
     test('access by key with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const data = { a: 100, b: 200, c: 300 };
                 const v = data['a'];
             `)
@@ -65,20 +106,21 @@ describe('array literal mapping', () => {
     });
 
     test('access by key with ?.', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const data = { a: 100, b: 200, c: 300 };
                 const v = data['d'] ?. toString();
           `)
         );
     });
 
-
     test('with optional chaining operator', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const arr = [10, 20, 30];
                 const value1 = arr/*a*/?./*b*/[1];
           `)
@@ -86,9 +128,10 @@ describe('array literal mapping', () => {
     });
 
     test('with optional chaining operator and object access', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const obj = {
                     val: null
                 };
@@ -97,5 +140,4 @@ describe('array literal mapping', () => {
             `)
         );
     });
-
 });

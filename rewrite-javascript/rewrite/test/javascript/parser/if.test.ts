@@ -1,40 +1,80 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('if mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('simple', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('if (true) console.log("foo");')
+          typescript('if (true) console.log("foo");')
         );
     });
 
     test('simple with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('/*a*/if /*b*/(/*c*/true/*d*/)/*e*/ console.log("foo")/*f*/;/*g*/')
+            typescript('/*a*/if /*b*/(/*c*/true/*d*/)/*e*/ console.log("foo")/*f*/;/*g*/')
         );
     });
 
     test('braces', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('if (true) /*a*/{/*b*/ console.log("foo")/*c*/; /*d*/}/*e*/')
+          typescript('if (true) /*a*/{/*b*/ console.log("foo")/*c*/; /*d*/}/*e*/')
         );
     });
     test('else', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('if (true) console.log("foo"); /*a*/ else/*b*/ console.log("bar")/*c*/;/*d*/')
+          typescript('if (true) console.log("foo"); /*a*/ else/*b*/ console.log("bar")/*c*/;/*d*/')
         );
     });
 
     test('if-else with semicolon', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 if (true) {
                     console.log("foo")/*a*/;/*b*/
                 } else
@@ -44,9 +84,10 @@ describe('if mapping', () => {
     });
 
     test('if-else-if with semicolon', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                     if (false)
                         console.log("foo")/*b*/;/*c*/
                     else /*d*/if (true)
@@ -56,9 +97,10 @@ describe('if mapping', () => {
     });
 
     test('if-if-else with semicolon', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                     if (false)
                         /*a*/if (true)
                             console.log("foo")/*b*/;/*c*/
@@ -69,9 +111,10 @@ describe('if mapping', () => {
     });
 
     test('if with for with semicolon', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 if (prevProps)
                     for (let name in prevProps) name in nextProps || (node[name] = void 0)/*a*/;/*b*/
             `)
@@ -79,9 +122,10 @@ describe('if mapping', () => {
     });
 
     test('for with if with return and semicolon', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function foo() {
                     for (let opt of el.options)
                         if (opt.selected !== opt.defaultSelected) return !0;
@@ -90,11 +134,11 @@ describe('if mapping', () => {
         );
     });
 
-
     test('for with if with semicolon', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 for(;;)
                     if (true)
                         console.log("foo")/*a*/;/*b*/
@@ -103,9 +147,10 @@ describe('if mapping', () => {
     });
 
     test('if with return', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function foo() {
                     if (prevProps)
                         return abs(prevProps)/*a*/;/*b*/
@@ -115,9 +160,10 @@ describe('if mapping', () => {
     });
 
     test('if with break', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 for(;;) {
                     if (!len--) break;
                 }
@@ -126,9 +172,10 @@ describe('if mapping', () => {
     });
 
     test('if with continue', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 for(;;) {
                     if (!len--) continue;
                 }
@@ -137,9 +184,10 @@ describe('if mapping', () => {
     });
 
     test('if with do', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 if (newStart > newEnd)
                     do {
                         abs(x);
@@ -147,5 +195,4 @@ describe('if mapping', () => {
             `)
         );
     });
-
 });

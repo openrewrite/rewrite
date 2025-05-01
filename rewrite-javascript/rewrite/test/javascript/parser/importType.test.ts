@@ -1,48 +1,89 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('import type mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('simple import', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`type ModuleType = import('fs');`)
+          typescript(`type ModuleType = import('fs');`)
         );
     });
 
     test('simple import with isTypeOf', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`type MyType = typeof import("module-name");`)
+            typescript(`type MyType = typeof import("module-name");`)
         );
     });
 
     test('simple import with isTypeOf and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`type MyType = /*a*/typeof /*b*/ import/*c*/(/*d*/"module-name"/*e*/)/*f*/;`)
+            typescript(`type MyType = /*a*/typeof /*b*/ import/*c*/(/*d*/"module-name"/*e*/)/*f*/;`)
         );
     });
 
     test('import with qualifier', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`type ReadStream = import("fs").ReadStream;`)
+            typescript(`type ReadStream = import("fs").ReadStream;`)
         );
     });
 
     test('import with qualifier and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`type ReadStream = import("fs")/*a*/./*b*/ReadStream/*c*/;`)
+            typescript(`type ReadStream = import("fs")/*a*/./*b*/ReadStream/*c*/;`)
         );
     });
 
     test('import with sub qualifiers', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export default class Utils {
                     static Tools = class {
                         static UtilityName = "Helper";
@@ -55,11 +96,11 @@ describe('import type mapping', () => {
         );
     });
 
-
     test('function with import type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function useModule(module: import("fs")): void {
                     console.log(module);
                 }
@@ -68,18 +109,20 @@ describe('import type mapping', () => {
     });
 
     test('import type with type argument', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type AnotherType = import("module-name").GenericType<string>;
             `)
         );
     });
 
     test('import type with type argument adv1', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export namespace Shapes {
                     export type Box<T> = { value: T; size: number };
                     export type Circle = { radius: number };
@@ -92,9 +135,10 @@ describe('import type mapping', () => {
     });
 
     test('import type with type argument adv2', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export namespace Models {
                     export type Response<T> = {
                         status: number;
@@ -109,27 +153,30 @@ describe('import type mapping', () => {
     });
 
     test('import with attributes', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type A = import("foo", {with: {type: "json"}})
             `)
         );
     });
 
     test('import with attributes with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type A = import("foo"/*0*/, /*a*/{/*b*/assert/*c*/:/*d*/ {type: "json"}/*e*/}/*f*/)
             `)
         );
     });
 
     test('import with attributes and qualifiers', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export type LocalInterface =
                     & import("pkg", { with: {"resolution-mode": "require"} }).RequireInterface
                     & import("pkg", { with: {"resolution-mode": "import"} }).ImportInterface;
@@ -141,9 +188,10 @@ describe('import type mapping', () => {
     });
 
     test('import type without qualifier an with type argument', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 declare module "ContextUtils" {
                     export function createContext<Config extends import("tailwindcss").Config>(config: ReturnType<typeof import("tailwindcss/resolveConfig")<Config>>,): import("./types.ts").TailwindContext;
                 }

@@ -1,13 +1,49 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('with mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('with statement', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 with (0) {
                     console.log("aaa");
                 }
@@ -16,9 +52,10 @@ describe('with mapping', () => {
     });
 
     test('with statement with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 /*a*/with /*b*/ (/*c*/0 /*d*/) /*e*/{/*f*/
                     console.log("aaa");
                     /*g*/}/*h*/
@@ -27,36 +64,40 @@ describe('with mapping', () => {
     });
 
     test('with statement with try-catch', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 with(ctx)try{return eval("("+str+")")}catch(e){}
             `)
         );
     });
 
     test('with statement with empty body', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 with (0) {/*a*/}
             `)
         );
     });
 
     test('with statement with body without braces', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 with (0) 1;
             `)
         );
     });
 
     test('with statement with await expr', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export {};
                 with ( await obj?.foo) {}
             `)
@@ -64,18 +105,20 @@ describe('with mapping', () => {
     });
 
     test('with statement with empty expr and body', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 with({/*a*/}) {/*b*/}
             `)
         );
     });
 
     test('with statement with multiline statement', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 with ([]) {
                     console.log("aaa");
                     console.log("bbb")
@@ -85,9 +128,10 @@ describe('with mapping', () => {
     });
 
     test('with statement with internal with statements', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 with (bindingContext) {
                     with (data || {}) {
                         with (options.templateRenderingVariablesInScope || {}) {
@@ -95,7 +139,6 @@ describe('with mapping', () => {
                             result = templateText.replace(/\\[renderTemplate\\:(.*?)\\]/g, function (match, templateName) {
                                 return ko.renderTemplate(templateName, data, options);
                             });
-
 
                             var evalHandler = function (match, script) {
                                 try {
@@ -117,5 +160,4 @@ describe('with mapping', () => {
             `)
         );
     });
-
 });

@@ -1,37 +1,76 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('class decorator mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('unqualified', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('@foo class A {}')
+          typescript('@foo class A {}')
         );
     });
     test('unqualified parens', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('@foo( ) class A {}')
+          typescript('@foo( ) class A {}')
         );
     });
     test('qualified', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('@foo . bar class A {}')
+          typescript('@foo . bar class A {}')
         );
     });
     test('qualified parens', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('@foo . bar ( ) class A {}')
+          typescript('@foo . bar ( ) class A {}')
         );
     });
     test('parameter decorator with params', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               export class WorkspaceMemberWorkspaceEntity extends BaseWorkspaceEntity {
                   @WorkspaceField({
                       standardId: WORKSPACE_MEMBER_STANDARD_FIELD_IDS.name,
@@ -46,18 +85,20 @@ describe('class decorator mapping', () => {
         );
     });
     test('decorator with type params', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               @StaticInterfaceImplement/*a*/<ISpriteAssembler>/*b*/()
               export class SimpleSpriteAssembler {}
           `)
         );
     });
     test('decorator with parenthesized expression', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               class SimpleSpriteAssembler {
                   @/*a*/(/*b*/Ember.computed('fullName').readOnly()/*c*/)/*d*/
                   get fullNameReadonly() {
@@ -68,17 +109,19 @@ describe('class decorator mapping', () => {
         );
     });
     test.skip('decorator on class expression', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               const Foo = (x => x)(@dec('') class { })
           `)
         );
     });
     test('class / method / params / properties decorators', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               @UseGuards(WorkspaceAuthGuard)
               @Resolver()
               export class RelationMetadataResolver {
@@ -109,44 +152,13 @@ describe('class decorator mapping', () => {
     });
 
     test.skip('decorator after modifiers', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export @decorator() class Foo {}
                 export default @decorator() class {}
             `)
-        );
-    });
-});
-
-// according to TypeScript documentation decorators are not allowed with
-// standalone functions https://www.typescriptlang.org/docs/handbook/decorators.html
-describe.skip('function decorator mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
-
-    test('unqualified', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('@foo function f() {}')
-        );
-    });
-    test('unqualified parens', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('@foo( ) function f() {}')
-        );
-    });
-    test('qualified', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('@foo . bar function f() {}')
-        );
-    });
-    test('qualified parens', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('@foo . bar ( ) function f() {}')
         );
     });
 });

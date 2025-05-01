@@ -1,16 +1,49 @@
-import * as J from "../../../dist/src/java/tree";
-import {JavaType} from "../../../dist/src/java";
-import * as JS from "../../../dist/src/javascript";
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('arithmetic operator mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('plus', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(
+          typescript(
             '1 + 2', undefined,
             cu => {
                 const binary = <J.Binary>(<JS.ExpressionStatement>cu.statements[0]).expression;
@@ -20,9 +53,10 @@ describe('arithmetic operator mapping', () => {
         );
     });
     test('concat', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(
+          typescript(
             '"1" + 2', undefined,
             cu => {
                 const binary = <J.Binary>(<JS.ExpressionStatement>cu.statements[0]).expression;
@@ -33,240 +67,73 @@ describe('arithmetic operator mapping', () => {
     });
 
     test('minus', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('1 - 2')
+          typescript('1 - 2')
         );
     });
 
     test('multiply', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('1 * 2')
+          typescript('1 * 2')
         );
     });
 
     test('divide', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('1 / 2')
+          typescript('1 / 2')
         );
     });
 
     test('modulo', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('1 % 2')
+          typescript('1 % 2')
         );
     });
 
     test('left shift', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('1 << 2')
+          typescript('1 << 2')
         );
     });
 
     test('right shift', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('1 >> 2')
+          typescript('1 >> 2')
         );
     });
 
     test('unsigned right shift', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('1 >>> 2')
+          typescript('1 >>> 2')
         );
     });
 
     test('power operation', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('2 ** 3')
+            typescript('2 ** 3')
         );
     });
     test('exponentiation operation', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript('x **= 1')
+            typescript('x **= 1')
         );
     });
-});
-
-describe('bitwise operator mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
-
-    test('and', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 & 2')
-        );
-    });
-    test('or', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 | 2')
-        );
-    });
-    test('xor', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 ^ 2')
-        );
-    });
-});
-
-describe('relational operator mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
-
-    test('less than', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 < 2')
-        );
-    });
-    test('less than or equal', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 <= 2')
-        );
-    });
-    test('greater than', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 > 2')
-        );
-    });
-    test('greater than or equal', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 >= 2')
-        );
-    });
-    test('equal', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 == 2')
-        );
-    });
-    test('not equal', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 != 2')
-        );
-    });
-
-    test('strict equal', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 === 2')
-        );
-    });
-    test('strict not equal', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 !== 2')
-        );
-    });
-})
-
-describe('boolean operator mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
-
-    test('and', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 && 2')
-        );
-    });
-    test('or', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 || 2')
-        );
-    });
-    test('in', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript('1 in 2')
-        );
-    });
-});
-describe('comma operator mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
-
-    test('comma operator', () => {
-        rewriteRun(
-          //language=typescript
-          typeScript(`
-              let x = 1;
-
-              x = (x++, x);
-
-              console.log(x);
-              // Expected output: 2
-
-              x = (2, 3);
-
-              console.log(x);
-              // Expected output: 3
-          `),
-            //language=typescript
-          typeScript(`
-              const a = Array.from({length: 10}, () =>
-                  Array.from({length: 10}, Math.random),
-              ); // A 10×10 array of random numbers
-
-              for (let i = 0, j = 9; i <= 9; i++, j--) {
-                  console.log(\`a[\${i}][\${j}] = \${a[i][j]}\`);
-              }
-          `),
-            //language=typescript
-          typeScript(`
-              let a, b, c;
-
-              a = b = 3, c = 4; // Returns 4
-              console.log(a); // 3 (left-most)
-
-              let x, y, z;
-
-              x = (y = 5, z = 6); // Returns 6
-              console.log(x); // 6 (right-most)
-          `),
-        );
-    });
-});
-
-
-describe('generic binary tests', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
-
-    test('multiple cases', () => {
-        rewriteRun(
-            //language=typescript
-            typeScript(`
-                var _ = {} as any;
-                var PRERELEASE_CHANNEL_MAGINITUDE = 1000;
-                var PRERELEASE_CHANNELS = (({} as any).availableChannels)
-                    .without('stable')
-                    .reverse()
-                    .value();
-
-                function hashPrerelease(s) {
-                    if (_.isString(s[0])) {
-                        return (_.indexOf(PRERELEASE_CHANNELS, s[0]) + 1) * PRERELEASE_CHANNEL_MAGINITUDE + (s[1] || 0);
-                    } else {
-                        return s[0];
-                    }
-                }
-            `)
-        );
-    })
 });

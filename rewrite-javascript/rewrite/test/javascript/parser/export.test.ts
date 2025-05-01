@@ -1,13 +1,49 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('export keyword tests', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('module.export', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const nxPreset = require('@nx/jest/preset').default;
 
                 module.exports = { ...nxPreset };
@@ -16,16 +52,17 @@ describe('export keyword tests', () => {
     });
 
     test('type export', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export type ObjectMetadataItemWithFieldMaps = ObjectMetadataInterface & {
                     fieldsById: FieldMetadataMap;
                     fieldsByName: FieldMetadataMap;
                 };
             `),
             //language=typescript
-            typeScript(`
+            typescript(`
                 import type { SomeThing } from "./some-module.js";
                 export type { SomeThing };
             `)
@@ -33,9 +70,10 @@ describe('export keyword tests', () => {
     });
 
     test('class export', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
 
                 export class RelationMetadataResolver {
 
@@ -49,9 +87,10 @@ describe('export keyword tests', () => {
     });
 
     test('namespace export', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export namespace MyNamespace {
                     export const x = 10;
                     export function greet() {
@@ -63,9 +102,10 @@ describe('export keyword tests', () => {
     });
 
     test('enum export', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export enum RemoteServerType {
                     POSTGRES_FDW = 'postgres_fdw',
                     STRIPE_FDW = 'stripe_fdw',
@@ -75,21 +115,22 @@ describe('export keyword tests', () => {
     });
 
     test('object export', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function foo() {};
                 function bar() {};
                 export {foo, bar};
             `),
             //language=typescript
-            typeScript(`
+            typescript(`
                 function foo() {}
                 function bar() {};
                 export default {foo, bar};
             `),
             //language=typescript
-            typeScript(`
+            typescript(`
                 // Default export of a variable
                 export default 42;
             `)
@@ -97,9 +138,10 @@ describe('export keyword tests', () => {
     });
 
     test('re-export', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 // Re-exporting everything from another module
                 export * from './accessibility';
                 export * as name1 from "module-name"    ;
@@ -111,9 +153,10 @@ describe('export keyword tests', () => {
     });
 
     test('single statement export', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 // Exporting a single item as default using \`export =\`
                 export = MyClass;
             `)
@@ -121,9 +164,10 @@ describe('export keyword tests', () => {
     });
 
     test('e2e', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 // Exporting declarations
                 export let name1, name2/*, … */; // also var
                 export const name1 = 1, name2 = 2/*, … */; // also var, let
@@ -160,18 +204,20 @@ describe('export keyword tests', () => {
     });
 
     test('empty named export', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export {/*a*/}
             `)
         );
     });
 
     test('export with attributes', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export type { A } from "A" with { type: "json" };
                 export type * as B from "B" /*a*/ with /*b*/ { type: "json" }/*c*/;
                 export { E, type F } from "C" assert { type: "json" };
@@ -180,9 +226,10 @@ describe('export keyword tests', () => {
     });
 
     test('export/import with empty attributes', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export * as foo from "foo.json"
                 export * as bar from "bar.json" assert { }
                 export * as baz from "baz.json" assert { /* comment */ }
@@ -194,5 +241,3 @@ describe('export keyword tests', () => {
         );
     });
 });
-
-

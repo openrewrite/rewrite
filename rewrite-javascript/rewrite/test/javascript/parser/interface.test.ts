@@ -1,22 +1,59 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('interface mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('empty interface', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
                 interface Empty {}
             `)
         );
     });
 
     test('interface with export modifier', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               export interface Empty {
                   greet(name: string, surname: string): void;
               }
@@ -25,9 +62,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with declare modifier', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               declare interface Empty {
                   greet(name: string, surname: string): void;
               }
@@ -36,9 +74,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with extends', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Animal {
                   name: string;
               }
@@ -51,9 +90,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with extending multiple interfaces', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface HasLegs {
                   count: string;
               }
@@ -70,9 +110,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
                 interface Person {
                   name: string
                   age: number
@@ -82,9 +123,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties with semicolons', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   name: string;
                   age: number;
@@ -94,9 +136,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties with coma', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   name: string,
                   age: number,
@@ -106,9 +149,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties with semicolons and comma', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   name: string,
                   age: number;
@@ -118,9 +162,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties with semicolons, comma and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   /*a*/ name /*b*/: /*c*/ string /*d*/ ; /*e*/
                   age: number /*f*/
@@ -130,9 +175,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with methods', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   greet(): void;
                   age(): number;
@@ -144,9 +190,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with methods and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   /*a*/ greet() /*b*/ :  /*c*/ void /*d*/;
                   age(): number; /*e*/
@@ -159,9 +206,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties and methods', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   greet(name: string): void
                   name: string
@@ -174,9 +222,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with get/set methods', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   name: string;
                   get age() : number ; // Getter for age
@@ -187,9 +236,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with constructor signature', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 interface Constructible {
                     new (name: string, age: number): Person; // Interface that defines a constructor signature
                 }
@@ -198,9 +248,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with constructor signature with type parameters', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 interface GenericConstructor {
                     new<R, T> (value: R, value: T): GenericClass;
                 }
@@ -209,9 +260,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with constructor signature with type parameters and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 interface GenericConstructor {
                     /*a*/new /*b*/</*c*/R/*d*/,/*e*/ T/*f*/>/*g*/ (value1: R, value2: T)/*e*/: GenericClass/*j*/;
                 }
@@ -220,9 +272,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties and methods with modifiers ', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   greet(name: string): void
                   readonly name: string
@@ -232,9 +285,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with optional property signature', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 interface Person {
                     surname?: string;
                     readonly name ?: string
@@ -244,9 +298,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with optional properties and methods ', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   greet ?(name: string): void
                   add ?(): (x: number, y?: number) => number;
@@ -257,9 +312,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with properties, methods and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Person {
                   /*a*/ greet(/*1*/name/*2*/: /*3*/string/*4*/, /*5*/ surname: string/*6*/): /*b*/ void /*c*/
                   name /*d*/ : string
@@ -272,9 +328,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with function type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Add {
                   add(): (x: number, y: number) => number;
               }
@@ -283,9 +340,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with function type and zero param', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Add {
                   produce(): () => number;
               }
@@ -294,9 +352,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with function type and several return types', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Add {
                   consume(): () => number /*a*/ | /*b*/ void;
               }
@@ -305,9 +364,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with function type and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Add {
                   /*a*/ add/*b*/(/*c*/)/*d*/ : /*e*/ (/*f*/ x/*g */:/*h*/ number /*i*/, /*j*/y /*k*/: /*l*/ number/*m*/)/*n*/ => /*o*/ number /*p*/;
               }
@@ -316,9 +376,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with call signature', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Add {
                   greet: (name: string) => string;
                   (x: number, y: number): number,
@@ -328,9 +389,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with call signature and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Add {
                   greet: (name: string) => string;
                   (x: number /*abc*/): number /*bcd*/,
@@ -341,9 +403,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with indexable type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Add {
                   [index: number]: string
               }
@@ -352,9 +415,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with hybrid types', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface Counter {
                   (start: number): string;   // Call signature
                   interval: number;          // Property
@@ -367,9 +431,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with generics', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface GenericIdentityFn<   T >   {
                     /*1231*/   < Type    /*1*/ >      (   arg   :    Type    )  :    T ;
                     /*1231*/ /*1231*/ add   < Type    /*1*/ , R >   (arg: Type): (x: T, y: Type) => R; //Function signature
@@ -379,9 +444,10 @@ describe('interface mapping', () => {
     });
 
     test('interface with generics', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               interface X {
                     find ? <R, T> (v1: R, v2: T): string;
                 }
@@ -390,14 +456,14 @@ describe('interface mapping', () => {
     });
 
     test('function type with empty args', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export interface ProxyCursorHooks {
                     getValue?: (/*a*/)=> any;
                 }
             `)
         );
     });
-
 });

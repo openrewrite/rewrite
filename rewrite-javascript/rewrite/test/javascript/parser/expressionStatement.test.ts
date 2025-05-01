@@ -1,19 +1,54 @@
-import {connect, disconnect, rewriteRun, rewriteRunWithOptions, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('expression statement mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('literal with semicolon', () => {
         rewriteRunWithOptions(
             {normalizeIndent: false},
-            typeScript('1 ;')
+            typescript('1 ;')
         );
     });
     test('multiple', () => {
         rewriteRunWithOptions(
             {normalizeIndent: false},
-            typeScript(
+            typescript(
                 //language=ts
                 `
                     1; // foo
@@ -25,63 +60,70 @@ describe('expression statement mapping', () => {
     });
 
     test('simple non-null expression', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const length = user ! . profile ! . username ! . length ;
             `)
         );
     });
 
     test('simple non-null expression with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const length = /*0*/user/*a*/!/*b*/./*c*/ profile /*d*/!/*e*/ ./*f*/ username /*g*/!/*h*/ ./*j*/ length/*l*/ ;
             `)
         );
     });
 
     test('simple question-dot expression', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const length = user ?. profile ?. username ?. length ;
             `)
         );
     });
 
     test('simple question-dot expression with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const length = /*0*/user/*a*/ ?./*b*/ profile/*c*/ ?./*d*/ username /*e*/?./*f*/ length /*g*/;
             `)
         );
     });
 
     test('simple default expression', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const length = user ?? 'default' ;
             `)
         );
     });
 
     test('simple default expression with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const length = user /*a*/??/*b*/ 'default' /*c*/;
             `)
         );
     });
 
     test('mixed expression with special tokens', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 class Profile {
                     username?: string; // Optional property
                 }
@@ -106,9 +148,10 @@ describe('expression statement mapping', () => {
     });
 
     test('mixed expression with methods with special tokens', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 interface Profile {
                     username?(): string; // Optional property
 
@@ -131,9 +174,10 @@ describe('expression statement mapping', () => {
     });
 
     test('optional chaining operator with ?.', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
             const func1 = (msg: string) => {
                 return {
                     func2: (greeting: string) => greeting + msg
@@ -146,9 +190,10 @@ describe('expression statement mapping', () => {
     });
 
     test('optional chaining operator with ?. and custom type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const func1: ((msg: string) => { func2: (greeting: string) => string }) | undefined = undefined;
                 const result2 = func1?.("Test")?.func2("Hi"); // Does not invoke and returns \`undefined\`.
             `)
@@ -156,9 +201,10 @@ describe('expression statement mapping', () => {
     });
 
     test('satisfies expression', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Person = {
                     name: string;
                     age: number;
@@ -174,9 +220,10 @@ describe('expression statement mapping', () => {
     });
 
     test('atisfies expression with complex type ', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type ApiResponse<T> = {
                     data: T;
                     status: "success" | "error";
@@ -191,9 +238,10 @@ describe('expression statement mapping', () => {
     });
 
     test('debugging statement', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
               function calculate(value: number) {
                   /*a*/debugger/*b*/;/*c*/ // Pauses execution when debugging
                   return value * 2;
@@ -203,9 +251,10 @@ describe('expression statement mapping', () => {
     });
 
     test('shorthand property assignment with initializer', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 ({
                     initialState,
                     resultSelector/*a*/ = /*b*/identity as ResultFunc<S, T>,
@@ -215,12 +264,12 @@ describe('expression statement mapping', () => {
     });
 
     test('new expression with array access', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const results = new this.constructor[Symbol.species]<Key, Value>();
             `)
         );
     });
-
 });

@@ -1,83 +1,129 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('import mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('simple', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('import {foo} from "bar"')
+          typescript('import {foo} from "bar"')
         );
     });
 
     test('for side effect', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('import "foo"')
+          typescript('import "foo"')
         );
     });
 
     test('space', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('import {foo} /*1*/ from /*2*/ "bar"/*3*/;')
+          typescript('import {foo} /*1*/ from /*2*/ "bar"/*3*/;')
         );
     });
 
     test('multiple', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('import {foo, bar} from "baz"')
+          typescript('import {foo, bar} from "baz"')
         );
     });
 
     test('trailing comma', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('import {foo, } from "baz"')
+          typescript('import {foo, } from "baz"')
         );
     });
 
     test('default', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('import foo from "bar"')
+          typescript('import foo from "bar"')
         );
     });
 
     test('namespace', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('import *  as foo  from "bar"')
+          typescript('import *  as foo  from "bar"')
         );
     });
 
     test('default and namespace', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('import baz, * as foo from "bar"')
+          typescript('import baz, * as foo from "bar"')
         );
     });
 
     test('default and others', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('import baz, {foo1, } from "bar"')
+          typescript('import baz, {foo1, } from "bar"')
         );
     });
 
     test('dynamic import', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('export {};const module = await import("module-name");')
+          typescript('export {};const module = await import("module-name");')
         )
     });
 
     test('type import and others', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`import {
+            typescript(`import {
                 Client,
                 defaultAxiosInstance,
                 defaultHttpsAgent,
@@ -88,16 +134,18 @@ describe('import mapping', () => {
     });
 
     test('type imports only', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`import type { Component } from "react";`)
+            typescript(`import type { Component } from "react";`)
         );
     });
 
     test('experimental: import with import attributes', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 import Package from 'module-name' assert { type: "json" }
                 import foo from 'module-name' with { type: "json" };
                 /*{1}*/import/*{2}*/ foo /*{3}*/from /*{4}*/'module-name'/*{5}*/ with/*{6}*/ {/*{7}*/ type/*{8}*/: /*{9}*/"json", /*{10}*/ } /*{11}*/;
@@ -106,9 +154,10 @@ describe('import mapping', () => {
     });
 
     test('import with import attributes', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 import type { SpyInstance } from 'jest';
                 ///*{1}*/import /*{2}*/type /*{3}*/{ /*{4}*/ SpyInstance /*{5}*/} /*{6}*/ from /*{7}*/ 'jest' /*{8}*/;
                 import SpyInstance = jest.SpyInstance;
@@ -117,9 +166,10 @@ describe('import mapping', () => {
     });
 
     test('external module import', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 import mongodb = /*a*/require/*b*/(/*c*/'mongodb'/*d*/)/*e*/;
             `)
         );

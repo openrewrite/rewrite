@@ -1,238 +1,299 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('type alias mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('simple alias', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type StringAlias = string;
             `)
         );
     });
 
     test('simple alias with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 /*a*/type /*b*/ StringAlias /*c*/= /*d*/string /*e*/;/*f*/
             `)
         );
     });
 
     test('function type alias', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type MyFunctionType = (x: number, y: number) => string;
             `)
         );
     });
 
     test('generic function type alias', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Response<T, R, Y> = (x: T, y: R) => Y;;
             `)
         );
     });
 
     test('generic type alias with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 /*a*/type/*b*/ Response/*c*/</*d*/T/*e*/> /*f*/ = /*g*/(x: T, y: number) => string;;
             `)
         );
     });
 
     test('union type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type ID = /*a*/ number /*b*/ | /*c*/ string /*d*/;
             `)
         );
     });
 
     test('union type with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type ID = number | string;
             `)
         );
     });
 
     test('construct function type alias', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type MyConstructor = abstract new (arg: string) => string;
             `)
         );
     });
 
     test('construct function type alias with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type MyConstructor = /*a*/new/*b*/ (/*c*/arg: string) => string;
             `)
         );
     });
 
     test('construct function type alias with abstract and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type MyConstructor = /*0*/ abstract /*a*/new/*b*/ (/*c*/arg: string) => string;
             `)
         );
     });
 
     test('recursive array type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type NestedArray<T> = T | NestedArray<T[]>;
             `)
         );
     });
 
     test('construct function type alias with generic', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type GenericConstructor<T> = new (/*a*/.../*b*/args: any[]) => T;
             `)
         );
     });
 
     test('tuple type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type MyTuple = [number, string, boolean];
             `)
         );
     });
 
     test('tuple type with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type MyTuple = /*a*/[/*b*/number/*c*/, /*d*/string/*e*/, /*f*/boolean/*g*/, /*h*/]/*j*/;
             `)
         );
     });
 
     test('tuple type empty', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type MyTuple = [/*a*/];
             `)
         );
     });
 
     test('nested tuple type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type NestedTuple = [number, [string, boolean]];
             `)
         );
     });
 
     test('optional tuple type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type OptionalTuple = [string, /*a*/number/*b*/?/*c*/];
             `)
         );
     });
 
     test('tuple rest type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type FlexibleTuple = [string, ...number[]];
             `)
         );
     });
 
     test('readonly operator tuple type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type ReadonlyTuple = readonly [string, number];
             `)
         );
     });
 
     test('readonly operator tuple type with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type ReadonlyTuple = /*a*/keyof /*b*/ [string, number];
             `)
         );
     });
 
     test('basic conditional type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type IsString<T> = T extends string ? 'Yes' : 'No';
             `)
         );
     });
 
     test('basic conditional type with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type IsString<T> = /*a*/T/*b*/ extends /*c*/string /*d*/? /*e*/'Yes' /*f*/:/*g*/ 'No'/*h*/;
             `)
         );
     });
 
     test('conditional type with parenthesized type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Flatten<T> = T extends (infer R)[] ? Flatten<R> : T;
             `)
         );
     });
 
     test('conditional type with parenthesized type and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Flatten<T> = T extends /*a*/(/*b*/infer/*c*/ R/*d*/)/*e*/[] ? Flatten<R> : T;
             `)
         );
     });
 
     test('conditional type with parenthesized type and never', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type GetReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
             `)
         );
     });
 
     test('named tuple member type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Coordinate = [x: number, y: number, z?: number];
                 type VariableArgs = [name: string, ...args: number[]];
             `)
@@ -240,9 +301,10 @@ describe('type alias mapping', () => {
     });
 
     test('trailing comma in params', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type RichText = (
                     overrides?: Partial<RichTextField>/*a*/,/*b*/
                 ) => RichTextField
@@ -251,9 +313,10 @@ describe('type alias mapping', () => {
     });
 
     test('trailing comma in type args', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 export type AfterReadRichTextHookArgs<
                     TValue = any,
                 > = {}
@@ -262,27 +325,30 @@ describe('type alias mapping', () => {
     });
 
     test('type with empty type argument', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type A/*a*/</*b*/>/*c*/ = {/*d*/}
             `)
         );
     });
 
     test('type with intrinsic keyword', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Uppercase<S extends string> = intrinsic
             `)
         );
     });
 
     test('constructor type with trailing coma', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type ElementConstructor<P> =
                     (new(
                     x: P,
@@ -293,13 +359,13 @@ describe('type alias mapping', () => {
     });
 
     test('constructor type with empty param', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type ElementConstructor<P> =
                     (new(/*a*/) => Component<any, any>);
             `)
         );
     });
-
 });

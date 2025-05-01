@@ -1,49 +1,89 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('type-query operator mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('typeof', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript(`
+          typescript(`
               type UserType = typeof Number;
           `)
         );
     });
 
     test('typeof with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type UserType = /*a*/ typeof /*b*/ Number /*c*/;
             `)
         );
     });
 
     test('typeof as a type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const createUser: typeof Number = Number;
             `)
         );
     });
 
     test('typeof as a type with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const createUser: /*a*/ typeof /*b*/ Number /*c*/ = /*d*/ Number /*e*/;
             `)
         );
     });
 
     test('typeof as a type as function', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function greet(name: string) {
                 }
 
@@ -56,9 +96,10 @@ describe('type-query operator mapping', () => {
     });
 
     test('typeof as a type as array', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const numbers = [];
 
                 const moreNumbers: typeof numbers = [4, 5, 6];
@@ -67,9 +108,10 @@ describe('type-query operator mapping', () => {
     });
 
     test('typeof as a type as a union', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const obj1 = { type: "type1", value: 42 };
                 const obj2 = { type: "type2", description: "TypeScript is awesome" };
 
@@ -79,28 +121,30 @@ describe('type-query operator mapping', () => {
     });
 
     test('index access type', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type DatabaseConfig = typeof config["database"];
           `)
         );
     });
 
     test('index access type with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type DatabaseConfig = /*a*/typeof /*b*/ config/*c*/[/*d*/"database"/*e*/]/*f*/;
           `)
         );
     });
 
-
     test('index access type nested', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 interface Company {
                     employees: {
                         name: string;
@@ -114,12 +158,12 @@ describe('type-query operator mapping', () => {
     });
 
     test('typeof with generics', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type MyStructReturnType<X extends S.Schema.All> = S.Schema.Type<ReturnType<typeof MyStruct/*a*/</*c*/X/*d*/>/*b*/>>
             `)
         );
     });
-
 });

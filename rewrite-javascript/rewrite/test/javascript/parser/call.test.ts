@@ -1,48 +1,89 @@
-import {connect, disconnect, rewriteRun, typeScript} from '../testHarness';
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {RecipeSpec} from "../../../src/test";
+
+import {typescript} from "../../../src/javascript";
+
+
 
 describe('call mapping', () => {
-    beforeAll(() => connect());
-    afterAll(() => disconnect());
+    const spec = new RecipeSpec();
 
     test('single', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('parseInt("42")')
+          typescript('parseInt("42")')
         );
     });
 
     test('multiple', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('setTimeout(null, 2000, \'Hello\');')
+          typescript('setTimeout(null, 2000, \'Hello\');')
         );
     });
 
     test('with array literal receiver', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('[1] . splice(0)')
+          typescript('[1] . splice(0)')
         );
     });
 
     test('with call receiver', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('"1" . substring(0) . substring(0)')
+          typescript('"1" . substring(0) . substring(0)')
         );
     });
 
     test('trailing comma', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
           //language=typescript
-          typeScript('parseInt("42" , )')
+          typescript('parseInt("42" , )')
         );
     });
 
     test('with optional chaining operator', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const func = (message: string) => message;
                 const result1 = func/*a*/?./*b*/("TS"); // Invokes the function
                 const result2 = func/*a*/?./*b*/call("TS"); // Invokes the function
@@ -51,9 +92,10 @@ describe('call mapping', () => {
     });
 
     test('call expression with type parameters', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function identity<T>(value: T): T {
                     return value;
                 }
@@ -64,9 +106,10 @@ describe('call mapping', () => {
     });
 
     test('call expression with type parameters and comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function identity<T>(value: T): T {
                     return value;
                 }
@@ -77,9 +120,10 @@ describe('call mapping', () => {
     });
 
     test('call expression with type parameters and optional chaining operator', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function identity<T>(value: T): T {
                     return value;
                 }
@@ -92,9 +136,10 @@ describe('call mapping', () => {
     });
 
     test('call expression with type parameters and optional chaining operator with comments', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 function identity<T>(value: T): T {
                     return value;
                 }
@@ -106,9 +151,10 @@ describe('call mapping', () => {
     });
 
     test('call expression with mapping', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Operation = (a: number, b: number) => number;
 
                 // Define an object with methods accessed by string keys
@@ -124,9 +170,10 @@ describe('call mapping', () => {
     });
 
     test('call expression with mapping and ?.', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 type Operation = (a: number, b: number) => number;
 
                 // Define an object with methods accessed by string keys
@@ -142,9 +189,10 @@ describe('call mapping', () => {
     });
 
     test('call expression with mapping adv', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 const arr: { [key: string]: (x: number, y: number) => number }[] = [
                     {
                         abc: (x, y) => x - y,
@@ -158,25 +206,25 @@ describe('call mapping', () => {
 
     // need a way to distinguish new class calls with empty braces and without braces
     test('call new expression without braces', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 var d = (new Date).getTime()
                 const intType = new arrow.Uint32
             `)
         );
     });
 
-
     // perhaps a bug in a Node parser
     // node.getChildren() skips token '/*a*/<'
     test.skip('call expression with sequential <<', () => {
-        rewriteRun(
+       spec.rewriteRun(
+
             //language=typescript
-            typeScript(`
+            typescript(`
                 expectTypeOf(o.get).toMatchTypeOf/*a*/<<K extends keyof EmberObject>(key: K) => EmberObject[K]>();
             `)
         );
     });
-
 });
