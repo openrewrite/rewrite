@@ -14,7 +14,7 @@ export class JavaScriptTypeMapping {
     );
   }
 
-  type(node: ts.Node): JavaType | null {
+  type(node: ts.Node): JavaType | undefined {
     let type: ts.Type | undefined;
     if (ts.isExpression(node)) {
       type = this.checker.getTypeAtLocation(node);
@@ -22,7 +22,7 @@ export class JavaScriptTypeMapping {
       type = this.checker.getTypeFromTypeNode(node);
     }
 
-    return type ? this.getType(type) : null;
+    return type ?? this.getType(type);
   }
 
   private getType(type: ts.Type) {
@@ -48,18 +48,18 @@ export class JavaScriptTypeMapping {
       : JavaType.Primitive.of(JavaType.PrimitiveKind.None);
   }
 
-  variableType(node: ts.NamedDeclaration): JavaType.Variable | null {
+  variableType(node: ts.NamedDeclaration): JavaType.Variable | undefined {
     if (ts.isVariableDeclaration(node)) {
       const symbol = this.checker.getSymbolAtLocation(node.name);
       if (symbol) {
         const type = this.checker.getTypeOfSymbolAtLocation(symbol, node);
       }
     }
-    return null;
+    return undefined;
   }
 
-  methodType(node: ts.Node): JavaType.Method | null {
-    return null;
+  methodType(node: ts.Node): JavaType.Method | undefined {
+    return undefined;
   }
 
   private createType(type: ts.Type, signature: string): JavaType {
@@ -71,8 +71,8 @@ export class JavaScriptTypeMapping {
       }
     }
 
-    if (type.flags === ts.TypeFlags.Null) {
-      return JavaType.Primitive.of(JavaType.PrimitiveKind.Null);
+    if (type.flags === ts.TypeFlags.undefined) {
+      return JavaType.Primitive.of(JavaType.PrimitiveKind.undefined);
     } else if (type.flags === ts.TypeFlags.Undefined) {
       return JavaType.Primitive.of(JavaType.PrimitiveKind.None);
     } else if (

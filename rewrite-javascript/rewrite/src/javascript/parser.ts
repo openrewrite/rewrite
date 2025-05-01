@@ -23,9 +23,10 @@ import {
     JavaType,
     NameTree,
     Statement,
+    TextComment,
     TrailingComma,
 } from '../java';
-import {Expression, isJavaScript, JS, TypeTree, TypedTree} from '.';
+import {Expression, isJavaScript, JS, TypedTree, TypeTree} from '.';
 import {
     emptyMarkers,
     ExecutionContext,
@@ -55,6 +56,7 @@ import {JavaScriptTypeMapping} from "./typeMapping";
 import path from "node:path";
 import {produce} from "immer";
 import Kind = JS.Kind;
+import ExpressionStatement = JS.ExpressionStatement;
 
 export class JavaScriptParser extends Parser<JS.CompilationUnit> {
 
@@ -742,8 +744,8 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             annotations: [], // FIXME decorators
             simpleName: name,
-            type: type?.kind instanceof JavaType.Variable ? type.type : type,
-            fieldType: type instanceof JavaType.Variable ? type : undefined
+            type: type?.kind === JavaType.Kind.Variable ? (type as JavaType.Variable).type : type,
+            fieldType: type?.kind === JavaType.Kind.Variable ? type as JavaType.Variable : undefined
         };
     }
 
@@ -2855,8 +2857,10 @@ export class JavaScriptParserVisitor {
     }
 
     visitVariableStatement(node: ts.VariableStatement) {
-        const declaration = this.visitVariableDeclarationList(node.declarationList);
-        return declaration.withModifiers(this.mapModifiers(node).concat(declaration.modifiers)).withPrefix(this.prefix(node));
+        return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
+            draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            draft.prefix = this.prefix(node);
+        });
     }
 
     visitExpressionStatement(node: ts.ExpressionStatement): Statement {
@@ -2870,7 +2874,7 @@ export class JavaScriptParserVisitor {
             prefix: expression,
             markers: emptyMarkers,
             expression: expression
-        }
+        } as ExpressionStatement;
     }
 
     visitIfStatement(node: ts.IfStatement) {
@@ -2969,11 +2973,23 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 init: [node.initializer ?
                     (ts.isVariableDeclarationList(node.initializer) ? this.rightPadded(this.visit(node.initializer), emptySpace) :
-                        this.rightPadded(ts.isStatement(node.initializer) ? this.visit(node.initializer) : JS.newExpressionStatement(randomId(), this.visit(node.initializer)), this.suffix(node.initializer))) :
+                        this.rightPadded(ts.isStatement(node.initializer) ? this.visit(node.initializer) : {
+                            kind: JS.Kind.ExpressionStatement,
+                            id: randomId(),
+                            prefix: emptySpace,
+                            markers: emptyMarkers,
+                            expression: this.visit(node.initializer)
+                        }, this.suffix(node.initializer))) :
                     this.rightPadded(this.newJEmpty(), this.suffix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!))],
                 condition: node.condition ? this.rightPadded(this.visit(node.condition), this.suffix(node.condition)) :
                     this.rightPadded(this.newJEmpty(), this.suffix(this.findChildNode(node, ts.SyntaxKind.SemicolonToken)!)),
-                update: [node.incrementor ? this.rightPadded(ts.isStatement(node.incrementor) ? this.visit(node.incrementor) : JS.newExpressionStatement(randomId(), this.visit(node.incrementor)), this.suffix(node.incrementor)) :
+                update: [node.incrementor ? this.rightPadded(ts.isStatement(node.incrementor) ? this.visit(node.incrementor) : {
+                        kind: JS.Kind.ExpressionStatement,
+                        id: randomId(),
+                        prefix: emptySpace,
+                        markers: emptyMarkers,
+                        expression: this.visit(node.incrementor)
+                    }, this.suffix(node.incrementor)) :
                     this.rightPadded(this.newJEmpty(this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)), emptySpace)]
             },
             body: this.rightPadded(
@@ -3170,10 +3186,13 @@ export class JavaScriptParserVisitor {
     }
 
     visitDebuggerStatement(node: ts.DebuggerStatement) {
-        return JS.newExpressionStatement(
-            randomId(),
-            this.mapIdentifier(node, 'debugger')
-        );
+        return {
+            kind: JS.Kind.ExpressionStatement,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            expression: this.mapIdentifier(node, 'debugger')
+        };
     }
 
     visitVariableDeclaration(node: ts.VariableDeclaration) {
@@ -4511,7 +4530,7 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
             text: commentBody,
             suffix: suffix,
             markers: emptyMarkers
-        });
+        } as TextComment);
     });
 
     // Step 3: Extract leading whitespace (before the first comment)

@@ -326,6 +326,7 @@ export namespace JS {
         readonly type: JavaType;
     }
 
+
     export interface MappedType extends JS {
         readonly kind: typeof Kind.MappedType;
         readonly prefixToken?: J.LeftPadded<J.Literal>;
