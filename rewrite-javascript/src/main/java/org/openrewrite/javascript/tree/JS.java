@@ -2208,7 +2208,7 @@ public interface JS extends J {
                     return t.typeParameter == typeParameter ? t : new KeysRemapping(t.id, t.prefix, t.markers, typeParameter, t.nameType);
                 }
 
-                public JRightPadded<Expression> getNameType() {
+                public @Nullable JRightPadded<Expression> getNameType() {
                     return t.nameType;
                 }
 
