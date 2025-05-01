@@ -18,7 +18,7 @@
 import {mapAsync, SourceFile, ValidImmerRecipeReturnType} from "../";
 import {J, JavaType, JavaVisitor, NameTree, Statement, TypedTree, TypeTree} from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
-import {Expression, isJavaScript, JavaScriptKind, JS,} from "./tree";
+import {Expression, isJavaScript, JS} from "./tree";
 import JSNamedVariable = JS.JSVariableDeclarations.JSNamedVariable;
 import MappedTypeParameter = JS.MappedType.MappedTypeParameter;
 import TemplateSpan = JS.TemplateExpression.TemplateSpan;
@@ -631,143 +631,143 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         if (isJavaScript(j)) {
             const tree = j as JS;
             switch (tree.kind) {
-                case JavaScriptKind.Alias:
+                case JS.Kind.Alias:
                     return this.visitAlias(tree as unknown as JS.Alias, p);
-                case JavaScriptKind.ArrowFunction:
+                case JS.Kind.ArrowFunction:
                     return this.visitArrowFunction(tree as unknown as JS.ArrowFunction, p);
-                case JavaScriptKind.Await:
+                case JS.Kind.Await:
                     return this.visitAwait(tree as unknown as JS.Await, p);
-                case JavaScriptKind.CompilationUnit:
+                case JS.Kind.CompilationUnit:
                     return this.visitJsCompilationUnit(tree as unknown as JS.CompilationUnit, p);
-                case JavaScriptKind.ConditionalType:
+                case JS.Kind.ConditionalType:
                     return this.visitConditionalType(tree as unknown as JS.ConditionalType, p);
-                case JavaScriptKind.DefaultType:
+                case JS.Kind.DefaultType:
                     return this.visitDefaultType(tree as unknown as JS.DefaultType, p);
-                case JavaScriptKind.Delete:
+                case JS.Kind.Delete:
                     return this.visitDelete(tree as unknown as JS.Delete, p);
-                case JavaScriptKind.Export:
+                case JS.Kind.Export:
                     return this.visitExport(tree as unknown as JS.Export, p);
-                case JavaScriptKind.ExpressionStatement:
+                case JS.Kind.ExpressionStatement:
                     return this.visitExpressionStatement(tree as unknown as JS.ExpressionStatement, p);
-                case JavaScriptKind.ExpressionWithTypeArguments:
+                case JS.Kind.ExpressionWithTypeArguments:
                     return this.visitExpressionWithTypeArguments(tree as unknown as JS.ExpressionWithTypeArguments, p);
-                case JavaScriptKind.FunctionType:
+                case JS.Kind.FunctionType:
                     return this.visitFunctionType(tree as unknown as JS.FunctionType, p);
-                case JavaScriptKind.InferType:
+                case JS.Kind.InferType:
                     return this.visitInferType(tree as unknown as JS.InferType, p);
-                case JavaScriptKind.ImportType:
+                case JS.Kind.ImportType:
                     return this.visitImportType(tree as unknown as JS.ImportType, p);
-                case JavaScriptKind.JsImport:
+                case JS.Kind.JsImport:
                     return this.visitJsImport(tree as unknown as JS.JsImport, p);
-                case JavaScriptKind.JsImportClause:
+                case JS.Kind.JsImportClause:
                     return this.visitJsImportClause(tree as unknown as JS.JsImportClause, p);
-                case JavaScriptKind.NamedImports:
+                case JS.Kind.NamedImports:
                     return this.visitNamedImports(tree as unknown as JS.NamedImports, p);
-                case JavaScriptKind.JsImportSpecifier:
+                case JS.Kind.JsImportSpecifier:
                     return this.visitJsImportSpecifier(tree as unknown as JS.JsImportSpecifier, p);
-                case JavaScriptKind.JSVariableDeclarations:
+                case JS.Kind.JSVariableDeclarations:
                     return this.visitJSVariableDeclarations(tree as unknown as JS.JSVariableDeclarations, p);
-                case JavaScriptKind.JSNamedVariable:
+                case JS.Kind.JSNamedVariable:
                     return this.visitJSNamedVariable(tree as unknown as JSNamedVariable, p);
-                case JavaScriptKind.ImportAttributes:
+                case JS.Kind.ImportAttributes:
                     return this.visitImportAttributes(tree as unknown as JS.ImportAttributes, p);
-                case JavaScriptKind.ImportTypeAttributes:
+                case JS.Kind.ImportTypeAttributes:
                     return this.visitImportTypeAttributes(tree as unknown as JS.ImportTypeAttributes, p);
-                case JavaScriptKind.ImportAttribute:
+                case JS.Kind.ImportAttribute:
                     return this.visitImportAttribute(tree as unknown as JS.ImportAttribute, p);
-                case JavaScriptKind.JsBinary:
+                case JS.Kind.JsBinary:
                     return this.visitJsBinary(tree as unknown as JS.JsBinary, p);
-                case JavaScriptKind.LiteralType:
+                case JS.Kind.LiteralType:
                     return this.visitLiteralType(tree as unknown as JS.LiteralType, p);
-                case JavaScriptKind.MappedType:
+                case JS.Kind.MappedType:
                     return this.visitMappedType(tree as unknown as JS.MappedType, p);
-                case JavaScriptKind.MappedTypeKeysRemapping:
+                case JS.Kind.MappedTypeKeysRemapping:
                     return this.visitKeysRemapping(tree as unknown as JS.MappedType.KeysRemapping, p);
-                case JavaScriptKind.MappedTypeMappedTypeParameter:
+                case JS.Kind.MappedTypeMappedTypeParameter:
                     return this.visitMappedTypeParameter(tree as unknown as MappedTypeParameter, p);
-                case JavaScriptKind.ObjectBindingDeclarations:
+                case JS.Kind.ObjectBindingDeclarations:
                     return this.visitObjectBindingDeclarations(tree as unknown as JS.ObjectBindingDeclarations, p);
-                case JavaScriptKind.PropertyAssignment:
+                case JS.Kind.PropertyAssignment:
                     return this.visitPropertyAssignment(tree as unknown as JS.PropertyAssignment, p);
-                case JavaScriptKind.SatisfiesExpression:
+                case JS.Kind.SatisfiesExpression:
                     return this.visitSatisfiesExpression(tree as unknown as JS.SatisfiesExpression, p);
-                case JavaScriptKind.ScopedVariableDeclarations:
+                case JS.Kind.ScopedVariableDeclarations:
                     return this.visitScopedVariableDeclarations(tree as unknown as JS.ScopedVariableDeclarations, p);
-                case JavaScriptKind.StatementExpression:
+                case JS.Kind.StatementExpression:
                     return this.visitStatementExpression(tree as unknown as JS.StatementExpression, p);
-                case JavaScriptKind.TaggedTemplateExpression:
+                case JS.Kind.TaggedTemplateExpression:
                     return this.visitTaggedTemplateExpression(tree as unknown as JS.TaggedTemplateExpression, p);
-                case JavaScriptKind.TemplateExpression:
+                case JS.Kind.TemplateExpression:
                     return this.visitTemplateExpression(tree as unknown as JS.TemplateExpression, p);
-                case JavaScriptKind.TemplateExpressionTemplateSpan:
+                case JS.Kind.TemplateExpressionTemplateSpan:
                     return this.visitTemplateSpan(tree as unknown as TemplateSpan, p);
-                case JavaScriptKind.TrailingTokenStatement:
+                case JS.Kind.TrailingTokenStatement:
                     return this.visitTrailingTokenStatement(tree as unknown as JS.TrailingTokenStatement, p);
-                case JavaScriptKind.Tuple:
+                case JS.Kind.Tuple:
                     return this.visitTuple(tree as unknown as JS.Tuple, p);
-                case JavaScriptKind.TypeDeclaration:
+                case JS.Kind.TypeDeclaration:
                     return this.visitTypeDeclaration(tree as unknown as JS.TypeDeclaration, p);
-                case JavaScriptKind.TypeOf:
+                case JS.Kind.TypeOf:
                     return this.visitTypeOf(tree as unknown as JS.TypeOf, p);
-                case JavaScriptKind.TypeTreeExpression:
+                case JS.Kind.TypeTreeExpression:
                     return this.visitTypeTreeExpression(tree as unknown as JS.TypeTreeExpression, p);
-                case JavaScriptKind.JsAssignmentOperation:
+                case JS.Kind.JsAssignmentOperation:
                     return this.visitJsAssignmentOperation(tree as unknown as JS.JsAssignmentOperation, p);
-                case JavaScriptKind.IndexedAccessType:
+                case JS.Kind.IndexedAccessType:
                     return this.visitIndexedAccessType(tree as unknown as JS.IndexedAccessType, p);
-                case JavaScriptKind.IndexType:
+                case JS.Kind.IndexType:
                     return this.visitIndexType(tree as unknown as JS.IndexedAccessType.IndexType, p);
-                case JavaScriptKind.TypeQuery:
+                case JS.Kind.TypeQuery:
                     return this.visitTypeQuery(tree as unknown as JS.TypeQuery, p);
-                case JavaScriptKind.TypeInfo:
+                case JS.Kind.TypeInfo:
                     return this.visitTypeInfo(tree as unknown as JS.TypeInfo, p);
-                case JavaScriptKind.TypeOperator:
+                case JS.Kind.TypeOperator:
                     return this.visitTypeOperator(tree as unknown as JS.TypeOperator, p);
-                case JavaScriptKind.TypePredicate:
+                case JS.Kind.TypePredicate:
                     return this.visitTypePredicate(tree as unknown as JS.TypePredicate, p);
-                case JavaScriptKind.Union:
+                case JS.Kind.Union:
                     return this.visitUnion(tree as unknown as JS.Union, p);
-                case JavaScriptKind.Intersection:
+                case JS.Kind.Intersection:
                     return this.visitIntersection(tree as unknown as JS.Intersection, p);
-                case JavaScriptKind.Void:
+                case JS.Kind.Void:
                     return this.visitVoid(tree as unknown as JS.Void, p);
-                case JavaScriptKind.Unary:
+                case JS.Kind.Unary:
                     return this.visitJsUnary(tree as unknown as JS.Unary, p);
-                case JavaScriptKind.Yield:
+                case JS.Kind.Yield:
                     return this.visitJsYield(tree as unknown as JS.Yield, p);
-                case JavaScriptKind.WithStatement:
+                case JS.Kind.WithStatement:
                     return this.visitWithStatement(tree as unknown as JS.WithStatement, p);
-                case JavaScriptKind.IndexSignatureDeclaration:
+                case JS.Kind.IndexSignatureDeclaration:
                     return this.visitIndexSignatureDeclaration(tree as unknown as JS.IndexSignatureDeclaration, p);
-                case JavaScriptKind.JSMethodDeclaration:
+                case JS.Kind.JSMethodDeclaration:
                     return this.visitJSMethodDeclaration(tree as unknown as JS.JSMethodDeclaration, p);
-                case JavaScriptKind.JSForOfLoop:
+                case JS.Kind.JSForOfLoop:
                     return this.visitJSForOfLoop(tree as unknown as JS.JSForOfLoop, p);
-                case JavaScriptKind.JSForInLoop:
+                case JS.Kind.JSForInLoop:
                     return this.visitJSForInLoop(tree as unknown as JS.JSForInLoop, p);
-                case JavaScriptKind.JSForInOfLoopControl:
+                case JS.Kind.JSForInOfLoopControl:
                     return this.visitJSForInOfLoopControl(tree as unknown as JS.JSForInOfLoopControl, p);
-                case JavaScriptKind.JSTry:
+                case JS.Kind.JSTry:
                     return this.visitJSTry(tree as unknown as JS.JSTry, p);
-                case JavaScriptKind.JSCatch:
+                case JS.Kind.JSCatch:
                     return this.visitJSCatch(tree as unknown as JS.JSTry.JSCatch, p);
-                case JavaScriptKind.NamespaceDeclaration:
+                case JS.Kind.NamespaceDeclaration:
                     return this.visitNamespaceDeclaration(tree as unknown as JS.NamespaceDeclaration, p);
-                case JavaScriptKind.FunctionDeclaration:
+                case JS.Kind.FunctionDeclaration:
                     return this.visitFunctionDeclaration(tree as unknown as JS.FunctionDeclaration, p);
-                case JavaScriptKind.TypeLiteral:
+                case JS.Kind.TypeLiteral:
                     return this.visitTypeLiteral(tree as unknown as JS.TypeLiteral, p);
-                case JavaScriptKind.ArrayBindingPattern:
+                case JS.Kind.ArrayBindingPattern:
                     return this.visitArrayBindingPattern(tree as unknown as JS.ArrayBindingPattern, p);
-                case JavaScriptKind.BindingElement:
+                case JS.Kind.BindingElement:
                     return this.visitBindingElement(tree as unknown as JS.BindingElement, p);
-                case JavaScriptKind.ExportDeclaration:
+                case JS.Kind.ExportDeclaration:
                     return this.visitExportDeclaration(tree as unknown as JS.ExportDeclaration, p);
-                case JavaScriptKind.ExportAssignment:
+                case JS.Kind.ExportAssignment:
                     return this.visitExportAssignment(tree as unknown as JS.ExportAssignment, p);
-                case JavaScriptKind.NamedExports:
+                case JS.Kind.NamedExports:
                     return this.visitNamedExports(tree as unknown as JS.NamedExports, p);
-                case JavaScriptKind.ExportSpecifier:
+                case JS.Kind.ExportSpecifier:
                     return this.visitExportSpecifier(tree as unknown as JS.ExportSpecifier, p);
             }
         }
