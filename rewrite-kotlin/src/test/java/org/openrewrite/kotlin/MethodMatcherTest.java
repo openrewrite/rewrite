@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.MethodMatcher;
@@ -53,6 +55,41 @@ class MethodMatcherTest implements RewriteTest {
               /*~~>*/fun function() {}
               fun usesFunction() {
                   function()
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "java.lang.Math max(int, int)",
+      "java.lang.Math max(..)"
+    })
+    void matchesMethodPatternOfJavaMethodWithAnyArgument(String methodPattern) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              private final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, true);
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                  if (methodMatcher.matches(method)) {
+                      return SearchResult.found(method);
+                  }
+                  return super.visitMethodInvocation(method, p);
+              }
+          })),
+          kotlin(
+            """
+              import java.lang.Math
+              fun max(a: Int, b: Int) : Int {
+                  return Math.max(a, b)
+              }
+              """,
+            """
+              import java.lang.Math
+              fun max(a: Int, b: Int) : Int {
+                  return /*~~>*/Math.max(a, b)
               }
               """
           )
