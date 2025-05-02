@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 
@@ -45,6 +46,7 @@ class ReplaceMethodInvocationWithConstantTest implements RewriteTest {
 
     @Nested
     class InMethod {
+        @DocumentExample
         @Test
         @SuppressWarnings("removal")
         void withNull() {

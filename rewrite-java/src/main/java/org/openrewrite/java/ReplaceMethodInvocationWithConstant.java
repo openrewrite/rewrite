@@ -19,11 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.trait.MethodAccess;
 import org.openrewrite.java.trait.Traits;
-import org.openrewrite.java.tree.CoordinateBuilder;
 import org.openrewrite.java.tree.Expression;
-import org.openrewrite.trait.VisitFunction;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -51,24 +48,11 @@ public class ReplaceMethodInvocationWithConstant extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesMethod<>(methodPattern),
-                Traits.methodAccess(methodPattern).asVisitor(replaceWith(replacement)));
+        return Preconditions.check(
+                new UsesMethod<>(methodPattern),
+                Traits.methodAccess(methodPattern)
+                        .asVisitor(ma ->
+                                JavaTemplate.apply(replacement, ma.getCursor(),
+                                        ((Expression) ma.getCursor().getValue()).getCoordinates().replace())));
     }
-
-    private VisitFunction<MethodAccess> replaceWith(String replacement) {
-        return new VisitFunction<MethodAccess>() {
-            final JavaTemplate replacementTemplate = JavaTemplate.builder(replacement).build();
-
-            @Override
-            public Tree visit(MethodAccess ma) {
-                return replacementTemplate.apply(ma.getCursor(), coordinateOf(ma).replace());
-            }
-
-            CoordinateBuilder.Expression coordinateOf(MethodAccess ma) {
-                return ((Expression) ma.getCursor().getValue()).getCoordinates();
-            }
-        };
-    }
-
-
 }
