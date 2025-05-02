@@ -1,3 +1,5 @@
+// noinspection TypeScriptUnresolvedReference,JSUnusedLocalSymbols
+
 /*
  * Copyright 2023 the original author or authors.
  * <p>
@@ -14,152 +16,131 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
 
 describe('variable declaration mapping', () => {
     const spec = new RecipeSpec();
 
     test('const', () => {
-       return spec.rewriteRun(
-          typescript(
+        return spec.rewriteRun({
             //language=javascript
-            `
+            ...typescript(`
                 const c = 1;
                 /* c1*/  /*c2 */
                 const d = 1;
-            `, undefined, cu => {
+            `),
+            afterRecipe: cu => {
                 expect(cu).toBeDefined();
                 expect(cu.statements).toHaveLength(2);
-                cu.statements.forEach(statement => {
-                    expect(statement).toBeInstanceOf(JS.ScopedVariableDeclarations);
+                cu.statements.forEach((statement: any) => {
+                    expect(statement.kind).toBe(JS.Kind.ScopedVariableDeclarations);
                 });
-                cu.padding.statements.forEach(statement => {
+                cu.padding.statements.forEach((statement: any) => {
                     expect(statement.after.comments).toHaveLength(0);
                     expect(statement.after.whitespace).toBe('');
                 });
-            })
-        );
+            }
+        });
     });
-    test('const2', () => {
-       return spec.rewriteRun(
-          typescript(
-            //language=javascript
-            `
-                const c = 1;
-                /* c1*/  /*c2 */
-                const d = 1;
-            `, undefined, cu => {
-                expect(cu).toBeDefined();
-                expect(cu.statements).toHaveLength(2);
-                cu.statements.forEach(statement => {
-                    expect(statement).toBeInstanceOf(JS.ScopedVariableDeclarations);
-                });
-                cu.padding.statements.forEach(statement => {
-                    expect(statement.after.comments).toHaveLength(0);
-                    expect(statement.after.whitespace).toBe('');
-                });
-            })
-        );
-    });
-    test('typed', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('let a : number =2')
-        );
-    });
-    test('typed unknown', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('const a : unknown')
-        );
-    });
-    test('typed any', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('let a : any = 2;')
-        );
-    });
+
+    test('typed', () => spec.rewriteRun(
+        //language=typescript
+        typescript('let a : number =2')
+    ));
+
+    test('typed unknown', () => spec.rewriteRun(
+        //language=typescript
+        typescript('const a : unknown = 2')
+    ));
+
+    test('typed any', () => spec.rewriteRun(
+        //language=typescript
+        typescript('let a : any = 2;')
+    ));
+
     test('multi', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('let a=2, b=2 ')
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('let a=2, b=2 ')
         );
     });
+
     test('multi typed', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('  /*0.1*/  let  /*0.2*/    a   /*1*/ :      /*2*/  number =2    /*3*/ , /*4*/   b   /*5*/:/*6*/    /*7*/string  /*8*/   =/*9*/    "2" /*10*/  ; //11')
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('  /*0.1*/  let  /*0.2*/    a   /*1*/ :      /*2*/  number =2    /*3*/ , /*4*/   b   /*5*/:/*6*/    /*7*/string  /*8*/   =/*9*/    "2" /*10*/  ; //11')
         );
     });
+
     test('a b c', () => {
-       return spec.rewriteRun(
-          //language=typescript
+        return spec.rewriteRun(
+            //language=typescript
 
             typescript(`
-               const obj : any | undefined = {}
-               obj ?. a ?. b ?. c
+                const obj: any | undefined = {}
+                obj?.a?.b?.c
             `)
         );
     });
 
     test('exported variables', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(' export /*0.1*/  let  /*0.2*/    a   /*1*/ :      /*2*/  number =2    /*3*/ , /*4*/   b   /*5*/:/*6*/    /*7*/string  /*8*/   =/*9*/    "2" /*10*/  ; //11')
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(' export /*0.1*/  let  /*0.2*/    a   /*1*/ :      /*2*/  number =2    /*3*/ , /*4*/   b   /*5*/:/*6*/    /*7*/string  /*8*/   =/*9*/    "2" /*10*/  ; //11')
         );
     });
 
     test('unique symbol', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('declare const unset: unique symbol;')
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('declare const unset: unique symbol;')
         );
     });
 
     test('bigint', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('type res3 = Call<Objects.PartialDeep, bigint>;\n')
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('type res3 = Call<Objects.PartialDeep, bigint>;\n')
         );
     });
 
     test('property signature as an array', () => {
-       return spec.rewriteRun(
+        return spec.rewriteRun(
             //language=typescript
             typescript(`
-              export type Apply<fn extends Fn, args extends unknown[]> = (fn & {
-                  [rawArgs]: args;
-              })["return"];
-          `)
+                export type Apply<fn extends Fn, args extends unknown[]> = (fn & {
+                    [rawArgs]: args;
+                })["return"];
+            `)
         );
     });
 
     test('declaration with destruction', () => {
-       return spec.rewriteRun(
+        return spec.rewriteRun(
             //language=typescript
             typescript(`
                 /*0*/
-                const /*1*/  {   Client   ,  Status }  /*2*/ =/*3*/  require("../src");
+                const /*1*/  {Client, Status}  /*2*/ =/*3*/  require("../src");
             `),
             //language=typescript
             typescript(`
-                const obj =  {  a   :   1, b       : { c: 2 } };
-                const { a } = obj; // a is constant
+                const obj = {a: 1, b: {c: 2}};
+                const {a} = obj; // const 'a' is a constant
                 let {
-                  /*1*/ b /*2*/:/*3*/ { /*4*/c  /*5*/: /*6*/ d /*7*/} /***/,
+                    /*1*/ b /*2*/:/*3*/ { /*4*/c  /*5*/: /*6*/ d /*7*/} /***/,
                 } = obj; // d is re-assignable
             `),
             //language=typescript
             typescript(`
                 const numbers = [];
-                const obj = { a: 1, b: 2 };
-                ({ a: numbers[0], b: numbers[1] } = obj);
+                const obj = {a: 1, b: 2};
+                ({a: numbers[0], b: numbers[1]} = obj);
             `),
             //language=typescript
             typescript(`
                 const {
                     size = "big",
-                    coords = { x: 0, y: 0 },
+                    coords = {x: 0, y: 0},
                     radius = 25,
                 } = {}
             `),
@@ -169,31 +150,35 @@ describe('variable declaration mapping', () => {
                 const obj = {};
                 const aDefault = {};
                 const bDefault = {};
-                const { x, y } = obj;
-                const { a: a1, b: b1 } = obj;
-                const { z: a2 = aDefault, f = bDefault } = obj;
-                const { c, k, ...rest } = obj;
-                const { re: a12, rb: b12, ...rest1 } = obj;
-                const { [key]: a } = obj;
+                const {x, y} = obj;
+                const {a: a1, b: b1} = obj;
+                const {z: a2 = aDefault, f = bDefault} = obj;
+                const {c, k, ...rest} = obj;
+                const {re: a12, rb: b12, ...rest1} = obj;
+                const {[key]: a} = obj;
             `),
             //language=typescript
             typescript(`
-                /*1*/ const /*2*/  {  /*3*/ a/*4*/  :/*5*/  aa /*6*/  = /*7*/  10 /*8*/ , /*9*/  b /*10*/ :  /*11*/ bb = {  } /*12*/ ,  /*13*/ } = { a: 3 };
+                /*1*/
+                const /*2*/  {  /*3*/
+                    a/*4*/:/*5*/  aa /*6*/ = /*7*/  10 /*8*/, /*9*/
+                    b /*10*/:  /*11*/ bb = {} /*12*/,  /*13*/
+                } = {a: 3};
             `),
         );
     });
 
     test('variable with exclamation token', () => {
-       return spec.rewriteRun(
+        return spec.rewriteRun(
             //language=typescript
             typescript(`
                 let schema/*a*/!/*b*/: number;
-          `)
+            `)
         );
     });
 
     test('variable with using keyword', () => {
-       return spec.rewriteRun(
+        return spec.rewriteRun(
             //language=typescript
             typescript(`
                 using unrefTimer = stub(Deno, 'unrefTimer');
@@ -202,13 +187,15 @@ describe('variable declaration mapping', () => {
     });
 
     test('variable with await using keyword', () => {
-       return spec.rewriteRun(
+        return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const getDb = async () => {
-                    return {async createUser(data) {
+                    return {
+                        async createUser(data) {
                             const user = to<AdapterUser>(data)
-                                /*a*/await /*b*/ using db = await getDb()
+                            /*a*/
+                                await /*b*/ using db = await getDb()
                             await db.U.insertOne(user)
                             return from<AdapterUser>(user)
                         }
@@ -219,7 +206,7 @@ describe('variable declaration mapping', () => {
     });
 
     test.skip('variable declaration with decorator', () => {
-       return spec.rewriteRun(
+        return spec.rewriteRun(
             //language=typescript
             typescript(`
                 export namespace process {

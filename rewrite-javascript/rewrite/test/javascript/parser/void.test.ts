@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {JavaType} from "../../../src/java";
 
 describe('void operator mapping', () => {
     const spec = new RecipeSpec();
 
-    test('void', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('void 1', undefined, cu => {
-              const statement = cu.statements[0] as JS.ExpressionStatement;
-              expect(statement).toBeInstanceOf(JS.Void);
-              const type = statement.type as JavaType.Primitive;
-              expect(type.kind).toBe(JavaType.PrimitiveKind.Void);
-          })
-        );
-    });
+    test('void', () => spec.rewriteRun({
+        //language=typescript
+        ...typescript('void 1'),
+        afterRecipe: cu => {
+            const statement = cu.statements[0] as JS.ExpressionStatement;
+            expect(statement.kind).toBeInstanceOf(JS.Kind.Void);
+            const type = (statement as any)['type'] as JavaType.Primitive;
+            expect(type.kind).toBe(JavaType.Primitive.Void);
+        }
+    }));
 });

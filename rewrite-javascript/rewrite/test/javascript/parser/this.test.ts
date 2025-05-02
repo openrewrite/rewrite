@@ -19,10 +19,7 @@ import {typescript} from "../../../src/javascript";
 describe('this mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-        rewriteRunWithOptions(
-          {normalizeIndent: false},
-          typescript('this')
-        );
-    });
+    test('simple', () => spec.rewriteRun(
+        typescript('this')
+    ));
 });
