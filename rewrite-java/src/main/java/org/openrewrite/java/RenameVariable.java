@@ -163,9 +163,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 Expression target = getTarget(fieldAccess);
                 JavaType targetType = resolveType(target.getType());
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
-                if (TypeUtils.isOfType(variableNameFieldType.getOwner(), targetType)) {
-                    // The isOfType used here triggers the behaviour we're seeing in the failed static analyses issue as both tests there use this recipe here.
-                    // By switching the return here to false (which is wrong ofc.), one can make this failing test green...
+                if (targetType != null && targetType.equals(variableNameFieldType.getOwner())) {
                     return true;
                 }
                 if (target instanceof J.TypeCast) {
