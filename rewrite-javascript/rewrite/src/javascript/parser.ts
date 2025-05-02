@@ -3528,7 +3528,16 @@ export class JavaScriptParserVisitor {
                         type: J.ModifierType.LanguageExtension,
                         annotations: []
                     }] : [],
-                    variables: []
+                    variables: [this.rightPadded({
+                        kind: J.Kind.NamedVariable,
+                        id: randomId(),
+                        prefix: emptySpace,
+                        markers: emptyMarkers,
+                        name: this.visit(node.name),
+                        dimensionsAfterName: [],
+                        initializer: this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference)),
+                        variableType: this.mapVariableType(node)
+                    }, emptySpace)]
                 }, emptySpace)
             ]
         }
