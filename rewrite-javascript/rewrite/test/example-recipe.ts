@@ -16,23 +16,27 @@
 import {
     Column,
     DataTable,
-    ExecutionContext,
-    Option,
+    ExecutionContext, markers, Markers,
+    Option, randomId,
     Recipe,
     RecipeRegistry,
     ScanningRecipe,
     SourceFile,
-    Transient,
+    Transient, Tree,
     TreeVisitor
 } from "../src";
 import {PlainText, PlainTextParser, PlainTextVisitor} from "../src/text";
 import {Json, JsonVisitor} from "../src/json";
+import {createDraft, finishDraft} from "immer";
+import {JavaScriptVisitor} from "../src/javascript";
+import {J} from "../src/java";
 
 export function activate(registry: RecipeRegistry) {
     registry.register(ChangeText);
     registry.register(CreateText);
     registry.register(ChangeVersion);
     registry.register(RecipeWithRecipeList);
+    registry.register(ReplaceId);
 }
 
 export class ReplacedText {
@@ -180,5 +184,27 @@ export class RecipeWithRecipeList extends Recipe {
 
     async recipeList() {
         return [new ChangeText({text: "hello"})];
+    }
+}
+
+export class ReplaceId extends Recipe {
+    name = "org.openrewrite.javascript.replace-id"
+    displayName = "Replace IDs";
+    description = "Replaces the ID of every `Tree` and `Marker` object in a JavaScript source.";
+
+    get editor(): TreeVisitor<any, ExecutionContext> {
+        return new class extends JavaScriptVisitor<ExecutionContext> {
+            protected async preVisit(tree: J, _p: ExecutionContext): Promise<J | undefined> {
+                let draft = createDraft(tree);
+                draft.id = randomId();
+                return finishDraft(draft);
+            }
+
+            protected async visitMarkers(markers: Markers, p: ExecutionContext): Promise<Markers> {
+                let draft = createDraft(markers);
+                draft.id = randomId();
+                return super.visitMarkers(finishDraft(draft), p);
+            }
+        }
     }
 }

@@ -23,6 +23,8 @@ import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import inspector from 'inspector';
 import {activate} from "../example-recipe";
+import {javascript} from "../../src/javascript";
+import fs from "node:fs";
 
 const isDebugging = Boolean(inspector.url());
 
@@ -35,24 +37,24 @@ describe("Rewrite RPC", () => {
     beforeEach(async () => {
         // Create in-memory streams to simulate the pipes.
         const clientToServer = new PassThrough();
-        if (isDebugging) {
-            clientToServer.on('data', chunk => {
-                console.debug('[server] ⇦ received:', `'${chunk.toString()}'`);
-            });
-        }
+        // if (isDebugging) {
+        //     clientToServer.on('data', chunk => {
+        //         console.debug('[server] ⇦ received:', `'${chunk.toString()}'`);
+        //     });
+        // }
 
         const serverToClient = new PassThrough();
-        if (isDebugging) {
-            serverToClient.on('data', chunk => {
-                console.debug('[client] ⇦ received:', `'${chunk.toString()}'`);
-            });
-        }
+        // if (isDebugging) {
+        //     serverToClient.on('data', chunk => {
+        //         console.debug('[client] ⇦ received:', `'${chunk.toString()}'`);
+        //     });
+        // }
 
         const clientConnection = rpc.createMessageConnection(
             new rpc.StreamMessageReader(serverToClient),
             new rpc.StreamMessageWriter(clientToServer)
         );
-        client = new RewriteRpc(clientConnection, {batchSize: 1});
+        client = new RewriteRpc(clientConnection, {batchSize: 1, traceGetObjectOutput: true, traceGetObjectInput: fs.createWriteStream('client.txt')});
 
         const serverConnection = rpc.createMessageConnection(
             new rpc.StreamMessageReader(clientToServer),
@@ -60,7 +62,7 @@ describe("Rewrite RPC", () => {
         );
         const registry = new RecipeRegistry();
         activate(registry);
-        server = new RewriteRpc(serverConnection, {registry: registry});
+        server = new RewriteRpc(serverConnection, {registry: registry, traceGetObjectOutput: true, traceGetObjectInput: fs.createWriteStream('server.txt')});
     });
 
     afterEach(() => {
@@ -154,6 +156,19 @@ describe("Rewrite RPC", () => {
             text(
                 "hi",
                 "hello"
+            )
+        );
+    });
+
+    test("runRecipeUpdatingAllTrees", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.javascript.replace-id");
+        await spec.rewriteRun(
+            javascript(
+                //language=javascript
+                `
+                    function foo() {
+                    }
+                `
             )
         );
     });
