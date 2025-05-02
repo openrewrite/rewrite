@@ -188,7 +188,7 @@ describe('expression statement mapping', () => {
         );
     });
 
-    test('atisfies expression with complex type ', () => {
+    test('satisfies expression with complex type ', () => {
        return spec.rewriteRun(
             //language=typescript
             typescript(`

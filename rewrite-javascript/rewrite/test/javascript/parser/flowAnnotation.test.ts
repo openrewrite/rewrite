@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {javascript, typescript} from "../../../src/javascript";
 
 describe('flow annotation checking test', () => {
     const spec = new RecipeSpec();
@@ -22,8 +22,9 @@ describe('flow annotation checking test', () => {
     test('@flow in a one line comment in js', () => {
         const faultyTest = () =>spec.rewriteRun(
             //language=javascript
-            javaScript(`
+            javascript(`
                 //@flow
+                // noinspection JSAnnotator
 
                 import Rocket from './rocket';
                 import RocketLaunch from './rocket-launch';
@@ -36,7 +37,7 @@ describe('flow annotation checking test', () => {
     test('@flow in a comment in js', () => {
         const faultyTest = () =>spec.rewriteRun(
             //language=javascript
-            javaScript(`
+            javascript(`
                 /* @flow */
 
                 import Rocket from './rocket';
@@ -50,7 +51,7 @@ describe('flow annotation checking test', () => {
     test('@flow in a multiline comment in js', () => {
         const faultyTest = () =>spec.rewriteRun(
             //language=javascript
-            javaScript(`
+            javascript(`
                 /*
                     @flow
                 */
@@ -64,7 +65,8 @@ describe('flow annotation checking test', () => {
     });
 
     test('@flow in a comment in ts', () => {
-       return spec.rewriteRun(
+        // noinspection ES6UnusedImports,TypeScriptCheckImport
+        return spec.rewriteRun(
             //language=typescript
             typescript(`
                 //@flow
