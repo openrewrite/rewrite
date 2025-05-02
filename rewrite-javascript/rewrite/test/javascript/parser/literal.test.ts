@@ -21,23 +21,25 @@ import Literal = J.Literal;
 const spec = new RecipeSpec();
 
 describe.each([
-    ['1', JavaType.Primitive.Int],
+    ['1', JavaType.Primitive.Double],
     ['1.0', JavaType.Primitive.Double],
     ['"1"', JavaType.Primitive.String],
     ['true', JavaType.Primitive.Boolean],
     ['null', JavaType.Primitive.Null],
-    ['undefined', JavaType.Primitive.None],
+    //skipped since undefined is a valid identifier in some scenarios.
+    // see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/undefined#description
+    // ['undefined', JavaType.Primitive.None],
     ['/hello/gi', JavaType.Primitive.String],
     ['`hello!`', JavaType.Primitive.String]
 ])(`primitive types`, (expectedValueSource: string, expectedType: JavaType.Primitive) => {
     test(`${expectedValueSource} should have primitive type ${expectedType.keyword}`, () => spec.rewriteRun({
-        ...typescript(' 1'),
+        ...typescript(` ${expectedValueSource}`),
         afterRecipe: (cu: JS.CompilationUnit) => {
             expect(cu).toBeDefined();
             expect(cu.statements).toHaveLength(1);
             const lit = (cu.statements[0].element as JS.ExpressionStatement).expression as Literal;
             expect(lit.valueSource).toBe(expectedValueSource);
-            expect(lit.type?.kind).toBe(expectedType);
+            expect(lit.type).toBe(expectedType);
         }
     }));
 });

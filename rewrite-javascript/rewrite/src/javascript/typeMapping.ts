@@ -70,9 +70,9 @@ export class JavaScriptTypeMapping {
         }
 
         if (type.flags === ts.TypeFlags.Null) {
-            return JavaType.unknownType;
+            return JavaType.Primitive.Null;
         } else if (type.flags === ts.TypeFlags.Undefined) {
-            return JavaType.unknownType;
+            return JavaType.Primitive.None;
         } else if (
             type.flags === ts.TypeFlags.Number ||
             type.flags === ts.TypeFlags.NumberLiteral ||
