@@ -1,5 +1,6 @@
 import * as ts from "typescript";
 import {JavaType} from "../java";
+import {Draft} from "immer";
 
 export class JavaScriptTypeMapping {
     private readonly typeCache: Map<string, JavaType> = new Map();
@@ -112,14 +113,13 @@ export class JavaScriptTypeMapping {
         }
 
         if (type.isUnion()) {
-            let result: JavaType.Union = {
+            let result: Draft<JavaType.Union> = {
                 kind: JavaType.Kind.Union,
                 bounds: []
             };
             this.typeCache.set(signature, result);
 
-            const types = type.types.map((t) => this.getType(t));
-            // FIXME result.unsafeSet(types);
+            result.bounds = type.types.map((t) => this.getType(t));
             return result;
         } else if (type.isClass()) {
             // FIXME flags
