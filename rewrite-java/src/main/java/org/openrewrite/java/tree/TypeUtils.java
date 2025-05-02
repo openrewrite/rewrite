@@ -155,7 +155,12 @@ public class TypeUtils {
         if (type1 instanceof JavaType.Annotation && type2 instanceof JavaType.Annotation) {
             return isOfType((JavaType.Annotation) type1, (JavaType.Annotation) type2);
         }
+        // This code used to be returning false, but now returns true as the `isOfType` method changes
+        // the JReturn of type1 = JavaType$Method A{name=setN,return=A,parameters=[int]} by looking at its return type now iso simple equality.
+        // before  type1 was not equal to type2 (JavaType$Class) but now as the return of the method (=class A) is equal to the class A, this one returns true.
         return new Types(false).isOfType(type1, type2);
+        // This used to be the reached code
+//        return type1.equals(type2);
     }
 
     private static boolean isOfType(JavaType.Annotation annotation1, JavaType.Annotation annotation2) {

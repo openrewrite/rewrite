@@ -995,4 +995,41 @@ class RenameVariableTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void troubleshooting() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                    if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
+                        doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
+                    }
+                    return super.visitVariableDeclarations(multiVariable, ctx);
+                }
+            })),
+          java(
+            """
+              public class A {
+                private int n;
+
+                public A setN(int n) {
+                  this.n = n;
+                  return this;
+                }
+              }
+              """,
+            """
+              public class A {
+                private int n;
+
+                public A setN(int n1) {
+                  this.n = n1;
+                  return this;
+                }
+              }
+              """
+          )
+        );
+    }
 }

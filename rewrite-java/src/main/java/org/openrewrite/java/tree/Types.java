@@ -481,6 +481,8 @@ public class Types {
     }
 
     private @Nullable JavaType normalize(@Nullable JavaType type) {
+        // This normalize method introduced the different behaviour.
+        // As I do not feel comfortable deciding (yet) if this is needed or not, not changing anything here and we could change the implementation of `RenameVariable` only?
         if (type instanceof JavaType.Method) {
             return normalize(((JavaType.Method) type).getReturnType());
         } else if (type instanceof JavaType.Variable) {
