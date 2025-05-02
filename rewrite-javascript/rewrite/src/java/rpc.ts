@@ -1321,10 +1321,11 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.before = await q.receive(left.before, space => this.visitSpace(space, q));
         draft.element = await q.receive(left.element, elem => {
-            if (isTree(elem)) {
-                return this.visit(elem as J, q) as any as T;
-            } else if (isSpace(elem)) {
+            if (isSpace(elem)) {
                 return this.visitSpace(elem as J.Space, q) as any as T;
+            } else if (typeof elem === 'object' && elem.kind) {
+                // FIXME find a better way to check if it is a `Tree`
+                return this.visit(elem as J, q) as any as T;
             }
             return elem;
         }) as Draft<T>;
@@ -1341,10 +1342,11 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const draft = createDraft(right);
 
         draft.element = await q.receive(right.element, elem => {
-            if (isTree(elem)) {
-                return this.visit(elem as J, q) as any as T;
-            } else if (isSpace(elem)) {
+            if (isSpace(elem)) {
                 return this.visitSpace(elem as J.Space, q) as any as T;
+            } else if (typeof elem === 'object' && elem.kind) {
+                // FIXME find a better way to check if it is a `Tree`
+                return this.visit(elem as J, q) as any as T;
             }
             return elem as any as T;
         }) as Draft<T>;
