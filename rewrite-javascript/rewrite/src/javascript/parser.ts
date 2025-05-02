@@ -2259,6 +2259,17 @@ export class JavaScriptParserVisitor {
         };
     }
 
+    visitTypeOfExpression(node: ts.TypeOfExpression): JS.TypeOf {
+        return {
+            kind: JS.Kind.TypeOf,
+            id: randomId(),
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            expression: this.convert(node.expression),
+            type: this.mapType(node)
+        };
+    }
+
     visitVoidExpression(node: ts.VoidExpression) {
         return {
             kind: JS.Kind.Void,
@@ -3357,8 +3368,8 @@ export class JavaScriptParserVisitor {
                     keywordType
                 ),
                 name: this.rightPadded(
-                    (body.name.kind === J.Kind.FieldAccess)
-                        ? this.remapFieldAccess(body.name, node.name)
+                    (body.name.element.kind === J.Kind.FieldAccess)
+                        ? this.remapFieldAccess(body.name.element, node.name)
                         : {
                             kind: J.Kind.FieldAccess,
                             id: randomId(),
@@ -3368,7 +3379,7 @@ export class JavaScriptParserVisitor {
                             name: {
                                 kind: J.Kind.JLeftPadded,
                                 before: this.suffix(node.name),
-                                element: body.name as J.Identifier,
+                                element: body.name.element as J.Identifier,
                                 markers: emptyMarkers
                             },
                             type: undefined
@@ -4352,7 +4363,7 @@ export class JavaScriptParserVisitor {
         if (token?.kind === ts.SyntaxKind.CommaToken) return {
             kind: JavaMarkers.TrailingComma,
             id: randomId(),
-            space: emptySpace
+            suffix: emptySpace
         };
         if (token?.kind === ts.SyntaxKind.SemicolonToken) return {kind: JavaMarkers.Semicolon, id: randomId()};
         return undefined;

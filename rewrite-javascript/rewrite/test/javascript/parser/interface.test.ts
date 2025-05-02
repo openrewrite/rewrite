@@ -101,7 +101,7 @@ describe('interface mapping', () => {
            `)
         ));
 
-    test('interface with properties with coma', () =>
+    test('interface with properties with comma', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
