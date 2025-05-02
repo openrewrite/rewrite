@@ -45,14 +45,14 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return this.javaSender.visit(tree, p, parent);
     }
 
-    protected async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
+    override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
         await q.getAndSend(j, j2 => asRef(j2.prefix), space => this.visitSpace(space, q));
         await q.sendMarkers(j, j2 => j2.markers);
         return j;
     }
 
-    protected async visitJSCompilationUnit(cu: JS.CompilationUnit, q: RpcSendQueue): Promise<J | undefined> {
+    override async visitJsCompilationUnit(cu: JS.CompilationUnit, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(cu, c => c.sourcePath);
         await q.getAndSend(cu, c => c.charsetName);
         await q.getAndSend(cu, c => c.charsetBomMarked);
@@ -546,6 +546,26 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(exportSpecifier, el => el.specifier, el => this.visit(el, q));
         await q.getAndSend(exportSpecifier, el => asRef(el.type), el => this.visitType(el, q));
         return exportSpecifier;
+    }
+
+    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcSendQueue): Promise<J.RightPadded<T>> {
+        return this.javaSender.visitRightPadded(right, q);
+    }
+
+    override async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
+        return this.javaSender.visitLeftPadded(left, q);
+    }
+
+    override async visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): Promise<J.Container<T>> {
+        return this.javaSender.visitContainer(container, q);
+    }
+
+    override async visitSpace(space: J.Space, q: RpcSendQueue): Promise<J.Space> {
+        return this.javaSender.visitSpace(space, q);
+    }
+
+    override async visitType(javaType: JavaType | undefined, q: RpcSendQueue): Promise<JavaType | undefined> {
+        return this.javaSender.visitType(javaType, q);
     }
 }
 
@@ -1158,6 +1178,26 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.specifier = await q.receive(draft.specifier, el => this.visitDefined<Expression>(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
+    }
+
+    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {
+        return this.javaReceiverDelegate.visitRightPadded(right, q)
+    }
+
+    protected async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
+        return this.javaReceiverDelegate.visitLeftPadded(left, q);
+    }
+
+    protected async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
+        return this.javaReceiverDelegate.visitContainer(container, q);
+    }
+
+    override async visitSpace(space: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
+        return this.javaReceiverDelegate.visitSpace(space, q);
+    }
+
+    override async visitType(javaType: JavaType | undefined, q: RpcReceiveQueue): Promise<JavaType | undefined> {
+        return this.javaReceiverDelegate.visitType(javaType, q);
     }
 }
 

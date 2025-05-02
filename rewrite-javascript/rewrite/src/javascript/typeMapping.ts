@@ -119,7 +119,7 @@ export class JavaScriptTypeMapping {
             };
             this.typeCache.set(signature, result);
 
-            result.bounds = type.types.map((t) => this.getType(t));
+            result.bounds = type.types.map(t => this.getType(t));
             return result;
         } else if (type.isClass()) {
             // FIXME flags

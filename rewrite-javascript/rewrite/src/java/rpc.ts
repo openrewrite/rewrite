@@ -15,9 +15,10 @@
  */
 import {JavaVisitor} from "./visitor";
 import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {Expression, isJava, isSpace, J, JavaType, TextComment} from "./tree";
+import {Expression, isSpace, J, JavaType, TextComment} from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
+import {isTree} from "../tree";
 
 export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
@@ -516,7 +517,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return ident;
     }
 
-    protected async visitSpace(space: J.Space, q: RpcSendQueue): Promise<J.Space> {
+    public override async visitSpace(space: J.Space, q: RpcSendQueue): Promise<J.Space> {
         await q.getAndSendList(space, s => s.comments,
             c => {
                 if (c.kind === J.Kind.TextComment) {
@@ -539,9 +540,9 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return space;
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
+    public override async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
         await q.getAndSend(left, l => asRef(l.before), space => this.visitSpace(space, q));
-        if (isJava(left.element)) {
+        if (isTree(left.element)) {
             await q.getAndSend(left, l => l.element, elem => this.visit(elem as J, q));
         } else if (isSpace(left.element)) {
             await q.getAndSend(left, l => asRef(l.element), space => this.visitSpace(space as J.Space, q));
@@ -552,8 +553,8 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return left;
     }
 
-    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcSendQueue): Promise<J.RightPadded<T>> {
-        if (isJava(right.element)) {
+    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcSendQueue): Promise<J.RightPadded<T>> {
+        if (isTree(right.element)) {
             await q.getAndSend(right, r => r.element, elem => this.visit(elem as J, q));
         } else {
             await q.getAndSend(right, r => r.element);
@@ -563,11 +564,15 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return right;
     }
 
-    protected async visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): Promise<J.Container<T>> {
+    public override async visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): Promise<J.Container<T>> {
         await q.getAndSend(container, c => asRef(c.before), space => this.visitSpace(space, q));
         await q.getAndSendList(container, c => c.elements, elem => elem.element.id, elem => this.visitRightPadded(elem, q));
         await q.sendMarkers(container, c => c.markers);
         return container;
+    }
+
+    public override async visitType(javaType: JavaType | undefined, q: RpcSendQueue): Promise<JavaType | undefined> {
+        return super.visitType(javaType, q);
     }
 }
 
@@ -1286,7 +1291,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitSpace(space: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
+    public override async visitSpace(space: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
         const draft = createDraft(space);
 
         draft.comments = await q.receiveListDefined(space.comments, async c => {
@@ -1307,7 +1312,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
+    public override async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
         if (!left) {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty left padding");
         }
@@ -1316,7 +1321,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.before = await q.receive(left.before, space => this.visitSpace(space, q));
         draft.element = await q.receive(left.element, elem => {
-            if (isJava(elem)) {
+            if (isTree(elem)) {
                 return this.visit(elem as J, q) as any as T;
             } else if (isSpace(elem)) {
                 return this.visitSpace(elem as J.Space, q) as any as T;
@@ -1328,7 +1333,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft) as J.LeftPadded<T>;
     }
 
-    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {
+    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {
         if (!right) {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty right padding");
         }
@@ -1336,7 +1341,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const draft = createDraft(right);
 
         draft.element = await q.receive(right.element, elem => {
-            if (isJava(elem)) {
+            if (isTree(elem)) {
                 return this.visit(elem as J, q) as any as T;
             } else if (isSpace(elem)) {
                 return this.visitSpace(elem as J.Space, q) as any as T;
@@ -1349,7 +1354,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft) as J.RightPadded<T>;
     }
 
-    protected async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
+    public override async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
         const draft = createDraft(container);
 
         draft.before = await q.receive(container.before, space => this.visitSpace(space, q));
@@ -1357,6 +1362,10 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         draft.markers = await q.receiveMarkers(container.markers);
 
         return finishDraft(draft) as J.Container<T>;
+    }
+
+    public override async visitType(javaType: JavaType | undefined, q: RpcReceiveQueue): Promise<JavaType | undefined> {
+        return super.visitType(javaType, q);
     }
 }
 

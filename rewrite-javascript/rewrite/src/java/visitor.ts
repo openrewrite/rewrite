@@ -41,27 +41,27 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-    protected async visitExpression(expression: Expression, _p: P): Promise<J | undefined> {
+    protected async visitExpression(expression: Expression, p: P): Promise<J | undefined> {
         return expression;
     }
 
     // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-    protected async visitStatement(statement: Statement, _p: P): Promise<J | undefined> {
+    protected async visitStatement(statement: Statement, p: P): Promise<J | undefined> {
         return statement;
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected async visitSpace(space: J.Space, _p: P): Promise<J.Space> {
+    protected async visitSpace(space: J.Space, p: P): Promise<J.Space> {
         return space;
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected async visitType(javaType: JavaType | undefined, _p: P): Promise<JavaType | undefined> {
+    protected async visitType(javaType: JavaType | undefined, p: P): Promise<JavaType | undefined> {
         return javaType;
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected async visitTypeName<N extends NameTree>(nameTree: N, _p: P): Promise<N> {
+    protected async visitTypeName<N extends NameTree>(nameTree: N, p: P): Promise<N> {
         return nameTree;
     }
 
