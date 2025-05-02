@@ -1,3 +1,5 @@
+// noinspection JSUnusedLocalSymbols,TypeScriptUnresolvedReference,TypeScriptValidateTypes,ThisExpressionReferencesGlobalObjectJS
+
 /*
  * Copyright 2023 the original author or authors.
  * <p>
@@ -19,136 +21,114 @@ import {typescript} from "../../../src/javascript";
 describe('expression statement mapping', () => {
     const spec = new RecipeSpec();
 
-    test('literal with semicolon', () => {
-        rewriteRunWithOptions(
-            {normalizeIndent: false},
-            typescript('1 ;')
-        );
-    });
-    test('multiple', () => {
-        rewriteRunWithOptions(
-            {normalizeIndent: false},
-            typescript(
-                //language=ts
-                `
-                    1; // foo
-                    // bar
-                    /*baz*/
-                    2;`
-            )
-        );
-    });
+    test('literal with semicolon', () => spec.rewriteRun(
+        typescript('1 ;')
+    ));
 
-    test('simple non-null expression', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                const length = user ! . profile ! . username ! . length ;
-            `)
-        );
-    });
+    test('multiple', () => spec.rewriteRun(
+        typescript(
+            //language=ts
+            `
+                1; // foo
+                // bar
+                /*baz*/
+                2;`
+        )
+    ));
 
-    test('simple non-null expression with comments', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                const length = /*0*/user/*a*/!/*b*/./*c*/ profile /*d*/!/*e*/ ./*f*/ username /*g*/!/*h*/ ./*j*/ length/*l*/ ;
-            `)
-        );
-    });
+    test('simple non-null expression', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            const length = user !.profile !.username !.length;
+        `)
+    ));
 
-    test('simple question-dot expression', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                const length = user ?. profile ?. username ?. length ;
-            `)
-        );
-    });
+    test('simple non-null expression with comments', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            const length = /*0*/user/*a*/!/*b*/./*c*/profile /*d*/!/*e*/./*f*/username /*g*/!/*h*/./*j*/length/*l*/;
+        `)
+    ));
 
-    test('simple question-dot expression with comments', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                const length = /*0*/user/*a*/ ?./*b*/ profile/*c*/ ?./*d*/ username /*e*/?./*f*/ length /*g*/;
-            `)
-        );
-    });
+    test('simple question-dot expression', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            const length = user?.profile?.username?.length;
+        `)
+    ));
 
-    test('simple default expression', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                const length = user ?? 'default' ;
-            `)
-        );
-    });
+    test('simple question-dot expression with comments', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            const length = /*0*/user/*a*/?./*b*/profile/*c*/?./*d*/username /*e*/?./*f*/length /*g*/;
+        `)
+    ));
 
-    test('simple default expression with comments', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                const length = user /*a*/??/*b*/ 'default' /*c*/;
-            `)
-        );
-    });
+    test('simple default expression', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            const length = user ?? 'default';
+        `)
+    ));
 
-    test('mixed expression with special tokens', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                class Profile {
-                    username?: string; // Optional property
+    test('simple default expression with comments', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            const length = user /*a*/ ??/*b*/ 'default' /*c*/;
+        `)
+    ));
+
+    test('mixed expression with special tokens', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            class Profile {
+                username?: string; // Optional property
+            }
+
+            class User {
+                profile?: Profile; // Optional property
+            }
+
+            function getUser(id: number): User | null {
+                if (id === 1) {
+                    return new User();
                 }
+                return null;
+            }
 
-                class User {
-                    profile?: Profile; // Optional property
-                }
+            const user = getUser(1);
+            const length = user  !.profile?.username  !.length /*test*/;
+            const username2 = getUser(1) !.profile?.username; // test;
+            const username = user!.profile?.username ?? 'Guest';
+        `)
+    ));
 
-                function getUser(id: number) : User | null {
-                    if (id === 1) {
-                        return new User();
-                    }
-                    return null;
-                }
+    test('mixed expression with methods with special tokens', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            interface Profile {
+                username?(): string; // Optional property
 
-                const user = getUser(1);
-                const length = user  ! .   profile ?.  username  !. length /*test*/ ;
-                const username2 = getUser(1) ! .  profile  ?. username ; // test;
-                const username = user!.profile?.username ?? 'Guest' ;
-            `)
-        );
-    });
+            }
 
-    test('mixed expression with methods with special tokens', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                interface Profile {
-                    username?(): string; // Optional property
+            interface User {
+                profile?(): Profile; // Optional property
+            }
 
-                }
+            function getUser(id: number): User | null {
+                return null;
+            }
 
-                interface User {
-                    profile?(): Profile; // Optional property
-                }
+            const user = getUser(1);
+            const username1 = user  !.profile()?.username()  !.toLowerCase() /*test*/;
+            const username2 = getUser(1) !.profile()?.username(); // test;
+            const username3 = getUser(1)?.profile()?.username() ?? 'Guest';
+        `)
+    ));
 
-                function getUser(id: number) : User | null {
-                    return null;
-                }
-
-                const user = getUser(1);
-                const username1 = user  ! .   profile() ?.  username()  !. toLowerCase() /*test*/ ;
-                const username2 = getUser(1) ! .  profile()  ?. username() ; // test;
-                const username3 = getUser(1) ?. profile()?.username() ?? 'Guest' ;
-            `)
-        );
-    });
-
-    test('optional chaining operator with ?.', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
+    test('optional chaining operator with ?.', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
             const func1 = (msg: string) => {
                 return {
                     func2: (greeting: string) => greeting + msg
@@ -156,85 +136,77 @@ describe('expression statement mapping', () => {
             };
 
             const result1 = func1?.("World")?.func2("Hello"); // Invokes func1 and then func2 if func1 is not null/undefined.
-            `)
-        );
-    });
+        `)
+    ));
 
-    test('optional chaining operator with ?. and custom type', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                const func1: ((msg: string) => { func2: (greeting: string) => string }) | undefined = undefined;
-                const result2 = func1?.("Test")?.func2("Hi"); // Does not invoke and returns \`undefined\`.
-            `)
-        );
-    });
+    test('optional chaining operator with ?. and custom type', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            const func1: ((msg: string) => { func2: (greeting: string) => string }) | undefined = undefined;
+            const result2 = func1?.("Test")?.func2("Hi"); // Does not invoke and returns \`undefined\`.
+        `)
+    ));
 
-    test('satisfies expression', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                type Person = {
-                    name: string;
-                    age: number;
-                };
+    test('satisfies expression', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            // noinspection JSAnnotator
 
-                const user = /*o*/ {
-                    name: "Alice",
-                    age: 25,
-                    occupation: "Engineer"
-                } /*a*/ satisfies /*b*/ Person /*c*/;
-            `)
-        );
-    });
+            type Person = {
+                name: string;
+                age: number;
+            };
 
-    test('satisfies expression with complex type ', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                type ApiResponse<T> = {
-                    data: T;
-                    status: "success" | "error";
-                };
+            const user = /*o*/ {
+                name: "Alice",
+                age: 25,
+                occupation: "Engineer"
+            } /*a*/ satisfies /*b*/ Person /*c*/;
+        `)
+    ));
 
-                const response = {
-                    data: { userId: 1 },
-                    status: "success",
-                } satisfies ApiResponse<{ userId: number }>;
-            `)
-        );
-    });
+    test('satisfies expression with complex type ', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            // noinspection JSAnnotator
 
-    test('debugging statement', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-              function calculate(value: number) {
-                  /*a*/debugger/*b*/;/*c*/ // Pauses execution when debugging
-                  return value * 2;
-              }
-          `)
-        );
-    });
+            type ApiResponse<T> = {
+                data: T;
+                status: "success" | "error";
+            };
 
-    test('shorthand property assignment with initializer', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                ({
-                    initialState,
-                    resultSelector/*a*/ = /*b*/identity as ResultFunc<S, T>,
-                } = initialStateOrOptions as GenerateOptions<T, S>);
-            `)
-        );
-    });
+            const response = {
+                data: {userId: 1},
+                status: "success",
+            } satisfies ApiResponse<{ userId: number }>;
+        `)
+    ));
 
-    test('new expression with array access', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                const results = new this.constructor[Symbol.species]<Key, Value>();
-            `)
-        );
-    });
+    test('debugging statement', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            function calculate(value: number) {
+                /*a*/
+                debugger/*b*/;/*c*/ // Pauses execution when debugging
+                return value * 2;
+            }
+        `)
+    ));
+
+    test('shorthand property assignment with initializer', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            ({
+                initialState,
+                resultSelector/*a*/ = /*b*/identity as ResultFunc<S, T>,
+            } = initialStateOrOptions as GenerateOptions<T, S>);
+        `)
+    ));
+
+    test('new expression with array access', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            const results = new this.constructor[Symbol.species]<Key, Value>();
+        `)
+    ));
 });

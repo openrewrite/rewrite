@@ -19,16 +19,11 @@ import {typescript} from "../../../src/javascript";
 describe('source file mapping', () => {
     const spec = new RecipeSpec();
 
-    test('whitespace after last statement', () => {
-        rewriteRunWithOptions(
-          {normalizeIndent: false},
-          typescript(
-            //language=typescript
-            `
-                1; /* comment 1 */
-                // comment 2
-            `
-          )
-        );
-    });
+    test('whitespace after last statement', () => spec.rewriteRun(
+        //language=typescript
+        typescript(`
+            1; /* comment 1 */
+            // comment 2
+        `)
+    ));
 });
