@@ -136,10 +136,11 @@ export class RecipeSpec {
      * Parse the whole group together so the sources can reference once another.
      */
     private async parse(specs: SourceSpec<any>[]): Promise<[SourceSpec<any>, SourceFile][]> {
+        let snowflake = SnowflakeId();
         const before: [SourceSpec<any>, { text: string, sourcePath: string }][] = [];
         for (const spec of specs) {
             if (spec.before) {
-                const sourcePath = spec.path || `${SnowflakeId().generate()}.${spec.ext}`;
+                const sourcePath = spec.path || `${snowflake.generate()}.${spec.ext}`;
                 before.push([spec, {text: dedent(spec.before), sourcePath: sourcePath}]);
             }
         }
