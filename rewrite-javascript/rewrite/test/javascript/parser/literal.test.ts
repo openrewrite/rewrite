@@ -32,10 +32,10 @@ describe.each([
 ])(`primitive types`, (expectedValueSource: string, expectedType: JavaType.Primitive) => {
     test(`${expectedValueSource} should have primitive type ${expectedType.keyword}`, () => spec.rewriteRun({
         ...typescript(' 1'),
-        afterRecipe: cu => {
+        afterRecipe: (cu: JS.CompilationUnit) => {
             expect(cu).toBeDefined();
             expect(cu.statements).toHaveLength(1);
-            const lit = (cu.statements[0] as JS.ExpressionStatement).expression as Literal;
+            const lit = (cu.statements[0].element as JS.ExpressionStatement).expression as Literal;
             expect(lit.valueSource).toBe(expectedValueSource);
             expect(lit.type?.kind).toBe(expectedType);
         }

@@ -90,9 +90,9 @@ export class RecipeSpec {
 
     private async expectResultsToMatchAfter(specs: SourceSpec<any>[], changeset: Result[], parsed: [SourceSpec<any>, SourceFile][]) {
         for (const spec of specs) {
+            const matchingSpec = parsed.find(([s, _]) => s === spec);
             const after = changeset.find(c => {
                 if (c.before) {
-                    const matchingSpec = parsed.find(([s, _]) => s === spec);
                     return c.before === matchingSpec![1];
                 } else if (c.after) {
                     const matchingSpec = specs.find(s => s.path === c.after!.sourcePath);
@@ -102,6 +102,9 @@ export class RecipeSpec {
 
             if (!spec.after) {
                 expect(after).not.toBeDefined();
+                if (spec.afterRecipe) {
+                    spec.afterRecipe(matchingSpec![1]);
+                }
             } else {
                 await this.expectAfter(spec, after);
             }

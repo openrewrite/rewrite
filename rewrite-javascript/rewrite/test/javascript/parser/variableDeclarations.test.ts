@@ -29,11 +29,11 @@ describe('variable declaration mapping', () => {
                 /* c1*/  /*c2 */
                 const d = 1;
             `),
-            afterRecipe: cu => {
+            afterRecipe: (cu: JS.CompilationUnit) => {
                 expect(cu).toBeDefined();
                 expect(cu.statements).toHaveLength(2);
-                cu.statements.forEach((statement: any) => expect(statement.kind).toBe(JS.Kind.ScopedVariableDeclarations));
-                cu.padding.statements.forEach((statement: any) => {
+                cu.statements.forEach(statement => expect(statement.element.kind).toBe(JS.Kind.ScopedVariableDeclarations));
+                cu.statements.forEach(statement => {
                     expect(statement.after.comments).toHaveLength(0);
                     expect(statement.after.whitespace).toBe('');
                 });

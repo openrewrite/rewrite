@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeSpec} from "../../../src/test";
-import {javascript, typescript} from "../../../src/javascript";
+import {RecipeSpec, SourceSpec} from "../../../src/test";
+import {javascript} from "../../../src/javascript";
+import {MarkersKind, ParseExceptionResult, SourceFile} from "../../../src";
 
 describe('flow annotation checking test', () => {
     const spec = new RecipeSpec();
 
-    test('@flow in a one line comment in js', () => {
-        const faultyTest = () => spec.rewriteRun(
+    test('@flow in a one line comment in js', () =>
+        expectFlowSyntaxError(
             //language=javascript
             javascript(`
                 //@flow
@@ -29,13 +30,10 @@ describe('flow annotation checking test', () => {
                 import Rocket from './rocket';
                 import RocketLaunch from './rocket-launch';
             `)
-        );
+        ));
 
-        expect(faultyTest).toThrow(/FlowSyntaxNotSupportedError/);
-    });
-
-    test('@flow in a comment in js', () => {
-        const faultyTest = () => spec.rewriteRun(
+    test('@flow in a comment in js', () =>
+        expectFlowSyntaxError(
             //language=javascript
             javascript(`
                 /* @flow */
@@ -43,13 +41,10 @@ describe('flow annotation checking test', () => {
                 import Rocket from './rocket';
                 import RocketLaunch from './rocket-launch';
             `)
-        );
+        ));
 
-        expect(faultyTest).toThrow(/FlowSyntaxNotSupportedError/);
-    });
-
-    test('@flow in a multiline comment in js', () => {
-        const faultyTest = () => spec.rewriteRun(
+    test('@flow in a multiline comment in js', () =>
+        expectFlowSyntaxError(
             //language=javascript
             javascript(`
                 /*
@@ -59,19 +54,27 @@ describe('flow annotation checking test', () => {
                 import Rocket from './rocket';
                 import RocketLaunch from './rocket-launch';
             `)
-        );
-
-        expect(faultyTest).toThrow(/FlowSyntaxNotSupportedError/);
-    });
+        ));
 
     test('@flow in a comment in ts', () =>
-        spec.rewriteRun(
-            //language=typescript
-            typescript(`
+        expectFlowSyntaxError(
+            //language=javascript
+            javascript(`
                 //@flow
 
                 import Rocket from './rocket';
                 import RocketLaunch from './rocket-launch';
             `)
         ));
+
+    async function expectFlowSyntaxError(sourceSpec: SourceSpec<any>) {
+        await spec.rewriteRun({
+            ...sourceSpec,
+            afterRecipe: (source: SourceFile) => {
+                let parseExceptionResult = source.markers.markers.find(m => m.kind == MarkersKind.ParseExceptionResult) as ParseExceptionResult;
+                expect(parseExceptionResult).toBeDefined();
+                expect(parseExceptionResult.exceptionType).toEqual('FlowSyntaxNotSupportedError');
+            }
+        });
+    }
 });
