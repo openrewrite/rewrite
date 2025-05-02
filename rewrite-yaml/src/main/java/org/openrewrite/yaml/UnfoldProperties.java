@@ -27,6 +27,7 @@ import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.countOccurrences;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
@@ -39,9 +40,7 @@ public class UnfoldProperties extends Recipe {
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     @Option(displayName = "Exclusions",
-            description = "Specifies keys that should not be unfolded. Supports regex expressions. " +
-                    "A special format `[<parent-regex>]-><child-regex>` can be used to exclude specific child keys under a parent. " +
-                    "For example, `[logging.level]->.*` excludes all child keys under 'logging.level'.",
+            description = "A list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions to specify keys that should not be unfolded.",
             example = "org.springframework.security")
     List<String> exclusions;
 
@@ -61,6 +60,7 @@ public class UnfoldProperties extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        List<JsonPathMatcher> matchers = exclusions.stream().map(JsonPathMatcher::new).collect(toList());
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext executionContext) {
@@ -74,7 +74,9 @@ public class UnfoldProperties extends Recipe {
                 Yaml.Mapping.Entry entry = super.visitMappingEntry(e, ctx);
 
                 String key = entry.getKey().getValue();
-                if (key.contains(".") && !exclusions.contains(key)) {
+
+                //if (key.contains(".") && !exclusions.contains(key)) {
+                if (key.contains(".") && matchers.stream().noneMatch(it -> it.matches(getCursor()))) {
                     List<String> parts = getParts(key);
                     if (parts.size() > 1) {
                         Yaml.Mapping.Entry nestedEntry = createNestedEntry(parts, 0, entry.getValue()).withPrefix(entry.getPrefix());
@@ -95,26 +97,55 @@ public class UnfoldProperties extends Recipe {
                 return entry;
             }
 
+            /**
+             * Splits a key into parts while respecting certain exclusion rules.
+             * The method ensures certain segments of the key are kept together as defined in the exclusions list.
+             *
+             * @param key the full key to be split into parts
+             * @return a list of strings representing the split parts of the key
+             */
             private List<String> getParts(String key) {
                 String parentKey = getParentKey();
                 List<String> keepTogether = new ArrayList<>();
                 for (String ex : exclusions) {
-                    if (ex.startsWith("[") && ex.contains("]->") && !ex.endsWith("]->")) {
+                    /*if (!ex.startsWith("->") && ex.contains("->") && !ex.endsWith("->")) {
                         if (parentKey == null) {
                             continue;
                         }
-                        String parentEx = ex.split("]->")[0].substring(1);
+                        String parentEx = ex.split("->")[0].substring(1);
                         Matcher m = Pattern.compile(".*(" + parentEx + ").*").matcher(parentKey);
                         if (m.matches()) {
-                            ex = ex.split("]->")[1];
+                            ex = ex.split("->")[1];
                         } else {
                             continue;
                         }
+                    }*/
+
+                    if (ex.startsWith("$..")) { // Recursive descent
+                        ex = ex.substring(3);
+                    }
+                    if (ex.startsWith("$.")) { // Starts from root
+                        ex = ex.replace("$." + parentKey, "");
+                    }
+                    if (ex.startsWith("[") && ex.endsWith("]")) {
+                        ex = ex.substring(1, ex.length() - 1);
+                    }
+                    if (ex.startsWith("\"") && ex.endsWith("\"")) {
+                        ex = ex.substring(1, ex.length() - 1);
+                    } else if (ex.startsWith("'") && ex.endsWith("'")) {
+                        ex = ex.substring(1, ex.length() - 1);
+                    } else if (ex.startsWith(".")) {
+                        ex = ex.substring(1);
                     }
 
-                    Matcher m = Pattern.compile(".*(" + ex + ").*").matcher(key);
-                    if (m.matches()) {
-                        keepTogether.add(m.group(1).isEmpty() ? m.group(0) : m.group(1));
+                    if (ex.startsWith("?(@property.match(/") && ex.endsWith("/))")) {
+                        ex = ex.substring(19, ex.length() - 3);
+                        Matcher m = Pattern.compile(".*(" + ex + ").*").matcher(key);
+                        if (m.matches()) {
+                            keepTogether.add(m.group(1).isEmpty() ? m.group(0) : m.group(1));
+                        }
+                    } else if (key.contains(ex)) {
+                        keepTogether.add(ex);
                     }
                 }
 

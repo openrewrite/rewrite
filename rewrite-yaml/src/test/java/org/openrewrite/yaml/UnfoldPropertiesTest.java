@@ -129,14 +129,22 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusions() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("metrics.enable.process.files", "endpoint.health"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of(
+            "$..['metrics.enable.process.files']",
+            "$..[\"endpoint.health\"]",
+            "$..[show.details]",
+            "$.management.endpoint.health[show.controllers]",
+            "$.management.endpoint.health.show.views"
+          ))),
           yaml(
             """
               management:
                 metrics.enable.process.files: true
                 endpoint.health:
                   show-components: always
-                  show-details: always
+                  show.details: always
+                  show.controllers: always
+                  show.views: always
               """
           )
         );
@@ -145,16 +153,18 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusionWithSubSetOfKey() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("com.service"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..['com.service']"))),
           yaml(
             """
               logging.level.com.service.A: DEBUG
+              logging.level.com.service.B: DEBUG
               """,
             """
               logging:
                 level:
                   com.service:
                     A: DEBUG
+                    B: DEBUG
               """
           )
         );
@@ -163,7 +173,7 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusionWithRegex() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("some.*"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[?(@property.match(/some.*/))]"))),
           yaml(
             """
               A.B:
@@ -182,7 +192,8 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusionWithParentAndRegex() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("[log.*level]->.*"))),
+          //spec -> spec.recipe(new UnfoldProperties(List.of("log.*level->.*"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/com*/))]"))),
           yaml(
             """
               first:
