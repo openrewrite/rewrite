@@ -155,7 +155,7 @@ public class TypeUtils {
         if (type1 instanceof JavaType.Annotation && type2 instanceof JavaType.Annotation) {
             return isOfType((JavaType.Annotation) type1, (JavaType.Annotation) type2);
         }
-        return new Types(false).isOfType(type1, type2);
+        return new Types().isOfType(type1, type2);
     }
 
     private static boolean isOfType(JavaType.Annotation annotation1, JavaType.Annotation annotation2) {
@@ -278,7 +278,7 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
-        return new Types(false).isAssignableTo(to, from);
+        return new Types().isAssignableTo(to, from);
     }
 
     public static boolean isAssignableTo(String to, @Nullable JavaType from) {
