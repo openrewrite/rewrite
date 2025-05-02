@@ -19,7 +19,7 @@ import {typescript} from "../../../src/javascript";
 describe('method mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
+    test('simple', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -29,10 +29,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('single parameter', () => {
+    test('single parameter', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -42,10 +41,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('single typed parameter', () => {
+    test('single typed parameter', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -55,10 +53,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('single typed parameter with initializer', () => {
+    test('single typed parameter with initializer', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -68,10 +65,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('single parameter with initializer', () => {
+    test('single parameter with initializer', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -81,10 +77,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('multi parameters', () => {
+    test('multi parameters', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -94,10 +89,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('parameter with trailing comma', () => {
+    test('parameter with trailing comma', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -107,10 +101,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('optional parameter with trailing comma', () => {
+    test('optional parameter with trailing comma', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -120,10 +113,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('type parameters', () => {
+    test('type parameters', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -133,10 +125,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('type parameters with bounds', () => {
+    test('type parameters with bounds', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -146,10 +137,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('return type', () => {
+    test('return type', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -160,10 +150,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('method with generics', () => {
+    test('method with generics', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -174,10 +163,9 @@ describe('method mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('method with ComputedPropertyName', () => {
+    test('method with ComputedPropertyName', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -191,10 +179,9 @@ describe('method mapping', () => {
                     },
                 };
             `)
-        );
-    });
+        ));
 
-    test('method signature with ComputedPropertyName', () => {
+    test('method signature with ComputedPropertyName', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -211,20 +198,18 @@ describe('method mapping', () => {
                     },
                 };
             `)
-        );
-    });
+        ));
 
-    test('extends as a call expression', () => {
+    test('extends as a call expression', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
                 export class ResultLengthMismatch extends TypeIdError(SqlErrorTypeId, "ResultLengthMismatch")<{}> {
                 }
             `)
-        );
-    });
+        ));
 
-    test('method name as string literal', () => {
+    test('method name as string literal', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -233,6 +218,5 @@ describe('method mapping', () => {
                     "System.Collections.IEnumerable.GetEnumerator"/*b*/(/*c*/): IEnumerator<any>;
                 }
             `)
-        );
-    });
+        ));
 });
