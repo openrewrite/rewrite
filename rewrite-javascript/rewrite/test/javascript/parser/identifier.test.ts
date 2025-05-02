@@ -19,15 +19,13 @@ import {typescript} from "../../../src/javascript";
 describe('literal mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          typescript('foo')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            typescript('foo')
+        ));
 
-    test('private', () => {
-       return spec.rewriteRun(
-          typescript('#foo')
-        );
-    });
+    test('private', () =>
+        spec.rewriteRun(
+            typescript('#foo')
+        ));
 });

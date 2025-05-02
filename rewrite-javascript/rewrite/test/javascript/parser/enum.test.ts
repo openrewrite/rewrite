@@ -19,199 +19,183 @@ import {typescript} from "../../../src/javascript";
 describe('enum mapping', () => {
     const spec = new RecipeSpec();
 
-    test('enum declaration', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              enum Test {
-              };
-          `)
-        );
-    });
-
-    test('enum empty declaration with modifiers', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              declare const enum Test {
-              };
-          `)
-        );
-    });
-
-    test('enum member', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              enum Test {
-                A
-              };
-          `)
-        );
-    });
-
-    test('enum member with coma', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              enum Test {
-                  A/*a*/,
-              };
-          `)
-        );
-    });
-
-    test('enum members', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              enum Test {
-                  A,
-                  B,
-                  C
-              };
-          `)
-        );
-    });
-
-    test('enum with const modifier', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              const enum Test {
-                  A,
-                  B,
-                  C,
-              };
-          `)
-        );
-    });
-
-    test('enum with declare modifier', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              declare enum Test {
-                  A,
-                  B,
-                  C,
-              };
-          `)
-        );
-    });
-
-    test('enum with declare const modifier', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              declare const enum Test {
-                  A,
-                  B,
-                  C,
-              };
-          `)
-        );
-    });
-
-    test('enum with declare const modifier and comments', () => {
-       return spec.rewriteRun(
+    test('enum declaration', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                /*a*/ declare /*b*/ const /*c*/ enum Test {
-                    A,
-                    B,
-                    C,
-                };
+               enum Test {
+               };
+           `)
+        ));
+
+    test('enum empty declaration with modifiers', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               declare const enum Test {
+               };
+           `)
+        ));
+
+    test('enum member', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               enum Test {
+                 A
+               };
+           `)
+        ));
+
+    test('enum member with coma', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               enum Test {
+                   A/*a*/,
+               };
+           `)
+        ));
+
+    test('enum members', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               enum Test {
+                   A,
+                   B,
+                   C
+               };
+           `)
+        ));
+
+    test('enum with const modifier', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               const enum Test {
+                   A,
+                   B,
+                   C,
+               };
+           `)
+        ));
+
+    test('enum with declare modifier', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               declare enum Test {
+                   A,
+                   B,
+                   C,
+               };
+           `)
+        ));
+
+    test('enum with declare const modifier', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               declare const enum Test {
+                   A,
+                   B,
+                   C,
+               };
+           `)
+        ));
+
+    test('enum with declare const modifier and comments', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                 /*a*/ declare /*b*/ const /*c*/ enum Test {
+                     A,
+                     B,
+                     C,
+                 };
+             `)
+        ));
+
+    test('enum members with comments', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                enum Test /*xx*/ {
+                   A /*aa*/, /*ab*/
+                   /*bb*/ B /*cc*/,
+                   C/*de*/, /*dd*/
+               };
+           `)
+        ));
+
+    test('enum members with initializer', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               enum Test {
+                   A  = "AA",
+                   B = 10
+               }
+           `)
+        ));
+
+    test('enum mixed members with initializer', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               enum Test {
+                   A  = "AA",
+                   B = undefined,
+                   C = 10,
+                   D = globalThis.NaN,
+                   E = (2 + 2),
+                   F,
+               }
+           `)
+        ));
+
+    test('enum members with initializer and comments', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               enum Test {
+                   //A /*aaa*/ = /*bbb*/ "A"
+                   A  /*aaa*/  = /*bbb*/ "AA"  ,
+                   B = 10 /*ccc*/ + /*ddd*/ 5
+               }
+           `)
+        ));
+
+    test('enum complex members with initializer', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               const baseValue = 10;
+ 
+               const enum MathConstants {
+                   Pi = 3.14,
+                   E = Math.E,
+                   GoldenRatio = baseValue + 1.618,
+               }
+           `)
+        ));
+
+    test('enum with string literals', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               enum CustomizableCompilers {
+                   /*a*/'typescript'/*b*/ = 'typescript'
+               }
+           `)
+        ));
+
+    test.skip('enum with non identifier name', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                enum A { ['baz'] }
             `)
-        );
-    });
-
-    test('enum members with comments', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-               enum Test /*xx*/ {
-                  A /*aa*/, /*ab*/
-                  /*bb*/ B /*cc*/,
-                  C/*de*/, /*dd*/
-              };
-          `)
-        );
-    });
-
-    test('enum members with initializer', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              enum Test {
-                  A  = "AA",
-                  B = 10
-              }
-          `)
-        );
-    });
-
-    test('enum mixed members with initializer', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              enum Test {
-                  A  = "AA",
-                  B = undefined,
-                  C = 10,
-                  D = globalThis.NaN,
-                  E = (2 + 2),
-                  F,
-              }
-          `)
-        );
-    });
-
-    test('enum members with initializer and comments', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              enum Test {
-                  //A /*aaa*/ = /*bbb*/ "A"
-                  A  /*aaa*/  = /*bbb*/ "AA"  ,
-                  B = 10 /*ccc*/ + /*ddd*/ 5
-              }
-          `)
-        );
-    });
-
-    test('enum complex members with initializer', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              const baseValue = 10;
-
-              const enum MathConstants {
-                  Pi = 3.14,
-                  E = Math.E,
-                  GoldenRatio = baseValue + 1.618,
-              }
-          `)
-        );
-    });
-
-    test('enum with string literals', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              enum CustomizableCompilers {
-                  /*a*/'typescript'/*b*/ = 'typescript'
-              }
-          `)
-        );
-    });
-
-    test.skip('enum with non identifier name', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              enum A { ['baz'] }
-          `)
-        );
-    });
+        ));
 });

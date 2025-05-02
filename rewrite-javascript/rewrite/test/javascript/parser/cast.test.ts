@@ -19,10 +19,9 @@ import {typescript} from "../../../src/javascript";
 describe('cast mapping', () => {
     const spec = new RecipeSpec();
 
-    test('primitive type', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('< string  > "x"')
-        );
-    });
+    test('primitive type', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('< string  > "x"')
+        ));
 });

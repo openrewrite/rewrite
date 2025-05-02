@@ -19,120 +19,109 @@ import {typescript} from "../../../src/javascript";
 describe('type-query operator mapping', () => {
     const spec = new RecipeSpec();
 
-    test('typeof', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              type UserType = typeof Number;
-          `)
-        );
-    });
-
-    test('typeof with comments', () => {
-       return spec.rewriteRun(
+    test('typeof', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type UserType = /*a*/ typeof /*b*/ Number /*c*/;
-            `)
-        );
-    });
+               type UserType = typeof Number;
+           `)
+        ));
 
-    test('typeof as a type', () => {
-       return spec.rewriteRun(
+    test('typeof with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const createUser: typeof Number = Number;
-            `)
-        );
-    });
+                 type UserType = /*a*/ typeof /*b*/ Number /*c*/;
+             `)
+        ));
 
-    test('typeof as a type with comments', () => {
-       return spec.rewriteRun(
+    test('typeof as a type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const createUser: /*a*/ typeof /*b*/ Number /*c*/ = /*d*/ Number /*e*/;
-            `)
-        );
-    });
+                 const createUser: typeof Number = Number;
+             `)
+        ));
 
-    test('typeof as a type as function', () => {
-       return spec.rewriteRun(
+    test('typeof as a type with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                function greet(name: string) {
-                }
+                 const createUser: /*a*/ typeof /*b*/ Number /*c*/ = /*d*/ Number /*e*/;
+             `)
+        ));
 
-                function hello() {
-                }
-
-                const sayHello: typeof greet = (name) => name | hello;
-            `)
-        );
-    });
-
-    test('typeof as a type as array', () => {
-       return spec.rewriteRun(
+    test('typeof as a type as function', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const numbers = [];
+                 function greet(name: string) {
+                 }
+ 
+                 function hello() {
+                 }
+ 
+                 const sayHello: typeof greet = (name) => name | hello;
+             `)
+        ));
 
-                const moreNumbers: typeof numbers = [4, 5, 6];
-            `)
-        );
-    });
-
-    test('typeof as a type as a union', () => {
-       return spec.rewriteRun(
+    test('typeof as a type as array', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const obj1 = { type: "type1", value: 42 };
-                const obj2 = { type: "type2", description: "TypeScript is awesome" };
+                 const numbers = [];
+ 
+                 const moreNumbers: typeof numbers = [4, 5, 6];
+             `)
+        ));
 
-                const un: typeof obj1 | typeof obj2;
-            `)
-        );
-    });
-
-    test('index access type', () => {
-       return spec.rewriteRun(
+    test('typeof as a type as a union', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type DatabaseConfig = typeof config["database"];
-          `)
-        );
-    });
+                 const obj1 = { type: "type1", value: 42 };
+                 const obj2 = { type: "type2", description: "TypeScript is awesome" };
+ 
+                 const un: typeof obj1 | typeof obj2;
+             `)
+        ));
 
-    test('index access type with comments', () => {
-       return spec.rewriteRun(
+    test('index access type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type DatabaseConfig = /*a*/typeof /*b*/ config/*c*/[/*d*/"database"/*e*/]/*f*/;
-          `)
-        );
-    });
+                 type DatabaseConfig = typeof config["database"];
+           `)
+        ));
 
-    test('index access type nested', () => {
-       return spec.rewriteRun(
+    test('index access type with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                interface Company {
-                    employees: {
-                        name: string;
-                        age: number;
-                    }[];
-                }
+                 type DatabaseConfig = /*a*/typeof /*b*/ config/*c*/[/*d*/"database"/*e*/]/*f*/;
+           `)
+        ));
 
-                type EmployeeNameType = Company["employees"][number]["name"]; // Result: string
-            `)
-        );
-    });
+    test('index access type nested', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                 interface Company {
+                     employees: {
+                         name: string;
+                         age: number;
+                     }[];
+                 }
+ 
+                 type EmployeeNameType = Company["employees"][number]["name"]; // Result: string
+             `)
+        ));
 
-    test('typeof with generics', () => {
-       return spec.rewriteRun(
+    test('typeof with generics', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                 type MyStructReturnType<X extends S.Schema.All> = S.Schema.Type<ReturnType<typeof MyStruct/*a*/</*c*/X/*d*/>/*b*/>>
             `)
-        );
-    });
+        ));
 });

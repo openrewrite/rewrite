@@ -19,116 +19,110 @@ import {typescript} from "../../../src/javascript";
 describe('with mapping', () => {
     const spec = new RecipeSpec();
 
-    test('with statement', () => {
-       return spec.rewriteRun(
+    test('with statement', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                with (0) {
-                    console.log("aaa");
+                 with (0) {
+                     console.log("aaa");
+                 }
+             `)
+        ));
+
+    test('with statement with comments', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                 /*a*/with /*b*/ (/*c*/0 /*d*/) /*e*/{/*f*/
+                     console.log("aaa");
+                     /*g*/}/*h*/
+             `)
+        ));
+
+    test('with statement with try-catch', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                with (ctx) try {
+                    return eval("(" + str + ")")
+                } catch (e) {
                 }
             `)
-        );
-    });
+        ));
 
-    test('with statement with comments', () => {
-       return spec.rewriteRun(
+    test('with statement with empty body', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                /*a*/with /*b*/ (/*c*/0 /*d*/) /*e*/{/*f*/
-                    console.log("aaa");
-                    /*g*/}/*h*/
-            `)
-        );
-    });
+                 with (0) {/*a*/}
+             `)
+        ));
 
-    test('with statement with try-catch', () => {
-       return spec.rewriteRun(
+    test('with statement with body without braces', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                with(ctx)try{return eval("("+str+")")}catch(e){}
-            `)
-        );
-    });
+                 with (0) 1;
+             `)
+        ));
 
-    test('with statement with empty body', () => {
-       return spec.rewriteRun(
+    test('with statement with await expr', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                with (0) {/*a*/}
-            `)
-        );
-    });
+                 export {};
+                 with ( await obj?.foo) {}
+             `)
+        ));
 
-    test('with statement with body without braces', () => {
-       return spec.rewriteRun(
+    test('with statement with empty expr and body', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                with (0) 1;
-            `)
-        );
-    });
+                 with({/*a*/}) {/*b*/}
+             `)
+        ));
 
-    test('with statement with await expr', () => {
-       return spec.rewriteRun(
+    test('with statement with multiline statement', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                export {};
-                with ( await obj?.foo) {}
-            `)
-        );
-    });
+                 with ([]) {
+                     console.log("aaa");
+                     console.log("bbb")
+                 }
+             `)
+        ));
 
-    test('with statement with empty expr and body', () => {
-       return spec.rewriteRun(
+    test('with statement with internal with statements', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                with({/*a*/}) {/*b*/}
-            `)
-        );
-    });
-
-    test('with statement with multiline statement', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                with ([]) {
-                    console.log("aaa");
-                    console.log("bbb")
-                }
-            `)
-        );
-    });
-
-    test('with statement with internal with statements', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                with (bindingContext) {
-                    with (data || {}) {
-                        with (options.templateRenderingVariablesInScope || {}) {
-                            // Dummy [renderTemplate:...] syntax
-                            result = templateText.replace(/\\[renderTemplate\\:(.*?)\\]/g, function (match, templateName) {
-                                return ko.renderTemplate(templateName, data, options);
-                            });
-
-                            var evalHandler = function (match, script) {
-                                try {
-                                    var evalResult = eval(script);
-                                    return (evalResult === null) || (evalResult === undefined) ? "" : evalResult.toString();
-                                } catch (ex) {
-                                    throw new Error("Error evaluating script: [js: " + script + "]\\n\\nException: " + ex.toString());
-                                }
-                            }
-
-                            // Dummy [[js:...]] syntax (in case you need to use square brackets inside the expression)
-                            result = result.replace(/\\[\\[js\\:([\\s\\S]*?)\\]\\]/g, evalHandler);
-
-                            // Dummy [js:...] syntax
-                            result = result.replace(/\\[js\\:([\\s\\S]*?)\\]/g, evalHandler);
-                        }
-                    }
-                }
-            `)
-        );
-    });
+                 with (bindingContext) {
+                     with (data || {}) {
+                         with (options.templateRenderingVariablesInScope || {}) {
+                             // Dummy [renderTemplate:...] syntax
+                             result = templateText.replace(/\\[renderTemplate\\:(.*?)\\]/g, function (match, templateName) {
+                                 return ko.renderTemplate(templateName, data, options);
+                             });
+ 
+                             var evalHandler = function (match, script) {
+                                 try {
+                                     var evalResult = eval(script);
+                                     return (evalResult === null) || (evalResult === undefined) ? "" : evalResult.toString();
+                                 } catch (ex) {
+                                     throw new Error("Error evaluating script: [js: " + script + "]\\n\\nException: " + ex.toString());
+                                 }
+                             }
+ 
+                             // Dummy [[js:...]] syntax (in case you need to use square brackets inside the expression)
+                             result = result.replace(/\\[\\[js\\:([\\s\\S]*?)\\]\\]/g, evalHandler);
+ 
+                             // Dummy [js:...] syntax
+                             result = result.replace(/\\[js\\:([\\s\\S]*?)\\]/g, evalHandler);
+                         }
+                     }
+                 }
+             `)
+        ));
 });

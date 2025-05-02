@@ -19,26 +19,23 @@ import {typescript} from "../../../src/javascript";
 describe('union type mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('let c: number/*1*/|/*2*/undefined/*3*/|/*4*/null')
-        );
-    });
-    test('literals', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('let c: true | 1 | "foo"')
-        );
-    });
-    test('union which starts with | ', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              export type GeolocateResponse =
-                  | GeolocateResponseSuccess
-                  | GeolocateResponseError;
-          `)
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('let c: number/*1*/|/*2*/undefined/*3*/|/*4*/null')
+        ));
+    test('literals', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('let c: true | 1 | "foo"')
+        ));
+    test('union which starts with | ', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               export type GeolocateResponse =
+                   | GeolocateResponseSuccess
+                   | GeolocateResponseError;
+           `)
+        ));
 });

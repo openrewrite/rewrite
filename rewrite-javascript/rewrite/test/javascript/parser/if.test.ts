@@ -19,146 +19,132 @@ import {typescript} from "../../../src/javascript";
 describe('if mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('if (true) console.log("foo");')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('if (true) console.log("foo");')
+        ));
 
-    test('simple with comments', () => {
-       return spec.rewriteRun(
+    test('simple with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('/*a*/if /*b*/(/*c*/true/*d*/)/*e*/ console.log("foo")/*f*/;/*g*/')
-        );
-    });
+        ));
 
-    test('braces', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('if (true) /*a*/{/*b*/ console.log("foo")/*c*/; /*d*/}/*e*/')
-        );
-    });
-    test('else', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('if (true) console.log("foo"); /*a*/ else/*b*/ console.log("bar")/*c*/;/*d*/')
-        );
-    });
+    test('braces', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('if (true) /*a*/{/*b*/ console.log("foo")/*c*/; /*d*/}/*e*/')
+        ));
+    test('else', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('if (true) console.log("foo"); /*a*/ else/*b*/ console.log("bar")/*c*/;/*d*/')
+        ));
 
-    test('if-else with semicolon', () => {
-       return spec.rewriteRun(
+    test('if-else with semicolon', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                if (true) {
-                    console.log("foo")/*a*/;/*b*/
-                } else
-                    console.log("bar")/*a*/;/*b*/
-            `)
-        );
-    });
+                 if (true) {
+                     console.log("foo")/*a*/;/*b*/
+                 } else
+                     console.log("bar")/*a*/;/*b*/
+             `)
+        ));
 
-    test('if-else-if with semicolon', () => {
-       return spec.rewriteRun(
+    test('if-else-if with semicolon', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                    if (false)
-                        console.log("foo")/*b*/;/*c*/
-                    else /*d*/if (true)
-                        console.log("bar")/*e*/;/*f*/
-            `)
-        );
-    });
+                     if (false)
+                         console.log("foo")/*b*/;/*c*/
+                     else /*d*/if (true)
+                         console.log("bar")/*e*/;/*f*/
+             `)
+        ));
 
-    test('if-if-else with semicolon', () => {
-       return spec.rewriteRun(
+    test('if-if-else with semicolon', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                    if (false)
-                        /*a*/if (true)
-                            console.log("foo")/*b*/;/*c*/
-                        else /*d*/if (true)
-                            console.log("bar")/*e*/;/*f*/
-            `)
-        );
-    });
+                     if (false)
+                         /*a*/if (true)
+                             console.log("foo")/*b*/;/*c*/
+                         else /*d*/if (true)
+                             console.log("bar")/*e*/;/*f*/
+             `)
+        ));
 
-    test('if with for with semicolon', () => {
-       return spec.rewriteRun(
+    test('if with for with semicolon', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                if (prevProps)
-                    for (let name in prevProps) name in nextProps || (node[name] = void 0)/*a*/;/*b*/
-            `)
-        );
-    });
+                 if (prevProps)
+                     for (let name in prevProps) name in nextProps || (node[name] = void 0)/*a*/;/*b*/
+             `)
+        ));
 
-    test('for with if with return and semicolon', () => {
-       return spec.rewriteRun(
+    test('for with if with return and semicolon', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                function foo() {
-                    for (let opt of el.options)
-                        if (opt.selected !== opt.defaultSelected) return !0;
-                }
-            `)
-        );
-    });
+                 function foo() {
+                     for (let opt of el.options)
+                         if (opt.selected !== opt.defaultSelected) return !0;
+                 }
+             `)
+        ));
 
-    test('for with if with semicolon', () => {
-       return spec.rewriteRun(
+    test('for with if with semicolon', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                for(;;)
-                    if (true)
-                        console.log("foo")/*a*/;/*b*/
-            `)
-        );
-    });
+                 for(;;)
+                     if (true)
+                         console.log("foo")/*a*/;/*b*/
+             `)
+        ));
 
-    test('if with return', () => {
-       return spec.rewriteRun(
+    test('if with return', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                function foo() {
-                    if (prevProps)
-                        return abs(prevProps)/*a*/;/*b*/
-                }
-            `)
-        );
-    });
+                 function foo() {
+                     if (prevProps)
+                         return abs(prevProps)/*a*/;/*b*/
+                 }
+             `)
+        ));
 
-    test('if with break', () => {
-       return spec.rewriteRun(
+    test('if with break', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                for(;;) {
-                    if (!len--) break;
-                }
-            `)
-        );
-    });
+                 for(;;) {
+                     if (!len--) break;
+                 }
+             `)
+        ));
 
-    test('if with continue', () => {
-       return spec.rewriteRun(
+    test('if with continue', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                for(;;) {
-                    if (!len--) continue;
-                }
-            `)
-        );
-    });
+                 for(;;) {
+                     if (!len--) continue;
+                 }
+             `)
+        ));
 
-    test('if with do', () => {
-       return spec.rewriteRun(
+    test('if with do', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                if (newStart > newEnd)
-                    do {
-                        abs(x);
-                    } while (oldStart <= oldEnd);
-            `)
-        );
-    });
+                 if (newStart > newEnd)
+                     do {
+                         abs(x);
+                     } while (oldStart <= oldEnd);
+             `)
+        ));
 });

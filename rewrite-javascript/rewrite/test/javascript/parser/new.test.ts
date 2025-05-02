@@ -19,31 +19,27 @@ import {typescript} from "../../../src/javascript";
 describe('new mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('new Uint8Array(1)')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('new Uint8Array(1)')
+        ));
 
-    test('space', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('new Uint8Array/*1*/(/*2*/1/*3*/)/*4*/')
-        );
-    });
+    test('space', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('new Uint8Array/*1*/(/*2*/1/*3*/)/*4*/')
+        ));
 
-    test('multiple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('new Date(2023, 9, 25, 10, 30, 15, 500)')
-        );
-    });
+    test('multiple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('new Date(2023, 9, 25, 10, 30, 15, 500)')
+        ));
 
-    test('trailing comma', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('new Uint8Array(1 ,  )')
-        );
-    });
+    test('trailing comma', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('new Uint8Array(1 ,  )')
+        ));
 });

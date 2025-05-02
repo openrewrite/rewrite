@@ -19,15 +19,13 @@ import {typescript} from "../../../src/javascript";
 describe('parenthesis mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          typescript('(1)')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            typescript('(1)')
+        ));
 
-    test('space', () => {
-       return spec.rewriteRun(
-          typescript('( 1 )')
-        );
-    });
+    test('space', () =>
+        spec.rewriteRun(
+            typescript('( 1 )')
+        ));
 });

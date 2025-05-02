@@ -19,173 +19,161 @@ import {typescript} from "../../../src/javascript";
 describe('try-catch mapping', () => {
     const spec = new RecipeSpec();
 
-    test('try-catch empty', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              try {
-              } catch (error) {
-              }
-          `)
-        );
-    });
-
-    test('try-finally empty', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              try {
-              } finally {
-              }
-          `)
-        );
-    });
-
-    test('try-catch-finally empty', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              try {
-              } catch (error) {
-              } finally {
-              }
-          `)
-        );
-    });
-
-    test('try-catch-finally empty comments', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              /*a*/ try /*b*/ {
-              } /*c*/ catch /*d*/ ( /*e*/ error /*f*/) { /*g*/
-              } /*h*/ finally /*i*/ { /*j*/
-              } /*k*/
-          `)
-        );
-    });
-
-    test('try-catch without error', () => {
-       return spec.rewriteRun(
+    test('try-catch empty', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                 try {
-                    // Code that may throw an error
-                } /*a*/ catch /*b*/ {
-                    // handel error
+                } catch (error) {
                 }
             `)
-        );
-    });
+        ));
 
-    test('try-catch with typed unknown error', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              try {
-                  // error
-              } catch (error: unknown) {
-                  // handel error
-              }
-          `)
-        );
-    });
-
-    test('try-catch with typed any error', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              try {
-                  // error
-              } catch (error: any) {
-                  // handel error
-              }
-          `)
-        );
-    });
-
-    test('try-catch with typed error and comments', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              try {
-                  // error
-              } catch (/*a*/ error /*b*/: /*c*/ unknown /*d*/) {
-                  // handel error
-              }
-          `)
-        );
-    });
-
-    test('try-catch-finally with body', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              try {
-                  // Try to parse JSON string
-                  const data = JSON.parse('{ "name": "Alice" }');
-                  console.log(data.name); // Output: "Alice"
-              } catch (error: unknown) {
-                  if (error instanceof Error) {
-                      console.error("Caught an error:", error.message);
-                  } else {
-                      console.error("An unknown error occurred");
-                  }
-              } finally {
-                  console.log("Parsing attempt finished.");
-              }
-          `)
-        );
-    });
-
-    test('try-catch-finally with throw', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-                  try {
-                      throw new Error("Failed to perform database operation.");
-                  } catch (error) {
-                      console.error("Database Error:", (error as Error).message);
-                  } finally {
-                      console.log("Clean.");
-                  }
-          `)
-        );
-    });
-
-    test('catch with ObjectBindingPattern as a name', () => {
-       return spec.rewriteRun(
+    test('try-finally empty', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                class A {
-                    public async connect() {
-                        try {
-                            await new Promise(null);
-                        } catch ({error} : any ) {
-                            throw error;
-                        }
-                    }
-                }
-            `)
-        );
-    });
+               try {
+               } finally {
+               }
+           `)
+        ));
 
-    test('catch with ObjectBindingPattern as a name with finally', () => {
-       return spec.rewriteRun(
+    test('try-catch-finally empty', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                class A {
-                    public async connect() {
-                        try {
-                            await new Promise(null);
-                        } catch ({error} : any ) {
-                            throw error;
-                        } finally {
-                            console.log("Log");
-                        }
-                    }
-                }
-            `)
-        );
-    });
+               try {
+               } catch (error) {
+               } finally {
+               }
+           `)
+        ));
+
+    test('try-catch-finally empty comments', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               /*a*/ try /*b*/ {
+               } /*c*/ catch /*d*/ ( /*e*/ error /*f*/) { /*g*/
+               } /*h*/ finally /*i*/ { /*j*/
+               } /*k*/
+           `)
+        ));
+
+    test('try-catch without error', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                 try {
+                     // Code that may throw an error
+                 } /*a*/ catch /*b*/ {
+                     // handel error
+                 }
+             `)
+        ));
+
+    test('try-catch with typed unknown error', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               try {
+                   // error
+               } catch (error: unknown) {
+                   // handel error
+               }
+           `)
+        ));
+
+    test('try-catch with typed any error', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               try {
+                   // error
+               } catch (error: any) {
+                   // handel error
+               }
+           `)
+        ));
+
+    test('try-catch with typed error and comments', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               try {
+                   // error
+               } catch (/*a*/ error /*b*/: /*c*/ unknown /*d*/) {
+                   // handel error
+               }
+           `)
+        ));
+
+    test('try-catch-finally with body', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               try {
+                   // Try to parse JSON string
+                   const data = JSON.parse('{ "name": "Alice" }');
+                   console.log(data.name); // Output: "Alice"
+               } catch (error: unknown) {
+                   if (error instanceof Error) {
+                       console.error("Caught an error:", error.message);
+                   } else {
+                       console.error("An unknown error occurred");
+                   }
+               } finally {
+                   console.log("Parsing attempt finished.");
+               }
+           `)
+        ));
+
+    test('try-catch-finally with throw', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                   try {
+                       throw new Error("Failed to perform database operation.");
+                   } catch (error) {
+                       console.error("Database Error:", (error as Error).message);
+                   } finally {
+                       console.log("Clean.");
+                   }
+           `)
+        ));
+
+    test('catch with ObjectBindingPattern as a name', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                 class A {
+                     public async connect() {
+                         try {
+                             await new Promise(null);
+                         } catch ({error} : any ) {
+                             throw error;
+                         }
+                     }
+                 }
+             `)
+        ));
+
+    test('catch with ObjectBindingPattern as a name with finally', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                 class A {
+                     public async connect() {
+                         try {
+                             await new Promise(null);
+                         } catch ({error} : any ) {
+                             throw error;
+                         } finally {
+                             console.log("Log");
+                         }
+                     }
+                 }
+             `)
+        ));
 });

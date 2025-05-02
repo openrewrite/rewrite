@@ -19,64 +19,58 @@ import {typescript} from "../../../src/javascript";
 describe('do-while mapping', () => {
     const spec = new RecipeSpec();
 
-    test('empty do-while', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('do {} while (true);')
-        );
-    });
+    test('empty do-while', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('do {} while (true);')
+        ));
 
-    test('empty do-while with comments', () => {
-       return spec.rewriteRun(
+    test('empty do-while with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('/*a*/ do /*b*/{/*c*/} /*d*/while/*e*/ (/*f*/true/*g*/)/*h*/;')
-        );
-    });
+        ));
 
-    test('empty do-while with expression and comments', () => {
-       return spec.rewriteRun(
+    test('empty do-while with expression and comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('/*a*/ do /*b*/{/*c*/} /*d*/while/*e*/ (/*f*/Math/*0*/./*1*/random(/*2*/) /*3*/ > /*4*/0.7/*g*/)/*h*/;')
-        );
-    });
+        ));
 
-    test('do-while with statements', () => {
-       return spec.rewriteRun(
+    test('do-while with statements', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                let count = 0;
-                do {
-                    console.log(count)
-                    /*count*/
-                    count++;
-                } while (count < 10);
-            `)
-        );
-    });
+                 let count = 0;
+                 do {
+                     console.log(count)
+                     /*count*/
+                     count++;
+                 } while (count < 10);
+             `)
+        ));
 
-    test('do-while with labeled statement and semicolon', () => {
-       return spec.rewriteRun(
+    test('do-while with labeled statement and semicolon', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                function foo() {
-                    partition: do {
-                        break partition;
-                    } while (from < to)/*a*/;/*b*/
-                }
-            `)
-        );
-    });
+                 function foo() {
+                     partition: do {
+                         break partition;
+                     } while (from < to)/*a*/;/*b*/
+                 }
+             `)
+        ));
 
-    test('do-while statement with semicolon', () => {
-       return spec.rewriteRun(
+    test('do-while statement with semicolon', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                export function getMarkoRoot(path: t.NodePath<t.Node>) {
-                    do curPath = curPath.parentPath/*a*/;/*b*/
-                    while (curPath && !isMarko(curPath));
-                    return curPath;
-                }
-            `)
-        );
-    });
+                 export function getMarkoRoot(path: t.NodePath<t.Node>) {
+                     do curPath = curPath.parentPath/*a*/;/*b*/
+                     while (curPath && !isMarko(curPath));
+                     return curPath;
+                 }
+             `)
+        ));
 });

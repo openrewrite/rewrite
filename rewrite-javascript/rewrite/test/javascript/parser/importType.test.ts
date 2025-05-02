@@ -19,149 +19,135 @@ import {typescript} from "../../../src/javascript";
 describe('import type mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple import', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`type ModuleType = import('fs');`)
-        );
-    });
+    test('simple import', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`type ModuleType = import('fs');`)
+        ));
 
-    test('simple import with isTypeOf', () => {
-       return spec.rewriteRun(
+    test('simple import with isTypeOf', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`type MyType = typeof import("module-name");`)
-        );
-    });
+        ));
 
-    test('simple import with isTypeOf and comments', () => {
-       return spec.rewriteRun(
+    test('simple import with isTypeOf and comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`type MyType = /*a*/typeof /*b*/ import/*c*/(/*d*/"module-name"/*e*/)/*f*/;`)
-        );
-    });
+        ));
 
-    test('import with qualifier', () => {
-       return spec.rewriteRun(
+    test('import with qualifier', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`type ReadStream = import("fs").ReadStream;`)
-        );
-    });
+        ));
 
-    test('import with qualifier and comments', () => {
-       return spec.rewriteRun(
+    test('import with qualifier and comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`type ReadStream = import("fs")/*a*/./*b*/ReadStream/*c*/;`)
-        );
-    });
+        ));
 
-    test('import with sub qualifiers', () => {
-       return spec.rewriteRun(
+    test('import with sub qualifiers', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                export default class Utils {
-                    static Tools = class {
-                        static UtilityName = "Helper";
-                    };
-                }
+                 export default class Utils {
+                     static Tools = class {
+                         static UtilityName = "Helper";
+                     };
+                 }
+ 
+                 // main.ts
+                 type UtilityNameType = import("./module")/*a*/./*b*/default/*c*/./*d*/Tools/*e*/./*f*/UtilityName;
+             `)
+        ));
 
-                // main.ts
-                type UtilityNameType = import("./module")/*a*/./*b*/default/*c*/./*d*/Tools/*e*/./*f*/UtilityName;
-            `)
-        );
-    });
-
-    test('function with import type', () => {
-       return spec.rewriteRun(
+    test('function with import type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                function useModule(module: import("fs")): void {
-                    console.log(module);
-                }
-            `)
-        );
-    });
+                 function useModule(module: import("fs")): void {
+                     console.log(module);
+                 }
+             `)
+        ));
 
-    test('import type with type argument', () => {
-       return spec.rewriteRun(
+    test('import type with type argument', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type AnotherType = import("module-name").GenericType<string>;
-            `)
-        );
-    });
+                 type AnotherType = import("module-name").GenericType<string>;
+             `)
+        ));
 
-    test('import type with type argument adv1', () => {
-       return spec.rewriteRun(
+    test('import type with type argument adv1', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                export namespace Shapes {
-                    export type Box<T> = { value: T; size: number };
-                    export type Circle = { radius: number };
-                }
+                 export namespace Shapes {
+                     export type Box<T> = { value: T; size: number };
+                     export type Circle = { radius: number };
+                 }
+ 
+                 // main.ts
+                 type CircleBox = import("./shapes").Shapes.Box<import("./shapes").Shapes.Circle>;
+             `)
+        ));
 
-                // main.ts
-                type CircleBox = import("./shapes").Shapes.Box<import("./shapes").Shapes.Circle>;
-            `)
-        );
-    });
-
-    test('import type with type argument adv2', () => {
-       return spec.rewriteRun(
+    test('import type with type argument adv2', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                export namespace Models {
-                    export type Response<T> = {
-                        status: number;
-                        data: T;
-                    };
-                }
+                 export namespace Models {
+                     export type Response<T> = {
+                         status: number;
+                         data: T;
+                     };
+                 }
+ 
+                 // main.ts
+                 type UserResponse = import(/*a*/"./library"/*b*/).Models.Response<{ id: string; name: string }>;
+             `)
+        ));
 
-                // main.ts
-                type UserResponse = import(/*a*/"./library"/*b*/).Models.Response<{ id: string; name: string }>;
-            `)
-        );
-    });
-
-    test('import with attributes', () => {
-       return spec.rewriteRun(
+    test('import with attributes', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type A = import("foo", {with: {type: "json"}})
-            `)
-        );
-    });
+                 type A = import("foo", {with: {type: "json"}})
+             `)
+        ));
 
-    test('import with attributes with comments', () => {
-       return spec.rewriteRun(
+    test('import with attributes with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type A = import("foo"/*0*/, /*a*/{/*b*/assert/*c*/:/*d*/ {type: "json"}/*e*/}/*f*/)
-            `)
-        );
-    });
+                 type A = import("foo"/*0*/, /*a*/{/*b*/assert/*c*/:/*d*/ {type: "json"}/*e*/}/*f*/)
+             `)
+        ));
 
-    test('import with attributes and qualifiers', () => {
-       return spec.rewriteRun(
+    test('import with attributes and qualifiers', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                export type LocalInterface =
-                    & import("pkg", { with: {"resolution-mode": "require"} }).RequireInterface
-                    & import("pkg", { with: {"resolution-mode": "import"} }).ImportInterface;
+                 export type LocalInterface =
+                     & import("pkg", { with: {"resolution-mode": "require"} }).RequireInterface
+                     & import("pkg", { with: {"resolution-mode": "import"} }).ImportInterface;
+ 
+                 export const a = (null as any as import("pkg", { with: {"resolution-mode": "require"} }).RequireInterface);
+                 export const b = (null as any as import("pkg", { with: {"resolution-mode": "import"} }).ImportInterface);
+             `)
+        ));
 
-                export const a = (null as any as import("pkg", { with: {"resolution-mode": "require"} }).RequireInterface);
-                export const b = (null as any as import("pkg", { with: {"resolution-mode": "import"} }).ImportInterface);
-            `)
-        );
-    });
-
-    test('import type without qualifier an with type argument', () => {
-       return spec.rewriteRun(
+    test('import type without qualifier an with type argument', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                declare module "ContextUtils" {
-                    export function createContext<Config extends import("tailwindcss").Config>(config: ReturnType<typeof import("tailwindcss/resolveConfig")<Config>>,): import("./types.ts").TailwindContext;
-                }
-            `)
-        );
-    });
+                 declare module "ContextUtils" {
+                     export function createContext<Config extends import("tailwindcss").Config>(config: ReturnType<typeof import("tailwindcss/resolveConfig")<Config>>,): import("./types.ts").TailwindContext;
+                 }
+             `)
+        ));
 });

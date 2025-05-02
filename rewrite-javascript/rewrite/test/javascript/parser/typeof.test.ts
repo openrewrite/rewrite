@@ -19,10 +19,9 @@ import {typescript} from "../../../src/javascript";
 describe('typeof operator mapping', () => {
     const spec = new RecipeSpec();
 
-    test('typeof', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('typeof 1')
-        );
-    });
+    test('typeof', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('typeof 1')
+        ));
 });

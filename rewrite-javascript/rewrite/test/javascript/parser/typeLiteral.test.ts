@@ -19,67 +19,63 @@ import {typescript} from "../../../src/javascript";
 describe('type literal mapping', () => {
     const spec = new RecipeSpec();
 
-    test('indexed type literal', () => {
-       return spec.rewriteRun(
+    test('indexed type literal', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                /*1*/
-                type/*2*/ OnlyBoolsAndHorses /*3*/ =/*4*/ { /*5*/
-                    /*6*/
-                    /*7*/[/*8*/key/*9*/:/*10*/ string/*11*/]/*12*/:/*13*/ boolean/*14*/ |/*15*/ Horse/*16*/; /*17*/
-                    /*18*/
-                }/*19*/; /*20*/
+                 /*1*/
+                 type/*2*/ OnlyBoolsAndHorses /*3*/ =/*4*/ { /*5*/
+                     /*6*/
+                     /*7*/[/*8*/key/*9*/:/*10*/ string/*11*/]/*12*/:/*13*/ boolean/*14*/ |/*15*/ Horse/*16*/; /*17*/
+                     /*18*/
+                 }/*19*/; /*20*/
+ 
+                 const conforms: OnlyBoolsAndHorses = {
+                     del: true,
+                     rodney: false,
+                 };
+             `),
+            //language=typescript
+            typescript(`
+               type test = {
+                   (start: number): string;   // Call signature
+                   interval: number;          // Property
+                   reset(): void;             // Method
+                   [index: number]: string    // Indexable
+                   add(): (x: number, y: number) => number; //Function signature
+                   add: <T> (x: number, y: number) => number; //Function type
+                   add1: (x: number, y: number) => number; //Function type
+                   ctroType: new < T > (x: number, y: number) => number; //Ctor type
+                   ctroType1: new  (x: number, y: number) => number; //Ctor type
+               }
+           `)
+        ));
 
-                const conforms: OnlyBoolsAndHorses = {
-                    del: true,
-                    rodney: false,
-                };
-            `),
+    test('type literal', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-              type test = {
-                  (start: number): string;   // Call signature
-                  interval: number;          // Property
-                  reset(): void;             // Method
-                  [index: number]: string    // Indexable
-                  add(): (x: number, y: number) => number; //Function signature
-                  add: <T> (x: number, y: number) => number; //Function type
-                  add1: (x: number, y: number) => number; //Function type
-                  ctroType: new < T > (x: number, y: number) => number; //Ctor type
-                  ctroType1: new  (x: number, y: number) => number; //Ctor type
-              }
-          `)
-        );
-    });
+                 type Animal = { kind: "dog"; bark(): void };
+             `)
+        ));
 
-    test('type literal', () => {
-       return spec.rewriteRun(
+    test('type literal in params', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type Animal = { kind: "dog"; bark(): void };
+                 type ascii = {
+                     " ": 32; "!": 33;
+                 }
+             `)
+        ));
+
+    test('with index signature and mapped type', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                export const struct: <R extends {/*a*/ readonly /*b*/[x: string]: Semigroup<any> }>(
+                    fields: R
+                ) => Semigroup<{ readonly [K in keyof R]: [R[K]] extends [Semigroup<infer A>] ? A : never }> = product_.struct(Product)
             `)
-        );
-    });
-
-    test('type literal in params', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                type ascii = {
-                    " ": 32; "!": 33;
-                }
-            `)
-        );
-    });
-
-    test('with index signature and mapped type', () => {
-       return spec.rewriteRun(
-            //language=typescript
-            typescript(`
-              export const struct: <R extends {/*a*/ readonly /*b*/[x: string]: Semigroup<any> }>(
-                  fields: R
-              ) => Semigroup<{ readonly [K in keyof R]: [R[K]] extends [Semigroup<infer A>] ? A : never }> = product_.struct(Product)
-          `)
-        );
-    });
+        ));
 });

@@ -20,7 +20,7 @@ describe('flow annotation checking test', () => {
     const spec = new RecipeSpec();
 
     test('@flow in a one line comment in js', () => {
-        const faultyTest = () =>spec.rewriteRun(
+        const faultyTest = () => spec.rewriteRun(
             //language=javascript
             javascript(`
                 //@flow
@@ -35,7 +35,7 @@ describe('flow annotation checking test', () => {
     });
 
     test('@flow in a comment in js', () => {
-        const faultyTest = () =>spec.rewriteRun(
+        const faultyTest = () => spec.rewriteRun(
             //language=javascript
             javascript(`
                 /* @flow */
@@ -49,7 +49,7 @@ describe('flow annotation checking test', () => {
     });
 
     test('@flow in a multiline comment in js', () => {
-        const faultyTest = () =>spec.rewriteRun(
+        const faultyTest = () => spec.rewriteRun(
             //language=javascript
             javascript(`
                 /*
@@ -64,9 +64,8 @@ describe('flow annotation checking test', () => {
         expect(faultyTest).toThrow(/FlowSyntaxNotSupportedError/);
     });
 
-    test('@flow in a comment in ts', () => {
-        // noinspection ES6UnusedImports,TypeScriptCheckImport
-        return spec.rewriteRun(
+    test('@flow in a comment in ts', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                 //@flow
@@ -74,6 +73,5 @@ describe('flow annotation checking test', () => {
                 import Rocket from './rocket';
                 import RocketLaunch from './rocket-launch';
             `)
-        );
-    });
+        ));
 });

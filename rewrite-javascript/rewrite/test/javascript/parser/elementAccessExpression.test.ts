@@ -19,88 +19,80 @@ import {typescript} from "../../../src/javascript";
 describe('array literal mapping', () => {
     const spec = new RecipeSpec();
 
-    test('access by index', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-                const numbers = [10, 20, 30, 40];
-                const v = numbers[2];
-          `)
-        );
-    });
-
-    test('access by index with comments', () => {
-       return spec.rewriteRun(
+    test('access by index', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const numbers = [10, 20, 30, 40];
-                const v = /*a*/ numbers/*b*/[/*c*/2/*d*/]/*e*/;/*f*/
-            `)
-        );
-    });
+                 const numbers = [10, 20, 30, 40];
+                 const v = numbers[2];
+           `)
+        ));
 
-    test('access by index with !', () => {
-       return spec.rewriteRun(
+    test('access by index with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const numbers = [10, 20, 30, 40];
-                const v = numbers[2]!;
-            `)
-        );
-    });
+                 const numbers = [10, 20, 30, 40];
+                 const v = /*a*/ numbers/*b*/[/*c*/2/*d*/]/*e*/;/*f*/
+             `)
+        ));
 
-    test('access by index with ! and comments', () => {
-       return spec.rewriteRun(
+    test('access by index with !', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const numbers = [10, 20, 30, 40];
-                const v = numbers[2]/*a*/!/*b*/;
-            `)
-        );
-    });
+                 const numbers = [10, 20, 30, 40];
+                 const v = numbers[2]!;
+             `)
+        ));
 
-    test('access by key', () => {
-       return spec.rewriteRun(
+    test('access by index with ! and comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const data = { a: 100, b: 200, c: 300 };
-                const v = /*a*/data/*b*/[/*c*/'a'/*d*/]/*e*/;/*f*/
-          `)
-        );
-    });
+                 const numbers = [10, 20, 30, 40];
+                 const v = numbers[2]/*a*/!/*b*/;
+             `)
+        ));
 
-    test('access by key with comments', () => {
-       return spec.rewriteRun(
+    test('access by key', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const data = { a: 100, b: 200, c: 300 };
-                const v = data['a'];
-            `)
-        );
-    });
+                 const data = { a: 100, b: 200, c: 300 };
+                 const v = /*a*/data/*b*/[/*c*/'a'/*d*/]/*e*/;/*f*/
+           `)
+        ));
 
-    test('access by key with ?.', () => {
-       return spec.rewriteRun(
+    test('access by key with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const data = { a: 100, b: 200, c: 300 };
-                const v = data['d'] ?. toString();
-          `)
-        );
-    });
+                 const data = { a: 100, b: 200, c: 300 };
+                 const v = data['a'];
+             `)
+        ));
 
-    test('with optional chaining operator', () => {
-       return spec.rewriteRun(
+    test('access by key with ?.', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const arr = [10, 20, 30];
-                const value1 = arr/*a*/?./*b*/[1];
-          `)
-        );
-    });
+                 const data = { a: 100, b: 200, c: 300 };
+                 const v = data['d'] ?. toString();
+           `)
+        ));
 
-    test('with optional chaining operator and object access', () => {
-       return spec.rewriteRun(
+    test('with optional chaining operator', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                 const arr = [10, 20, 30];
+                 const value1 = arr/*a*/?./*b*/[1];
+           `)
+        ));
+
+    test('with optional chaining operator and object access', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                 const obj = {
@@ -109,6 +101,5 @@ describe('array literal mapping', () => {
 
                 const result2 = obj.val?.[1];
             `)
-        );
-    });
+        ));
 });

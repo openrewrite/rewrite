@@ -19,124 +19,109 @@ import {typescript} from "../../../src/javascript";
 describe('import mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('import {foo} from "bar"')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('import {foo} from "bar"')
+        ));
 
-    test('for side effect', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('import "foo"')
-        );
-    });
+    test('for side effect', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('import "foo"')
+        ));
 
-    test('space', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('import {foo} /*1*/ from /*2*/ "bar"/*3*/;')
-        );
-    });
+    test('space', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('import {foo} /*1*/ from /*2*/ "bar"/*3*/;')
+        ));
 
-    test('multiple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('import {foo, bar} from "baz"')
-        );
-    });
+    test('multiple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('import {foo, bar} from "baz"')
+        ));
 
-    test('trailing comma', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('import {foo, } from "baz"')
-        );
-    });
+    test('trailing comma', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('import {foo, } from "baz"')
+        ));
 
-    test('default', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('import foo from "bar"')
-        );
-    });
+    test('default', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('import foo from "bar"')
+        ));
 
-    test('namespace', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('import *  as foo  from "bar"')
-        );
-    });
+    test('namespace', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('import *  as foo  from "bar"')
+        ));
 
-    test('default and namespace', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('import baz, * as foo from "bar"')
-        );
-    });
+    test('default and namespace', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('import baz, * as foo from "bar"')
+        ));
 
-    test('default and others', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('import baz, {foo1, } from "bar"')
-        );
-    });
+    test('default and others', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('import baz, {foo1, } from "bar"')
+        ));
 
-    test('dynamic import', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('export {};const module = await import("module-name");')
-        )
-    });
+    test('dynamic import', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('export {};const module = await import("module-name");')
+        ));
 
-    test('type import and others', () => {
-       return spec.rewriteRun(
+    test('type import and others', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`import {
-                Client,
-                defaultAxiosInstance,
-                defaultHttpsAgent,
-                type ElevationResponse,
-                /*1*/ type  /*2*/ ElevationResponseSuper /*3*/ as   /*4*/ ERS   /*5*/ ,  /*6*/
-            } from "../src";`)
-        );
-    });
+                 Client,
+                 defaultAxiosInstance,
+                 defaultHttpsAgent,
+                 type ElevationResponse,
+                 /*1*/ type  /*2*/ ElevationResponseSuper /*3*/ as   /*4*/ ERS   /*5*/ ,  /*6*/
+             } from "../src";`)
+        ));
 
-    test('type imports only', () => {
-       return spec.rewriteRun(
+    test('type imports only', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`import type { Component } from "react";`)
-        );
-    });
+        ));
 
-    test('experimental: import with import attributes', () => {
-       return spec.rewriteRun(
+    test('experimental: import with import attributes', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                import Package from 'module-name' assert { type: "json" }
-                import foo from 'module-name' with { type: "json" };
-                /*{1}*/import/*{2}*/ foo /*{3}*/from /*{4}*/'module-name'/*{5}*/ with/*{6}*/ {/*{7}*/ type/*{8}*/: /*{9}*/"json", /*{10}*/ } /*{11}*/;
-            `)
-        );
-    });
+                 import Package from 'module-name' assert { type: "json" }
+                 import foo from 'module-name' with { type: "json" };
+                 /*{1}*/import/*{2}*/ foo /*{3}*/from /*{4}*/'module-name'/*{5}*/ with/*{6}*/ {/*{7}*/ type/*{8}*/: /*{9}*/"json", /*{10}*/ } /*{11}*/;
+             `)
+        ));
 
-    test('import with import attributes', () => {
-       return spec.rewriteRun(
+    test('import with import attributes', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                import type { SpyInstance } from 'jest';
-                ///*{1}*/import /*{2}*/type /*{3}*/{ /*{4}*/ SpyInstance /*{5}*/} /*{6}*/ from /*{7}*/ 'jest' /*{8}*/;
-                import SpyInstance = jest.SpyInstance;
-            `)
-        );
-    });
+                 import type { SpyInstance } from 'jest';
+                 ///*{1}*/import /*{2}*/type /*{3}*/{ /*{4}*/ SpyInstance /*{5}*/} /*{6}*/ from /*{7}*/ 'jest' /*{8}*/;
+                 import SpyInstance = jest.SpyInstance;
+             `)
+        ));
 
-    test('external module import', () => {
-       return spec.rewriteRun(
+    test('external module import', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                 import mongodb = /*a*/require/*b*/(/*c*/'mongodb'/*d*/)/*e*/;
             `)
-        );
-    });
+        ));
 });

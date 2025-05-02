@@ -19,10 +19,9 @@ import {typescript} from "../../../src/javascript";
 describe('await mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('export {}; await 1')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('export {}; await 1')
+        ));
 });

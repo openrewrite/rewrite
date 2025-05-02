@@ -19,37 +19,34 @@ import {typescript} from "../../../src/javascript";
 describe('throw mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple throw', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              throw new Error("Cannot divide by zero!");
-          `)
-        );
-    });
+    test('simple throw', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               throw new Error("Cannot divide by zero!");
+           `)
+        ));
 
-    test('simple throw with comments', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              /*a*/ throw /*b*/ new /*c*/ Error/*d*/(/*e*/'Cannot divide by zero!'/*f*/)/*g*/;
-          `)
-        );
-    });
+    test('simple throw with comments', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+               /*a*/ throw /*b*/ new /*c*/ Error/*d*/(/*e*/'Cannot divide by zero!'/*f*/)/*g*/;
+           `)
+        ));
 
-    test('re-throwing', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              function riskyOperation() {
-                  try {
-                      throw new Error("An error occurred during risky operation.");
-                  } catch (error) {
-                      console.error("Logging Error:", (error as Error).message);
-                      throw error;  // Re-throw the error to be handled at a higher level
-                  }
-              }
-          `)
-        );
-    });
+    test('re-throwing', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                function riskyOperation() {
+                    try {
+                        throw new Error("An error occurred during risky operation.");
+                    } catch (error) {
+                        console.error("Logging Error:", (error as Error).message);
+                        throw error;  // Re-throw the error to be handled at a higher level
+                    }
+                }
+            `)
+        ));
 });

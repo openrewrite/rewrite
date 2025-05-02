@@ -19,301 +19,269 @@ import {typescript} from "../../../src/javascript";
 describe('type alias mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple alias', () => {
-       return spec.rewriteRun(
+    test('simple alias', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type StringAlias = string;
-            `)
-        );
-    });
+                 type StringAlias = string;
+             `)
+        ));
 
-    test('simple alias with comments', () => {
-       return spec.rewriteRun(
+    test('simple alias with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                /*a*/type /*b*/ StringAlias /*c*/= /*d*/string /*e*/;/*f*/
-            `)
-        );
-    });
+                 /*a*/type /*b*/ StringAlias /*c*/= /*d*/string /*e*/;/*f*/
+             `)
+        ));
 
-    test('function type alias', () => {
-       return spec.rewriteRun(
+    test('function type alias', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type MyFunctionType = (x: number, y: number) => string;
-            `)
-        );
-    });
+                 type MyFunctionType = (x: number, y: number) => string;
+             `)
+        ));
 
-    test('generic function type alias', () => {
-       return spec.rewriteRun(
+    test('generic function type alias', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type Response<T, R, Y> = (x: T, y: R) => Y;;
-            `)
-        );
-    });
+                 type Response<T, R, Y> = (x: T, y: R) => Y;;
+             `)
+        ));
 
-    test('generic type alias with comments', () => {
-       return spec.rewriteRun(
+    test('generic type alias with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                /*a*/type/*b*/ Response/*c*/</*d*/T/*e*/> /*f*/ = /*g*/(x: T, y: number) => string;;
-            `)
-        );
-    });
+                 /*a*/type/*b*/ Response/*c*/</*d*/T/*e*/> /*f*/ = /*g*/(x: T, y: number) => string;;
+             `)
+        ));
 
-    test('union type', () => {
-       return spec.rewriteRun(
+    test('union type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type ID = /*a*/ number /*b*/ | /*c*/ string /*d*/;
-            `)
-        );
-    });
+                 type ID = /*a*/ number /*b*/ | /*c*/ string /*d*/;
+             `)
+        ));
 
-    test('union type with comments', () => {
-       return spec.rewriteRun(
+    test('union type with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type ID = number | string;
-            `)
-        );
-    });
+                 type ID = number | string;
+             `)
+        ));
 
-    test('construct function type alias', () => {
-       return spec.rewriteRun(
+    test('construct function type alias', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type MyConstructor = abstract new (arg: string) => string;
-            `)
-        );
-    });
+                 type MyConstructor = abstract new (arg: string) => string;
+             `)
+        ));
 
-    test('construct function type alias with comments', () => {
-       return spec.rewriteRun(
+    test('construct function type alias with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type MyConstructor = /*a*/new/*b*/ (/*c*/arg: string) => string;
-            `)
-        );
-    });
+                 type MyConstructor = /*a*/new/*b*/ (/*c*/arg: string) => string;
+             `)
+        ));
 
-    test('construct function type alias with abstract and comments', () => {
-       return spec.rewriteRun(
+    test('construct function type alias with abstract and comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type MyConstructor = /*0*/ abstract /*a*/new/*b*/ (/*c*/arg: string) => string;
-            `)
-        );
-    });
+                 type MyConstructor = /*0*/ abstract /*a*/new/*b*/ (/*c*/arg: string) => string;
+             `)
+        ));
 
-    test('recursive array type', () => {
-       return spec.rewriteRun(
+    test('recursive array type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type NestedArray<T> = T | NestedArray<T[]>;
-            `)
-        );
-    });
+                 type NestedArray<T> = T | NestedArray<T[]>;
+             `)
+        ));
 
-    test('construct function type alias with generic', () => {
-       return spec.rewriteRun(
+    test('construct function type alias with generic', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type GenericConstructor<T> = new (/*a*/.../*b*/args: any[]) => T;
-            `)
-        );
-    });
+                 type GenericConstructor<T> = new (/*a*/.../*b*/args: any[]) => T;
+             `)
+        ));
 
-    test('tuple type', () => {
-       return spec.rewriteRun(
+    test('tuple type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type MyTuple = [number, string, boolean];
-            `)
-        );
-    });
+                 type MyTuple = [number, string, boolean];
+             `)
+        ));
 
-    test('tuple type with comments', () => {
-       return spec.rewriteRun(
+    test('tuple type with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type MyTuple = /*a*/[/*b*/number/*c*/, /*d*/string/*e*/, /*f*/boolean/*g*/, /*h*/]/*j*/;
-            `)
-        );
-    });
+                 type MyTuple = /*a*/[/*b*/number/*c*/, /*d*/string/*e*/, /*f*/boolean/*g*/, /*h*/]/*j*/;
+             `)
+        ));
 
-    test('tuple type empty', () => {
-       return spec.rewriteRun(
+    test('tuple type empty', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type MyTuple = [/*a*/];
-            `)
-        );
-    });
+                 type MyTuple = [/*a*/];
+             `)
+        ));
 
-    test('nested tuple type', () => {
-       return spec.rewriteRun(
+    test('nested tuple type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type NestedTuple = [number, [string, boolean]];
-            `)
-        );
-    });
+                 type NestedTuple = [number, [string, boolean]];
+             `)
+        ));
 
-    test('optional tuple type', () => {
-       return spec.rewriteRun(
+    test('optional tuple type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type OptionalTuple = [string, /*a*/number/*b*/?/*c*/];
-            `)
-        );
-    });
+                 type OptionalTuple = [string, /*a*/number/*b*/?/*c*/];
+             `)
+        ));
 
-    test('tuple rest type', () => {
-       return spec.rewriteRun(
+    test('tuple rest type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type FlexibleTuple = [string, ...number[]];
-            `)
-        );
-    });
+                 type FlexibleTuple = [string, ...number[]];
+             `)
+        ));
 
-    test('readonly operator tuple type', () => {
-       return spec.rewriteRun(
+    test('readonly operator tuple type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type ReadonlyTuple = readonly [string, number];
-            `)
-        );
-    });
+                 type ReadonlyTuple = readonly [string, number];
+             `)
+        ));
 
-    test('readonly operator tuple type with comments', () => {
-       return spec.rewriteRun(
+    test('readonly operator tuple type with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type ReadonlyTuple = /*a*/keyof /*b*/ [string, number];
-            `)
-        );
-    });
+                 type ReadonlyTuple = /*a*/keyof /*b*/ [string, number];
+             `)
+        ));
 
-    test('basic conditional type', () => {
-       return spec.rewriteRun(
+    test('basic conditional type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type IsString<T> = T extends string ? 'Yes' : 'No';
-            `)
-        );
-    });
+                 type IsString<T> = T extends string ? 'Yes' : 'No';
+             `)
+        ));
 
-    test('basic conditional type with comments', () => {
-       return spec.rewriteRun(
+    test('basic conditional type with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type IsString<T> = /*a*/T/*b*/ extends /*c*/string /*d*/? /*e*/'Yes' /*f*/:/*g*/ 'No'/*h*/;
-            `)
-        );
-    });
+                 type IsString<T> = /*a*/T/*b*/ extends /*c*/string /*d*/? /*e*/'Yes' /*f*/:/*g*/ 'No'/*h*/;
+             `)
+        ));
 
-    test('conditional type with parenthesized type', () => {
-       return spec.rewriteRun(
+    test('conditional type with parenthesized type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type Flatten<T> = T extends (infer R)[] ? Flatten<R> : T;
-            `)
-        );
-    });
+                 type Flatten<T> = T extends (infer R)[] ? Flatten<R> : T;
+             `)
+        ));
 
-    test('conditional type with parenthesized type and comments', () => {
-       return spec.rewriteRun(
+    test('conditional type with parenthesized type and comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type Flatten<T> = T extends /*a*/(/*b*/infer/*c*/ R/*d*/)/*e*/[] ? Flatten<R> : T;
-            `)
-        );
-    });
+                 type Flatten<T> = T extends /*a*/(/*b*/infer/*c*/ R/*d*/)/*e*/[] ? Flatten<R> : T;
+             `)
+        ));
 
-    test('conditional type with parenthesized type and never', () => {
-       return spec.rewriteRun(
+    test('conditional type with parenthesized type and never', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type GetReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
-            `)
-        );
-    });
+                 type GetReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+             `)
+        ));
 
-    test('named tuple member type', () => {
-       return spec.rewriteRun(
+    test('named tuple member type', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type Coordinate = [x: number, y: number, z?: number];
-                type VariableArgs = [name: string, ...args: number[]];
-            `)
-        );
-    });
+                 type Coordinate = [x: number, y: number, z?: number];
+                 type VariableArgs = [name: string, ...args: number[]];
+             `)
+        ));
 
-    test('trailing comma in params', () => {
-       return spec.rewriteRun(
+    test('trailing comma in params', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type RichText = (
-                    overrides?: Partial<RichTextField>/*a*/,/*b*/
-                ) => RichTextField
-            `)
-        );
-    });
+                 type RichText = (
+                     overrides?: Partial<RichTextField>/*a*/,/*b*/
+                 ) => RichTextField
+             `)
+        ));
 
-    test('trailing comma in type args', () => {
-       return spec.rewriteRun(
+    test('trailing comma in type args', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                export type AfterReadRichTextHookArgs<
-                    TValue = any,
-                > = {}
-            `)
-        );
-    });
+                 export type AfterReadRichTextHookArgs<
+                     TValue = any,
+                 > = {}
+             `)
+        ));
 
-    test('type with empty type argument', () => {
-       return spec.rewriteRun(
+    test('type with empty type argument', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type A/*a*/</*b*/>/*c*/ = {/*d*/}
-            `)
-        );
-    });
+                 type A/*a*/</*b*/>/*c*/ = {/*d*/}
+             `)
+        ));
 
-    test('type with intrinsic keyword', () => {
-       return spec.rewriteRun(
+    test('type with intrinsic keyword', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type Uppercase<S extends string> = intrinsic
-            `)
-        );
-    });
+                 type Uppercase<S extends string> = intrinsic
+             `)
+        ));
 
-    test('constructor type with trailing coma', () => {
-       return spec.rewriteRun(
+    test('constructor type with trailing coma', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type ElementConstructor<P> =
-                    (new(
-                    x: P,
-                    y?: any/*a*/,/*b*/
-                ) => Component<any, any>);
-            `)
-        );
-    });
+                 type ElementConstructor<P> =
+                     (new(
+                     x: P,
+                     y?: any/*a*/,/*b*/
+                 ) => Component<any, any>);
+             `)
+        ));
 
-    test('constructor type with empty param', () => {
-       return spec.rewriteRun(
+    test('constructor type with empty param', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                 type ElementConstructor<P> =
                     (new(/*a*/) => Component<any, any>);
             `)
-        );
-    });
+        ));
 });

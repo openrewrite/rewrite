@@ -19,46 +19,40 @@ import {typescript} from "../../../src/javascript";
 describe('object literal mapping', () => {
     const spec = new RecipeSpec();
 
-    test('empty', () => {
-        return spec.rewriteRun(
+    test('empty', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('const c = {}')
-        );
-    });
+        ));
 
-    test('single', () => {
-        return spec.rewriteRun(
+    test('single', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('const c = { foo: 1 }')
-        );
-    });
+        ));
 
-    test('multiple', () => {
-        return spec.rewriteRun(
+    test('multiple', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('const c = { foo: 1, bar: 2 }')
-        );
-    });
-    test('trailing comma', () => {
-        return spec.rewriteRun(
+        ));
+    test('trailing comma', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('const c = { foo: 1, /*1*/ }')
-        );
-    });
-    test('string key', () => {
-        return spec.rewriteRun(
+        ));
+    test('string key', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('const c = { "foo": 1 }')
-        );
-    });
-    test('undefined key', () => {
-        return spec.rewriteRun(
+        ));
+    test('undefined key', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('const c = { undefined: 1 }')
-        );
-    });
-    test('computed property', () => {
-        return spec.rewriteRun({
+        ));
+    test('computed property', () =>
+        spec.rewriteRun({
             //language=typescript
             ...typescript(
                 'const c = { [ 1 + 1 ] : 1 }'
@@ -72,6 +66,5 @@ describe('object literal mapping', () => {
                 // expect(expression).toBeDefined();
                 // expect((<J.Literal>expression.left).valueSource).toBe("1");
             }
-        });
-    });
+        }));
 });

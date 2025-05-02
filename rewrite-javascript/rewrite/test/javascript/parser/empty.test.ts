@@ -19,10 +19,9 @@ import {typescript} from "../../../src/javascript";
 describe('empty mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('if (true) {/*a*/};')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('if (true) {/*a*/};')
+        ));
 });

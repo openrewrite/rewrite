@@ -19,117 +19,112 @@ import {typescript} from "../../../src/javascript";
 describe('switch-case mapping', () => {
     const spec = new RecipeSpec();
 
-    test('empty switch', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              let txt: string;
-              switch /*a*/(/*b*/txt/*c*/)/*d*/ {
-                  /*e*/
-              }
-          `)
-        );
-    });
-
-    test('simple switch-case', () => {
-       return spec.rewriteRun(
+    test('empty switch', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                let txt: string;
-                switch (txt) {
-                    case 'a':
-                        console.log('A');
-                        break;
-                }
-            `)
-        );
-    });
+               let txt: string;
+               switch /*a*/(/*b*/txt/*c*/)/*d*/ {
+                   /*e*/
+               }
+           `)
+        ));
 
-    test('simple switch-case with comments', () => {
-       return spec.rewriteRun(
+    test('simple switch-case', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-              let  txt: string;
-              switch (txt) {
-                  /*a*/ case /*b*/'a'/*c*/:/*d*/
-                      console.log('A');
-                      /*e*/break /*f*/;/*g*/
-              }
-          `)
-        );
-    });
+                 let txt: string;
+                 switch (txt) {
+                     case 'a':
+                         console.log('A');
+                         break;
+                 }
+             `)
+        ));
 
-    test('switch-case with several different cases', () => {
-       return spec.rewriteRun(
+    test('simple switch-case with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                let txt: string;
-                switch (txt) {
-                    // first
-                    case 'a':
-                        console.log('A');
-                        break;
-                    //second
-                    case 'b':
-                        console.log('B');
-                        break;
-                }
-            `)
-        );
-    });
+               let  txt: string;
+               switch (txt) {
+                   /*a*/ case /*b*/'a'/*c*/:/*d*/
+                       console.log('A');
+                       /*e*/break /*f*/;/*g*/
+               }
+           `)
+        ));
 
-    test('switch-case with several cases with one body', () => {
-       return spec.rewriteRun(
+    test('switch-case with several different cases', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                let txt: string;
-                switch (txt) {
-                    // first
-                    case 'a':
-                    //second
-                    case 'b':
-                        console.log('B');
-                        break;
-                }
-            `)
-        );
-    });
+                 let txt: string;
+                 switch (txt) {
+                     // first
+                     case 'a':
+                         console.log('A');
+                         break;
+                     //second
+                     case 'b':
+                         console.log('B');
+                         break;
+                 }
+             `)
+        ));
 
-    test('switch-case with cases and default', () => {
-       return spec.rewriteRun(
+    test('switch-case with several cases with one body', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                let txt: string;
-                switch (txt) {
-                    // first
-                    case 'a':
-                        console.log('A');
-                        break
-                    //second
-                    case 'b':
-                        console.log('B')
-                        break;
-                    //default
-                    default:
-                        console.log('C, ...')
-                        break
-                }
-            `)
-        );
-    });
+                 let txt: string;
+                 switch (txt) {
+                     // first
+                     case 'a':
+                     //second
+                     case 'b':
+                         console.log('B');
+                         break;
+                 }
+             `)
+        ));
 
-    test('switch-case with default and comments', () => {
-       return spec.rewriteRun(
+    test('switch-case with cases and default', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                 let txt: string;
+                 switch (txt) {
+                     // first
+                     case 'a':
+                         console.log('A');
+                         break
+                     //second
+                     case 'b':
+                         console.log('B')
+                         break;
+                     //default
+                     default:
+                         console.log('C, ...')
+                         break
+                 }
+             `)
+        ));
+
+    test('switch-case with default and comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                 let txt: string;
                 switch (txt) {
                     //default
-                    /*a*/default/*b*/:/*c*/
+                    /*a*/
+                    default/*b*/
+                    :/*c*/
                         console.log('C, ...');
                         break;
                 }
             `)
-        );
-    });
+        ));
 });

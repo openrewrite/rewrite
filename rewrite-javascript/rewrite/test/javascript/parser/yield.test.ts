@@ -20,42 +20,38 @@ import {typescript} from "../../../src/javascript";
 describe('yield mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('function* generatorFunction() { yield 42;}')
-        );
-    });
-    test('empty', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('yield')
-        );
-    });
-    test('delegated', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('yield* other')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('function* generatorFunction() { yield 42;}')
+        ));
+    test('empty', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('yield')
+        ));
+    test('delegated', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('yield* other')
+        ));
 
-    test('yield expression', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript(`
-              DenseMatrix.prototype[Symbol.iterator] = function* () {
-                  const recurse = function* (value, index) {
-                      if (isArray(value)) {
-                          for (let i = 0; i < value.length; i++) {
-                              yield* recurse(value[i], index.concat(i))
-                          }
-                      } else {
-                          yield ({value, index})
-                      }
-                  }
-                  yield/*a*/* /*b*/recurse(this._data, [])
-              }
-          `)
-        );
-    });
+    test('yield expression', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                DenseMatrix.prototype[Symbol.iterator] = function* () {
+                    const recurse = function* (value, index) {
+                        if (isArray(value)) {
+                            for (let i = 0; i < value.length; i++) {
+                                yield* recurse(value[i], index.concat(i))
+                            }
+                        } else {
+                            yield ({value, index})
+                        }
+                    }
+                    yield/*a*/* /*b*/recurse(this._data, [])
+                }
+            `)
+        ));
 });

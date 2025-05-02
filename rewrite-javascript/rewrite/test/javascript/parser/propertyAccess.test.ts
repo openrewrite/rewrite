@@ -19,45 +19,39 @@ import {typescript} from "../../../src/javascript";
 describe('property access mapping', () => {
     const spec = new RecipeSpec();
 
-    test('with array literal receiver', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('[1] . length')
-        );
-    });
+    test('with array literal receiver', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('[1] . length')
+        ));
 
-    test('with array literal receiver', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('foo . bar . baz')
-        );
-    });
+    test('with array literal receiver', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('foo . bar . baz')
+        ));
 
-    test('optional property last', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('options.onGroup?.(onGroupOptions)')
-        );
-    });
+    test('optional property last', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('options.onGroup?.(onGroupOptions)')
+        ));
 
-    test('optional property first', () => {
-       return spec.rewriteRun(
+    test('optional property first', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('options?.onGroup(onGroupOptions)')
-        );
-    });
+        ));
 
-    test('optional property all', () => {
-       return spec.rewriteRun(
+    test('optional property all', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('options?.onGroup?.(onGroupOptions)')
-        );
-    });
+        ));
 
-    test('no optional properties', () => {
-       return spec.rewriteRun(
+    test('no optional properties', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('options.onGroup(onGroupOptions)')
-        );
-    });
+        ));
 });

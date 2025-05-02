@@ -19,177 +19,162 @@ import {typescript} from "../../../src/javascript";
 describe('call mapping', () => {
     const spec = new RecipeSpec();
 
-    test('single', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('parseInt("42")')
-        );
-    });
+    test('single', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('parseInt("42")')
+        ));
 
-    test('multiple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('setTimeout(null, 2000, \'Hello\');')
-        );
-    });
+    test('multiple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('setTimeout(null, 2000, \'Hello\');')
+        ));
 
-    test('with array literal receiver', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('[1] . splice(0)')
-        );
-    });
+    test('with array literal receiver', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('[1] . splice(0)')
+        ));
 
-    test('with call receiver', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('"1" . substring(0) . substring(0)')
-        );
-    });
+    test('with call receiver', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('"1" . substring(0) . substring(0)')
+        ));
 
-    test('trailing comma', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('parseInt("42" , )')
-        );
-    });
+    test('trailing comma', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('parseInt("42" , )')
+        ));
 
-    test('with optional chaining operator', () => {
-       return spec.rewriteRun(
+    test('with optional chaining operator', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const func = (message: string) => message;
-                const result1 = func/*a*/?./*b*/("TS"); // Invokes the function
-                const result2 = func/*a*/?./*b*/call("TS"); // Invokes the function
-            `)
-        );
-    });
+                 const func = (message: string) => message;
+                 const result1 = func/*a*/?./*b*/("TS"); // Invokes the function
+                 const result2 = func/*a*/?./*b*/call("TS"); // Invokes the function
+             `)
+        ));
 
-    test('call expression with type parameters', () => {
-       return spec.rewriteRun(
+    test('call expression with type parameters', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                function identity<T>(value: T): T {
-                    return value;
-                }
+                 function identity<T>(value: T): T {
+                     return value;
+                 }
+ 
+                 const result = identity<string>("Hello TypeScript");
+             `)
+        ));
 
-                const result = identity<string>("Hello TypeScript");
-            `)
-        );
-    });
-
-    test('call expression with type parameters and comments', () => {
-       return spec.rewriteRun(
+    test('call expression with type parameters and comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                function identity<T>(value: T): T {
-                    return value;
-                }
+                 function identity<T>(value: T): T {
+                     return value;
+                 }
+ 
+                 const result = /*a*/identity/*b*/</*c*/string/*d*/>/*e*/("Hello TypeScript");
+             `)
+        ));
 
-                const result = /*a*/identity/*b*/</*c*/string/*d*/>/*e*/("Hello TypeScript");
-            `)
-        );
-    });
-
-    test('call expression with type parameters and optional chaining operator', () => {
-       return spec.rewriteRun(
+    test('call expression with type parameters and optional chaining operator', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                function identity<T>(value: T): T {
-                    return value;
-                }
+                 function identity<T>(value: T): T {
+                     return value;
+                 }
+ 
+                 const result1 = identity<string>?.("Hello TypeScript");
+                 const result2 = identity?.<string>("Hello TypeScript");
+                 const result3 = identity?.call("Hello TypeScript");
+             `)
+        ));
 
-                const result1 = identity<string>?.("Hello TypeScript");
-                const result2 = identity?.<string>("Hello TypeScript");
-                const result3 = identity?.call("Hello TypeScript");
-            `)
-        );
-    });
-
-    test('call expression with type parameters and optional chaining operator with comments', () => {
-       return spec.rewriteRun(
+    test('call expression with type parameters and optional chaining operator with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                function identity<T>(value: T): T {
-                    return value;
-                }
+                 function identity<T>(value: T): T {
+                     return value;
+                 }
+ 
+                 const result1 = /*a*/identity/*b*/<string>/*c*/?./*d*/("Hello TypeScript");
+                 const result2 = /*a*/identity/*b*/?./*c*/<string>/*d*/("Hello TypeScript");
+             `)
+        ));
 
-                const result1 = /*a*/identity/*b*/<string>/*c*/?./*d*/("Hello TypeScript");
-                const result2 = /*a*/identity/*b*/?./*c*/<string>/*d*/("Hello TypeScript");
-            `)
-        );
-    });
-
-    test('call expression with mapping', () => {
-       return spec.rewriteRun(
+    test('call expression with mapping', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type Operation = (a: number, b: number) => number;
+                 type Operation = (a: number, b: number) => number;
+ 
+                 // Define an object with methods accessed by string keys
+                 const operations: { [key: string]: Operation } = {
+                     add: (a, b) => a + b,
+                     multiply: (a, b) => a * b,
+                 };
+ 
+                 // Access and call the "add" method using bracket notation
+                 const result1 = operations["add"](3, 4); // 3 + 4 = 7
+             `)
+        ));
 
-                // Define an object with methods accessed by string keys
-                const operations: { [key: string]: Operation } = {
-                    add: (a, b) => a + b,
-                    multiply: (a, b) => a * b,
-                };
-
-                // Access and call the "add" method using bracket notation
-                const result1 = operations["add"](3, 4); // 3 + 4 = 7
-            `)
-        );
-    });
-
-    test('call expression with mapping and ?.', () => {
-       return spec.rewriteRun(
+    test('call expression with mapping and ?.', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                type Operation = (a: number, b: number) => number;
+                 type Operation = (a: number, b: number) => number;
+ 
+                 // Define an object with methods accessed by string keys
+                 const operations: { [key: string]: Operation } = {
+                     add: (a, b) => a + b,
+                     multiply: (a, b) => a * b,
+                 };
+ 
+                 // Access and call the "add" method using bracket notation
+                 const result1 = operations["add"]?.(3, 4); // 3 + 4 = 7
+             `)
+        ));
 
-                // Define an object with methods accessed by string keys
-                const operations: { [key: string]: Operation } = {
-                    add: (a, b) => a + b,
-                    multiply: (a, b) => a * b,
-                };
-
-                // Access and call the "add" method using bracket notation
-                const result1 = operations["add"]?.(3, 4); // 3 + 4 = 7
-            `)
-        );
-    });
-
-    test('call expression with mapping adv', () => {
-       return spec.rewriteRun(
+    test('call expression with mapping adv', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                const arr: { [key: string]: (x: number, y: number) => number }[] = [
-                    {
-                        abc: (x, y) => x - y,
-                    },
-                ];
-
-                const result = arr[0]["abc"](10, 5); // Calls the function and subtracts 10 - 5 = 5
-            `)
-        );
-    });
+                 const arr: { [key: string]: (x: number, y: number) => number }[] = [
+                     {
+                         abc: (x, y) => x - y,
+                     },
+                 ];
+ 
+                 const result = arr[0]["abc"](10, 5); // Calls the function and subtracts 10 - 5 = 5
+             `)
+        ));
 
     // need a way to distinguish new class calls with empty braces and without braces
-    test('call new expression without braces', () => {
-       return spec.rewriteRun(
+    test('call new expression without braces', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                var d = (new Date).getTime()
-                const intType = new arrow.Uint32
-            `)
-        );
-    });
+                 var d = (new Date).getTime()
+                 const intType = new arrow.Uint32
+             `)
+        ));
 
     // perhaps a bug in a Node parser
     // node.getChildren() skips token '/*a*/<'
-    test.skip('call expression with sequential <<', () => {
-       return spec.rewriteRun(
+    test.skip('call expression with sequential <<', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                expectTypeOf(o.get).toMatchTypeOf/*a*/<<K extends keyof EmberObject>(key: K) => EmberObject[K]>();
-            `)
-        );
-    });
+                 expectTypeOf(o.get).toMatchTypeOf/*a*/<<K extends keyof EmberObject>(key: K) => EmberObject[K]>();
+             `)
+        ));
 });

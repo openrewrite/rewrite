@@ -19,64 +19,57 @@ import {typescript} from "../../../src/javascript";
 describe('while mapping', () => {
     const spec = new RecipeSpec();
 
-    test('empty while', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('while (true);')
-        );
-    });
+    test('empty while', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('while (true);')
+        ));
 
-    test('empty while with empty statements', () => {
-       return spec.rewriteRun(
+    test('empty while with empty statements', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('while (true/*a*/);/*b*/;/*c*/')
-        );
-    });
+        ));
 
-    test('empty while with comments', () => {
-       return spec.rewriteRun(
+    test('empty while with comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('/*a*/while/*b*/ (/*c*/true/*d*/)/*e*/;/*f*/')
-        );
-    });
+        ));
 
-    test('empty while with empty statement', () => {
-       return spec.rewriteRun(
+    test('empty while with empty statement', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('while (true) { };')
-        );
-    });
+        ));
 
-    test('empty while with empty statement and comments', () => {
-       return spec.rewriteRun(
+    test('empty while with empty statement and comments', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('/*a*/ while /*b*/(/*c*/true /*d*/)/*e*/ {/*f*/}/*g*/;/*h*/')
-        );
-    });
+        ));
 
-    test('while with statements', () => {
-       return spec.rewriteRun(
+    test('while with statements', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
-                let count = 0;
-                while (count < 10) {
-                    console.log(count);
-                    /*count*/
-                    count++;
-                };
-            `)
-        );
-    });
+                 let count = 0;
+                 while (count < 10) {
+                     console.log(count);
+                     /*count*/
+                     count++;
+                 };
+             `)
+        ));
 
-    test('while-if with semicolon', () => {
-       return spec.rewriteRun(
+    test('while-if with semicolon', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('function foo() { while (i--) if (nodeList[i] == elem) return true;}')
-        );
-    });
+        ));
 
-    test('if-do-while with semicolon', () => {
-       return spec.rewriteRun(
+    test('if-do-while with semicolon', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                 if (true)
@@ -87,6 +80,5 @@ describe('while mapping', () => {
                     while (true)
                 }
             `)
-        );
-    });
+        ));
 });

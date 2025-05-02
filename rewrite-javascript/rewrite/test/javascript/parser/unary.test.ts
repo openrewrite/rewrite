@@ -19,56 +19,49 @@ import {typescript} from "../../../src/javascript";
 describe('prefix operator mapping', () => {
     const spec = new RecipeSpec();
 
-    test('plus', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('+1')
-        );
-    });
-    test('minus', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('-1')
-        );
-    });
-    test('not', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('!1')
-        );
-    });
-    test('tilde', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('~1')
-        );
-    });
-    test('increment', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('++1')
-        );
-    });
-    test('decrement', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('--a;')
-        );
-    });
-    test('spread', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('[ ...[] ]')
-        );
-    });
-    test('spread in method param', () => {
-       return spec.rewriteRun(
+    test('plus', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('+1')
+        ));
+    test('minus', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('-1')
+        ));
+    test('not', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('!1')
+        ));
+    test('tilde', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('~1')
+        ));
+    test('increment', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('++1')
+        ));
+    test('decrement', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('--a;')
+        ));
+    test('spread', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('[ ...[] ]')
+        ));
+    test('spread in method param', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                 class Foo {
-                    constructor(@multiInject(BAR) /*a*/...args: Bar[][]) {}
+                    constructor(@multiInject(BAR) /*a*/...args: Bar[][]) {
+                    }
                 }
             `)
-        );
-    });
+        ));
 });

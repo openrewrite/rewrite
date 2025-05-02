@@ -19,10 +19,9 @@ import {typescript} from "../../../src/javascript";
 describe('delete operator mapping', () => {
     const spec = new RecipeSpec();
 
-    test('delete', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('delete 1')
-        );
-    });
+    test('delete', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('delete 1')
+        ));
 });

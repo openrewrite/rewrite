@@ -19,16 +19,14 @@ import {typescript} from "../../../src/javascript";
 describe('return mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('function f() {return 1;}')
-        );
-    });
-    test('empty', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('function f() {return}')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('function f() {return 1;}')
+        ));
+    test('empty', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('function f() {return}')
+        ));
 });

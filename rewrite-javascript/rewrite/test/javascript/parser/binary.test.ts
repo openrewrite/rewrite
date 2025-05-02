@@ -20,8 +20,8 @@ import {J, JavaType} from "../../../src/java";
 describe('arithmetic operator mapping', () => {
     const spec = new RecipeSpec();
 
-    test('plus', () => {
-        return spec.rewriteRun({
+    test('plus', () =>
+        spec.rewriteRun({
             //language=typescript
             ...typescript(
                 '1 + 2'
@@ -30,11 +30,10 @@ describe('arithmetic operator mapping', () => {
                 const binary = (cu.statements[0].element as JS.ExpressionStatement).expression as J.Binary;
                 expect(binary.type).toBe(JavaType.Primitive.Double);
             }
-        });
-    });
+        }));
 
-    test('concat', () => {
-        return spec.rewriteRun({
+    test('concat', () =>
+        spec.rewriteRun({
             //language=typescript
             ...typescript(
                 '"1" + 2'
@@ -43,72 +42,62 @@ describe('arithmetic operator mapping', () => {
                 const binary = (cu.statements[0].element as JS.ExpressionStatement).expression as J.Binary;
                 expect(binary.type).toBe(JavaType.Primitive.String);
             }
-        });
-    });
+        }));
 
-    test('minus', () => {
-        return spec.rewriteRun(
+    test('minus', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('1 - 2')
-        );
-    });
+        ));
 
-    test('multiply', () => {
-        return spec.rewriteRun(
+    test('multiply', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('1 * 2')
-        );
-    });
+        ));
 
-    test('divide', () => {
-        return spec.rewriteRun(
+    test('divide', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('1 / 2')
-        );
-    });
+        ));
 
-    test('modulo', () => {
-        return spec.rewriteRun(
+    test('modulo', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('1 % 2')
-        );
-    });
+        ));
 
-    test('left shift', () => {
-        return spec.rewriteRun(
+    test('left shift', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('1 << 2')
-        );
-    });
+        ));
 
-    test('right shift', () => {
-        return spec.rewriteRun(
+    test('right shift', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('1 >> 2')
-        );
-    });
+        ));
 
-    test('unsigned right shift', () => {
-        return spec.rewriteRun(
+    test('unsigned right shift', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('1 >>> 2')
-        );
-    });
+        ));
 
-    test('power operation', () => {
-        return spec.rewriteRun(
+    test('power operation', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript('2 ** 3')
-        );
-    });
+        ));
 
-    test('exponentiation operation', () => {
-        return spec.rewriteRun(
+    test('exponentiation operation', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                 let x = 0
                 x **= 1
             `)
-        );
-    });
+        ));
 });

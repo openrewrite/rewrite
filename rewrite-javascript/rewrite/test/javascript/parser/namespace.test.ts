@@ -19,17 +19,16 @@ import {typescript} from "../../../src/javascript";
 describe('namespace mapping', () => {
     const spec = new RecipeSpec();
 
-    test('namespace empty', () => {
+    test('namespace empty', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
                 namespace X {
                 }
             `)
-        );
-    });
+        ));
 
-    test('namespace with statement body', () => {
+    test('namespace with statement body', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -37,10 +36,9 @@ describe('namespace mapping', () => {
                     const x = 10
                 }
             `)
-        );
-    });
+        ));
 
-    test('namespace with several statements in body', () => {
+    test('namespace with several statements in body', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -50,10 +48,9 @@ describe('namespace mapping', () => {
                     const z = 0;
                 }
             `)
-        );
-    });
+        ));
 
-    test('namespace with several statements in body and comments', () => {
+    test('namespace with several statements in body and comments', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -65,10 +62,9 @@ describe('namespace mapping', () => {
                     const z = 0;/*f*/
                 }
             `)
-        );
-    });
+        ));
 
-    test('namespace with statement body and comments', () => {
+    test('namespace with statement body and comments', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -80,10 +76,9 @@ describe('namespace mapping', () => {
                     const x = 10 /*f*/
                 } /*g*/
             `)
-        );
-    });
+        ));
 
-    test('namespace with statement body and modifier', () => {
+    test('namespace with statement body and modifier', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -91,10 +86,9 @@ describe('namespace mapping', () => {
                     const x = 10
                 }
             `)
-        );
-    });
+        ));
 
-    test('namespace with statement body, modifier and comments', () => {
+    test('namespace with statement body, modifier and comments', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -106,20 +100,18 @@ describe('namespace mapping', () => {
                     const x = 10
                 }
             `)
-        );
-    });
+        ));
 
-    test('namespace empty with sub-namespaces', () => {
+    test('namespace empty with sub-namespaces', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
                 namespace X.Y.Z {
                 }
             `)
-        );
-    });
+        ));
 
-    test('namespace empty with sub-namespaces and comments', () => {
+    test('namespace empty with sub-namespaces and comments', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -130,10 +122,9 @@ describe('namespace mapping', () => {
                 {
                 }
             `)
-        );
-    });
+        ));
 
-    test('namespace non-empty with sub-namespaces and body', () => {
+    test('namespace non-empty with sub-namespaces and body', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -141,10 +132,9 @@ describe('namespace mapping', () => {
                     const x = 10
                 }
             `)
-        );
-    });
+        ));
 
-    test('namespace non-empty with sub-namespaces and body and modifier', () => {
+    test('namespace non-empty with sub-namespaces and body and modifier', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -152,10 +142,9 @@ describe('namespace mapping', () => {
                     const x = 10
                 }
             `)
-        );
-    });
+        ));
 
-    test('hierarchic namespaces with body with comments', () => {
+    test('hierarchic namespaces with body with comments', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -173,10 +162,9 @@ describe('namespace mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('hierarchic namespaces with body', () => {
+    test('hierarchic namespaces with body', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -190,10 +178,9 @@ describe('namespace mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 
-    test('namespace with expression', () => {
+    test('namespace with expression', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -222,10 +209,9 @@ describe('namespace mapping', () => {
                     /*ghj*/
                 }
             `)
-        );
-    });
+        ));
 
-    test('complex test with namaspaces and modules', () => {
+    test('complex test with namaspaces and modules', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -269,20 +255,18 @@ describe('namespace mapping', () => {
                 }
 
             `)
-        );
-    });
+        ));
 
-    test('empty body', () => {
+    test('empty body', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
                 declare module 'vue-count-to' /*a*/
                 ;/*b*/
             `)
-        );
-    });
+        ));
 
-    test('namespace export as', () => {
+    test('namespace export as', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -294,10 +278,9 @@ describe('namespace mapping', () => {
                 /*a*/
                 export /*b*/ as /*c*/ namespace /*d*/ MyLibrary/*e*/;
             `)
-        );
-    });
+        ));
 
-    test('complex namespace export as', () => {
+    test('complex namespace export as', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -314,10 +297,9 @@ describe('namespace mapping', () => {
                             ? boolean
                             : T
             `)
-        );
-    });
+        ));
 
-    test('extend global type definitions without namespace keyword', () => {
+    test('extend global type definitions without namespace keyword', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -327,6 +309,5 @@ describe('namespace mapping', () => {
                     }
                 }
             `)
-        );
-    });
+        ));
 });

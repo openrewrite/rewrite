@@ -19,10 +19,9 @@ import {typescript} from "../../../src/javascript";
 describe('ternary mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('true ? 1 : 2')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('true ? 1 : 2')
+        ));
 });

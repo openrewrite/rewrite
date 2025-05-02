@@ -19,10 +19,9 @@ import {typescript} from "../../../src/javascript";
 describe('instanceof mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => {
-       return spec.rewriteRun(
-          //language=typescript
-          typescript('1 instanceof Object')
-        );
-    });
+    test('simple', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('1 instanceof Object')
+        ));
 });
