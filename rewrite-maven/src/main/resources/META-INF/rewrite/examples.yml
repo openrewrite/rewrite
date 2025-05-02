@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# 
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddAnnotationProcessor
@@ -235,13 +234,12 @@ examples:
   - 'null'
   - 'null'
   sources:
-  - before: |
-      <project>
-          <groupId>com.mycompany.app</groupId>
-          <artifactId>my-app</artifactId>
-          <version>1</version>
-      </project>
-    path: pom.xml
+  - after: |
+      <gradleEnterprise>
+        <server>
+          <url>https://foo</url>
+        </server>
+      </gradleEnterprise>
     language: xml
   - before: |
       <?xml version="1.0" encoding="UTF-8"?>
@@ -257,12 +255,13 @@ examples:
         </extension>
       </extensions>
     language: xml
-  - after: |
-      <gradleEnterprise>
-        <server>
-          <url>https://foo</url>
-        </server>
-      </gradleEnterprise>
+  - before: |
+      <project>
+          <groupId>com.mycompany.app</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+      </project>
+    path: pom.xml
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
@@ -2257,6 +2256,36 @@ recipeName: org.openrewrite.maven.UpgradeParentVersion
 examples:
 - description: ''
   parameters:
+  - org.jenkins-ci
+  - jenkins
+  - '1.125'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      <project>
+          <parent>
+              <groupId>org.jenkins-ci</groupId>
+              <artifactId>jenkins</artifactId>
+              <version>1.124</version>
+          </parent>
+          <artifactId>example</artifactId>
+          <version>1.0.0</version>
+      </project>
+    after: |
+      <project>
+          <parent>
+              <groupId>org.jenkins-ci</groupId>
+              <artifactId>jenkins</artifactId>
+              <version>1.125</version>
+          </parent>
+          <artifactId>example</artifactId>
+          <version>1.0.0</version>
+      </project>
+    path: pom.xml
+    language: xml
+- description: ''
+  parameters:
   - '*'
   - '*'
   - latest.patch
@@ -2285,36 +2314,6 @@ examples:
         <groupId>com.mycompany.app</groupId>
         <artifactId>my-app</artifactId>
         <version>1</version>
-      </project>
-    path: pom.xml
-    language: xml
-- description: ''
-  parameters:
-  - org.jenkins-ci
-  - jenkins
-  - '1.125'
-  - 'null'
-  - 'null'
-  sources:
-  - before: |
-      <project>
-          <parent>
-              <groupId>org.jenkins-ci</groupId>
-              <artifactId>jenkins</artifactId>
-              <version>1.124</version>
-          </parent>
-          <artifactId>example</artifactId>
-          <version>1.0.0</version>
-      </project>
-    after: |
-      <project>
-          <parent>
-              <groupId>org.jenkins-ci</groupId>
-              <artifactId>jenkins</artifactId>
-              <version>1.125</version>
-          </parent>
-          <artifactId>example</artifactId>
-          <version>1.0.0</version>
       </project>
     path: pom.xml
     language: xml
@@ -2584,6 +2583,8 @@ recipeName: org.openrewrite.maven.plugin.DependencyPluginGoalResolveSources
 examples:
 - description: ''
   sources:
+  - before: foo
+    language: mavenProject
   - before: |
       <project>
           <modelVersion>4.0.0</modelVersion>
@@ -2632,8 +2633,6 @@ examples:
       </project>
     path: pom.xml
     language: xml
-  - before: foo
-    language: mavenProject
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.DependencyInsight
@@ -2968,6 +2967,8 @@ examples:
   - 'null'
   - 'null'
   sources:
+  - before: demo
+    language: mavenProject
   - before: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\
       \ xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n\txsi:schemaLocation=\"\
       http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd\"\
@@ -2986,8 +2987,6 @@ examples:
       </project>\n"
     path: pom.xml
     language: xml
-  - before: demo
-    language: mavenProject
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.security.UseHttpsForRepositories
