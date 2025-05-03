@@ -483,18 +483,6 @@ public class TypeUtils {
         return Optional.empty();
     }
 
-    public static Optional<JavaType.Variable> findDeclaredField(JavaType.@Nullable FullyQualified clazz, String name) {
-        if (clazz == null) {
-            return Optional.empty();
-        }
-        for (JavaType.Variable variable : clazz.getMembers()) {
-            if (variable.getName().equals(name)) {
-                return Optional.of(variable);
-            }
-        }
-        return findDeclaredField(clazz.getSupertype(), name);
-    }
-
     private static boolean methodHasSignature(JavaType.FullyQualified clazz, JavaType.Method m, String name, List<JavaType> argTypes) {
         if (!name.equals(m.getName())) {
             return false;
