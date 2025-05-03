@@ -123,7 +123,10 @@ public class TypeUtils {
         if (type1 == type2) {
             return true;
         }
-        if (type1 instanceof JavaType.Method && type2 instanceof JavaType.Method) {
+        if (type1 instanceof JavaType.Method || type2 instanceof JavaType.Method) {
+            if (!(type1 instanceof JavaType.Method) || !(type2 instanceof JavaType.Method)) {
+                return false;
+            }
             JavaType.Method method1 = (JavaType.Method) type1;
             JavaType.Method method2 = (JavaType.Method) type2;
             if (!method1.getName().equals(method2.getName()) ||
@@ -147,12 +150,18 @@ public class TypeUtils {
             }
             return true;
         }
-        if(type1 instanceof JavaType.Variable && type2 instanceof JavaType.Variable) {
+        if (type1 instanceof JavaType.Variable || type2 instanceof JavaType.Variable) {
+            if (!(type1 instanceof JavaType.Variable) || !(type2 instanceof JavaType.Variable)) {
+                return false;
+            }
             JavaType.Variable var1 = (JavaType.Variable) type1;
             JavaType.Variable var2 = (JavaType.Variable) type2;
             return isOfType((var1).getType(), var2.getType()) && isOfType(var1.getOwner(), var2.getOwner());
         }
-        if (type1 instanceof JavaType.Annotation && type2 instanceof JavaType.Annotation) {
+        if (type1 instanceof JavaType.Annotation || type2 instanceof JavaType.Annotation) {
+            if (!(type1 instanceof JavaType.Annotation) || !(type2 instanceof JavaType.Annotation)) {
+                return false;
+            }
             return isOfType((JavaType.Annotation) type1, (JavaType.Annotation) type2);
         }
         return new Types().isOfType(type1, type2);
@@ -472,6 +481,18 @@ public class TypeUtils {
             }
         }
         return Optional.empty();
+    }
+
+    public static Optional<JavaType.Variable> findDeclaredField(JavaType.@Nullable FullyQualified clazz, String name) {
+        if (clazz == null) {
+            return Optional.empty();
+        }
+        for (JavaType.Variable variable : clazz.getMembers()) {
+            if (variable.getName().equals(name)) {
+                return Optional.of(variable);
+            }
+        }
+        return findDeclaredField(clazz.getSupertype(), name);
     }
 
     private static boolean methodHasSignature(JavaType.FullyQualified clazz, JavaType.Method m, String name, List<JavaType> argTypes) {
