@@ -163,7 +163,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 Expression target = getTarget(fieldAccess);
                 JavaType targetType = resolveType(target.getType());
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
-                if (TypeUtils.isOfType(variableNameFieldType.getOwner(), targetType)) {
+                if (targetType != null && targetType.equals(variableNameFieldType.getOwner())) {
                     return true;
                 }
                 if (target instanceof J.TypeCast) {
