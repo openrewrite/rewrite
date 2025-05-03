@@ -153,8 +153,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         }
 
         /**
-         * FieldAccess targets the variable if its target is an Identifier and either
-         * its target Type equals variable.Name.FieldType.Owner.
+         * FieldAccess targets the variable if its target type equals variable.Name.FieldType.Owner.
          */
         private boolean fieldAccessTargetsVariable(J.FieldAccess fieldAccess) {
             if (renameVariable.getName().getFieldType() != null &&

@@ -1219,7 +1219,8 @@ class RenameVariableTest implements RewriteTest {
                       return this;
                   }
               }
-              """)
+              """
+          )
         );
     }
 
