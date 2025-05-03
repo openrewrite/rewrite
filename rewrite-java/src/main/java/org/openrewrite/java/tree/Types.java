@@ -25,6 +25,10 @@ public class Types {
     private final Set<TypePair> visiting = new HashSet<>();
     private final boolean infer;
 
+    public Types() {
+        this(false);
+    }
+
     public Types(boolean infer) {
         this.infer = infer;
     }
