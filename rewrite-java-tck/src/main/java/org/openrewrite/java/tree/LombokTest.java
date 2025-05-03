@@ -197,6 +197,7 @@ class LombokTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import lombok.Builder;
               import lombok.experimental.SuperBuilder;
               
               @SuperBuilder
@@ -221,6 +222,7 @@ class LombokTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import lombok.Builder;
               import lombok.experimental.SuperBuilder;
               
               @SuperBuilder
