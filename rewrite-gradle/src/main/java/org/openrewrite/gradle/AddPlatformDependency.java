@@ -40,7 +40,7 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
+public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.Scanned> {
 
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -77,45 +77,16 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             description = "A configuration to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
                     "is used when adding a new as of yet unused dependency.",
             example = "implementation",
-            required = false)
+            required = true)
     @Nullable
     String configuration;
 
-    @Option(displayName = "Only if using",
-            description = "Used to determine if the dependency will be added and in which scope it should be placed.",
-            example = "org.junit.jupiter.api.*",
-            required = false)
-    @Nullable
-    String onlyIfUsing;
-
-    @Option(displayName = "Classifier",
-            description = "A classifier to add. Commonly used to select variants of a library.",
-            example = "test",
-            required = false)
-    @Nullable
-    String classifier;
-
-    @Option(displayName = "Extension",
-            description = "The extension of the dependency to add. If omitted Gradle defaults to assuming the type is \"jar\".",
-            example = "jar",
-            required = false)
-    @Nullable
-    String extension;
-
-    @Option(displayName = "Family pattern",
-            description = "A pattern, applied to groupIds, used to determine which other dependencies should have aligned version numbers. " +
-                    "Accepts '*' as a wildcard character.",
-            example = "com.fasterxml.jackson*",
-            required = false)
-    @Nullable
-    String familyPattern;
-
-    @Option(displayName = "Accept transitive",
-            description = "Default false. If enabled, the dependency will not be added if it is already on the classpath as a transitive dependency.",
+    @Option(displayName = "Enforced",
+            description = "Used to determine whether the platform dependency should be enforcedPlatform.",
             example = "true",
             required = false)
     @Nullable
-    Boolean acceptTransitive;
+    Boolean enforced;
 
     @Override
     public String getDisplayName() {
@@ -142,7 +113,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     }
 
     public static class Scanned {
-        Map<JavaProject, Boolean> usingType = new HashMap<>();
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
         Map<JavaProject, Set<String>> customJvmTestSuitesWithDependencies = new HashMap<>();
     }
@@ -156,19 +126,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
 
-            @Nullable
-            UsesType<ExecutionContext> usesType = null;
-
-            private boolean usesType(SourceFile sourceFile, ExecutionContext ctx) {
-                if (onlyIfUsing == null) {
-                    return true;
-                }
-                if (usesType == null) {
-                    usesType = new UsesType<>(onlyIfUsing, true);
-                }
-                return usesType.isAcceptable(sourceFile, ctx) && usesType.visit(sourceFile, ctx) != sourceFile;
-            }
-
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (!(tree instanceof SourceFile)) {
@@ -176,7 +133,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 }
                 SourceFile sourceFile = (SourceFile) tree;
                 sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
-                    acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || usesType(sourceFile, ctx));
                     acc.customJvmTestSuitesWithDependencies
                             .computeIfAbsent(javaProject, ignored -> new HashSet<>())
                             .addAll(FindJVMTestSuites.jvmTestSuiteNames(tree, true));
@@ -197,6 +153,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        AddDependencyVisitor.DependencyModifier modifier = AddDependencyVisitor.DependencyModifier.PLATFORM;
+                        if (Boolean.TRUE.equals(enforced)) {
+                            modifier = AddDependencyVisitor.DependencyModifier.ENFORCED_PLATFORM;
+                        }
                         if (!(tree instanceof JavaSourceFile)) {
                             return (J) tree;
                         }
@@ -207,7 +167,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         }
 
                         JavaProject jp = maybeJp.get();
-                        if ((onlyIfUsing != null && !acc.usingType.getOrDefault(jp, false)) || !acc.configurationsByProject.containsKey(jp)) {
+                        if (!acc.configurationsByProject.containsKey(jp)) {
                             return s;
                         }
 
@@ -236,10 +196,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         for (String tmpConfiguration : tmpConfigurations) {
                             GradleDependencyConfiguration gdc = requireNonNull((gp.getConfiguration(tmpConfiguration)));
                             for (GradleDependencyConfiguration transitive : gp.configurationsExtendingFrom(gdc, true)) {
-                                if (resolvedConfigurations.contains(transitive.getName()) ||
-                                        (Boolean.TRUE.equals(acceptTransitive) && transitive.findResolvedDependency(groupId, artifactId) != null)) {
-                                    resolvedConfigurations.remove(transitive.getName());
-                                }
+                                resolvedConfigurations.remove(transitive.getName());
                             }
                         }
 
@@ -250,10 +207,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             if (targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
                                 s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, purgeSourceSet(configuration),
-                                        classifier, extension, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration), null).visitNonNull(s, ctx);
+                                        null, null, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration), modifier).visitNonNull(s, ctx);
                             } else {
                                 s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                        classifier, extension, metadataFailures, this::isTopLevel, null).visitNonNull(s, ctx);
+                                        null, null, metadataFailures, this::isTopLevel, modifier).visitNonNull(s, ctx);
                             }
                         }
 
