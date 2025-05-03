@@ -465,10 +465,6 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
         return t;
     }
 
-    private void skip(TerminalNode node) {
-        advanceCursor(node.getSymbol().getStopIndex() + 1);
-    }
-
     /**
      * @return Source from <code>cursor</code> to next occurrence of <code>untilDelim</code>,
      * and if not found in the remaining source, the empty String. If <code>stop</code> is reached before

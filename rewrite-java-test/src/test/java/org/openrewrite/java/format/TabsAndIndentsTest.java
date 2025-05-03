@@ -48,6 +48,49 @@ class TabsAndIndentsTest implements RewriteTest {
         spec.recipe(new TabsAndIndents());
     }
 
+    // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
+    @DocumentExample
+    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
+    @Test
+    void rspec3973() {
+        rewriteRun(
+          java(
+            """
+              class Test {{
+                  if (true == false)
+                  doTheThing();
+                            
+                  doTheOtherThing();
+                  somethingElseEntirely();
+                            
+                  foo();
+              }
+                  public static void doTheThing() {}
+                  public static void doTheOtherThing() {}
+                  public static void somethingElseEntirely() {}
+                  public static void foo() {}
+              }
+              """,
+            """
+              class Test {{
+                  if (true == false)
+                      doTheThing();
+                            
+                  doTheOtherThing();
+                  somethingElseEntirely();
+                            
+                  foo();
+              }
+                  public static void doTheThing() {}
+                  public static void doTheOtherThing() {}
+                  public static void somethingElseEntirely() {}
+                  public static void foo() {}
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
         return spec -> spec.recipe(new TabsAndIndents())
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
@@ -215,49 +258,6 @@ class TabsAndIndentsTest implements RewriteTest {
             	}
             }
             """
-          )
-        );
-    }
-
-    // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
-    @DocumentExample
-    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
-    @Test
-    void rspec3973() {
-        rewriteRun(
-          java(
-            """
-              class Test {{
-                  if (true == false)
-                  doTheThing();
-                            
-                  doTheOtherThing();
-                  somethingElseEntirely();
-                            
-                  foo();
-              }
-                  public static void doTheThing() {}
-                  public static void doTheOtherThing() {}
-                  public static void somethingElseEntirely() {}
-                  public static void foo() {}
-              }
-              """,
-            """
-              class Test {{
-                  if (true == false)
-                      doTheThing();
-                            
-                  doTheOtherThing();
-                  somethingElseEntirely();
-                            
-                  foo();
-              }
-                  public static void doTheThing() {}
-                  public static void doTheOtherThing() {}
-                  public static void somethingElseEntirely() {}
-                  public static void foo() {}
-              }
-              """
           )
         );
     }

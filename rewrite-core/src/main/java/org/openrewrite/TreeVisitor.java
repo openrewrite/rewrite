@@ -15,9 +15,6 @@
  */
 package org.openrewrite;
 
-import io.micrometer.core.instrument.DistributionSummary;
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
@@ -74,7 +71,6 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     private @Nullable List<TreeVisitor<?, P>> afterVisit;
 
     private int visitCount;
-    private final DistributionSummary visitCountSummary = DistributionSummary.builder("rewrite.visitor.visit.method.count").description("Visit methods called per source file visited.").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry);
 
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return true;
@@ -146,7 +142,8 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     }
 
     public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
-        assert !(parent.getValue() instanceof Tree) ||
+        assert parent.isRoot() ||
+               !(parent.getValue() instanceof Tree) ||
                !((Tree) parent.getValue()).isScope(tree) ||
                !(p instanceof ExecutionContext) ||
                !CursorValidatingExecutionContextView.view((ExecutionContext) p).getValidateCursorAcyclic() :
@@ -227,11 +224,9 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
             return defaultValue(null, p);
         }
 
-        Timer.Sample sample = null;
         boolean topLevel = false;
         if (visitCount == 0) {
             topLevel = true;
-            sample = Timer.start();
         }
 
         visitCount++;
@@ -266,9 +261,6 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
             setCursor(cursor.getParent());
 
             if (topLevel) {
-                sample.stop(Timer.builder("rewrite.visitor.visit").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry));
-                visitCountSummary.record(visitCount);
-
                 if (t != null && afterVisit != null) {
                     for (TreeVisitor<?, P> v : afterVisit) {
                          v.setCursor(getCursor());
@@ -277,7 +269,6 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
                     }
                 }
 
-                sample.stop(Timer.builder("rewrite.visitor.visit.cumulative").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry));
                 afterVisit = null;
                 visitCount = 0;
             }

@@ -17,8 +17,13 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Example;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Tree;
+import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
@@ -29,6 +34,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class ChangeMethodNameTest implements RewriteTest {
     @Language("java")
@@ -42,6 +48,33 @@ class ChangeMethodNameTest implements RewriteTest {
          public static void static2(String s) {}
       }
       """;
+
+    @DocumentExample
+    @Test
+    void changeMethodNameForMethodWithSingleArg() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null)),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              package com.abc;
+              class A {
+                 public void test() {
+                     new B().singleArg("boo");
+                 }
+              }
+              """,
+            """
+              package com.abc;
+              class A {
+                 public void test() {
+                     new B().bar("boo");
+                 }
+              }
+              """
+          )
+        );
+    }
 
     @SuppressWarnings({"ConstantConditions", "RedundantOperationOnEmptyContainer"})
     @Issue("https://github.com/openrewrite/rewrite/issues/605")
@@ -183,33 +216,6 @@ class ChangeMethodNameTest implements RewriteTest {
                       new B().bar("boo");
                       new java.util.ArrayList<String>().forEach(new B()::bar);
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @Example
-    @Test
-    void changeMethodNameForMethodWithSingleArg() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
-              package com.abc;
-              class A {
-                 public void test() {
-                     new B().singleArg("boo");
-                 }
-              }
-              """,
-            """
-              package com.abc;
-              class A {
-                 public void test() {
-                     new B().bar("boo");
-                 }
               }
               """
           )
@@ -421,5 +427,69 @@ class ChangeMethodNameTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"123", "  ", "\t", "this", "class", "null", "true"})
+    void ignoreInvalidMethodNamesWhenCalledDownstream(String newMethodName) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J visit(Tree tree, ExecutionContext executionContext) {
+                  return (J) new ChangeMethodName("com.abc.B static1(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, executionContext);
+              }
+          })),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              package com.abc;
+              
+              import java.util.ArrayList;
+              
+              class A {
+                 public void test() {
+                     com.abc.B.static1("boo");
+                     new java.util.ArrayList<String>().forEach(B::static1);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void validation() {
+        Validated<Object> validObject = new ChangeMethodName("a.Clazz method(..)", "method2", null, null).validate();
+        assertThat(validObject.isValid()).isTrue();
+    }
+
+    @Test
+    void validateReservedKeyword() {
+        Validated<Object> reservedKeyword = new ChangeMethodName("a.Clazz method(..)", "this", null, null).validate();
+        assertThat(reservedKeyword.isValid()).isFalse();
+        assertThat(reservedKeyword.failures()).singleElement()
+          .matches(f -> f.getProperty().equals("newMethodName"))
+          .matches(f -> f.getInvalidValue().equals("this"))
+          .matches(f -> f.getMessage().equals("should not be a Java Reserved Keyword."));
+    }
+
+    @Test
+    void validateReservedLiteral() {
+        Validated<Object> reservedLiteral = new ChangeMethodName("a.Clazz method(..)", "null", null, null).validate();
+        assertThat(reservedLiteral.isValid()).isFalse();
+        assertThat(reservedLiteral.failures()).singleElement()
+          .matches(f -> f.getProperty().equals("newMethodName"))
+          .matches(f -> f.getInvalidValue().equals("null"))
+          .matches(f -> f.getMessage().equals("should not be a Java Reserved Literal."));
+    }
+
+    @Test
+    void validatePattern() {
+        Validated<Object> invalidPattern = new ChangeMethodName("a.Clazz method(..)", "123", null, null).validate();
+        assertThat(invalidPattern.isValid()).isFalse();
+        assertThat(invalidPattern.failures()).singleElement()
+          .matches(f -> f.getProperty().equals("newMethodName"))
+          .matches(f -> f.getInvalidValue().equals("123"))
+          .matches(f -> f.getMessage().equals("should be a valid Java method name."));
     }
 }

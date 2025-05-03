@@ -6,9 +6,9 @@ tasks.register<JavaExec>("generateAntlrSources") {
     mainClass.set("org.antlr.v4.Tool")
 
     args = listOf(
-            "-o", "src/main/java/org/openrewrite/json/internal/grammar",
-            "-package", "org.openrewrite.json.internal.grammar",
-            "-visitor"
+        "-o", "src/main/java/org/openrewrite/json/internal/grammar",
+        "-package", "org.openrewrite.json.internal.grammar",
+        "-visitor"
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
     classpath = sourceSets["main"].runtimeClasspath
@@ -21,9 +21,9 @@ dependencies {
 
     compileOnly(project(":rewrite-test"))
 
-    implementation("org.antlr:antlr4-runtime:4.11.1")
+    implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("io.micrometer:micrometer-core:1.9.+")
 
     testImplementation(project(":rewrite-test"))
-    testImplementation(project(":rewrite-yaml"))
+    testImplementation("io.moderne:jsonrpc:latest.release")
 }

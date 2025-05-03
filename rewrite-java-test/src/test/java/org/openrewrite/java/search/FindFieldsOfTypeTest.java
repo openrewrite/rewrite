@@ -20,11 +20,38 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.java.table.FieldsOfTypeUses;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class FindFieldsOfTypeTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void findArrayOfType() {
+        rewriteRun(
+          spec -> spec.recipe(new FindFieldsOfType("java.lang.String", null)),
+          java(
+            """
+              import java.util.*;
+              public class A {
+                 private String[] s;
+              }
+              """,
+            """
+              import java.util.*;
+              public class A {
+                 /*~~>*/private String[] s;
+              }
+              """
+          )
+        );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2199")
     @Test
@@ -70,28 +97,6 @@ class FindFieldsOfTypeTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void findArrayOfType() {
-        rewriteRun(
-          spec -> spec.recipe(new FindFieldsOfType("java.lang.String", null)),
-          java(
-            """
-              import java.util.*;
-              public class A {
-                 private String[] s;
-              }
-              """,
-            """
-              import java.util.*;
-              public class A {
-                 /*~~>*/private String[] s;
-              }
-              """
-          )
-        );
-    }
-
     @SuppressWarnings("EmptyTryBlock")
     @Test
     void skipsMultiCatches() {
@@ -116,6 +121,50 @@ class FindFieldsOfTypeTest implements RewriteTest {
                       try(FileInputStream fis = new FileInputStream(f)) {}
                       catch(FileNotFoundException | RuntimeException ignored) {}
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void verifyDataTable() {
+        List<FieldsOfTypeUses.Row> expectedFields = List.of(
+          new FieldsOfTypeUses.Row("A.java", "list", "java.util.List<Generic{?}>", "java.util.List<Generic{?}>", "private", "private List<?> list"),
+          new FieldsOfTypeUses.Row("A.java", "list1", "java.util.List<java.lang.String>", "java.util.ArrayList<java.lang.String>", "private static", "private static List<String> list1 = new ArrayList<>()"),
+          new FieldsOfTypeUses.Row("A.java", "list2", "java.util.LinkedList<java.lang.String>", "java.util.LinkedList<java.lang.String>", "private", "private LinkedList<String> list2 = new LinkedList<>()")
+        );
+        rewriteRun(
+          spec -> spec.recipe(new FindFieldsOfType("java.util.List", true))
+            .afterRecipe(recipeRun -> {
+                List<FieldsOfTypeUses.Row> fields = recipeRun.getDataTableRows(FieldsOfTypeUses.class.getName());
+                assertThat(fields).containsExactlyInAnyOrderElementsOf(expectedFields);
+            }),
+          java(
+            """
+              import java.security.SecureRandom;
+              import java.util.ArrayList;
+              import java.util.LinkedList;
+              import java.util.List;
+              
+              public class A {
+                 private List<?> list;
+                 private static List<String> list1 = new ArrayList<>();
+                 private LinkedList<String> list2 = new LinkedList<>();
+                 private SecureRandom rand;
+              }
+              """,
+            """
+              import java.security.SecureRandom;
+              import java.util.ArrayList;
+              import java.util.LinkedList;
+              import java.util.List;
+              
+              public class A {
+                 /*~~>*/private List<?> list;
+                 /*~~>*/private static List<String> list1 = new ArrayList<>();
+                 /*~~>*/private LinkedList<String> list2 = new LinkedList<>();
+                 private SecureRandom rand;
               }
               """
           )

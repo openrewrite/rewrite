@@ -20,8 +20,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.jgit.lib.FileMode;
+import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.remote.Remote;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -30,7 +32,9 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.Tree.randomId;
 
 public class Result {
     /**
@@ -50,16 +54,15 @@ public class Result {
     @Getter
     private final Collection<List<Recipe>> recipes;
 
-    @Getter
-    @Nullable
-    private final Duration timeSavings;
+    private final Duration potentialTimeSavings;
+    private @Nullable Duration timeSavings;
 
     public Result(@Nullable SourceFile before, @Nullable SourceFile after, Collection<List<Recipe>> recipes) {
         this.before = before;
         this.after = after;
         this.recipes = recipes;
 
-        Duration timeSavings = null;
+        Duration timeSavings = Duration.ZERO;
         for (List<Recipe> recipesStack : recipes) {
             if (recipesStack != null && !recipesStack.isEmpty()) {
                 Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
@@ -69,17 +72,19 @@ public class Result {
                 }
             }
         }
-
-        this.timeSavings = timeSavings;
+        this.potentialTimeSavings = timeSavings;
     }
 
     public Result(@Nullable SourceFile before, SourceFile after) {
         this(before, after, after.getMarkers()
                 .findFirst(RecipesThatMadeChanges.class)
-                .orElseThrow(() -> new UnknownSourceFileChangeException(
-                        after,
-                        explainWhatChanged(before, after)
-                ))
+                .orElseGet(() -> after.getMarkers()
+                        .findFirst(DeserializationError.class)
+                        .map(m -> new RecipesThatMadeChanges(randomId(), emptyList()))
+                        .orElseThrow(() -> new UnknownSourceFileChangeException(
+                                after,
+                                explainWhatChanged(before, after)
+                        )))
                 .getRecipes());
     }
 
@@ -130,6 +135,17 @@ public class Result {
                 return super.visit(tree, changed);
             }
         }.reduce(root, new AtomicBoolean(false)).get();
+    }
+
+    public Duration getTimeSavings() {
+        if (timeSavings == null) {
+            if (potentialTimeSavings.isZero() || isLocalAndHasNoChanges(before, after)) {
+                timeSavings = Duration.ZERO;
+            } else {
+                timeSavings = potentialTimeSavings;
+            }
+        }
+        return timeSavings;
     }
 
     /**
@@ -248,5 +264,13 @@ public class Result {
     @Override
     public String toString() {
         return diff();
+    }
+
+    public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
+        return (before == after) ||
+               (before != null && after != null &&
+                // Remote source files are fetched on `printAll`, let's avoid that cost.
+                !(before instanceof Remote) && !(after instanceof Remote) &&
+                before.printAll().equals(after.printAll()));
     }
 }

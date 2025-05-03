@@ -17,6 +17,7 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -33,6 +34,9 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void methodDeclarationDeclaringType() {
         rewriteRun(
+          // Avoid type information in the usual groovy parser type cache leaking and affecting this test
+          // In the real world you don't parse a bunch of classes all named "A" all at once
+          spec -> spec.parser(GroovyParser.builder()),
           groovy(
             """
               class A {
@@ -80,7 +84,7 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void genericTypeParameter() {
+    void genericTypeParameterReturn() {
         rewriteRun(
           groovy(
             """
@@ -93,21 +97,21 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void emptyArguments() {
+    void modifiersReturn() {
         rewriteRun(
-          groovy("def foo( ) {}")
+          groovy(
+            """
+              public final accept(Map m) {
+              }
+              """
+          )
         );
     }
 
     @Test
-    void methodThrows() {
+    void emptyArguments() {
         rewriteRun(
-          groovy(
-            """
-              def foo(int a) throws Exception , RuntimeException {
-              }
-              """
-          )
+          groovy("def foo( ) {}")
         );
     }
 
@@ -149,6 +153,30 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void modifiersArguments() {
+        rewriteRun(
+          groovy(
+            """
+              def accept(final def Map m) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodThrows() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(int a) throws Exception , RuntimeException {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void returnNull() {
         rewriteRun(
           groovy(
@@ -166,16 +194,17 @@ class MethodDeclarationTest implements RewriteTest {
           groovy(
             """
               def foo(String[][] s) {}
-              """, spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
-                    if (arrayType.getElementType() instanceof J.ArrayType) {
-                        assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
-                        assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
+              """,
+                spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                        if (arrayType.getElementType() instanceof J.ArrayType) {
+                            assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
+                            assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
+                        }
+                        return super.visitArrayType(arrayType, o);
                     }
-                    return super.visitArrayType(arrayType, o);
-                }
-            }.visit(cu, 0))
+                }.visit(cu, 0))
           )
         );
     }
@@ -212,11 +241,47 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              class A {
+              class B {
                   def /*int*/ int one() { 1 }
                   @Foo def /*Object*/ Object two() { 2 }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void parameterWithConflictingTypeName() {
+        rewriteRun(
+          groovy(
+            """
+              class variable {}
+              def accept(final def variable m) {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(1);
+                J.VariableDeclarations m = (J.VariableDeclarations) accept.getParameters().get(0);
+                assertThat(m.getModifiers()).satisfiesExactly(
+                  mod -> assertThat(mod.getType()).isEqualTo(J.Modifier.Type.Final),
+                  mod -> assertThat(mod.getKeyword()).isEqualTo("def")
+                );
+            })
+          )
+        );
+    }
+
+    @Test
+    void defIsNotReturnType() {
+        rewriteRun(
+          groovy(
+            """
+              final def accept(final def Object m) {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(0);
+                assertThat(accept.getReturnTypeExpression()).isNull();
+            })
           )
         );
     }

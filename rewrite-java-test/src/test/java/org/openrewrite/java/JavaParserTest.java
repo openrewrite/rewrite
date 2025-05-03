@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
@@ -46,6 +47,69 @@ import static org.openrewrite.test.TypeValidation.all;
  * @author Alex Boyko
  */
 class JavaParserTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void erroneousVariableDeclarations() {
+        rewriteRun(
+          spec -> spec.recipe(new FindCompileErrors())
+            .typeValidationOptions(all().erroneous(false)),
+          java(
+            """
+              package com.example.demo;
+              class Foo {
+                  /pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Foo {
+                  /*~~>*///*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Bar {
+                  pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Bar {
+                  /*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Baz {
+                  -pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Baz {
+                  /*~~>*/-/*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void incompleteAssignment() {
@@ -196,7 +260,7 @@ class JavaParserTest implements RewriteTest {
         package com.example.demo;
         class FooBar {
             public void test(int num string msg) {
-              String a; this.ownerR
+              String a;
               System.out.println();
             }
         }
@@ -204,7 +268,7 @@ class JavaParserTest implements RewriteTest {
       """
         package com.example.demo;
         class FooBar {
-            public void test(int num string s, int b) {
+            public void test() {
               String a; this.ownerR
               System.out.println();
             }
@@ -242,68 +306,6 @@ class JavaParserTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(all().erroneous(false)),
           java(source)
-        );
-    }
-
-    @Test
-    void erroneousVariableDeclarations() {
-        rewriteRun(
-          spec -> spec.recipe(new FindCompileErrors())
-            .typeValidationOptions(all().erroneous(false)),
-          java(
-            """
-              package com.example.demo;
-              class Foo {
-                  /pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Foo {
-                  /*~~>*///*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              package com.example.demo;
-              class Bar {
-                  pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Bar {
-                  /*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              package com.example.demo;
-              class Baz {
-                  -pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Baz {
-                  /*~~>*/-/*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          )
         );
     }
 
@@ -358,11 +360,11 @@ class JavaParserTest implements RewriteTest {
 
     @Test
     void filterArtifacts() {
-        List<URI> classpath = List.of(
-          URI.create("file:/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar"),
-          URI.create("file:/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"),
-          URI.create("file:/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"),
-          URI.create("file:/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar")
+        List<Path> classpath = List.of(
+          Paths.get(URI.create("file:/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar")),
+          Paths.get(URI.create("file:/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar")),
+          Paths.get(URI.create("file:/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar")),
+          Paths.get(URI.create("file:/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"))
         );
         assertThat(JavaParser.filterArtifacts("threeten-extra", classpath))
           .containsOnly(Paths.get("/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"));
@@ -372,6 +374,24 @@ class JavaParserTest implements RewriteTest {
           .containsOnly(Paths.get("/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"));
         assertThat(JavaParser.filterArtifacts("rewrite-java", classpath))
           .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
+    }
+
+    @Test
+    void emptyEnum() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+            package com.helloworld;
+            import java.time.Instant;
+            public class InstallationStatus {
+              public enum InstallationFeatures {}
+              public InstallationStatus create(Instant updateTime) {
+                return null;
+              }
+            }
+            """
+          ));
     }
 
 }

@@ -65,7 +65,7 @@ public interface JavaParser extends Parser {
      * matching jars can be found.
      */
     static List<Path> dependenciesFromClasspath(String... artifactNames) {
-        List<URI> runtimeClasspath = new ClassGraph().disableNestedJarScanning().getClasspathURIs();
+        List<Path> runtimeClasspath = RuntimeClasspathCache.getRuntimeClasspath();
         List<Path> artifacts = new ArrayList<>(artifactNames.length);
         List<String> missingArtifactNames = new ArrayList<>(artifactNames.length);
         for (String artifactName : artifactNames) {
@@ -76,14 +76,11 @@ public interface JavaParser extends Parser {
                 artifacts.addAll(matchedArtifacts);
             }
         }
-
         if (!missingArtifactNames.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Unable to find runtime dependencies beginning with: " +
-                    missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")) +
-                    ", classpath: " + runtimeClasspath);
+            String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
+            throw new IllegalArgumentException(String.format("Unable to find runtime dependencies beginning with: %s, classpath: %s",
+                    missing, runtimeClasspath));
         }
-
         return artifacts;
     }
 
@@ -95,23 +92,18 @@ public interface JavaParser extends Parser {
      * @return List of Paths that match the artifact name.
      */
     // VisibleForTesting
-    static List<Path> filterArtifacts(String artifactName, List<URI> runtimeClasspath) {
+    static List<Path> filterArtifacts(String artifactName, List<Path> runtimeClasspath) {
         List<Path> artifacts = new ArrayList<>();
         // Bazel automatically replaces '-' with '_' when generating jar files.
         String normalizedArtifactName = artifactName.replace('-', '_');
         Pattern jarPattern = Pattern.compile(String.format("(%s|%s)(?:-.*?)?\\.jar$", artifactName, normalizedArtifactName));
         // In a multi-project IDE classpath, some classpath entries aren't jars
         Pattern explodedPattern = Pattern.compile("/" + artifactName + "/");
-        for (URI cpEntry : runtimeClasspath) {
-            if (!"file".equals(cpEntry.getScheme())) {
-                // exclude any `jar` entries which could result from `Bundle-ClassPath` in `MANIFEST.MF`
-                continue;
-            }
+        for (Path cpEntry : runtimeClasspath) {
             String cpEntryString = cpEntry.toString();
-            Path path = Paths.get(cpEntry);
             if (jarPattern.matcher(cpEntryString).find() ||
-                explodedPattern.matcher(cpEntryString).find() && path.toFile().isDirectory()) {
-                artifacts.add(path);
+                    explodedPattern.matcher(cpEntryString).find() && cpEntry.toFile().isDirectory()) {
+                artifacts.add(cpEntry);
                 // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
             }
         }
@@ -127,8 +119,8 @@ public interface JavaParser extends Parser {
 
         try (RewriteClasspathJarClasspathLoader rewriteClasspathJarClasspathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
             List<JavaParserClasspathLoader> loaders = new ArrayList<>(2);
-            Optional.ofNullable(TypeTable.fromClasspath(ctx, missingArtifactNames)).ifPresent(loaders::add);
             loaders.add(rewriteClasspathJarClasspathLoader);
+            Optional.ofNullable(TypeTable.fromClasspath(ctx, missingArtifactNames)).ifPresent(loaders::add);
 
             for (JavaParserClasspathLoader loader : loaders) {
                 for (String missingArtifactName : new ArrayList<>(missingArtifactNames)) {
@@ -139,15 +131,12 @@ public interface JavaParser extends Parser {
                     }
                 }
             }
-        }
 
-        if (!missingArtifactNames.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Unable to find classpath resource dependencies beginning with: " +
-                    missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n"))
-            );
+            if (!missingArtifactNames.isEmpty()) {
+                String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
+                throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
+            }
         }
-
         return artifacts;
     }
 
@@ -208,8 +197,7 @@ public interface JavaParser extends Parser {
             //Fall through to an exception without making this the "cause".
         }
 
-        throw new IllegalStateException(
-                "Unable to create a Java parser instance. " +
+        throw new IllegalStateException("Unable to create a Java parser instance. " +
                 "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.");
     }
 
@@ -379,7 +367,7 @@ public interface JavaParser extends Parser {
         Pattern classPattern = Pattern.compile("(class|interface|enum|record)\\s*(<[^>]*>)?\\s+(\\w+)");
         Pattern publicClassPattern = Pattern.compile("public\\s+" + classPattern.pattern());
 
-        Function<String, String> simpleName = sourceStr -> {
+        Function<String, @Nullable String> simpleName = sourceStr -> {
             Matcher classMatcher = publicClassPattern.matcher(sourceStr);
             if (classMatcher.find()) {
                 return classMatcher.group(3);
@@ -392,7 +380,7 @@ public interface JavaParser extends Parser {
         String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
         String className = Optional.ofNullable(simpleName.apply(sourceCode))
-                                   .orElse(Long.toString(System.nanoTime())) + ".java";
+                .orElse(Long.toString(System.nanoTime())) + ".java";
 
         return prefix.resolve(Paths.get(pkg + className));
     }
@@ -411,7 +399,8 @@ class RuntimeClasspathCache {
                     .disableNestedJarScanning()
                     .getClasspathURIs().stream()
                     .filter(uri -> "file".equals(uri.getScheme()))
-                    .map(Paths::get).collect(toList());
+                    .map(Paths::get)
+                    .collect(toList());
         }
         return runtimeClasspath;
     }

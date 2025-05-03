@@ -1,0 +1,477 @@
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.AppendToSequence
+examples:
+- description: ''
+  parameters:
+  - $.things.fruit
+  - strawberry
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      things:
+        fruit:
+          - apple
+          - blueberry
+    after: |
+      things:
+        fruit:
+          - apple
+          - blueberry
+          - strawberry
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.ChangeKey
+examples:
+- description: ''
+  parameters:
+  - $.metadata.name
+  - name2
+  sources:
+  - before: |2
+          apiVersion: v1
+          metadata:
+            name: monitoring-tools
+            namespace: monitoring-tools
+    after: |2
+          apiVersion: v1
+          metadata:
+            name2: monitoring-tools
+            namespace: monitoring-tools
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.ChangePropertyKey
+examples:
+- description: ''
+  parameters:
+  - management.metrics.binders.*.enabled
+  - management.metrics.enable.process.files
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: 'management.metrics.binders.files.enabled: true'
+    after: 'management.metrics.enable.process.files: true'
+    language: yaml
+- description: ''
+  parameters:
+  - a.b.c.d
+  - a.b.c
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: 'a.b.c.d: true'
+    after: 'a.b.c: true'
+    language: yaml
+- description: ''
+  parameters:
+  - spring.profiles
+  - spring.config.activate.on-profile
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      spring.profiles.group.prod: proddb,prodmq,prodmetrics
+    after: |
+      spring.config.activate.on-profile.group.prod: proddb,prodmq,prodmetrics
+    language: yaml
+- description: ''
+  parameters:
+  - spring.profiles
+  - spring.config.activate.on-profile
+  - 'null'
+  - List.of("group", "active", "include")
+  - 'null'
+  sources:
+  - before: |
+      spring:
+        profiles:
+          active: allEnvs
+          include: baseProfile
+          foo: bar
+          group:
+            prod: proddb,prodmq,prodmetrics
+    after: |
+      spring:
+        profiles:
+          active: allEnvs
+          include: baseProfile
+          group:
+            prod: proddb,prodmq,prodmetrics
+        config.activate.on-profile:
+          foo: bar
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.ChangePropertyValue
+examples:
+- description: ''
+  parameters:
+  - my.prop
+  - bar
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      my.prop: foo
+    after: |
+      my.prop: bar
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.ChangeValue
+examples:
+- description: ''
+  parameters:
+  - $.metadata.name
+  - monitoring
+  - 'null'
+  sources:
+  - before: |2
+          apiVersion: v1
+          metadata:
+            name: monitoring-tools
+            namespace: monitoring-tools
+    after: |2
+          apiVersion: v1
+          metadata:
+            name: monitoring
+            namespace: monitoring-tools
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.CoalesceProperties
+examples:
+- description: ''
+  sources:
+  - before: |2
+          management:
+              metrics:
+                  enable.process.files: true
+              endpoint:
+                  health:
+                      show-components: always
+                      show-details: always
+    after: |2
+          management:
+              metrics.enable.process.files: true
+              endpoint.health:
+                  show-components: always
+                  show-details: always
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.CommentOutProperty
+examples:
+- description: comment out a map entry
+  parameters:
+  - foo.bar.sequence.propertyA
+  - Some comments
+  - 'null'
+  sources:
+  - before: |2
+        foo:
+          bar:
+            sequence:
+              - name: name
+              - propertyA: fieldA
+              - propertyB: fieldB
+            scalar: value
+    after: |2
+        foo:
+          bar:
+            sequence:
+              - name: name
+              # Some comments
+              # propertyA: fieldA
+              - propertyB: fieldB
+            scalar: value
+    language: yaml
+- description: comment out entire sequence
+  parameters:
+  - foo.bar.sequence
+  - Some comments
+  - 'null'
+  sources:
+  - before: |
+      foo:
+        bar:
+          sequence:
+            - name: name
+            - propertyA: fieldA
+            - propertyB: fieldB
+          scalar: value
+    after: |
+      foo:
+        bar:
+          # Some comments
+          # sequence:
+          #   - name: name
+          #   - propertyA: fieldA
+          #   - propertyB: fieldB
+          scalar: value
+    language: yaml
+- description: comment out a map entry
+  parameters:
+  - foo.bar.sequence.propertyA
+  - Some comments
+  - 'false'
+  sources:
+  - before: |2
+        foo:
+          bar:
+            sequence:
+              - name: name
+              - propertyA: fieldA
+              - propertyB: fieldB
+            scalar: value
+    after: |2
+        foo:
+          bar:
+            sequence:
+              - name: name
+              # Some comments
+              - propertyA: fieldA
+              - propertyB: fieldB
+            scalar: value
+    language: yaml
+- description: comment out a map entry
+  parameters:
+  - foo.bar.sequence.name
+  - Some comments
+  - 'false'
+  sources:
+  - before: |2
+        foo:
+          bar:
+            sequence:
+              - name: name
+              - propertyA: fieldA
+              - propertyB: fieldB
+            scalar: value
+    after: |2
+        foo:
+          bar:
+            sequence:
+              # Some comments
+              - name: name
+              - propertyA: fieldA
+              - propertyB: fieldB
+            scalar: value
+    language: yaml
+- description: comment out entire sequence
+  parameters:
+  - foo.bar.sequence
+  - Some comments
+  - 'false'
+  sources:
+  - before: |
+      foo:
+        bar:
+          sequence:
+            - name: name
+            - propertyA: fieldA
+            - propertyB: fieldB
+          scalar: value
+    after: |
+      foo:
+        bar:
+          # Some comments
+          sequence:
+            - name: name
+            - propertyA: fieldA
+            - propertyB: fieldB
+          scalar: value
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.CopyValue
+examples:
+- description: ''
+  parameters:
+  - $.source
+  - 'null'
+  - $.destination
+  - 'null'
+  sources:
+  - before: |
+      source: value
+      destination: original
+    after: |
+      source: value
+      destination: value
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.CreateYamlFile
+examples:
+- description: ''
+  parameters:
+  - test/test.yaml
+  - 'after: true'
+  - 'null'
+  - 'true'
+  sources:
+  - before: 'before: true'
+    after: 'after: true'
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.DeleteKey
+examples:
+- description: ''
+  parameters:
+  - $.metadata.name
+  - 'null'
+  sources:
+  - before: |2
+          apiVersion: v1
+          metadata:
+            name: monitoring-tools
+            namespace: monitoring-tools
+    after: |2
+          apiVersion: v1
+          metadata:
+            namespace: monitoring-tools
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.DeleteProperty
+examples:
+- description: ''
+  parameters:
+  - management.metrics.binders.files.enabled
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: 'management.metrics.binders.files.enabled: true'
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.MergeYaml
+examples:
+- description: ''
+  parameters:
+  - $.spec
+  - |
+    lifecycleRule:
+        - action:
+              type: Delete
+          condition:
+              age: 7
+  - 'false'
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      apiVersion: storage.cnrm.cloud.google.com/v1beta1
+      kind: StorageBucket
+      spec:
+          bucketPolicyOnly: true
+    after: |
+      apiVersion: storage.cnrm.cloud.google.com/v1beta1
+      kind: StorageBucket
+      spec:
+          bucketPolicyOnly: true
+          lifecycleRule:
+              - action:
+                    type: Delete
+                condition:
+                    age: 7
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.UnfoldProperties
+examples:
+- description: ''
+  parameters:
+  - 'null'
+  sources:
+  - before: |
+      management:
+        metrics.enable.process.files: true
+        endpoint.health:
+          show-components: always
+          show-details: always
+    after: |
+      management:
+        metrics:
+          enable:
+            process:
+              files: true
+        endpoint:
+          health:
+            show-components: always
+            show-details: always
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.cleanup.RemoveUnused
+examples:
+- description: ''
+  sources:
+  - before: |2
+        root:
+          a:
+            b:
+          c: 0
+    after: |2
+        root:
+          c: 0
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.search.FindKey
+examples:
+- description: ''
+  parameters:
+  - $.metadata.name
+  sources:
+  - before: |2
+          apiVersion: v1
+          metadata:
+            name: monitoring-tools
+            namespace: monitoring-tools
+    after: |2
+          apiVersion: v1
+          metadata:
+            ~~>name: monitoring-tools
+            namespace: monitoring-tools
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.search.FindProperty
+examples:
+- description: ''
+  parameters:
+  - management.metrics.binders.files.enabled
+  - 'null'
+  - 'null'
+  sources:
+  - before: 'management.metrics.binders.files.enabled: true'
+    after: 'management.metrics.binders.files.enabled: ~~>true'
+    language: yaml

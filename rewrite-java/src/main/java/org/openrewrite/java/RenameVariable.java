@@ -43,7 +43,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        if (!VariableNameUtils.JavaKeywords.isReserved(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
+        if (!JavaKeywordUtils.isReservedKeyword(toName) && !JavaKeywordUtils.isReservedLiteral(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
             doAfterVisit(new RenameVariableVisitor(variable, toName));
             return variable;
         }
@@ -163,7 +163,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 Expression target = getTarget(fieldAccess);
                 JavaType targetType = resolveType(target.getType());
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
-                if (TypeUtils.isOfType(variableNameFieldType.getOwner(), targetType)) {
+                if (targetType != null && targetType.equals(variableNameFieldType.getOwner())) {
                     return true;
                 }
                 if (target instanceof J.TypeCast) {

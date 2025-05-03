@@ -16,7 +16,6 @@
 package org.openrewrite.java.internal.parser;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaParser;
 
 import java.nio.file.Path;

@@ -62,7 +62,7 @@ public class TypeMatcher implements Reference.Matcher {
             targetTypePattern = Pattern.compile(".*");
         } else {
             MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
-                    CharStreams.fromString(fieldType))));
+                    CharStreams.fromString(fieldType + "#dummy()"))));
 
             new MethodSignatureParserBaseVisitor<Void>() {
 

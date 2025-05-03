@@ -19,10 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
@@ -335,6 +331,18 @@ class TomlParserTest implements RewriteTest {
             """
               str = "I'm a string. \\"You can quote me\\". Name\\tJos\\u00E9\\nLocation\\tSF."
               # trailing comment
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingEmptyComment() {
+        rewriteRun(
+          toml(
+              """
+              str = "I'm a string. \\"You can quote me\\". Name\\tJos\\u00E9\\nLocation\\tSF."
+              #
               """
           )
         );

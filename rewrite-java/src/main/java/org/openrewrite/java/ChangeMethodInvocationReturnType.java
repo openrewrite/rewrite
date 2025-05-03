@@ -1,11 +1,11 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Moderne Source Available License (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://docs.moderne.io/licensing/moderne-source-available-license
+ * https://www.apache.org/licenses/LICENSE-2.0
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,10 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -34,7 +31,7 @@ import static java.util.Collections.emptyList;
 public class ChangeMethodInvocationReturnType extends Recipe {
 
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method declarations/invocations.",
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "org.mockito.Matchers anyVararg()")
     String methodPattern;
 
@@ -51,6 +48,11 @@ public class ChangeMethodInvocationReturnType extends Recipe {
     @Override
     public String getDescription() {
         return "Changes the return type of a method invocation.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
     }
 
     @Override

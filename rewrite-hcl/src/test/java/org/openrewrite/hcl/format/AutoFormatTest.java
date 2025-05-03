@@ -30,19 +30,6 @@ class AutoFormatTest implements RewriteTest {
         spec.recipe(new AutoFormat());
     }
 
-    @Test
-    void forLoops() {
-        rewriteRun(
-          hcl(
-          """
-          a = [for v in ["a", "b"] : v]
-          b = [for i, v in ["a", "b"] : i]
-          c = [for i, v in ["a", "b", "c"]: v if 1 && !0]
-          """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void objectValues() {
@@ -64,6 +51,19 @@ class AutoFormatTest implements RewriteTest {
                 }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void forLoops() {
+        rewriteRun(
+          hcl(
+          """
+          a = [for v in ["a", "b"] : v]
+          b = [for i, v in ["a", "b"] : i]
+          c = [for i, v in ["a", "b", "c"]: v if 1 && !0]
+          """
           )
         );
     }

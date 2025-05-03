@@ -17,7 +17,7 @@ val javaTck = configurations.create("javaTck") {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
-    runtimeOnly(project(":rewrite-java-lombok"))
+    implementation(project(":rewrite-java-lombok"))
 
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
@@ -54,7 +54,10 @@ tasks.withType<Javadoc> {
             "**/ReloadableJava21Parser**",
             "**/ReloadableJava21ParserVisitor**",
             "**/ReloadableJava21TypeMapping**",
-            "**/ReloadableJava21TypeSignatureBuilder**"
+            "**/ReloadableJava21TypeSignatureBuilder**",
+            "**/Javac**",
+            "**/JavacTreeMaker**",
+            "**/Permit**"
     )
 }
 

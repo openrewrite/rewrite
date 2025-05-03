@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -33,12 +34,12 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class FindDependency extends Recipe {
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+            description = "The first part of a dependency coordinate identifying its publisher.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+            description = "The second part of a dependency coordinate uniquely identifying it among artifacts from the same publisher.",
             example = "guava")
     String artifactId;
 
@@ -75,21 +76,29 @@ public class FindDependency extends Recipe {
                 if (dependency.matches(method)) {
                     if (StringUtils.isBlank(configuration) || method.getSimpleName().equals(configuration)) {
                         List<Expression> depArgs = method.getArguments();
-                        if (depArgs.get(0) instanceof J.Literal) {
-                            String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
-                            assert gav != null;
-                            String[] parts = gav.split(":");
-                            if(gav.length() >= 2) {
-                                if (StringUtils.matchesGlob(parts[0], groupId) &&
-                                    StringUtils.matchesGlob(parts[1], artifactId)) {
-                                    return SearchResult.found(method);
-                                }
-                            }
+                        if (depArgs.get(0) instanceof J.Literal &&
+                                groupArtifactMatches((J.Literal) depArgs.get(0))) {
+                            return SearchResult.found(method);
+                        } else if (depArgs.get(0) instanceof G.GString &&
+                                groupArtifactMatches((J.Literal) ((G.GString) depArgs.get(0)).getStrings().get(0))) {
+                            return SearchResult.found(method);
                         }
                     }
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
+
+            boolean groupArtifactMatches(J.Literal gavValue) {
+                String gav = (String) gavValue.getValue();
+                assert gav != null;
+                String[] parts = gav.split(":");
+                if (parts.length >= 2) {
+                    return StringUtils.matchesGlob(parts[0], groupId) && StringUtils.matchesGlob(parts[1], artifactId);
+                }
+                return false;
+            }
         });
     }
+
+
 }

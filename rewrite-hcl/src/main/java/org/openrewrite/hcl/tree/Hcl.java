@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.hcl.HclParser;
@@ -27,7 +26,6 @@ import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.template.SourceTemplate;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -1265,6 +1263,7 @@ public interface Hcl extends Tree {
         Markers markers;
 
         @With
+        @Nullable
         Object value;
 
         @With
@@ -1680,6 +1679,7 @@ public interface Hcl extends Tree {
         Markers markers;
 
         @With
+        @Nullable // FIXME remove this annotation after 2025-05-01, once new LST models are in use
         Identifier name;
 
         @Override

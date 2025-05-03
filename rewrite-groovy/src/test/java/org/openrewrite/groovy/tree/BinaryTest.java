@@ -16,7 +16,6 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -60,6 +59,18 @@ class BinaryTest implements RewriteTest {
             """
               def a = []
               boolean b = 42 in a;
+              """
+          )
+        );
+    }
+
+    @Test
+    void notIn() {
+        rewriteRun(
+          groovy(
+            """
+              def a = []
+              boolean b = 42 !in a;
               """
           )
         );
@@ -177,7 +188,8 @@ class BinaryTest implements RewriteTest {
           groovy(
             """
               def isString = "" instanceof java.lang.String
-              """)
+              """
+          )
         );
     }
 
@@ -191,7 +203,8 @@ class BinaryTest implements RewriteTest {
                   def value = 1
               }
               [ new A() ].findAll { it -> it.value == 1 } *. value = 2
-              """)
+              """
+          )
         );
     }
 
@@ -261,5 +274,21 @@ class BinaryTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void spaceShipOperator() {
+        rewriteRun(
+          groovy(
+            """
+              def justPrint(){
+                  println(1 <=> 2)
+                  println('a' <=> 'z')
+                  def a = 'tiger'
+                  def b = 'cheetah'
+                  println(a <=> b)
+              }
+              """
+          ));
     }
 }

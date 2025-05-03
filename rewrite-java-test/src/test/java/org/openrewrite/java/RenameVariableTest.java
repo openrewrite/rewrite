@@ -32,6 +32,48 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"SimplifyStreamApiCallChains", "ConstantConditions", "UnnecessaryLocalVariable", "LocalVariableUsedAndDeclaredInDifferentSwitchBranches", "Convert2Diamond", "UnusedAssignment"})
 class RenameVariableTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void doNotRenameForLoopVariables() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+          java(
+            """
+              package org.openrewrite;
+
+              public class A {
+                  int fooA() {
+                      v++;
+                      // creates new scope owned by for loop.
+                      for (int v = 0; v < 10; ++v) {
+                          int x = v + 1;
+                      }
+                      v++;
+                  }
+                  // v is scoped to classDeclaration regardless of statement order.
+                  public int v = 1;
+              }
+              """,
+            """
+              package org.openrewrite;
+
+              public class A {
+                  int fooA() {
+                      VALUE++;
+                      // creates new scope owned by for loop.
+                      for (int v = 0; v < 10; ++v) {
+                          int x = v + 1;
+                      }
+                      VALUE++;
+                  }
+                  // v is scoped to classDeclaration regardless of statement order.
+                  public int VALUE = 1;
+              }
+              """
+          )
+        );
+    }
     private static Recipe renameVariableTest(String hasName, String toName, boolean includeMethodParameters) {
         return toRecipe(() -> new JavaVisitor<>() {
             @Override
@@ -227,48 +269,6 @@ class RenameVariableTest implements RewriteTest {
                   }
                   // v is scoped to classDeclaration regardless of statement order.
                   public int v = 1;
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void doNotRenameForLoopVariables() {
-        rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
-              package org.openrewrite;
-
-              public class A {
-                  int fooA() {
-                      v++;
-                      // creates new scope owned by for loop.
-                      for (int v = 0; v < 10; ++v) {
-                          int x = v + 1;
-                      }
-                      v++;
-                  }
-                  // v is scoped to classDeclaration regardless of statement order.
-                  public int v = 1;
-              }
-              """,
-            """
-              package org.openrewrite;
-
-              public class A {
-                  int fooA() {
-                      VALUE++;
-                      // creates new scope owned by for loop.
-                      for (int v = 0; v < 10; ++v) {
-                          int x = v + 1;
-                      }
-                      VALUE++;
-                  }
-                  // v is scoped to classDeclaration regardless of statement order.
-                  public int VALUE = 1;
               }
               """
           )
@@ -989,6 +989,44 @@ class RenameVariableTest implements RewriteTest {
 
                 public int length() {
                   return objects.length;
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/5369")
+    void hiddenVariablesGetRenamedCorrectly() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                    if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
+                        doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
+                    }
+                    return super.visitVariableDeclarations(multiVariable, ctx);
+                }
+            })),
+          java(
+            """
+              public class A {
+                private int n;
+
+                public A setN(int n) {
+                  this.n = n;
+                  return this;
+                }
+              }
+              """,
+            """
+              public class A {
+                private int n;
+
+                public A setN(int n1) {
+                  this.n = n1;
+                  return this;
                 }
               }
               """

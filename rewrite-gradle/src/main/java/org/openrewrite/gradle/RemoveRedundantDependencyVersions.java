@@ -19,12 +19,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
-import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.internal.Dependency;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -45,7 +45,6 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
@@ -79,8 +78,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     Comparator onlyIfManagedVersionIs;
 
     @Option(displayName = "Except",
-            description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe."
-                          + " GAV versions are ignored if provided.",
+            description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe." +
+                          " GAV versions are ignored if provided.",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable
@@ -204,7 +203,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         cu = (G.CompilationUnit) new GroovyIsoVisitor<ExecutionContext>() {
 
                             @Override
-                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                            public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                                 if (CONSTRAINTS_MATCHER.matches(m)) {
                                     if (m.getArguments().isEmpty() || !(m.getArguments().get(0) instanceof J.Lambda)) {
@@ -237,7 +236,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             }
 
                             @Override
-                            public J.Return visitReturn(J.Return _return, ExecutionContext ctx) {
+                            public J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
                                 J.Return r = super.visitReturn(_return, ctx);
                                 if (r.getExpression() == null) {
                                     //noinspection DataFlowIssue
@@ -260,8 +259,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     // https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
                                     return false;
                                 }
-                                if ((groupPattern != null && !StringUtils.matchesGlob(constraint.getGroupId(), groupPattern))
-                                    || (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
+                                if ((groupPattern != null && !StringUtils.matchesGlob(constraint.getGroupId(), groupPattern)) ||
+                                    (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
                                     return false;
                                 }
                                 return Stream.concat(

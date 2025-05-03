@@ -1,11 +1,11 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Moderne Source Available License (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://docs.moderne.io/licensing/moderne-source-available-license
+ * https://www.apache.org/licenses/LICENSE-2.0
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -40,12 +38,6 @@ public class ReplaceStringLiteralValue extends Recipe {
             example = "orange")
     String newLiteralValue;
 
-    @JsonCreator
-    public ReplaceStringLiteralValue(@JsonProperty("oldStringValue") String oldStringValue, @JsonProperty("newStringValue") String newStringValue) {
-        this.oldLiteralValue = oldStringValue;
-        this.newLiteralValue = newStringValue;
-    }
-
     @Override
     public String getDisplayName() {
         return "Replace `String` literal";
@@ -63,7 +55,7 @@ public class ReplaceStringLiteralValue extends Recipe {
             public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
                 J.Literal lit = super.visitLiteral(literal, ctx);
                 if (lit.getType() == JavaType.Primitive.String &&
-                        oldLiteralValue.equals(lit.getValue())) {
+                    oldLiteralValue.equals(lit.getValue())) {
                     return lit
                             .withValue(newLiteralValue)
                             .withValueSource('"' + newLiteralValue + '"');

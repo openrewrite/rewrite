@@ -61,6 +61,14 @@ public class ChangeType extends Recipe {
 
     @Override
     public String getInstanceNameSuffix() {
+        // Defensively guard against null values when recipes are first classloaded. This
+        // is a temporary workaround until releases of workers/CLI that include the defensive
+        // coding in Recipe.
+        //noinspection ConstantValue
+        if (oldFullyQualifiedTypeName == null || newFullyQualifiedTypeName == null) {
+            return getDisplayName();
+        }
+
         String oldShort = oldFullyQualifiedTypeName.substring(oldFullyQualifiedTypeName.lastIndexOf('.') + 1);
         String newShort = newFullyQualifiedTypeName.substring(newFullyQualifiedTypeName.lastIndexOf('.') + 1);
         if (oldShort.equals(newShort)) {
@@ -256,7 +264,15 @@ public class ChangeType extends Recipe {
                     }
                 }
 
-                j = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
+                j = sf.withImports(ListUtils.map(sf.getImports(), i -> {
+                    Cursor cursor = getCursor();
+                    setCursor(new Cursor(cursor, i));
+                    try {
+                        return visitAndCast(i, ctx, super::visitImport);
+                    } finally {
+                        setCursor(cursor);
+                    }
+                }));
             }
 
             return j;
@@ -266,8 +282,14 @@ public class ChangeType extends Recipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             if (fieldAccess.isFullyQualifiedClassReference(originalType.getFullyQualifiedName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
-                    return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                    J.FieldAccess fa = (J.FieldAccess) updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
                             .withPrefix(fieldAccess.getPrefix()));
+                    if (getCursor().firstEnclosing(J.Import.class) == null) {
+                        // don't shorten qualified names in imports
+                        fa = fa.withName(fa.getName().withType(targetType));
+                        doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(fa));
+                    }
+                    return fa;
                 } else if (targetType instanceof JavaType.Primitive) {
                     return new J.Primitive(
                             fieldAccess.getId(),
@@ -395,7 +417,7 @@ public class ChangeType extends Recipe {
 
                 if (type.getOwningClass() == null) {
                     // just a performance shortcut when this isn't an inner class
-                    typeTree.withType(updateType(targetType));
+                    return typeTree.withType(updateType(targetType));
                 }
 
                 Stack<Expression> typeStack = new Stack<>();
