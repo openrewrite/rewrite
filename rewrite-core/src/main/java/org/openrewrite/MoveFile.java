@@ -58,7 +58,7 @@ public class MoveFile extends Recipe {
                     Path currentFolder = sourcePath.getParent();
                     String fileName = sourcePath.getFileName().toString();
                     PathMatcher pathMatcher = sourcePath.getFileSystem().getPathMatcher("glob:" + fileMatcher);
-                    if(pathMatcher.matches(sourcePath)) {
+                    if (pathMatcher.matches(sourcePath)) {
                         Path moveToSourcePath = null;
                         String moveToPath = moveTo;
                         if (moveTo.startsWith("/")) {
