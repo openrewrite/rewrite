@@ -90,7 +90,7 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
 
     @Override
     public String getDisplayName() {
-        return "Add Gradle dependency";
+        return "Add Gradle platform dependency";
     }
 
     @Override
@@ -100,7 +100,7 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
 
     @Override
     public String getDescription() {
-        return "Add a gradle dependency to a `build.gradle` file in the correct configuration based on where it is used.";
+        return "Add a gradle platform dependency to a `build.gradle` file in the correct configuration based on where it is used.";
     }
 
     @Override
