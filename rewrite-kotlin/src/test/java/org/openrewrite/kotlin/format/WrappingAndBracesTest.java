@@ -44,6 +44,31 @@ class WrappingAndBracesTest implements RewriteTest {
         spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(IntelliJ.wrappingAndBraces())));
     }
 
+    @DocumentExample
+    @SuppressWarnings({"ClassInitializerMayBeStatic", "ReassignedVariable", "UnusedAssignment"})
+    @Test
+    void blockLevelStatements() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  init {        var n: Int = 0
+                      n++
+                  }
+              }
+              """,
+            """
+              class Test {
+                  init {
+                      var n: Int = 0
+                      n++
+                  }
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> wrappingAndBraces(UnaryOperator<SpacesStyle> spaces,
                                                           UnaryOperator<WrappingAndBracesStyle> wrapping) {
         return spec -> spec
@@ -72,31 +97,6 @@ class WrappingAndBracesTest implements RewriteTest {
                       val type: Int = 1
               ) {
                    var a = 2
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @SuppressWarnings({"ClassInitializerMayBeStatic", "ReassignedVariable", "UnusedAssignment"})
-    @Test
-    void blockLevelStatements() {
-        rewriteRun(
-          kotlin(
-            """
-              class Test {
-                  init {        var n: Int = 0
-                      n++
-                  }
-              }
-              """,
-            """
-              class Test {
-                  init {
-                      var n: Int = 0
-                      n++
-                  }
               }
               """
           )

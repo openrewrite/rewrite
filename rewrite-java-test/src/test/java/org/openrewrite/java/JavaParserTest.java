@@ -48,6 +48,69 @@ import static org.openrewrite.test.TypeValidation.all;
  */
 class JavaParserTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void erroneousVariableDeclarations() {
+        rewriteRun(
+          spec -> spec.recipe(new FindCompileErrors())
+            .typeValidationOptions(all().erroneous(false)),
+          java(
+            """
+              package com.example.demo;
+              class Foo {
+                  /pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Foo {
+                  /*~~>*///*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Bar {
+                  pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Bar {
+                  /*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Baz {
+                  -pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Baz {
+                  /*~~>*/-/*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void incompleteAssignment() {
         rewriteRun(
@@ -243,69 +306,6 @@ class JavaParserTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(all().erroneous(false)),
           java(source)
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void erroneousVariableDeclarations() {
-        rewriteRun(
-          spec -> spec.recipe(new FindCompileErrors())
-            .typeValidationOptions(all().erroneous(false)),
-          java(
-            """
-              package com.example.demo;
-              class Foo {
-                  /pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Foo {
-                  /*~~>*///*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              package com.example.demo;
-              class Bar {
-                  pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Bar {
-                  /*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              package com.example.demo;
-              class Baz {
-                  -pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Baz {
-                  /*~~>*/-/*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          )
         );
     }
 

@@ -42,6 +42,7 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -186,7 +187,14 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new LinkedHashMap<>();
 
                     DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
+                    configurations:
                     for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
+                        // Skip when there's a direct dependency, as per openrewrite/rewrite#5355
+                        for (Dependency dependency : configuration.getRequested()) {
+                            if (dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                                continue configurations;
+                            }
+                        }
                         for (ResolvedDependency resolved : configuration.getResolved()) {
                             if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(),
                                     resolved.getArtifactId(), resolved.getVersion())) {
@@ -407,7 +415,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         .withMarkers(Markers.EMPTY);
 
                 return autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                    if(!(arg instanceof J.Lambda)) {
+                    if (!(arg instanceof J.Lambda)) {
                         return arg;
                     }
                     J.Lambda dependencies = (J.Lambda) arg;
@@ -450,7 +458,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         .withMarkers(Markers.EMPTY);
 
                 return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                    if(!(arg instanceof J.Lambda)) {
+                    if (!(arg instanceof J.Lambda)) {
                         return arg;
                     }
                     J.Lambda dependencies = (J.Lambda) arg;
@@ -484,7 +492,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if(!CONSTRAINTS_MATCHER.matches(m) && !(isKotlinDsl && m.getSimpleName().equals("constraints") && withinBlock(getCursor(), "dependencies"))) {
+            if (!CONSTRAINTS_MATCHER.matches(m) && !(isKotlinDsl && m.getSimpleName().equals("constraints") && withinBlock(getCursor(), "dependencies"))) {
                 return m;
             }
             String ga = gav.getGroupId() + ":" + gav.getArtifactId();
@@ -493,7 +501,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             MethodMatcher constraintMatcher = new MethodMatcher(CONSTRAINT_MATCHER, true);
             for (Statement statement : ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements()) {
                 if (statement instanceof J.MethodInvocation || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation)) {
-                    J.MethodInvocation m2 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() :  statement);
+                    J.MethodInvocation m2 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
                     if (constraintMatcher.matches(m2)) {
                         if (m2.getSimpleName().equals(config) && matchesConstraint(m2, ga)) {
                             existingConstraint = m2;
@@ -510,7 +518,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             if (Objects.equals(gav.getVersion(), existingConstraintVersion)) {
                 return m;
             }
-            if(existingConstraint == null) {
+            if (existingConstraint == null) {
                 m = (J.MethodInvocation) new CreateConstraintVisitor(config, gav, because, isKotlinDsl)
                         .visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
             } else {
@@ -658,7 +666,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             }
 
             m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                if(!(arg instanceof J.Lambda)) {
+                if (!(arg instanceof J.Lambda)) {
                     return arg;
                 }
                 J.Lambda dependencies = (J.Lambda) arg;
@@ -691,13 +699,13 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 return method;
             }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if(existingConstraint.isScope(m)) {
+            if (existingConstraint.isScope(m)) {
                 AtomicBoolean updatedBecause = new AtomicBoolean(false);
                 m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                    if(arg instanceof J.Literal) {
+                    if (arg instanceof J.Literal) {
                         String valueSource = ((J.Literal) arg).getValueSource();
                         char quote;
-                        if(valueSource == null) {
+                        if (valueSource == null) {
                             quote = '\'';
                         } else {
                             quote = valueSource.charAt(0);
@@ -707,17 +715,17 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     } else if (arg instanceof J.Lambda) {
                         arg = (Expression) new RemoveVersionVisitor().visitNonNull(arg, ctx);
                     }
-                    if(because != null) {
+                    if (because != null) {
                         Expression arg2 = (Expression) new UpdateBecauseTextVisitor(because)
                                 .visitNonNull(arg, ctx, getCursor());
-                        if(arg2 != arg) {
+                        if (arg2 != arg) {
                             updatedBecause.set(true);
                         }
                         return arg2;
                     }
                     return arg;
                 }));
-                if(because != null && !updatedBecause.get()) {
+                if (because != null && !updatedBecause.get()) {
                     m = (J.MethodInvocation) new CreateBecauseVisitor(because, isKotlinDsl).visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
                 }
             }
@@ -729,18 +737,18 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     private static class RemoveVersionVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
-        public  J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
+        public J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
             J.Return r = super.visitReturn(_return, ctx);
-            if(r.getExpression() == null) {
+            if (r.getExpression() == null) {
                 return null;
             }
             return r;
         }
 
         @Override
-        public  J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+        public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
+            if ("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
                 return null;
             }
             return m;
@@ -751,16 +759,17 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     @EqualsAndHashCode(callSuper = false)
     private static class UpdateBecauseTextVisitor extends JavaIsoVisitor<ExecutionContext> {
         String because;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if(!"because".equals(m.getSimpleName())) {
+            if (!"because".equals(m.getSimpleName())) {
                 return m;
             }
             m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                if(arg instanceof J.Literal) {
+                if (arg instanceof J.Literal) {
                     char quote;
-                    if(((J.Literal) arg).getValueSource() == null) {
+                    if (((J.Literal) arg).getValueSource() == null) {
                         quote = '"';
                     } else {
                         quote = ((J.Literal) arg).getValueSource().charAt(0);

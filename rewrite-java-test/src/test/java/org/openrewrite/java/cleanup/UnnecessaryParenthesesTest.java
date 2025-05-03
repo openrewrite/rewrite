@@ -46,6 +46,59 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         spec.recipe(toRecipe(UnnecessaryParenthesesVisitor::new));
     }
 
+    @DocumentExample
+    @Test
+    void fullUnwrappingDefault() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+
+              class Test {
+                  int square(int a, int b) {
+                      int square = (a * b);
+
+                      int sumOfSquares = 0;
+                      for (int i = (0); i < 10; i++) {
+                          sumOfSquares += (square(i * i, i));
+                      }
+                      double num = (10.0);
+
+                      List<String> list = Arrays.asList("a1", "b1", "c1");
+                      list.stream()
+                              .filter((s) -> s.startsWith("c"))
+                              .forEach(System.out::println);
+
+                      return (square);
+                  }
+              }
+              """,
+            """
+              import java.util.*;
+
+              class Test {
+                  int square(int a, int b) {
+                      int square = a * b;
+
+                      int sumOfSquares = 0;
+                      for (int i = 0; i < 10; i++) {
+                          sumOfSquares += square(i * i, i);
+                      }
+                      double num = 10.0;
+
+                      List<String> list = Arrays.asList("a1", "b1", "c1");
+                      list.stream()
+                              .filter(s -> s.startsWith("c"))
+                              .forEach(System.out::println);
+
+                      return square;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> unnecessaryParentheses(UnaryOperator<UnnecessaryParenthesesStyle> with) {
         return spec -> spec.parser(JavaParser.fromJavaVersion().styles(
           singletonList(
@@ -102,59 +155,6 @@ class UnnecessaryParenthesesTest implements RewriteTest {
               class Test {
                   int test() {
                       return 1;
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void fullUnwrappingDefault() {
-        rewriteRun(
-          java(
-            """
-              import java.util.*;
-
-              class Test {
-                  int square(int a, int b) {
-                      int square = (a * b);
-
-                      int sumOfSquares = 0;
-                      for (int i = (0); i < 10; i++) {
-                          sumOfSquares += (square(i * i, i));
-                      }
-                      double num = (10.0);
-
-                      List<String> list = Arrays.asList("a1", "b1", "c1");
-                      list.stream()
-                              .filter((s) -> s.startsWith("c"))
-                              .forEach(System.out::println);
-
-                      return (square);
-                  }
-              }
-              """,
-            """
-              import java.util.*;
-
-              class Test {
-                  int square(int a, int b) {
-                      int square = a * b;
-
-                      int sumOfSquares = 0;
-                      for (int i = 0; i < 10; i++) {
-                          sumOfSquares += square(i * i, i);
-                      }
-                      double num = 10.0;
-
-                      List<String> list = Arrays.asList("a1", "b1", "c1");
-                      list.stream()
-                              .filter(s -> s.startsWith("c"))
-                              .forEach(System.out::println);
-
-                      return square;
                   }
               }
               """

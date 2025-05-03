@@ -36,6 +36,60 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         spec.recipe(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, null));
     }
 
+    @DocumentExample
+    @Test
+    void matchesOwnDmThenRemoveIt() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>30.0-jre</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void givenScopeIsDefinedWhenVersionMatchesParentDmForDifferentScopeThenStillRemoveIt() {
         rewriteRun(
@@ -361,60 +415,6 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                 </project>
                 """
             )
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void matchesOwnDmThenRemoveIt() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                  <groupId>org.example</groupId>
-                  <artifactId>parent</artifactId>
-                  <version>1.0-SNAPSHOT</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>30.0-jre</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>30.0-jre</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>org.example</groupId>
-                  <artifactId>parent</artifactId>
-                  <version>1.0-SNAPSHOT</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>30.0-jre</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
           )
         );
     }

@@ -28,6 +28,26 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class RemoveImportTest implements RewriteTest {
 
+    static Recipe removeTypeImportRecipe(String type) {
+        return toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeRemoveImport(type);
+                return cu;
+            }
+        });
+    }
+
+    static Recipe removeMemberImportRecipe(String type, String member) {
+        return toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeRemoveImport(type + '.' + member);
+                return cu;
+            }
+        });
+    }
+
     @DocumentExample
     @Test
     void jvmStaticMember() {
@@ -202,25 +222,5 @@ class RemoveImportTest implements RewriteTest {
               """
           )
         );
-    }
-
-    static Recipe removeTypeImportRecipe(String type) {
-        return toRecipe(() -> new KotlinIsoVisitor<>() {
-            @Override
-            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                maybeRemoveImport(type);
-                return cu;
-            }
-        });
-    }
-
-    static Recipe removeMemberImportRecipe(String type, String member) {
-        return toRecipe(() -> new KotlinIsoVisitor<>() {
-            @Override
-            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                maybeRemoveImport(type + '.' + member);
-                return cu;
-            }
-        });
     }
 }

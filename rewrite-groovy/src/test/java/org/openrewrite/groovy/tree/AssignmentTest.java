@@ -196,4 +196,15 @@ class AssignmentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void staticTypeWithTypeAsPrefix() {
+        rewriteRun(
+          groovy(
+            """
+            int a = 1    ,
+            intB = 2
+            """
+          ));
+    }
 }

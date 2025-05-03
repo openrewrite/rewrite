@@ -307,6 +307,32 @@ class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
+    void preconditionOnNestedDeclarative() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionOnDeclarative
+              description: Test.
+              preconditions:
+                - org.openrewrite.text.Find:
+                    find: foo
+              recipeList:
+                - org.openrewrite.DeclarativeExample
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.DeclarativeExample
+              description: Test.
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: foo
+                    replace: bar
+              """, "org.openrewrite.PreconditionOnDeclarative"),
+          text("foo", "bar")
+        );
+    }
+
+    @Test
     void exposesUnderlyingDataTables() {
         DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
           "test", emptySet(), null, URI.create("dummy"), true, Collections.emptyList());

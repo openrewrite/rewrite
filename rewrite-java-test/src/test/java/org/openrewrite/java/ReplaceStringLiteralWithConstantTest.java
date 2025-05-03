@@ -38,6 +38,30 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
             .logCompilationWarningsAndErrors(true));
     }
 
+    @DocumentExample
+    @Test
+    void shouldNotAddImportWhenUnnecessary() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
+          java(
+            """
+              package org.openrewrite.java;
+              
+              class Test {
+                  Object o = "Hello World!";
+              }
+              """,
+            """
+              package org.openrewrite.java;
+              
+              class Test {
+                  Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void doNothingIfStringLiteralNotFound() {
         rewriteRun(
@@ -67,30 +91,6 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               }
               """
           ));
-    }
-
-    @DocumentExample
-    @Test
-    void shouldNotAddImportWhenUnnecessary() {
-        rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
-          java(
-            """
-              package org.openrewrite.java;
-              
-              class Test {
-                  Object o = "Hello World!";
-              }
-              """,
-            """
-              package org.openrewrite.java;
-              
-              class Test {
-                  Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
-              }
-              """
-          )
-        );
     }
 
     @Test
