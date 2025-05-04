@@ -135,7 +135,9 @@ public class MoveFile extends Recipe {
                     }
                     if (destination != null) {
                         return destination.resolve(subFolders);
-                    } else return null;
+                    } else {
+                        return null;
+                    }
                 }
                 return sourcePath;
             }
