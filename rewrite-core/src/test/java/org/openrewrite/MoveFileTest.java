@@ -28,9 +28,9 @@ class MoveFileTest implements RewriteTest {
 
     @Test
     @DocumentExample
-    void renameDirectory() {
+    void moveToRelativeToFileName() {
         rewriteRun(
-          spec -> spec.recipe(new MoveFile("**/application*.yml", "../resources")),
+          spec -> spec.recipe(new MoveFile(null, "**/application*.yml", "../resources")),
           text(
             "hello: world",
             "hello: world",
@@ -51,9 +51,40 @@ class MoveFileTest implements RewriteTest {
     }
 
     @Test
-    void moveToSubDirectory() {
+    void moveRelativeToFolderName() {
         rewriteRun(
-          spec -> spec.recipe(new MoveFile("**/application*.yml", "profiles")),
+          spec -> spec.recipe(new MoveFile("src/main/renameMe", null, "../resources")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec ->
+              spec
+                .path("src/main/renameMe/nested/deeply/application.yml")
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/nested/deeply/application.yml")))
+          ),
+          text(
+            "hello: world",
+            "hello: world",
+            spec ->
+              spec
+                .path("src/main/renameMe/nested/application-dev.yml")
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/nested/application-dev.yml")))
+          ),
+          text(
+            "hello: world",
+            "hello: world",
+            spec ->
+              spec
+                .path("src/main/renameMe/application-dev.yml")
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/application-dev.yml")))
+          )
+        );
+    }
+
+    @Test
+    void moveFilesToSubDirectory() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile(null, "**/application*.yml", "profiles")),
           text(
             "hello: world",
             "hello: world",
@@ -74,9 +105,48 @@ class MoveFileTest implements RewriteTest {
     }
 
     @Test
-    void moveToExactPath() {
+    void moveFolderToSubDirectory() {
         rewriteRun(
-          spec -> spec.recipe(new MoveFile("**/application*.yml", "/profiles")),
+          spec -> spec.recipe(new MoveFile("src/main", null, "nested")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec ->
+              spec
+                .path("src/main/resources/application.yml")
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/nested/resources/application.yml")))
+          )
+        );
+    }
+
+    @Test
+    void moveFilesToExactPath() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile(null, "**/application*.yml", "/profiles")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec ->
+              spec
+                .path("src/main/resources/application.yml")
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles/application.yml")))
+          ),
+          text(
+            "hello: world",
+            "hello: world",
+            spec ->
+              spec
+                .path("src/main/resources/application-dev.yml")
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles/application-dev.yml")))
+          )
+        );
+    }
+
+
+    @Test
+    void moveFolderToExactPath() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile("src/main/resources", null, "/profiles")),
           text(
             "hello: world",
             "hello: world",
@@ -99,14 +169,29 @@ class MoveFileTest implements RewriteTest {
     @Test
     void ignoreNonMatchingFiles() {
         rewriteRun(
-          spec -> spec.recipe(new MoveFile("**/renameMe/application*.yml", "../resources")),
+          spec -> spec.recipe(new MoveFile(null, "**/renameMe/application*.yml", "../resources")),
           text(
             "hello: world",
-            spec -> spec.path("src/main/renameMe/application.yaml")
+            spec -> spec.path("src/main/renameMe/application.yaml") // extension is wrong
           ),
           text(
             "hello: world",
-            spec -> spec.path("src/main/doNotRenameMe/application.yml")
+            spec -> spec.path("src/main/doNotRenameMe/application.yml") // folder name is wrong
+          )
+        );
+    }
+
+    @Test
+    void ignoreNonMatchingFolders() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile("src/main/renameMe", null, "../profiles")),
+          text(
+            "hello: world",
+            spec -> spec.path("src/main/.renameMe/application.yaml") // hidden folder name is wrong
+          ),
+          text(
+            "hello: world",
+            spec -> spec.path("src/main/doNotRenameMe/application.yml") // folder name is wrong
           )
         );
     }
