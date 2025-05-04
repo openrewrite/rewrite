@@ -31,6 +31,28 @@ import static org.openrewrite.java.Assertions.java;
 
 class FindFieldsOfTypeTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void findArrayOfType() {
+        rewriteRun(
+          spec -> spec.recipe(new FindFieldsOfType("java.lang.String", null)),
+          java(
+            """
+              import java.util.*;
+              public class A {
+                 private String[] s;
+              }
+              """,
+            """
+              import java.util.*;
+              public class A {
+                 /*~~>*/private String[] s;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2199")
     @Test
     void findFieldNotVariable() {
@@ -69,28 +91,6 @@ class FindFieldsOfTypeTest implements RewriteTest {
               public class A {
                  /*~~>*/private List<?> list;
                  private SecureRandom rand;
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void findArrayOfType() {
-        rewriteRun(
-          spec -> spec.recipe(new FindFieldsOfType("java.lang.String", null)),
-          java(
-            """
-              import java.util.*;
-              public class A {
-                 private String[] s;
-              }
-              """,
-            """
-              import java.util.*;
-              public class A {
-                 /*~~>*/private String[] s;
               }
               """
           )

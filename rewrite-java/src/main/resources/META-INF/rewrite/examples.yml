@@ -1,4 +1,3 @@
-#
 # Copyright 2025 the original author or authors.
 # <p>
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.AddCommentToMethod
@@ -82,6 +79,48 @@ examples:
           void bar() {
               long one = Integer.parseInt("1");
           }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangePackageInStringLiteral
+examples:
+- description: ''
+  parameters:
+  - javax.type
+  - jakarta.type
+  sources:
+  - before: |
+      class Test {
+          String ref = "javax.type.A";
+          String extendedRef = "there is a type reference here -> javax.type.A <- hopefully it only replaces that";
+      }
+    after: |
+      class Test {
+          String ref = "jakarta.type.A";
+          String extendedRef = "there is a type reference here -> jakarta.type.A <- hopefully it only replaces that";
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangeTypeInStringLiteral
+examples:
+- description: ''
+  parameters:
+  - javax.type.A
+  - jakarta.type.B
+  sources:
+  - before: |
+      class Test {
+          String ref = "javax.type.A";
+          String refNested = "javax.type.other.A";
+          String extendedRef = "there is a type reference here -> javax.type.A <- hopefully it only replaces that";
+      }
+    after: |
+      class Test {
+          String ref = "jakarta.type.B";
+          String refNested = "javax.type.other.A";
+          String extendedRef = "there is a type reference here -> jakarta.type.B <- hopefully it only replaces that";
       }
     language: java
 ---

@@ -29,6 +29,23 @@ class RenameTypeAliasTest implements RewriteTest {
         spec.recipe(new RenameTypeAlias("OldAlias", "NewAlias", "Test"));
     }
 
+    @DocumentExample
+    @Test
+    void declaration() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test
+              typealias OldAlias = Test
+              """,
+            """
+              class Test
+              typealias NewAlias = Test
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/119")
     @Test
     void doesNotMatchType() {
@@ -50,23 +67,6 @@ class RenameTypeAliasTest implements RewriteTest {
             """
               class Test
               typealias OtherAlias = Test
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void declaration() {
-        rewriteRun(
-          kotlin(
-            """
-              class Test
-              typealias OldAlias = Test
-              """,
-            """
-              class Test
-              typealias NewAlias = Test
               """
           )
         );

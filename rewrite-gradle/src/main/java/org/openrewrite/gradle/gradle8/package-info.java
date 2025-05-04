@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.ai;
+@NullMarked
+package org.openrewrite.gradle.gradle8;
 
-import lombok.Value;
-
-@Value
-public class CodeEditRequest {
-    String model = "code-davinci-edit-001";
-    double temperature = 0.3;
-    String instruction;
-    String input;
-}
+import org.jspecify.annotations.NullMarked;

@@ -60,6 +60,51 @@ class UpgradePluginVersionTest implements RewriteTest {
         );
     }
 
+    @DocumentExample("Upgrading a settings plugin")
+    @Test
+    void upgradeGradleSettingsPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("com.gradle.enterprise", "3.10.x", null)),
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.10'
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.10.3'
+              }
+              """
+          )
+        );
+    }
+
+    @DocumentExample("Upgrading a build plugin with version in gradle.properties")
+    @Test
+    void upgradePluginVersionInProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.x", null)),
+          properties(
+            """
+              rewriteVersion=5.40.0
+              """,
+            """
+              rewriteVersion=5.40.6
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version "$rewriteVersion"
+                  id 'com.github.johnrengelman.shadow' version '6.1.0'
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void pluginManagementPlugin() {
         rewriteRun(
@@ -77,26 +122,6 @@ class UpgradePluginVersionTest implements RewriteTest {
                   plugins {
                       id 'org.openrewrite.rewrite' version '5.40.6'
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample("Upgrading a settings plugin")
-    @Test
-    void upgradeGradleSettingsPlugin() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("com.gradle.enterprise", "3.10.x", null)),
-          settingsGradle(
-            """
-              plugins {
-                  id 'com.gradle.enterprise' version '3.10'
-              }
-              """,
-            """
-              plugins {
-                  id 'com.gradle.enterprise' version '3.10.3'
               }
               """
           )
@@ -198,31 +223,6 @@ class UpgradePluginVersionTest implements RewriteTest {
               springDependencyManagementVersion=1.1.0
               """,
             spec -> spec.path("gradle.properties")
-          )
-        );
-    }
-
-    @DocumentExample("Upgrading a build plugin with version in gradle.properties")
-    @Test
-    void upgradePluginVersionInProperties() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.x", null)),
-          properties(
-            """
-              rewriteVersion=5.40.0
-              """,
-            """
-              rewriteVersion=5.40.6
-              """,
-            spec -> spec.path("gradle.properties")
-          ),
-          buildGradle(
-            """
-              plugins {
-                  id 'org.openrewrite.rewrite' version "$rewriteVersion"
-                  id 'com.github.johnrengelman.shadow' version '6.1.0'
-              }
-              """
           )
         );
     }

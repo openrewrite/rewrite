@@ -35,6 +35,46 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnnecessaryBoxing", "StatementWithEmptyBody", "UnusedAssignment", "SizeReplaceableByIsEmpty", "ResultOfMethodCallIgnored", "RedundantOperationOnEmptyContainer"})
 class JavaTemplateTest implements RewriteTest {
 
+    @DocumentExample
+    @SuppressWarnings({"RedundantOperationOnEmptyContainer"})
+    @Test
+    void replaceForEachControlVariableType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  var mv = super.visitVariableDeclarations(multiVariable, ctx);
+                  if (mv.getVariables().get(0).getInitializer() == null && TypeUtils.isOfType(mv.getTypeExpression()
+                    .getType(), JavaType.Primitive.String)) {
+                      mv = JavaTemplate.apply("Object #{}", getCursor(),
+                        multiVariable.getCoordinates().replace(),
+                        multiVariable.getVariables().get(0).getSimpleName()
+                      );
+                  }
+                  return mv;
+              }
+          })),
+          java(
+            """
+              import java.util.ArrayList;
+              class T {
+                  void m() {
+                      for (String s : new ArrayList<String>()) {}
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              class T {
+                  void m() {
+                      for (Object s : new ArrayList<String>()) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void addAnnotation() {
         rewriteRun(
@@ -236,46 +276,6 @@ class JavaTemplateTest implements RewriteTest {
                           int i;
                           i = 1;
                       }, "hello" );
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @SuppressWarnings({"RedundantOperationOnEmptyContainer"})
-    @Test
-    void replaceForEachControlVariableType() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  var mv = super.visitVariableDeclarations(multiVariable, ctx);
-                  if (mv.getVariables().get(0).getInitializer() == null && TypeUtils.isOfType(mv.getTypeExpression()
-                    .getType(), JavaType.Primitive.String)) {
-                      mv = JavaTemplate.apply("Object #{}", getCursor(),
-                        multiVariable.getCoordinates().replace(),
-                        multiVariable.getVariables().get(0).getSimpleName()
-                      );
-                  }
-                  return mv;
-              }
-          })),
-          java(
-            """
-              import java.util.ArrayList;
-              class T {
-                  void m() {
-                      for (String s : new ArrayList<String>()) {}
-                  }
-              }
-              """,
-            """
-              import java.util.ArrayList;
-              class T {
-                  void m() {
-                      for (Object s : new ArrayList<String>()) {}
                   }
               }
               """

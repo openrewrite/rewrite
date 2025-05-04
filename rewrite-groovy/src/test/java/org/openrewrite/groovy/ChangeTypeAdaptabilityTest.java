@@ -38,6 +38,28 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
         spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
     }
 
+    @DocumentExample
+    @Test
+    void changeDefinition() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
+          groovy(
+            """
+              class file {
+              }
+              """,
+            """
+              class newFile {
+              }
+              """,
+            spec -> spec.path("file.groovy").afterRecipe(cu -> {
+                assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
+            })
+          )
+        );
+    }
+
     @SuppressWarnings("GrPackage")
     @Test
     void changeImport() {
@@ -92,28 +114,6 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
                   Target type
               }
               """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void changeDefinition() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
-          groovy(
-            """
-              class file {
-              }
-              """,
-            """
-              class newFile {
-              }
-              """,
-            spec -> spec.path("file.groovy").afterRecipe(cu -> {
-                assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
-            })
           )
         );
     }

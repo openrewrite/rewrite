@@ -35,6 +35,27 @@ class OrderImportsTest implements RewriteTest {
         spec.recipe(new OrderImports(false));
     }
 
+    @DocumentExample
+    @Test
+    void foldIntoStar() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+              import java.util.regex.Pattern;
+              import java.util.Objects;
+              import java.util.Set;
+              import java.util.Map;
+              """,
+            """
+              import java.util.*;
+              import java.util.regex.Pattern;
+              """
+          )
+        );
+    }
+
     @Test
     void sortInnerAndOuterClassesInTheSamePackage() {
         rewriteRun(
@@ -52,27 +73,6 @@ class OrderImportsTest implements RewriteTest {
               import java.util.List;
               
               class Test {}
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void foldIntoStar() {
-        rewriteRun(
-          java(
-            """
-              import java.util.List;
-              import java.util.ArrayList;
-              import java.util.regex.Pattern;
-              import java.util.Objects;
-              import java.util.Set;
-              import java.util.Map;
-              """,
-            """
-              import java.util.*;
-              import java.util.regex.Pattern;
               """
           )
         );

@@ -15,10 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.assertj.core.api.BooleanAssert;
-import org.assertj.core.api.ObjectAssert;
-import org.assertj.core.api.SoftAssertions;
-import org.assertj.core.api.StringAssert;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -37,8 +33,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.tree.TypeUtils.TypePosition.Invariant;
-import static org.openrewrite.java.tree.TypeUtils.TypePosition.Out;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
@@ -340,7 +334,7 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
-    void isAssignableToGenericTypeVariable() {
+    void isAssignableToGenericTypeVariable1() {
         rewriteRun(
           java(
             """
@@ -395,8 +389,8 @@ class TypeUtilsTest implements RewriteTest {
                     if (method.getSimpleName().equals("test")) {
                         J.Return return_ = (J.Return) method.getBody().getStatements().get(0);
                         J.TypeCast cast = (J.TypeCast) return_.getExpression();
-                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), Invariant)).isFalse();
-                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), Out)).isTrue();
+                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType())).isFalse();
+                        assertThat(new Types(true).isAssignableTo(cast.getType(), cast.getExpression().getType())).isTrue();
                     }
                     return method;
                 }
@@ -441,8 +435,8 @@ class TypeUtilsTest implements RewriteTest {
                         JavaType consumeClassParamType = ((J.VariableDeclarations) consumeClass.getParameters().get(0)).getVariables().get(0).getType();
                         JavaType consumeMethodParamType = ((J.VariableDeclarations) consumeMethod.getParameters().get(0)).getVariables().get(0).getType();
 
-                        assertThat(TypeUtils.isAssignableTo(consumeClassParamType, list.getType(), Out)).isTrue();
-                        assertThat(TypeUtils.isAssignableTo(consumeMethodParamType, list.getType(), Out)).isTrue();
+                        assertThat(new Types(true).isAssignableTo(consumeClassParamType, list.getType())).isTrue();
+                        assertThat(new Types(true).isAssignableTo(consumeMethodParamType, list.getType())).isTrue();
                     }
                     return method;
                 }
@@ -628,11 +622,12 @@ class TypeUtilsTest implements RewriteTest {
 
     @Test
     void isAssignableToString() {
-        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String));
+        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String, JavaType.Primitive.Null));
         for (JavaType.Primitive other : others) {
             assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.String, other));
         }
         assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.String, JavaType.Primitive.String));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.String, JavaType.Primitive.Null));
     }
 
     @Test
@@ -752,7 +747,7 @@ class TypeUtilsTest implements RewriteTest {
               import java.io.*;
               import java.util.*;
               
-              @SuppressWarnings("all")              
+              @SuppressWarnings("all")
               public class Test<A extends B, B extends Number, C extends Comparable<? super C> & Serializable> {
               
                   // Plain generics
@@ -911,83 +906,5 @@ class TypeUtilsTest implements RewriteTest {
             }.visit(cu, new InMemoryExecutionContext()))
           )
         );
-    }
-
-    static class TypeUtilsAssertions implements AutoCloseable {
-        SoftAssertions softly = new SoftAssertions();
-        Map<String, List<JavaType>> types = new HashMap<>();
-
-        public TypeUtilsAssertions(J.CompilationUnit cu) {
-            EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String, JavaType.Primitive.None))
-              .forEach(e -> types.put(e.getKeyword(), new ArrayList<>(Collections.singletonList(e))));
-            new JavaIsoVisitor<Integer>() {
-                @Override
-                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer o) {
-                    if (multiVariable.getTypeExpression() != null) {
-                        String type = multiVariable.getTypeExpression().printTrimmed(getCursor());
-                        types.computeIfAbsent(type, k -> new ArrayList<>(2)).add(multiVariable.getTypeExpression().getType());
-                    }
-                    for (J.VariableDeclarations.NamedVariable variable : multiVariable.getVariables()) {
-                        types.computeIfAbsent(variable.getSimpleName(), k -> new ArrayList<>(2)).add(variable.getVariableType());
-                    }
-                    return super.visitVariableDeclarations(multiVariable, o);
-                }
-
-                @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer o) {
-                    String type = method.printTrimmed(getCursor());
-                    types.computeIfAbsent(type, k -> new ArrayList<>(2)).add(method.getMethodType());
-                    return super.visitMethodInvocation(method, o);
-                }
-            }.visit(cu, 0);
-        }
-
-        public ObjectAssert<JavaType> type(String type) {
-            JavaType javaType = getFirst(type);
-            return softly.assertThat(javaType);
-        }
-
-        public BooleanAssert isAssignableTo(String to, String from) {
-            JavaType toType = getFirst(to);
-            JavaType fromType = getLast(from);
-            return softly.assertThat(TypeUtils.isAssignableTo(toType, fromType))
-              .describedAs("isAssignableTo(%s, %s)", to, from);
-        }
-
-        public BooleanAssert isOfType(String to, String from) {
-            JavaType toType = getFirst(to);
-            JavaType fromType = getLast(from);
-            return softly.assertThat(TypeUtils.isOfType(toType, fromType))
-              .describedAs("isOfType(%s, %s)", to, from);
-        }
-
-        public StringAssert toString(String type) {
-            JavaType javaType = getFirst(type);
-            return softly.assertThat(TypeUtils.toString(javaType))
-              .describedAs("toString(%s)", type);
-        }
-
-        public StringAssert toGenericTypeString(String type) {
-            JavaType javaType = getFirst(type);
-            return softly.assertThat(TypeUtils.toGenericTypeString((JavaType.GenericTypeVariable) javaType))
-              .describedAs("toGenericTypeString(%s)", type);
-        }
-
-        private JavaType getFirst(String type) {
-            return Optional.ofNullable(types.get(type))
-              .flatMap(list -> list.stream().findFirst())
-              .orElseThrow(() -> new IllegalArgumentException("Type not found: " + type));
-        }
-
-        private JavaType getLast(String type) {
-            return Optional.ofNullable(types.get(type))
-              .map(list -> list.get(list.size() - 1))
-              .orElseThrow(() -> new IllegalArgumentException("Type not found: " + type));
-        }
-
-        @Override
-        public void close() {
-            softly.assertAll();
-        }
     }
 }
