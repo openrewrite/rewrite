@@ -26,12 +26,16 @@ class AddExplicitImportTest implements RewriteTest {
     @Test
     void addExplicitImportWhenNoExistingImports() {
         rewriteRun(spec -> spec.recipe(new AddExplicitImport("foo.bar"))
-          , java("""
-            class Dummy {}
-            """, """
-            import foo.bar;
-            
-            class Dummy {}
+          , java(
+                """
+            """,
+                """
+            """ ));
+          , java(
+                """
+            """,
+                """
+            """ ));
             """));
     }
 
@@ -58,8 +62,10 @@ class AddExplicitImportTest implements RewriteTest {
             ztf.core.ASimpleClass
             static a.b.c.staticMethod
             """))
-          , java("""
-            import xyz.bbb.ccc.D;
+          , java(
+                """
+            """,
+                """
             
             class Dummy {}
             """, """
@@ -70,12 +76,16 @@ class AddExplicitImportTest implements RewriteTest {
             import static a.b.c.staticMethod;
             
             class Dummy {}
-            """));
-    }
-
-    @Test
-    void addStaticImports() {
-        rewriteRun(spec -> spec.recipe(new AddExplicitImport("static foo.bar.staticMethod"))
+            """ ));
+          , java(
+                """
+            """,
+                """
+            """ ));
+          , java(
+                """
+            """,
+                """
           , java("""
             import xyz.bbb.ccc.D;
             
@@ -105,6 +115,6 @@ class AddExplicitImportTest implements RewriteTest {
             */
             
             class Dummy {}
-            """));
+            """ ));
     }
 }
