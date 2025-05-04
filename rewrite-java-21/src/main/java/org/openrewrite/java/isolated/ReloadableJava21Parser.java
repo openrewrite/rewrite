@@ -237,7 +237,14 @@ public class ReloadableJava21Parser implements JavaParser {
                 if (!annotationProcessors.isEmpty()) {
                     compiler.processAnnotations(jcCompilationUnits, emptyList());
                 }
-                compiler.attribute(compiler.todo);
+                while (!compiler.todo.isEmpty()) {
+                    try {
+                        compiler.attribute(compiler.todo);
+                    } catch (Throwable t) {
+                        System.out.println("Failed find type: " + t);
+                        ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
+                    }
+                }
             } catch (Throwable t) {
                 // when symbol entering fails on problems like missing types, attribution can often times proceed
                 // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
