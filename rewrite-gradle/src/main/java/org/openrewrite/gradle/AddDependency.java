@@ -19,9 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
+import org.openrewrite.gradle.util.GradleConfigurationNameUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
@@ -30,13 +30,13 @@ import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
 import java.util.function.Predicate;
 
 import static java.util.Collections.singletonList;
-import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -224,24 +224,12 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         if (resolvedConfigurations.isEmpty()) {
                             resolvedConfigurations.add("implementation");
                         }
-                        Set<String> tmpConfigurations = new HashSet<>(resolvedConfigurations);
-                        for (String tmpConfiguration : tmpConfigurations) {
-                            GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
-                            if (gdc == null || gdc.findRequestedDependency(groupId, artifactId) != null) {
-                                resolvedConfigurations.remove(tmpConfiguration);
-                            }
-                        }
 
-                        tmpConfigurations = new HashSet<>(resolvedConfigurations);
-                        for (String tmpConfiguration : tmpConfigurations) {
-                            GradleDependencyConfiguration gdc = requireNonNull((gp.getConfiguration(tmpConfiguration)));
-                            for (GradleDependencyConfiguration transitive : gp.configurationsExtendingFrom(gdc, true)) {
-                                if (resolvedConfigurations.contains(transitive.getName()) ||
-                                        (Boolean.TRUE.equals(acceptTransitive) && transitive.findResolvedDependency(groupId, artifactId) != null)) {
-                                    resolvedConfigurations.remove(transitive.getName());
-                                }
-                            }
-                        }
+                        GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
+                        gradleConfigurationFilter.removeTransitiveConfigurations();
+                        gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
+                        gradleConfigurationFilter.removeTransitiveConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
+                        resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
 
                         if (resolvedConfigurations.isEmpty()) {
                             return s;
@@ -249,7 +237,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             if (targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
-                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, purgeSourceSet(configuration),
+                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, GradleConfigurationNameUtils.purgeSourceSet(configuration),
                                         classifier, extension, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration), null).visitNonNull(s, ctx);
                             } else {
                                 s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
@@ -265,58 +253,20 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
 
                     private Predicate<Cursor> isMatchingJVMTestSuite(String resolvedConfiguration) {
+                        String sourceSet = GradleConfigurationNameUtils.purgeConfigurationSuffix(resolvedConfiguration);
                         return cursor -> {
-                            String sourceSet = purgeConfigurationSuffix(resolvedConfiguration);
                             J.MethodInvocation methodInvocation = cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
                             return methodInvocation != null && sourceSet.equals(methodInvocation.getSimpleName());
                         };
                     }
 
-                    private final Set<String> gradleStandardConfigurations = new HashSet<>(Arrays.asList(
-                            "api",
-                            "implementation",
-                            "compileOnly",
-                            "compileOnlyApi",
-                            "runtimeOnly",
-                            "testImplementation",
-                            "testCompileOnly",
-                            "testRuntimeOnly"));
-
                     boolean targetsCustomJVMTestSuite(String configuration, Set<String> customJvmTestSuites) {
-                        if (gradleStandardConfigurations.contains(configuration) || "default".equals(configuration)) {
+                        if (GradleConfigurationNameUtils.isStandardConfiguration(configuration)) {
                             return false;
                         }
 
-                        String sourceSet = purgeConfigurationSuffix(configuration);
+                        String sourceSet = GradleConfigurationNameUtils.purgeConfigurationSuffix(configuration);
                         return customJvmTestSuites.contains(sourceSet);
-                    }
-
-                    private String purgeConfigurationSuffix(String configuration) {
-                        if (configuration.endsWith("Implementation")) {
-                            return configuration.substring(0, configuration.length() - 14);
-                        } else if (configuration.endsWith("CompileOnly")) {
-                            return configuration.substring(0, configuration.length() - 11);
-                        } else if (configuration.endsWith("RuntimeOnly")) {
-                            return configuration.substring(0, configuration.length() - 11);
-                        } else if (configuration.endsWith("AnnotationProcessor")) {
-                            return configuration.substring(0, configuration.length() - 19);
-                        } else {
-                            return configuration;
-                        }
-                    }
-
-                    private String purgeSourceSet(@Nullable String configuration) {
-                        if (StringUtils.isBlank(configuration) || configuration.endsWith("Implementation")) {
-                            return "implementation";
-                        } else if (configuration.endsWith("CompileOnly")) {
-                            return "compileOnly";
-                        } else if (configuration.endsWith("RuntimeOnly")) {
-                            return "runtimeOnly";
-                        } else if (configuration.endsWith("AnnotationProcessor")) {
-                            return "annotationProcessor";
-                        } else {
-                            return configuration;
-                        }
                     }
                 })
         );
