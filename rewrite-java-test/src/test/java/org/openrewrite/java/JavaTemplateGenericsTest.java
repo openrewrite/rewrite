@@ -123,7 +123,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
-    void testSetsDifferenceMultimapRecipe() {
+    void setsDifferenceMultimapRecipe() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava"))
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -168,7 +168,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
-    void testEmptyStreamRecipe() {
+    void emptyStreamRecipe() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               final JavaTemplate template = JavaTemplate.builder("java.util.stream.Stream.of()")
