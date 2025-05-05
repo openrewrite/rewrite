@@ -1090,7 +1090,7 @@ public interface J extends Tree {
 
         @Nullable
         @Getter
-        @With
+        @With(AccessLevel.PRIVATE)
         Expression guard;
 
         @JsonCreator
@@ -1111,6 +1111,23 @@ public interface J extends Tree {
             this.guard = guard;
             this.statements = statements;
             this.body = body;
+        }
+
+        public Case withGuard(@Nullable Expression guard) {
+            if (this.guard == guard) {
+                return this;
+            }
+            if (this.guard == null) {
+                List<JRightPadded<J>> caseLabels = ListUtils.mapLast(getPadding().getCaseLabels().getPadding().getElements(), last -> {
+                    if (last != null && Space.EMPTY.equals(last.getAfter())) {
+                        return last.withAfter(Space.SINGLE_SPACE);
+                    }
+                    return last;
+                });
+
+                return new Case(this.padding, this.id, this.prefix, this.markers, this.type, JContainer.build(this.caseLabels.getBefore(), caseLabels, this.caseLabels.getMarkers()), this.statements, this.body, guard);
+            }
+            return new Case(this.padding, this.id, this.prefix, this.markers, this.type, this.caseLabels, this.statements, this.body, guard);
         }
 
         @Override
