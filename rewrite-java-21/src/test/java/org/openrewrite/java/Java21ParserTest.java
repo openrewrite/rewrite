@@ -23,11 +23,51 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import static org.openrewrite.java.Assertions.java;
+
 class Java21ParserTest implements RewriteTest {
 
     @Test
     void shouldLoadResourceFromClasspath() throws IOException {
         Files.deleteIfExists(Paths.get(System.getProperty("user.home"), ".rewrite", "classpath", "jackson-annotations-2.17.1.jar"));
         rewriteRun(spec -> spec.parser(JavaParser.fromJavaVersion().classpathFromResources(new InMemoryExecutionContext(), "jackson-annotations")));
+    }
+
+    @Test
+    void variableDeclaration() {
+        rewriteRun(
+          java(
+            """
+              public class SomeClass {
+               
+                   static AccountItem.StatusEnum mapStatus(Account.Status status) {
+                       return (status == null) ? null : switch(status) {
+                           case ACTIVE -> AccountItem.StatusEnum.ACTIVE;
+                           case BLOCKED -> AccountItem.StatusEnum.BLOCKED;
+                           case CLOSED -> AccountItem.StatusEnum.CLOSED;
+                           default -> null;
+                       };
+                   }
+               
+                   class Account {
+                       enum Status {
+                           ACTIVE,
+                           BLOCKED,
+                           CLOSED,
+                           UNKNOWN
+                       }
+                   }
+               
+                   class AccountItem {
+                       enum StatusEnum {
+                           ACTIVE,
+                           BLOCKED,
+                           CLOSED
+                       }
+                   }
+               }
+              """
+          )
+        );
     }
 }
