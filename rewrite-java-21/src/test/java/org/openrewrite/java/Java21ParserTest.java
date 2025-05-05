@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -38,6 +39,45 @@ class Java21ParserTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              public class AccountItem {
+              
+                   public enum StatusEnum {
+                       ACTIVE("ACTIVE"),
+              
+                       BLOCKED("BLOCKED"),
+              
+                       CLOSED("CLOSED");
+              
+                       private String value;
+              
+                       StatusEnum(String value) {
+                           this.value = value;
+                       }
+              
+                       public String getValue() {
+                           return value;
+                       }
+              
+                       @Override
+                       public String toString() {
+                           return String.valueOf(value);
+                       }
+              
+                       public static StatusEnum fromValue(String value) {
+                           for (StatusEnum b : StatusEnum.values()) {
+                               if (b.value.equals(value)) {
+                                   return b;
+                               }
+                           }
+                           throw new IllegalArgumentException("Unexpected value '" + value + "'");
+                       }
+                   }
+               }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
               public class SomeClass {
                
                    static AccountItem.StatusEnum mapStatus(Account.Status status) {
@@ -55,14 +95,6 @@ class Java21ParserTest implements RewriteTest {
                            BLOCKED,
                            CLOSED,
                            UNKNOWN
-                       }
-                   }
-               
-                   class AccountItem {
-                       enum StatusEnum {
-                           ACTIVE,
-                           BLOCKED,
-                           CLOSED
                        }
                    }
                }
