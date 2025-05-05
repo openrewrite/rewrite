@@ -18,11 +18,11 @@ package org.openrewrite.java.lombok;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.ListBuffer;
-import lombok.experimental.SuperBuilder;
 import lombok.core.AnnotationValues;
 import lombok.core.HandlerPriority;
 import lombok.core.LombokImmutableList;
 import lombok.core.LombokNode;
+import lombok.experimental.SuperBuilder;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
 import lombok.javac.handlers.HandleConstructor;
@@ -60,6 +60,7 @@ public class SuperBuilderHandler extends JavacAnnotationHandler<SuperBuilder> {
             // which is unlikely to be called in original code. Therefore, it is safe to temporarily remove the
             // @Builder.Default annotation during processing.
             for (JavacNode fieldNode : HandleConstructor.findAllFields(parent, true)) {
+                @SuppressWarnings("unchecked") // if the cast fails the resulting parser error is clear enough
                 LombokImmutableList<JavacNode> children = (LombokImmutableList<JavacNode>) childrenField.get(fieldNode);
                 nodeToChildrenMap.put(fieldNode, children);
                 LombokImmutableList<JavacNode> filtered = children;

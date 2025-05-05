@@ -122,124 +122,162 @@ class LombokTest implements RewriteTest {
         );
     }
 
-    @Test
-    void builder() {
-        rewriteRun(
-          java(
-            """
-              import lombok.Builder;
-              
-              @Builder
-              class A {
-                  boolean b;
-                  int n;
-                  String s;
-              
-                  void test() {
-                      A a = A.builder().n(1).b(true).s("foo").build();
+    @Nested
+    class Builder {
+        @Test
+        void simple() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.Builder;
+                  
+                  @Builder
+                  class A {
+                      boolean b;
+                      int n;
+                      String s;
+                  
+                      void test() {
+                          A a = A.builder().n(1).b(true).s("foo").build();
+                      }
                   }
-              }
-              """
-          )
-        );
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withDefault() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.Builder;
+                  
+                  @Builder
+                  class A {
+                      @Builder.Default boolean b = false;
+                      @Builder.Default int n = 0;
+                      @Builder.Default String s = "Hello, Anshuman!";
+                  
+                      void test() {
+                          A x = A.builder().n(1).b(true).s("foo").build();
+                          A y = A.builder().n(1).b(true).build();
+                          A z = A.builder().n(1).build();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withDefaultAndFinal() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.Builder;
+                  
+                  @Builder
+                  class A {
+                      @Builder.Default private final boolean b = false;
+                      @Builder.Default public final int n = 0;
+                      @Builder.Default protected final String s = "Hello, Anshuman!";
+                  
+                      void test() {
+                          A x = A.builder().n(1).b(true).s("foo").build();
+                          A y = A.builder().n(1).b(true).build();
+                          A z = A.builder().n(1).build();
+                      }
+                  }
+                  """
+              )
+            );
+        }
     }
 
-    @Test
-    void builderWithDefault() {
-        rewriteRun(
-          java(
-            """
-              import lombok.Builder;
-              
-              @Builder
-              class A {
-                  @Builder.Default boolean b = false;
-                  @Builder.Default int n = 0;
-                  @Builder.Default String s = "Hello, Anshuman!";
-              
-                  void test() {
-                      A x = A.builder().n(1).b(true).s("foo").build();
-                      A y = A.builder().n(1).b(true).build();
-                      A z = A.builder().n(1).build();
-                  }
-              }
-              """
-          )
-        );
-    }
+    @Nested
+    class SuperBuilder {
 
-    @Test
-    void builderWithDefaultAndFinal() {
-        rewriteRun(
-          java(
-            """
-              import lombok.Builder;
-              
-              @Builder
-              class A {
-                  @Builder.Default private final boolean b = false;
-                  @Builder.Default public final int n = 0;
-                  @Builder.Default protected final String s = "Hello, Anshuman!";
-              
-                  void test() {
-                      A x = A.builder().n(1).b(true).s("foo").build();
-                      A y = A.builder().n(1).b(true).build();
-                      A z = A.builder().n(1).build();
+        @Test
+        void withHierarchy() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.experimental.SuperBuilder;
+                  
+                  @SuperBuilder
+                  public class Parent {
+                      String lastName;
                   }
-              }
-              """
-          )
-        );
-    }
+                 
+                  @SuperBuilder
+                  public class Child extends Parent {
+                      String firstName;
+                  }
+                  
+                  class Test {
+                      void test() {
+                          Child child = Child.builder()
+                            .firstName("John")
+                            .lastName("Doe")
+                            .build();
+                      }
+                  }
+                  """
+              )
+            );
+        }
 
-    @Test
-    void superBuilderWithDefault() {
-        rewriteRun(
-          java(
-            """
-              import lombok.Builder;
-              import lombok.experimental.SuperBuilder;
-              
-              @SuperBuilder
-              class A {
-                  @Builder.Default boolean b = false;
-                  @Builder.Default int n = 0;
-                  @Builder.Default String s = "Hello, Anshuman!";
-              
-                  void test() {
-                      A x = A.builder().n(1).b(true).s("foo").build();
-                      A y = A.builder().n(1).b(true).build();
-                      A z = A.builder().n(1).build();
+        @Test
+        void withDefault() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.Builder;
+                  import lombok.experimental.SuperBuilder;
+                  
+                  @SuperBuilder
+                  class A {
+                      @Builder.Default boolean b = false;
+                      @Builder.Default int n = 0;
+                      @Builder.Default String s = "Hello, Anshuman!";
+                  
+                      void test() {
+                          A x = A.builder().n(1).b(true).s("foo").build();
+                          A y = A.builder().n(1).b(true).build();
+                          A z = A.builder().n(1).build();
+                      }
                   }
-              }
-              """
-          )
-        );
-    }
+                  """
+              )
+            );
+        }
 
-    @Test
-    void superBuilderWithDefaultAndFinal() {
-        rewriteRun(
-          java(
-            """
-              import lombok.Builder;
-              import lombok.experimental.SuperBuilder;
-              
-              @SuperBuilder
-              class A {
-                  @Builder.Default private final boolean b = false;
-                  @Builder.Default public final int n = 0;
-                  @Builder.Default protected final String s = "Hello, Anshuman!";
-              
-                  void test() {
-                      A x = A.builder().n(1).b(true).s("foo").build();
-                      A y = A.builder().n(1).b(true).build();
-                      A z = A.builder().n(1).build();
+        @Test
+        void withDefaultAndFinal() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.Builder;
+                  import lombok.experimental.SuperBuilder;
+                  
+                  @SuperBuilder
+                  class A {
+                      @Builder.Default private final boolean b = false;
+                      @Builder.Default public final int n = 0;
+                      @Builder.Default protected final String s = "Hello, Anshuman!";
+                  
+                      void test() {
+                          A x = A.builder().n(1).b(true).s("foo").build();
+                          A y = A.builder().n(1).b(true).build();
+                          A z = A.builder().n(1).build();
+                      }
                   }
-              }
-              """
-          )
-        );
+                  """
+              )
+            );
+        }
+
     }
 
     @Test
