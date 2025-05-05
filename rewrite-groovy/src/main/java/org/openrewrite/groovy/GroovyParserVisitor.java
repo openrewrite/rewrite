@@ -1373,8 +1373,8 @@ public class GroovyParserVisitor {
                         .map(this::createNamedVariable)
                         .collect(toList());
                 int first = 0, last = namedVariables.size() - 1;
-                namedVariables.set(first, namedVariables.get(first).withPrefix(prefixBeforeOpenParentheses).withMarkers(Markers.build(singletonList(new OpenParentheses(randomId())))));
-                namedVariables.set(last, namedVariables.get(last).withMarkers(Markers.build(singletonList(new CloseParentheses(randomId())))));
+                namedVariables = ListUtils.mapFirst(namedVariables, first -> first.withPrefix(prefixBeforeOpenParentheses).withMarkers(Markers.build(singletonList(new OpenParentheses(randomId())))));
+                namedVariables = ListUtils.mapLast(namedVariables, last -> last.withMarkers(Markers.build(singletonList(new CloseParentheses(randomId())))));
             } else {
                 typeExpr = visitVariableExpressionType(expression.getVariableExpression());
                 J.Identifier name = visit(expression.getVariableExpression());
