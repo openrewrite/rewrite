@@ -26,7 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class JavaTemplateJavadocTest implements RewriteTest {
+class JavaTemplateJavadocTest implements RewriteTest {
 
     @Test
     void simpleMethodInvocationReplacement() {
