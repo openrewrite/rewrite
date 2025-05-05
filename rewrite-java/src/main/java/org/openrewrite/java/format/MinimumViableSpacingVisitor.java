@@ -212,6 +212,25 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.Case visitCase(J.Case _case, P p) {
+        J.Case c = super.visitCase(_case, p);
+
+        List<JRightPadded<J>> labels = c.getPadding().getCaseLabels().getPadding().getElements();
+        if (c.getGuard() != null && !labels.isEmpty()) {
+            List<JRightPadded<J>> caseLabels = ListUtils.mapLast(c.getPadding().getCaseLabels().getPadding().getElements(), last -> {
+                if (last != null && Space.EMPTY.equals(last.getAfter())) {
+                    return last.withAfter(Space.SINGLE_SPACE);
+                }
+                return last;
+            });
+
+            return c.getPadding().withCaseLabels(c.getPadding().getCaseLabels().getPadding().withElements(caseLabels));
+        }
+
+        return c;
+    }
+
+    @Override
     public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
