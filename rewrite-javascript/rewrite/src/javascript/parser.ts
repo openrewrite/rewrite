@@ -29,6 +29,7 @@ import {
 import {Expression, isJavaScript, JS, TypedTree, TypeTree} from '.';
 import {
     emptyMarkers,
+    ExecutionContext,
     markers,
     Markers,
     MarkersKind,
@@ -37,6 +38,7 @@ import {
     ParserInput,
     parserInputFile,
     parserInputRead,
+    Parsers,
     randomId,
     SourceFile,
     SourcePath
@@ -55,6 +57,7 @@ import {
 import {JavaScriptTypeMapping} from "./typeMapping";
 import {produce} from "immer";
 import Kind = JS.Kind;
+import {RpcCodecs} from "../rpc";
 
 export class JavaScriptParser extends Parser {
 
@@ -62,8 +65,9 @@ export class JavaScriptParser extends Parser {
     private readonly sourceFileCache: Map<string, ts.SourceFile> = new Map();
     private oldProgram?: ts.Program;
 
-    constructor() {
-        super();
+    constructor(ctx: ExecutionContext = new ExecutionContext(),
+                readonly relativeTo?: string) {
+        super(ctx, relativeTo);
         this.compilerOptions = {
             target: ts.ScriptTarget.Latest,
             module: ts.ModuleKind.CommonJS,
@@ -4453,3 +4457,5 @@ class InvalidSurrogatesNotSupportedError extends SyntaxError {
         this.name = "InvalidSurrogatesNotSupportedError";
     }
 }
+
+Parsers.registerParser("javascript", JavaScriptParser);

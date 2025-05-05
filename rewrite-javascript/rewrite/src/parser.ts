@@ -117,3 +117,24 @@ export function readSourceSync(sourcePath: ParserInput) {
     }
     return sourcePath.text;
 }
+
+type ParserConstructor<T extends Parser> = new (...args: any[]) => T;
+
+export class Parsers {
+    private static registry: Record<string, ParserConstructor<Parser>> = {};
+
+    static registerParser<T extends Parser>(
+        name: string,
+        parserClass: ParserConstructor<T>
+    ): void {
+        Parsers.registry[name] = parserClass as ParserConstructor<Parser>;
+    }
+
+    static createParser(name: string, ...args: any[]): Parser {
+        const ParserClass = Parsers.registry[name];
+        if (!ParserClass) {
+            throw new Error(`No parser registered with name: ${name}`);
+        }
+        return new ParserClass(...args);
+    }
+}
