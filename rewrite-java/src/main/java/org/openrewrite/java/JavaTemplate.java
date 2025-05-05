@@ -29,6 +29,7 @@ import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
+import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.template.SourceTemplate;
 
 import java.io.IOException;
@@ -106,6 +107,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     @Override
     @SuppressWarnings("unchecked")
     public <J2 extends J> J2 apply(Cursor scope, JavaCoordinates coordinates, Object... parameters) {
+        if (scope.firstEnclosing(Javadoc.DocComment.class) != null) {
+            return scope.getValue();
+        }
         if (!(scope.getValue() instanceof J)) {
             throw new IllegalArgumentException("`scope` must point to a J instance.");
         }
