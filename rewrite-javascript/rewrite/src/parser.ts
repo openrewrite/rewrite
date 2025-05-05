@@ -38,10 +38,22 @@ export function parserInputFile(input: ParserInput): string {
     return input;
 }
 
+export interface ParserOptions {
+    ctx?: ExecutionContext;
+    relativeTo?: string;
+}
+
 export abstract class Parser {
-    constructor(protected ctx: ExecutionContext = new ExecutionContext(),
-                protected readonly relativeTo?: string) {
+    constructor({
+                    ctx = new ExecutionContext(),
+                    relativeTo
+                }: ParserOptions = {}) {
+        this.ctx = ctx;
+        this.relativeTo = relativeTo;
     }
+
+    protected ctx: ExecutionContext;
+    protected readonly relativeTo?: string;
 
     abstract parse(...sourcePaths: ParserInput[]): Promise<SourceFile[]>
 

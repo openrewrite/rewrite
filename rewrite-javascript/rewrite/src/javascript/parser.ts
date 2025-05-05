@@ -37,7 +37,7 @@ import {
     Parser,
     ParserInput,
     parserInputFile,
-    parserInputRead,
+    parserInputRead, ParserOptions,
     Parsers,
     randomId,
     SourceFile,
@@ -57,7 +57,6 @@ import {
 import {JavaScriptTypeMapping} from "./typeMapping";
 import {produce} from "immer";
 import Kind = JS.Kind;
-import {RpcCodecs} from "../rpc";
 
 export class JavaScriptParser extends Parser {
 
@@ -65,9 +64,11 @@ export class JavaScriptParser extends Parser {
     private readonly sourceFileCache: Map<string, ts.SourceFile> = new Map();
     private oldProgram?: ts.Program;
 
-    constructor(ctx: ExecutionContext = new ExecutionContext(),
-                readonly relativeTo?: string) {
-        super(ctx, relativeTo);
+    constructor({
+                    ctx = new ExecutionContext(),
+                    relativeTo
+                }: ParserOptions = {}) {
+        super({ctx: ctx, relativeTo: relativeTo});
         this.compilerOptions = {
             target: ts.ScriptTarget.Latest,
             module: ts.ModuleKind.CommonJS,
