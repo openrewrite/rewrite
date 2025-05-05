@@ -778,10 +778,10 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         return JavaType.Unknown.getInstance();
     }
 
+    /**
+     * Check for the `UnknownType` which existed up until JDK 22; starting with JDK 23 only the `ErrorType` is used
+     */
     public static boolean isUnknownType(@Nullable Type type) {
-        if (type == null) {
-            return false;
-        }
-        return type.getClass().getName().equals("com.sun.tools.javac.code.Type.UnknownType");
+        return type != null && type.getClass().getName().equals("com.sun.tools.javac.code.Type$UnknownType");
     }
 }
