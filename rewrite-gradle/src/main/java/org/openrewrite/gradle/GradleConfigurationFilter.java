@@ -25,7 +25,7 @@ import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
-public class GradleConfigurationFilter {
+class GradleConfigurationFilter {
     private final GradleProject gradleProject;
 
     @Getter
