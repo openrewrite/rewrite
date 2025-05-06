@@ -20,11 +20,15 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -39,7 +43,7 @@ import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 @Value
 @Builder
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class PlainText implements SourceFileWithReferences, Tree {
+public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<PlainText> {
 
     @Builder.Default
     @With
@@ -152,6 +156,39 @@ public class PlainText implements SourceFileWithReferences, Tree {
             return this;
         }
         return new PlainText(id, sourcePath, markers, charsetName, charsetBomMarked, fileAttributes, checksum, text, snippets, null);
+    }
+
+    @Override
+    public void rpcSend(PlainText after, RpcSendQueue q) {
+        q.getAndSend(after, Tree::getId);
+        q.sendMarkers(after, Tree::getMarkers);
+        q.getAndSend(after, (PlainText d) -> d.getSourcePath().toString());
+        q.getAndSend(after, (PlainText d) -> d.getCharset().name());
+        q.getAndSend(after, PlainText::isCharsetBomMarked);
+        q.getAndSend(after, PlainText::getChecksum);
+        q.getAndSend(after, PlainText::getFileAttributes);
+        q.getAndSend(after, PlainText::getText);
+        q.getAndSendList(after, PlainText::getSnippets, Tree::getId, snippet -> {
+            q.getAndSend(snippet, Tree::getId);
+            q.sendMarkers(snippet, Tree::getMarkers);
+            q.getAndSend(snippet, Snippet::getText);
+        });
+    }
+
+    @Override
+    public PlainText rpcReceive(PlainText t, RpcReceiveQueue q) {
+        return t.withId(UUID.fromString(q.receiveAndGet(t.getId(), UUID::toString)))
+                .withMarkers(q.receiveMarkers(t.getMarkers()))
+                .withSourcePath(Paths.get(q.receiveAndGet(t.getSourcePath(), Path::toString)))
+                .withCharset(Charset.forName(q.receiveAndGet(t.getCharset(), Charset::name)))
+                .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
+                .withChecksum(q.receive(t.getChecksum()))
+                .<PlainText>withFileAttributes(q.receive(t.getFileAttributes()))
+                .withText(q.receiveAndGet(t.getText(), String::toString))
+                .withSnippets(q.receiveList(t.getSnippets(), s -> s
+                        .withId(UUID.fromString(q.receiveAndGet(s.getId(), UUID::toString)))
+                        .withMarkers(q.receiveMarkers(s.getMarkers()))
+                        .withText(q.receiveAndGet(s.getText(), String::toString))));
     }
 
     @Value

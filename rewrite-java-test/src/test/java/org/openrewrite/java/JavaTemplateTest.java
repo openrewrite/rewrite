@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
@@ -33,6 +34,46 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnnecessaryBoxing", "StatementWithEmptyBody", "UnusedAssignment", "SizeReplaceableByIsEmpty", "ResultOfMethodCallIgnored", "RedundantOperationOnEmptyContainer"})
 class JavaTemplateTest implements RewriteTest {
+
+    @DocumentExample
+    @SuppressWarnings({"RedundantOperationOnEmptyContainer"})
+    @Test
+    void replaceForEachControlVariableType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  var mv = super.visitVariableDeclarations(multiVariable, ctx);
+                  if (mv.getVariables().get(0).getInitializer() == null && TypeUtils.isOfType(mv.getTypeExpression()
+                    .getType(), JavaType.Primitive.String)) {
+                      mv = JavaTemplate.apply("Object #{}", getCursor(),
+                        multiVariable.getCoordinates().replace(),
+                        multiVariable.getVariables().get(0).getSimpleName()
+                      );
+                  }
+                  return mv;
+              }
+          })),
+          java(
+            """
+              import java.util.ArrayList;
+              class T {
+                  void m() {
+                      for (String s : new ArrayList<String>()) {}
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              class T {
+                  void m() {
+                      for (Object s : new ArrayList<String>()) {}
+                  }
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void addAnnotation() {
@@ -58,6 +99,62 @@ class JavaTemplateTest implements RewriteTest {
             """
               @SuppressWarnings({"ALL"})
               public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addParentheses() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+                    return JavaTemplate.builder("#{any()}")
+                      .build()
+                      .apply(getCursor(), parens.getCoordinates().replace(), parens.getTree());
+                }
+            }))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """,
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addParenthesesToParameter() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                    return JavaTemplate.builder("#{any(int)} * 3")
+                      .build()
+                      .apply(getCursor(), binary.getCoordinates().replace(), binary);
+                }
+            }))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              public class A {
+                  int a = 1 + 2;
+              }
+              """,
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
               }
               """
           )
@@ -113,8 +210,7 @@ class JavaTemplateTest implements RewriteTest {
                       return multiVariable;
                   }
                   J.VariableDeclarations.NamedVariable var0 = multiVariable.getVariables().get(0);
-                  return JavaTemplate.builder("var #{} = #{any()}")
-                    .contextSensitive()
+                  return JavaTemplate.builder("var #{} = #{any()};")
                     .build()
                     .apply(getCursor(), multiVariable.getCoordinates().replace(), var0.getSimpleName(), var0.getInitializer());
               }
@@ -129,7 +225,8 @@ class JavaTemplateTest implements RewriteTest {
                       T x = doIt();
                   }
               }
-              """, """
+              """,
+            """
               import java.io.Serializable;
               
               abstract class Outer<T extends Serializable> {
@@ -179,46 +276,6 @@ class JavaTemplateTest implements RewriteTest {
                           int i;
                           i = 1;
                       }, "hello" );
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @SuppressWarnings({"RedundantOperationOnEmptyContainer"})
-    @Test
-    void replaceForEachControlVariableType() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  var mv = super.visitVariableDeclarations(multiVariable, ctx);
-                  if (mv.getVariables().get(0).getInitializer() == null && TypeUtils.isOfType(mv.getTypeExpression()
-                    .getType(), JavaType.Primitive.String)) {
-                      mv = JavaTemplate.apply("Object #{}", getCursor(),
-                        multiVariable.getCoordinates().replace(),
-                        multiVariable.getVariables().get(0).getSimpleName()
-                      );
-                  }
-                  return mv;
-              }
-          })),
-          java(
-            """
-              import java.util.ArrayList;
-              class T {
-                  void m() {
-                      for (String s : new ArrayList<String>()) {}
-                  }
-              }
-              """,
-            """
-              import java.util.ArrayList;
-              class T {
-                  void m() {
-                      for (Object s : new ArrayList<String>()) {}
                   }
               }
               """
@@ -439,7 +496,6 @@ class JavaTemplateTest implements RewriteTest {
                       maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
                       return JavaTemplate.builder("Collections.singletonList(#{any()})")
-                        .contextSensitive()
                         .imports("java.util.Collections")
                         .build()
                         .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
@@ -489,7 +545,6 @@ class JavaTemplateTest implements RewriteTest {
                       maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
                       return JavaTemplate.builder("Collections.singletonList(#{any()})")
-                        .contextSensitive()
                         .imports("java.util.Collections")
                         .build()
                         .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
@@ -577,7 +632,7 @@ class JavaTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher bigDecimalSetScale = new MethodMatcher("java.math.BigDecimal setScale(int, int)");
-              final JavaTemplate twoArgScale = JavaTemplate.builder("#{any(int)}, #{}").contextSensitive()
+              final JavaTemplate twoArgScale = JavaTemplate.builder("#{any(int)}, #{}")
                 .imports("java.math.RoundingMode").build();
 
               @Override
@@ -625,7 +680,6 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitUnary(J.Unary unary, ExecutionContext ctx) {
                   return JavaTemplate.builder("#{any()}++")
-                    .contextSensitive()
                     .build().apply(
                       getCursor(),
                       unary.getCoordinates().replace(),
@@ -865,7 +919,8 @@ class JavaTemplateTest implements RewriteTest {
               public class ArrayHelper {
                   public static Object[] of(Object... objects){ return null;}
               }
-              """
+              """,
+            SourceSpec::skip
           ),
           java(
             """
@@ -963,7 +1018,8 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return JavaTemplate.builder("\"ab\"").contextSensitive().build()
+                  return JavaTemplate.builder("\"ab\"")
+                    .build()
                     .apply(getCursor(), binary.getCoordinates().replace());
               }
           })),
@@ -1083,9 +1139,8 @@ class JavaTemplateTest implements RewriteTest {
                       }
                   }
                   Statement lastStatement = newBlock.getStatements().get(newBlock.getStatements().size() - 1);
-                  String code = "s.toLowerCase();";
                   return JavaTemplate
-                    .builder(code)
+                    .builder("s.toLowerCase();")
                     .contextSensitive()
                     .javaParser(JavaParser.fromJavaVersion())
                     .build()
@@ -1279,13 +1334,15 @@ class JavaTemplateTest implements RewriteTest {
               class A {
                   String testMethod(@NotNull final String test) {}
               }
-              """, """
+              """,
+            """
               import lombok.NonNull;
               
               class A {
                   String testMethod(@NonNull final String test) {}
               }
-              """)
+              """
+          )
         );
     }
 
@@ -1299,8 +1356,6 @@ class JavaTemplateTest implements RewriteTest {
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if (new MethodMatcher("batch.StepBuilder create()").matches(method)) {
                         return JavaTemplate.builder("new StepBuilder()")
-                          //.doBeforeParseTemplate(System.out::println)
-                          .contextSensitive()
                           .build()
                           .apply(getCursor(), method.getCoordinates().replace());
                     }
@@ -1353,7 +1408,6 @@ class JavaTemplateTest implements RewriteTest {
                   if (new MethodMatcher("Foo bar(..)").matches(mi) &&
                     mi.getArguments().get(0) instanceof J.Binary) {
                       return JavaTemplate.builder("\"Hello, {}\", \"World!\"")
-                        .contextSensitive()
                         .build()
                         .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments());
                   }
@@ -1394,7 +1448,6 @@ class JavaTemplateTest implements RewriteTest {
                       JavaCoordinates coordinates = vd.getCoordinates().replace();
                       return JavaTemplate.builder("final var #{}")
                         .contextSensitive()
-                        .doBeforeParseTemplate(System.out::println)
                         .build()
                         .apply(getCursor(), coordinates, new Object[]{vd.getVariables().get(0).getSimpleName()});
                   }
@@ -1420,6 +1473,52 @@ class JavaTemplateTest implements RewriteTest {
                   void bar(List<String> lst) {
                       for (final var s : lst) {}
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5289")
+    void recursiveType() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext o) {
+                    J.VariableDeclarations param = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
+                    J.VariableDeclarations.NamedVariable variable = param.getVariables().get(0);
+
+                    return JavaTemplate.builder("reference -> System.out.println(#{any()})")
+                      .contextSensitive()
+                      .build()
+                      .apply(getCursor(), lambda.getCoordinates().replace(), variable.getName());
+                }
+            })),
+          java(
+            """
+              import java.util.Optional;
+              
+              class BugTest {
+                  void run(One<?, ?> firstBuild) {
+                      Optional.of(firstBuild).ifPresent(reference -> {});
+                  }
+              
+                  abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                  abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              }
+              """,
+            """
+              import java.util.Optional;
+              
+              class BugTest {
+                  void run(One<?, ?> firstBuild) {
+                      Optional.of(firstBuild).ifPresent(reference -> System.out.println(reference));
+                  }
+              
+                  abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+                  abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
               }
               """
           )

@@ -36,6 +36,19 @@ class RemoveUnusedImportsTest implements RewriteTest {
         spec.recipe(new RemoveUnusedImports());
     }
 
+    @DocumentExample
+    @Test
+    void removeNamedImport() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              class A {}
+              """,
+            "class A {}")
+        );
+    }
+
     @Test
     void enumsFromInnerClass() {
         rewriteRun(
@@ -153,19 +166,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
               }
               """
           )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void removeNamedImport() {
-        rewriteRun(
-          java(
-            """
-              import java.util.List;
-              class A {}
-              """,
-            "class A {}")
         );
     }
 
@@ -1749,7 +1749,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
                     B9 b9 = r.theOther9();
                   }
               }
-              """));
+              """
+          ));
     }
 
     @Test

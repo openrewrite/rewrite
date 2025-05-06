@@ -225,7 +225,7 @@ public class Space {
             last = c;
         }
 
-        if ((comment.length() > 0)) {
+        if ((comment.length() > 0) || inSingleLineComment) {
             comments.add(new Comment(inLineSlashOrHashComment, comment.toString(), prefix.toString(), Markers.EMPTY));
             prefix = new StringBuilder();
         }

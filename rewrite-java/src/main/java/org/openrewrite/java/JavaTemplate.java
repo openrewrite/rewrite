@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import java.util.Collections;
 import lombok.Getter;
 import lombok.Value;
 import lombok.experimental.NonFinal;
@@ -25,6 +26,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.template.SourceTemplate;
@@ -79,21 +81,24 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
     @Getter
     private final String code;
+    @Getter
+    private final Set<String> genericTypes;
 
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
     private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, Set<String> imports,
-                         Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
-        this(code, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports));
+                         Set<String> genericTypes, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+        this(code, genericTypes, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports));
     }
 
     private static JavaParser.Builder<?, ?> augmentClasspath(JavaParser.Builder<?, ?> parserBuilder) {
         return parserBuilder.addClasspathEntry(getTemplateClasspathDir());
     }
 
-    protected JavaTemplate(String code, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {
+    protected JavaTemplate(String code, Set<String> genericTypes, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {
         this.code = code;
+        this.genericTypes = genericTypes;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.templateParser = templateParser;
     }
@@ -110,13 +115,17 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
         //noinspection ConstantConditions
-        return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
+        J2 result = (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
                 .getMixin()
                 .visit(scope.getValue(), 0, scope.getParentOrThrow());
+
+        return result != scope.getValue() && result instanceof Expression ?
+                (J2) ParenthesizeVisitor.maybeParenthesize((Expression) result, scope) :
+                result;
     }
 
     protected Substitutions substitutions(Object[] parameters) {
-        return new Substitutions(code, parameters);
+        return new Substitutions(code, genericTypes, parameters);
     }
 
     @Incubating(since = "8.0.0")
@@ -169,6 +178,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         private final String code;
         private final Set<String> imports = new HashSet<>();
+        private final Set<String> genericTypes = new HashSet<>();
 
         private boolean contextSensitive;
 
@@ -218,6 +228,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             return this;
         }
 
+        public Builder genericTypes(String... genericTypes) {
+            Collections.addAll(this.genericTypes, genericTypes);
+            return this;
+        }
+
         private void validateImport(String typeName) {
             if (StringUtils.isBlank(typeName)) {
                 throw new IllegalArgumentException("Imports must not be blank");
@@ -244,7 +259,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(contextSensitive, parser.clone(), code, imports,
+            return new JavaTemplate(contextSensitive, parser.clone(), code, imports, genericTypes,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }

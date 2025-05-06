@@ -19,13 +19,10 @@ import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.*;
 import okhttp3.tls.HandshakeCertificates;
 import okhttp3.tls.HeldCertificate;
-import org.assertj.core.api.Condition;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -33,13 +30,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
-import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.MavenParser;
-import org.openrewrite.maven.MavenSettings;
+import org.openrewrite.maven.*;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.xml.tree.Xml;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
@@ -52,6 +47,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -143,8 +139,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               """,
             spec -> spec.beforeRecipe(pom -> {
                 MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                assertThat(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null)
-                  .stream()
+                assertThat(StreamSupport.stream(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null).spliterator(), false)
                   .map(MavenRepository::getId))
                   .containsExactly("settings-provided", "local-provided");
             }))
@@ -160,39 +155,13 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void centralIdOverridesDefaultRepository() {
             var ctx = MavenExecutionContextView.view(this.ctx);
-            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
-                <settings>
-                  <profiles>
-                    <profile>
-                        <id>central</id>
-                        <repositories>
-                            <repository>
-                                <id>central</id>
-                                <url>https://internalartifactrepository.yourorg.com</url>
-                            </repository>
-                        </repositories>
-                    </profile>
-                  </profiles>
-                  <activeProfiles>
-                    <activeProfile>central</activeProfile>
-                  </activeProfiles>
-                </settings>
-                """
-            ), ctx));
-
-            // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
-            for (MavenRepository repository : ctx.getRepositories()) {
-                repository.setKnownToExist(true);
-            }
-
+            var centralOverride = new MavenRepository("repo", "https://google.com/definitelydoesnotexist/", null, null, true, null, null, null, null);
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
-            Collection<MavenRepository> repos = downloader.distinctNormalizedRepositories(emptyList(), null, null);
-            assertThat(repos).areExactly(1, new Condition<>(repo -> "central".equals(repo.getId()),
-              "id \"central\""));
-            assertThat(repos).areExactly(1, new Condition<>(repo -> "https://internalartifactrepository.yourorg.com".equals(repo.getUri()),
-              "URI https://internalartifactrepository.yourorg.com"));
+            try {
+                downloader.download(new GroupArtifactVersion("org.openrewrite", "nonexistent", "7.0.0"), null, null, List.of(centralOverride));
+                Assertions.fail();
+            } catch (MavenDownloadingException ignore) {
+            }
         }
 
         @Test
@@ -228,6 +197,28 @@ class MavenPomDownloaderTest implements RewriteTest {
               .containsExactly("http://internalartifactrepository.yourorg.com/org/openrewrite/rewrite-core/7.0.0/rewrite-core-7.0.0.pom");
             assertThat(discoveredRepositories)
               .containsExactly(nonexistentRepo);
+        }
+
+        @Test
+        void onlyAccessRequiredRepositories() throws MavenDownloadingException {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
+            for (MavenRepository repository : ctx.getRepositories()) {
+                repository.setKnownToExist(true);
+            }
+
+            MavenRepository nonExistentRepo = new MavenRepository("repo", "https://definitelydoesnotexist2.xyz/", null, null, false, null, null, null, null);
+            List<String> attemptedUris = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repositoryAccessFailed(String uri, Throwable e) {
+                    attemptedUris.add(uri);
+                }
+            });
+
+            new MavenPomDownloader(ctx)
+              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, List.of(MAVEN_CENTRAL, nonExistentRepo));
+            assertThat(attemptedUris).isEmpty();
         }
 
         @Test
@@ -1298,4 +1289,34 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
     }
+
+    @Test
+    void resolveDependencies() throws MavenDownloadingExceptions {
+        Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
+                  <project>
+                      <parent>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-parent</artifactId>
+                          <version>3.2.0</version>
+                          <relativePath/>
+                      </parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>demo</artifactId>
+                      <version>0.0.1-SNAPSHOT</version>
+                      <name>demo</name>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-web</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+        """).toList().get(0);
+        MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+        resolutionResult = resolutionResult.resolveDependencies(new MavenPomDownloader(Collections.emptyMap(), new InMemoryExecutionContext(), null, null), new InMemoryExecutionContext());
+        List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
+        assertThat(deps).hasSize(34);
+    }
+
+
 }

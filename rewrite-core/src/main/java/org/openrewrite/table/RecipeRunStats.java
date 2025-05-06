@@ -44,9 +44,9 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     }
 
     public void recordSourceFileChanged(@Nullable SourceFile before, @Nullable SourceFile after) {
-        if(after != null) {
+        if (after != null) {
             sourceFileChanged.add(after.getSourcePath());
-        } else if(before != null) {
+        } else if (before != null) {
             sourceFileChanged.add(before.getSourcePath());
         }
     }
@@ -76,19 +76,44 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                     Long.valueOf(editor.count()).intValue(),
                     sourceFileChanged.size(),
                     scanner == null ? 0 : (long) scanner.totalTime(TimeUnit.NANOSECONDS),
-                    scanner == null ? 0 : scanner.takeSnapshot().percentileValues()[0].percentile(),
+                    scanner == null ? 0 : scanner.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
                     scanner == null ? 0 : (long) scanner.max(TimeUnit.NANOSECONDS),
                     (long) editor.totalTime(TimeUnit.NANOSECONDS),
-                    editor.takeSnapshot().percentileValues()[0].percentile(),
-                    (long) editor.max(TimeUnit.NANOSECONDS));
-            //noinspection DuplicatedCode
-            ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
-                //noinspection unchecked
-                List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
-                dataTablesOfType.add(row);
-                return allDataTables;
-            });
+                    editor.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
+                    (long) editor.max(TimeUnit.NANOSECONDS)
+            );
+            addRowToDataTable(ctx, row);
         }
+
+        // find scanners that never finished their edit phase
+        for (Timer scanner : registry.find("rewrite.recipe.scan").timers()) {
+            String recipeName = requireNonNull(scanner.getId().getTag("name"));
+            if (registry.find("rewrite.recipe.edit").tag("name", recipeName).timer() == null) {
+                Row row = new Row(
+                        recipeName,
+                        Long.valueOf(scanner.count()).intValue(),
+                        sourceFileChanged.size(),
+                        (long) scanner.totalTime(TimeUnit.NANOSECONDS),
+                        scanner.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
+                        (long) scanner.max(TimeUnit.NANOSECONDS),
+                        0L,
+                        0.0,
+                        0L
+                );
+
+                addRowToDataTable(ctx, row);
+            }
+        }
+    }
+
+    private void addRowToDataTable(ExecutionContext ctx, Row row) {
+        //noinspection DuplicatedCode
+        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
+            //noinspection unchecked
+            List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
+            dataTablesOfType.add(row);
+            return allDataTables;
+        });
     }
 
     @Value
@@ -105,28 +130,28 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 description = "The number of source files which were changed in the recipe run. Includes files created, deleted, and edited.")
         Integer sourceFilesChanged;
 
-        @Column(displayName = "Cumulative scanning time",
+        @Column(displayName = "Cumulative scanning time (ns)",
                 description = "The total time spent across the scanning phase of this recipe.")
-        Long scanTotalTime;
+        Long scanTotalTimeNs;
 
-        @Column(displayName = "99th percentile scanning time",
+        @Column(displayName = "99th percentile scanning time (ns)",
                 description = "99 out of 100 scans completed in this amount of time.")
-        Double scanP99;
+        Double scanP99Ns;
 
-        @Column(displayName = "Max scanning time",
+        @Column(displayName = "Max scanning time (ns)",
                 description = "The max time scanning any one source file.")
-        Long scanMax;
+        Long scanMaxNs;
 
-        @Column(displayName = "Cumulative edit time",
+        @Column(displayName = "Cumulative edit time (ns)",
                 description = "The total time spent across the editing phase of this recipe.")
-        Long editTotalTime;
+        Long editTotalTimeNs;
 
-        @Column(displayName = "99th percentile edit time",
+        @Column(displayName = "99th percentile edit time (ns)",
                 description = "99 out of 100 edits completed in this amount of time.")
-        Double editP99;
+        Double editP99Ns;
 
-        @Column(displayName = "Max edit time",
+        @Column(displayName = "Max edit time (ns)",
                 description = "The max time editing any one source file.")
-        Long editMax;
+        Long editMaxNs;
     }
 }

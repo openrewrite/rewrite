@@ -16,7 +16,9 @@
 package org.openrewrite.java.internal.parser;
 
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.*;
 import org.objectweb.asm.util.CheckClassAdapter;
@@ -29,15 +31,19 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.zip.DeflaterOutputStream;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
+import java.util.zip.ZipException;
 
-import static java.util.Objects.requireNonNull;
+import static java.util.Collections.emptyList;
 import static org.objectweb.asm.ClassReader.SKIP_CODE;
+import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
 
@@ -67,9 +73,8 @@ import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
  * There is of course a lot of duplication in the class and GAV columns, but compression cuts down on
  * the disk impact of that and the value is an overall single table representation.
  * <p>
- * To read a compressed type table file (which is compressed with zlib), the following command can be used:
- * <code>printf "\x1f\x8b\x08\x00\x00\x00\x00\x00" |cat - types.tsv.zip |gzip -dc</code>
- * It prepends the gzip magic header onto the zlib data and used gzip to decompress.
+ * To read a compressed type table file (which is compressed with gzip), the following command can be used:
+ * <code>gzcat types.tsv.zip</code>.
  */
 @Incubating(since = "8.44.0")
 @Value
@@ -108,8 +113,21 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     private static void read(URL url, Collection<String> artifactNames, ExecutionContext ctx) {
-        try (InputStream is = url.openStream(); InputStream inflate = new InflaterInputStream(is)) {
-            new Reader(ctx).read(inflate, artifactsNotYetWritten(artifactNames));
+        Collection<String> missingArtifacts = artifactsNotYetWritten(artifactNames);
+        if (missingArtifacts.isEmpty()) {
+            // all artifacts have already been extracted
+            return;
+        }
+
+        try (InputStream is = url.openStream(); InputStream inflate = new GZIPInputStream(is)) {
+            new Reader(ctx).read(inflate, missingArtifacts);
+        } catch (ZipException e) {
+            // Fallback to `InflaterInputStream` for older files created as raw zlib data using DeflaterOutputStream
+            try (InputStream is = url.openStream(); InputStream inflate = new InflaterInputStream(is)) {
+                new Reader(ctx).read(inflate, missingArtifacts);
+            } catch (IOException e1) {
+                throw new UncheckedIOException(e1);
+            }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -118,8 +136,9 @@ public class TypeTable implements JavaParserClasspathLoader {
     private static Collection<String> artifactsNotYetWritten(Collection<String> artifactNames) {
         Collection<String> notWritten = new ArrayList<>(artifactNames);
         for (String artifactName : artifactNames) {
+            Pattern artifactPattern = Pattern.compile(artifactName + ".*");
             for (GroupArtifactVersion groupArtifactVersion : classesDirByArtifact.keySet()) {
-                if (Pattern.compile(artifactName + ".*")
+                if (artifactPattern
                         .matcher(groupArtifactVersion.getArtifactId() + "-" + groupArtifactVersion.getVersion())
                         .matches()) {
                     notWritten.remove(artifactName);
@@ -134,59 +153,87 @@ public class TypeTable implements JavaParserClasspathLoader {
      */
     @RequiredArgsConstructor
     static class Reader {
+        private static final int NESTED_TYPE_ACCESS_MASK = Opcodes.ACC_PUBLIC | Opcodes.ACC_PRIVATE | Opcodes.ACC_PROTECTED |
+                                                           Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_INTERFACE |
+                                                           Opcodes.ACC_ABSTRACT | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_ANNOTATION |
+                                                           Opcodes.ACC_ENUM;
+
         private final ExecutionContext ctx;
-        private @Nullable GroupArtifactVersion gav;
-        private final Map<ClassDefinition, List<Member>> membersByClassName = new HashMap<>();
 
         public void read(InputStream is, Collection<String> artifactNames) throws IOException {
+            if (artifactNames.isEmpty()) {
+                // could be empty due to the filtering in `artifactsNotYetWritten()`
+                return;
+            }
+
             Set<Pattern> artifactNamePatterns = artifactNames.stream()
                     .map(name -> Pattern.compile(name + ".*"))
                     .collect(Collectors.toSet());
 
+            AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
+            Map<String, ClassDefinition> classesByName = new HashMap<>();
+            // nested types appear first in type tables and therefore not stored in a `ClassDefinition` field
+            Map<String, List<ClassDefinition>> nestedTypesByOwner = new HashMap<>();
+
             try (BufferedReader in = new BufferedReader(new InputStreamReader(is))) {
+                AtomicReference<@Nullable GroupArtifactVersion> lastGav = new AtomicReference<>();
                 in.lines().skip(1).forEach(line -> {
                     String[] fields = line.split("\t", -1);
                     GroupArtifactVersion rowGav = new GroupArtifactVersion(fields[0], fields[1], fields[2]);
-                    if (!rowGav.equals(gav)) {
-                        writeClassesDir();
-                    }
 
-                    String artifactVersion = fields[1] + "-" + fields[2];
+                    if (!Objects.equals(rowGav, lastGav.get())) {
+                        writeClassesDir(matchedGav.get(), classesByName, nestedTypesByOwner);
+                        matchedGav.set(null);
+                        classesByName.clear();
+                        nestedTypesByOwner.clear();
 
-                    for (Pattern artifactNamePattern : artifactNamePatterns) {
-                        if (artifactNamePattern.matcher(artifactVersion).matches()) {
-                            gav = rowGav;
-                            break;
+                        String artifactVersion = fields[1] + "-" + fields[2];
+
+                        for (Pattern artifactNamePattern : artifactNamePatterns) {
+                            if (artifactNamePattern.matcher(artifactVersion).matches()) {
+                                matchedGav.set(rowGav);
+                                break;
+                            }
                         }
                     }
+                    lastGav.set(rowGav);
 
-                    if (gav != null) {
-                        ClassDefinition classDefinition = new ClassDefinition(
-                                Integer.parseInt(fields[3]),
-                                fields[4],
-                                fields[5].isEmpty() ? null : fields[5],
-                                fields[6].isEmpty() ? null : fields[6],
-                                fields[7].isEmpty() ? null : fields[7].split("\\|")
-                        );
-                        List<Member> classMembers = membersByClassName.computeIfAbsent(classDefinition, cd -> new ArrayList<>());
+                    if (matchedGav.get() != null) {
+                        String className = fields[4];
+                        ClassDefinition classDefinition = classesByName.computeIfAbsent(className, name ->
+                                new ClassDefinition(
+                                        Integer.parseInt(fields[3]),
+                                        name,
+                                        fields[5].isEmpty() ? null : fields[5],
+                                        fields[6].isEmpty() ? null : fields[6],
+                                        fields[7].isEmpty() ? null : fields[7].split("\\|")
+                                ));
+                        int lastIndexOf$ = className.lastIndexOf('$');
+                        if (lastIndexOf$ != -1) {
+                            String ownerName = className.substring(0, lastIndexOf$);
+                            nestedTypesByOwner.computeIfAbsent(ownerName, k -> new ArrayList<>(4))
+                                    .add(classDefinition);
+                        }
                         int memberAccess = Integer.parseInt(fields[8]);
                         if (memberAccess != -1) {
-                            classMembers.add(new Member(
+                            classDefinition.addMember(new Member(
                                     classDefinition,
                                     memberAccess,
                                     fields[9],
                                     fields[10],
                                     fields[11].isEmpty() ? null : fields[11],
-                                    fields[12].isEmpty() ? null : fields[12].split("\\|")
+                                    fields[12].isEmpty() ? null : fields[12].split("\\|"),
+                                    fields[13].isEmpty() ? null : fields[13].split("\\|")
                             ));
                         }
                     }
                 });
             }
-            writeClassesDir();
+
+            writeClassesDir(matchedGav.get(), classesByName, nestedTypesByOwner);
         }
 
-        private void writeClassesDir() {
+        private void writeClassesDir(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes, Map<String, List<ClassDefinition>> nestedTypesByOwner) {
             if (gav == null) {
                 return;
             }
@@ -194,13 +241,13 @@ public class TypeTable implements JavaParserClasspathLoader {
             Path classesDir = getClassesDir(ctx, gav);
             classesDirByArtifact.put(gav, classesDir);
 
-            membersByClassName.forEach((classDef, members) -> {
+            classes.values().forEach(classDef -> {
                 Path classFile = classesDir.resolve(classDef.getName() + ".class");
-                if (!Files.exists(classFile.getParent()) && !classFile.getParent().toFile().mkdirs()) {
+                if (!classFile.getParent().toFile().mkdirs() && !Files.exists(classFile.getParent())) {
                     throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir.getParent()));
                 }
 
-                ClassWriter cw = new ClassWriter(0);
+                ClassWriter cw = new ClassWriter(COMPUTE_MAXS);
                 ClassVisitor classWriter = ctx.getMessage(VERIFY_CLASS_WRITING, false) ?
                         new CheckClassAdapter(cw) : cw;
 
@@ -213,34 +260,33 @@ public class TypeTable implements JavaParserClasspathLoader {
                         classDef.getSuperinterfaceSignatures()
                 );
 
-                Set<ClassDefinition> innerClasses = new HashSet<>();
-                for (ClassDefinition innerClassDef : membersByClassName.keySet()) {
-                    if (innerClassDef.getName().contains("$")) {
-                        innerClasses.add(innerClassDef);
-                    }
-                }
-
-                for (ClassDefinition innerClass : innerClasses) {
-                    int lastIndexOf$ = innerClass.getName().lastIndexOf('$');
+                for (ClassDefinition innerClassDef : nestedTypesByOwner.getOrDefault(classDef.getName(), emptyList())) {
                     classWriter.visitInnerClass(
-                            innerClass.getName(),
-                            innerClass.getName().substring(0, lastIndexOf$),
-                            innerClass.getName().substring(lastIndexOf$ + 1),
-                            innerClass.getAccess() & 30239
+                            innerClassDef.getName(),
+                            classDef.getName(),
+                            innerClassDef.getName().substring(classDef.getName().length() + 1),
+                            innerClassDef.getAccess() & NESTED_TYPE_ACCESS_MASK
                     );
                 }
 
-                for (Member member : members) {
+                for (Member member : classDef.getMembers()) {
                     if (member.getDescriptor().contains("(")) {
-                        classWriter
+                        MethodVisitor mv = classWriter
                                 .visitMethod(
                                         member.getAccess(),
                                         member.getName(),
                                         member.getDescriptor(),
                                         member.getSignature(),
                                         member.getExceptions()
-                                )
-                                .visitEnd();
+                                );
+                        String[] parameterNames = member.getParameterNames();
+                        if (parameterNames != null) {
+                            for (String parameterName : parameterNames) {
+                                mv.visitParameter(parameterName, 0);
+                            }
+                        }
+                        writeMethodBody(member, mv);
+                        mv.visitEnd();
                     } else {
                         classWriter
                                 .visitField(
@@ -260,15 +306,67 @@ public class TypeTable implements JavaParserClasspathLoader {
                     throw new UncheckedIOException(e);
                 }
             });
+        }
 
-            gav = null;
+        private void writeMethodBody(Member member, MethodVisitor mv) {
+            if ((member.getAccess() & Opcodes.ACC_ABSTRACT) == 0) {
+                mv.visitCode();
+
+                if ("<init>".equals(member.getName())) {
+                    // constructors: the called super constructor doesn't need to exist; we only need to pass JVM class verification
+                    mv.visitVarInsn(Opcodes.ALOAD, 0);
+                    mv.visitMethodInsn(Opcodes.INVOKESPECIAL, member.getClassDefinition().getSuperclassSignature(), "<init>", "()V", false);
+                }
+
+                Type returnType = Type.getReturnType(member.getDescriptor());
+
+                switch (returnType.getSort()) {
+                    case Type.VOID:
+                        mv.visitInsn(Opcodes.RETURN);
+                        break;
+
+                    case Type.BOOLEAN:
+                    case Type.BYTE:
+                    case Type.CHAR:
+                    case Type.SHORT:
+                    case Type.INT:
+                        mv.visitInsn(Opcodes.ICONST_0); // Push default value (0)
+                        mv.visitInsn(Opcodes.IRETURN);  // Return integer-compatible value
+                        break;
+
+                    case Type.LONG:
+                        mv.visitInsn(Opcodes.LCONST_0); // Push default value (0L)
+                        mv.visitInsn(Opcodes.LRETURN);
+                        break;
+
+                    case Type.FLOAT:
+                        mv.visitInsn(Opcodes.FCONST_0); // Push default value (0.0f)
+                        mv.visitInsn(Opcodes.FRETURN);
+                        break;
+
+                    case Type.DOUBLE:
+                        mv.visitInsn(Opcodes.DCONST_0); // Push default value (0.0d)
+                        mv.visitInsn(Opcodes.DRETURN);
+                        break;
+
+                    case Type.OBJECT:
+                    case Type.ARRAY:
+                        mv.visitInsn(Opcodes.ACONST_NULL); // Push default value (null)
+                        mv.visitInsn(Opcodes.ARETURN);
+                        break;
+
+                    default:
+                        throw new IllegalArgumentException("Unknown return type: " + returnType);
+                }
+                mv.visitMaxs(0, 0);
+            }
         }
     }
 
     private static Path getClassesDir(ExecutionContext ctx, GroupArtifactVersion gav) {
         Path jarsFolder = JavaParserExecutionContextView.view(ctx)
                 .getParserClasspathDownloadTarget().toPath().resolve(".tt");
-        if (!Files.exists(jarsFolder) && !jarsFolder.toFile().mkdirs()) {
+        if (!jarsFolder.toFile().mkdirs() && !Files.exists(jarsFolder)) {
             throw new UncheckedIOException(new IOException("Failed to create directory " + jarsFolder));
         }
 
@@ -278,7 +376,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
         classesDir = classesDir.resolve(gav.getArtifactId()).resolve(gav.getVersion());
 
-        if (!Files.exists(classesDir) && !classesDir.toFile().mkdirs()) {
+        if (!classesDir.toFile().mkdirs() && !Files.exists(classesDir)) {
             throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir));
         }
 
@@ -286,7 +384,11 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     public static Writer newWriter(OutputStream out) {
-        return new Writer(out);
+        try {
+            return new Writer(out);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override
@@ -304,10 +406,10 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     public static class Writer implements AutoCloseable {
         private final PrintStream out;
-        private final DeflaterOutputStream deflater;
+        private final GZIPOutputStream deflater;
 
-        public Writer(OutputStream out) {
-            this.deflater = new DeflaterOutputStream(out);
+        public Writer(OutputStream out) throws IOException {
+            this.deflater = new GZIPOutputStream(out);
             this.out = new PrintStream(deflater);
             this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions");
         }
@@ -338,32 +440,60 @@ public class TypeTable implements JavaParserClasspathLoader {
                                 new ClassReader(inputStream).accept(new ClassVisitor(Opcodes.ASM9) {
                                     @Nullable
                                     ClassDefinition classDefinition;
+
                                     boolean wroteFieldOrMethod;
+                                    final List<String> collectedParameterNames = new ArrayList<>();
 
                                     @Override
                                     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-                                        classDefinition = new ClassDefinition(Jar.this, access, name, signature, superName, interfaces);
-                                        wroteFieldOrMethod = false;
-                                        super.visit(version, access, name, signature, superName, interfaces);
-                                        if (!wroteFieldOrMethod && !"module-info".equals(name)) {
-                                            // No fields or methods, which can happen for marker annotations for example
-                                            classDefinition.writeClass();
+                                        int lastIndexOf$ = name.lastIndexOf('$');
+                                        if (lastIndexOf$ != -1 && lastIndexOf$ < name.length() - 1 && !Character.isJavaIdentifierStart(name.charAt(lastIndexOf$ + 1))) {
+                                            // skip anonymous subclasses
+                                            classDefinition = null;
+                                        } else {
+                                            classDefinition = new ClassDefinition(Jar.this, access, name, signature, superName, interfaces);
+                                            wroteFieldOrMethod = false;
+                                            super.visit(version, access, name, signature, superName, interfaces);
+                                            if (!wroteFieldOrMethod && !"module-info".equals(name)) {
+                                                // No fields or methods, which can happen for marker annotations for example
+                                                classDefinition.writeClass();
+                                            }
                                         }
                                     }
 
                                     @Override
-                                    public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
-                                        wroteFieldOrMethod |= requireNonNull(classDefinition)
-                                                .writeField(access, name, descriptor, signature);
-                                        return super.visitField(access, name, descriptor, signature, value);
+                                    public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
+                                        if (classDefinition != null) {
+                                            wroteFieldOrMethod |= classDefinition
+                                                    .writeField(access, name, descriptor, signature);
+                                        }
+
+                                        return null;
                                     }
 
                                     @Override
-                                    public MethodVisitor visitMethod(int access, String name, String descriptor,
-                                                                     String signature, String[] exceptions) {
-                                        wroteFieldOrMethod |= requireNonNull(classDefinition)
-                                                .writeMethod(access, name, descriptor, signature, null, exceptions);
-                                        return super.visitMethod(access, name, descriptor, signature, exceptions);
+                                    public @Nullable MethodVisitor visitMethod(int access, @Nullable String name, String descriptor,
+                                                                               String signature, String[] exceptions) {
+                                        // Repeating check from `writeMethod()` for performance reasons
+                                        if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
+                                            name != null && !"<clinit>".equals(name)) {
+                                            return new MethodVisitor(Opcodes.ASM9) {
+                                                @Override
+                                                public void visitParameter(@Nullable String name, int access) {
+                                                    if (name != null) {
+                                                        collectedParameterNames.add(name);
+                                                    }
+                                                }
+
+                                                @Override
+                                                public void visitEnd() {
+                                                    wroteFieldOrMethod |= classDefinition
+                                                            .writeMethod(access, name, descriptor, signature, collectedParameterNames.isEmpty() ? null : collectedParameterNames, exceptions);
+                                                    collectedParameterNames.clear();
+                                                }
+                                            };
+                                        }
+                                        return null;
                                     }
                                 }, SKIP_CODE);
                             }
@@ -396,15 +526,15 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classSignature == null ? "" : classSignature,
                             classSuperclassName,
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
-                            -1, null, null, null, null, null);
+                            -1, "", "", "", "", "");
                 }
             }
 
-            public boolean writeMethod(int access, String name, String descriptor,
+            public boolean writeMethod(int access, @Nullable String name, String descriptor,
                                        @Nullable String signature,
-                                       String @Nullable [] parameterNames,
+                                       @Nullable List<String> parameterNames,
                                        String @Nullable [] exceptions) {
-                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
+                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 && name != null && !name.equals("<clinit>")) {
                     out.printf(
                             "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
@@ -437,6 +567,7 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     @Value
+    @RequiredArgsConstructor
     private static class ClassDefinition {
         int access;
         String name;
@@ -448,6 +579,22 @@ public class TypeTable implements JavaParserClasspathLoader {
         String superclassSignature;
 
         String @Nullable [] superinterfaceSignatures;
+
+        @NonFinal
+        @Nullable
+        @ToString.Exclude
+        List<Member> members;
+
+        public List<Member> getMembers() {
+            return members != null ? members : emptyList();
+        }
+
+        public void addMember(Member member) {
+            if (members == null) {
+                members = new ArrayList<>();
+            }
+            members.add(member);
+        }
     }
 
     @Value
@@ -460,6 +607,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         @Nullable
         String signature;
 
+        String @Nullable [] parameterNames;
         String @Nullable [] exceptions;
     }
 }

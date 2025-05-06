@@ -44,6 +44,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterGenericPattern(TemplateParameterParser.GenericPatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitGenericPattern(TemplateParameterParser.GenericPatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterTypedPattern(TemplateParameterParser.TypedPatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -104,6 +116,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterTypeArray(TemplateParameterParser.TypeArrayContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTypeArray(TemplateParameterParser.TypeArrayContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterParameterName(TemplateParameterParser.ParameterNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -111,6 +135,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitParameterName(TemplateParameterParser.ParameterNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterGenericName(TemplateParameterParser.GenericNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitGenericName(TemplateParameterParser.GenericNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

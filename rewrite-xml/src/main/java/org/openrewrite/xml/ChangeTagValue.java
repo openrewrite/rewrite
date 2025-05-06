@@ -127,7 +127,7 @@ public class ChangeTagValue extends Recipe {
                 if (oldMarkers
                         .findAll(AlreadyReplaced.class)
                         .stream()
-                        .noneMatch(m -> m.getFind().equals(oldValue) && newValue.equals(m.getReplace()))) {
+                        .noneMatch(m -> oldValue.equals(m.getFind()) && newValue.equals(m.getReplace()))) {
                     return t.withContent(singletonList(content
                             .withText(text.replaceAll(oldValue, newValue))
                             .withMarkers(oldMarkers.add(new AlreadyReplaced(randomId(), oldValue, newValue)))));

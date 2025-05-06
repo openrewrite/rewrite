@@ -214,7 +214,8 @@ class FindDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-            ,sourceSpecs -> sourceSpecs.path("pom.xml")),
+            ,
+                sourceSpecs -> sourceSpecs.path("pom.xml")),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -248,7 +249,58 @@ class FindDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          ,sourceSpecs -> sourceSpecs.path("sample-module/pom.xml"))
+          ,
+                sourceSpecs -> sourceSpecs.path("sample-module/pom.xml"))
+        );
+    }
+
+    @Test
+    void withProperties() {
+        rewriteRun(spec -> spec.recipe(new FindDependency("jakarta.activation", "jakarta.activation-api", "2.1.2", null)),
+          pomXml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <groupId>jakarta.activation</groupId>
+                  <artifactId>jakarta.activation-api</artifactId>
+                  <version>2.1.2</version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>${groupId}</groupId>
+                    <artifactId>${artifactId}</artifactId>
+                    <version>${version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <groupId>jakarta.activation</groupId>
+                  <artifactId>jakarta.activation-api</artifactId>
+                  <version>2.1.2</version>
+                </properties>
+                <dependencies>
+                  <!--~~>--><dependency>
+                    <groupId>${groupId}</groupId>
+                    <artifactId>${artifactId}</artifactId>
+                    <version>${version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
         );
     }
 }

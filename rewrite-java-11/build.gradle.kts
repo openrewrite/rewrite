@@ -21,6 +21,16 @@ dependencies {
     "javaTck"(project(":rewrite-java-tck"))
 }
 
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "org.assertj" && requested.name == "assertj-core") {
+                useVersion("3.+") // Pin to latest 3.+ version as AssertJ 4 requires Java 17
+            }
+        }
+    }
+}
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(11))
@@ -72,9 +82,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        useJUnitPlatform {
-                            excludeTags("java17", "java21")
-                        }
+                        useJUnitPlatform()
                         testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)

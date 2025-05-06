@@ -293,7 +293,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 .orElse(getResolutionResult().getPom().getGroupId()));
         String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
         String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
-        String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse(null));
+        String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse("jar"));
         if (groupId != null && artifactId != null) {
             return findManagedDependency(groupId, artifactId, classifier, type);
         }
@@ -305,15 +305,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier) {
-        return findManagedDependency(groupId, artifactId, classifier, null);
+        return findManagedDependency(groupId, artifactId, classifier, "jar");
     }
 
-    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
+    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, String type) {
         for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
             if (groupId.equals(d.getGroupId()) &&
                 artifactId.equals(d.getArtifactId()) &&
-                (classifier == null || classifier.equals(d.getClassifier())) &&
-                (type == null || type.equals(d.getType()))) {
+                Objects.equals(classifier, d.getClassifier()) &&
+                Objects.equals(type, d.getType())) {
                 return d;
             }
         }
@@ -389,6 +389,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getRepositories());
     }
 
+    public MavenMetadata downloadPluginMetadata(String groupId, String artifactId, ExecutionContext ctx) throws MavenDownloadingException {
+        return downloadPluginMetadata(groupId, artifactId, null, ctx);
+    }
+
+    public MavenMetadata downloadPluginMetadata(String groupId, String artifactId, @Nullable ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
+        return new MavenPomDownloader(emptyMap(), ctx, getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles())
+                .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getPluginRepositories());
+    }
+
     /**
      * Does the current tag can contain groupId, artifactId and version?
      */
@@ -406,12 +415,16 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     private static @Nullable Plugin findPlugin(Xml.Tag tag, List<Plugin> plugins) {
+        String tagGroupId = tag.getChildValue("groupId").orElse(PLUGIN_DEFAULT_GROUPID);
+        String tagArtifactId = tag.getChildValue("artifactId").orElse(null);
+        String tagVersion = tag.getChildValue("version").orElse(null);
         for (Plugin resolvedPlugin : plugins) {
-            String reqGroup = resolvedPlugin.getGroupId();
-            String reqVersion = resolvedPlugin.getVersion();
-            if (reqGroup.equals(tag.getChildValue("groupId").orElse(PLUGIN_DEFAULT_GROUPID)) &&
-                resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
+            String resGroup = resolvedPlugin.getGroupId();
+            String resArtifactId = resolvedPlugin.getArtifactId();
+            String resVersion = resolvedPlugin.getVersion();
+            if (resGroup.equals(tagGroupId) &&
+                resArtifactId.equals(tagArtifactId) &&
+                (resVersion == null || tagVersion == null || resVersion.equals(tagVersion))) {
                 return resolvedPlugin;
             }
         }

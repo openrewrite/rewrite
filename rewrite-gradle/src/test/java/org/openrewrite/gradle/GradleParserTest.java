@@ -20,8 +20,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
 
 class GradleParserTest implements RewriteTest {
 
@@ -183,6 +182,81 @@ class GradleParserTest implements RewriteTest {
               
               dependencies {
                   testImplementation "junit:junit:4.13"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependencyNotations() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+              
+                  // String notation
+                  implementation "org.openrewrite:rewrite-java:latest.release"
+                  implementation ("org.openrewrite:rewrite-java:latest.release")
+                  implementation ("org.openrewrite:rewrite-java:latest.release") { transitive = false }
+                  implementation ("org.openrewrite:rewrite-java:latest.release") {
+                      transitive = false
+                  }
+                  implementation ( "org.openrewrite:rewrite-java:latest.release" )
+                  implementation ( "org.openrewrite:rewrite-java:latest.release" ) { transitive = false }
+                  implementation ( "org.openrewrite:rewrite-java:latest.release" ) {
+                      transitive = false
+                  }
+              
+                  // Map notation
+                  implementation group: "org.openrewrite", name: "rewrite-java", version: "latest.release"
+                  implementation(group: "org.openrewrite", name: "rewrite-java", version: "latest.release")
+                  implementation(group: "org.openrewrite", name: "rewrite-java", version: "latest.release") { transitive = false }
+                  implementation(group: "org.openrewrite", name: "rewrite-java", version: "latest.release") {
+                      transitive = false
+                  }
+                  implementation( group: "org.openrewrite", name: "rewrite-java", version: "latest.release" )
+                  implementation( group: "org.openrewrite", name: "rewrite-java", version: "latest.release" ) { transitive = false }
+                  implementation( group: "org.openrewrite", name: "rewrite-java", version: "latest.release" ) {
+                      transitive = false
+                  }
+                  
+                  // Map literal notation
+                  implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"])
+                  implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"]) { transitive = false }
+                  implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"]) {
+                      transitive = false
+                  }
+                  implementation( [group: "org.openrewrite", name: "rewrite-java", version: "latest.release"] )
+                  implementation( [group: "org.openrewrite", name: "rewrite-java", version: "latest.release"] ) { transitive = false }
+                  implementation( [group: "org.openrewrite", name: "rewrite-java", version: "latest.release"] ) {
+                      transitive = false
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDsl() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
               }
               """
           )

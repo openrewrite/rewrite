@@ -22,13 +22,17 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.StringJoiner;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -60,12 +64,14 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class MethodMatcher {
     //language=markdown
-    public static final String METHOD_PATTERN_DESCRIPTION = "To find all method invocations in the Guava library, use the pattern " +
-                                                             "`com.google.common..*#*(..)`. The pattern format is `<PACKAGE>#<METHOD_NAME>(<ARGS>)`. " +
-                                                             "`..*` includes all subpackages of `com.google.common`. " +
-                                                             "`*(..)` matches any method name with any number of arguments. " +
-                                                             "For more specific queries, like Guava's `ImmutableMap`, use " +
-                                                             "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
+    public static final String METHOD_PATTERN_DESCRIPTION = "A [method pattern](https://docs.openrewrite.org/reference/method-patterns) is used to find matching method invocations. " +
+                                                            "For example, to find all method invocations in the Guava library, use the pattern: " +
+                                                            "`com.google.common..*#*(..)`.<br/><br/>" +
+                                                            "The pattern format is `<PACKAGE>#<METHOD_NAME>(<ARGS>)`. <br/><br/>" +
+                                                            "`..*` includes all subpackages of `com.google.common`. <br/>" +
+                                                            "`*(..)` matches any method name with any number of arguments. <br/><br/>" +
+                                                            "For more specific queries, like Guava's `ImmutableMap`, use " +
+                                                            "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
 
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
     private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
@@ -95,15 +101,15 @@ public class MethodMatcher {
     @Getter
     private final boolean matchOverrides;
 
-    public MethodMatcher(String signature, @Nullable Boolean matchOverrides) {
-        this(signature, Boolean.TRUE.equals(matchOverrides));
+    public MethodMatcher(String methodPattern, @Nullable Boolean matchOverrides) {
+        this(methodPattern, Boolean.TRUE.equals(matchOverrides));
     }
 
-    public MethodMatcher(String signature, boolean matchOverrides) {
+    public MethodMatcher(String methodPattern, boolean matchOverrides) {
         this.matchOverrides = matchOverrides;
 
         MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
-                CharStreams.fromString(signature))));
+                CharStreams.fromString(methodPattern))));
 
         new MethodSignatureParserBaseVisitor<Void>() {
 
@@ -118,7 +124,9 @@ public class MethodMatcher {
                     targetTypePattern = Pattern.compile(StringUtils.aspectjNameToPattern(pattern));
                 }
 
-                if (isPlainIdentifier(ctx.simpleNamePattern())) {
+                if (ctx.simpleNamePattern().CONSTRUCTOR() != null) {
+                    methodName = "<constructor>";
+                } else if (isPlainIdentifier(ctx.simpleNamePattern())) {
                     StringBuilder builder = new StringBuilder();
                     for (ParseTree child : ctx.simpleNamePattern().children) {
                         builder.append(child.getText());
@@ -145,6 +153,25 @@ public class MethodMatcher {
         }.visit(parser.methodPattern());
     }
 
+    public static Validated<String> validate(@Nullable String signature) {
+        return Validated.test(
+                "methodPattern",
+                "Tried to construct a method matcher with an invalid method pattern. " +
+                "An example of a good method pattern is `java.util.List add(..)`.",
+                signature,
+                s -> {
+                    if (signature == null) {
+                        return true;
+                    }
+                    try {
+                        new MethodMatcher(s, null);
+                        return true;
+                    } catch (Throwable t) {
+                        return false;
+                    }
+                });
+    }
+
     private static boolean matchAllArguments(MethodSignatureParser.FormalsPatternContext context) {
         return context.dotDot() != null && context.formalsPatternAfterDotDot().isEmpty();
     }
@@ -165,8 +192,8 @@ public class MethodMatcher {
         this(methodPattern(method), matchOverrides);
     }
 
-    public MethodMatcher(String signature) {
-        this(signature, false);
+    public MethodMatcher(String methodPattern) {
+        this(methodPattern, false);
     }
 
     public MethodMatcher(J.MethodDeclaration method) {

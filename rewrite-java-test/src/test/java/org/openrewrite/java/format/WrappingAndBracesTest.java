@@ -44,6 +44,31 @@ class WrappingAndBracesTest implements RewriteTest {
           new WrappingAndBracesStyle.IfStatement(false)))));
     }
 
+    @DocumentExample
+    @SuppressWarnings({"ClassInitializerMayBeStatic", "ReassignedVariable", "UnusedAssignment"})
+    @Test
+    void blockLevelStatements() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                  {        int n = 0;
+                      n++;
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  {
+                      int n = 0;
+                      n++;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> wrappingAndBraces(UnaryOperator<SpacesStyle> spaces,
                                                           UnaryOperator<WrappingAndBracesStyle> wrapping) {
         return spec -> spec
@@ -89,31 +114,6 @@ class WrappingAndBracesTest implements RewriteTest {
                       }
                       if (1 == 3) {
                       }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @SuppressWarnings({"ClassInitializerMayBeStatic", "ReassignedVariable", "UnusedAssignment"})
-    @Test
-    void blockLevelStatements() {
-        rewriteRun(
-          java(
-            """
-              public class Test {
-                  {        int n = 0;
-                      n++;
-                  }
-              }
-              """,
-            """
-              public class Test {
-                  {
-                      int n = 0;
-                      n++;
                   }
               }
               """

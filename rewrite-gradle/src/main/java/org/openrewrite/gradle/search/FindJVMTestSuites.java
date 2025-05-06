@@ -19,8 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.table.JVMTestSuitesDefined;
-import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -61,7 +62,7 @@ public class FindJVMTestSuites extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         boolean requireDependencies = definesDependencies != null && definesDependencies;
         boolean tableAvailable = this.insertRows == null || this.insertRows;
-        return new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             private boolean isJVMTestSuitesBlock() {
                 Cursor parent = getCursor().getParent();
                 if (parent != null) {
@@ -101,7 +102,7 @@ public class FindJVMTestSuites extends Recipe {
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
-        };
+        });
     }
 
     public static Set<String> jvmTestSuiteNames(Tree tree, boolean definesDependencies) {

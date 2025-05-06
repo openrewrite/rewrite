@@ -229,6 +229,18 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4116")
+    @Test
+    void closureWithGString() {
+        rewriteRun(
+          groovy(
+            """
+            { x -> "${x.y}" }
+            """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4766")
     @Test
     void gradleFileWithMultipleClosuresWithoutParentheses() {

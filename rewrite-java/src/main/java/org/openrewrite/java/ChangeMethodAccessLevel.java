@@ -60,8 +60,10 @@ public class ChangeMethodAccessLevel extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        return super.validate().and(Validated.test("newAccessLevel", "Must be one of 'private', 'protected', 'package', 'public'",
-                newAccessLevel, level -> "private".equals(level) || "protected".equals(level) || "package".equals(level) || "public".equals(level)));
+        return super.validate()
+                .and(Validated.test("newAccessLevel", "Must be one of 'private', 'protected', 'package', 'public'",
+                        newAccessLevel, level -> "private".equals(level) || "protected".equals(level) || "package".equals(level) || "public".equals(level)))
+                .and(MethodMatcher.validate(methodPattern));
     }
 
     @Override

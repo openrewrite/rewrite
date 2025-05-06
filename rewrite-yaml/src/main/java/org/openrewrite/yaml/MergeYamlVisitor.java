@@ -36,9 +36,8 @@ import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.*;
-import static org.openrewrite.yaml.MergeYaml.InsertMode;
+import static org.openrewrite.yaml.MergeYaml.*;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
-import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
 /**
  * Visitor class to merge two yaml files.
@@ -87,30 +86,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     public MergeYamlVisitor(Yaml.Block block, Yaml incoming, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, boolean shouldAutoFormat, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
         this(block, incoming, acceptTheirs, objectIdentifyingProperty, insertMode, insertProperty);
         this.shouldAutoFormat = shouldAutoFormat;
-    }
-
-    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
-        this(scope,
-                new YamlParser().parse(yamlString)
-                        .findFirst()
-                        .map(Yaml.Documents.class::cast)
-                        .map(docs -> {
-                            // Any comments will have been put on the parent Yaml.Document node, preserve by copying to the mapping
-                            Yaml.Document doc = docs.getDocuments().get(0);
-                            if (doc.getBlock() instanceof Yaml.Mapping) {
-                                Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
-                                return m.withEntries(mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                            } else if (doc.getBlock() instanceof Yaml.Sequence) {
-                                Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
-                                return s.withEntries(mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                            }
-                            return doc.getBlock().withPrefix(doc.getPrefix());
-                        })
-                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML")),
-                acceptTheirs,
-                objectIdentifyingProperty,
-                insertMode,
-                insertProperty);
     }
 
     @Override
@@ -308,7 +283,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
 
-            List<Yaml.Sequence.Entry> newEntries = map(incomingEntries, it -> autoFormat(it, p, cursor));
+            String existingEntryPrefix = s1.getEntries().get(0).getPrefix();
+            String currentIndent = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
+            List<Yaml.Sequence.Entry> newEntries = ListUtils.map(incomingEntries, it -> it.withPrefix(currentIndent));
             List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> ((Yaml.Scalar) it.getBlock()).getValue()).ls;
 
             return s1.withEntries(mutatedEntries);

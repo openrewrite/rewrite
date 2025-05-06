@@ -54,6 +54,11 @@ public class UseStaticImport extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> preconditions = new UsesMethod<>(methodPattern);
         if (!methodPattern.contains(" *(")) {

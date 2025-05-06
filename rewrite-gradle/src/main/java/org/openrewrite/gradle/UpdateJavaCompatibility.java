@@ -101,10 +101,10 @@ public class UpdateJavaCompatibility extends Recipe {
             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
                 G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
                 if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
-                    c = addCompatibilityTypeToSourceFile(c, "source");
+                    c = addCompatibilityTypeToSourceFile(c, "source", ctx);
                 }
                 if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
-                    c = addCompatibilityTypeToSourceFile(c, "target");
+                    c = addCompatibilityTypeToSourceFile(c, "target", ctx);
                 }
                 return c;
             }
@@ -132,7 +132,10 @@ public class UpdateJavaCompatibility extends Recipe {
                 } else if (a.getVariable() instanceof J.FieldAccess) {
                     J.FieldAccess fieldAccess = (J.FieldAccess) a.getVariable();
                     if (compatibilityType == null) {
-                        if (!("sourceCompatibility".equals(fieldAccess.getSimpleName()) || "targetCompatibility".equals(fieldAccess.getSimpleName()))) {
+                        if (!("sourceCompatibility".equals(fieldAccess.getSimpleName()) || "targetCompatibility".equals(fieldAccess.getSimpleName()) ||
+                                ("release".equals(fieldAccess.getSimpleName()) &&
+                                        ((fieldAccess.getTarget() instanceof J.Identifier && "options".equals(((J.Identifier) fieldAccess.getTarget()).getSimpleName()))
+                                                || (fieldAccess.getTarget() instanceof J.FieldAccess && "options".equals(((J.FieldAccess) fieldAccess.getTarget()).getSimpleName())))))) {
                             return a;
                         }
                     } else if (!(compatibilityType.toString().toLowerCase() + "Compatibility").equals(fieldAccess.getSimpleName())) {
@@ -202,6 +205,7 @@ public class UpdateJavaCompatibility extends Recipe {
                         int currentMajor = getMajorVersion(m.getArguments().get(0));
                         if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
                             DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
+                            //noinspection DataFlowIssue
                             return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeExpression(arg, actualStyle)));
                         } else {
                             return m;
@@ -216,7 +220,7 @@ public class UpdateJavaCompatibility extends Recipe {
             }
 
             private int getMajorVersion(@Nullable String version) {
-                if(version == null) {
+                if (version == null) {
                     return -1;
                 }
                 try {
@@ -383,9 +387,9 @@ public class UpdateJavaCompatibility extends Recipe {
         });
     }
 
-    private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String compatibilityType) {
+    private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
         if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
-            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse("\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
+            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse(ctx, "\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
             sourceFile.getStatements();

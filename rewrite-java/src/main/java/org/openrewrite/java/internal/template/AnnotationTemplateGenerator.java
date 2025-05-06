@@ -75,6 +75,16 @@ public class AnnotationTemplateGenerator {
 
                     J j = cursor.getValue();
                     J annotationParent = j instanceof J.Annotation && cursor.getParent() != null ? cursor.getParent().firstEnclosing(J.class) : null;
+
+                    int level = 1;
+                    while (annotationParent instanceof J.NewArray || annotationParent instanceof J.Annotation) {
+                        level += 1;
+                        if (cursor.getParent(level) == null) {
+                            break;
+                        }
+                        annotationParent = cursor.getParent(level).firstEnclosing(J.class);
+                    }
+
                     if (j instanceof J.MethodDeclaration || annotationParent instanceof J.MethodDeclaration) {
                         after.insert(0, " void $method() {}");
                     } else if (j instanceof J.VariableDeclarations || annotationParent instanceof J.VariableDeclarations) {

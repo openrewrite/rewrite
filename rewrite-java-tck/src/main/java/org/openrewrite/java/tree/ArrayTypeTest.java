@@ -39,45 +39,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class ArrayTypeTest implements RewriteTest {
 
-    @ParameterizedTest
-    @ValueSource(strings = {
-      "String [] [ ] s;",
-      """
-        String [] [ ] method() {
-            return null;
-        }
-        """
-    })
-    void arrayType(String input) {
-        rewriteRun(
-          java(
-            String.format("""
-              class Test {
-                %s
-              }
-              """, input), spec -> spec.afterRecipe(cu -> {
-                AtomicBoolean firstDimension = new AtomicBoolean(false);
-                AtomicBoolean secondDimension = new AtomicBoolean(false);
-                new JavaIsoVisitor<>() {
-                    @Override
-                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
-                        if (arrayType.getElementType() instanceof J.ArrayType) {
-                            assertThat(arrayType.toString()).isEqualTo("String [] [ ]");
-                            secondDimension.set(true);
-                        } else {
-                            assertThat(arrayType.toString()).isEqualTo("String [ ]");
-                            firstDimension.set(true);
-                        }
-                        return super.visitArrayType(arrayType, o);
-                    }
-                }.visit(cu, 0);
-                assertThat(firstDimension.get()).isTrue();
-                assertThat(secondDimension.get()).isTrue();
-            })
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void javaTypesFromJsonCreatorConstructor() {
@@ -136,6 +97,45 @@ class ArrayTypeTest implements RewriteTest {
                     return super.visitArrayType(arrayType, p);
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "String [] [ ] s;",
+      """
+        String [] [ ] method() {
+            return null;
+        }
+        """
+    })
+    void arrayType(String input) {
+        rewriteRun(
+          java(
+            String.format("""
+              class Test {
+                %s
+              }
+              """, input), spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean firstDimension = new AtomicBoolean(false);
+                AtomicBoolean secondDimension = new AtomicBoolean(false);
+                new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                        if (arrayType.getElementType() instanceof J.ArrayType) {
+                            assertThat(arrayType.toString()).isEqualTo("String [] [ ]");
+                            secondDimension.set(true);
+                        } else {
+                            assertThat(arrayType.toString()).isEqualTo("String [ ]");
+                            firstDimension.set(true);
+                        }
+                        return super.visitArrayType(arrayType, o);
+                    }
+                }.visit(cu, 0);
+                assertThat(firstDimension.get()).isTrue();
+                assertThat(secondDimension.get()).isTrue();
+            })
           )
         );
     }

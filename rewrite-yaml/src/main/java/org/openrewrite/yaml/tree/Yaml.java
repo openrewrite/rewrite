@@ -244,22 +244,6 @@ public interface Yaml extends Tree {
             PLAIN
         }
 
-        @Deprecated
-        public Scalar(UUID id, String prefix, Markers markers, Style style, @Nullable Anchor anchor, String value) {
-            this(id, prefix, markers, style, anchor, null, value);
-        }
-
-        @JsonCreator
-        public Scalar(UUID id, String prefix, Markers markers, Style style, @Nullable Anchor anchor, @Nullable Tag tag, String value) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.style = style;
-            this.anchor = anchor;
-            this.tag = tag;
-            this.value = value;
-        }
-
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitScalar(this, p);
@@ -299,11 +283,6 @@ public interface Yaml extends Tree {
 
         @Nullable
         Tag tag;
-
-        @Deprecated
-        public Mapping(UUID id, Markers markers, @Nullable String openingBracePrefix, List<Entry> entries, @Nullable String closingBracePrefix, @Nullable Anchor anchor) {
-            this(id, markers, openingBracePrefix, entries, closingBracePrefix, anchor, null);
-        }
 
         @JsonCreator
         public Mapping(UUID id, Markers markers, @Nullable String openingBracePrefix, List<Entry> entries, @Nullable String closingBracePrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
@@ -403,11 +382,6 @@ public interface Yaml extends Tree {
 
         @Nullable
         Tag tag;
-
-        @Deprecated
-        public Sequence(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor) {
-            this(id, markers, openingBracketPrefix, entries, closingBracketPrefix, anchor, null);
-        }
 
         @JsonCreator
         public Sequence(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor, @Nullable Tag tag) {

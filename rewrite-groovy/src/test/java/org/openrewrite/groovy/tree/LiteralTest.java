@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -196,7 +197,8 @@ class LiteralTest implements RewriteTest {
           groovy(
                 """
             "$System.env.BAR_BAZ"
-            """)
+            """
+          )
         );
     }
 
@@ -206,7 +208,8 @@ class LiteralTest implements RewriteTest {
           groovy(
                 """
             "${}"
-            """)
+            """
+          )
         );
     }
 
@@ -216,7 +219,8 @@ class LiteralTest implements RewriteTest {
           groovy(
                 """
             " ${ " ${ " " } " } "
-            """)
+            """
+          )
         );
     }
 
@@ -226,7 +230,8 @@ class LiteralTest implements RewriteTest {
           groovy(
                 """
             " ${""}\\n${" "} "
-            """)
+            """
+          )
         );
     }
 
@@ -400,6 +405,20 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               from(":-)").via(''':-|(''').via(":-)").to(':-(')
+              """
+          )
+        );
+    }
+
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5232")
+    void stringWithMultipleBackslashes() {
+        rewriteRun(
+          groovy(
+            """
+              "".replaceAll('\\\\', '/')
+              "a\\b".replaceAll('\\\\', '/')
               """
           )
         );

@@ -17,6 +17,7 @@ package org.openrewrite.scheduling;
 
 import lombok.Getter;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.LargeSourceSet;
 import org.openrewrite.Recipe;
@@ -32,6 +33,8 @@ import static org.openrewrite.Recipe.PANIC;
 
 class RecipeStack {
     private final Map<Recipe, List<Recipe>> recipeLists = new IdentityHashMap<>();
+
+    @SuppressWarnings("NotNullFieldNotInitialized")
     private Stack<Stack<Recipe>> allRecipesStack;
 
     /**
@@ -41,8 +44,8 @@ class RecipeStack {
     @Getter
     int recipePosition;
 
-    public <T> T reduce(LargeSourceSet sourceSet, Recipe recipe, ExecutionContext ctx,
-                        BiFunction<T, Stack<Recipe>, T> consumer, T acc) {
+    public <T> @Nullable T reduce(LargeSourceSet sourceSet, Recipe recipe, ExecutionContext ctx,
+                                  BiFunction<@Nullable T, Stack<Recipe>, @Nullable T> consumer, @Nullable T acc) {
         init(recipe);
         AtomicInteger recipePosition = new AtomicInteger(0);
         while (!allRecipesStack.isEmpty()) {

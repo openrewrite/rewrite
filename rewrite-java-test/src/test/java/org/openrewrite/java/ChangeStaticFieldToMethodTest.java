@@ -337,4 +337,32 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4390")
+    void migratesTernaryOperator() {
+        rewriteRun(
+          java(acmeLists),
+          java(
+            """
+              import java.util.Collections;
+
+              class A {
+                  static Object empty() {
+                      return (1 == 1) ? Collections.EMPTY_LIST : new RuntimeException("what universe is this?");
+                  }
+              }
+              """,
+            """
+              import com.acme.Lists;
+
+              class A {
+                  static Object empty() {
+                      return (1 == 1) ? Lists.of() : new RuntimeException("what universe is this?");
+                  }
+              }
+              """
+          )
+        );
+    }
 }

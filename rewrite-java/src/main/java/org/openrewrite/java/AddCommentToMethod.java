@@ -71,6 +71,11 @@ public class AddCommentToMethod extends Recipe {
     private static final Pattern NEWLINE = Pattern.compile("\\R");
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
         return Preconditions.check(new DeclaresMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
