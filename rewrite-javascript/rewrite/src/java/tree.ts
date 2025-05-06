@@ -361,7 +361,6 @@ export namespace J {
         readonly kind: typeof Kind.ParenthesizedTypeTree;
         readonly annotations: Annotation[];
         readonly parenthesizedType: Parentheses<TypeTree>;
-        readonly type?: JavaType;
     }
 
     export interface Identifier extends J {
@@ -855,8 +854,7 @@ export namespace J {
             prefix,
             markers,
             annotations,
-            parenthesizedType,
-            type
+            parenthesizedType
         };
     }
 

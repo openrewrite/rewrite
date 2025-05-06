@@ -494,7 +494,6 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return this.produceJava<J.ParenthesizedTypeTree>(parTypeTree, p, async draft => {
             draft.annotations = await mapAsync(parTypeTree.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.parenthesizedType = await this.visitDefined(parTypeTree.parenthesizedType, p) as J.Parentheses<TypeTree>;
-            draft.type = await this.visitType(parTypeTree.type, p);
         });
     }
 

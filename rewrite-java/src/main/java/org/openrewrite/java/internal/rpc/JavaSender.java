@@ -430,7 +430,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parenthesizedType, RpcSendQueue q) {
         q.getAndSendList(parenthesizedType, J.ParenthesizedTypeTree::getAnnotations, Tree::getId, a -> visit(a, q));
         q.getAndSend(parenthesizedType, J.ParenthesizedTypeTree::getParenthesizedType, tree -> visit(tree, q));
-        q.getAndSend(parenthesizedType, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return parenthesizedType;
     }
 

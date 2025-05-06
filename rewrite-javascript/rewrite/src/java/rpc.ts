@@ -313,7 +313,6 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitParenthesizedTypeTree(parenthesizedType: J.ParenthesizedTypeTree, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(parenthesizedType, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
         await q.getAndSend(parenthesizedType, p => p.parenthesizedType, tree => this.visit(tree, q));
-        await q.getAndSend(parenthesizedType, p => asRef(p.type), type => this.visitType(type, q));
         return parenthesizedType;
     }
 
@@ -1004,7 +1003,6 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.annotations = await q.receiveListDefined(parenthesizedType.annotations, annot => this.visit(annot, q));
         draft.parenthesizedType = await q.receive(parenthesizedType.parenthesizedType, tree => this.visit(tree, q));
-        draft.type = await q.receive(parenthesizedType.type, type => this.visitType(type, q));
 
         return finishDraft(draft);
     }
