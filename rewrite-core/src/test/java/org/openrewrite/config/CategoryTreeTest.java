@@ -120,7 +120,7 @@ class CategoryTreeTest {
     void removeCategory() {
         CategoryTree.Root<Group> ct = categoryTree();
         ct.removeAll(Group2);
-        assertThat(ct.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
+        assertThat(ct.getCategories().stream().map(sub -> sub.getDescriptor().getSubPackageName()))
           .doesNotContain("io.moderne.rewrite", "io.moderne.cloud", "io.moderne");
     }
 

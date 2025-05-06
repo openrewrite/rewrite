@@ -33,7 +33,23 @@ public class CategoryDescriptor {
     @NlsRewrite.DisplayName
     String displayName;
 
-    String packageName;
+    /**
+     * Represents the part of the package under the root packages collected in {@link #rootPackages}
+     * If a category contains the packages "org.openrewrite.java" and "com.company.java" this will become "java"
+     */
+    String subPackageName;
+
+    /**
+     * Backwards compatibility method for retrieving the packageName
+     * which has been changed to only the subPackage name ("org.openrewrite.java" becomes "java")
+     *
+     * @return the sub-package name of this category descriptor.
+     * @deprecated Use {@link #getSubPackageName()} instead
+     */
+    @Deprecated
+    public String getPackageName() {
+        return subPackageName;
+    }
 
     @Language("markdown")
     @NlsRewrite.Description
@@ -43,7 +59,7 @@ public class CategoryDescriptor {
     boolean root;
 
     /**
-     * Defines the sort order for category descriptors of the same {@link #packageName}. The description, tags, and root values of the highest
+     * Defines the sort order for category descriptors of the same {@link #subPackageName}. The description, tags, and root values of the highest
      * priority category descriptor for a given package name will be used.
      * <p/>
      * Lower values have higher priority. The default value is {@link #LOWEST_PRECEDENCE}, indicating the lowest priority
