@@ -29,7 +29,6 @@ import {
 import {Expression, isJavaScript, JS, TypedTree, TypeTree} from '.';
 import {
     emptyMarkers,
-    ExecutionContext,
     markers,
     Markers,
     MarkersKind,
@@ -37,7 +36,8 @@ import {
     Parser,
     ParserInput,
     parserInputFile,
-    parserInputRead, ParserOptions,
+    parserInputRead,
+    ParserOptions,
     Parsers,
     randomId,
     SourceFile,
