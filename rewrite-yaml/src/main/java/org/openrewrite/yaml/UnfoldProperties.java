@@ -74,8 +74,6 @@ public class UnfoldProperties extends Recipe {
                 Yaml.Mapping.Entry entry = super.visitMappingEntry(e, ctx);
 
                 String key = entry.getKey().getValue();
-
-                //if (key.contains(".") && !exclusions.contains(key)) {
                 if (key.contains(".") && matchers.stream().noneMatch(it -> it.matches(getCursor()))) {
                     List<String> parts = getParts(key);
                     if (parts.size() > 1) {
@@ -109,48 +107,7 @@ public class UnfoldProperties extends Recipe {
                 String parentKey = getParentKey();
                 List<String> keepTogether = new ArrayList<>();
                 for (String ex : exclusions) {
-                    // Recursive descent
-                    if (ex.startsWith("$..")) {
-                        ex = ex.substring(3);
-                        // Handle parent-child conditions like: `$..[logging.level][?(<condition>)]` and `$..logging.level[?(<condition>)]`
-                        if (ex.startsWith("[") && ex.contains("][")) {
-                            int secondBracket = ex.indexOf( '[', 1);
-                            ex = ex.substring(1, secondBracket - 1) + ex.substring(secondBracket);
-                        }
-                        if (!ex.startsWith("[") && ex.contains("[") && parentKey.contains(ex.split("\\[")[0])) {
-                            ex = "[" + ex.split("\\[")[1];
-                        }
-                    }
-
-                    // Starts from root
-                    if (ex.startsWith("$.")) {
-                        ex = ex.replace("$." + parentKey, "");
-                        if (ex.startsWith(".")) {
-                            ex = ex.substring(1);
-                        }
-                    }
-
-                    // property in brackets
-                    if (ex.startsWith("[") && ex.endsWith("]")) {
-                        ex = ex.substring(1, ex.length() - 1);
-                    }
-
-                    // properties can be wrapped in quotes
-                    if (ex.startsWith("\"") && ex.endsWith("\"")) {
-                        ex = ex.substring(1, ex.length() - 1);
-                    } else if (ex.startsWith("'") && ex.endsWith("'")) {
-                        ex = ex.substring(1, ex.length() - 1);
-                    }
-
-                    if (ex.startsWith("?(@property.match(/") && ex.endsWith("/))")) {
-                        ex = ex.substring(19, ex.length() - 3);
-                        Matcher m = Pattern.compile(".*(" + ex + ").*").matcher(key);
-                        if (m.matches()) {
-                            keepTogether.add(m.group(1).isEmpty() ? m.group(0) : m.group(1));
-                        }
-                    } else if (key.contains(ex)) {
-                        keepTogether.add(ex);
-                    }
+                    matchesWith(ex, key, parentKey).ifPresent(keepTogether::add);
                 }
 
                 List<String> result = new ArrayList<>();
@@ -185,6 +142,53 @@ public class UnfoldProperties extends Recipe {
                     c = c.getParent();
                 }
                 return parentKey.length() == 0 ? "" : parentKey.substring(0, parentKey.length() - 1);
+            }
+
+            // Custom JsonPathParser to parse keys with dots, like `logging.level`
+            private Optional<String> matchesWith(String ex, String key, String parentKey) {
+                // Recursive descent
+                if (ex.startsWith("$..")) {
+                    ex = ex.substring(3);
+                    // Handle parent-child conditions like: `$..[logging.level][?(<condition>)]` and `$..logging.level[?(<condition>)]`
+                    if (ex.startsWith("[") && ex.contains("][")) {
+                        int secondBracket = ex.indexOf( '[', 1);
+                        ex = ex.substring(1, secondBracket - 1) + ex.substring(secondBracket);
+                    }
+                    if (!ex.startsWith("[") && ex.contains("[") && parentKey.contains(ex.split("\\[")[0])) {
+                        ex = "[" + ex.split("\\[")[1];
+                    }
+                }
+
+                // Starts from root
+                if (ex.startsWith("$.")) {
+                    ex = ex.replace("$." + parentKey, "");
+                    if (ex.startsWith(".")) {
+                        ex = ex.substring(1);
+                    }
+                }
+
+                // property in brackets
+                if (ex.startsWith("[") && ex.endsWith("]")) {
+                    ex = ex.substring(1, ex.length() - 1);
+                }
+
+                // properties can be wrapped in quotes
+                if (ex.startsWith("\"") && ex.endsWith("\"")) {
+                    ex = ex.substring(1, ex.length() - 1);
+                } else if (ex.startsWith("'") && ex.endsWith("'")) {
+                    ex = ex.substring(1, ex.length() - 1);
+                }
+
+                if (key.contains(ex)) {
+                    return Optional.of(ex);
+                } else if (ex.startsWith("?(@property.match(/") && ex.endsWith("/))")) {
+                    ex = ex.substring(19, ex.length() - 3);
+                    Matcher m = Pattern.compile(".*(" + ex + ").*").matcher(key);
+                    if (m.matches()) {
+                        return Optional.of(m.group(1).isEmpty() ? m.group(0) : m.group(1));
+                    }
+                }
+                return Optional.empty();
             }
 
             private Yaml.Mapping.Entry createNestedEntry(List<String> keys, int index, Yaml.Block value) {
