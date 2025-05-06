@@ -15,6 +15,7 @@
  */
 package org.openrewrite.rpc;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -105,6 +106,7 @@ public class RpcObjectData {
         return (V) value;
     }
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     public enum State {
         NO_CHANGE,
         ADD,

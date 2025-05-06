@@ -15,8 +15,17 @@
  */
 package org.openrewrite.javascript.rpc;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
+import io.moderne.jsonrpc.handler.MessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
@@ -29,6 +38,16 @@ import java.io.UncheckedIOException;
 
 public class JavaScriptRewriteRpc extends RewriteRpc {
     private final JavaScriptRewriteRpcProcess process;
+    private static final ObjectMapper mapper = new ObjectMapper()
+            .registerModules(new ParameterNamesModule(), new JavaTimeModule())
+            .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+            .enable(SerializationFeature.WRITE_ENUMS_USING_INDEX)
+            .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+            .setVisibility(VisibilityChecker.Std.defaultInstance()
+                .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY)
+                .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
+                .withIsGetterVisibility(JsonAutoDetect.Visibility.NONE)
+                .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
 
     private JavaScriptRewriteRpc(JavaScriptRewriteRpcProcess process, Environment marketplace) {
         super(process.getRpcClient(), marketplace);
@@ -108,14 +127,14 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                     throw new RuntimeException(e);
                 }
             }
-            this.rpcClient = new JsonRpc(
-                    // FIXME provide an option to make tracing optional
-                    new TraceMessageHandler(
-                            "client",
-                            new HeaderDelimitedMessageHandler(this.process.getInputStream(),
-                                    this.process.getOutputStream())
-                    )
-            );
+            MessageHandler handler = new HeaderDelimitedMessageHandler(
+                    new JsonMessageFormatter(mapper),
+                    this.process.getInputStream(),
+                    this.process.getOutputStream());
+
+            // FIXME provide an option to make tracing optional
+            handler = new TraceMessageHandler("client", handler);
+            this.rpcClient = new JsonRpc(handler);
         }
     }
 }
