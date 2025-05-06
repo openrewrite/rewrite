@@ -24,10 +24,13 @@ import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
+
+import static java.util.Objects.requireNonNull;
 
 public class JavaScriptParser implements Parser {
 
@@ -85,7 +88,7 @@ public class JavaScriptParser implements Parser {
     }
 
     public static class Builder extends org.openrewrite.Parser.Builder {
-        private @Nullable Path nodePath;
+        private Path nodePath = Paths.get("node");
         private @Nullable Path installationDir;
 
         Builder() {
@@ -104,7 +107,7 @@ public class JavaScriptParser implements Parser {
 
         @Override
         public JavaScriptParser build() {
-            return new JavaScriptParser(nodePath, installationDir);
+            return new JavaScriptParser(nodePath, requireNonNull(installationDir));
         }
 
         @Override

@@ -21,10 +21,14 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.javascript.tree.JS;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class JavaScriptParserTest {
 
@@ -32,7 +36,6 @@ public class JavaScriptParserTest {
 
     @BeforeEach
     void before() {
-//        this.log = new PrintStream(new FileOutputStream("rpc.java.log"));
         this.parser = JavaScriptParser.builder()
           .nodePath(Path.of("node"))
           .installationDir(Path.of("./rewrite/dist/src/rpc"))
@@ -40,13 +43,16 @@ public class JavaScriptParserTest {
     }
 
     @Test
-    void parseJavascript() {
+    void helloWorld() {
         @Language("js")
         String helloWorld = """
           console.info("Hello world!")
           """;
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.js"), helloWorld);
-        SourceFile javascript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst().get();
-        System.out.println(javascript);
+        Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
+        assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
+        assertThat(javascript.get()).satisfies(cu -> {
+            assertThat(cu.printAll()).isEqualTo(helloWorld);
+        });
     }
 }

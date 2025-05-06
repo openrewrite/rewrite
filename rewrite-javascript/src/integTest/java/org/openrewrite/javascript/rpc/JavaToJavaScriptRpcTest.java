@@ -55,7 +55,7 @@ public class JavaToJavaScriptRpcTest {
                   PrintStream log = new PrintStream(new FileOutputStream("rpc.java.log"));
                   JavaScriptRewriteRpc client = JavaScriptRewriteRpc.start(
                     Environment.builder().build(),
-                    "/usr/local/bin/node",
+                    "node",
                     "--enable-source-maps",
                     // Uncomment this to debug the server
 //                  "--inspect-brk",

@@ -109,6 +109,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 }
             }
             this.rpcClient = new JsonRpc(
+                    // FIXME provide an option to make tracing optional
                     new TraceMessageHandler(
                             "client",
                             new HeaderDelimitedMessageHandler(this.process.getInputStream(),

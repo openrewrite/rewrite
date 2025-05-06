@@ -17,7 +17,6 @@ package org.openrewrite.javascript.rpc;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -25,7 +24,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
 import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -61,7 +59,7 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
         this.log = new PrintStream(new FileOutputStream("rpc.java.log"));
         this.client = JavaScriptRewriteRpc.start(
           Environment.builder().build(),
-          "/usr/local/bin/node",
+          "node",
           "--enable-source-maps",
           // Uncomment this to debug the server
 //          "--inspect-brk",

@@ -58,6 +58,9 @@ import {JavaScriptTypeMapping} from "./typeMapping";
 import {produce} from "immer";
 import Kind = JS.Kind;
 
+export interface JavaScriptParserOptions extends ParserOptions {
+}
+
 export class JavaScriptParser extends Parser {
 
     private readonly compilerOptions: ts.CompilerOptions;
@@ -65,10 +68,10 @@ export class JavaScriptParser extends Parser {
     private oldProgram?: ts.Program;
 
     constructor({
-                    ctx = new ExecutionContext(),
+                    ctx,
                     relativeTo
-                }: ParserOptions = {}) {
-        super({ctx: ctx, relativeTo: relativeTo});
+                }: JavaScriptParserOptions = {}) {
+        super({ctx, relativeTo});
         this.compilerOptions = {
             target: ts.ScriptTarget.Latest,
             module: ts.ModuleKind.CommonJS,
