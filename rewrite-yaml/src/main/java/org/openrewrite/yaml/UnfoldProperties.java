@@ -44,7 +44,7 @@ public class UnfoldProperties extends Recipe {
 
     @Option(displayName = "Exclusions",
             description = "A list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions to specify keys that should not be unfolded.",
-            example = "org.springframework.security")
+            example = "$..[org.springframework.security]")
     List<String> exclusions;
 
     public UnfoldProperties(@Nullable final List<String> exclusions) {

@@ -35,8 +35,13 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void unfold() {
         rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/.*/))]"))),
           yaml(
             """
+              spring.application.name: my-app
+              logging.level:
+                root: INFO
+                org.springframework.web: DEBUG
               management:
                 metrics.enable.process.files: true
                 endpoint.health:
@@ -44,6 +49,13 @@ class UnfoldPropertiesTest implements RewriteTest {
                   show-details: always
               """,
             """
+              spring:
+                application:
+                  name: my-app
+              logging:
+                level:
+                  root: INFO
+                  org.springframework.web: DEBUG
               management:
                 metrics:
                   enable:
