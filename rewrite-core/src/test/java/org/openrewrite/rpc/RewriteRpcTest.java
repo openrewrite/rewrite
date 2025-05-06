@@ -72,16 +72,7 @@ class RewriteRpcTest implements RewriteTest {
         client.shutdown();
     }
 
-    @Test
-    void sendReceiveExecutionContext() {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        ctx.putMessage("key", "value");
-
-        client.localObjects.put("123", ctx);
-        InMemoryExecutionContext received = server.getObject("123");
-        assertThat(received.<String>getMessage("key")).isEqualTo("value");
-    }
-
+    @DocumentExample
     @Test
     void sendReceiveIdempotence() {
         rewriteRun(
@@ -99,6 +90,16 @@ class RewriteRpcTest implements RewriteTest {
             "Hello World!"
           )
         );
+    }
+
+    @Test
+    void sendReceiveExecutionContext() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage("key", "value");
+
+        client.localObjects.put("123", ctx);
+        InMemoryExecutionContext received = server.getObject("123");
+        assertThat(received.<String>getMessage("key")).isEqualTo("value");
     }
 
     @Test

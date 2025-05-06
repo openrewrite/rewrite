@@ -2029,7 +2029,8 @@ class ChangeTypeTest implements RewriteTest {
               public class A {
                 public static String A = "A";
               }
-              """),
+              """
+          ),
           java(
             """
               package org.ab;
@@ -2038,7 +2039,8 @@ class ChangeTypeTest implements RewriteTest {
                 public static String A = "A";
                 public static String B = "B";
               }
-              """),
+              """
+          ),
           // language=java
           java(
             """
@@ -2081,7 +2083,6 @@ class ChangeTypeTest implements RewriteTest {
               """
           )
         );
-
     }
 
     @Test
@@ -2119,7 +2120,8 @@ class ChangeTypeTest implements RewriteTest {
               a.property=java.lang.Integer
               c.property=java.lang.StringBuilder
               b.property=String
-              """, spec -> spec.path("application.properties"))
+              """,
+                spec -> spec.path("application.properties"))
         );
     }
 
@@ -2245,7 +2247,8 @@ class ChangeTypeTest implements RewriteTest {
                     return b.build();
                 }
               }
-              """, """
+              """,
+                """
               import foo.A;
               
               class Test {

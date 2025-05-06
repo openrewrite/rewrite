@@ -42,21 +42,23 @@ class ScalarTest implements RewriteTest {
     @Test
     void multilineString() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
             foo:
               bar: >
                 A multiline string.
               baz:
                 quz: Another string.
-            """, spec -> spec.afterRecipe(doc -> new YamlIsoVisitor<>() {
-                @Override
-                public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Object o) {
-                    if ("baz".equals(entry.getKey().getValue())) {
-                        assertThat(entry.getPrefix()).isEqualTo("\n  ");
+            """,
+                spec -> spec.afterRecipe(doc -> new YamlIsoVisitor<>() {
+                    @Override
+                    public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Object o) {
+                        if ("baz".equals(entry.getKey().getValue())) {
+                            assertThat(entry.getPrefix()).isEqualTo("\n  ");
+                        }
+                        return super.visitMappingEntry(entry, o);
                     }
-                    return super.visitMappingEntry(entry, o);
-                }
-            }.visit(doc, 0))
+                }.visit(doc, 0))
           )
         );
     }
@@ -67,10 +69,11 @@ class ScalarTest implements RewriteTest {
           yaml(
                 """
             foo # look mom, no mapping
-            """, spec -> spec.afterRecipe(documents -> {
-                Yaml.Block maybeScalar = documents.getDocuments().get(0).getBlock();
-                Assertions.assertThat(maybeScalar).isInstanceOf(Yaml.Scalar.class);
-          }))
+            """,
+                spec -> spec.afterRecipe(documents -> {
+                    Yaml.Block maybeScalar = documents.getDocuments().get(0).getBlock();
+                    Assertions.assertThat(maybeScalar).isInstanceOf(Yaml.Scalar.class);
+                }))
         );
     }
 }

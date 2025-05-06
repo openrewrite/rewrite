@@ -40,47 +40,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class MavenDependencyFailuresTest implements RewriteTest {
 
-    @Test
-    void unresolvableMavenMetadata() {
-        rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").build())))
-            .recipeExecutionContext(new InMemoryExecutionContext())
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
-            .dataTable(MavenMetadataFailures.Row.class, failures ->
-                assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
-          pomXml(
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                  <dependency>
-                    <groupId>org.jenkins-ci.plugins</groupId>
-                    <artifactId>credentials</artifactId>
-                    <version>2.3.0</version>
-                  </dependency>
-                  <dependency>
-                    <groupId>org.jenkins-ci.plugins</groupId>
-                    <artifactId>appio</artifactId>
-                    <version>1.3</version>
-                  </dependency>
-                </dependencies>
-              </project>
-              """,
-            spec -> spec.after(after -> {
-                //There should be two errors (one for each failed metadata download)
-                assertThat(after.split("Unable to download metadata")).hasSize(3);
-                return after;
-            })
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
@@ -121,6 +80,47 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void unresolvableMavenMetadata() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").build())))
+            .recipeExecutionContext(new InMemoryExecutionContext())
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1)
+            .dataTable(MavenMetadataFailures.Row.class, failures ->
+                assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.jenkins-ci.plugins</groupId>
+                    <artifactId>credentials</artifactId>
+                    <version>2.3.0</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.jenkins-ci.plugins</groupId>
+                    <artifactId>appio</artifactId>
+                    <version>1.3</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.after(after -> {
+                //There should be two errors (one for each failed metadata download)
+                assertThat(after.split("Unable to download metadata")).hasSize(3);
+                return after;
+            })
           )
         );
     }
@@ -311,7 +311,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """)
+              """
+          )
         );
     }
 

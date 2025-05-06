@@ -18,6 +18,7 @@ package org.openrewrite;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.FindAndReplace;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,8 +39,50 @@ class RecipeRunTest implements RewriteTest {
             }), text(
                 """
             replace_me
-            """, """
+            """,
+                """
             replacement
-            """));
+            """ ));
+    }
+
+
+    @Test
+    void delegateRecipeWithOnComplete() {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        rewriteRun(recipeSpec -> recipeSpec.recipe(new DelegatingRecipe()).executionContext(ctx).typeValidationOptions(TypeValidation.none()));
+        assertThat(ctx.<String>getMessage("org.openrewrite.recipe.oncomplete")).isEqualTo("with delegate recipe.");
+    }
+
+    public static class DelegatingRecipe extends Recipe implements Recipe.DelegatingRecipe{
+
+        @Override
+        public String getDisplayName() {
+            return "Test delegate recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Test onComplete with delegate recipe.";
+        }
+
+        @Override
+        public Recipe getDelegate() {
+            return new Recipe() {
+                @Override
+                public String getDisplayName() {
+                    return "Actual recipe";
+                }
+
+                @Override
+                public String getDescription() {
+                    return "Actual recipe with onComplete.";
+                }
+
+                @Override
+                public void onComplete(ExecutionContext ctx) {
+                    ctx.putMessage("org.openrewrite.recipe.oncomplete", "with delegate recipe.");
+                }
+            };
+        }
     }
 }

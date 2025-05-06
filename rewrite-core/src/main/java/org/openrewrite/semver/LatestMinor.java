@@ -28,7 +28,7 @@ public class LatestMinor implements VersionComparator {
     public boolean isValid(@Nullable String currentVersion, String version) {
         Validated<? extends VersionComparator> validated = currentVersion == null ?
                 LatestRelease.buildLatestRelease("latest.release", metadataPattern) :
-                TildeRange.build("~" + Semver.majorVersion(currentVersion), metadataPattern);
+                TildeRange.build("~" + Semver.majorVersion(currentVersion), metadataPattern, true);
 
         if (validated.isValid()) {
             VersionComparator comparator = validated.getValue();
@@ -55,6 +55,6 @@ public class LatestMinor implements VersionComparator {
     public static Validated<LatestMinor> build(String toVersion, @Nullable String metadataPattern) {
         return "latest.minor".equalsIgnoreCase(toVersion) ?
                 Validated.valid("latestMinor", new LatestMinor(metadataPattern)) :
-                Validated.invalid("latestMinor", toVersion, "not latest release");
+                Validated.invalid("latestMinor", toVersion, "not latest minor");
     }
 }

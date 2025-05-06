@@ -24,7 +24,7 @@ import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.EnumSet;
+import java.util.*;
 import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
@@ -33,8 +33,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.tree.TypeUtils.TypePosition.Invariant;
-import static org.openrewrite.java.tree.TypeUtils.TypePosition.Out;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
@@ -336,7 +334,7 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
-    void isAssignableToGenericTypeVariable() {
+    void isAssignableToGenericTypeVariable1() {
         rewriteRun(
           java(
             """
@@ -391,8 +389,8 @@ class TypeUtilsTest implements RewriteTest {
                     if (method.getSimpleName().equals("test")) {
                         J.Return return_ = (J.Return) method.getBody().getStatements().get(0);
                         J.TypeCast cast = (J.TypeCast) return_.getExpression();
-                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), Invariant)).isFalse();
-                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), Out)).isTrue();
+                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType())).isFalse();
+                        assertThat(new Types(true).isAssignableTo(cast.getType(), cast.getExpression().getType())).isTrue();
                     }
                     return method;
                 }
@@ -437,8 +435,8 @@ class TypeUtilsTest implements RewriteTest {
                         JavaType consumeClassParamType = ((J.VariableDeclarations) consumeClass.getParameters().get(0)).getVariables().get(0).getType();
                         JavaType consumeMethodParamType = ((J.VariableDeclarations) consumeMethod.getParameters().get(0)).getVariables().get(0).getType();
 
-                        assertThat(TypeUtils.isAssignableTo(consumeClassParamType, list.getType(), Out)).isTrue();
-                        assertThat(TypeUtils.isAssignableTo(consumeMethodParamType, list.getType(), Out)).isTrue();
+                        assertThat(new Types(true).isAssignableTo(consumeClassParamType, list.getType())).isTrue();
+                        assertThat(new Types(true).isAssignableTo(consumeMethodParamType, list.getType())).isTrue();
                     }
                     return method;
                 }
@@ -569,6 +567,42 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    void arrayIsAssignableToObject() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  Object o;
+                  Object[] oa;
+                  String[] sa;
+                  int[] ia;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    J.VariableDeclarations o = (J.VariableDeclarations) classDecl.getBody().getStatements().get(0);
+                    J.VariableDeclarations oa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(1);
+                    J.VariableDeclarations sa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(2);
+                    J.VariableDeclarations ia = (J.VariableDeclarations) classDecl.getBody().getStatements().get(3);
+                    JavaType object = o.getType();
+                    JavaType objectArray = oa.getType();
+                    JavaType stringArray = sa.getType();
+                    JavaType intArray = ia.getType();
+                    assertThat(TypeUtils.isAssignableTo(object, objectArray)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(object, stringArray)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(objectArray, stringArray)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(stringArray, objectArray)).isFalse();
+                    assertThat(TypeUtils.isAssignableTo(object, intArray)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo(objectArray, intArray)).isFalse();
+                    return classDecl;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
     void isAssignableToNone() {
         EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.None));
         for (JavaType.Primitive other : others) {
@@ -588,11 +622,12 @@ class TypeUtilsTest implements RewriteTest {
 
     @Test
     void isAssignableToString() {
-        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String));
+        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String, JavaType.Primitive.Null));
         for (JavaType.Primitive other : others) {
             assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.String, other));
         }
         assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.String, JavaType.Primitive.String));
+        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.String, JavaType.Primitive.Null));
     }
 
     @Test
@@ -700,6 +735,175 @@ class TypeUtilsTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void typeToString() {
+        rewriteRun(
+          java(
+            """
+              import java.io.*;
+              import java.util.*;
+              
+              @SuppressWarnings("all")
+              public class Test<A extends B, B extends Number, C extends Comparable<? super C> & Serializable> {
+              
+                  // Plain generics
+                  A a;
+                  B b;
+                  C c;
+              
+                  // Parameterized
+                  Optional<A> oa;
+                  Optional<B> ob;
+                  Optional<C> oc;
+              
+                  // Wildcards
+                  Optional<?> ow;
+                  Optional<? extends A> oea;
+                  Optional<? extends B> oeb;
+                  Optional<? extends C> oec;
+                  Optional<? super A> osa;
+                  Optional<? super B> osb;
+                  Optional<? super C> osc;
+              
+                  // === Raw types ===
+                  List rawList;
+                  Map rawMap;
+              
+                  // === Recursive generic ===
+                  static class Recursive<T extends Comparable<T>> {}
+                  Recursive<Recursive<String>> rec;
+              
+                  // === Arrays ===
+                  int[] intArray;
+                  boolean[] boolArray;
+                  String[] stringArray;
+                  Map<?, String>[][] wildcardArray;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                    try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                        assertions.toGenericTypeString("A").isEqualTo("A extends B");
+                        assertions.toGenericTypeString("B").isEqualTo("B extends java.lang.Number");
+                        assertions.toGenericTypeString("C").isEqualTo("C extends java.lang.Comparable<? super C> & java.io.Serializable");
+
+                        assertions.toString("int").isEqualTo("int");
+                        assertions.toString("long").isEqualTo("long");
+                        assertions.toString("double").isEqualTo("double");
+                        assertions.toString("boolean").isEqualTo("boolean");
+
+                        assertions.toString("A").isEqualTo("A");
+                        assertions.toString("B").isEqualTo("B");
+                        assertions.toString("C").isEqualTo("C");
+
+                        assertions.toString("Optional<A>").isEqualTo("java.util.Optional<A>");
+                        assertions.toString("Optional<B>").isEqualTo("java.util.Optional<B>");
+                        assertions.toString("Optional<C>").isEqualTo("java.util.Optional<C>");
+
+                        assertions.toString("Optional<?>").isEqualTo("java.util.Optional<?>");
+                        assertions.toString("Optional<? extends A>").isEqualTo("java.util.Optional<? extends A>");
+                        assertions.toString("Optional<? extends B>").isEqualTo("java.util.Optional<? extends B>");
+                        assertions.toString("Optional<? extends C>").isEqualTo("java.util.Optional<? extends C>");
+                        assertions.toString("Optional<? super A>").isEqualTo("java.util.Optional<? super A>");
+                        assertions.toString("Optional<? super B>").isEqualTo("java.util.Optional<? super B>");
+                        assertions.toString("Optional<? super C>").isEqualTo("java.util.Optional<? super C>");
+
+                        assertions.toString("List").isEqualTo("java.util.List");
+                        assertions.toString("Map").isEqualTo("java.util.Map");
+
+                        assertions.toString("Recursive<Recursive<String>>").isEqualTo("Test$Recursive<Test$Recursive<java.lang.String>>");
+
+                        assertions.toString("int[]").isEqualTo("int[]");
+                        assertions.toString("boolean[]").isEqualTo("boolean[]");
+                        assertions.toString("String[]").isEqualTo("java.lang.String[]");
+                        assertions.toString("Map<?, String>[][]").isEqualTo("java.util.Map<?, java.lang.String>[][]");
+                    }
+                    return cu;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    @MinimumJava11
+    void typeToString2() {
+        rewriteRun(
+          java(
+            """
+              import java.io.*;
+              import java.util.*;
+              
+              @SuppressWarnings("all")
+              public class Test {
+                  void test() {
+                      var intersection = (Cloneable & Serializable) null;
+                      try {} catch (NullPointerException | IllegalArgumentException exception) {}
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                    try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                        assertions.toString("intersection").isEqualTo("java.lang.Cloneable & java.io.Serializable");
+                        assertions.toString("exception").isEqualTo("java.lang.RuntimeException");
+                        assertions.toString("NullPointerException | IllegalArgumentException").isEqualTo("java.lang.NullPointerException | java.lang.IllegalArgumentException");
+                    }
+                    return cu;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5289")
+    void toStringRecursiveType() {
+        rewriteRun(
+          java(
+            """
+              import java.io.*;
+              import java.util.*;
+              
+              abstract class Rec<T extends Rec<T>> {}
+              
+              abstract class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              abstract class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              
+              @SuppressWarnings("all")
+              public class Test {
+                  void run(Rec<?> r, One<?, ?> m) {
+                      Optional.of(r).get();
+                      Optional.of(m).get();
+              
+                      Optional.of(r).ifPresent(sr -> {});
+                      Optional.of(m).ifPresent(sm -> {});
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                    try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                        assertions.toString("r").isEqualTo("Rec<?>");
+                        assertions.toString("Optional.of(r)").isEqualTo("java.util.Optional<Rec<?>>");
+                        assertions.toString("Optional.of(r).get()").isEqualTo("Rec<?>");
+                        assertions.toString("sr").isEqualTo("Rec<?>");
+
+                        assertions.toString("m").isEqualTo("One<?, ?>");
+                        assertions.toString("Optional.of(m)").isEqualTo("java.util.Optional<One<?, ?>>");
+                        assertions.toString("Optional.of(m).get()").isEqualTo("One<?, ?>");
+                        assertions.toString("sm").isEqualTo("One<?, ?>");
+                    }
+                    return cu;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
           )
         );
     }

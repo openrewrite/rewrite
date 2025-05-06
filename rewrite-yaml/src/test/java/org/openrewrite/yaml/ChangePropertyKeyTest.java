@@ -40,6 +40,17 @@ class ChangePropertyKeyTest implements RewriteTest {
         ));
     }
 
+    @DocumentExample
+    @Test
+    void singleEntry() {
+        rewriteRun(
+          yaml(
+            "management.metrics.binders.files.enabled: true",
+            "management.metrics.enable.process.files: true"
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1873")
     @Test
     void shorterNewKeyWithIndentedConfig() {
@@ -77,17 +88,6 @@ class ChangePropertyKeyTest implements RewriteTest {
               a.b.c.d.e:
                 child: true
               """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void singleEntry() {
-        rewriteRun(
-          yaml(
-            "management.metrics.binders.files.enabled: true",
-            "management.metrics.enable.process.files: true"
           )
         );
     }
@@ -152,6 +152,18 @@ class ChangePropertyKeyTest implements RewriteTest {
 
     @Nested
     class AvoidsRegenerativeChangesTest implements RewriteTest {
+
+        @DocumentExample
+        @Test
+        void changePathToOnePathShorter() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePropertyKey("a.b.c.d", "a.b.c", null, null, null)),
+              yaml(
+                "a.b.c.d: true",
+                "a.b.c: true"
+              )
+            );
+        }
         @Test
         void indentedProperty() {
             rewriteRun(
@@ -191,18 +203,6 @@ class ChangePropertyKeyTest implements RewriteTest {
               yaml(
                 "a.b.c: true",
                 "a.b.c.d: true"
-              )
-            );
-        }
-
-        @DocumentExample
-        @Test
-        void changePathToOnePathShorter() {
-            rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("a.b.c.d", "a.b.c", null, null, null)),
-              yaml(
-                "a.b.c.d: true",
-                "a.b.c: true"
               )
             );
         }

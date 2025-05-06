@@ -159,11 +159,12 @@ class ClassDeclarationTest implements RewriteTest {
                   class Inner {
                   }
               }
-              """, spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getStatements().stream()
-                  .anyMatch(it -> it instanceof J.ClassDeclaration &&
-                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Interface)).isTrue();
-            })
+              """,
+                spec -> spec.afterRecipe(cu -> {
+                    assertThat(cu.getStatements().stream()
+                            .anyMatch(it -> it instanceof J.ClassDeclaration &&
+                                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Interface)).isTrue();
+                })
           )
         );
     }
@@ -471,7 +472,8 @@ class ClassDeclarationTest implements RewriteTest {
                     println ( "Hello, world!" )
                 }
             }
-            """)
+            """
+          )
         );
     }
 

@@ -32,6 +32,48 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"SimplifyStreamApiCallChains", "ConstantConditions", "UnnecessaryLocalVariable", "LocalVariableUsedAndDeclaredInDifferentSwitchBranches", "Convert2Diamond", "UnusedAssignment"})
 class RenameVariableTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void doNotRenameForLoopVariables() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+          java(
+            """
+              package org.openrewrite;
+
+              public class A {
+                  int fooA() {
+                      v++;
+                      // creates new scope owned by for loop.
+                      for (int v = 0; v < 10; ++v) {
+                          int x = v + 1;
+                      }
+                      v++;
+                  }
+                  // v is scoped to classDeclaration regardless of statement order.
+                  public int v = 1;
+              }
+              """,
+            """
+              package org.openrewrite;
+
+              public class A {
+                  int fooA() {
+                      VALUE++;
+                      // creates new scope owned by for loop.
+                      for (int v = 0; v < 10; ++v) {
+                          int x = v + 1;
+                      }
+                      VALUE++;
+                  }
+                  // v is scoped to classDeclaration regardless of statement order.
+                  public int VALUE = 1;
+              }
+              """
+          )
+        );
+    }
     private static Recipe renameVariableTest(String hasName, String toName, boolean includeMethodParameters) {
         return toRecipe(() -> new JavaVisitor<>() {
             @Override
@@ -227,48 +269,6 @@ class RenameVariableTest implements RewriteTest {
                   }
                   // v is scoped to classDeclaration regardless of statement order.
                   public int v = 1;
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void doNotRenameForLoopVariables() {
-        rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
-              package org.openrewrite;
-
-              public class A {
-                  int fooA() {
-                      v++;
-                      // creates new scope owned by for loop.
-                      for (int v = 0; v < 10; ++v) {
-                          int x = v + 1;
-                      }
-                      v++;
-                  }
-                  // v is scoped to classDeclaration regardless of statement order.
-                  public int v = 1;
-              }
-              """,
-            """
-              package org.openrewrite;
-
-              public class A {
-                  int fooA() {
-                      VALUE++;
-                      // creates new scope owned by for loop.
-                      for (int v = 0; v < 10; ++v) {
-                          int x = v + 1;
-                      }
-                      VALUE++;
-                  }
-                  // v is scoped to classDeclaration regardless of statement order.
-                  public int VALUE = 1;
               }
               """
           )
@@ -990,6 +990,329 @@ class RenameVariableTest implements RewriteTest {
                 public int length() {
                   return objects.length;
                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/5369")
+    void hiddenVariablesGetRenamedCorrectly() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                    if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
+                        doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
+                    }
+                    return super.visitVariableDeclarations(multiVariable, ctx);
+                }
+            })),
+          java(
+            """
+              public class A {
+                private int n;
+
+                public A setN(int n) {
+                  this.n = n;
+                  return this;
+                }
+              }
+              """,
+            """
+              public class A {
+                private int n;
+
+                public A setN(int n1) {
+                  this.n = n1;
+                  return this;
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void hiddenVariablesHierarchyRenameBase() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  J target = getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
+                  if ("hidden".equals(multiVariable.getVariables().get(0).getSimpleName()) &&
+                    target instanceof J.ClassDeclaration && ((J.ClassDeclaration) target).getSimpleName().equals("Base")) {
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "changed"));
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+              class Base {
+                  protected Base visible;
+                  protected Base hidden;
+              
+                  Base base() {
+                      return hidden;
+                  }
+              }
+              
+              class Middle extends Base {
+                  Middle middle() {
+                      return (Middle) hidden;
+                  }
+              }
+              
+              class Extended extends Middle {
+                  private Base hidden;
+              
+                  Extended extended() {
+                      return (Extended) hidden;
+                  }
+              
+                  public Extended test(Base hidden) {
+                      this.hidden = super.hidden;
+                      this.hidden = hidden.hidden;
+                      this.hidden = ((Middle) hidden).hidden;
+                      this.hidden = ((Extended) hidden).hidden;
+                      base().hidden = this;
+                      middle().hidden = this;
+                      extended().hidden = this;
+                      super.hidden = visible.hidden;
+                      visible.hidden = hidden;
+                      hidden.hidden.hidden = hidden.hidden = this.hidden = hidden;
+                      return this;
+                  }
+              }
+              """,
+            """
+              class Base {
+                  protected Base visible;
+                  protected Base changed;
+              
+                  Base base() {
+                      return changed;
+                  }
+              }
+              
+              class Middle extends Base {
+                  Middle middle() {
+                      return (Middle) changed;
+                  }
+              }
+              
+              class Extended extends Middle {
+                  private Base hidden;
+              
+                  Extended extended() {
+                      return (Extended) hidden;
+                  }
+              
+                  public Extended test(Base hidden) {
+                      this.hidden = super.changed;
+                      this.hidden = hidden.changed;
+                      this.hidden = ((Middle) hidden).changed;
+                      this.hidden = ((Extended) hidden).hidden;
+                      base().changed = this;
+                      middle().changed = this;
+                      extended().hidden = this;
+                      super.changed = visible.changed;
+                      visible.changed = hidden;
+                      hidden.changed.changed = hidden.changed = this.hidden = hidden;
+                      return this;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void hiddenVariablesHierarchyRenameExtended() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  J target = getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
+                  if ("hidden".equals(multiVariable.getVariables().get(0).getSimpleName()) &&
+                    target instanceof J.ClassDeclaration && ((J.ClassDeclaration) target).getSimpleName().equals("Extended")) {
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "changed"));
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+              class Base {
+                  protected Base visible;
+                  protected Base hidden;
+              
+                  Base base() {
+                      return hidden;
+                  }
+              }
+              
+              class Middle extends Base {
+                  Middle middle() {
+                      return (Middle) hidden;
+                  }
+              }
+              
+              class Extended extends Middle {
+                  private Base hidden;
+              
+                  Extended extended() {
+                      return (Extended) hidden;
+                  }
+              
+                  public Extended test(Base hidden) {
+                      this.hidden = super.hidden;
+                      this.hidden = hidden.hidden;
+                      this.hidden = ((Middle) hidden).hidden;
+                      this.hidden = ((Extended) hidden).hidden;
+                      base().hidden = this;
+                      middle().hidden = this;
+                      extended().hidden = this;
+                      super.hidden = visible.hidden;
+                      visible.hidden = hidden;
+                      hidden.hidden.hidden = hidden.hidden = this.hidden = hidden;
+                      return this;
+                  }
+              }
+              """,
+            """
+              class Base {
+                  protected Base visible;
+                  protected Base hidden;
+              
+                  Base base() {
+                      return hidden;
+                  }
+              }
+              
+              class Middle extends Base {
+                  Middle middle() {
+                      return (Middle) hidden;
+                  }
+              }
+              
+              class Extended extends Middle {
+                  private Base changed;
+              
+                  Extended extended() {
+                      return (Extended) changed;
+                  }
+              
+                  public Extended test(Base hidden) {
+                      this.changed = super.hidden;
+                      this.changed = hidden.hidden;
+                      this.changed = ((Middle) hidden).hidden;
+                      this.changed = ((Extended) hidden).changed;
+                      base().hidden = this;
+                      middle().hidden = this;
+                      extended().changed = this;
+                      super.hidden = visible.hidden;
+                      visible.hidden = hidden;
+                      hidden.hidden.hidden = hidden.hidden = this.changed = hidden;
+                      return this;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void hiddenVariablesHierarchyRenameLocal() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  J target = getCursor().getParentTreeCursor().getValue();
+                  if ("hidden".equals(multiVariable.getVariables().get(0).getSimpleName()) &&
+                    target instanceof J.MethodDeclaration) {
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "changed"));
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+              class Base {
+                  protected Base visible;
+                  protected Base hidden;
+              
+                  Base base() {
+                      return hidden;
+                  }
+              }
+              
+              class Middle extends Base {
+                  Middle middle() {
+                      return (Middle) hidden;
+                  }
+              }
+              
+              class Extended extends Middle {
+                  private Base hidden;
+              
+                  Extended extended() {
+                      return (Extended) hidden;
+                  }
+              
+                  public Extended test(Base hidden) {
+                      this.hidden = super.hidden;
+                      this.hidden = hidden.hidden;
+                      this.hidden = ((Middle) hidden).hidden;
+                      this.hidden = ((Extended) hidden).hidden;
+                      base().hidden = this;
+                      middle().hidden = this;
+                      extended().hidden = this;
+                      super.hidden = visible.hidden;
+                      visible.hidden = hidden;
+                      hidden.hidden.hidden = hidden.hidden = this.hidden = hidden;
+                      return this;
+                  }
+              }
+              """,
+            """
+              class Base {
+                  protected Base visible;
+                  protected Base hidden;
+              
+                  Base base() {
+                      return hidden;
+                  }
+              }
+              
+              class Middle extends Base {
+                  Middle middle() {
+                      return (Middle) hidden;
+                  }
+              }
+              
+              class Extended extends Middle {
+                  private Base hidden;
+              
+                  Extended extended() {
+                      return (Extended) hidden;
+                  }
+              
+                  public Extended test(Base changed) {
+                      this.hidden = super.hidden;
+                      this.hidden = changed.hidden;
+                      this.hidden = ((Middle) changed).hidden;
+                      this.hidden = ((Extended) changed).hidden;
+                      base().hidden = this;
+                      middle().hidden = this;
+                      extended().hidden = this;
+                      super.hidden = visible.hidden;
+                      visible.hidden = changed;
+                      changed.hidden.hidden = changed.hidden = this.hidden = changed;
+                      return this;
+                  }
               }
               """
           )

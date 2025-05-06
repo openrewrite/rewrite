@@ -49,7 +49,7 @@ public class ReplaceCharToIntWithCode extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (CHAR_TO_INT_METHOD_MATCHER.matches(method) && method.getSelect() != null) {
-                    return KotlinTemplate.builder("#{any(Char)}.code")
+                    return KotlinTemplate.builder("#{any(kotlin.Char)}.code")
                             .build()
                             .apply(getCursor(), method.getCoordinates().replace(), method.getSelect())
                             .withPrefix(method.getPrefix());

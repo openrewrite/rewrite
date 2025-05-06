@@ -30,7 +30,7 @@ class OpenRewriteModelSerializableTest {
 
     @Test
     void mavenRepository() throws IOException {
-        MavenRepository mavenRepository = new MavenRepository("id", "url", null, null, null, null);
+        MavenRepository mavenRepository = new MavenRepository("id", "url", null, null, null, null, null);
         ObjectOutputStream os = new ObjectOutputStream(new ByteArrayOutputStream());
         os.writeObject(mavenRepository);
     }

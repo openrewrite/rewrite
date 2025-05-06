@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
@@ -46,6 +47,69 @@ import static org.openrewrite.test.TypeValidation.all;
  * @author Alex Boyko
  */
 class JavaParserTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void erroneousVariableDeclarations() {
+        rewriteRun(
+          spec -> spec.recipe(new FindCompileErrors())
+            .typeValidationOptions(all().erroneous(false)),
+          java(
+            """
+              package com.example.demo;
+              class Foo {
+                  /pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Foo {
+                  /*~~>*///*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Bar {
+                  pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Bar {
+                  /*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Baz {
+                  -pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Baz {
+                  /*~~>*/-/*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void incompleteAssignment() {
@@ -246,68 +310,6 @@ class JavaParserTest implements RewriteTest {
     }
 
     @Test
-    void erroneousVariableDeclarations() {
-        rewriteRun(
-          spec -> spec.recipe(new FindCompileErrors())
-            .typeValidationOptions(all().erroneous(false)),
-          java(
-            """
-              package com.example.demo;
-              class Foo {
-                  /pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Foo {
-                  /*~~>*///*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              package com.example.demo;
-              class Bar {
-                  pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Bar {
-                  /*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              package com.example.demo;
-              class Baz {
-                  -pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Baz {
-                  /*~~>*/-/*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4624")
     void shouldParseComments() {
         rewriteRun(
@@ -388,7 +390,8 @@ class JavaParserTest implements RewriteTest {
                 return null;
               }
             }
-            """));
+            """
+          ));
     }
 
 }

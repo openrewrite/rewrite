@@ -42,12 +42,30 @@ import java.util.Properties;
 import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.Recipe.noop;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class RecipeLifecycleTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void generateFile() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe()
+              .withGenerator(() -> List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build()))
+              .withName("test.GeneratingRecipe")
+              .withMaxCycles(1)
+            )
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
+              .map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
+              .containsOnly("test.GeneratingRecipe")),
+          text(null, "test", spec -> spec.path("test.txt"))
+        );
+    }
 
     @Test
     void panic() {
@@ -64,23 +82,6 @@ class RecipeLifecycleTest implements RewriteTest {
               }
           })).executionContext(ctx),
           text("hello")
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void generateFile() {
-        rewriteRun(
-          spec -> spec
-            .recipe(toRecipe()
-              .withGenerator(() -> List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build()))
-              .withName("test.GeneratingRecipe")
-              .withMaxCycles(1)
-            )
-            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
-              .map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
-              .containsOnly("test.GeneratingRecipe")),
-          text(null, "test", spec -> spec.path("test.txt"))
         );
     }
 
@@ -301,20 +302,6 @@ class RecipeLifecycleTest implements RewriteTest {
         }
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/389")
-    @Test
-    void sourceFilesAcceptOnlyApplicableVisitors() {
-        var sources = List.of(new FooSource(), PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build());
-        var fooVisitor = new FooVisitor<ExecutionContext>();
-        var textVisitor = new PlainTextVisitor<ExecutionContext>();
-        var ctx = new InMemoryExecutionContext();
-
-        for (SourceFile source : sources) {
-            fooVisitor.visit(source, ctx);
-            textVisitor.visit(source, ctx);
-        }
-    }
-
     @DocumentExample
     @Test
     void accurateReportingOfRecipesMakingChanges() {
@@ -333,6 +320,20 @@ class RecipeLifecycleTest implements RewriteTest {
             "Change2Change1Hello"
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/389")
+    @Test
+    void sourceFilesAcceptOnlyApplicableVisitors() {
+        var sources = List.of(new FooSource(), PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build());
+        var fooVisitor = new FooVisitor<ExecutionContext>();
+        var textVisitor = new PlainTextVisitor<ExecutionContext>();
+        var ctx = new InMemoryExecutionContext();
+
+        for (SourceFile source : sources) {
+            fooVisitor.visit(source, ctx);
+            textVisitor.visit(source, ctx);
+        }
     }
 
     private Recipe testRecipe(@Language("markdown") String name) {

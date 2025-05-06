@@ -2526,20 +2526,6 @@ public interface J extends Tree {
 
         JavaType.@Nullable Variable fieldType;
 
-        /**
-         * @deprecated Use {@link #Identifier(UUID, Space, Markers, List, String, JavaType, JavaType.Variable)} instead.
-         */
-        @Deprecated
-        public Identifier(UUID id, Space prefix, Markers markers, String simpleName, @Nullable JavaType type, JavaType.@Nullable Variable fieldType) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.annotations = emptyList();
-            this.simpleName = simpleName;
-            this.type = type;
-            this.fieldType = fieldType;
-        }
-
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitIdentifier(this, p);
@@ -4192,19 +4178,6 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitModifier(this, p);
-        }
-
-        /**
-         * @deprecated Use {@link #Modifier(UUID, Space, Markers, String, Type, List)} instead.
-         */
-        @Deprecated
-        public Modifier(UUID id, Space prefix, Markers markers, Type type, List<Annotation> annotations) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.keyword = null;
-            this.type = type;
-            this.annotations = annotations;
         }
 
         @Override

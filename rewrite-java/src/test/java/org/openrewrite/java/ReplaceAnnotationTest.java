@@ -28,16 +28,18 @@ class ReplaceAnnotationTest implements RewriteTest {
     @SuppressWarnings("NullableProblems")
     @Nested
     class OnMatch {
+
         @Test
-        void matchNoPrams() {
+        @DocumentExample
+        void matchWithPrams() {
             rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull(\"Test\")", "@lombok.NonNull", null)),
               java(
                 """
                   import org.jetbrains.annotations.NotNull;
-                  
+                 
                   class A {
-                      @NotNull
+                      @NotNull("Test")
                       String testMethod() {}
                   }
                   """,
@@ -52,18 +54,16 @@ class ReplaceAnnotationTest implements RewriteTest {
               )
             );
         }
-
         @Test
-        @DocumentExample
-        void matchWithPrams() {
+        void matchNoPrams() {
             rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull(\"Test\")", "@lombok.NonNull", null)),
+              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
               java(
                 """
                   import org.jetbrains.annotations.NotNull;
-                 
+                  
                   class A {
-                      @NotNull("Test")
+                      @NotNull
                       String testMethod() {}
                   }
                   """,

@@ -46,7 +46,8 @@ class FindMethodDeclarationTest implements RewriteTest {
                   void a(String s) {
                   }
               }
-              """)
+              """
+          )
         );
     }
 }

@@ -51,7 +51,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             throw new IllegalArgumentException("Only expressions and statements can be matched against a template: " + input.getClass());
         }
 
-        J[] parameters = createTemplateParameters(template.getCode());
+        J[] parameters = createTemplateParameters(template.getCode(), template.getGenericTypes());
         try {
             J templateTree = template.apply(input, coordinates, (Object[]) parameters);
             return matchTemplate(templateTree, input);
@@ -61,10 +61,11 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         }
     }
 
-    private static J[] createTemplateParameters(String code) {
+    private static J[] createTemplateParameters(String code, Set<String> genericTypes) {
         PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper(
                 "#{", "}", null);
 
+        Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
         List<J> parameters = new ArrayList<>();
         String substituted = code;
         Map<String, String> typedPatternByName = new HashMap<>();
@@ -73,24 +74,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
                 String s;
                 if (!key.isEmpty()) {
-                    BaseErrorListener errorListener = new BaseErrorListener() {
-                        @Override
-                        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                                int line, int charPositionInLine, String msg, RecognitionException e) {
-                            throw new IllegalArgumentException(
-                                    String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
-                        }
-                    };
-
-                    TemplateParameterLexer lexer = new TemplateParameterLexer(CharStreams.fromString(key));
-                    lexer.removeErrorListeners();
-                    lexer.addErrorListener(errorListener);
-
-                    TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(lexer));
-                    parser.removeErrorListeners();
-                    parser.addErrorListener(errorListener);
-
-                    TemplateParameterParser.MatcherPatternContext ctx = parser.matcherPattern();
+                    TemplateParameterParser.MatcherPatternContext ctx = TypeParameter.parser(key).matcherPattern();
                     if (ctx.typedPattern() == null) {
                         String paramName = ctx.parameterName().Identifier().getText();
                         s = typedPatternByName.get(paramName);
@@ -99,7 +83,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                         }
                     } else {
                         TypedPatternContext typedPattern = ctx.typedPattern();
-                        JavaType type = typedParameter(key, typedPattern);
+                        JavaType type = typedParameter(key, typedPattern, generics);
                         s = TypeUtils.toString(type);
 
                         String name = null;
@@ -126,12 +110,12 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         return parameters.toArray(new J[0]);
     }
 
-    private static JavaType typedParameter(String key, TypedPatternContext typedPattern) {
+    private static JavaType typedParameter(String key, TypedPatternContext typedPattern, Map<String, JavaType.GenericTypeVariable> generics) {
         String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
         if ("any".equals(matcherName)) {
-            return TypeParameter.toFullyQualifiedName(typedPattern.patternType().type());
+            return TypeParameter.toJavaType(typedPattern.patternType().type(), generics);
         } else if ("anyArray".equals(matcherName)) {
-            return new JavaType.Array(null, TypeParameter.toFullyQualifiedName(typedPattern.patternType().type()), null);
+            return new JavaType.Array(null, TypeParameter.toJavaType(typedPattern.patternType().type(), generics), null);
         } else {
             throw new IllegalArgumentException("Unsupported template matcher '" + key + "'");
         }
@@ -152,6 +136,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     @SuppressWarnings("ConstantConditions")
     private static class JavaTemplateSemanticallyEqualVisitor extends SemanticallyEqualVisitor {
         final Map<J, String> matchedParameters = new LinkedHashMap<>();
+        final Types types = new Types(true);
 
         public JavaTemplateSemanticallyEqualVisitor() {
             super(true);
@@ -174,7 +159,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 }
 
                 if (TypeUtils.isObject(marker.getType()) ||
-                    TypeUtils.isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
+                    isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
                     registerMatch(j, marker.getName());
                     return true;
                 }
@@ -210,6 +195,16 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         private static boolean isTemplateParameterPlaceholder(J.Empty empty) {
             Markers markers = empty.getMarkers();
             return markers.getMarkers().size() == 1 && markers.getMarkers().get(0) instanceof TemplateParameter;
+        }
+
+        @Override
+        protected boolean isOfType(@Nullable JavaType target, @Nullable JavaType source) {
+            return target == source || isAssignableTo(target, source);
+        }
+
+        @Override
+        protected boolean isAssignableTo(@Nullable JavaType target, @Nullable JavaType source) {
+            return types.isAssignableTo(target, source);
         }
     }
 }

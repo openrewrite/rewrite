@@ -502,7 +502,8 @@ class MethodInvocationTest implements RewriteTest {
               fun test ( ) {
                 format (  *   arrayOf ( "foo" , "bar" ) )
               }
-              """)
+              """
+          )
         );
     }
 
@@ -517,7 +518,8 @@ class MethodInvocationTest implements RewriteTest {
                 val x = arrayOf ( "foo" , "bar" )
                 format ( "" , * x )
               }
-              """)
+              """
+          )
         );
     }
 
