@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.format.MinimumViableSpacingVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
@@ -35,7 +34,7 @@ class SwitchEnhancementsTest implements RewriteTest {
               .afterTypeValidationOptions(TypeValidation.none())
               .recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
                   @Override
-                  public J.Case visitCase(J.Case _case, ExecutionContext executionContext) {
+                  public J.Case visitCase(J.Case _case, ExecutionContext ctx) {
                       if (_case.getBody() == null || _case.getGuard() != null || (!_case.getCaseLabels().isEmpty() && _case.getCaseLabels().get(0) instanceof J.Identifier)) {
                           return _case;
                       }
@@ -43,9 +42,8 @@ class SwitchEnhancementsTest implements RewriteTest {
                           .contextSensitive()
                           .build()
                           .apply(new Cursor(getCursor(), _case.getBody()), ((Expression) _case.getBody()).getCoordinates().replace());
-                      // test fails if I do not specifically add this visitor myself
-                      doAfterVisit(new MinimumViableSpacingVisitor<>(_case));
-                      return _case.withGuard(expression);
+
+                      return autoFormat(_case.withGuard(expression), ctx);
                   }
               })),
           //language=java
