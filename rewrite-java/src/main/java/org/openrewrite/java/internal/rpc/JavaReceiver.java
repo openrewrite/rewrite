@@ -320,8 +320,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitLambdaParameters(J.Lambda.Parameters parameters, RpcReceiveQueue q) {
         return parameters
-                .getPadding().withParameters(q.receiveList(parameters.getPadding().getParameters(), p -> visitRightPadded(p, q)))
-                .withParenthesized(q.receive(parameters.isParenthesized()));
+                .withParenthesized(q.receive(parameters.isParenthesized()))
+                .getPadding().withParameters(q.receiveList(parameters.getPadding().getParameters(), p -> visitRightPadded(p, q)));
     }
 
     @Override

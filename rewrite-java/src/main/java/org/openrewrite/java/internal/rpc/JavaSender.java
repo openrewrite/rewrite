@@ -319,8 +319,8 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     @Override
     public J visitLambdaParameters(J.Lambda.Parameters parameters, RpcSendQueue q) {
-        q.getAndSendList(parameters, p -> p.getPadding().getParameters(), r -> r.getElement().getId(), param -> visitRightPadded(param, q));
         q.getAndSend(parameters, J.Lambda.Parameters::isParenthesized);
+        q.getAndSendList(parameters, p -> p.getPadding().getParameters(), r -> r.getElement().getId(), param -> visitRightPadded(param, q));
         return parameters;
     }
 

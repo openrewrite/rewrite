@@ -886,8 +886,8 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitLambdaParameters(params: J.Lambda.Parameters, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(params);
 
-        draft.parameters = await q.receiveListDefined(params.parameters, param => this.visitRightPadded(param, q));
         draft.parenthesized = await q.receive(params.parenthesized);
+        draft.parameters = await q.receiveListDefined(params.parameters, param => this.visitRightPadded(param, q));
 
         return finishDraft(draft);
     }
