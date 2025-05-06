@@ -78,7 +78,8 @@ public class CheckstyleConfigLoader {
                                 operatorWrapStyle(conf),
                                 typecastParenPadStyle(conf),
                                 unnecessaryParentheses(conf),
-                                customImportOrderStyle(conf))
+                                customImportOrderStyle(conf),
+                                unusedImportsStyles(conf))
                         .filter(Objects::nonNull)
                         .flatMap(Set::stream)
                         .collect(toSet()));
@@ -530,6 +531,16 @@ public class CheckstyleConfigLoader {
         return moduleList.stream()
                 .map(module -> Checkstyle.hideUtilityClassConstructorStyle())
                 .collect(Collectors.toSet());
+    }
+
+    private static @Nullable Set<UnusedImportsStyle> unusedImportsStyles(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("UnusedImports");
+        if (moduleList == null) {
+            return null;
+        }
+        return moduleList.stream()
+            .map(module -> new UnusedImportsStyle(parseBoolean(module.properties.get("processJavadoc"))))
+            .collect(toSet());
     }
 
     protected static class Module {
