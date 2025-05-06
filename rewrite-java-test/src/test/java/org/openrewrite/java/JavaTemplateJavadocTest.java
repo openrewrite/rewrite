@@ -29,7 +29,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 class JavaTemplateJavadocTest implements RewriteTest {
 
     @Test
-    void simpleMethodInvocationReplacement() {
+    void methodInvocationReplacement() {
         // Extracted from org.openrewrite.java.migrate.net.MigrateURLDecoderDecode
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

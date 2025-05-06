@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import java.util.Collections;
 import lombok.Getter;
 import lombok.Value;
 import lombok.experimental.NonFinal;
@@ -29,13 +28,13 @@ import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
-import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.template.SourceTemplate;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -107,9 +106,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     @Override
     @SuppressWarnings("unchecked")
     public <J2 extends J> J2 apply(Cursor scope, JavaCoordinates coordinates, Object... parameters) {
-        if (scope.firstEnclosing(Javadoc.DocComment.class) != null) {
-            return scope.getValue();
-        }
         if (!(scope.getValue() instanceof J)) {
             throw new IllegalArgumentException("`scope` must point to a J instance.");
         }
