@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -93,6 +94,25 @@ public class TypesInUse {
                 }
             }
             return javaType;
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+            maybeAddMethod(method.getMethodType(), method.getSelect());
+            return super.visitMethodInvocation(method, integer);
+        }
+
+        @Override
+        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer integer) {
+            maybeAddMethod(memberRef.getMethodType(), memberRef.getContaining());
+            return super.visitMemberReference(memberRef, integer);
+        }
+
+        private void maybeAddMethod(JavaType.@Nullable Method methodType, @Nullable Expression expression) {
+            if (methodType != null && expression != null && expression.getType() instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified declaringType = (JavaType.FullyQualified) expression.getType();
+                usedMethods.add(methodType.withDeclaringType(declaringType));
+            }
         }
     }
 }

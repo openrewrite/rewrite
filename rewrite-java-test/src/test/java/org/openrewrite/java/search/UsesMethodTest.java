@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -200,6 +201,64 @@ class UsesMethodTest implements RewriteTest {
                  public static class C {
                      public void foo() {}
                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5376")
+    void usesMethodDeepHierarchy() {
+        //noinspection ResultOfMethodCallIgnored
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("java.util.Set contains(..)", true)))
+            .parser(JavaParser.fromJavaVersion().classpath("guava")),
+          java(
+            """
+              import com.google.common.collect.ImmutableMap;
+              
+              class TestMethodInvocation {
+                  void test() {
+                      ImmutableMap.of("1", 4, "2", 5).keySet().contains("3");
+                  }
+              }
+              """,
+            """
+              /*~~>*/import com.google.common.collect.ImmutableMap;
+              
+              class TestMethodInvocation {
+                  void test() {
+                      ImmutableMap.of("1", 4, "2", 5).keySet().contains("3");
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import com.google.common.collect.ImmutableMap;
+              import com.google.common.collect.ImmutableSet;
+              
+              import java.util.stream.Stream;
+              
+              class TestMemberReference {
+                  void test() {
+                        var set = ImmutableSet.of("1");
+                        Stream.of("foo").filter(set::contains);
+                  }
+              }
+              """,
+            """
+              /*~~>*/import com.google.common.collect.ImmutableMap;
+              import com.google.common.collect.ImmutableSet;
+              
+              import java.util.stream.Stream;
+              
+              class TestMemberReference {
+                  void test() {
+                        var set = ImmutableSet.of("1");
+                        Stream.of("foo").filter(set::contains);
+                  }
               }
               """
           )
