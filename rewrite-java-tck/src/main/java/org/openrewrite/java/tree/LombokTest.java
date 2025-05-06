@@ -209,9 +209,47 @@ class LombokTest implements RewriteTest {
                   public class Parent {
                       String lastName;
                   }
-                 
+                  """
+              ),
+              java(
+                """
+                  import lombok.experimental.SuperBuilder;
+                  
                   @SuperBuilder
                   public class Child extends Parent {
+                      String firstName;
+                  }
+                  """
+              ),
+              java(
+                """
+                  class Test {
+                      void test() {
+                          Child child = Child.builder()
+                            .firstName("John")
+                            .lastName("Doe")
+                            .build();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withHierarchy2() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.experimental.SuperBuilder;
+                  
+                  @SuperBuilder
+                  class Parent {
+                      String lastName;
+                  }
+                  
+                  @SuperBuilder
+                  class Child extends Parent {
                       String firstName;
                   }
                   
@@ -1073,7 +1111,7 @@ class LombokTest implements RewriteTest {
          */
 
         @Test
-        // TODO: Find solution and remove this test
+            // TODO: Find solution and remove this test
         void jacksonizedForJava8() {
             rewriteRun(
               spec -> spec
@@ -1083,7 +1121,7 @@ class LombokTest implements RewriteTest {
                     FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
                     // Using the @Jacksonized annotation in java 8 just breaks it all
                     return result.getPath().startsWith("ClassDeclaration->CompilationUnit") ||
-                      result.getPath().startsWith("Identifier->Annotation")||
+                      result.getPath().startsWith("Identifier->Annotation") ||
                       result.getPath().startsWith("Identifier->ParameterizedType");
                 }).build()),
               java(
@@ -1104,7 +1142,7 @@ class LombokTest implements RewriteTest {
         }
 
         @Test
-        // TODO: Find solution and remove this test
+            // TODO: Find solution and remove this test
         void onConstructorForJava8() {
             rewriteRun(
               spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
@@ -1146,7 +1184,7 @@ class LombokTest implements RewriteTest {
         }
 
         @Test
-        // TODO: Find solution and remove this test
+            // TODO: Find solution and remove this test
         void onConstructorNoArgsForJava8() {
             rewriteRun(
               spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
