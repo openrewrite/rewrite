@@ -19,10 +19,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.Tree.randomId;
