@@ -103,7 +103,13 @@ export class RpcSendQueue {
             await this.getAndSend(markersRef, m => m.id);
             await this.getAndSendList(markersRef,
                 (m) => m.markers,
-                (marker: Marker) => marker.id
+                (marker: Marker) => marker.id,
+                async (marker: Marker) => {
+                    const afterCodec = RpcCodecs.forInstance(marker);
+                    if (afterCodec) {
+                        await afterCodec?.rpcSend(marker, this)
+                    }
+                }
             );
         });
     }

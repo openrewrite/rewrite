@@ -19,6 +19,7 @@ import {Expression, isSpace, J, JavaType, TextComment} from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
 import {isTree} from "../tree";
+import {JavaMarkers, TrailingComma} from "./markers";
 
 export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
@@ -1387,3 +1388,19 @@ const javaCodec: RpcCodec<J> = {
 Object.values(J.Kind).forEach(kind => {
     RpcCodecs.registerCodec(kind, javaCodec);
 });
+
+// Register codecs for all Java markers with additional properties
+RpcCodecs.registerCodec(JavaMarkers.TrailingComma, {
+        async rpcReceive(before: TrailingComma, q: RpcReceiveQueue): Promise<TrailingComma> {
+            const draft = createDraft(before);
+            draft.id = await q.receive(before.id);
+            draft.suffix = await q.receive(before.suffix, space => new JavaReceiver().visitSpace(space, q))
+            return finishDraft(draft);
+        },
+
+        async rpcSend(after: TrailingComma, q: RpcSendQueue): Promise<void> {
+            await q.getAndSend(after, a => a.id);
+            await q.getAndSend(after, a => asRef(a.suffix), space => new JavaSender().visitSpace(space, q));
+        }
+    }
+);

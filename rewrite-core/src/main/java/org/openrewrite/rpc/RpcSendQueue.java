@@ -69,7 +69,12 @@ public class RpcSendQueue {
         getAndSend(parent, t2 -> asRef(markersFn.apply(t2)), markersRef -> {
             Markers markers = Reference.getValue(markersRef);
             getAndSend(requireNonNull(markers), Markers::getId);
-            getAndSendList(markers, Markers::getMarkers, Marker::getId, null);
+            getAndSendList(markers, Markers::getMarkers, Marker::getId, marker -> {
+                if (marker instanceof RpcCodec) {
+                    //noinspection unchecked
+                    ((RpcCodec<Object>) marker).rpcSend(marker, this);
+                }
+            });
         });
     }
 
