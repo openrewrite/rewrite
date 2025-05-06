@@ -23,6 +23,7 @@ import {WriteStream} from "fs";
 import "../text";
 import "../json";
 import "../java";
+import "../javascript";
 
 const log: WriteStream = fs.createWriteStream(`${process.cwd()}/rpc.js.log`, {flags: 'w'});
 log.write(`[js-rewrite-rpc] starting\n\n`);

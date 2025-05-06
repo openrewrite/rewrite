@@ -15,15 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import '../tree';
-import '../java';
-import {JavaScriptVisitor, JS} from ".";
+import {JS} from "./tree";
+import {JavaScriptVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, JavaMarkers, Statement, TextComment, TrailingComma, TypeTree} from "../java";
 import {Marker, Markers} from "../markers";
-import Space = J.Space;
-import NamespaceDeclaration = JS.NamespaceDeclaration;
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -156,7 +153,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             case JS.NamespaceDeclaration.KeywordType.Namespace:
                 p.append("namespace");
                 break;
-            case NamespaceDeclaration.KeywordType.Module:
+            case JS.NamespaceDeclaration.KeywordType.Module:
                 p.append("module");
                 break;
             default:
@@ -1813,7 +1810,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntaxExt(j.prefix, j.markers, p);
     }
 
-    private async beforeSyntaxExt(prefix: Space, markers: Markers, p: PrintOutputCapture) {
+    private async beforeSyntaxExt(prefix: J.Space, markers: Markers, p: PrintOutputCapture) {
         for (const marker of markers.markers) {
             p.out.concat(
                 p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER)

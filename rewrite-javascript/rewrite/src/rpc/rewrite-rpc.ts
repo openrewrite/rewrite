@@ -22,6 +22,7 @@ import {
     Generate,
     GetObject,
     GetRecipes,
+    Parse,
     PrepareRecipe,
     PrepareRecipeResponse,
     Print,
@@ -34,7 +35,7 @@ import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
 import {WriteStream} from "fs";
-import {trace} from "./trace";
+import {ParserInput, parserInputFile, parserInputRead} from "../parser";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
@@ -71,6 +72,7 @@ export class RewriteRpc {
             !!options?.traceGetObjectOutput);
         GetRecipes.handle(this.connection, registry);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
+        Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
         InstallRecipes.handle(this.connection, ".rewrite", registry);
 
@@ -116,6 +118,20 @@ export class RewriteRpc {
             }
         }
         return cursor;
+    }
+
+    async parse(parser: string, inputs: ParserInput[], relativeTo?: string, ctx?: ExecutionContext): Promise<SourceFile[]> {
+        const parsed: SourceFile[] = [];
+        for (const g of await this.connection.sendRequest(
+            new rpc.RequestType<Parse, string[], Error>("Parse"),
+            new Parse(parser, inputs.map(i => ({
+                path: parserInputFile(i),
+                text: i === "string" ? undefined : parserInputRead(i)
+            })), relativeTo)
+        )) {
+            parsed.push(await this.getObject(g));
+        }
+        return parsed;
     }
 
     async print(tree: SourceFile): Promise<string>;

@@ -27,6 +27,8 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
 
 import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -200,6 +202,25 @@ public class RewriteRpc {
     public Recipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
+    }
+
+    public List<SourceFile> parse(String parser, Iterable<Parser.Input> inputs, @Nullable Path relativeTo, ExecutionContext ctx) {
+        List<Parse.Input> mappedInputs = new ArrayList<>();
+        for (Parser.Input input : inputs) {
+            if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
+                mappedInputs.add(new Parse.Input(input.getSource(ctx).readFully(), input.getPath().toString()));
+            } else {
+                mappedInputs.add(new Parse.Input(null, input.getPath().toString()));
+            }
+        }
+
+        List<String> parsed = send("Parse", new Parse(parser, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+        if (!parsed.isEmpty()) {
+            return parsed.stream()
+                    .map(this::<SourceFile>getObject)
+                    .collect(Collectors.toList());
+        }
+        return emptyList();
     }
 
     public String print(SourceFile tree) {

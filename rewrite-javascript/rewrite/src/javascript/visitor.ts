@@ -15,14 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {mapAsync, SourceFile, ValidImmerRecipeReturnType} from "../";
+import {SourceFile} from "../tree";
+import {ValidImmerRecipeReturnType} from "../visitor";
+import {mapAsync} from "../util";
 import {J, JavaType, JavaVisitor, NameTree, Statement, TypedTree, TypeTree} from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
 import {Expression, isJavaScript, JS} from "./tree";
-import JSNamedVariable = JS.JSVariableDeclarations.JSNamedVariable;
-import MappedTypeParameter = JS.MappedType.MappedTypeParameter;
-import TemplateSpan = JS.TemplateExpression.TemplateSpan;
-import IndexType = JS.IndexedAccessType.IndexType;
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
@@ -221,8 +219,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJSNamedVariable(jSNamedVariable: JSNamedVariable, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JSNamedVariable>(jSNamedVariable, p, async draft => {
+    protected async visitJSNamedVariable(jSNamedVariable: JS.JSVariableDeclarations.JSNamedVariable, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.JSVariableDeclarations.JSNamedVariable>(jSNamedVariable, p, async draft => {
             draft.name = await this.visitDefined<Expression>(jSNamedVariable.name, p);
             draft.dimensionsAfterName = await mapAsync(jSNamedVariable.dimensionsAfterName, item => this.visitLeftPadded(item, p));
             draft.initializer = jSNamedVariable.initializer && await this.visitLeftPadded(jSNamedVariable.initializer, p);
@@ -286,8 +284,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitMappedTypeParameter(mappedTypeParameter: MappedTypeParameter, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<MappedTypeParameter>(mappedTypeParameter, p, async draft => {
+    protected async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.MappedTypeParameter, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.MappedType.MappedTypeParameter>(mappedTypeParameter, p, async draft => {
             draft.name = await this.visitDefined<Expression>(mappedTypeParameter.name, p);
             draft.iterateType = await this.visitLeftPadded(mappedTypeParameter.iterateType, p);
         });
@@ -349,8 +347,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitTemplateSpan(templateSpan: TemplateSpan, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<TemplateSpan>(templateSpan, p, async draft => {
+    protected async visitTemplateSpan(templateSpan: JS.TemplateExpression.TemplateSpan, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.TemplateExpression.TemplateSpan>(templateSpan, p, async draft => {
             draft.expression = await this.visitDefined<J>(templateSpan.expression, p);
             draft.tail = await this.visitDefined<J.Literal>(templateSpan.tail, p);
         });
@@ -410,8 +408,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitIndexType(indexType: IndexType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<IndexType>(indexType, p, async draft => {
+    protected async visitIndexType(indexType: JS.IndexedAccessType.IndexType, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.IndexedAccessType.IndexType>(indexType, p, async draft => {
             draft.element = await this.visitRightPadded(indexType.element, p);
             draft.type = indexType.type && await this.visitType(indexType.type, p);
         });
@@ -668,7 +666,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 case JS.Kind.JSVariableDeclarations:
                     return this.visitJSVariableDeclarations(tree as unknown as JS.JSVariableDeclarations, p);
                 case JS.Kind.JSNamedVariable:
-                    return this.visitJSNamedVariable(tree as unknown as JSNamedVariable, p);
+                    return this.visitJSNamedVariable(tree as unknown as JS.JSVariableDeclarations.JSNamedVariable, p);
                 case JS.Kind.ImportAttributes:
                     return this.visitImportAttributes(tree as unknown as JS.ImportAttributes, p);
                 case JS.Kind.ImportTypeAttributes:
@@ -684,7 +682,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 case JS.Kind.MappedTypeKeysRemapping:
                     return this.visitKeysRemapping(tree as unknown as JS.MappedType.KeysRemapping, p);
                 case JS.Kind.MappedTypeMappedTypeParameter:
-                    return this.visitMappedTypeParameter(tree as unknown as MappedTypeParameter, p);
+                    return this.visitMappedTypeParameter(tree as unknown as JS.MappedType.MappedTypeParameter, p);
                 case JS.Kind.ObjectBindingDeclarations:
                     return this.visitObjectBindingDeclarations(tree as unknown as JS.ObjectBindingDeclarations, p);
                 case JS.Kind.PropertyAssignment:
@@ -700,7 +698,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 case JS.Kind.TemplateExpression:
                     return this.visitTemplateExpression(tree as unknown as JS.TemplateExpression, p);
                 case JS.Kind.TemplateExpressionTemplateSpan:
-                    return this.visitTemplateSpan(tree as unknown as TemplateSpan, p);
+                    return this.visitTemplateSpan(tree as unknown as JS.TemplateExpression.TemplateSpan, p);
                 case JS.Kind.TrailingTokenStatement:
                     return this.visitTrailingTokenStatement(tree as unknown as JS.TrailingTokenStatement, p);
                 case JS.Kind.Tuple:

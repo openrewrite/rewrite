@@ -23,7 +23,7 @@ import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import inspector from 'inspector';
 import {activate} from "../example-recipe";
-import {javascript} from "../../src/javascript";
+import {javascript, JS} from "../../src/javascript";
 import fs from "node:fs";
 
 const isDebugging = Boolean(inspector.url());
@@ -79,6 +79,13 @@ describe("Rewrite RPC", () => {
             }
         }
     ));
+
+    test("parse", async () => {
+        let sourceFile = (await client.parse("javascript", [{text: "console.info('hello')", sourcePath: "hello.js"}]))[0];
+        expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
+        expect(sourceFile.sourcePath).toEqual("hello.js");
+        return sourceFile;
+    });
 
     test("getRecipes", async () =>
         expect((await client.recipes()).length).toBeGreaterThan(0)

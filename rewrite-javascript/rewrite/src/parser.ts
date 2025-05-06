@@ -38,10 +38,22 @@ export function parserInputFile(input: ParserInput): string {
     return input;
 }
 
+export interface ParserOptions {
+    ctx?: ExecutionContext;
+    relativeTo?: string;
+}
+
 export abstract class Parser {
-    constructor(protected ctx: ExecutionContext = new ExecutionContext(),
-                protected readonly relativeTo?: string) {
+    constructor({
+                    ctx = new ExecutionContext(),
+                    relativeTo
+                }: ParserOptions = {}) {
+        this.ctx = ctx;
+        this.relativeTo = relativeTo;
     }
+
+    protected ctx: ExecutionContext;
+    protected readonly relativeTo?: string;
 
     abstract parse(...sourcePaths: ParserInput[]): Promise<SourceFile[]>
 
@@ -116,4 +128,25 @@ export function readSourceSync(sourcePath: ParserInput) {
         return readFileSync(sourcePath).toString();
     }
     return sourcePath.text;
+}
+
+type ParserConstructor<T extends Parser> = new (...args: any[]) => T;
+
+export class Parsers {
+    private static registry: Record<string, ParserConstructor<Parser>> = {};
+
+    static registerParser<T extends Parser>(
+        name: string,
+        parserClass: ParserConstructor<T>
+    ): void {
+        Parsers.registry[name] = parserClass as ParserConstructor<Parser>;
+    }
+
+    static createParser(name: string, ...args: any[]): Parser {
+        const ParserClass = Parsers.registry[name];
+        if (!ParserClass) {
+            throw new Error(`No parser registered with name: ${name}`);
+        }
+        return new ParserClass(...args);
+    }
 }

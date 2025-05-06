@@ -37,6 +37,8 @@ import {
     ParserInput,
     parserInputFile,
     parserInputRead,
+    ParserOptions,
+    Parsers,
     randomId,
     SourceFile,
     SourcePath
@@ -56,14 +58,20 @@ import {JavaScriptTypeMapping} from "./typeMapping";
 import {produce} from "immer";
 import Kind = JS.Kind;
 
+export interface JavaScriptParserOptions extends ParserOptions {
+}
+
 export class JavaScriptParser extends Parser {
 
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly sourceFileCache: Map<string, ts.SourceFile> = new Map();
     private oldProgram?: ts.Program;
 
-    constructor() {
-        super();
+    constructor({
+                    ctx,
+                    relativeTo
+                }: JavaScriptParserOptions = {}) {
+        super({ctx, relativeTo});
         this.compilerOptions = {
             target: ts.ScriptTarget.Latest,
             module: ts.ModuleKind.CommonJS,
@@ -4453,3 +4461,5 @@ class InvalidSurrogatesNotSupportedError extends SyntaxError {
         this.name = "InvalidSurrogatesNotSupportedError";
     }
 }
+
+Parsers.registerParser("javascript", JavaScriptParser);
