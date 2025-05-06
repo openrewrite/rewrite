@@ -1620,7 +1620,7 @@ public interface JS extends J {
             }
 
             public JsImportSpecifier withImportType(JLeftPadded<Boolean> importType) {
-                return t.importType == importType ? t : new JsImportSpecifier(t.id, t.prefix, t.markers, t.importType, t.specifier, t.type);
+                return t.importType == importType ? t : new JsImportSpecifier(t.id, t.prefix, t.markers, importType, t.specifier, t.type);
             }
         }
 
