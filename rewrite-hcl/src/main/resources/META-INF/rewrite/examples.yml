@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# 
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.hcl.DeleteContent
@@ -39,6 +38,10 @@ examples:
   - from.tf
   - to.tf
   sources:
+  - after: |
+      before {
+      }
+    language: hcl
   - before: |
       after {
       }
@@ -46,10 +49,6 @@ examples:
       }
     after: |
       after {
-      }
-    language: hcl
-  - after: |
-      before {
       }
     language: hcl
 ---

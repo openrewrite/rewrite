@@ -2085,8 +2085,11 @@ public class GroovyParserVisitor {
             String typeName = "";
 
             if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
-                typeName = expression.getOriginType().getUnresolvedName();
-                skip(typeName);
+                if (cursor + expression.getOriginType().getUnresolvedName().length() < source.length()
+                    && !Character.isJavaIdentifierPart(source.charAt(cursor + expression.getOriginType().getUnresolvedName().length()))) {
+                    typeName = expression.getOriginType().getUnresolvedName();
+                    skip(typeName);
+                }
             }
             J.Identifier ident = new J.Identifier(randomId(),
                     EMPTY,

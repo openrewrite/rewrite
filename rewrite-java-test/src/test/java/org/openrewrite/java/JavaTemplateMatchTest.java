@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -992,6 +993,51 @@ class JavaTemplateMatchTest implements RewriteTest {
                       /*~~(double)~~>*/Double.valueOf((Long) 1L);
                       /*~~(double)~~>*/Double.valueOf(Float.valueOf(1.2f));
                       /*~~(double)~~>*/Double.valueOf((Double) 1.2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchMemberReferenceContainingParameter() {
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                JavaTemplate template = JavaTemplate.builder("java.util.Optional.ofNullable(#{any(java.lang.String)}).orElseGet(#{any(java.lang.Object)}::toString)").build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                    JavaTemplate.Matcher matcher = template.matcher(getCursor());
+                    if (matcher.find()) {
+                        JavaTemplateSemanticallyEqual.TemplateMatchResult result = matcher.getMatchResult();
+                        assertThat(result.getMatchedParameters()).hasSize(2);
+                        return SearchResult.found(template.apply(getCursor(), method.getCoordinates().replace(), result.getMatchedParameters().toArray()));
+                    }
+                    return super.visitMethodInvocation(method, executionContext);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.Optional;
+              
+              class Foo {
+                  @SuppressWarnings("all")
+                  void test() {
+                      Optional.ofNullable("foo").orElseGet("bar"::toString);
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+              
+              class Foo {
+                  @SuppressWarnings("all")
+                  void test() {
+                      /*~~>*/java.util.Optional.ofNullable("foo").orElseGet("bar"::toString);
                   }
               }
               """
