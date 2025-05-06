@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
@@ -1028,6 +1029,116 @@ class RenameVariableTest implements RewriteTest {
                   this.n = n1;
                   return this;
                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/5369")
+    //This does not work
+    void hiddenVariablesGetRenamedCorrectlyInBlocks() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                    if (multiVariable.getVariables().get(0).isField(getCursor()) || multiVariable.getPrefix().getComments().isEmpty()) {
+                        return multiVariable;
+                    }
+                    doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
+                    return super.visitVariableDeclarations(multiVariable, ctx);
+                }
+            })),
+            java(
+              """
+                public class A {
+                    int n;
+    
+                    public void blocks() {
+                        {
+                            //only this one is in scope
+                            int n = 0;
+                            int x = n;
+                        }
+                        {
+                            int n = 0;
+                            int x = n;
+                        }
+                    }
+                }
+                """,
+              """
+                public class A {
+                    int n;
+    
+                    public void blocks() {
+                        {
+                            //only this one is in scope
+                            int n1 = 0;
+                            int x = n1;
+                        }
+                        {
+                            int n = 0;
+                            int x = n;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/5369")
+    //This is working
+    void hiddenVariablesGetRenamedCorrectlyInClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+
+              @Override
+              public J visitBlock(J.Block block, ExecutionContext ctx) {
+                  if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof J.ClassDeclaration) {
+                      for (Statement statement : block.getStatements()) {
+                          if (statement instanceof J.VariableDeclarations) {
+                              doAfterVisit(new RenameVariable<>(((J.VariableDeclarations) statement).getVariables().get(0), "n1"));
+                          }
+                      }
+                  }
+                  return super.visitBlock(block, ctx);
+              }
+          })),
+          java(
+            """
+              public class A {
+                  int n;
+  
+                  public void blocks() {
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  int n1;
+  
+                  public void blocks() {
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                  }
               }
               """
           )

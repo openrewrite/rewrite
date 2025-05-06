@@ -90,6 +90,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             }
             Cursor parent = getCursor().getParentTreeCursor();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
+                // This check evaluates to true for both blocks as int n = 0's fieldType is the same as the one of the variable to rename.
                 if (ident.getFieldType() != null && TypeUtils.isOfType(ident.getFieldType(), renameVariable.getVariableType())) {
                     parent.putMessage("renamed", true);
                     return ident.withFieldType(ident.getFieldType().withName(newName)).withSimpleName(newName);
