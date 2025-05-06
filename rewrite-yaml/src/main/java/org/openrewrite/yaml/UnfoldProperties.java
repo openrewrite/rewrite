@@ -100,6 +100,7 @@ public class UnfoldProperties extends Recipe {
             /**
              * Splits a key into parts while respecting certain exclusion rules.
              * The method ensures certain segments of the key are kept together as defined in the exclusions list.
+             * It uses a custom JsonPathParser to parse keys with dots, like `logging.level`.
              *
              * @param key the full key to be split into parts
              * @return a list of strings representing the split parts of the key
@@ -108,34 +109,37 @@ public class UnfoldProperties extends Recipe {
                 String parentKey = getParentKey();
                 List<String> keepTogether = new ArrayList<>();
                 for (String ex : exclusions) {
-                    /*if (!ex.startsWith("->") && ex.contains("->") && !ex.endsWith("->")) {
-                        if (parentKey == null) {
-                            continue;
-                        }
-                        String parentEx = ex.split("->")[0].substring(1);
-                        Matcher m = Pattern.compile(".*(" + parentEx + ").*").matcher(parentKey);
-                        if (m.matches()) {
-                            ex = ex.split("->")[1];
-                        } else {
-                            continue;
-                        }
-                    }*/
-
-                    if (ex.startsWith("$..")) { // Recursive descent
+                    // Recursive descent
+                    if (ex.startsWith("$..")) {
                         ex = ex.substring(3);
+                        // Handle parent-child conditions like: `$..[logging.level][?(<condition>)]` and `$..logging.level[?(<condition>)]`
+                        if (ex.startsWith("[") && ex.contains("][")) {
+                            int secondBracket = ex.indexOf( '[', 1);
+                            ex = ex.substring(1, secondBracket - 1) + ex.substring(secondBracket);
+                        }
+                        if (!ex.startsWith("[") && ex.contains("[") && parentKey.contains(ex.split("\\[")[0])) {
+                            ex = "[" + ex.split("\\[")[1];
+                        }
                     }
-                    if (ex.startsWith("$.")) { // Starts from root
+
+                    // Starts from root
+                    if (ex.startsWith("$.")) {
                         ex = ex.replace("$." + parentKey, "");
+                        if (ex.startsWith(".")) {
+                            ex = ex.substring(1);
+                        }
                     }
+
+                    // property in brackets
                     if (ex.startsWith("[") && ex.endsWith("]")) {
                         ex = ex.substring(1, ex.length() - 1);
                     }
+
+                    // properties can be wrapped in quotes
                     if (ex.startsWith("\"") && ex.endsWith("\"")) {
                         ex = ex.substring(1, ex.length() - 1);
                     } else if (ex.startsWith("'") && ex.endsWith("'")) {
                         ex = ex.substring(1, ex.length() - 1);
-                    } else if (ex.startsWith(".")) {
-                        ex = ex.substring(1);
                     }
 
                     if (ex.startsWith("?(@property.match(/") && ex.endsWith("/))")) {
@@ -171,7 +175,7 @@ public class UnfoldProperties extends Recipe {
                 return result;
             }
 
-            private @Nullable String getParentKey() {
+            private String getParentKey() {
                 StringBuilder parentKey = new StringBuilder();
                 Cursor c = getCursor().getParent();
                 while (c != null) {
@@ -180,7 +184,7 @@ public class UnfoldProperties extends Recipe {
                     }
                     c = c.getParent();
                 }
-                return parentKey.length() == 0 ? null : parentKey.substring(0, parentKey.length() - 1);
+                return parentKey.length() == 0 ? "" : parentKey.substring(0, parentKey.length() - 1);
             }
 
             private Yaml.Mapping.Entry createNestedEntry(List<String> keys, int index, Yaml.Block value) {

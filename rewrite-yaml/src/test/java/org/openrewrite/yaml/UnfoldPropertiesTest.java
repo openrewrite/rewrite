@@ -193,7 +193,7 @@ class UnfoldPropertiesTest implements RewriteTest {
     void exclusionWithParentAndRegex() {
         rewriteRun(
           //spec -> spec.recipe(new UnfoldProperties(List.of("log.*level->.*"))),
-          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/com*/))]"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/^com.*/))]"))),
           yaml(
             """
               first:
