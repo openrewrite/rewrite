@@ -419,6 +419,14 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitParameterizedType(J.ParameterizedType type, RpcReceiveQueue q) {
+        return type
+                .withClazz(q.receive(type.getClazz(), t -> (NameTree) visitNonNull(t, q)))
+                .getPadding().withTypeParameters(q.receive(type.getPadding().getTypeParameters(), c -> visitContainer(c, q)))
+                .withType(q.receive(type.getType(), t -> visitType(t, q)));
+    }
+
+    @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, RpcReceiveQueue q) {
         return parens
                 .getPadding().withTree(q.receive(parens.getPadding().getTree(), t -> visitRightPadded(t, q)));
@@ -512,6 +520,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitTypeParameter(J.TypeParameter typeParam, RpcReceiveQueue q) {
         return typeParam
                 .withAnnotations(q.receiveList(typeParam.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
+                .withModifiers(q.receiveList(typeParam.getModifiers(), a -> (J.Modifier) visitNonNull(a, q)))
                 .withName(q.receive(typeParam.getName(), n -> (J.Identifier) visitNonNull(n, q)))
                 .getPadding().withBounds(q.receive(typeParam.getPadding().getBounds(), b -> visitContainer(b, q)));
     }
