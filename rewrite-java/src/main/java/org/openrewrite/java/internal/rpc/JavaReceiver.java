@@ -19,11 +19,8 @@ import org.jspecify.annotations.NonNull;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.ValueCodec;
 
-import java.nio.charset.Charset;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.UUID;
 import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
@@ -32,7 +29,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J preVisit(@NonNull J j, RpcReceiveQueue q) {
-        return ((J) j.withId(UUID.fromString(q.receiveAndGet(j.getId(), UUID::toString))))
+        return ((J) j.withId(q.receiveAndGet(j.getId(), ValueCodec.UUID)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
     }
@@ -149,15 +146,15 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     private J.ClassDeclaration.Kind visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcReceiveQueue q) {
         J.ClassDeclaration.Kind k = (J.ClassDeclaration.Kind) preVisit(kind, q);
         k = k.withAnnotations(q.receiveList(kind.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
-                .withType(J.ClassDeclaration.Kind.Type.valueOf(q.receiveAndGet(kind.getType(), Enum::name)));
+                .withType(q.receiveAndGet(kind.getType(), ValueCodec.forEnum(J.ClassDeclaration.Kind.Type.class)));
         return k;
     }
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, RpcReceiveQueue q) {
         return cu
-                .withSourcePath(Paths.get(q.receiveAndGet(cu.getSourcePath(), Path::toString)))
-                .withCharset(Charset.forName(q.receiveAndGet(cu.getCharset(), Charset::name)))
+                .withSourcePath(q.receiveAndGet(cu.getSourcePath(), ValueCodec.PATH))
+                .withCharset(q.receiveAndGet(cu.getCharset(), ValueCodec.CHARSET))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<J.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))

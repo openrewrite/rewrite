@@ -22,11 +22,8 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.ValueCodec;
 
-import java.nio.charset.Charset;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.UUID;
 import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
@@ -48,15 +45,15 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
-        return ((J) j.withId(UUID.fromString(q.receiveAndGet(j.getId(), UUID::toString))))
+        return ((J) j.withId(q.receiveAndGet(j.getId(), ValueCodec.UUID)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
     }
 
     @Override
     public J visitCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
-        return cu.withSourcePath(Paths.get(q.receiveAndGet(cu.getSourcePath(), Path::toString)))
-                .withCharset(Charset.forName(q.receiveAndGet(cu.getCharset(), Charset::name)))
+        return cu.withSourcePath(q.receiveAndGet(cu.getSourcePath(), ValueCodec.PATH))
+                .withCharset(q.receiveAndGet(cu.getCharset(), ValueCodec.CHARSET))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<JS.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))

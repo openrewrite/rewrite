@@ -24,8 +24,6 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -58,7 +56,7 @@ public class RpcReceiveQueue {
      * convert it to a string or fetch some nested object off of it.
      *
      * @param before The value to apply the function to, which may be null.
-     * @param apply  A function that is called only when before is non-null.
+     * @param codec  Used to encode the {@code before} value and decode the received value.
      * @param <T>    A before value ahead of the function call.
      * @param <U>    The return type of the function. This will match the type that is
      *               being received from the remote.
@@ -66,13 +64,15 @@ public class RpcReceiveQueue {
      * is NO_CHANGE or CHANGE, the function is applied to the before parameter, unless before
      * is null in which case the before state is assumed to be null.
      */
-    public <T, U> U receiveAndGet(@Nullable T before, Function<T, U> apply) {
-        return receive(before == null ? null : apply.apply(before), null);
+    public <T> T receiveAndGet(@Nullable T before, ValueCodec<T> codec) {
+        Object received = receive(before == null ? null : codec.encode(before), null);
+        //noinspection ConstantValue
+        return received != null ? codec.decode(received) : null;
     }
 
     public Markers receiveMarkers(Markers markers) {
         return receive(markers, m -> m
-                .withId(UUID.fromString(receiveAndGet(m.getId(), UUID::toString)))
+                .withId(receiveAndGet(m.getId(), ValueCodec.UUID))
                 .withMarkers(receiveList(m.getMarkers(), m2 -> {
                     if (m2 instanceof RpcCodec) {
                         //noinspection unchecked
