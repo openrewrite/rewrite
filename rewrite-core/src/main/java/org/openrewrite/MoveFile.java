@@ -131,12 +131,15 @@ public class MoveFile extends Recipe {
                         subFolders = subFolders.substring(1);
                     }
                     Path destination = null;
-                    if (destinationPattern.startsWith("/")) {
-                        destination = moveToAbsolutePath();
-                    } else if (destinationPattern.startsWith("../")) {
+                    if (destinationPattern.startsWith("../")) {
                         destination = moveToRelativePath(Paths.get(folderPrefix.substring(0, folderPrefix.length() - 3)), destinationPattern);
-                    } else if (!(subFolders.equals(destinationPattern) || subFolders.startsWith(destinationPattern + "/"))) {
-                        destination = Paths.get(folder, destinationPattern);
+                    } else if (!(subFolders.equals(destinationPattern.startsWith("/") ? destinationPattern.substring(1) : destinationPattern) ||
+                            subFolders.startsWith(destinationPattern.startsWith("/") ? destinationPattern.substring(1) : destinationPattern + "/"))) {
+                        if (destinationPattern.startsWith("/")) {
+                            destination = moveToAbsolutePath();
+                        } else {
+                            destination = Paths.get(folder, destinationPattern);
+                        }
                     }
                     if (destination != null) {
                         return destination.resolve(subFolders);
@@ -171,18 +174,18 @@ public class MoveFile extends Recipe {
                 return Paths.get(moveTo().substring(1));
             }
 
-            private @Nullable Path moveToRelativePath(Path sourcePath, String relativePath) {
+            private @Nullable Path moveToRelativePath(@Nullable Path sourcePath, String relativePath) {
                 Path moveToSourcePath = sourcePath;
                 String moveToPath = relativePath;
                 while (moveToPath.startsWith("../")) {
-                    moveToSourcePath = moveToSourcePath.getParent();
+                    moveToSourcePath = moveToSourcePath != null ? moveToSourcePath.getParent() : null;
                     if (moveToSourcePath == null) {
                         return null;
                     }
                     moveToPath = moveToPath.substring(3);
                 }
 
-                return moveToSourcePath.resolve(moveToPath);
+                return moveToSourcePath != null ? moveToSourcePath.resolve(moveToPath) : null;
             }
         };
     }

@@ -533,4 +533,58 @@ class MoveFileTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void absoluteSystemUnixPathIsRelativeToProjectRootWhenMovingFolder() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile("/", null, "/src/main/resources")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
+          )
+        );
+    }
+
+    @Test
+    void absoluteSystemUnixPathIsRelativeToProjectRootWhenMovingFiles() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile(null, "*.yml", "/src/main/resources")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
+          )
+        );
+    }
+
+    @Test
+    void cantMoveFolderOutsideProjectRoot() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile("/", null, "../src/main/resources")),
+          text(
+            "hello: world",
+            spec -> spec
+              .path("application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("application.yml"))))
+          )
+        );
+    }
+
+    @Test
+    void cantMoveFileOutsideProjectRoot() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile(null, "*.yml", "../src/main/resources")),
+          text(
+            "hello: world",
+            spec -> spec
+              .path("application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("application.yml"))))
+          )
+        );
+    }
 }
