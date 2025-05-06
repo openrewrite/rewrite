@@ -69,18 +69,29 @@ public interface ValueCodec<T> {
         }
     };
 
-    static <T extends Enum<T>> ValueCodec<T> forEnum(Class<T> clazz) {
-        return new ValueCodec<T>() {
-            @Override
-            public T decode(Object value) {
-                return clazz.getEnumConstants()[(Integer) value];
-            }
+    ClassValue<ValueCodec<?>> _ENUM_CODECS = new ClassValue<ValueCodec<?>>() {
+        @Override
+        protected ValueCodec<?> computeValue(Class<?> type) {
+            return new ValueCodec<Object>() {
 
-            @Override
-            public Object encode(T value) {
-                return value.ordinal();
-            }
-        };
+                private final Object[] enumConstants = type.getEnumConstants();
+
+                @Override
+                public Object decode(Object value) {
+                    return enumConstants[(Integer) value];
+                }
+
+                @Override
+                public Object encode(Object value) {
+                    return ((Enum<?>) value).ordinal();
+                }
+            };
+        }
+    };
+
+    static <T extends Enum<T>> ValueCodec<T> forEnum(Class<T> clazz) {
+        //noinspection unchecked
+        return (ValueCodec<T>) _ENUM_CODECS.get(clazz);
     }
 
     T decode(Object value);

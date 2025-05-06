@@ -372,7 +372,9 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     @Override
     public J visitModifier(J.Modifier modifier, RpcSendQueue q) {
+        q.getAndSend(modifier, J.Modifier::getKeyword);
         q.getAndSend(modifier, J.Modifier::getType);
+        q.getAndSendList(modifier, J.Modifier::getAnnotations, J.Annotation::getId, annot -> visit(annot, q));
         return modifier;
     }
 

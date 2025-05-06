@@ -263,7 +263,9 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitModifier(modifier: J.Modifier, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(modifier, m => m.keyword);
         await q.getAndSend(modifier, m => m.type);
+        await q.getAndSendList(modifier, m => m.annotations, annot => annot.id, annot => this.visit(annot, q));
         return modifier;
     }
 
@@ -930,7 +932,9 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitModifier(modifier: J.Modifier, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(modifier);
 
+        draft.keyword = await q.receive(modifier.keyword);
         draft.type = await q.receive(modifier.type);
+        draft.annotations = await q.receiveListDefined(modifier.annotations, annot => this.visit(annot, q));
 
         return finishDraft(draft);
     }
