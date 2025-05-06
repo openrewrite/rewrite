@@ -590,11 +590,11 @@ public interface JS extends J {
         public static class Padding {
             private final ConditionalType t;
 
-            public @Nullable JContainer<TypedTree> getCondition() {
+            public JContainer<TypedTree> getCondition() {
                 return t.condition;
             }
 
-            public ConditionalType withCondition(@Nullable JContainer<TypedTree> condition) {
+            public ConditionalType withCondition(JContainer<TypedTree> condition) {
                 return t.condition == condition ? t : new ConditionalType(t.id, t.prefix, t.markers, t.checkType, condition, t.type);
             }
         }
@@ -5640,7 +5640,7 @@ public interface JS extends J {
             }
 
             public ExportSpecifier withTypeOnly(JLeftPadded<Boolean> typeOnly) {
-                return t.typeOnly == typeOnly ? t : new ExportSpecifier(t.id, t.prefix, t.markers, t.typeOnly, t.specifier, t.type);
+                return t.typeOnly == typeOnly ? t : new ExportSpecifier(t.id, t.prefix, t.markers, typeOnly, t.specifier, t.type);
             }
         }
 
