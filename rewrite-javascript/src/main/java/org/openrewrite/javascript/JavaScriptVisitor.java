@@ -48,8 +48,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         JS.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        c = c.getPadding().withImports(Objects.requireNonNull(ListUtils.map(c.getPadding().getImports(), t -> visitRightPadded(t, JRightPadded.Location.IMPORT, p))));
-        c = c.withStatements(Objects.requireNonNull(ListUtils.map(c.getStatements(), e -> visitAndCast(e, p))));
+        c = c.getPadding().withImports(ListUtils.map(c.getPadding().getImports(), t -> visitRightPadded(t, JRightPadded.Location.IMPORT, p)));
+        c = c.getPadding().withStatements(ListUtils.map(c.getPadding().getStatements(), e -> visitRightPadded(e, JRightPadded.Location.BLOCK_STATEMENT, p)));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
         return c;
     }

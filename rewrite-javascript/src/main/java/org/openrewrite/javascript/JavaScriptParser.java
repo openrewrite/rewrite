@@ -39,7 +39,7 @@ public class JavaScriptParser implements Parser {
                 nodePath.toString(),
                 "--enable-source-maps",
                 // Uncomment this to debug the server
-//          "--inspect-brk",
+//                "--inspect-brk",
                 installationDir.resolve("server.js").toString()
         );
     }

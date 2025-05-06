@@ -26,7 +26,11 @@ import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.internal.JavaScriptPrinter;
+import org.openrewrite.javascript.internal.rpc.JavaScriptReceiver;
+import org.openrewrite.javascript.internal.rpc.JavaScriptSender;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -67,6 +71,16 @@ public interface JS extends J {
     @Override
     default List<Comment> getComments() {
         return getPrefix().getComments();
+    }
+
+    @Override
+    default void rpcSend(J after, RpcSendQueue q) {
+        new JavaScriptSender().visit(after, q);
+    }
+
+    @Override
+    default J rpcReceive(J before, RpcReceiveQueue q) {
+        return new JavaScriptReceiver().visitNonNull(before, q);
     }
 
     @ToString

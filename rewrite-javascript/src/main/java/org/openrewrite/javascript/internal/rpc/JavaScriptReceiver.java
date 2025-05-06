@@ -26,6 +26,7 @@ import org.openrewrite.rpc.RpcReceiveQueue;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 
@@ -46,25 +47,21 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
-        return ((J) j.withId(q.receive(j.getId())))
+        return ((J) j.withId(UUID.fromString(q.receiveAndGet(j.getId(), UUID::toString))))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
     }
 
     @Override
     public J visitCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
-        try {
-            return cu.withSourcePath(Paths.get(q.receiveAndGet(cu.getSourcePath(), Path::toString)))
-                    .withCharset(Charset.forName(q.receiveAndGet(cu.getCharset(), Charset::name)))
-                    .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
-                    .withChecksum(q.receive(cu.getChecksum()))
-                    .<JS.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
-                    .getPadding().withImports(q.receiveList(cu.getPadding().getImports(), imp -> visitRightPadded(imp, q)))
-                    .getPadding().withStatements(q.receiveList(cu.getPadding().getStatements(), stmt -> visitRightPadded(stmt, q)))
-                    .withEof(q.receive(cu.getEof(), space -> visitSpace(space, q)));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        return cu.withSourcePath(Paths.get(q.receiveAndGet(cu.getSourcePath(), Path::toString)))
+                .withCharset(Charset.forName(q.receiveAndGet(cu.getCharset(), Charset::name)))
+                .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
+                .withChecksum(q.receive(cu.getChecksum()))
+                .<JS.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
+                .getPadding().withImports(q.receiveList(cu.getPadding().getImports(), imp -> visitRightPadded(imp, q)))
+                .getPadding().withStatements(q.receiveList(cu.getPadding().getStatements(), stmt -> visitRightPadded(stmt, q)))
+                .withEof(q.receive(cu.getEof(), space -> visitSpace(space, q)));
     }
 
     @Override

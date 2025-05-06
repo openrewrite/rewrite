@@ -23,6 +23,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 public class JavaScriptParserTest {
@@ -44,7 +45,7 @@ public class JavaScriptParserTest {
         String helloWorld = """
           console.info("Hello world!")
           """;
-        Parser.Input input = Parser.Input.fromString(helloWorld);
+        Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.js"), helloWorld);
         SourceFile javascript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst().get();
         System.out.println(javascript);
     }

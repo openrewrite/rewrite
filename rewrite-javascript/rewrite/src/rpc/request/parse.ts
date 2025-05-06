@@ -31,10 +31,10 @@ export class Parse {
             let parser: Parser | undefined = Parsers.createParser(request.parser, new ExecutionContext(), request.relativeTo);
 
             if (parser) {
-                const sourcePaths: ParserInput[] = request.inputs.map(i => i.text === undefined ? i.path! : {
+                const sourcePaths: ParserInput[] = request.inputs.map(i => i.text ? {
                     text: i.text!,
                     sourcePath: i.path
-                });
+                } : i.path!);
                 const parsed = await parser.parse(...sourcePaths);
                 return parsed.map(g => {
                     localObjects.set(g.id.toString(), g);
