@@ -132,26 +132,26 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
 
         @Column(displayName = "Cumulative scanning time (ns)",
                 description = "The total time spent across the scanning phase of this recipe.")
-        Long scanTotalTime;
+        Long scanTotalTimeNs;
 
         @Column(displayName = "99th percentile scanning time (ns)",
                 description = "99 out of 100 scans completed in this amount of time.")
-        Double scanP99;
+        Double scanP99Ns;
 
         @Column(displayName = "Max scanning time (ns)",
                 description = "The max time scanning any one source file.")
-        Long scanMax;
+        Long scanMaxNs;
 
         @Column(displayName = "Cumulative edit time (ns)",
                 description = "The total time spent across the editing phase of this recipe.")
-        Long editTotalTime;
+        Long editTotalTimeNs;
 
         @Column(displayName = "99th percentile edit time (ns)",
                 description = "99 out of 100 edits completed in this amount of time.")
-        Double editP99;
+        Double editP99Ns;
 
         @Column(displayName = "Max edit time (ns)",
                 description = "The max time editing any one source file.")
-        Long editMax;
+        Long editMaxNs;
     }
 }
