@@ -18,6 +18,7 @@ package org.openrewrite.text;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.apache.commons.lang3.BooleanUtils;
+import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
@@ -97,12 +98,18 @@ public class Find extends Recipe {
     @Nullable
     Boolean description;
 
+    @Option(displayName = "Context size for Datatable",
+            description = "The number of characters to include in the datatable before and after the match. Default `0`, " +
+                    "`-1` indicates that the whole text should be used.",
+            required = false,
+            example = "50")
+    @Nullable
+    Integer contextSize;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
         TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
-
-            static final int CONTEXT_SIZE = 50;
 
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -167,26 +174,39 @@ public class Find extends Recipe {
                         endLine = rawText.length();
                     }
 
-                    StringBuilder context = new StringBuilder(Math.min(endLine - startLine + 3, CONTEXT_SIZE * 2 + matcher.group().length() + 3));
-                    if (matchStart - startLine > CONTEXT_SIZE) {
-                        context.append("...");
-                        context.append(rawText, matchStart - (CONTEXT_SIZE - 3), matchStart);
-                    } else {
-                        context.append(rawText, startLine, matchStart);
-                    }
-                    context.append("~~>");
-                    int matchLength = matcher.group().length();
-                    if (endLine - (matchStart + 3 + matchLength) > CONTEXT_SIZE) {
-                        context.append(rawText, matchStart, matchStart + 3 + matchLength + (CONTEXT_SIZE - 3));
-                        context.append("...");
-                    } else {
-                        context.append(rawText, matchStart, endLine);
-                    }
+                    String context = truncateContext(endLine, startLine, matcher, matchStart, rawText);
 
-                    textMatches.insertRow(ctx, new TextMatches.Row(sourceFilePath, context.toString()));
+                    textMatches.insertRow(ctx, new TextMatches.Row(sourceFilePath, context));
                 } while (matcher.find());
                 snippets.add(snippet(rawText.substring(previousEnd)));
                 return plainText.withText("").withSnippets(snippets);
+            }
+
+            private @NotNull String truncateContext(int endLine, int startLine, Matcher matcher, int matchStart, String rawText) {
+                if (contextSize == null || contextSize == 0) {
+                    return "...~~>" + matcher.group() + "...";
+                }
+
+                if (contextSize == -1) {
+                    return rawText.substring(0, matchStart) + "~~>" + rawText.substring(matchStart);
+                }
+
+                StringBuilder context = new StringBuilder(Math.min(endLine - startLine + 3, contextSize * 2 + matcher.group().length() + 3));
+                if (matchStart - startLine > contextSize) {
+                    context.append("...");
+                    context.append(rawText, matchStart - (contextSize - 3), matchStart);
+                } else {
+                    context.append(rawText, startLine, matchStart);
+                }
+                context.append("~~>");
+                int matchLength = matcher.group().length();
+                if (endLine - (matchStart + 3 + matchLength) > contextSize) {
+                    context.append(rawText, matchStart, matchStart + 3 + matchLength + (contextSize - 3));
+                    context.append("...");
+                } else {
+                    context.append(rawText, matchStart, endLine);
+                }
+                return context.toString();
             }
         };
         if (filePattern != null) {

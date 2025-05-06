@@ -29,7 +29,7 @@ class FindTest implements RewriteTest {
     @Test
     void dataTable() {
         rewriteRun(
-          spec -> spec.recipe(new Find("text", null, null, null, null, null, null))
+          spec -> spec.recipe(new Find("text", null, null, null, null, null, null, 50))
             .dataTable(TextMatches.Row.class, rows -> {
                 assertThat(rows).hasSize(1);
                 assertThat(rows.get(0).getMatch()).isEqualTo("This is ~~>text.");
@@ -53,7 +53,7 @@ class FindTest implements RewriteTest {
     @Test
     void regex() {
         rewriteRun(
-          spec -> spec.recipe(new Find("[T\\s]", true, true, null, null, null, null)),
+          spec -> spec.recipe(new Find("[T\\s]", true, true, null, null, null, null, 50)),
           text(
             """
               This is\ttext.
@@ -68,7 +68,7 @@ class FindTest implements RewriteTest {
     @Test
     void plainText() {
         rewriteRun(
-          spec -> spec.recipe(new Find("\\s", null, null, null, null, null, null)),
+          spec -> spec.recipe(new Find("\\s", null, null, null, null, null, null, 50)),
           text(
             """
               This i\\s text.
@@ -83,7 +83,7 @@ class FindTest implements RewriteTest {
     @Test
     void caseInsensitive() {
         rewriteRun(
-          spec -> spec.recipe(new Find("text", null, null, null, null, "**/foo/**;**/baz/**", null)),
+          spec -> spec.recipe(new Find("text", null, null, null, null, "**/foo/**;**/baz/**", null, 50)),
           dir("foo",
             text(
               """
@@ -115,7 +115,7 @@ class FindTest implements RewriteTest {
     @Test
     void regexBasicMultiLine() {
         rewriteRun(
-          spec -> spec.recipe(new Find("[T\\s]", true, true, true, null, null, null)),
+          spec -> spec.recipe(new Find("[T\\s]", true, true, true, null, null, null, 50)),
           text(
             """
               This is\ttext.
@@ -132,7 +132,7 @@ class FindTest implements RewriteTest {
     @Test
     void regexWithoutMultilineAndDotall() {
         rewriteRun(
-          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, false, false, null, null)),
+          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, false, false, null, null, 50)),
           text(
             """
               This is text.
@@ -148,7 +148,7 @@ class FindTest implements RewriteTest {
     @Test
     void regexMatchingWhitespaceWithoutMultilineWithDotall() {
         rewriteRun(
-          spec -> spec.recipe(new Find("One.Two$", true, true, false, true, null, null)),
+          spec -> spec.recipe(new Find("One.Two$", true, true, false, true, null, null, 50)),
           //language=csv
           text( // the `.` above matches the space character on the same line
             """
@@ -163,7 +163,7 @@ class FindTest implements RewriteTest {
     @Test
     void regexWithoutMultilineAndWithDotAll() {
         rewriteRun(
-          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, false, true, null, null)),
+          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, false, true, null, null, 50)),
           text(
             """
               This is text.
@@ -186,7 +186,7 @@ class FindTest implements RewriteTest {
     @Test
     void regexWithMultilineAndWithoutDotall() {
         rewriteRun(
-          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, false, null, null)),
+          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, false, null, null, 50)),
           text(
             """
               This is text.
@@ -209,7 +209,7 @@ class FindTest implements RewriteTest {
     @Test
     void regexWithBothMultilineAndDotAll() {
         rewriteRun(
-          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, true, null, null)),
+          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, true, null, null, 50)),
           text(
             """
               The first line.
@@ -232,7 +232,7 @@ class FindTest implements RewriteTest {
     @Test
     void description() {
         rewriteRun(
-          spec -> spec.recipe(new Find("text", null, null, null, null, null, true)),
+          spec -> spec.recipe(new Find("text", null, null, null, null, null, true, 50)),
           text(
             """
               This is text.
@@ -247,7 +247,7 @@ class FindTest implements RewriteTest {
     @Test
     void longLine() {
         rewriteRun(
-          spec -> spec.recipe(new Find("very", null, null, null, null, null, null))
+          spec -> spec.recipe(new Find("very", null, null, null, null, null, null, 50))
             .dataTable(TextMatches.Row.class, rows -> {
                 assertThat(rows).hasSize(18);
                 assertThat(rows).satisfiesExactly(
@@ -269,6 +269,65 @@ class FindTest implements RewriteTest {
                   r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very long line."),
                   r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very long line."),
                   r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very long line.")
+                );
+            }),
+          text(
+            """
+              This is a very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very long line.
+              """,
+            """
+              This is a ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very long line.
+              """
+          )
+        );
+    }
+
+    @Test
+    void justMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("very", null, null, null, null, null, null, null))
+            .dataTable(TextMatches.Row.class, rows -> {
+                assertThat(rows).hasSize(18);
+                assertThat(rows).allSatisfy(
+                    r -> assertThat(r.getMatch()).isEqualTo("...~~>very...")
+                  );
+            }),
+          text(
+            """
+              This is a very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very long line.
+              """,
+            """
+              This is a ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very long line.
+              """
+          )
+        );
+    }
+
+    @Test
+    void noTruncate() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("very", null, null, null, null, null, null, -1))
+            .dataTable(TextMatches.Row.class, rows -> {
+                assertThat(rows).hasSize(18);
+                assertThat(rows).satisfiesExactly(
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a ~~>very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, ~~>very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, ~~>very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, ~~>very, very, very, very, very, very, very, very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, very, very, very, very, very, very, ~~>very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, very, very, very, very, very, very, very, ~~>very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, ~~>very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, ~~>very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, ~~>very long line.")
                 );
             }),
           text(
