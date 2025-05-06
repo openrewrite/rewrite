@@ -84,7 +84,7 @@ class MoveFileTest implements RewriteTest {
     @Test
     void moveToRelativeToWindowsFileName() {
         rewriteRun(
-          spec -> spec.recipe(new MoveFile(null, "src/**/application*.yml", "../profiles")),
+          spec -> spec.recipe(new MoveFile(null, "src/**/application*.yml", "..\\profiles")),
           text(
             "hello: world",
             "hello: world",
@@ -112,7 +112,7 @@ class MoveFileTest implements RewriteTest {
     @Test
     void moveToRelativeToWindowsFolderName() {
         rewriteRun(
-          spec -> spec.recipe(new MoveFile("src/main/renameMe", null, "../profiles")),
+          spec -> spec.recipe(new MoveFile("src/main/renameMe", null, "..\\profiles")),
           text(
             "hello: world",
             "hello: world",
@@ -176,6 +176,44 @@ class MoveFileTest implements RewriteTest {
     }
 
     @Test
+    void moveFilesToUnixNestedSubDirectory() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile(null, "**/application*.yml", "profiles/subdirectory")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec ->
+              spec
+                .path("src/main/resources/application.yml")
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/profiles/subdirectory/application.yml")))
+          ),
+          text(
+            "hello: world",
+            "hello: world",
+            spec ->
+              spec
+                .path("src/main/resources/application-dev.yml")
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/profiles/subdirectory/application-dev.yml")))
+          )
+        );
+    }
+
+    @Test
+    void moveFolderToUnixNestedSubDirectory() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile("src/main", null, "nested/subdirectory")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec ->
+              spec
+                .path("src/main/resources/application.yml")
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/nested/subdirectory/resources/application.yml")))
+          )
+        );
+    }
+
+    @Test
     void moveFilesToWindowsSubDirectory() {
         rewriteRun(
           spec -> spec.recipe(new MoveFile(null, "src/**/application*.yml", "profiles")),
@@ -227,6 +265,62 @@ class MoveFileTest implements RewriteTest {
             spec -> spec
               .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
               .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\deeply\\nested\\application.yml")))
+          )
+        );
+    }
+
+    @Test
+    void moveFilesToWindowsNestedSubDirectory() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile(null, "src/**/application*.yml", "profiles\\subdirectory")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("src\\main\\renameMe\\application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\subdirectory\\application.yml")))
+          ),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("src\\main\\renameMe\\nested\\application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\nested\\profiles\\subdirectory\\application.yml")))
+          ),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\deeply\\nested\\profiles\\subdirectory\\application.yml")))
+          )
+        );
+    }
+
+    @Test
+    void moveFolderToWindowsNestedSubDirectory() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile("src/main/renameMe", null, "profiles\\subdirectory")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("src\\main\\renameMe\\application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\subdirectory\\application.yml")))
+          ),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("src\\main\\renameMe\\nested\\application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\subdirectory\\nested\\application.yml")))
+          ),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\subdirectory\\deeply\\nested\\application.yml")))
           )
         );
     }
@@ -299,7 +393,7 @@ class MoveFileTest implements RewriteTest {
     @Test
     void moveFilesToExactWindowsPath() {
         rewriteRun(
-          spec -> spec.recipe(new MoveFile(null, "src/**/application*.yml", "/profiles")),
+          spec -> spec.recipe(new MoveFile(null, "src/**/application*.yml", "\\profiles")),
           text(
             "hello: world",
             "hello: world",
@@ -327,7 +421,7 @@ class MoveFileTest implements RewriteTest {
     @Test
     void moveFolderToExactWindowsPath() {
         rewriteRun(
-          spec -> spec.recipe(new MoveFile("src/main/renameMe", null, "/profiles")),
+          spec -> spec.recipe(new MoveFile("src/main/renameMe", null, "\\profiles")),
           text(
             "hello: world",
             "hello: world",
@@ -394,6 +488,48 @@ class MoveFileTest implements RewriteTest {
           text(
             "hello: world",
             spec -> spec.path("src\\main\\doNotRenameMe\\application.yml") // folder name is wrong
+          )
+        );
+    }
+
+    @Test
+    void rootFiles() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile(null, "*.yml", "src/main/resources")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
+          )
+        );
+    }
+
+    @Test
+    void rootUnixFolder() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile("/", null, "src/main/resources")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
+          )
+        );
+    }
+
+    @Test
+    void rootWindowsFolder() {
+        rewriteRun(
+          spec -> spec.recipe(new MoveFile("\\", null, "src/main/resources")),
+          text(
+            "hello: world",
+            "hello: world",
+            spec -> spec
+              .path("application.yml")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
           )
         );
     }

@@ -28,7 +28,8 @@ import java.nio.file.Paths;
 public class MoveFile extends Recipe {
     @Nullable
     @Option(displayName = "Folder",
-            description = "When using the folder option, all files / subfolders will be moved to the moveTo source path.",
+            description = "When using the folder option, all files / subfolders in the folder will be moved to the moveTo source path. " +
+                    "Folder should be starting at root",
             required = false,
             example = "src/main/resources/")
     String folder;
@@ -81,21 +82,24 @@ public class MoveFile extends Recipe {
                     Path sourcePath = Paths.get(PathUtils.separatorsToSystem(originalSourcePath));
                     boolean isWindowsPath = originalSourcePath.equals(PathUtils.separatorsToWindows(originalSourcePath));
                     boolean isUnixPath = originalSourcePath.equals(PathUtils.separatorsToUnix(originalSourcePath));
-                    if (isWindowsPath && isUnixPath || (!isWindowsPath && !isUnixPath)) {
+                    boolean isFileOnRoot = sourcePath.getParent() == null;
+                    if (!isFileOnRoot && (isWindowsPath && isUnixPath || (!isWindowsPath && !isUnixPath))) {
                         // This should never happen, but just in case
                         return tree;
                     }
 
                     Path destination;
-                    if (!StringUtils.isNullOrEmpty(folder)) {
-                        destination = getFolderTarget(sourcePath);
+                    if (folder() != null) {
+                        destination = getFolderTarget(sourcePath, moveTo());
                     } else {
-                        destination = getFilePatternTarget(sourcePath);
+                        destination = getFilePatternTarget(sourcePath, moveTo());
                     }
                     if (destination != null && !destination.equals(sourcePath)) {
                         destination = destination.resolve(sourcePath.getFileName().toString());
                         if (!destination.equals(sourcePath)) {
-                            if (isWindowsPath) {
+                            if (isFileOnRoot) {
+                                return ((SourceFile) tree).withSourcePath(Paths.get(PathUtils.separatorsToSystem(destination.toString())));
+                            } else if (isWindowsPath) {
                                 return ((SourceFile) tree).withSourcePath(Paths.get(PathUtils.separatorsToWindows(destination.toString())));
                             } else {
                                 return ((SourceFile) tree).withSourcePath(Paths.get(PathUtils.separatorsToUnix(destination.toString())));
@@ -106,8 +110,9 @@ public class MoveFile extends Recipe {
                 return super.visit(tree, ctx);
             }
 
-            private @Nullable Path getFolderTarget(Path sourcePath) {
-                if (StringUtils.isNullOrEmpty(folder)) {
+            private @Nullable Path getFolderTarget(Path sourcePath, String destinationPattern) {
+                String folder = folder();
+                if (folder == null) {
                     return null;
                 }
                 String folderPrefix = folder;
@@ -120,18 +125,18 @@ public class MoveFile extends Recipe {
                 }
 
                 Path currentFolder = sourcePath.getParent();
-                if (PathUtils.matchesGlob(sourcePath, folderPrefix)) {
-                    String subFolders = currentFolder.toString().substring(folder.length());
+                if (PathUtils.matchesGlob(sourcePath, folderPrefix) || folderPrefix.equals("/**")) {
+                    String subFolders = currentFolder == null ? "" : currentFolder.toString().substring(folder.length());
                     if (subFolders.startsWith("/") || subFolders.startsWith("\\")) {
                         subFolders = subFolders.substring(1);
                     }
                     Path destination = null;
-                    if (moveTo.startsWith("/")) {
+                    if (destinationPattern.startsWith("/")) {
                         destination = moveToAbsolutePath();
-                    } else if (moveTo.startsWith("../")) {
-                        destination = moveToRelativePath(Paths.get(folderPrefix.substring(0, folderPrefix.length() - 3)), moveTo);
-                    } else if (!(subFolders.equals(moveTo) || subFolders.startsWith(moveTo + "/") || subFolders.startsWith(moveTo + "\\"))) {
-                        destination = Paths.get(folder, moveTo);
+                    } else if (destinationPattern.startsWith("../")) {
+                        destination = moveToRelativePath(Paths.get(folderPrefix.substring(0, folderPrefix.length() - 3)), destinationPattern);
+                    } else if (!(subFolders.equals(destinationPattern) || subFolders.startsWith(destinationPattern + "/"))) {
+                        destination = Paths.get(folder, destinationPattern);
                     }
                     if (destination != null) {
                         return destination.resolve(subFolders);
@@ -142,18 +147,20 @@ public class MoveFile extends Recipe {
                 return sourcePath;
             }
 
-            private @Nullable Path getFilePatternTarget(Path sourcePath) {
+            private @Nullable Path getFilePatternTarget(Path sourcePath, String destinationPattern) {
                 if (fileMatcher == null) {
                     return null;
                 }
                 if (sourcePath.getFileSystem().getPathMatcher("glob:" + fileMatcher).matches(sourcePath)) {
                     Path currentFolder = sourcePath.getParent();
-                    if (moveTo.startsWith("/")) {
+                    if (destinationPattern.startsWith("/")) {
                         return moveToAbsolutePath();
-                    } else if (moveTo.startsWith("../")) {
-                        return moveToRelativePath(currentFolder, moveTo);
-                    } else if (!currentFolder.endsWith(moveTo)) {
-                        return currentFolder.resolve(moveTo);
+                    } else if (destinationPattern.startsWith("../")) {
+                        return moveToRelativePath(currentFolder, destinationPattern);
+                    } else if (currentFolder != null && !currentFolder.endsWith(destinationPattern)) {
+                        return currentFolder.resolve(destinationPattern);
+                    } else if (currentFolder == null) {
+                        return Paths.get(destinationPattern);
                     }
                 }
 
@@ -161,7 +168,7 @@ public class MoveFile extends Recipe {
             }
 
             private Path moveToAbsolutePath() {
-                return Paths.get(moveTo.substring(1));
+                return Paths.get(moveTo().substring(1));
             }
 
             private @Nullable Path moveToRelativePath(Path sourcePath, String relativePath) {
@@ -178,5 +185,17 @@ public class MoveFile extends Recipe {
                 return moveToSourcePath.resolve(moveToPath);
             }
         };
+    }
+
+    private @Nullable String folder() {
+        if (StringUtils.isNullOrEmpty(this.folder)) {
+            return null;
+        }
+
+        return PathUtils.separatorsToUnix(this.folder.startsWith("/") || this.folder.startsWith("\\") ? this.folder.substring(1) : this.folder);
+    }
+
+    private String moveTo() {
+        return PathUtils.separatorsToUnix(this.moveTo);
     }
 }
