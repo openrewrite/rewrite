@@ -27,6 +27,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 
@@ -311,7 +312,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitScopedVariableDeclarations(JS.ScopedVariableDeclarations scopedVariableDeclarations, RpcReceiveQueue q) {
         return scopedVariableDeclarations
                 .withModifiers(q.receiveList(scopedVariableDeclarations.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .getPadding().withScope(q.receive(scopedVariableDeclarations.getPadding().getScope(), el -> visitLeftPadded(el, q)))
+                .getPadding().withScope(q.receive(scopedVariableDeclarations.getPadding().getScope(), el -> visitLeftPadded(el, q, i -> JS.ScopedVariableDeclarations.Scope.values()[(Integer) i])))
                 .getPadding().withVariables(q.receiveList(scopedVariableDeclarations.getPadding().getVariables(), el -> visitRightPadded(el, q)));
     }
 
@@ -627,6 +628,10 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
         return delegate.visitLeftPadded(left, q);
+    }
+
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q, Function<Object, T> elementMapping) {
+        return delegate.visitLeftPadded(left, q, elementMapping);
     }
 
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {

@@ -24,6 +24,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 
@@ -545,8 +546,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, RpcReceiveQueue q) {
         return variable
                 .withName(q.receive(variable.getName(), n -> (J.Identifier) visitNonNull(n, q)))
-                // TODO what to do here
-//                .withDimensionsAfterName(q.receiveList(variable.getDimensionsAfterName(), d -> visitLeftPadded(d, q)))
+                .withDimensionsAfterName(q.receiveList(variable.getDimensionsAfterName(), d -> visitLeftPadded(d, q)))
                 .getPadding().withInitializer(q.receive(variable.getPadding().getInitializer(), i -> visitLeftPadded(i, q)))
                 .withVariableType(q.receive(variable.getVariableType(), t -> (JavaType.Variable) visitType(t, q)));
     }
@@ -618,6 +618,13 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                     }
                     return t;
                 }))
+                .withMarkers(q.receiveMarkers(left.getMarkers()));
+    }
+
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q, Function<Object, T> elementMapping) {
+        return left
+                .withBefore(q.receive(left.getBefore(), s -> visitSpace(s, q)))
+                .withElement(q.receive(left.getElement(), elementMapping::apply))
                 .withMarkers(q.receiveMarkers(left.getMarkers()));
     }
 

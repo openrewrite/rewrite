@@ -43,7 +43,7 @@ public class JavaScriptParserTest {
     }
 
     @Test
-    void helloWorld() {
+    void helloJavaScript() {
         @Language("js")
         String helloWorld = """
           console.info("Hello world!")
@@ -53,6 +53,23 @@ public class JavaScriptParserTest {
         assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(javascript.get()).satisfies(cu -> {
             assertThat(cu.printAll()).isEqualTo(helloWorld);
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
+        });
+    }
+
+    @Test
+    void helloTypeScript() {
+        @Language("ts")
+        String helloWorld = """
+          const message: string = "Hello world!";
+          console.info(message);
+          """;
+        Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.ts"), helloWorld);
+        Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
+        assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
+        assertThat(typescript.get()).satisfies(cu -> {
+            assertThat(cu.printAll()).isEqualTo(helloWorld);
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
         });
     }
 }
