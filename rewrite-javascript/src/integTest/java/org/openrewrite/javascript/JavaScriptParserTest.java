@@ -17,12 +17,17 @@ package org.openrewrite.javascript;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.tree.JS;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -70,6 +75,25 @@ public class JavaScriptParserTest {
         assertThat(typescript.get()).satisfies(cu -> {
             assertThat(cu.printAll()).isEqualTo(helloWorld);
             assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
+        });
+    }
+
+    @Test
+    @Disabled
+    void complexTypeScript() throws MalformedURLException {
+        URL url = URI.create("https://raw.githubusercontent.com/sinclairzx81/typebox/f958156785350aa052c5f822bc2970d0945d887b/src/syntax/parser.ts").toURL();
+        Parser.Input input = new Parser.Input(Paths.get("parser.ts"), null, () -> {
+            try {
+                return url.openStream();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
+        assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
+        assertThat(typescript.get()).satisfies(cu -> {
+            assertThat(cu.printAll()).isEqualTo(input.getSource(new InMemoryExecutionContext()).readFully());
+//            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
         });
     }
 }
