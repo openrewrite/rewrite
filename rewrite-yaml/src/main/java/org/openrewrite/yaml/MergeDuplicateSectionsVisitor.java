@@ -85,6 +85,6 @@ public class MergeDuplicateSectionsVisitor<P> extends YamlIsoVisitor<P> {
 
     // TODO We don't support comments yet, as supporting comments is a hard thing to get right
     private static boolean hasComments(String prefix) {
-        return isNotEmpty(prefix) && !prefix.equals("\n");
+        return isNotEmpty(prefix) && !prefix.matches("^(\\r\\n|\\n|\\r)+$");
     }
 }

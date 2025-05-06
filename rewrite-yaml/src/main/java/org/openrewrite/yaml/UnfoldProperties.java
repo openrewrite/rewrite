@@ -100,8 +100,7 @@ public class UnfoldProperties extends Recipe {
 
             /**
              * Splits a key into parts while respecting certain exclusion rules.
-             * The method ensures certain segments of the key are kept together as defined in the exclusions list.
-             * It uses a custom JsonPathParser to parse keys with dots, like `logging.level`.
+             * The method ensures certain segments of the key are kept together as defined in the exclusion list.
              *
              * @param key the full key to be split into parts
              * @return a list of strings representing the split parts of the key
@@ -110,7 +109,7 @@ public class UnfoldProperties extends Recipe {
                 String parentKey = getParentKey();
                 List<String> keepTogether = new ArrayList<>();
                 for (String ex : exclusions) {
-                    matchesWith(ex, key, parentKey).ifPresent(keepTogether::add);
+                    matches(key, ex, parentKey).ifPresent(keepTogether::add);
                 }
 
                 List<String> result = new ArrayList<>();
@@ -147,46 +146,51 @@ public class UnfoldProperties extends Recipe {
                 return parentKey.length() == 0 ? "" : parentKey.substring(0, parentKey.length() - 1);
             }
 
-            // Custom JsonPathParser to parse keys with dots, like `logging.level`
-            private Optional<String> matchesWith(String ex, String key, String parentKey) {
+            /**
+             * Matches a key against a JsonPath pattern.
+             * It uses a custom JsonPathParser to parse keys with dots, like `logging.level`.
+             *
+             * @return found group or empty if no match was found
+             */
+            private Optional<String> matches(String key, String pattern, String parentKey) {
                 // Recursive descent
-                if (ex.startsWith("$..")) {
-                    ex = ex.substring(3);
+                if (pattern.startsWith("$..")) {
+                    pattern = pattern.substring(3);
                     // Handle parent-child conditions like: `$..[logging.level][?(<condition>)]` and `$..logging.level[?(<condition>)]`
-                    if (ex.startsWith("[") && ex.contains("][")) {
-                        int secondBracket = ex.indexOf( '[', 1);
-                        ex = ex.substring(1, secondBracket - 1) + ex.substring(secondBracket);
+                    if (pattern.startsWith("[") && pattern.contains("][")) {
+                        int secondBracket = pattern.indexOf( '[', 1);
+                        pattern = pattern.substring(1, secondBracket - 1) + pattern.substring(secondBracket);
                     }
-                    if (!ex.startsWith("[") && ex.contains("[") && parentKey.contains(ex.split("\\[")[0])) {
-                        ex = "[" + ex.split("\\[")[1];
+                    if (!pattern.startsWith("[") && pattern.contains("[") && parentKey.contains(pattern.split("\\[")[0])) {
+                        pattern = "[" + pattern.split("\\[")[1];
                     }
                 }
 
                 // Starts from root
-                if (ex.startsWith("$.")) {
-                    ex = ex.replace("$." + parentKey, "");
-                    if (ex.startsWith(".")) {
-                        ex = ex.substring(1);
+                if (pattern.startsWith("$.")) {
+                    pattern = pattern.replace("$." + parentKey, "");
+                    if (pattern.startsWith(".")) {
+                        pattern = pattern.substring(1);
                     }
                 }
 
                 // property in brackets
-                if (ex.startsWith("[") && ex.endsWith("]")) {
-                    ex = ex.substring(1, ex.length() - 1);
+                if (pattern.startsWith("[") && pattern.endsWith("]")) {
+                    pattern = pattern.substring(1, pattern.length() - 1);
                 }
 
                 // properties can be wrapped in quotes
-                if (ex.startsWith("\"") && ex.endsWith("\"")) {
-                    ex = ex.substring(1, ex.length() - 1);
-                } else if (ex.startsWith("'") && ex.endsWith("'")) {
-                    ex = ex.substring(1, ex.length() - 1);
+                if (pattern.startsWith("\"") && pattern.endsWith("\"")) {
+                    pattern = pattern.substring(1, pattern.length() - 1);
+                } else if (pattern.startsWith("'") && pattern.endsWith("'")) {
+                    pattern = pattern.substring(1, pattern.length() - 1);
                 }
 
-                if (key.contains(ex)) {
-                    return Optional.of(ex);
-                } else if (ex.startsWith("?(@property.match(/") && ex.endsWith("/))")) {
-                    ex = ex.substring(19, ex.length() - 3);
-                    Matcher m = Pattern.compile(".*(" + ex + ").*").matcher(key);
+                if (key.contains(pattern)) {
+                    return Optional.of(pattern);
+                } else if (pattern.startsWith("?(@property.match(/") && pattern.endsWith("/))")) {
+                    pattern = pattern.substring(19, pattern.length() - 3);
+                    Matcher m = Pattern.compile(".*(" + pattern + ").*").matcher(key);
                     if (m.matches()) {
                         return Optional.of(m.group(1).isEmpty() ? m.group(0) : m.group(1));
                     }
