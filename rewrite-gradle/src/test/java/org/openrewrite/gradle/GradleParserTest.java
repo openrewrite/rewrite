@@ -189,6 +189,64 @@ class GradleParserTest implements RewriteTest {
     }
 
     @Test
+    void dependencyNotations() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+              
+                  // String notation
+                  implementation "org.openrewrite:rewrite-java:latest.release"
+                  implementation ("org.openrewrite:rewrite-java:latest.release")
+                  implementation ("org.openrewrite:rewrite-java:latest.release") { transitive = false }
+                  implementation ("org.openrewrite:rewrite-java:latest.release") {
+                      transitive = false
+                  }
+                  implementation ( "org.openrewrite:rewrite-java:latest.release" )
+                  implementation ( "org.openrewrite:rewrite-java:latest.release" ) { transitive = false }
+                  implementation ( "org.openrewrite:rewrite-java:latest.release" ) {
+                      transitive = false
+                  }
+              
+                  // Map notation
+                  implementation group: "org.openrewrite", name: "rewrite-java", version: "latest.release"
+                  implementation(group: "org.openrewrite", name: "rewrite-java", version: "latest.release")
+                  implementation(group: "org.openrewrite", name: "rewrite-java", version: "latest.release") { transitive = false }
+                  implementation(group: "org.openrewrite", name: "rewrite-java", version: "latest.release") {
+                      transitive = false
+                  }
+                  implementation( group: "org.openrewrite", name: "rewrite-java", version: "latest.release" )
+                  implementation( group: "org.openrewrite", name: "rewrite-java", version: "latest.release" ) { transitive = false }
+                  implementation( group: "org.openrewrite", name: "rewrite-java", version: "latest.release" ) {
+                      transitive = false
+                  }
+                  
+                  // Map literal notation
+                  implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"])
+                  implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"]) { transitive = false }
+                  implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"]) {
+                      transitive = false
+                  }
+                  implementation( [group: "org.openrewrite", name: "rewrite-java", version: "latest.release"] )
+                  implementation( [group: "org.openrewrite", name: "rewrite-java", version: "latest.release"] ) { transitive = false }
+                  implementation( [group: "org.openrewrite", name: "rewrite-java", version: "latest.release"] ) {
+                      transitive = false
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void kotlinDsl() {
         rewriteRun(
           buildGradleKts(

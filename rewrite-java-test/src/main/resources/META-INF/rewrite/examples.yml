@@ -1,4 +1,3 @@
-#
 # Copyright 2025 the original author or authors.
 # <p>
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.AddLiteralMethodArgument
@@ -225,6 +222,14 @@ recipeName: org.openrewrite.java.ExtractInterfaceTest$ExtractTestInterface
 examples:
 - description: ''
   sources:
+  - after: |
+      package org.openrewrite.interfaces;
+
+      interface ITest {
+
+          int test();
+      }
+    language: java
   - before: |
       package org.openrewrite;
 
@@ -265,14 +270,6 @@ examples:
 
           public static int staticTest() {
           }
-      }
-    language: java
-  - after: |
-      package org.openrewrite.interfaces;
-
-      interface ITest {
-
-          int test();
       }
     language: java
 ---
@@ -831,21 +828,6 @@ examples:
   sources:
   - before: |
       package com.example.demo;
-      class Foo {
-          /pet
-          public void test() {
-          }
-      }
-    after: |
-      package com.example.demo;
-      class Foo {
-          /*~~>*///*~~>*/pet
-          public void test() {
-          }
-      }
-    language: java
-  - before: |
-      package com.example.demo;
       class Bar {
           pet
           public void test() {
@@ -870,6 +852,21 @@ examples:
       package com.example.demo;
       class Baz {
           /*~~>*/-/*~~>*/pet
+          public void test() {
+          }
+      }
+    language: java
+  - before: |
+      package com.example.demo;
+      class Foo {
+          /pet
+          public void test() {
+          }
+      }
+    after: |
+      package com.example.demo;
+      class Foo {
+          /*~~>*///*~~>*/pet
           public void test() {
           }
       }
@@ -1117,17 +1114,17 @@ examples:
   - 'false'
   sources:
   - before: |
+      class A {
+          public A(String s) {}
+      }
+    language: java
+  - before: |
       class Test {
           A a = new A("test");
       }
     after: |
       class Test {
           A a = /*~~>*/new A("test");
-      }
-    language: java
-  - before: |
-      class A {
-          public A(String s) {}
       }
     language: java
 ---
@@ -1245,14 +1242,14 @@ examples:
   - 'false'
   sources:
   - before: |
+      class Higher {
+      }
+    language: java
+  - before: |
       class Test {
       }
     after: |
       /*~~(Java version 8)~~>*/class Test {
-      }
-    language: java
-  - before: |
-      class Higher {
       }
     language: java
 ---

@@ -35,6 +35,7 @@ import org.openrewrite.test.UncheckedConsumer;
 
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -43,9 +44,9 @@ import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings("unused")
 public class Assertions {
-    private static final Map<Integer, JavaVersion> javaVersions = new HashMap<>();
-    private static final Map<String, JavaProject> javaProjects = new HashMap<>();
-    private static final Map<String, JavaSourceSet> javaSourceSets = new HashMap<>();
+    private static final Map<Integer, JavaVersion> javaVersions = new ConcurrentHashMap<>();
+    private static final Map<String, JavaProject> javaProjects = new ConcurrentHashMap<>();
+    private static final Map<String, JavaSourceSet> javaSourceSets = new ConcurrentHashMap<>();
 
     private Assertions() {
     }

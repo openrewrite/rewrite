@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
@@ -79,10 +78,7 @@ public class RecipeScheduler {
 
                     // pre-transformation scanning phase where there can only be modifications to capture exceptions
                     // occurring during the scanning phase
-                    if (hasScanningRecipe(recipe)) {
-                        after = cycle.scanSources(after);
-                    }
-
+                    after = cycle.scanSources(after);
                     // transformation phases
                     after = cycle.generateSources(after);
                     after = cycle.editSources(after);
@@ -124,28 +120,6 @@ public class RecipeScheduler {
         for (Recipe r : recipe.getRecipeList()) {
             recursiveOnComplete(r, ctx);
         }
-    }
-
-    private boolean hasScanningRecipe(Recipe recipe) {
-        if (recipe instanceof ScanningRecipe) {
-            // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
-            // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
-            if(recipe instanceof DeclarativeRecipe) {
-                for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
-                    if (hasScanningRecipe(precondition)) {
-                        return true;
-                    }
-                }
-            } else {
-                return true;
-            }
-        }
-        for (Recipe r : recipe.getRecipeList()) {
-            if (hasScanningRecipe(r)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // Delete any files created in the working directory

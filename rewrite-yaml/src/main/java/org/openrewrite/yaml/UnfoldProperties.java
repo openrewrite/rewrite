@@ -18,18 +18,19 @@ package org.openrewrite.yaml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.countOccurrences;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
@@ -42,8 +43,8 @@ public class UnfoldProperties extends Recipe {
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     @Option(displayName = "Exclusions",
-            description = "The keys which you do not want to unfold",
-            example = "org.springframework.security")
+            description = "A list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions to specify keys that should not be unfolded.",
+            example = "$..[org.springframework.security]")
     List<String> exclusions;
 
     public UnfoldProperties(@Nullable final List<String> exclusions) {
@@ -62,44 +63,154 @@ public class UnfoldProperties extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        List<JsonPathMatcher> matchers = exclusions.stream().map(JsonPathMatcher::new).collect(toList());
         return new YamlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext executionContext) {
+                Yaml.Document doc = super.visitDocument(document, executionContext);
+                doAfterVisit(new MergeDuplicateSectionsVisitor<>(doc));
+                return doc;
+            }
+
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry e, ExecutionContext ctx) {
                 Yaml.Mapping.Entry entry = super.visitMappingEntry(e, ctx);
 
                 String key = entry.getKey().getValue();
-                if (key.contains(".") && !exclusions.contains(key)) {
-                    String[] parts = key.split("\\.");
-                    Yaml.Mapping.Entry nestedEntry = createNestedEntry(parts, 0, entry.getValue()).withPrefix(entry.getPrefix());
-                    Yaml.Mapping.Entry newEntry = maybeAutoFormat(entry, nestedEntry, entry.getValue(), ctx, getCursor());
+                if (key.contains(".") && matchers.stream().noneMatch(it -> it.matches(getCursor()))) {
+                    List<String> parts = getParts(key);
+                    if (parts.size() > 1) {
+                        Yaml.Mapping.Entry nestedEntry = createNestedEntry(parts, 0, entry.getValue()).withPrefix(entry.getPrefix());
+                        Yaml.Mapping.Entry newEntry = maybeAutoFormat(entry, nestedEntry, entry.getValue(), ctx, getCursor());
 
-                    if (shouldShift()) {
-                        int identLevel = Math.abs(getIndentLevel(entry) - getIndentLevel(newEntry));
-                        if (!hasLineBreak(entry.getPrefix()) && hasLineBreak(newEntry.getPrefix())) {
-                            newEntry = newEntry.withPrefix(substringOfAfterFirstLineBreak(entry.getPrefix()));
+                        if (shouldShift()) {
+                            int identLevel = Math.abs(getIndentLevel(entry) - getIndentLevel(newEntry));
+                            if (!hasLineBreak(entry.getPrefix()) && hasLineBreak(newEntry.getPrefix())) {
+                                newEntry = newEntry.withPrefix(substringOfAfterFirstLineBreak(entry.getPrefix()));
+                            }
+                            doAfterVisit(new ShiftFormatLeftVisitor<>(newEntry, identLevel));
                         }
-                        doAfterVisit(new ShiftFormatLeftVisitor<>(newEntry, identLevel));
-                    }
 
-                    return newEntry;
+                        return newEntry;
+                    }
                 }
 
                 return entry;
             }
 
-            private Yaml.Mapping.Entry createNestedEntry(String[] keys, int index, Yaml.Block value) {
-                if (index != keys.length - 1) {
+            /**
+             * Splits a key into parts while respecting certain exclusion rules.
+             * The method ensures certain segments of the key are kept together as defined in the exclusion list.
+             *
+             * @param key the full key to be split into parts
+             * @return a list of strings representing the split parts of the key
+             */
+            private List<String> getParts(String key) {
+                String parentKey = getParentKey();
+                List<String> keepTogether = new ArrayList<>();
+                for (String ex : exclusions) {
+                    matches(key, ex, parentKey).ifPresent(keepTogether::add);
+                }
+
+                List<String> result = new ArrayList<>();
+                List<String> parts = Arrays.asList(key.split("\\."));
+                outer:
+                for (int i = 0; i < parts.size(); ) {
+                    for (String group : keepTogether) {
+                        List<String> groupParts = Arrays.asList(group.split("\\."));
+                        if (i + groupParts.size() <= parts.size()) {
+                            List<String> subList = parts.subList(i, i + groupParts.size());
+                            if (subList.equals(groupParts)) {
+                                result.add(String.join(".", groupParts));
+                                i += groupParts.size();
+                                continue outer;
+                            }
+                        }
+                    }
+                    result.add(parts.get(i));
+                    i++;
+                }
+
+                return result;
+            }
+
+            private String getParentKey() {
+                StringBuilder parentKey = new StringBuilder();
+                Cursor c = getCursor().getParent();
+                while (c != null) {
+                    if (c.getValue() instanceof Yaml.Mapping.Entry) {
+                        parentKey.insert(0, ((Yaml.Mapping.Entry) c.getValue()).getKey().getValue() + ".");
+                    }
+                    c = c.getParent();
+                }
+                return parentKey.length() == 0 ? "" : parentKey.substring(0, parentKey.length() - 1);
+            }
+
+            /**
+             * Matches a key against a JsonPath pattern.
+             * It uses a custom JsonPathParser to parse keys with dots, like `logging.level`.
+             *
+             * @return found group or empty if no match was found
+             */
+            private Optional<String> matches(String key, String pattern, String parentKey) {
+                // Recursive descent
+                if (pattern.startsWith("$..")) {
+                    pattern = pattern.substring(3);
+                    // Handle parent-child conditions like: `$..[logging.level][?(<condition>)]` and `$..logging.level[?(<condition>)]`
+                    if (pattern.startsWith("[") && pattern.contains("][")) {
+                        int secondBracket = pattern.indexOf( '[', 1);
+                        pattern = pattern.substring(1, secondBracket - 1) + pattern.substring(secondBracket);
+                    }
+                    if (!pattern.startsWith("[") && pattern.contains("[") && parentKey.contains(pattern.split("\\[")[0])) {
+                        pattern = "[" + pattern.split("\\[")[1];
+                    }
+                }
+
+                // Starts from root
+                if (pattern.startsWith("$.")) {
+                    pattern = pattern.replace("$." + parentKey, "");
+                    if (pattern.startsWith(".")) {
+                        pattern = pattern.substring(1);
+                    }
+                }
+
+                // property in brackets
+                if (pattern.startsWith("[") && pattern.endsWith("]")) {
+                    pattern = pattern.substring(1, pattern.length() - 1);
+                }
+
+                // properties can be wrapped in quotes
+                if (pattern.startsWith("\"") && pattern.endsWith("\"")) {
+                    pattern = pattern.substring(1, pattern.length() - 1);
+                } else if (pattern.startsWith("'") && pattern.endsWith("'")) {
+                    pattern = pattern.substring(1, pattern.length() - 1);
+                }
+
+                if (key.contains(pattern)) {
+                    return Optional.of(pattern);
+                } else if (pattern.startsWith("?(@property.match(/") && pattern.endsWith("/))")) {
+                    pattern = pattern.substring(19, pattern.length() - 3);
+                    Matcher m = Pattern.compile(".*(" + pattern + ").*").matcher(key);
+                    if (m.matches()) {
+                        return Optional.of(m.group(1).isEmpty() ? m.group(0) : m.group(1));
+                    }
+                }
+                return Optional.empty();
+            }
+
+            private Yaml.Mapping.Entry createNestedEntry(List<String> keys, int index, Yaml.Block value) {
+                if (index != keys.size() - 1) {
                     Yaml.Mapping.Entry entry = createNestedEntry(keys, index + 1, value);
                     value = new Yaml.Mapping(randomId(), EMPTY, null, singletonList(entry), null, null, null);
                 }
 
-                Yaml.Scalar key = new Yaml.Scalar(randomId(), "", EMPTY, PLAIN, null, null, keys[index]);
+                Yaml.Scalar key = new Yaml.Scalar(randomId(), "", EMPTY, PLAIN, null, null, keys.get(index));
                 return new Yaml.Mapping.Entry(randomId(), "", EMPTY, key, "", value);
             }
 
             private int getIndentLevel(Yaml.Mapping.Entry entry) {
                 String[] parts = entry.getPrefix().split("\\R");
-                return parts.length > 1 ? countOccurrences(parts[1], " "): 0;
+                return parts.length > 1 ? countOccurrences(parts[1], " ") : 0;
             }
 
             /**

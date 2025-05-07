@@ -1,4 +1,3 @@
-#
 # Copyright 2025 the original author or authors.
 # <p>
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddAnnotationProcessor
@@ -236,13 +234,12 @@ examples:
   - 'null'
   - 'null'
   sources:
-  - before: |
-      <project>
-          <groupId>com.mycompany.app</groupId>
-          <artifactId>my-app</artifactId>
-          <version>1</version>
-      </project>
-    path: pom.xml
+  - after: |
+      <gradleEnterprise>
+        <server>
+          <url>https://foo</url>
+        </server>
+      </gradleEnterprise>
     language: xml
   - before: |
       <?xml version="1.0" encoding="UTF-8"?>
@@ -258,12 +255,13 @@ examples:
         </extension>
       </extensions>
     language: xml
-  - after: |
-      <gradleEnterprise>
-        <server>
-          <url>https://foo</url>
-        </server>
-      </gradleEnterprise>
+  - before: |
+      <project>
+          <groupId>com.mycompany.app</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+      </project>
+    path: pom.xml
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
@@ -2581,6 +2579,62 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.plugin.DependencyPluginGoalResolveSources
+examples:
+- description: ''
+  sources:
+  - before: foo
+    language: mavenProject
+  - before: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.mycompany.app</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-dependency-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <executions>
+                          <execution>
+                              <goals>
+                                  <goal>sources</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    after: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.mycompany.app</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-dependency-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <executions>
+                          <execution>
+                              <goals>
+                                  <goal>resolve-sources</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.DependencyInsight
 examples:
 - description: ''
@@ -2913,6 +2967,8 @@ examples:
   - 'null'
   - 'null'
   sources:
+  - before: demo
+    language: mavenProject
   - before: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\
       \ xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n\txsi:schemaLocation=\"\
       http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd\"\
@@ -2931,8 +2987,6 @@ examples:
       </project>\n"
     path: pom.xml
     language: xml
-  - before: demo
-    language: mavenProject
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.security.UseHttpsForRepositories

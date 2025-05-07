@@ -16,9 +16,11 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Objects;
@@ -79,6 +81,43 @@ class JavaTemplateGenericsTest implements RewriteTest {
                       System.out.printf(any());
                   }
                   static native <T> T any();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @ExpectedToFail("PR #5374 was reverted, due to regressions")
+    void expressionTest() {
+        var template = JavaTemplate.builder("!#{iterable:any(java.lang.Iterable<T>)}.iterator().hasNext()")
+          .genericTypes("T")
+          .build();
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Unary visitUnary(J.Unary unary, ExecutionContext executionContext) {
+                  return template.matches(getCursor()) ? SearchResult.found(unary) : super.visitUnary(unary, executionContext);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              
+              class Test {
+                  boolean test() {
+                      return !List.of("1").iterator().hasNext();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              class Test {
+                  boolean test() {
+                      return /*~~>*/!List.of("1").iterator().hasNext();
+                  }
               }
               """
           )
