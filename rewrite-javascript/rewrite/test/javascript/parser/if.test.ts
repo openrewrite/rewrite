@@ -25,6 +25,12 @@ describe('if mapping', () => {
             typescript('if (true) console.log("foo");')
         ));
 
+    test('simple parse failure', () => {
+        expect(() => {
+            return spec.rewriteRun(typescript('if'));
+        }).rejects.toThrow();
+    });
+
     test('simple with comments', () =>
         spec.rewriteRun(
             //language=typescript

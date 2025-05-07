@@ -23,6 +23,7 @@ import dedent from "dedent";
 import {Result, scheduleRun} from "../run";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {mapAsync} from "../util";
+import {ParseErrorKind} from "../parse-error";
 
 export interface SourceSpec<T extends SourceFile> {
     kind: string,
@@ -68,6 +69,7 @@ export class RecipeSpec {
         for (const kind in specsByKind) {
             const specs = specsByKind[kind];
             const parsed = await this.parse(specs);
+            await this.expectNoParseFailures(parsed);
             await this.expectParsePrintIdempotence(parsed);
             const changeset = (await scheduleRun(this.recipe,
                 parsed.map(([_, sourceFile]) => sourceFile),
@@ -79,6 +81,15 @@ export class RecipeSpec {
         // for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
         //     assertion(getRows(name, this.recipeExecutionContext));
         // }
+    }
+
+    private async expectNoParseFailures(parsed: [SourceSpec<any>, SourceFile][]) {
+        for (const [_, sourceFile] of parsed) {
+            if (sourceFile.kind === ParseErrorKind) {
+                // TODO some reporting on what actually went wrong with parsing
+                throw new Error("Parsed source contains a ParseError.");
+            }
+        }
     }
 
     private async expectParsePrintIdempotence(parsed: [SourceSpec<any>, SourceFile][]) {
