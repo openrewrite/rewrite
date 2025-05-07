@@ -30,7 +30,7 @@ class FindTest implements RewriteTest {
     @Test
     void regex() {
         rewriteRun(
-          spec -> spec.recipe(new Find("[T\\s]", true, true, null, null, null, null)),
+          spec -> spec.recipe(new Find("[T\\s]", true, true, null, null, null, null, null)),
           text(
             """
               This is\ttext.
