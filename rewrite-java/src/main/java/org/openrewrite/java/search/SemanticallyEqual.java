@@ -24,6 +24,9 @@ import org.openrewrite.java.tree.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.openrewrite.java.tree.TypeUtils.isAssignableTo;
+import static org.openrewrite.java.tree.TypeUtils.isOfType;
+
 /**
  * Recursively checks the equality of each element of two ASTs to determine if two trees are semantically equal.
  * <p>
@@ -929,7 +932,6 @@ public class SemanticallyEqual {
                     return memberRef;
                 }
 
-                visit(memberRef.getContaining(), compareTo.getContaining());
                 visitList(memberRef.getTypeParameters(), compareTo.getTypeParameters());
             }
             return memberRef;
@@ -1524,14 +1526,6 @@ public class SemanticallyEqual {
                 }
             }
             return firstTypeName;
-        }
-
-        protected boolean isOfType(@Nullable JavaType target, @Nullable JavaType source) {
-            return TypeUtils.isOfType(target, source);
-        }
-
-        protected boolean isAssignableTo(@Nullable JavaType target, @Nullable JavaType source) {
-            return TypeUtils.isAssignableTo(target, source);
         }
     }
 }
