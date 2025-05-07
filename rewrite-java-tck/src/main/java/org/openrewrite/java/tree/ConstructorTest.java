@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class ConstructorTest implements RewriteTest {
+class ConstructorTest implements RewriteTest {
 
     @Test
     void noConstructor() {
