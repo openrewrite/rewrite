@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -87,6 +88,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    @ExpectedToFail("PR #5374 was reverted, due to regressions")
     void expressionTest() {
         var template = JavaTemplate.builder("!#{iterable:any(java.lang.Iterable<T>)}.iterator().hasNext()")
           .genericTypes("T")
