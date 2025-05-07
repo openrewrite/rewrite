@@ -18,7 +18,6 @@ package org.openrewrite.text;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.apache.commons.lang3.BooleanUtils;
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
@@ -187,7 +186,7 @@ public class Find extends Recipe {
                 return plainText.withText("").withSnippets(snippets);
             }
 
-            private @NotNull String truncateContext(int endLine, int startLine, Matcher matcher, int matchStart, String rawText) {
+            private String truncateContext(int endLine, int startLine, Matcher matcher, int matchStart, String rawText) {
                 if (contextSize == null || contextSize == 0) {
                     return "...~~>" + matcher.group() + "...";
                 }
