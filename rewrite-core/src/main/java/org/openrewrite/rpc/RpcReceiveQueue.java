@@ -107,7 +107,6 @@ public class RpcReceiveQueue {
             logFile.flush();
         }
         Integer ref = null;
-        T value = message.getValue();
         switch (message.getState()) {
             case NO_CHANGE:
                 return before;
@@ -120,7 +119,7 @@ public class RpcReceiveQueue {
                     return (T) refs.get(ref);
                 }
                 before = message.getValueType() == null ?
-                        value :
+                        message.getValue() :
                         newObj(message.getValueType());
                 // Intentional fall-through...
             case CHANGE:
@@ -130,8 +129,8 @@ public class RpcReceiveQueue {
                 } else if (before instanceof RpcCodec) {
                     //noinspection unchecked
                     after = (T) ((RpcCodec<Object>) before).rpcReceive(before, this);
-                } else if (value != null) {
-                    after = value;
+                } else if (message.getValueType() == null) {
+                    after = message.getValue();
                 } else {
                     after = before;
                 }

@@ -1374,19 +1374,35 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 }
 
+const javaReceiver = new JavaReceiver();
+const javaSender = new JavaSender();
+
 const javaCodec: RpcCodec<J> = {
     async rpcReceive(before: J, q: RpcReceiveQueue): Promise<J> {
-        return (await new JavaReceiver().visit(before, q))!;
+        return (await javaReceiver.visit(before, q))!;
     },
 
     async rpcSend(after: J, q: RpcSendQueue): Promise<void> {
-        await new JavaSender().visit(after, q);
+        await javaSender.visit(after, q);
     }
 }
 
 // Register codec for all Java AST node types
 Object.values(J.Kind).forEach(kind => {
-    RpcCodecs.registerCodec(kind, javaCodec);
+    if (kind === J.Kind.Space) {
+        RpcCodecs.registerCodec(kind, {
+                async rpcReceive(before: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
+                    return (await javaReceiver.visitSpace(before, q))!;
+                },
+
+                async rpcSend(after: J.Space, q: RpcSendQueue): Promise<void> {
+                    await javaSender.visitSpace(after, q);
+                }
+            }
+        );
+    } else {
+        RpcCodecs.registerCodec(kind, javaCodec);
+    }
 });
 
 // Register codecs for all Java markers with additional properties

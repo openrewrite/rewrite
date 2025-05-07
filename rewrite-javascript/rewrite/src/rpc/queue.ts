@@ -59,13 +59,8 @@ export class RpcSendQueue {
     }
 
     async* generate(after: any, before: any): AsyncGenerator<RpcObjectData> {
-        const afterCodec = RpcCodecs.forInstance(after);
-        const onChange = afterCodec ? async () => {
-            await afterCodec?.rpcSend(after, this);
-        } : undefined;
-
         let next = this.next;
-        const top: Promise<void> = this.send(after, before, onChange);
+        const top: Promise<void> = this.send(after, before);
         let sendComplete = false
         while (!sendComplete) {
             // Race between waiting for the next data and the resolution of 'top'
@@ -103,13 +98,7 @@ export class RpcSendQueue {
             await this.getAndSend(markersRef, m => m.id);
             await this.getAndSendList(markersRef,
                 (m) => m.markers,
-                (marker: Marker) => marker.id,
-                async (marker: Marker) => {
-                    const afterCodec = RpcCodecs.forInstance(marker);
-                    if (afterCodec) {
-                        await afterCodec?.rpcSend(marker, this)
-                    }
-                }
+                (marker: Marker) => marker.id
             );
         });
     }
@@ -119,7 +108,7 @@ export class RpcSendQueue {
                      onChange?: (value: U) => Promise<any>): Promise<void> {
         const after = value(parent);
         const before = this.before === undefined ? undefined : value(this.before as T);
-        return this.send(after, before, onChange ? () => onChange(after!) : undefined);
+        return this.send(after, before, onChange && (() => onChange(after!)));
     }
 
     getAndSendList<T, U>(parent: T,
@@ -131,7 +120,7 @@ export class RpcSendQueue {
         return this.sendList(after, before, id, onChange);
     }
 
-    send<T>(after: T | undefined, before: T | undefined, onChange: (() => Promise<any>) | undefined): Promise<void> {
+    send<T>(after: T | undefined, before: T | undefined, onChange?: (() => Promise<any>)): Promise<void> {
         return saveTrace(this.trace, async () => {
             if (before === after) {
                 this.put({state: RpcObjectState.NO_CHANGE});
@@ -224,6 +213,8 @@ export class RpcSendQueue {
                 await onChange();
             }
             this.before = lastBefore;
+        } else if (after !== undefined) {
+            await RpcCodecs.forInstance(after)?.rpcSend(after, this);
         }
     }
 

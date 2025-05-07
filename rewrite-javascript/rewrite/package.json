@@ -13,6 +13,8 @@
   "exports": {
     ".": "./dist/src/index.js",
     "./json": "./dist/src/json/index.js",
+    "./java": "./dist/src/java/index.js",
+    "./javascript": "./dist/src/javascript/index.js",
     "./rpc": "./dist/src/rpc/index.js",
     "./test": "./dist/src/test/index.js"
   },

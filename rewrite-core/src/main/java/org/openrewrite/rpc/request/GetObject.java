@@ -18,7 +18,6 @@ package org.openrewrite.rpc.request;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
-import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcSendQueue;
 
@@ -72,11 +71,7 @@ public class GetObject implements RpcRequest {
                 RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, trace.get());
                 forkJoin.submit(() -> {
                     try {
-                        Runnable onChange = after instanceof RpcCodec ? () -> {
-                            //noinspection unchecked
-                            ((RpcCodec<Object>) after).rpcSend(after, sendQueue);
-                        } : null;
-                        sendQueue.send(after, before, onChange);
+                        sendQueue.send(after, before, null);
 
                         // All the data has been sent, and the remote should have received
                         // the full tree, so update our understanding of the remote state
