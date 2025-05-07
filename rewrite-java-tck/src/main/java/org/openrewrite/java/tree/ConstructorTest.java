@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.MinimumJava21;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -94,6 +95,7 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Issue("https://openjdk.org/jeps/513")
+    @MinimumJava21
     @Test
     void validationBeforeThisConstructor() {
         rewriteRun(
@@ -114,6 +116,7 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Issue("https://openjdk.org/jeps/513")
+    @MinimumJava21
     @Test
     void validationBeforeSuperConstructor() {
         rewriteRun(
@@ -133,6 +136,7 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Issue("https://openjdk.org/jeps/513")
+    @MinimumJava21
     @Test
     void assignmentBeforeThisConstructor() {
         rewriteRun(
@@ -152,6 +156,7 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Issue("https://openjdk.org/jeps/513")
+    @MinimumJava21
     @Test
     void assignmentBeforeSuperConstructor() {
         rewriteRun(
