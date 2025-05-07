@@ -85,6 +85,12 @@ public class TypesInUse {
                 } else if (javaType instanceof JavaType.Method) {
                     if (cursor.getValue() instanceof J.MethodDeclaration) {
                         declaredMethods.add((JavaType.Method) javaType);
+                    } else if (cursor.getValue() instanceof J.MethodInvocation) {
+                        Expression expression = ((J.MethodInvocation) cursor.getValue()).getSelect();
+                        usedMethods.add(maybeRelocateMethod((JavaType.Method) javaType, expression));
+                    } else if (cursor.getValue() instanceof J.MemberReference) {
+                        Expression expression = ((J.MemberReference) cursor.getValue()).getContaining();
+                        usedMethods.add(maybeRelocateMethod((JavaType.Method) javaType, expression));
                     } else {
                         usedMethods.add((JavaType.Method) javaType);
                     }
@@ -96,22 +102,12 @@ public class TypesInUse {
             return javaType;
         }
 
-        @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-            maybeAddMethod(method.getMethodType(), method.getSelect());
-            return super.visitMethodInvocation(method, integer);
-        }
-
-        @Override
-        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer integer) {
-            maybeAddMethod(memberRef.getMethodType(), memberRef.getContaining());
-            return super.visitMemberReference(memberRef, integer);
-        }
-
-        private void maybeAddMethod(JavaType.@Nullable Method methodType, @Nullable Expression expression) {
-            if (methodType != null && expression != null && expression.getType() instanceof JavaType.FullyQualified) {
+        private JavaType.Method maybeRelocateMethod(JavaType.Method methodType, @Nullable Expression expression) {
+            if (expression != null && expression.getType() instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified declaringType = (JavaType.FullyQualified) expression.getType();
-                usedMethods.add(methodType.withDeclaringType(declaringType));
+                return methodType.withDeclaringType(declaringType);
+            } else {
+                return methodType;
             }
         }
     }

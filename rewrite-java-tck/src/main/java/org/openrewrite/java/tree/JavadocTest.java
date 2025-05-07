@@ -15,12 +15,14 @@
  */
 package org.openrewrite.java.tree;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
@@ -1259,7 +1261,7 @@ class JavadocTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertEquals("test", cu.getTypesInUse().getUsedMethods().iterator().next().getName());
-                assertEquals("SomeParent2", cu.getTypesInUse().getUsedMethods().iterator().next().getDeclaringType().getFullyQualifiedName());
+                assertEquals("Test", cu.getTypesInUse().getUsedMethods().iterator().next().getDeclaringType().getFullyQualifiedName());
             })
           )
         );
