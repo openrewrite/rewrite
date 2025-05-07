@@ -30,6 +30,9 @@ export async function produceAsync<Base extends Objectish>(
         PromiseLike<ValidImmerRecipeReturnType<Draft<Base>>>
 ): Promise<Base> {
     const b: Base = await before;
+    if (b === undefined) {
+        throw new Error("Cannot produce from undefined");
+    }
     const draft = createDraft(b);
     await recipe(draft);
     return finishDraft(draft) as Base;
