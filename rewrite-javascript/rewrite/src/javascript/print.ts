@@ -19,7 +19,7 @@ import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
-import {Comment, emptySpace, J, JavaMarkers, Statement, TextComment, TrailingComma, TypeTree} from "../java";
+import {Comment, emptySpace, J, JavaMarkers, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {Marker, Markers} from "../markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
@@ -297,7 +297,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitArrayType(arrayType: J.ArrayType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(arrayType, p);
-        let type: TypeTree = arrayType;
+        let type: TypedTree = arrayType;
 
         while (type.kind === J.Kind.ArrayType) {
             type = (type as J.ArrayType).elementType;

@@ -26,12 +26,10 @@ import {
     isSpace,
     J,
     NameTree,
-    Statement,
-    TypeTree,
-    TypedTree,
-    JavaType
+    Statement, TypedTree, TypeTree
 } from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
+import {JavaType} from "./type";
 
 export class JavaVisitor<P> extends TreeVisitor<J, P> {
     // protected javadocVisitor: any | null = null;
@@ -68,7 +66,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitAnnotatedType(annotatedType: J.AnnotatedType, p: P): Promise<J | undefined> {
         return this.produceJava<J.AnnotatedType>(annotatedType, p, async draft => {
             draft.annotations = await mapAsync(annotatedType.annotations, a => this.visitDefined<J.Annotation>(a, p));
-            draft.typeExpression = await this.visitDefined(annotatedType.typeExpression, p) as TypeTree;
+            draft.typeExpression = await this.visitDefined(annotatedType.typeExpression, p) as TypedTree;
         });
     }
 
@@ -94,7 +92,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected async visitArrayType(arrayType: J.ArrayType, p: P): Promise<J | undefined> {
         return this.produceJava<J.ArrayType>(arrayType, p, async draft => {
-            draft.elementType = await this.visitDefined(arrayType.elementType, p) as TypeTree;
+            draft.elementType = await this.visitDefined(arrayType.elementType, p) as TypedTree;
             if (arrayType.annotations) {
                 draft.annotations = await mapAsync(arrayType.annotations, a => this.visitDefined<J.Annotation>(a, p));
             }
@@ -385,7 +383,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             }
 
             if (methodDecl.returnTypeExpression) {
-                draft.returnTypeExpression = await this.visitDefined(methodDecl.returnTypeExpression, p) as TypeTree;
+                draft.returnTypeExpression = await this.visitDefined(methodDecl.returnTypeExpression, p) as TypedTree;
             }
 
             draft.nameAnnotations = await mapAsync(methodDecl.nameAnnotations, a => this.visitDefined<J.Annotation>(a, p));
@@ -423,7 +421,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitNewArray(newArray: J.NewArray, p: P): Promise<J | undefined> {
         return this.produceJava<J.NewArray>(newArray, p, async draft => {
             if (newArray.typeExpression) {
-                draft.typeExpression = await this.visitDefined(newArray.typeExpression, p) as TypeTree;
+                draft.typeExpression = await this.visitDefined(newArray.typeExpression, p) as TypedTree;
             }
 
             draft.dimensions = await mapAsync(newArray.dimensions, dim =>
@@ -443,7 +441,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.new = await this.visitSpace(newClass.new, p);
 
             if (newClass.clazz) {
-                draft.clazz = await this.visitDefined(newClass.clazz, p) as TypeTree;
+                draft.clazz = await this.visitDefined(newClass.clazz, p) as TypedTree;
             }
 
             draft.arguments = await this.visitContainer(newClass.arguments, p);
@@ -568,7 +566,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected async visitTypeCast(typeCast: J.TypeCast, p: P): Promise<J | undefined> {
         return this.produceJava<J.TypeCast>(typeCast, p, async draft => {
-            draft.clazz = await this.visitDefined(typeCast.clazz, p) as J.ControlParentheses<TypeTree>;
+            draft.clazz = await this.visitDefined(typeCast.clazz, p) as J.ControlParentheses<TypedTree>;
             draft.expression = await this.visitDefined(typeCast.expression, p) as Expression;
         });
     }
@@ -613,7 +611,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.modifiers = await mapAsync(varDecls.modifiers, m => this.visitDefined<J.Modifier>(m, p));
 
             if (varDecls.typeExpression) {
-                draft.typeExpression = await this.visitDefined(varDecls.typeExpression, p) as TypeTree;
+                draft.typeExpression = await this.visitDefined(varDecls.typeExpression, p) as TypedTree;
             }
 
             if (varDecls.varargs) {

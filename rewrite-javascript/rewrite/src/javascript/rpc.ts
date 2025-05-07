@@ -15,17 +15,13 @@
  */
 import {JavaScriptVisitor} from "./visitor";
 import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {isJavaScript, JS} from "./tree";
 import {
     Expression,
-    isJavaScript,
-    JS, TypedTree,
-    TypeTree,
-} from "./tree";
-import {
     J,
-    JavaType, Statement
+    JavaType, Statement, TypedTree, TypeTree
 } from "../java";
-import {createDraft, Draft, finishDraft} from "immer";
+import {createDraft, finishDraft} from "immer";
 import {JavaReceiver, JavaSender} from "../java/rpc";
 import {Cursor, Tree} from "../tree";
 

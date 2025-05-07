@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 export * from "./markers";
+export * from "./type";
 export * from "./tree";
 export * from "./visitor";
 

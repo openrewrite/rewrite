@@ -17,16 +17,16 @@ import * as ts from 'typescript';
 import {
     Comment,
     emptyContainer,
-    emptySpace,
+    emptySpace, Expression,
     J,
     JavaMarkers,
     JavaType,
     NameTree,
     Statement,
     TextComment,
-    TrailingComma,
+    TrailingComma, TypedTree, TypeTree,
 } from '../java';
-import {Expression, isJavaScript, JS, TypedTree, TypeTree} from '.';
+import {isJavaScript, JS} from '.';
 import {
     emptyMarkers,
     markers,

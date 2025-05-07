@@ -15,11 +15,12 @@
  */
 import {JavaVisitor} from "./visitor";
 import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {Expression, isSpace, J, JavaType, TextComment} from "./tree";
+import {Expression, isSpace, J, TextComment} from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
 import {isTree} from "../tree";
 import {JavaMarkers, TrailingComma} from "./markers";
+import {JavaType} from "./type";
 
 export class JavaSender extends JavaVisitor<RpcSendQueue> {
 

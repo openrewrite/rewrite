@@ -15,12 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {SourceFile} from "../tree";
-import {ValidImmerRecipeReturnType} from "../visitor";
-import {mapAsync} from "../util";
-import {J, JavaType, JavaVisitor, NameTree, Statement, TypedTree, TypeTree} from "../java";
+import {mapAsync, SourceFile, ValidImmerRecipeReturnType} from "../";
+import {Expression, J, JavaType, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
-import {Expression, isJavaScript, JS} from "./tree";
+import {isJavaScript, JS} from "./tree";
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
@@ -82,7 +80,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.modifiers = await mapAsync(arrowFunction.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.typeParameters = arrowFunction.typeParameters && await this.visitDefined<J.TypeParameters>(arrowFunction.typeParameters, p);
             draft.parameters = await this.visitDefined<J.Lambda.Parameters>(arrowFunction.parameters, p);
-            draft.returnTypeExpression = arrowFunction.returnTypeExpression && await this.visitDefined<TypeTree>(arrowFunction.returnTypeExpression, p);
+            draft.returnTypeExpression = arrowFunction.returnTypeExpression && await this.visitDefined<TypedTree>(arrowFunction.returnTypeExpression, p);
             draft.body = await this.visitLeftPadded(arrowFunction.body, p);
             draft.type = arrowFunction.type && await this.visitType(arrowFunction.type, p);
         });
@@ -213,7 +211,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return this.produceJavaScript<JS.JSVariableDeclarations>(jSVariableDeclarations, p, async draft => {
             draft.leadingAnnotations = await mapAsync(jSVariableDeclarations.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
             draft.modifiers = await mapAsync(jSVariableDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.typeExpression = jSVariableDeclarations.typeExpression && await this.visitDefined<TypeTree>(jSVariableDeclarations.typeExpression, p);
+            draft.typeExpression = jSVariableDeclarations.typeExpression && await this.visitDefined<TypedTree>(jSVariableDeclarations.typeExpression, p);
             draft.varargs = jSVariableDeclarations.varargs && await this.visitSpace(jSVariableDeclarations.varargs, p);
             draft.variables = await mapAsync(jSVariableDeclarations.variables, item => this.visitRightPadded(item, p));
         });
@@ -295,7 +293,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return this.produceJavaScript<JS.ObjectBindingDeclarations>(objectBindingDeclarations, p, async draft => {
             draft.leadingAnnotations = await mapAsync(objectBindingDeclarations.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
             draft.modifiers = await mapAsync(objectBindingDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.typeExpression = objectBindingDeclarations.typeExpression && await this.visitDefined<TypeTree>(objectBindingDeclarations.typeExpression, p);
+            draft.typeExpression = objectBindingDeclarations.typeExpression && await this.visitDefined<TypedTree>(objectBindingDeclarations.typeExpression, p);
             draft.bindings = await this.visitContainer(objectBindingDeclarations.bindings, p);
             draft.initializer = objectBindingDeclarations.initializer && await this.visitLeftPadded(objectBindingDeclarations.initializer, p);
         });
@@ -402,8 +400,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitIndexedAccessType(indexedAccessType: JS.IndexedAccessType, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.IndexedAccessType>(indexedAccessType, p, async draft => {
-            draft.objectType = await this.visitDefined<TypeTree>(indexedAccessType.objectType, p);
-            draft.indexType = await this.visitDefined<TypeTree>(indexedAccessType.indexType, p);
+            draft.objectType = await this.visitDefined<TypedTree>(indexedAccessType.objectType, p);
+            draft.indexType = await this.visitDefined<TypedTree>(indexedAccessType.indexType, p);
             draft.type = indexedAccessType.type && await this.visitType(indexedAccessType.type, p);
         });
     }
@@ -417,7 +415,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTypeQuery(typeQuery: JS.TypeQuery, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.TypeQuery>(typeQuery, p, async draft => {
-            draft.typeExpression = await this.visitDefined<TypeTree>(typeQuery.typeExpression, p);
+            draft.typeExpression = await this.visitDefined<TypedTree>(typeQuery.typeExpression, p);
             draft.typeArguments = typeQuery.typeArguments && await this.visitContainer(typeQuery.typeArguments, p);
             draft.type = typeQuery.type && await this.visitType(typeQuery.type, p);
         });
@@ -425,7 +423,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTypeInfo(typeInfo: JS.TypeInfo, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.TypeInfo>(typeInfo, p, async draft => {
-            draft.typeIdentifier = await this.visitDefined<TypeTree>(typeInfo.typeIdentifier, p);
+            draft.typeIdentifier = await this.visitDefined<TypedTree>(typeInfo.typeIdentifier, p);
         });
     }
 
@@ -501,7 +499,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.leadingAnnotations = await mapAsync(jSMethodDeclaration.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
             draft.modifiers = await mapAsync(jSMethodDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.typeParameters = jSMethodDeclaration.typeParameters && await this.visitDefined<J.TypeParameters>(jSMethodDeclaration.typeParameters, p);
-            draft.returnTypeExpression = jSMethodDeclaration.returnTypeExpression && await this.visitDefined<TypeTree>(jSMethodDeclaration.returnTypeExpression, p);
+            draft.returnTypeExpression = jSMethodDeclaration.returnTypeExpression && await this.visitDefined<TypedTree>(jSMethodDeclaration.returnTypeExpression, p);
             draft.name = await this.visitDefined<Expression>(jSMethodDeclaration.name, p);
             draft.parameters = await this.visitContainer(jSMethodDeclaration.parameters, p);
             draft.body = jSMethodDeclaration.body && await this.visitDefined<J.Block>(jSMethodDeclaration.body, p);
@@ -563,7 +561,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.name = await this.visitLeftPadded(functionDeclaration.name, p);
             draft.typeParameters = functionDeclaration.typeParameters && await this.visitDefined<J.TypeParameters>(functionDeclaration.typeParameters, p);
             draft.parameters = await this.visitContainer(functionDeclaration.parameters, p);
-            draft.returnTypeExpression = functionDeclaration.returnTypeExpression && await this.visitDefined<TypeTree>(functionDeclaration.returnTypeExpression, p);
+            draft.returnTypeExpression = functionDeclaration.returnTypeExpression && await this.visitDefined<TypedTree>(functionDeclaration.returnTypeExpression, p);
             draft.body = functionDeclaration.body && await this.visitDefined<J>(functionDeclaration.body, p);
             draft.type = functionDeclaration.type && await this.visitType(functionDeclaration.type, p);
         });
