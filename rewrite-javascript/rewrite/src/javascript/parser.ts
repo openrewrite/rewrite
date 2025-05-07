@@ -3364,7 +3364,7 @@ export class JavaScriptParserVisitor {
         } else {
             keywordType = JS.NamespaceDeclaration.KeywordType.Module;
         }
-        if (body.kind === JS.Kind.NamespaceDeclaration) {
+        if (body?.kind === JS.Kind.NamespaceDeclaration) {
             return {
                 kind: JS.Kind.NamespaceDeclaration,
                 id: randomId(),
@@ -4377,11 +4377,13 @@ export class JavaScriptParserVisitor {
     }
 
     private convertToken(token?: ts.Node) {
-        if (token?.kind === ts.SyntaxKind.CommaToken) return {
-            kind: JavaMarkers.TrailingComma,
-            id: randomId(),
-            suffix: emptySpace
-        };
+        if (token?.kind === ts.SyntaxKind.CommaToken) {
+            return {
+                kind: JavaMarkers.TrailingComma,
+                id: randomId(),
+                suffix: emptySpace
+            };
+        }
         if (token?.kind === ts.SyntaxKind.SemicolonToken) return {kind: JavaMarkers.Semicolon, id: randomId()};
         return undefined;
     }

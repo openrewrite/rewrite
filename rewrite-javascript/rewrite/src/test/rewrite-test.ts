@@ -24,6 +24,7 @@ import {Result, scheduleRun} from "../run";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {mapAsync} from "../util";
 import {ParseErrorKind} from "../parse-error";
+import {ParseExceptionResult} from "../markers";
 
 export interface SourceSpec<T extends SourceFile> {
     kind: string,
@@ -86,8 +87,8 @@ export class RecipeSpec {
     private async expectNoParseFailures(parsed: [SourceSpec<any>, SourceFile][]) {
         for (const [_, sourceFile] of parsed) {
             if (sourceFile.kind === ParseErrorKind) {
-                // TODO some reporting on what actually went wrong with parsing
-                throw new Error("Parsed source contains a ParseError.");
+                throw new Error("Parsed source contains a ParseError: " +
+                    (sourceFile.markers.markers.find(m => m.kind === "org.openrewrite.marker.ParseExceptionResult")! as ParseExceptionResult).message);
             }
         }
     }
