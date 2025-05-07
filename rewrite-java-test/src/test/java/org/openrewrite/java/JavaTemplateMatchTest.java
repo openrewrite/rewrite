@@ -15,10 +15,10 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -1002,7 +1002,7 @@ class JavaTemplateMatchTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("PR #5374 was reverted, due to regressions")
+    @ExpectedToFail("PR #5374 was reverted, due to regressions")
     void matchMemberReferenceContainingParameter() {
         rewriteRun(
           spec -> spec
@@ -1025,7 +1025,7 @@ class JavaTemplateMatchTest implements RewriteTest {
           java(
             """
               import java.util.Optional;
-              
+
               class Foo {
                   @SuppressWarnings("all")
                   void test() {
@@ -1035,7 +1035,7 @@ class JavaTemplateMatchTest implements RewriteTest {
               """,
             """
               import java.util.Optional;
-              
+
               class Foo {
                   @SuppressWarnings("all")
                   void test() {

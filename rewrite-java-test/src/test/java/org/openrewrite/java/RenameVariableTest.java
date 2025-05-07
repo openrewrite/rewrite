@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -123,7 +123,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   private String name;
-                  
+              
                   /**
                    * The length of <code>name</code> added to the length of {@link #name}.
                    *
@@ -137,7 +137,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   private String _name;
-                  
+              
                   /**
                    * The length of <code>name</code> added to the length of {@link #_name}.
                    *
@@ -224,11 +224,11 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-                            
+              
               public class A<T> {
                   private String _val;
                   private String name;
-                   
+              
                   A(String name, String _val) {
                       this._val = _val;
                       this.name = name;
@@ -237,11 +237,11 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-                            
+              
               public class A<T> {
                   private String v;
                   private String name;
-                   
+              
                   A(String name, String v) {
                       this.v = v;
                       this.name = name;
@@ -822,7 +822,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class B {
                   int n;
-                            
+              
                   {
                       n++; // do not change.
                       int n;
@@ -831,7 +831,7 @@ class RenameVariableTest implements RewriteTest {
                       if(n + 1 == 2) {}
                       n++;
                   }
-                 
+              
                   public int foo(int n) {
                       return n + this.n;
                   }
@@ -840,7 +840,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class B {
                   int n;
-                            
+              
                   {
                       n++; // do not change.
                       int n1;
@@ -849,7 +849,7 @@ class RenameVariableTest implements RewriteTest {
                       if(n1 + 1 == 2) {}
                       n1++;
                   }
-                 
+              
                   public int foo(int n2) {
                       return n2 + this.n;
                   }
@@ -1037,7 +1037,7 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("PR #5372 was reverted, due to regressions")
+    @ExpectedToFail("PR #5372 was reverted, due to regressions")
     void hiddenVariablesHierarchyRenameBase() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -1133,7 +1133,7 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("PR #5372 was reverted, due to regressions")
+    @ExpectedToFail("PR #5372 was reverted, due to regressions")
     void hiddenVariablesHierarchyRenameExtended() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -1229,7 +1229,7 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("PR #5372 was reverted, due to regressions")
+    @ExpectedToFail("PR #5372 was reverted, due to regressions")
     void hiddenVariablesHierarchyRenameLocal() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
