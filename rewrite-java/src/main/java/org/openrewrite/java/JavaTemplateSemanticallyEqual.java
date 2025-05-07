@@ -136,7 +136,6 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     @SuppressWarnings("ConstantConditions")
     private static class JavaTemplateSemanticallyEqualVisitor extends SemanticallyEqualVisitor {
         final Map<J, String> matchedParameters = new LinkedHashMap<>();
-        final Types types = new Types(true);
 
         public JavaTemplateSemanticallyEqualVisitor() {
             super(true);
@@ -159,7 +158,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 }
 
                 if (TypeUtils.isObject(marker.getType()) ||
-                    isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
+                    TypeUtils.isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
                     registerMatch(j, marker.getName());
                     return true;
                 }
@@ -195,16 +194,6 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         private static boolean isTemplateParameterPlaceholder(J.Empty empty) {
             Markers markers = empty.getMarkers();
             return markers.getMarkers().size() == 1 && markers.getMarkers().get(0) instanceof TemplateParameter;
-        }
-
-        @Override
-        protected boolean isOfType(@Nullable JavaType target, @Nullable JavaType source) {
-            return target == source || isAssignableTo(target, source);
-        }
-
-        @Override
-        protected boolean isAssignableTo(@Nullable JavaType target, @Nullable JavaType source) {
-            return types.isAssignableTo(target, source);
         }
     }
 }
