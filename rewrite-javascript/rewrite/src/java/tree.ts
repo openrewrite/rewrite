@@ -468,7 +468,7 @@ export namespace J {
         readonly nameAnnotations: Annotation[];
         readonly name: Identifier;
         readonly parameters: Container<Statement>;
-        readonly throws: Container<NameTree>;
+        readonly throws?: Container<NameTree>;
         readonly body?: Block;
         readonly defaultValue?: LeftPadded<Expression>;
         readonly methodType?: JavaType.Method;

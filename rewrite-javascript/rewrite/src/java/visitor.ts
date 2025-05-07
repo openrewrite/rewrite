@@ -391,12 +391,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.nameAnnotations = await mapAsync(methodDecl.nameAnnotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.name = await this.visitDefined(methodDecl.name, p);
             draft.parameters = await this.visitContainer(methodDecl.parameters, p);
-            draft.throws = await this.visitContainer(methodDecl.throws, p);
-
-            if (methodDecl.body) {
-                draft.body = await this.visitDefined(methodDecl.body, p) as J.Block;
-            }
-
+            draft.throws = methodDecl.throws && await this.visitContainer(methodDecl.throws, p);
+            draft.body = methodDecl.body && await this.visitDefined(methodDecl.body, p) as J.Block;
             draft.defaultValue = await this.visitOptionalLeftPadded(methodDecl.defaultValue, p);
             draft.methodType = await this.visitType(methodDecl.methodType, p) as JavaType.Method | undefined;
         });
