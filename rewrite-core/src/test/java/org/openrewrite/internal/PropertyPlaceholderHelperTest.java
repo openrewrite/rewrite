@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PropertyPlaceholderHelperTest {
 
     @Test
-    void dashed() {
+    void space() {
         var helper = new PropertyPlaceholderHelper("%%{", "}", null);
         var s = helper.replacePlaceholders("%%{k1} %%{k2}", k -> switch (k) {
             case "k1" -> "hi";
@@ -30,5 +30,16 @@ class PropertyPlaceholderHelperTest {
             default -> throw new UnsupportedOperationException();
         });
         assertThat(s).isEqualTo("hi jon");
+    }
+
+    @Test
+    void noSpace() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("%%{k1}%%{k2}", k -> switch (k) {
+            case "k1" -> "hi";
+            case "k2" -> "jon";
+            default -> throw new UnsupportedOperationException();
+        });
+        assertThat(s).isEqualTo("hijon");
     }
 }
