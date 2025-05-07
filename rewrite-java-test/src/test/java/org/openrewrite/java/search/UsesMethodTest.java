@@ -16,6 +16,8 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
@@ -67,7 +69,7 @@ class UsesMethodTest implements RewriteTest {
           java(
             """
               package abc;
-                            
+
               import java.util.Set;
               import java.util.Collections;
               import java.util.concurrent.ConcurrentHashMap;
@@ -85,7 +87,7 @@ class UsesMethodTest implements RewriteTest {
           java(
             """
               package abc;
-                            
+
               import java.util.Set;
               class Test {
                   Set<String> s = Thing.newConcurrentHashSet();
@@ -93,7 +95,7 @@ class UsesMethodTest implements RewriteTest {
               """,
             """
               /*~~>*/package abc;
-                            
+
               import java.util.Set;
               class Test {
                   Set<String> s = Thing.newConcurrentHashSet();
@@ -207,12 +209,17 @@ class UsesMethodTest implements RewriteTest {
         );
     }
 
-    @Test
+    @ParameterizedTest
     @Issue("https://github.com/openrewrite/rewrite/issues/5376")
-    void usesMethodDeepHierarchy() {
+    @ValueSource(strings = {
+      "java.util.Collection contains(..)",
+      "java.util.Set contains(..)",
+      "com.google.common.collect.ImmutableSet contains(..)",
+    })
+    void usesMethodDeepHierarchy(String methodPattern) {
         //noinspection ResultOfMethodCallIgnored
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("java.util.Set contains(..)", true)))
+          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>(methodPattern, true)))
             .parser(JavaParser.fromJavaVersion().classpath("guava")),
           java(
             """
@@ -236,28 +243,26 @@ class UsesMethodTest implements RewriteTest {
           ),
           java(
             """
-              import com.google.common.collect.ImmutableMap;
               import com.google.common.collect.ImmutableSet;
               
               import java.util.stream.Stream;
               
               class TestMemberReference {
                   void test() {
-                        var set = ImmutableSet.of("1");
-                        Stream.of("foo").filter(set::contains);
+                      var set = ImmutableSet.of("1");
+                      Stream.of("foo").filter(set::contains);
                   }
               }
               """,
             """
-              /*~~>*/import com.google.common.collect.ImmutableMap;
-              import com.google.common.collect.ImmutableSet;
+              /*~~>*/import com.google.common.collect.ImmutableSet;
               
               import java.util.stream.Stream;
               
               class TestMemberReference {
                   void test() {
-                        var set = ImmutableSet.of("1");
-                        Stream.of("foo").filter(set::contains);
+                      var set = ImmutableSet.of("1");
+                      Stream.of("foo").filter(set::contains);
                   }
               }
               """

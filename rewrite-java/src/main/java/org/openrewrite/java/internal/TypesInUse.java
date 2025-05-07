@@ -106,9 +106,8 @@ public class TypesInUse {
             if (expression != null && expression.getType() instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified declaringType = (JavaType.FullyQualified) expression.getType();
                 return methodType.withDeclaringType(declaringType);
-            } else {
-                return methodType;
             }
+            return methodType;
         }
     }
 }
