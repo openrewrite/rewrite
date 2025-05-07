@@ -68,13 +68,6 @@ describe('flow annotation checking test', () => {
         ));
 
     async function expectFlowSyntaxError(sourceSpec: SourceSpec<any>) {
-        await spec.rewriteRun({
-            ...sourceSpec,
-            afterRecipe: (source: SourceFile) => {
-                let parseExceptionResult = source.markers.markers.find(m => m.kind == MarkersKind.ParseExceptionResult) as ParseExceptionResult;
-                expect(parseExceptionResult).toBeDefined();
-                expect(parseExceptionResult.exceptionType).toEqual('FlowSyntaxNotSupportedError');
-            }
-        });
+        await expect(spec.rewriteRun(sourceSpec)).rejects.toThrow('FlowSyntaxNotSupportedError');
     }
 });
