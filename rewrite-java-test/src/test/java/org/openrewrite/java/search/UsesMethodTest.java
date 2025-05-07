@@ -21,6 +21,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -267,6 +268,40 @@ class UsesMethodTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void usesMethodMatchesEnums() {
+        rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("java.lang.Enum equals(java.lang.Object)", true)))
+                      .parser(JavaParser.fromJavaVersion().classpath("guava")),
+              java(
+                      """
+                        import java.time.DayOfWeek;
+                        
+                        class Test {
+                            void method(DayOfWeek arg0) {
+                                if (DayOfWeek.SUNDAY.equals(arg0)) {
+                                }
+                                if (arg0.equals(DayOfWeek.MONDAY)) {
+                                }
+                            }
+                        }
+                        """,
+                      """
+                        /*~~>*/import java.time.DayOfWeek;
+                        
+                        class Test {
+                            void method(DayOfWeek arg0) {
+                                if (DayOfWeek.SUNDAY.equals(arg0)) {
+                                }
+                                if (arg0.equals(DayOfWeek.MONDAY)) {
+                                }
+                            }
+                        }
+                        """
+              )
         );
     }
 }
