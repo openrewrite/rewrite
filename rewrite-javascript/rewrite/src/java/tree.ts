@@ -826,10 +826,7 @@ export namespace TypedTree {
         return (typeTree as any).type;
     }
 
-    export function registerTypeGetter<K extends TypedTree["kind"]>(
-        kind: K,
-        fn: (tree: Extract<TypedTree, { kind: K }>) => JavaType | undefined
-    ): void {
+    export function registerTypeGetter<T extends TypedTree>(kind: T["kind"], fn: (tree: T) => JavaType | undefined): void {
         typeGetters.set(kind, fn as any);
     }
 
