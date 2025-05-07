@@ -17,7 +17,7 @@
 import {JS} from "./tree";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor} from "./visitor";
-import {J, Comment} from "../java";
+import {Comment, J} from "../java";
 import {createDraft, Draft, finishDraft, produce} from "immer";
 import {isTree} from "../tree";
 import {SpacesStyle} from "./style";
@@ -70,7 +70,8 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
                     // TODO support arrowFunction, beforeUnaryNotAndNotNull, afterUnaryNotAndNotNull
                     throw new Error("Unsupported operator type " + ret.operator.element.valueOf());
             }
-            draft.operator.before.whitespace = property  ? " " : ""; // TODO check the context and refer to proper setting
+            draft.operator.before.whitespace = property  ? " " : "";
+            draft.right.prefix.whitespace = property ? " " : "";
             return finishDraft(draft) as J.Binary;
         }
         return ret;
@@ -247,6 +248,81 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
         return ret;
     }
 
+    protected async visitMethodInvocation(methodInv: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitMethodInvocation(methodInv, p) as J.MethodInvocation;
+        if (isTree(ret)) {
+            const draft = createDraft(ret);
+            if (draft.select != undefined) {
+                draft.select = await this.spaceAfter(draft.select, this.style.beforeParentheses.functionCallParentheses);
+            }
+            if (ret.arguments.elements.length > 0 && ret.arguments.elements[0].element.kind != J.Kind.Empty) {
+                // TODO all arguments, not only the first and last one
+                draft.arguments.elements[0] = await this.spaceBeforeRightPaddedElement(draft.arguments.elements[0], this.style.within.functionCallParentheses);
+                const lastArgIndex = draft.arguments.elements.length - 1;
+                draft.arguments.elements[lastArgIndex] = await this.spaceAfter(draft.arguments.elements[lastArgIndex], this.style.within.functionCallParentheses);
+            } else if (ret.arguments.elements.length == 1) {
+                draft.arguments.elements[0] = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(draft.arguments.elements[0], this.style.within.functionCallParentheses), false);
+            }
+
+            // TODO
+            // m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), style.getBeforeParentheses().getMethodCall()));
+            // if (m.getArguments().isEmpty() || m.getArguments()[0] instanceof J.Empty) {
+            //   ...
+            // } else {
+            //     const argsSize = m.getArguments().length;
+            //     const useSpace = style.getWithin().getMethodCallParentheses();
+            //     m = m.getPadding().withArguments(
+            //         m.getPadding().getArguments().getPadding().withElements(
+            //             ListUtils.map(m.getPadding().getArguments().getPadding().getElements(),
+            //                 (index: number, arg: any) => {
+            //                     if (index === 0) {
+            //                         arg = arg.withElement(spaceBefore(arg.getElement(), useSpace));
+            //                     } else {
+            //                         arg = arg.withElement(
+            //                             spaceBefore(arg.getElement(), style.getOther().getAfterComma())
+            //                         );
+            //                     }
+            //                     if (index === argsSize - 1) {
+            //                         arg = spaceAfter(arg, useSpace);
+            //                     } else {
+            //                         arg = spaceAfter(arg, style.getOther().getBeforeComma());
+            //                     }
+            //                     return arg;
+            //                 }
+            //             )
+            //         )
+            //     );
+            // }
+            // if (m.getPadding().getTypeParameters() !== null) {
+            //     m = m.getPadding().withTypeParameters(
+            //         spaceBefore(m.getPadding().getTypeParameters(),
+            //             style.getTypeArguments().getBeforeOpeningAngleBracket())
+            //     );
+            //     m = m.withName(spaceBefore(m.getName(), style.getTypeArguments().getAfterClosingAngleBracket()));
+            // }
+            // if (m.getPadding().getTypeParameters() !== null) {
+            //     m = m.getPadding().withTypeParameters(
+            //         m.getPadding().getTypeParameters().getPadding().withElements(
+            //             ListUtils.map(m.getPadding().getTypeParameters().getPadding().getElements(),
+            //                 (index: number, elemContainer: any) => {
+            //                     if (index !== 0) {
+            //                         elemContainer = elemContainer.withElement(
+            //                             spaceBefore(elemContainer.getElement(),
+            //                                 style.getTypeArguments().getAfterComma())
+            //                         );
+            //                     }
+            //                     return elemContainer;
+            //                 }
+            //             )
+            //         )
+            //     );
+            // }
+            return finishDraft(draft) as J.MethodInvocation;
+        }
+        return ret;
+
+    }
+
     protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: ExecutionContext): Promise<J.RightPadded<T>> {
         const ret = await super.visitRightPadded(right, p);
         if (isTree(ret.element)) {
@@ -261,10 +337,11 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
     }
 
     protected async visitTypeInfo(typeInfo: JS.TypeInfo, p: ExecutionContext): Promise<J | undefined> {
-        const ret = await super.visitTypeInfo(typeInfo, p);
+        const ret = await super.visitTypeInfo(typeInfo, p) as JS.TypeInfo;
         if (isTree(ret)) {
             const draft = createDraft(ret);
             draft.prefix.whitespace = this.style.other.beforeTypeReferenceColon ? " " : "";
+            draft.typeIdentifier = await this.spaceBefore(draft.typeIdentifier, this.style.other.afterTypeReferenceColon)
             return finishDraft(draft) as JS.TypeInfo;
         }
         return ret;
@@ -354,9 +431,9 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
 
     private static spaceSuffix(comment: Comment, spaceSuffix: boolean): Comment {
         if (spaceSuffix && this.isNotSingleSpace(comment.suffix)) {
-            return { ...comment, suffix: " " };
+            return { ...comment, suffix: " "};
         } else if (!spaceSuffix && this.isOnlySpacesAndNotEmpty(comment.suffix)) {
-            return { ...comment, suffix: "" };
+            return { ...comment, suffix: ""};
         } else {
             return comment;
         }

@@ -29,18 +29,20 @@ describe('AutoformatVisitor', () => {
             typescript(`
                 class K{
                     m () :number{
-                        return   x;
+                        this.m( );
+                        return 1;
                     }
                 }
                 const a=1;
                 if(1>0){
-                    console. log ( "true"  );
+                    console.log  (   "true"  );
                 }
                 `,
             `
                 class K {
                     m(): number {
-                        return x;
+                        this.m();
+                        return 1;
                     }
                 }
                 const a = 1;
