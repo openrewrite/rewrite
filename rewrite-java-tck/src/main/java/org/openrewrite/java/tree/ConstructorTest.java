@@ -93,7 +93,7 @@ class ConstructorTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1144")
+    @Issue("https://openjdk.org/jeps/513")
     @Test
     void validationBeforeThisConstructor() {
         rewriteRun(
@@ -113,7 +113,7 @@ class ConstructorTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1144")
+    @Issue("https://openjdk.org/jeps/513")
     @Test
     void validationBeforeSuperConstructor() {
         rewriteRun(
@@ -132,7 +132,7 @@ class ConstructorTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1144")
+    @Issue("https://openjdk.org/jeps/513")
     @Test
     void assignmentBeforeThisConstructor() {
         rewriteRun(
@@ -151,7 +151,7 @@ class ConstructorTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1144")
+    @Issue("https://openjdk.org/jeps/513")
     @Test
     void assignmentBeforeSuperConstructor() {
         rewriteRun(
