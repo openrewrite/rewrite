@@ -18,6 +18,7 @@
 
 import {SourceFile, TreeKind} from "../";
 import {Expression, J, JavaType, Statement, TypedTree, TypeTree,} from "../java";
+import getType = TypedTree.getType;
 
 export interface JS extends J {
 }
@@ -682,3 +683,6 @@ const KindValues = new Set(Object.values(JS.Kind));
 export function isJavaScript(tree: any): tree is JS {
     return KindValues.has(tree["kind"]);
 }
+
+
+TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => getType(tree.initializer));

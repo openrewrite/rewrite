@@ -277,7 +277,10 @@ export class JavaScriptParserVisitor {
             }
             return this.rightPadded(j, this.semicolonPrefix(n), (n => {
                 const last = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile);
-                return last?.kind == ts.SyntaxKind.SemicolonToken ? markers({kind: JavaMarkers.Semicolon, id: randomId()}) : emptyMarkers;
+                return last?.kind == ts.SyntaxKind.SemicolonToken ? markers({
+                    kind: JavaMarkers.Semicolon,
+                    id: randomId()
+                }) : emptyMarkers;
             })?.(n));
         });
     }
@@ -482,7 +485,10 @@ export class JavaScriptParserVisitor {
                 statements: node.members.map((ce: ts.ClassElement) => this.rightPadded(
                     this.convert(ce),
                     ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
-                    ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({kind: JavaMarkers.Semicolon, id: randomId()}) : emptyMarkers
+                    ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                        kind: JavaMarkers.Semicolon,
+                        id: randomId()
+                    }) : emptyMarkers
                 )),
                 end: this.prefix(node.getLastToken()!)
             },
@@ -503,7 +509,7 @@ export class JavaScriptParserVisitor {
                     prefix: emptySpace,
                     markers: emptyMarkers,
                     expression: expression
-                });
+                } as JS.TypeTreeExpression);
             }
         }
         return undefined;
@@ -733,14 +739,14 @@ export class JavaScriptParserVisitor {
             modifiers: this.mapModifiers(node),
             name: this.visit(node.name),
             bounds: (node.constraint || node.default) && {
-                    kind: J.Kind.JContainer,
-                    before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExtendsKeyword) ?? this.findChildNode(node, ts.SyntaxKind.EqualsToken)!),
-                    elements: [
-                        node.constraint ? this.rightPadded(this.visit(node.constraint), this.suffix(node.constraint)) : this.rightPadded(this.newJEmpty(), emptySpace),
-                        node.default ? this.rightPadded(this.visit(node.default), this.suffix(node.default)) : this.rightPadded(this.newJEmpty(), emptySpace)
-                    ],
-                    markers: emptyMarkers
-                }
+                kind: J.Kind.JContainer,
+                before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExtendsKeyword) ?? this.findChildNode(node, ts.SyntaxKind.EqualsToken)!),
+                elements: [
+                    node.constraint ? this.rightPadded(this.visit(node.constraint), this.suffix(node.constraint)) : this.rightPadded(this.newJEmpty(), emptySpace),
+                    node.default ? this.rightPadded(this.visit(node.default), this.suffix(node.default)) : this.rightPadded(this.newJEmpty(), emptySpace)
+                ],
+                markers: emptyMarkers
+            }
         };
     }
 
@@ -856,7 +862,7 @@ export class JavaScriptParserVisitor {
                     markers: emptyMarkers,
                     name: nameExpression,
                     dimensionsAfterName: [],
-                    initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)) ,
+                    initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
                     variableType: this.mapVariableType(node)
                 },
                 this.suffix(node.name)
@@ -874,22 +880,22 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: emptySpace,
                 markers: emptyMarkers,
-                clazz: this.convert<J>(node.expression.expression),
+                clazz: this.convert<J>(node.expression.expression) as Expression,
                 typeArguments: node.expression.typeArguments && this.mapTypeArguments(this.suffix(node.expression.expression), node.expression.typeArguments)
-            };
+            } as JS.ExpressionWithTypeArguments;
             _arguments = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
         } else if (ts.isIdentifier(node.expression)) {
             annotationType = this.convert(node.expression);
         } else if (ts.isPropertyAccessExpression(node.expression)) {
             annotationType = this.convert(node.expression);
         } else if (ts.isParenthesizedExpression(node.expression)) {
-            annotationType = ({
+            annotationType = {
                 kind: JS.Kind.TypeTreeExpression,
                 id: randomId(),
                 prefix: this.prefix(node.expression),
                 markers: emptyMarkers,
-                expression: this.convert(node.expression)
-            });
+                expression: this.convert(node.expression) as Expression
+            } as JS.TypeTreeExpression;
         } else {
             return this.visitUnknown(node);
         }
@@ -1222,7 +1228,7 @@ export class JavaScriptParserVisitor {
 
     private mapTypeInfo(node: ts.MethodDeclaration | ts.PropertyDeclaration | ts.VariableDeclaration | ts.ParameterDeclaration
         | ts.PropertySignature | ts.MethodSignature | ts.ArrowFunction | ts.CallSignatureDeclaration | ts.GetAccessorDeclaration
-        | ts.FunctionDeclaration | ts.ConstructSignatureDeclaration | ts.FunctionExpression | ts.NamedTupleMember): TypeTree | undefined {
+        | ts.FunctionDeclaration | ts.ConstructSignatureDeclaration | ts.FunctionExpression | ts.NamedTupleMember): JS.TypeInfo | undefined {
         return node.type && {
             kind: JS.Kind.TypeInfo,
             id: randomId(),
@@ -2634,7 +2640,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitClassExpression(node: ts.ClassExpression) : JS.StatementExpression {
+    visitClassExpression(node: ts.ClassExpression): JS.StatementExpression {
         return {
             kind: JS.Kind.StatementExpression,
             id: randomId(),
@@ -3431,7 +3437,7 @@ export class JavaScriptParserVisitor {
                         fa.target
                     ),
                     type: undefined
-                },
+                } as J.FieldAccess,
                 name: fa.name,
                 type: undefined
             };

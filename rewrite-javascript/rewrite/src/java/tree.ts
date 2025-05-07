@@ -29,48 +29,6 @@ export interface Expression extends J {
 export interface TypedTree extends J {
 }
 
-export namespace TypedTree {
-    const typeGetters = new Map<TypedTree["kind"], (tree: TypedTree) => JavaType | undefined>();
-
-    export function getType(typeTree?: TypedTree): JavaType | undefined {
-        if (!typeTree) {
-            return undefined;
-        }
-        const customFn = typeGetters.get(typeTree.kind as any);
-        if (customFn) {
-            return customFn(typeTree as any) as any;
-        }
-        if ("typeExpression" in typeTree && (typeTree as any).typeExpression) {
-            return getType((typeTree as any).typeExpression);
-        }
-        return (typeTree as any).type;
-    }
-
-    export function registerTypeGetter<K extends TypedTree["kind"]>(
-        kind: K,
-        fn: (tree: Extract<TypedTree, { kind: K }>) => JavaType | undefined
-    ): void {
-        typeGetters.set(kind, fn as any);
-    }
-
-    registerTypeGetter(J.Kind.MethodDeclaration, (tree: J.MethodDeclaration) => tree.methodType?.returnType);
-    registerTypeGetter(J.Kind.MethodInvocation, (tree: J.MethodInvocation) => tree.methodType?.returnType);
-    registerTypeGetter(J.Kind.Parentheses, (tree: J.Parentheses<TypedTree>) => getType(tree.tree.element));
-    registerTypeGetter(J.Kind.NewClass, (tree: J.NewClass) => tree.constructorType?.returnType);
-
-    // TODO ControlParentheses here isn't a TypedTree so why does this compile?
-    registerTypeGetter(J.Kind.TypeCast, (tree: J.TypeCast) => getType(tree.clazz));
-
-    registerTypeGetter(J.Kind.Empty, () => JavaType.unknownType);
-    registerTypeGetter(J.Kind.MultiCatch, (tree: J.MultiCatch) => {
-        const bounds = tree.alternatives.map(a => getType(a.element));
-        return {kind: JavaType.Kind.Union, bounds: bounds};
-    });
-    registerTypeGetter(J.Kind.NullableType, (tree: J.NullableType) => getType(tree.typeTree.element));
-    registerTypeGetter(J.Kind.Wildcard, () => JavaType.unknownType);
-    registerTypeGetter(J.Kind.Unknown, () => JavaType.unknownType);
-}
-
 export interface NameTree extends TypedTree {
 }
 
@@ -849,4 +807,46 @@ const javaKindValues = new Set(Object.values(J.Kind));
 
 export function isJava(tree: any): tree is J {
     return javaKindValues.has(tree["kind"]);
+}
+
+export namespace TypedTree {
+    const typeGetters = new Map<TypedTree["kind"], (tree: TypedTree) => JavaType | undefined>();
+
+    export function getType(typeTree?: TypedTree): JavaType | undefined {
+        if (!typeTree) {
+            return undefined;
+        }
+        const customFn = typeGetters.get(typeTree.kind as any);
+        if (customFn) {
+            return customFn(typeTree as any) as any;
+        }
+        if ("typeExpression" in typeTree && (typeTree as any).typeExpression) {
+            return getType((typeTree as any).typeExpression);
+        }
+        return (typeTree as any).type;
+    }
+
+    export function registerTypeGetter<K extends TypedTree["kind"]>(
+        kind: K,
+        fn: (tree: Extract<TypedTree, { kind: K }>) => JavaType | undefined
+    ): void {
+        typeGetters.set(kind, fn as any);
+    }
+
+    registerTypeGetter(J.Kind.MethodDeclaration, (tree: J.MethodDeclaration) => tree.methodType?.returnType);
+    registerTypeGetter(J.Kind.MethodInvocation, (tree: J.MethodInvocation) => tree.methodType?.returnType);
+    registerTypeGetter(J.Kind.Parentheses, (tree: J.Parentheses<TypedTree>) => getType(tree.tree.element));
+    registerTypeGetter(J.Kind.NewClass, (tree: J.NewClass) => tree.constructorType?.returnType);
+
+    // TODO ControlParentheses here isn't a TypedTree so why does this compile?
+    registerTypeGetter(J.Kind.TypeCast, (tree: J.TypeCast) => getType(tree.clazz));
+
+    registerTypeGetter(J.Kind.Empty, () => JavaType.unknownType);
+    registerTypeGetter(J.Kind.MultiCatch, (tree: J.MultiCatch) => {
+        const bounds = tree.alternatives.map(a => getType(a.element));
+        return {kind: JavaType.Kind.Union, bounds: bounds};
+    });
+    registerTypeGetter(J.Kind.NullableType, (tree: J.NullableType) => getType(tree.typeTree.element));
+    registerTypeGetter(J.Kind.Wildcard, () => JavaType.unknownType);
+    registerTypeGetter(J.Kind.Unknown, () => JavaType.unknownType);
 }
