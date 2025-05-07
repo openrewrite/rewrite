@@ -1037,7 +1037,6 @@ class RenameVariableTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/5369")
-    //This does not work
     void hiddenVariablesGetRenamedCorrectlyInBlocks() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
