@@ -252,13 +252,7 @@ public class RewriteRpc {
     public <T> T getObject(String id) {
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
                 new GetObject(id), GetObjectResponse.class));
-        Object remoteObject = q.receive(localObjects.get(id), before -> {
-            if (before instanceof RpcCodec) {
-                //noinspection unchecked
-                return ((RpcCodec<Object>) before).rpcReceive(before, q);
-            }
-            return before;
-        });
+        Object remoteObject = q.receive(localObjects.get(id), null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }

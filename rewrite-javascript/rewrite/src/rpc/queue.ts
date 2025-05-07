@@ -257,10 +257,7 @@ export class RpcReceiveQueue {
             return saveTrace(this.logFile, async () => {
                 const draft = createDraft(markers);
                 draft.id = await this.receive(m.id);
-                draft.markers = (await this.receiveList(m.markers, async m2 => {
-                    const afterCodec = RpcCodecs.forInstance(m2);
-                    return afterCodec ? afterCodec.rpcReceive(m2, this) : m2;
-                }))!;
+                draft.markers = (await this.receiveList(m.markers))!;
                 return finishDraft(draft);
             })
         })
@@ -287,7 +284,17 @@ export class RpcReceiveQueue {
                     before = message.value ?? this.newObj(message.valueType!);
                 // Intentional fall-through...
                 case RpcObjectState.CHANGE:
-                    const after = onChange ? onChange(before!) : message.value;
+                    let after;
+                    let codec;
+                    if (onChange) {
+                        after = onChange(before!);
+                    } else if ((codec = RpcCodecs.forInstance(before))) {
+                        after = codec.rpcReceive(before, this);
+                    } else if (message.value !== undefined) {
+                        after = message.value;
+                    } else {
+                        after = before;
+                    }
                     if (ref !== undefined) {
                         this.refs.set(ref, after);
                     }

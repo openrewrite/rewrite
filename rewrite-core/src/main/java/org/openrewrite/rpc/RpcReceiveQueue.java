@@ -17,7 +17,6 @@ package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.io.PrintStream;
@@ -73,13 +72,7 @@ public class RpcReceiveQueue {
     public Markers receiveMarkers(Markers markers) {
         return receive(markers, m -> m
                 .withId(receiveAndGet(m.getId(), ValueCodec.UUID))
-                .withMarkers(receiveList(m.getMarkers(), m2 -> {
-                    if (m2 instanceof RpcCodec) {
-                        //noinspection unchecked
-                        return (Marker) ((RpcCodec<Object>) m2).rpcReceive(m2, this);
-                    }
-                    return m2;
-                })));
+                .withMarkers(receiveList(m.getMarkers(), null)));
     }
 
     /**
@@ -114,6 +107,7 @@ public class RpcReceiveQueue {
             logFile.flush();
         }
         Integer ref = null;
+        T value = message.getValue();
         switch (message.getState()) {
             case NO_CHANGE:
                 return before;
@@ -125,12 +119,22 @@ public class RpcReceiveQueue {
                     //noinspection unchecked
                     return (T) refs.get(ref);
                 }
-                before = onChange == null || message.getValueType() == null ?
-                        message.getValue() :
+                before = message.getValueType() == null ?
+                        value :
                         newObj(message.getValueType());
                 // Intentional fall-through...
             case CHANGE:
-                T after = onChange == null ? message.getValue() : onChange.apply(before);
+                T after;
+                if (onChange != null) {
+                    after = onChange.apply(before);
+                } else if (before instanceof RpcCodec) {
+                    //noinspection unchecked
+                    after = (T) ((RpcCodec<Object>) before).rpcReceive(before, this);
+                } else if (value != null) {
+                    after = value;
+                } else {
+                    after = before;
+                }
                 if (ref != null) {
                     refs.put(ref, after);
                 }

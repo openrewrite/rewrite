@@ -83,7 +83,7 @@ public class RpcObjectData {
     @Nullable
     String trace;
 
-    public <V> V getValue() {
+    public <V> @Nullable V getValue() {
         if (value instanceof Map && valueType != null) {
             try {
                 Class<?> valueClass = Class.forName(valueType);
@@ -102,7 +102,7 @@ public class RpcObjectData {
                 throw new RuntimeException(e);
             }
         }
-        //noinspection DataFlowIssue,unchecked
+        // noinspection unchecked
         return (V) value;
     }
 
