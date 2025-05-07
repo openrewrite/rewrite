@@ -17,6 +17,7 @@ import {randomId, UUID} from "./uuid";
 
 export const MarkersKind = {
     Markers: "org.openrewrite.marker.Markers",
+    NamedStyles: "org.openrewrite.marker.NamedStyles",
     SearchResult: "org.openrewrite.marker.SearchResult",
     ParseExceptionResult: "org.openrewrite.marker.ParseExceptionResult",
     RpcMarker: "org.openrewrite.rpc.RpcMarker",
@@ -66,4 +67,10 @@ export interface ParseExceptionResult extends Marker {
     readonly exceptionType: string
     readonly message: string
     readonly treeType?: string;
+}
+
+// TODO, am I using this at all?
+export interface NamedStyles extends Marker {
+    readonly kind: typeof MarkersKind.RpcMarker
+    readonly data: {}
 }

@@ -201,3 +201,23 @@ export function dedentAfter(s?: AfterRecipeText): AfterRecipeText {
     }
     return null;
 }
+
+
+export class AdHocRecipe extends Recipe {
+    name = "org.openrewrite.adhoc"
+    displayName = "ad-hoc"
+    description = "ad-hoc."
+
+    constructor(private visitor: TreeVisitor<any, any>) {
+        super();
+    }
+
+    get editor(): TreeVisitor<any, any> {
+        return this.visitor;
+    }
+}
+
+export function fromVisitor(visitor: TreeVisitor<any, any>): Recipe {
+    return new AdHocRecipe(visitor);
+}
+
