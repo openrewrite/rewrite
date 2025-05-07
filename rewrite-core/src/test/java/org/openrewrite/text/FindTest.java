@@ -43,6 +43,26 @@ class FindTest implements RewriteTest {
     }
 
     @Test
+    void isFullMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("This is text.", true, true, null, null, null, null, null))
+            .dataTable(TextMatches.Row.class, rows -> {
+                  assertThat(rows)
+                    .hasSize(1)
+                    .allSatisfy(r -> assertThat(r.getMatch()).isEqualTo("~~>This is text."));
+              }),
+          text(
+            """
+              This is text.
+              """,
+            """
+              ~~>This is text.
+              """
+          )
+        );
+    }
+
+    @Test
     void dataTable() {
         rewriteRun(
           spec -> spec.recipe(new Find("text", null, null, null, null, null, null, 50))
@@ -258,17 +278,17 @@ class FindTest implements RewriteTest {
                   r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
                   r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
                   r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...is a very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very l..."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very long line."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very long line."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very long line."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very long line."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very long line."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very long line."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very long line."),
-                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very long line.")
+                  r -> assertThat(r.getMatch()).isEqualTo("...is is a very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...a very, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("..., very, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very l..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("..., very, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very long li..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("..., very, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("..., very, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("..., very, very, very, very, very, very, very, very, ~~>very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("..., very, very, very, very, very, very, very, very, ~~>very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("..., very, very, very, very, very, very, very, very, ~~>very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("..., very, very, very, very, very, very, very, very, ~~>very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("..., very, very, very, very, very, very, very, very, ~~>very long line.")
                 );
             }),
           text(

@@ -187,30 +187,26 @@ public class Find extends Recipe {
             }
 
             private String truncateContext(int endLine, int startLine, Matcher matcher, int matchStart, String rawText) {
-                if (contextSize == null || contextSize == 0) {
-                    return "...~~>" + matcher.group() + "...";
+                String matchText = matcher.group();
+                int contextLength = contextSize == null ? 0 : contextSize;
+                int contextStart = contextLength == -1 ? startLine : matchStart - contextLength;
+                int contextEnd = contextLength == -1 ? endLine : matchStart + matchText.length() + contextLength;
+
+                StringBuilder sb = new StringBuilder();
+
+                if (contextStart > startLine) {
+                    sb.append("...");
                 }
 
-                if (contextSize == -1) {
-                    return rawText.substring(0, matchStart) + "~~>" + rawText.substring(matchStart);
+                sb.append(rawText, Math.max(contextStart, startLine), matchStart)
+                        .append("~~>")
+                        .append(rawText, matchStart, Math.min(contextEnd, endLine));
+
+                if (contextEnd < endLine) {
+                    sb.append("...");
                 }
 
-                StringBuilder context = new StringBuilder(Math.min(endLine - startLine + 3, contextSize * 2 + matcher.group().length() + 3));
-                if (matchStart - startLine > contextSize) {
-                    context.append("...");
-                    context.append(rawText, matchStart - (contextSize - 3), matchStart);
-                } else {
-                    context.append(rawText, startLine, matchStart);
-                }
-                context.append("~~>");
-                int matchLength = matcher.group().length();
-                if (endLine - (matchStart + 3 + matchLength) > contextSize) {
-                    context.append(rawText, matchStart, matchStart + 3 + matchLength + (contextSize - 3));
-                    context.append("...");
-                } else {
-                    context.append(rawText, matchStart, endLine);
-                }
-                return context.toString();
+                return sb.toString();
             }
         };
         if (filePattern != null) {
