@@ -69,8 +69,7 @@ describe('AutoformatVisitor', () => {
                             return y;
                         }
                     }
-                    const a=0;
-                    if(   1>a ){
+                    if(   1>0 ){
                         console.log  (   "four"   ,    "three"  ,    "six"   );
                     }
                     let i                                  = 1;
@@ -84,6 +83,7 @@ describe('AutoformatVisitor', () => {
                     }finally{
                         console.log("finally");
                     }
+                    const isTypeScriptFun = i > 3?"yes":"hell yeah!";
                 `,
                 `
                     class K {
@@ -92,8 +92,7 @@ describe('AutoformatVisitor', () => {
                             return y;
                         }
                     }
-                    const a = 0;
-                    if (1 > a) {
+                    if (1 > 0) {
                         console.log("four", "three", "six");
                     }
                     let i = 1;
@@ -107,6 +106,7 @@ describe('AutoformatVisitor', () => {
                     } finally {
                         console.log("finally");
                     }
+                    const isTypeScriptFun = i > 3 ? "yes" : "hell yeah!";
                 `)
             // @formatter:on
         )

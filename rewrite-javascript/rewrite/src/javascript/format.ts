@@ -170,6 +170,13 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         }
         return ret;
     }
+    protected async visitTernary(ternary: J.Ternary, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitTernary(ternary, p) as J.Ternary;
+        return produceAsync(ret, async draft => {
+            draft.truePart = await this.spaceBeforeLeftPaddedElement(draft.truePart, this.style.ternaryOperator.beforeQuestionMark, this.style.ternaryOperator.afterQuestionMark);
+            draft.falsePart = await this.spaceBeforeLeftPaddedElement(draft.falsePart, this.style.ternaryOperator.beforeColon, this.style.ternaryOperator.afterColon);
+        });
+    }
 
     protected async visitTry(try_: J.Try, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitTry(try_, p) as J.Try;
