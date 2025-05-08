@@ -21,7 +21,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -31,21 +30,21 @@ class SwitchEnhancementsTest implements RewriteTest {
     void addSwitchGuard() {
         rewriteRun(
           spec -> spec
-              .afterTypeValidationOptions(TypeValidation.none())
-              .recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
-                  @Override
-                  public J.Case visitCase(J.Case _case, ExecutionContext ctx) {
-                      if (_case.getBody() == null || _case.getGuard() != null || (!_case.getCaseLabels().isEmpty() && _case.getCaseLabels().get(0) instanceof J.Identifier)) {
-                          return _case;
-                      }
-                      Expression expression = JavaTemplate.builder("\"YES\".equalsIgnoreCase(s)")
-                          .contextSensitive()
-                          .build()
-                          .apply(new Cursor(getCursor(), _case.getBody()), ((Expression) _case.getBody()).getCoordinates().replace());
-
-                      return autoFormat(_case.withGuard(expression), ctx);
-                  }
-              })),
+            .recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.Case visitCase(J.Case case_, ExecutionContext ctx) {
+                    if (case_.getBody() == null || case_.getGuard() != null || case_.getCaseLabels().getFirst() instanceof J.Identifier) {
+                        return case_;
+                    }
+                    J.Identifier s = ((J.VariableDeclarations) case_.getCaseLabels().getFirst()).getVariables().getFirst().getName();
+                    Expression expression = JavaTemplate.apply(
+                      "\"YES\".equalsIgnoreCase(#{any(String)})",
+                      new Cursor(getCursor(), case_.getBody()),
+                      ((Expression) case_.getBody()).getCoordinates().replace(),
+                      s);
+                    return autoFormat(case_.withGuard(expression), ctx);
+                }
+            })),
           //language=java
           java(
             """

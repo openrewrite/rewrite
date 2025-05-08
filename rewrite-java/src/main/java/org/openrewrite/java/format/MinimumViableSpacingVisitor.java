@@ -215,16 +215,11 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     public J.Case visitCase(J.Case _case, P p) {
         J.Case c = super.visitCase(_case, p);
 
-        List<JRightPadded<J>> labels = c.getPadding().getCaseLabels().getPadding().getElements();
-        if (c.getGuard() != null && !labels.isEmpty()) {
-            List<JRightPadded<J>> caseLabels = ListUtils.mapLast(c.getPadding().getCaseLabels().getPadding().getElements(), last -> {
-                if (last != null && Space.EMPTY.equals(last.getAfter())) {
-                    return last.withAfter(Space.SINGLE_SPACE);
-                }
-                return last;
-            });
-
-            return c.getPadding().withCaseLabels(c.getPadding().getCaseLabels().getPadding().withElements(caseLabels));
+        if (c.getGuard() != null) {
+            // At a minimum, we need a space between the guard and the case label
+            JContainer.Padding<J> padding = c.getPadding().getCaseLabels().getPadding();
+            return c.getPadding().withCaseLabels(padding.withElements(ListUtils.mapLast(padding.getElements(),
+                    last -> last != null && last.getAfter().isEmpty() ? last.withAfter(Space.SINGLE_SPACE) : last)));
         }
 
         return c;
