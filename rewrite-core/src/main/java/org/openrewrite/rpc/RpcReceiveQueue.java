@@ -29,6 +29,7 @@ import java.util.function.UnaryOperator;
 import static java.util.Objects.requireNonNull;
 
 public class RpcReceiveQueue {
+    private final ObjenesisStd objenesis = new ObjenesisStd();
     private final List<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
     private final @Nullable PrintStream logFile;
@@ -169,11 +170,11 @@ public class RpcReceiveQueue {
         }
     }
 
-    private static <T> T newObj(String type) {
+    private <T> T newObj(String type) {
         try {
             Class<?> clazz = Class.forName(type);
             //noinspection unchecked
-            return (T) new ObjenesisStd().newInstance(clazz);
+            return (T) objenesis.newInstance(clazz);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
