@@ -352,6 +352,9 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
 
     private async spaceBeforeLeftPaddedElement<T extends J>(left: J.LeftPadded<T>, spaceBefore: boolean): Promise<J.LeftPadded<T>> {
         return produceAsync(left, async draft => {
+            if (draft.before.comments.length == 0) {
+                draft.before.whitespace = "";
+            }
             draft.element = await this.spaceBefore(left.element, spaceBefore) as Draft<T>;
         });
     }

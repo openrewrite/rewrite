@@ -68,11 +68,11 @@ describe('AutoformatVisitor', () => {
                             return 1;
                         }
                     }
-                    const a=1;
-                    if(   1>0 ){
+                    const a=0;
+                    if(   1>a ){
                         console.log  (   "true"  );
                     }
-                    let i=   1;
+                    let i                                  = 1;
                     while(   i<4   ){
                         i++;
                     }
@@ -84,8 +84,8 @@ describe('AutoformatVisitor', () => {
                             return 1;
                         }
                     }
-                    const a = 1;
-                    if (1 > 0) {
+                    const a = 0;
+                    if (1 > a) {
                         console.log("true");
                     }
                     let i = 1;
