@@ -19,11 +19,21 @@ import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor} from "./visitor";
 import {Comment, J} from "../java";
 import {Draft, produce} from "immer";
-import {isTree} from "../tree";
+import {Cursor, isTree, Tree} from "../tree";
 import {SpacesStyle} from "./style";
 import {produceAsync} from "../visitor";
 
 export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
+    constructor(private spacesStyle: SpacesStyle) {
+        super();
+    }
+
+    async visit<R extends J>(tree: Tree, p: ExecutionContext, cursor?: Cursor): Promise<R | undefined> {
+        return new SpacesVisitor(this.spacesStyle).visit(tree, p, cursor); // TODO possibly cursor.fork, when we have more visitors
+    }
+}
+
+export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
     constructor(private style: SpacesStyle) {
         super();
     }
@@ -337,13 +347,13 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
     private async spaceAfter<T extends J>(right: J.RightPadded<T>, spaceAfter: boolean): Promise<J.RightPadded<T>> {
         if (right.after.comments.length > 0) {
             // Perform the space rule for the suffix of the last comment only. Same as IntelliJ.
-            const comments = AutoformatVisitor.spaceLastCommentSuffix(right.after.comments, spaceAfter);
+            const comments = SpacesVisitor.spaceLastCommentSuffix(right.after.comments, spaceAfter);
             return {...right, after: {...right.after, comments}};
         }
 
-        if (spaceAfter && AutoformatVisitor.isNotSingleSpace(right.after.whitespace)) {
+        if (spaceAfter && SpacesVisitor.isNotSingleSpace(right.after.whitespace)) {
             return {...right, after: {...right.after, whitespace: " "}};
-        } else if (!spaceAfter && AutoformatVisitor.isOnlySpacesAndNotEmpty(right.after.whitespace)) {
+        } else if (!spaceAfter && SpacesVisitor.isOnlySpacesAndNotEmpty(right.after.whitespace)) {
             return {...right, after: {...right.after, whitespace: ""}};
         } else {
             return right;
@@ -369,11 +379,11 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
         if (j.prefix.comments.length > 0) {
             return j;
         }
-        if (spaceBefore && AutoformatVisitor.isNotSingleSpace(j.prefix.whitespace)) {
+        if (spaceBefore && SpacesVisitor.isNotSingleSpace(j.prefix.whitespace)) {
             return produce(j, draft => {
                 draft.prefix.whitespace = " ";
             });
-        } else if (!spaceBefore && AutoformatVisitor.isOnlySpacesAndNotEmpty(j.prefix.whitespace)) {
+        } else if (!spaceBefore && SpacesVisitor.isOnlySpacesAndNotEmpty(j.prefix.whitespace)) {
             return produce(j, draft => {
                 draft.prefix.whitespace = "";
             });
@@ -386,15 +396,15 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
         if (container.before.comments.length > 0) {
             // Perform the space rule for the suffix of the last comment only. Same as IntelliJ.
             return produce(container, draft => {
-                draft.before.comments = AutoformatVisitor.spaceLastCommentSuffix(container.before.comments, spaceBefore);
+                draft.before.comments = SpacesVisitor.spaceLastCommentSuffix(container.before.comments, spaceBefore);
             });
         }
 
-        if (spaceBefore && AutoformatVisitor.isNotSingleSpace(container.before.whitespace)) {
+        if (spaceBefore && SpacesVisitor.isNotSingleSpace(container.before.whitespace)) {
             return produce(container, draft => {
                 draft.before.whitespace = " ";
             });
-        } else if (!spaceBefore && AutoformatVisitor.isOnlySpacesAndNotEmpty(container.before.whitespace)) {
+        } else if (!spaceBefore && SpacesVisitor.isOnlySpacesAndNotEmpty(container.before.whitespace)) {
             return produce(container, draft => {
                 draft.before.whitespace = "";
             });
