@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.UpdateDependencyLockFile.UpdateDependencyLockFileVisitor;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.internal.Dependency;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
@@ -177,12 +178,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class)
                             .orElse(null);
                 }
-                J visited = super.visit(tree, ctx);
-                if (visited == null) {
-                    return null;
-                }
-
-                return acc.addGradleModule(visited);
+                return acc.addGradleModule(super.visit(tree, ctx));
             }
 
             @Override
@@ -402,7 +398,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
-            private final UpdateDependencyLockFile updateLockFile = new UpdateDependencyLockFile(acc.getProjectDependencyState());
+            private final UpdateDependencyLockFileVisitor updateLockFile = new UpdateDependencyLockFile().getVisitor(acc.getProjectDependencyState());
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {

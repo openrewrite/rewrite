@@ -30,7 +30,7 @@ class UpdateDependencyLockFileTest implements RewriteTest {
     void calculateGradleLock() {
         rewriteRun(spec ->
                 spec.beforeRecipe(withToolingApi())
-                        .recipe(new UpgradeDependencyVersion("some-group", "and-never-matching-artifact", null, null)),
+                        .recipe(new UpdateDependencyLockFile()),
                 buildGradle(
                         """
                                 plugins {
@@ -76,7 +76,7 @@ class UpdateDependencyLockFileTest implements RewriteTest {
     void multimodule() {
         rewriteRun(spec ->
                 spec.beforeRecipe(withToolingApi())
-                        .recipe(new UpgradeDependencyVersion("some-group", "and-never-matching-artifact", null, null)),
+                        .recipe(new UpdateDependencyLockFile()),
                 settingsGradle(
                         """
                                 rootProject.name = 'test'

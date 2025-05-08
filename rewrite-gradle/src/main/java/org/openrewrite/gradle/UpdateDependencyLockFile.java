@@ -18,11 +18,13 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -35,10 +37,19 @@ import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpdateDependencyLockFile extends PlainTextVisitor<ExecutionContext> {
+public class UpdateDependencyLockFile extends ScanningRecipe<UpdateDependencyLockFile.GradleProjectDependencyState> {
     private static final String[] EMPTY = new String[0];
 
-    GradleProjectDependencyState acc;
+    @Override
+    public String getDisplayName() {
+        return "Update gradle dependency lock file";
+    }
+
+    @Override
+    public String getDescription() {
+        //language=markdown
+        return "Update the version of a dependency in a gradle lockfile.";
+    }
 
     @Value
     public static class GradleProjectDependencyState {
@@ -71,84 +82,117 @@ public class UpdateDependencyLockFile extends PlainTextVisitor<ExecutionContext>
     }
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-        return sourceFile instanceof PlainText && sourceFile.getSourcePath().endsWith("gradle.lockfile");
+    public GradleProjectDependencyState getInitialValue(ExecutionContext ctx) {
+        return new GradleProjectDependencyState();
     }
 
     @Override
-    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
-        Map<GroupArtifactVersion, SortedSet<String>> lockedVersions = new HashMap<>();
-        SortedSet<String> empty = new TreeSet<>();
-        List<String> comments = new ArrayList<>();
+    public TreeVisitor<?, ExecutionContext> getScanner(GradleProjectDependencyState acc) {
+        return new JavaVisitor<ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return (sourceFile instanceof G.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle")) ||
+                        (sourceFile instanceof K.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle.kts"));
+            }
 
-        if (tree == null) {
-            return null;
-        }
-        PlainText plainText = (PlainText) tree;
-        GradleProject gradleProject = acc.getModules().get(plainText.getSourcePath().toString());
-        if (gradleProject == null) {
-            return tree;
-        }
-        String text = plainText.getText();
-        if (StringUtils.isBlank(text)) {
-            return plainText;
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                return acc.addGradleModule(super.visit(tree, ctx));
+            }
+        };
+    }
+
+    @Override
+    public UpdateDependencyLockFileVisitor getVisitor(GradleProjectDependencyState acc) {
+        return new UpdateDependencyLockFileVisitor(acc);
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    public static class UpdateDependencyLockFileVisitor extends PlainTextVisitor<ExecutionContext> {
+
+        UpdateDependencyLockFile.GradleProjectDependencyState acc;
+
+        @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+            return sourceFile instanceof PlainText && sourceFile.getSourcePath().endsWith("gradle.lockfile");
         }
 
-        gradleProject.getConfigurations().forEach(conf -> {
-            if (conf.isCanBeResolved()) {
-                if (conf.getResolved().isEmpty()) {
-                    empty.add(conf.getName());
-                } else {
-                    for (ResolvedDependency resolved : conf.getDirectResolved()) {
-                        lockedVersions.computeIfAbsent(acc.getVersion(resolved), k -> new TreeSet<>()).add(conf.getName());
+        @Override
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            Map<GroupArtifactVersion, SortedSet<String>> lockedVersions = new HashMap<>();
+            SortedSet<String> empty = new TreeSet<>();
+            List<String> comments = new ArrayList<>();
+
+            if (tree == null) {
+                return null;
+            }
+            PlainText plainText = (PlainText) tree;
+            GradleProject gradleProject = acc.getModules().get(plainText.getSourcePath().toString());
+            if (gradleProject == null) {
+                return tree;
+            }
+            String text = plainText.getText();
+            if (StringUtils.isBlank(text)) {
+                return plainText;
+            }
+
+            gradleProject.getConfigurations().forEach(conf -> {
+                if (conf.isCanBeResolved()) {
+                    if (conf.getResolved().isEmpty()) {
+                        empty.add(conf.getName());
+                    } else {
+                        for (ResolvedDependency resolved : conf.getDirectResolved()) {
+                            lockedVersions.computeIfAbsent(acc.getVersion(resolved), k -> new TreeSet<>()).add(conf.getName());
+                        }
                     }
                 }
+            });
+
+            Arrays.stream(text.split("\n")).forEach(lock -> {
+                if (isComment(lock)) {
+                    comments.add(lock);
+                }
+            });
+
+            SortedSet<String> locks = new TreeSet<>();
+            lockedVersions.forEach((gav, configurations) -> {
+                String lock = asLock(gav, configurations);
+                if (lock != null) {
+                    locks.add(lock);
+                }
+            });
+
+            StringBuilder sb = new StringBuilder();
+            if (comments != null && !comments.isEmpty()) {
+                sb.append(String.join("\n", comments));
             }
-        });
-
-        Arrays.stream(text.split("\n")).forEach(lock -> {
-            if (isComment(lock)) {
-                comments.add(lock);
+            if (comments != null && !comments.isEmpty() && locks != null && !locks.isEmpty()) {
+                sb.append("\n");
             }
-        });
-
-        SortedSet<String> locks = new TreeSet<>();
-        lockedVersions.forEach((gav, configurations) -> {
-            String lock = asLock(gav, configurations);
-            if (lock != null) {
-                locks.add(lock);
+            if (locks != null && !locks.isEmpty()) {
+                sb.append(String.join("\n", locks));
             }
-        });
+            sb.append("\n").append(asLock(null, empty));
+            if (plainText.getText().contentEquals(sb)) {
+                return tree;
+            }
+            return plainText.withText(sb.toString());
+        }
 
-        StringBuilder sb = new StringBuilder();
-        if (comments != null && !comments.isEmpty()) {
-            sb.append(String.join("\n", comments));
+        private @Nullable String asLock(@Nullable GroupArtifactVersion gav, @Nullable Set<String> configurations) {
+            TreeSet<String> sortedConfigurations = new TreeSet<>(configurations == null ? emptyList() : configurations);
+            if (gav == null) {
+                return "empty=" + String.join(",", sortedConfigurations);
+            }
+            if (sortedConfigurations.isEmpty()) {
+                return null;
+            }
+            return String.format("%s=%s", gav, String.join(",", sortedConfigurations));
         }
-        if (comments != null && !comments.isEmpty() && locks != null && !locks.isEmpty()) {
-            sb.append("\n");
-        }
-        if (locks != null && !locks.isEmpty()) {
-            sb.append(String.join("\n", locks));
-        }
-        sb.append("\n").append(asLock(null, empty));
-        if (plainText.getText().contentEquals(sb)) {
-            return tree;
-        }
-        return plainText.withText(sb.toString());
-    }
 
-    private @Nullable String asLock(@Nullable GroupArtifactVersion gav, @Nullable Set<String> configurations) {
-        TreeSet<String> sortedConfigurations = new TreeSet<>(configurations == null ? emptyList() : configurations);
-        if (gav == null) {
-            return "empty=" + String.join(",", sortedConfigurations);
+        private static boolean isComment(String entry) {
+            return entry.startsWith("# ");
         }
-        if (sortedConfigurations.isEmpty()) {
-            return null;
-        }
-        return String.format("%s=%s", gav, String.join(",", sortedConfigurations));
-    }
-
-    private static boolean isComment(String entry) {
-        return entry.startsWith("# ");
     }
 }
