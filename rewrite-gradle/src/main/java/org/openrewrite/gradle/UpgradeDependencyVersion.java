@@ -134,7 +134,22 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
          */
         Map<GroupArtifact, Object> gaToNewVersion = new HashMap<>();
 
-        Map<String, GradleProject> modules = new HashMap<>();
+        UpdateDependencyLockFile.GradleProjectDependencyState projectDependencyState = new UpdateDependencyLockFile.GradleProjectDependencyState();
+
+        <T extends Tree> @Nullable T addGradleModule(@Nullable T t) {
+            return projectDependencyState.addGradleModule(t);
+        }
+
+        UpdateDependencyLockFile.GradleProjectDependencyState getProjectDependencyState() {
+            if (projectDependencyState.getVersionOverrides().isEmpty()) {
+                gaToNewVersion.forEach((key, value) -> {
+                    if (value instanceof String) {
+                        projectDependencyState.getVersionOverrides().put(key, (String) value);
+                    }
+                });
+            }
+            return projectDependencyState;
+        }
     }
 
     @Override
@@ -166,17 +181,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (visited == null) {
                     return null;
                 }
-                visited.getMarkers().findFirst(GradleProject.class).ifPresent(project -> {
-                    String path = project.getPath();
-                    if (path.startsWith(":")) {
-                        path = path.substring(1);
-                    }
-                    if (!path.isEmpty()) {
-                        path += "/";
-                    }
-                    acc.modules.put(path.replaceAll(":", "/") + "gradle.lockfile", project);
-                });
-                return visited;
+
+                return acc.addGradleModule(visited);
             }
 
             @Override
@@ -396,7 +402,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
-            private final UpdateDependencyLockFile updateLockFile = new UpdateDependencyLockFile(acc, groupId, artifactId);
+            private final UpdateDependencyLockFile updateLockFile = new UpdateDependencyLockFile(acc.getProjectDependencyState());
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
