@@ -1519,7 +1519,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                   implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.0.27'
               }
-              """, spec -> spec.path("moduleA/build.gradle")
+              """,
+            spec -> spec.path("moduleA/build.gradle")
           ), lockFile(
             """
               # This is a Gradle generated file for dependency locking.
@@ -1536,7 +1537,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               org.apache.tomcat.embed:tomcat-embed-core:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               empty=annotationProcessor,testAnnotationProcessor
-              """, spec -> spec.path("moduleA/gradle.lockfile")
+              """,
+            spec -> spec.path("moduleA/gradle.lockfile")
           )
         );
     }

@@ -1,3 +1,18 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
@@ -67,7 +82,8 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                 rootProject.name = 'test'
                                 include 'module1'
                                 include 'module2'
-                                """, spec -> spec.path("settings.gradle")
+                                """,
+                        spec -> spec.path("settings.gradle")
                 ),
                 buildGradle(
                         """
@@ -78,7 +94,8 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                         mavenCentral()
                                     }
                                 }
-                                """, spec -> spec.path("build.gradle")
+                                """,
+                        spec -> spec.path("build.gradle")
                 ),
                 buildGradle(
                         """
@@ -87,7 +104,8 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                     implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.4'
                                     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.4'
                                 }
-                                """, spec -> spec.path("module1/build.gradle")
+                                """,
+                        spec -> spec.path("module1/build.gradle")
                 ), buildGradle(
                         """
                                 dependencies {
@@ -95,7 +113,8 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                     implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.3'
                                     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.3'
                                 }
-                                """, spec -> spec.path("module2/build.gradle")
+                                """,
+                        spec -> spec.path("module2/build.gradle")
                 ),
                 text(
                         """
@@ -103,7 +122,8 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                 # Manual edits can break the build and are not advised.
                                 # This file is expected to be part of source control.
                                 empty=
-                                """, spec -> spec.path("gradle.lockfile")
+                                """,
+                        spec -> spec.path("gradle.lockfile")
                 ),
                 text(
                         """
@@ -126,7 +146,8 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                 com.fasterxml.jackson.core:jackson-databind:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
                                 com.fasterxml.jackson:jackson-bom:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
                                 empty=annotationProcessor,testAnnotationProcessor
-                                """, spec -> spec.path("module1/gradle.lockfile")
+                                """,
+                        spec -> spec.path("module1/gradle.lockfile")
                 ),
                 text(
                         """
@@ -149,7 +170,8 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                 com.fasterxml.jackson.core:jackson-databind:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
                                 com.fasterxml.jackson:jackson-bom:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
                                 empty=annotationProcessor,testAnnotationProcessor
-                                """, spec -> spec.path("module2/gradle.lockfile")
+                                """,
+                        spec -> spec.path("module2/gradle.lockfile")
                 )
         );
     }
