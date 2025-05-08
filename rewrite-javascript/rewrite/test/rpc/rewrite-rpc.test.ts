@@ -76,6 +76,8 @@ describe("Rewrite RPC", () => {
     afterEach(() => {
         server.end();
         client.end();
+        fs.unlink('client.txt', () => {});
+        fs.unlink('server.txt', () => {});
     });
 
     test("print", () => spec.rewriteRun(
