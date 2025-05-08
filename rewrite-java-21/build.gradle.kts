@@ -26,6 +26,7 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation("org.antlr:antlr4-runtime:4.13.2")
     "javaTck"(project(":rewrite-java-tck"))
 }
 
