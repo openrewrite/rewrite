@@ -21,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.UpdateDependencyLockFile.UpdateDependencyLockFileVisitor;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.internal.Dependency;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
@@ -135,21 +134,21 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
          */
         Map<GroupArtifact, Object> gaToNewVersion = new HashMap<>();
 
-        UpdateDependencyLockFile.GradleProjectDependencyState projectDependencyState = new UpdateDependencyLockFile.GradleProjectDependencyState();
+        UpdateDependencyLock.DependencyState dependencyState = new UpdateDependencyLock.DependencyState();
 
         <T extends Tree> @Nullable T addGradleModule(@Nullable T t) {
-            return projectDependencyState.addGradleModule(t);
+            return dependencyState.addGradleModule(t);
         }
 
-        UpdateDependencyLockFile.GradleProjectDependencyState getProjectDependencyState() {
-            if (projectDependencyState.getVersionOverrides().isEmpty()) {
+        UpdateDependencyLock.DependencyState getDependencyState() {
+            if (dependencyState.getVersionOverrides().isEmpty()) {
                 gaToNewVersion.forEach((key, value) -> {
                     if (value instanceof String) {
-                        projectDependencyState.getVersionOverrides().put(key, (String) value);
+                        dependencyState.getVersionOverrides().put(key, (String) value);
                     }
                 });
             }
-            return projectDependencyState;
+            return dependencyState;
         }
     }
 
@@ -398,7 +397,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
-            private final UpdateDependencyLockFileVisitor updateLockFile = new UpdateDependencyLockFile().getVisitor(acc.getProjectDependencyState());
+            private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock(acc.getDependencyState());
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {

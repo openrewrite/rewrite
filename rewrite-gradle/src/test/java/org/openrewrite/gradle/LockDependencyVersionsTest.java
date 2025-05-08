@@ -21,16 +21,51 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
-import static org.openrewrite.test.SourceSpecs.text;
 
-class UpdateDependencyLockFileTest implements RewriteTest {
+class LockDependencyVersionsTest implements RewriteTest {
 
     @Test
     @DocumentExample
-    void calculateGradleLock() {
+    void createGradleLockFile() {
+        rewriteRun(spec ->
+            spec.beforeRecipe(withToolingApi())
+              .recipe(new LockDependencyVersions()),
+          buildGradle(
+            """
+                    plugins {
+                        id 'java'
+                    }
+                    repositories {
+                        mavenCentral()
+                    }
+                    dependencies {
+                        implementation 'com.fasterxml.jackson.core:jackson-core:2.15.3'
+                        implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.4'
+                        implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.4'
+                    }
+                    """
+          ),
+          lockFile(
+            null,
+            """
+                    # This is a Gradle generated file for dependency locking.
+                    # Manual edits can break the build and are not advised.
+                    # This file is expected to be part of source control.
+                    com.fasterxml.jackson.core:jackson-annotations:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    com.fasterxml.jackson.core:jackson-core:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    com.fasterxml.jackson.core:jackson-databind:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    com.fasterxml.jackson:jackson-bom:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    empty=annotationProcessor,testAnnotationProcessor
+                    """
+          )
+        );
+    }
+
+    @Test
+    void updateGradleLock() {
         rewriteRun(spec ->
                 spec.beforeRecipe(withToolingApi())
-                        .recipe(new UpdateDependencyLockFile()),
+                        .recipe(new LockDependencyVersions()),
                 buildGradle(
                         """
                                 plugins {
@@ -76,14 +111,13 @@ class UpdateDependencyLockFileTest implements RewriteTest {
     void multimodule() {
         rewriteRun(spec ->
                 spec.beforeRecipe(withToolingApi())
-                        .recipe(new UpdateDependencyLockFile()),
+                        .recipe(new LockDependencyVersions()),
                 settingsGradle(
                         """
                                 rootProject.name = 'test'
                                 include 'module1'
                                 include 'module2'
-                                """,
-                        spec -> spec.path("settings.gradle")
+                                """
                 ),
                 buildGradle(
                         """
@@ -94,8 +128,7 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                         mavenCentral()
                                     }
                                 }
-                                """,
-                        spec -> spec.path("build.gradle")
+                                """
                 ),
                 buildGradle(
                         """
@@ -116,16 +149,15 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                 """,
                         spec -> spec.path("module2/build.gradle")
                 ),
-                text(
+                lockFile(
                         """
                                 # This is a Gradle generated file for dependency locking.
                                 # Manual edits can break the build and are not advised.
                                 # This file is expected to be part of source control.
                                 empty=
-                                """,
-                        spec -> spec.path("gradle.lockfile")
+                                """
                 ),
-                text(
+                lockFile(
                         """
                                 # This is a Gradle generated file for dependency locking.
                                 # Manual edits can break the build and are not advised.
@@ -149,7 +181,7 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                 """,
                         spec -> spec.path("module1/gradle.lockfile")
                 ),
-                text(
+                lockFile(
                         """
                                 # This is a Gradle generated file for dependency locking.
                                 # Manual edits can break the build and are not advised.
@@ -173,6 +205,88 @@ class UpdateDependencyLockFileTest implements RewriteTest {
                                 """,
                         spec -> spec.path("module2/gradle.lockfile")
                 )
+        );
+    }
+
+    @Test
+    void createMultiModuleLockFile() {
+        rewriteRun(spec ->
+            spec.beforeRecipe(withToolingApi())
+              .recipe(new LockDependencyVersions()),
+          settingsGradle(
+            """
+                    rootProject.name = 'test'
+                    include 'module1'
+                    include 'module2'
+                    """
+          ),
+          buildGradle(
+            """
+                    subprojects {
+                        apply plugin: 'java'
+                    
+                        repositories {
+                            mavenCentral()
+                        }
+                    }
+                    """
+          ),
+          buildGradle(
+            """
+                    dependencies {
+                        implementation 'com.fasterxml.jackson.core:jackson-core:2.15.3'
+                        implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.4'
+                        implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.4'
+                    }
+                    """,
+            spec -> spec.path("module1/build.gradle")
+          ), buildGradle(
+            """
+                    dependencies {
+                        implementation 'com.fasterxml.jackson.core:jackson-core:2.15.3'
+                        implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.3'
+                        implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.3'
+                    }
+                    """,
+            spec -> spec.path("module2/build.gradle")
+          ),
+          lockFile(
+            null,
+            """
+                    # This is a Gradle generated file for dependency locking.
+                    # Manual edits can break the build and are not advised.
+                    # This file is expected to be part of source control.
+                    empty=
+                    """
+          ),
+          lockFile(
+            null,
+            """
+                    # This is a Gradle generated file for dependency locking.
+                    # Manual edits can break the build and are not advised.
+                    # This file is expected to be part of source control.
+                    com.fasterxml.jackson.core:jackson-annotations:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    com.fasterxml.jackson.core:jackson-core:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    com.fasterxml.jackson.core:jackson-databind:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    com.fasterxml.jackson:jackson-bom:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    empty=annotationProcessor,testAnnotationProcessor
+                    """,
+            spec -> spec.path("module1/gradle.lockfile")
+          ),
+          lockFile(
+            null,
+            """
+                    # This is a Gradle generated file for dependency locking.
+                    # Manual edits can break the build and are not advised.
+                    # This file is expected to be part of source control.
+                    com.fasterxml.jackson.core:jackson-annotations:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    com.fasterxml.jackson.core:jackson-core:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    com.fasterxml.jackson.core:jackson-databind:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    com.fasterxml.jackson:jackson-bom:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+                    empty=annotationProcessor,testAnnotationProcessor
+                    """,
+            spec -> spec.path("module2/gradle.lockfile")
+          )
         );
     }
 }
