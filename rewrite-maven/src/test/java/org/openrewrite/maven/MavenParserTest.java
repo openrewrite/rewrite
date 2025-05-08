@@ -4090,7 +4090,16 @@ class MavenParserTest implements RewriteTest {
                           </dependency>
                         </dependencies>
                       </project>
-                      """
+                      """,
+                    spec -> spec.afterRecipe(pom -> {
+                        MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        List<ResolvedDependency> resolvedDependencies = resolution.getDependencies().get(Scope.Compile);
+                        assertThat(resolvedDependencies).satisfiesExactly(dep -> {
+                            assertThat(dep.getGav().getGroupId()).isEqualTo("org.springframework.boot");
+                            assertThat(dep.getGav().getArtifactId()).isEqualTo("spring-boot-cli");
+                            assertThat(dep.getGav().getVersion()).isEqualTo("3.4.5");
+                        });
+                    })
                   )
                 )
               )
@@ -4149,7 +4158,16 @@ class MavenParserTest implements RewriteTest {
                           </dependency>
                         </dependencies>
                       </project>
-                      """
+                      """,
+                    spec -> spec.afterRecipe(pom -> {
+                        MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        List<ResolvedDependency> resolvedDependencies = resolution.getDependencies().get(Scope.Compile);
+                        assertThat(resolvedDependencies).satisfiesExactly(dep -> {
+                            assertThat(dep.getGav().getGroupId()).isEqualTo("org.springframework.boot");
+                            assertThat(dep.getGav().getArtifactId()).isEqualTo("spring-boot-cli");
+                            assertThat(dep.getGav().getVersion()).isEqualTo("3.4.5");
+                        });
+                    })
                   )
                 )
               )
