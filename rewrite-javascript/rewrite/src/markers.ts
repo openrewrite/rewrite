@@ -68,8 +68,3 @@ export interface ParseExceptionResult extends Marker {
     readonly message: string
     readonly treeType?: string;
 }
-
-export interface NamedStyles extends Marker {
-    readonly kind: typeof MarkersKind.NamedStyles
-    readonly data: {}
-}

@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,164 +14,346 @@
  * limitations under the License.
  */
 
-export const StyleKind = {
-    SpacesStyle: "org.openrewrite.style.SpacesStyle"
-} as const
+import {NamedStyles, Style} from "../style";
+import {randomId} from "../uuid";
 
-export interface Style {
-    readonly kind: string
+export const JavaScriptStyles = {
+    IntelliJ: "org.openrewrite.javascript.style.IntelliJ",
 }
 
-export class SpacesStyle implements Style {
-    readonly kind = StyleKind.SpacesStyle;
-    constructor(
-        readonly beforeParentheses: SpacesStyle.BeforeParentheses,
-        readonly aroundOperators: SpacesStyle.AroundOperators,
-        readonly beforeLeftBrace: SpacesStyle.BeforeLeftBrace,
-        readonly beforeKeywords: SpacesStyle.BeforeKeywords,
-        readonly within: SpacesStyle.Within,
-        readonly ternaryOperator: SpacesStyle.TernaryOperator,
-        readonly other: SpacesStyle.Other
-    ) {}
+export const StyleKind = {
+    SpacesStyle: "org.openrewrite.style.SpacesStyle"
+} as const;
+
+export const StyleDetailKind = {
+    SpacesStyleBeforeParentheses: "org.openrewrite.javascript.style.SpacesStyle$BeforeParentheses",
+    SpacesStyleAroundOperators: "org.openrewrite.javascript.style.SpacesStyle$AroundOperators",
+    SpacesStyleBeforeLeftBrace: "org.openrewrite.javascript.style.SpacesStyle$BeforeLeftBrace",
+    SpacesStyleBeforeKeywords: "org.openrewrite.javascript.style.SpacesStyle$BeforeKeywords",
+    SpacesStyleWithin: "org.openrewrite.javascript.style.SpacesStyle$Within",
+    SpacesStyleTernaryOperator: "org.openrewrite.javascript.style.SpacesStyle$TernaryOperator",
+    SpacesStyleOther: "org.openrewrite.javascript.style.SpacesStyle$Other",
+} as const;
+
+export interface SpacesStyle extends Style {
+    readonly kind: typeof StyleKind.SpacesStyle;
+    readonly beforeParentheses: SpacesStyle.BeforeParentheses;
+    readonly aroundOperators: SpacesStyle.AroundOperators;
+    readonly beforeLeftBrace: SpacesStyle.BeforeLeftBrace;
+    readonly beforeKeywords: SpacesStyle.BeforeKeywords;
+    readonly within: SpacesStyle.Within;
+    readonly ternaryOperator: SpacesStyle.TernaryOperator;
+    readonly other: SpacesStyle.Other;
 }
 
 export namespace SpacesStyle {
-    export class BeforeParentheses {
-        constructor(
-            public readonly functionDeclarationParentheses: boolean,
-            public readonly functionCallParentheses: boolean,
-            public readonly ifParentheses: boolean,
-            public readonly forParentheses: boolean,
-            public readonly whileParentheses: boolean,
-            public readonly switchParentheses: boolean,
-            public readonly catchParentheses: boolean,
-            public readonly inFunctionCallExpression: boolean,
-            public readonly inAsyncArrowFunction: boolean
-        ) {
-        }
+    export interface BeforeParentheses {
+        readonly kind: typeof StyleDetailKind.SpacesStyleBeforeParentheses;
+        readonly functionDeclarationParentheses: boolean;
+        readonly functionCallParentheses: boolean;
+        readonly ifParentheses: boolean;
+        readonly forParentheses: boolean;
+        readonly whileParentheses: boolean;
+        readonly switchParentheses: boolean;
+        readonly catchParentheses: boolean;
+        readonly inFunctionCallExpression: boolean;
+        readonly inAsyncArrowFunction: boolean;
     }
 
-    export class AroundOperators {
-        constructor(
-            public readonly assignment: boolean,
-            public readonly logical: boolean,
-            public readonly equality: boolean,
-            public readonly relational: boolean,
-            public readonly bitwise: boolean,
-            public readonly additive: boolean,
-            public readonly multiplicative: boolean,
-            public readonly shift: boolean,
-            public readonly unary: boolean,
-            public readonly arrowFunction: boolean,
-            public readonly beforeUnaryNotAndNotNull: boolean,
-            public readonly afterUnaryNotAndNotNull: boolean
-        ) {
-        }
+    export interface AroundOperators {
+        readonly kind: typeof StyleDetailKind.SpacesStyleAroundOperators;
+        readonly assignment: boolean;
+        readonly logical: boolean;
+        readonly equality: boolean;
+        readonly relational: boolean;
+        readonly bitwise: boolean;
+        readonly additive: boolean;
+        readonly multiplicative: boolean;
+        readonly shift: boolean;
+        readonly unary: boolean;
+        readonly arrowFunction: boolean;
+        readonly beforeUnaryNotAndNotNull: boolean;
+        readonly afterUnaryNotAndNotNull: boolean;
     }
 
-    export class BeforeLeftBrace {
-        constructor(
-            public readonly functionLeftBrace: boolean,
-            public readonly ifLeftBrace: boolean,
-            public readonly elseLeftBrace: boolean,
-            public readonly forLeftBrace: boolean,
-            public readonly whileLeftBrace: boolean,
-            public readonly doLeftBrace: boolean,
-            public readonly switchLeftBrace: boolean,
-            public readonly tryLeftBrace: boolean,
-            public readonly catchLeftBrace: boolean,
-            public readonly finallyLeftBrace: boolean,
-            public readonly classInterfaceModuleLeftBrace: boolean
-        ) {
-        }
+    export interface BeforeLeftBrace {
+        readonly kind: typeof StyleDetailKind.SpacesStyleBeforeLeftBrace;
+        readonly functionLeftBrace: boolean;
+        readonly ifLeftBrace: boolean;
+        readonly elseLeftBrace: boolean;
+        readonly forLeftBrace: boolean;
+        readonly whileLeftBrace: boolean;
+        readonly doLeftBrace: boolean;
+        readonly switchLeftBrace: boolean;
+        readonly tryLeftBrace: boolean;
+        readonly catchLeftBrace: boolean;
+        readonly finallyLeftBrace: boolean;
+        readonly classInterfaceModuleLeftBrace: boolean;
     }
 
-    export class BeforeKeywords {
-        constructor(
-            public readonly elseKeyword: boolean,
-            public readonly whileKeyword: boolean,
-            public readonly catchKeyword: boolean,
-            public readonly finallyKeyword: boolean
-        ) {
-        }
+    export interface BeforeKeywords {
+        readonly kind: typeof StyleDetailKind.SpacesStyleBeforeKeywords;
+        readonly elseKeyword: boolean;
+        readonly whileKeyword: boolean;
+        readonly catchKeyword: boolean;
+        readonly finallyKeyword: boolean;
     }
 
-    export class Within {
-        constructor(
-            public readonly indexAccessBrackets: boolean,
-            public readonly groupingParentheses: boolean,
-            public readonly functionDeclarationParentheses: boolean,
-            public readonly functionCallParentheses: boolean,
-            public readonly ifParentheses: boolean,
-            public readonly forParentheses: boolean,
-            public readonly whileParentheses: boolean,
-            public readonly switchParentheses: boolean,
-            public readonly catchParentheses: boolean,
-            public readonly objectLiteralBraces: boolean,
-            public readonly es6ImportExportBraces: boolean,
-            public readonly arrayBrackets: boolean,
-            public readonly interpolationExpressions: boolean,
-            public readonly objectLiteralTypeBraces: boolean,
-            public readonly unionAndIntersectionTypes: boolean,
-            public readonly typeAssertions: boolean
-        ) {
-        }
+    export interface Within {
+        readonly kind: typeof StyleDetailKind.SpacesStyleWithin;
+        readonly indexAccessBrackets: boolean;
+        readonly groupingParentheses: boolean;
+        readonly functionDeclarationParentheses: boolean;
+        readonly functionCallParentheses: boolean;
+        readonly ifParentheses: boolean;
+        readonly forParentheses: boolean;
+        readonly whileParentheses: boolean;
+        readonly switchParentheses: boolean;
+        readonly catchParentheses: boolean;
+        readonly objectLiteralBraces: boolean;
+        readonly es6ImportExportBraces: boolean;
+        readonly arrayBrackets: boolean;
+        readonly interpolationExpressions: boolean;
+        readonly objectLiteralTypeBraces: boolean;
+        readonly unionAndIntersectionTypes: boolean;
+        readonly typeAssertions: boolean;
     }
 
-    export class TernaryOperator {
-        constructor(
-            public readonly beforeQuestionMark: boolean,
-            public readonly afterQuestionMark: boolean,
-            public readonly beforeColon: boolean,
-            public readonly afterColon: boolean
-        ) {
-        }
+    export interface TernaryOperator {
+        readonly kind: typeof StyleDetailKind.SpacesStyleTernaryOperator;
+        readonly beforeQuestionMark: boolean;
+        readonly afterQuestionMark: boolean;
+        readonly beforeColon: boolean;
+        readonly afterColon: boolean;
     }
 
-    export class Other {
-        constructor(
-            public readonly beforeComma: boolean,
-            public readonly afterComma: boolean,
-            public readonly beforeForSemicolon: boolean,
-            public readonly beforePropertyNameValueSeparator: boolean,
-            public readonly afterPropertyNameValueSeparator: boolean,
-            public readonly afterVarArgInRestOrSpread: boolean,
-            public readonly beforeAsteriskInGenerator: boolean,
-            public readonly afterAsteriskInGenerator: boolean,
-            public readonly beforeTypeReferenceColon: boolean,
-            public readonly afterTypeReferenceColon: boolean
-        ) {
-        }
+    export interface Other {
+        readonly kind: typeof StyleDetailKind.SpacesStyleOther;
+        readonly beforeComma: boolean;
+        readonly afterComma: boolean;
+        readonly beforeForSemicolon: boolean;
+        readonly beforePropertyNameValueSeparator: boolean;
+        readonly afterPropertyNameValueSeparator: boolean;
+        readonly afterVarArgInRestOrSpread: boolean;
+        readonly beforeAsteriskInGenerator: boolean;
+        readonly afterAsteriskInGenerator: boolean;
+        readonly beforeTypeReferenceColon: boolean;
+        readonly afterTypeReferenceColon: boolean;
     }
 }
 
 
-export class IntelliJ {
-    static JavaScript = class {
-        static spaces(): SpacesStyle {
-            return new SpacesStyle(
-                new SpacesStyle.BeforeParentheses(false, false, true, true, true, true, true, true, true),
-                new SpacesStyle.AroundOperators(true, true, true, true, true, true, true, true, false, true, false, false),
-                new SpacesStyle.BeforeLeftBrace(true, true, true, true, true, true, true, true, true, true, true),
-                new SpacesStyle.BeforeKeywords(true, true, true, true),
-                new SpacesStyle.Within(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false),
-                new SpacesStyle.TernaryOperator(true, true, true, true),
-                new SpacesStyle.Other(false, true, false, false, true, false, false, true, false, false)
-            );
-        }
-    };
+export interface IntelliJ extends NamedStyles<typeof JavaScriptStyles.IntelliJ> {
+    readonly kind: typeof JavaScriptStyles.IntelliJ;
+}
 
-    static TypeScript = class {
-        static spaces(): SpacesStyle {
-            return new SpacesStyle(
-                new SpacesStyle.BeforeParentheses(false, false, true, true, true, true, true, true, true),
-                new SpacesStyle.AroundOperators(true, true, true, true, true, true, true, true, false, true, false, false),
-                new SpacesStyle.BeforeLeftBrace(true, true, true, true, true, true, true, true, true, true, false),
-                new SpacesStyle.BeforeKeywords(true, true, true, true),
-                new SpacesStyle.Within(false, false, false, false, false, false, false, false, false, false, false, false, false, true, true, false),
-                new SpacesStyle.TernaryOperator(true, true, true, true),
-                new SpacesStyle.Other(false, true, false, false, true, false, false, true, false, true)
-            );
+export namespace IntelliJ {
+    export namespace JavaScript {
+        export const defaults: NamedStyles<typeof JavaScriptStyles.IntelliJ> = {
+            kind: JavaScriptStyles.IntelliJ,
+            id: randomId(),
+            name: "org.openrewrite.javascript.IntelliJ",
+            displayName: "IntelliJ IDEA",
+            description: "Default IntelliJ IDEA code style.",
+            tags: [],
+            styles: [spaces()],
         }
-    };
+
+        export function spaces(): SpacesStyle {
+            return {
+                kind: StyleKind.SpacesStyle,
+                beforeParentheses: {
+                    kind: StyleDetailKind.SpacesStyleBeforeParentheses,
+                    functionDeclarationParentheses: false,
+                    functionCallParentheses: false,
+                    ifParentheses: true,
+                    forParentheses: true,
+                    whileParentheses: true,
+                    switchParentheses: true,
+                    catchParentheses: true,
+                    inFunctionCallExpression: true,
+                    inAsyncArrowFunction: true
+                },
+                aroundOperators: {
+                    kind: StyleDetailKind.SpacesStyleAroundOperators,
+                    assignment: true,
+                    logical: true,
+                    equality: true,
+                    relational: true,
+                    bitwise: true,
+                    additive: true,
+                    multiplicative: true,
+                    shift: true,
+                    unary: true,
+                    arrowFunction: true,
+                    beforeUnaryNotAndNotNull: false,
+                    afterUnaryNotAndNotNull: false
+                },
+                beforeLeftBrace: {
+                    kind: StyleDetailKind.SpacesStyleBeforeLeftBrace,
+                    functionLeftBrace: true,
+                    ifLeftBrace: true,
+                    elseLeftBrace: true,
+                    forLeftBrace: true,
+                    whileLeftBrace: true,
+                    doLeftBrace: true,
+                    switchLeftBrace: true,
+                    tryLeftBrace: true,
+                    catchLeftBrace: true,
+                    finallyLeftBrace: true,
+                    classInterfaceModuleLeftBrace: true
+                },
+                beforeKeywords: {
+                    kind: StyleDetailKind.SpacesStyleBeforeKeywords,
+                    elseKeyword: true,
+                    whileKeyword: true,
+                    catchKeyword: true,
+                    finallyKeyword: true
+                },
+                within: {
+                    kind: StyleDetailKind.SpacesStyleWithin,
+                    indexAccessBrackets: false,
+                    groupingParentheses: false,
+                    functionDeclarationParentheses: false,
+                    functionCallParentheses: false,
+                    ifParentheses: false,
+                    forParentheses: false,
+                    whileParentheses: false,
+                    switchParentheses: false,
+                    catchParentheses: false,
+                    objectLiteralBraces: false,
+                    es6ImportExportBraces: false,
+                    arrayBrackets: false,
+                    interpolationExpressions: false,
+                    objectLiteralTypeBraces: false,
+                    unionAndIntersectionTypes: false,
+                    typeAssertions: false
+                },
+                ternaryOperator: {
+                    kind: StyleDetailKind.SpacesStyleTernaryOperator,
+                    beforeQuestionMark: true,
+                    afterQuestionMark: true,
+                    beforeColon: true,
+                    afterColon: true
+                },
+                other: {
+                    kind: StyleDetailKind.SpacesStyleOther,
+                    beforeComma: false,
+                    afterComma: true,
+                    beforeForSemicolon: false,
+                    beforePropertyNameValueSeparator: false,
+                    afterPropertyNameValueSeparator: true,
+                    afterVarArgInRestOrSpread: false,
+                    beforeAsteriskInGenerator: false,
+                    afterAsteriskInGenerator: true,
+                    beforeTypeReferenceColon: false,
+                    afterTypeReferenceColon: false
+                },
+            };
+        }
+    }
+    export namespace TypeScript {
+        export const defaults: NamedStyles<typeof JavaScriptStyles.IntelliJ> = {
+            kind: JavaScriptStyles.IntelliJ,
+            id: randomId(),
+            name: "org.openrewrite.javascript.IntelliJ",
+            displayName: "IntelliJ IDEA",
+            description: "Default IntelliJ IDEA code style.",
+            tags: [],
+            styles: [spaces()],
+        }
+
+        export function spaces(): SpacesStyle {
+            return {
+                kind: StyleKind.SpacesStyle,
+                beforeParentheses: {
+                    kind: StyleDetailKind.SpacesStyleBeforeParentheses,
+                    functionDeclarationParentheses: false,
+                    functionCallParentheses: false,
+                    ifParentheses: true,
+                    forParentheses: true,
+                    whileParentheses: true,
+                    switchParentheses: true,
+                    catchParentheses: true,
+                    inFunctionCallExpression: true,
+                    inAsyncArrowFunction: true
+                },
+                aroundOperators: {
+                    kind: StyleDetailKind.SpacesStyleAroundOperators,
+                    assignment: true,
+                    logical: true,
+                    equality: true,
+                    relational: true,
+                    bitwise: true,
+                    additive: true,
+                    multiplicative: true,
+                    shift: true,
+                    unary: true,
+                    arrowFunction: true,
+                    beforeUnaryNotAndNotNull: false,
+                    afterUnaryNotAndNotNull: false
+                },
+                beforeLeftBrace: {
+                    kind: StyleDetailKind.SpacesStyleBeforeLeftBrace,
+                    functionLeftBrace: true,
+                    ifLeftBrace: true,
+                    elseLeftBrace: true,
+                    forLeftBrace: true,
+                    whileLeftBrace: true,
+                    doLeftBrace: true,
+                    switchLeftBrace: true,
+                    tryLeftBrace: true,
+                    catchLeftBrace: true,
+                    finallyLeftBrace: true,
+                    classInterfaceModuleLeftBrace: false
+                },
+                beforeKeywords: {
+                    kind: StyleDetailKind.SpacesStyleBeforeKeywords,
+                    elseKeyword: true,
+                    whileKeyword: true,
+                    catchKeyword: true,
+                    finallyKeyword: true
+                },
+                within: {
+                    kind: StyleDetailKind.SpacesStyleWithin,
+                    indexAccessBrackets: false,
+                    groupingParentheses: false,
+                    functionDeclarationParentheses: false,
+                    functionCallParentheses: false,
+                    ifParentheses: false,
+                    forParentheses: false,
+                    whileParentheses: false,
+                    switchParentheses: false,
+                    catchParentheses: false,
+                    objectLiteralBraces: false,
+                    es6ImportExportBraces: false,
+                    arrayBrackets: false,
+                    interpolationExpressions: false,
+                    objectLiteralTypeBraces: true,
+                    unionAndIntersectionTypes: true,
+                    typeAssertions: false
+                },
+                ternaryOperator: {
+                    kind: StyleDetailKind.SpacesStyleTernaryOperator,
+                    beforeQuestionMark: true,
+                    afterQuestionMark: true,
+                    beforeColon: true,
+                    afterColon: true
+                },
+                other: {
+                    kind: StyleDetailKind.SpacesStyleOther,
+                    beforeComma: false,
+                    afterComma: true,
+                    beforeForSemicolon: false,
+                    beforePropertyNameValueSeparator: false,
+                    afterPropertyNameValueSeparator: true,
+                    afterVarArgInRestOrSpread: false,
+                    beforeAsteriskInGenerator: false,
+                    afterAsteriskInGenerator: true,
+                    beforeTypeReferenceColon: false,
+                    afterTypeReferenceColon: true
+                },
+            };
+        }
+    }
 }

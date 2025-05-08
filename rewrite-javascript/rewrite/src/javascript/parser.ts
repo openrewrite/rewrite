@@ -1159,7 +1159,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: prefix,
             markers: emptyMarkers,
-            decorators: [], // no decorators allowed
+            leadingAnnotations: [], // no decorators allowed
             modifiers: [], // no modifiers allowed
             typeParameters: this.mapTypeParametersAsObject(node),
             returnTypeExpression: this.mapTypeInfo(node),

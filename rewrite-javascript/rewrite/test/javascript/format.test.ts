@@ -14,41 +14,78 @@
  * limitations under the License.
  */
 
-import {RecipeSpec, fromVisitor} from "../../src/test";
-import {typescript} from "../../src/javascript";
+import {fromVisitor, RecipeSpec} from "../../src/test";
+import {IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../src/javascript";
 import {AutoformatVisitor} from "../../src/javascript/format";
-import {IntelliJ} from "../../src/javascript/style";
+import {Draft, produce} from "immer";
+import {MarkersKind, NamedStyles, randomId, Style} from "../../src";
+
+type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
+
+function spaces(customizer: StyleCustomizer<SpacesStyle>): NamedStyles {
+    return {
+        displayName: "", name: "", tags: [],
+        kind: MarkersKind.NamedStyles,
+        id: randomId(),
+        styles: [produce(IntelliJ.TypeScript.spaces(), customizer)]
+    }
+}
 
 describe('AutoformatVisitor', () => {
     const spec = new RecipeSpec()
     spec.recipe = fromVisitor(new AutoformatVisitor(IntelliJ.TypeScript.spaces()));
 
-    test('spaces', () => {
+    test('no spaces before function declaration parentheses', () => {
+        let styles = spaces(draft => {
+            draft.beforeParentheses.functionDeclarationParentheses = true;
+        });
+        return spec.rewriteRun({
+            // @formatter:off
+            //language=typescript
+            ...typescript(`
+                    interface K {
+                        m (): number;
+                    }
+                `,
+                `
+                    interface K {
+                        m(): number;
+                    }
+                `),
+            // @formatter:on
+            parser: _ => new JavaScriptParser({styles: [styles]})
+        })
+    });
+
+    test('everything', () => {
         return spec.rewriteRun(
+            // @formatter:off
             //language=typescript
             typescript(`
-                class K{
-                    m () :number{
-                        this.m( );
-                        return 1;
+                    class K{
+                        m () :number{
+                            this.m( );
+                            return 1;
+                        }
                     }
-                }
-                const a=1;
-                if(1>0){
-                    console.log  (   "true"  );
-                }
+                    const a=1;
+                    if(1>0){
+                        console.log  (   "true"  );
+                    }
                 `,
-            `
-                class K {
-                    m(): number {
-                        this.m();
-                        return 1;
+                `
+                    class K {
+                        m(): number {
+                            this.m();
+                            return 1;
+                        }
                     }
-                }
-                const a = 1;
-                if (1 > 0) {
-                    console.log("true");
-                }
+                    const a = 1;
+                    if (1 > 0) {
+                        console.log("true");
+                    }
                 `)
-        )});
+            // @formatter:on
+        )
+    });
 });
