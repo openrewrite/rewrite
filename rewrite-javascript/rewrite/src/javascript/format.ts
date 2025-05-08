@@ -171,6 +171,22 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         return ret;
     }
 
+    protected async visitTry(try_: J.Try, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitTry(try_, p) as J.Try;
+        return produceAsync(ret, async draft => {
+            draft.body.prefix.whitespace = this.style.beforeLeftBrace.tryLeftBrace ? " " : "";
+            draft.catches = await Promise.all(draft.catches.map(async (catch_, index) => {
+                catch_ = await this.spaceBefore(catch_, this.style.beforeKeywords.catchKeyword);
+                catch_.parameter.prefix.whitespace = this.style.beforeParentheses.catchParentheses ? " " : "";
+                catch_.parameter.tree = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(catch_.parameter.tree, this.style.within.catchParentheses), this.style.within.catchParentheses);
+                catch_.parameter.tree.element.variables[catch_.parameter.tree.element.variables.length - 1].after.whitespace = "";
+                catch_.body.prefix.whitespace = this.style.beforeLeftBrace.catchLeftBrace ? " " : "";
+                return catch_;
+            }));
+            draft.finally = draft.finally && await this.spaceBeforeLeftPaddedElement(draft.finally, this.style.beforeKeywords.finallyKeyword, this.style.beforeLeftBrace.finallyLeftBrace) as Draft<J.LeftPadded<J.Block>>;
+        });
+    }
+
     protected async visitTypeInfo(typeInfo: JS.TypeInfo, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitTypeInfo(typeInfo, p) as JS.TypeInfo;
         return produceAsync(ret, async draft => {
@@ -182,7 +198,9 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
     protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitVariable(variable, p) as J.VariableDeclarations.NamedVariable;
         return produceAsync(ret, async draft => {
-            draft.initializer = ret.initializer && await this.spaceBeforeLeftPaddedElement(ret.initializer, this.style.aroundOperators.assignment);
+            if (draft.initializer) {
+                draft.initializer = await this.spaceBeforeLeftPaddedElement(draft.initializer, false, this.style.aroundOperators.assignment);
+            }
         });
     }
 
@@ -211,12 +229,12 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         }
     }
 
-    private async spaceBeforeLeftPaddedElement<T extends J>(left: J.LeftPadded<T>, spaceBefore: boolean): Promise<J.LeftPadded<T>> {
+    private async spaceBeforeLeftPaddedElement<T extends J>(left: J.LeftPadded<T>, spaceBeforePadding: boolean, spaceBeforeElement: boolean): Promise<J.LeftPadded<T>> {
         return produceAsync(left, async draft => {
             if (draft.before.comments.length == 0) {
-                draft.before.whitespace = "";
+                draft.before.whitespace = spaceBeforePadding ? " " : "";
             }
-            draft.element = await this.spaceBefore(left.element, spaceBefore) as Draft<T>;
+            draft.element = await this.spaceBefore(left.element, spaceBeforeElement) as Draft<T>;
         });
     }
 

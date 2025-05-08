@@ -77,6 +77,13 @@ describe('AutoformatVisitor', () => {
                     while(   i<4   ){
                         i++;
                     }
+                    try{
+                        throw new Error("test");
+                    }catch(  error  ){
+                        console.log("Error " + error);
+                    }finally{
+                        console.log("finally");
+                    }
                 `,
                 `
                     class K {
@@ -92,6 +99,13 @@ describe('AutoformatVisitor', () => {
                     let i = 1;
                     while (i < 4) {
                         i++;
+                    }
+                    try {
+                        throw new Error("test");
+                    } catch (error) {
+                        console.log("Error " + error);
+                    } finally {
+                        console.log("finally");
                     }
                 `)
             // @formatter:on
