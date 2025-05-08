@@ -33,6 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.tree.TypeUtils.TypePosition.Invariant;
+import static org.openrewrite.java.tree.TypeUtils.TypePosition.Out;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
@@ -334,7 +336,7 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
-    void isAssignableToGenericTypeVariable1() {
+    void isAssignableToGenericTypeVariable() {
         rewriteRun(
           java(
             """
@@ -389,8 +391,8 @@ class TypeUtilsTest implements RewriteTest {
                     if (method.getSimpleName().equals("test")) {
                         J.Return return_ = (J.Return) method.getBody().getStatements().get(0);
                         J.TypeCast cast = (J.TypeCast) return_.getExpression();
-                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType())).isFalse();
-                        assertThat(new Types(true).isAssignableTo(cast.getType(), cast.getExpression().getType())).isTrue();
+                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), Invariant)).isFalse();
+                        assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), Out)).isTrue();
                     }
                     return method;
                 }
@@ -435,8 +437,8 @@ class TypeUtilsTest implements RewriteTest {
                         JavaType consumeClassParamType = ((J.VariableDeclarations) consumeClass.getParameters().get(0)).getVariables().get(0).getType();
                         JavaType consumeMethodParamType = ((J.VariableDeclarations) consumeMethod.getParameters().get(0)).getVariables().get(0).getType();
 
-                        assertThat(new Types(true).isAssignableTo(consumeClassParamType, list.getType())).isTrue();
-                        assertThat(new Types(true).isAssignableTo(consumeMethodParamType, list.getType())).isTrue();
+                        assertThat(TypeUtils.isAssignableTo(consumeClassParamType, list.getType(), Out)).isTrue();
+                        assertThat(TypeUtils.isAssignableTo(consumeMethodParamType, list.getType(), Out)).isTrue();
                     }
                     return method;
                 }
@@ -622,12 +624,11 @@ class TypeUtilsTest implements RewriteTest {
 
     @Test
     void isAssignableToString() {
-        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String, JavaType.Primitive.Null));
+        EnumSet<JavaType.Primitive> others = EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String));
         for (JavaType.Primitive other : others) {
             assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.String, other));
         }
         assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.String, JavaType.Primitive.String));
-        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.String, JavaType.Primitive.Null));
     }
 
     @Test

@@ -66,7 +66,7 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
     public BooleanAssert isAssignableTo(String to, String from, boolean capture) {
         JavaType toType = getFirst(to);
         JavaType fromType = getLast(from);
-        return assertThat(new Types(capture).isAssignableTo(toType, fromType))
+        return assertThat(TypeUtils.isAssignableTo(toType, fromType))
           .describedAs("isAssignableTo(%s, %s, %s)", to, from, capture);
     }
 
@@ -77,7 +77,7 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
     public BooleanAssert isOfType(String to, String from, boolean capture) {
         JavaType toType = getFirst(to);
         JavaType fromType = getLast(from);
-        return assertThat(new Types(capture).isOfType(toType, fromType))
+        return assertThat(TypeUtils.isOfType(toType, fromType))
           .describedAs("isOfType(%s, %s, %s)", to, from, capture);
     }
 

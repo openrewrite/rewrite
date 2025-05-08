@@ -27,11 +27,14 @@ import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.marker.Generated;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.RecipesThatMadeChanges;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -144,12 +147,16 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                             }
                         }
                     }
-                    List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
-                    generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
-                    if (!generated.isEmpty()) {
-                        acc.addAll(generated);
-                        generated.forEach(source -> recordSourceFileResult(null, source, recipeStack, ctx));
-                        madeChangesInThisCycle.add(recipe);
+                    try {
+                        List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
+                        generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
+                        if (!generated.isEmpty()) {
+                            acc.addAll(generated);
+                            generated.forEach(source -> recordSourceFileResult(null, source, recipeStack, ctx));
+                            madeChangesInThisCycle.add(recipe);
+                        }
+                    } catch (Throwable t) {
+                        handleError(recipe, new Quark(Tree.randomId(), Paths.get("error during generation"), Markers.EMPTY, null, null), null, t);
                     }
                 }
                 return acc;

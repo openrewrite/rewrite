@@ -135,7 +135,7 @@ class RewriteRpcTest implements RewriteTest {
             .validateRecipeSerialization(false)
             .dataTable(TextMatches.Row.class, rows -> {
                 assertThat(rows).contains(new TextMatches.Row(
-                  "hello.txt", "~~>Hello Jon!"));
+                  "hello.txt", "~~>Hello..."));
                 latch.countDown();
             }),
           text(
