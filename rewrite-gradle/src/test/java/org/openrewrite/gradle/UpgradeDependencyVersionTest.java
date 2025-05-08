@@ -1500,7 +1500,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             # Manual edits can break the build and are not advised.
             # This file is expected to be part of source control.
             empty=
-            """, spec -> spec.path("gradle.lockfile")
+            """,
+            spec -> spec.path("gradle.lockfile")
           ),
           //language=groovy
           buildGradle(
