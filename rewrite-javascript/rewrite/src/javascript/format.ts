@@ -20,16 +20,13 @@ import {JavaScriptVisitor} from "./visitor";
 import {Comment, J} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isTree, Tree} from "../tree";
-import {SpacesStyle} from "./style";
+import {SpacesStyle, styleFromSourceFile, StyleKind} from "./style";
 import {produceAsync} from "../visitor";
 
 export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
-    constructor(private spacesStyle: SpacesStyle) {
-        super();
-    }
-
     async visit<R extends J>(tree: Tree, p: ExecutionContext, cursor?: Cursor): Promise<R | undefined> {
-        return new SpacesVisitor(this.spacesStyle).visit(tree, p, cursor); // TODO possibly cursor.fork, when we have more visitors
+        const spacesStyle = styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle;
+        return new SpacesVisitor(spacesStyle).visit(tree, p, cursor); // TODO possibly cursor.fork, when we have more visitors
     }
 }
 

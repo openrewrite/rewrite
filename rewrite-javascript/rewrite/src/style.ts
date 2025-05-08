@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import {Marker, MarkersKind} from "./markers";
+import {SourceFile} from "./tree";
 
 export interface Style {
     readonly kind: string

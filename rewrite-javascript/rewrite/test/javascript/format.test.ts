@@ -34,9 +34,9 @@ function spaces(customizer: StyleCustomizer<SpacesStyle>): NamedStyles {
 
 describe('AutoformatVisitor', () => {
     const spec = new RecipeSpec()
-    spec.recipe = fromVisitor(new AutoformatVisitor(IntelliJ.TypeScript.spaces()));
+    spec.recipe = fromVisitor(new AutoformatVisitor());
 
-    test('no spaces before function declaration parentheses', () => {
+    test('space before function declaration parentheses', () => {
         let styles = spaces(draft => {
             draft.beforeParentheses.functionDeclarationParentheses = true;
         });
@@ -45,12 +45,12 @@ describe('AutoformatVisitor', () => {
             //language=typescript
             ...typescript(`
                     interface K {
-                        m (): number;
+                        m(): number;
                     }
                 `,
                 `
                     interface K {
-                        m(): number;
+                        m (): number;
                     }
                 `),
             // @formatter:on
