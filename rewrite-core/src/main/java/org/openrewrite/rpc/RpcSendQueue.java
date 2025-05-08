@@ -105,8 +105,10 @@ public class RpcSendQueue {
         } else if (afterVal == null) {
             put(new RpcObjectData(DELETE, null, null, null, trace ? Trace.traceSender() : null));
         } else {
-            put(new RpcObjectData(CHANGE, null, onChange == null ? afterVal : null, null, trace ? Trace.traceSender() : null));
-            doChange(after, before, onChange);
+            //noinspection unchecked
+            RpcCodec<Object> afterCodec = after instanceof RpcCodec ? (RpcCodec<Object>) after : null;
+            put(new RpcObjectData(CHANGE, null, onChange == null && afterCodec == null ? afterVal : null, null, trace ? Trace.traceSender() : null));
+            doChange(after, before, onChange, afterCodec);
         }
     }
 
@@ -130,7 +132,8 @@ public class RpcSendQueue {
                         put(new RpcObjectData(NO_CHANGE, null, null, null, trace ? Trace.traceSender() : null));
                     } else {
                         put(new RpcObjectData(CHANGE, null, null, null, trace ? Trace.traceSender() : null));
-                        doChange(anAfter, aBefore, onChangeRun);
+                        //noinspection unchecked
+                        doChange(anAfter, aBefore, onChangeRun, anAfter instanceof RpcCodec ? ((RpcCodec<Object>) anAfter) : null);
                     }
                 }
             }
@@ -165,22 +168,26 @@ public class RpcSendQueue {
             ref = refs.size() + 1;
             refs.put(afterVal, ref);
         }
+        //noinspection unchecked
+        RpcCodec<Object> afterCodec = after instanceof RpcCodec ? (RpcCodec<Object>) after : null;
         put(new RpcObjectData(ADD, getValueType(afterVal),
-                onChange == null ? afterVal : null, ref, trace ? Trace.traceSender() : null));
-        doChange(afterVal, null, onChange);
+                onChange == null && afterCodec == null ? afterVal : null, ref, trace ? Trace.traceSender() : null));
+        doChange(afterVal, null, onChange, afterCodec);
     }
 
-    private void doChange(@Nullable Object after, @Nullable Object before, @Nullable Runnable onChange) {
-        if (onChange != null) {
-            Object lastBefore = this.before;
-            this.before = before;
-            if (after != null) {
-                onChange.run();
+    private void doChange(@Nullable Object after, @Nullable Object before, @Nullable Runnable onChange, @Nullable RpcCodec<Object> afterCodec) {
+        Object lastBefore = this.before;
+        this.before = before;
+        try {
+            if (onChange != null) {
+                if (after != null) {
+                    onChange.run();
+                }
+            } else if (afterCodec != null && after != null) {
+                afterCodec.rpcSend(after, this);
             }
+        } finally {
             this.before = lastBefore;
-        } else if (after instanceof RpcCodec) {
-            //noinspection unchecked
-            ((RpcCodec<Object>) after).rpcSend(after, this);
         }
     }
 

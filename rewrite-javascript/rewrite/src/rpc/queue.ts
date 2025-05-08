@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Marker, Markers, MarkersKind} from "../markers";
-import {RpcCodecs} from "./codec";
+import {RpcCodec, RpcCodecs} from "./codec";
 import {randomId} from "../uuid";
 import {WriteStream} from "fs";
 import {saveTrace, trace} from "./trace";
@@ -129,8 +129,9 @@ export class RpcSendQueue {
             } else if (after === undefined) {
                 this.put({state: RpcObjectState.DELETE});
             } else {
-                this.put({state: RpcObjectState.CHANGE, value: onChange ? undefined : after});
-                await this.doChange(after, before, onChange);
+                let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after);
+                this.put({state: RpcObjectState.CHANGE, value: onChange || afterCodec ? undefined : after});
+                await this.doChange(after, before, onChange, afterCodec);
             }
         });
     }
@@ -157,7 +158,7 @@ export class RpcSendQueue {
                         this.put({state: RpcObjectState.NO_CHANGE});
                     } else {
                         this.put({state: RpcObjectState.CHANGE});
-                        await this.doChange(anAfter, aBefore, onChangeRun);
+                        await this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter));
                     }
                 }
             }
@@ -196,25 +197,29 @@ export class RpcSendQueue {
             ref = this.refCount++;
             this.refs.set(after, ref);
         }
+        let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after);
         this.put({
             state: RpcObjectState.ADD,
             valueType: this.getValueType(after),
-            value: onChange ? undefined : after,
+            value: onChange || afterCodec ? undefined : after,
             ref: ref
         });
-        await this.doChange(after, undefined, onChange);
+        await this.doChange(after, undefined, onChange, afterCodec);
     }
 
-    private async doChange(after: any, before: any, onChange: (() => Promise<void>) | undefined): Promise<void> {
-        if (onChange) {
-            const lastBefore = this.before;
-            this.before = before;
-            if (after !== undefined) {
-                await onChange();
+    private async doChange(after: any, before: any, onChange?: () => Promise<void>, afterCodec?: RpcCodec<any>): Promise<void> {
+        const lastBefore = this.before;
+        this.before = before;
+        try {
+            if (onChange) {
+                if (after !== undefined) {
+                    await onChange();
+                }
+            } else if (afterCodec) {
+                await afterCodec.rpcSend(after, this);
             }
+        } finally {
             this.before = lastBefore;
-        } else if (after !== undefined) {
-            await RpcCodecs.forInstance(after)?.rpcSend(after, this);
         }
     }
 
