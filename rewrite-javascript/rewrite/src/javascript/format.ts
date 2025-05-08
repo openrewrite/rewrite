@@ -325,9 +325,13 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
 
     private static spaceSuffix(comment: Comment, spaceSuffix: boolean): Comment {
         if (spaceSuffix && this.isNotSingleSpace(comment.suffix)) {
-            return {...comment, suffix: " "};
+            return produce(comment, draft => {
+                draft.suffix = " ";
+            });
         } else if (!spaceSuffix && this.isOnlySpacesAndNotEmpty(comment.suffix)) {
-            return {...comment, suffix: ""};
+            return produce(comment, draft => {
+                draft.suffix = "";
+            });
         } else {
             return comment;
         }
