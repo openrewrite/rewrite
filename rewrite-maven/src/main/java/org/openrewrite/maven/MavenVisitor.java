@@ -293,7 +293,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 .orElse(getResolutionResult().getPom().getGroupId()));
         String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
         String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
-        String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse("jar"));
+        String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse(null));
         if (groupId != null && artifactId != null) {
             return findManagedDependency(groupId, artifactId, classifier, type);
         }
@@ -305,15 +305,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier) {
-        return findManagedDependency(groupId, artifactId, classifier, "jar");
+        return findManagedDependency(groupId, artifactId, classifier, null);
     }
 
-    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, String type) {
+    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
         for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
             if (groupId.equals(d.getGroupId()) &&
-                artifactId.equals(d.getArtifactId()) &&
-                Objects.equals(classifier, d.getClassifier()) &&
-                Objects.equals(type, d.getType())) {
+                    artifactId.equals(d.getArtifactId()) &&
+                    Objects.equals(classifier, d.getClassifier()) &&
+                    d.getType().equals(type == null ? "jar" : type)) {
                 return d;
             }
         }
