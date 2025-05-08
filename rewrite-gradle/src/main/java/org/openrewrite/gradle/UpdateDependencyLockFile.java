@@ -72,7 +72,7 @@ public class UpdateDependencyLockFile extends PlainTextVisitor<ExecutionContext>
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-        return sourceFile instanceof PlainText;
+        return sourceFile instanceof PlainText && sourceFile.getSourcePath().endsWith("gradle.lockfile");
     }
 
     @Override

@@ -24,6 +24,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainTextParser;
 
+import java.nio.file.Paths;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1072,8 +1073,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         UpgradeDependencyVersion guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
         TreeVisitor<?, ExecutionContext> visitor = guava.getVisitor();
 
-        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow();
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow().withSourcePath(Paths.get("not-a-gradle-file.txt"));
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
+
+        sourceFile = PlainTextParser.builder().build().parse("empty=").findFirst().orElseThrow().withSourcePath(Paths.get("gradle.lockfile"));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isTrue();
+
+        sourceFile = PlainTextParser.builder().build().parse("empty=").findFirst().orElseThrow().withSourcePath(Paths.get("module/gradle.lockfile"));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isTrue();
 
         sourceFile = PropertiesParser.builder().build().parse("guavaVersion=29.0-jre").findFirst().orElseThrow();
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isTrue();
