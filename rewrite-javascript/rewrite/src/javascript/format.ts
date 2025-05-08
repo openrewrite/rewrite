@@ -114,45 +114,24 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         const ret = await super.visitMethodDeclaration(methodDecl, p) as J.MethodDeclaration;
         return produceAsync(ret, async draft => {
             draft.body = ret.body && await this.spaceBefore(ret.body, this.style.beforeLeftBrace.functionLeftBrace);
-            draft.parameters = await this.spaceBeforeContainer(ret.parameters, this.style.beforeParentheses.functionDeclarationParentheses);
+
+            if (draft.parameters.elements.length > 0 && draft.parameters.elements[0].element.kind != J.Kind.Empty) {
+                draft.parameters.elements = await Promise.all(draft.parameters.elements.map(async (param, index) => {
+                    param = await this.spaceAfterRightPadded(param, index === draft.parameters.elements.length - 1 ? this.style.within.functionDeclarationParentheses : this.style.other.beforeComma);
+                    param.element = await this.spaceBefore(param.element, index === 0 ? this.style.within.functionDeclarationParentheses : this.style.other.afterComma);
+                    (param.element as Draft<J.VariableDeclarations>).variables[0].element.name.prefix.whitespace = "";
+                    (param.element as Draft<J.VariableDeclarations>).variables[0].after.whitespace = "";
+                    return param;
+                }));
+            } else if (draft.parameters.elements.length == 1) {
+                draft.parameters.elements[0] = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(draft.parameters.elements[0], this.style.within.functionDeclarationParentheses), false);
+            }
+            draft.parameters = await this.spaceBeforeContainer(draft.parameters, this.style.beforeParentheses.functionDeclarationParentheses);
+
             // TODO typeParameters handling - see visitClassDeclaration
             // TODO
             // if (m.leadingAnnotations.length > 1) {
             //     m = m.withLeadingAnnotations(this.spaceBetweenAnnotations(m.leadingAnnotations));
-            // }
-            // if (m.parameters.length === 0 || m.parameters[0] instanceof J.Empty) {
-            //     const useSpace = this.style.within.emptyMethodDeclarationParentheses;
-            //     m = m.getPadding().withParameters(
-            //         m.getPadding().parameters.getPadding().withElements(
-            //             ListUtils.map(m.getPadding().parameters.getPadding().elements,
-            //                 (param) => param.withElement(this.spaceBefore(param.element, useSpace))
-            //             )
-            //         )
-            //     );
-            // } else {
-            //     const paramsSize = m.parameters.length;
-            //     const useSpace = this.style.within.methodDeclarationParentheses;
-            //     m = m.getPadding().withParameters(
-            //         m.getPadding().parameters.getPadding().withElements(
-            //             ListUtils.map(m.getPadding().parameters.getPadding().elements,
-            //                 (index, param) => {
-            //                     if (index === 0) {
-            //                         param = param.withElement(this.spaceBefore(param.element, useSpace));
-            //                     } else {
-            //                         param = param.withElement(
-            //                             this.spaceBefore(param.element, this.style.other.afterComma)
-            //                         );
-            //                     }
-            //                     if (index === paramsSize - 1) {
-            //                         param = this.spaceAfter(param, useSpace);
-            //                     } else {
-            //                         param = this.spaceAfter(param, this.style.other.beforeComma);
-            //                     }
-            //                     return param;
-            //                 }
-            //             )
-            //         )
-            //     );
             // }
         });
     }
