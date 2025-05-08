@@ -143,10 +143,6 @@ export namespace SpacesStyle {
 }
 
 
-export interface IntelliJ extends NamedStyles<typeof JavaScriptStyles.IntelliJ> {
-    readonly kind: typeof JavaScriptStyles.IntelliJ;
-}
-
 export namespace IntelliJ {
     export namespace JavaScript {
         export const defaults: NamedStyles<typeof JavaScriptStyles.IntelliJ> = {
