@@ -19,6 +19,7 @@ import {IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../src/jav
 import {AutoformatVisitor} from "../../src/javascript/format";
 import {Draft, produce} from "immer";
 import {MarkersKind, NamedStyles, randomId, Style} from "../../src";
+import fs from "node:fs";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
 
@@ -70,7 +71,7 @@ describe('AutoformatVisitor', () => {
                     }
                     const a=0;
                     if(   1>a ){
-                        console.log  (   "true"  );
+                        console.log  (   "four"   ,    "three"  ,    "six"   );
                     }
                     let i                                  = 1;
                     while(   i<4   ){
@@ -86,7 +87,7 @@ describe('AutoformatVisitor', () => {
                     }
                     const a = 0;
                     if (1 > a) {
-                        console.log("true");
+                        console.log("four", "three", "six");
                     }
                     let i = 1;
                     while (i < 4) {

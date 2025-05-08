@@ -105,8 +105,8 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         const ret = await super.visitIf(iff, p) as J.If;
         return produceAsync(ret, async draft => {
             draft.ifCondition = await this.spaceBefore(draft.ifCondition, this.style.beforeParentheses.ifParentheses);
-            draft.ifCondition.tree = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(draft.ifCondition.tree, this.style.within.ifParentheses), this.style.within.ifParentheses);
-            draft.thenPart = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(ret.thenPart, this.style.beforeLeftBrace.ifLeftBrace), false);
+            draft.ifCondition.tree = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(draft.ifCondition.tree, this.style.within.ifParentheses), this.style.within.ifParentheses);
+            draft.thenPart = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(ret.thenPart, this.style.beforeLeftBrace.ifLeftBrace), false);
         });
     }
 
@@ -161,15 +161,16 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         const ret = await super.visitMethodInvocation(methodInv, p) as J.MethodInvocation;
         return produceAsync(ret, async draft => {
             if (draft.select) {
-                draft.select = await this.spaceAfter(draft.select, this.style.beforeParentheses.functionCallParentheses);
+                draft.select = await this.spaceAfterRightPadded(draft.select, this.style.beforeParentheses.functionCallParentheses);
             }
             if (ret.arguments.elements.length > 0 && ret.arguments.elements[0].element.kind != J.Kind.Empty) {
-                // TODO all arguments, not only the first and last one
-                draft.arguments.elements[0] = await this.spaceBeforeRightPaddedElement(draft.arguments.elements[0], this.style.within.functionCallParentheses);
-                const lastArgIndex = draft.arguments.elements.length - 1;
-                draft.arguments.elements[lastArgIndex] = await this.spaceAfter(draft.arguments.elements[lastArgIndex], this.style.within.functionCallParentheses);
+                draft.arguments.elements = await Promise.all(draft.arguments.elements.map(async (arg, index) => {
+                    arg = await this.spaceAfterRightPadded(arg, index === draft.arguments.elements.length - 1 ? this.style.within.functionCallParentheses : this.style.other.beforeComma);
+                    arg.element = await this.spaceBefore(arg.element, index === 0 ? this.style.within.functionCallParentheses : this.style.other.afterComma);
+                    return arg;
+                }));
             } else if (ret.arguments.elements.length == 1) {
-                draft.arguments.elements[0] = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(draft.arguments.elements[0], this.style.within.functionCallParentheses), false);
+                draft.arguments.elements[0] = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(draft.arguments.elements[0], this.style.within.functionCallParentheses), false);
             }
 
             // TODO typeParameters handling - see visitClassDeclaration
@@ -178,31 +179,6 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
             // m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), style.getBeforeParentheses().getMethodCall()));
             // if (m.getArguments().isEmpty() || m.getArguments()[0] instanceof J.Empty) {
             //   ...
-            // } else {
-            //     const argsSize = m.getArguments().length;
-            //     const useSpace = style.getWithin().getMethodCallParentheses();
-            //     m = m.getPadding().withArguments(
-            //         m.getPadding().getArguments().getPadding().withElements(
-            //             ListUtils.map(m.getPadding().getArguments().getPadding().getElements(),
-            //                 (index: number, arg: any) => {
-            //                     if (index === 0) {
-            //                         arg = arg.withElement(spaceBefore(arg.getElement(), useSpace));
-            //                     } else {
-            //                         arg = arg.withElement(
-            //                             spaceBefore(arg.getElement(), style.getOther().getAfterComma())
-            //                         );
-            //                     }
-            //                     if (index === argsSize - 1) {
-            //                         arg = spaceAfter(arg, useSpace);
-            //                     } else {
-            //                         arg = spaceAfter(arg, style.getOther().getBeforeComma());
-            //                     }
-            //                     return arg;
-            //                 }
-            //             )
-            //         )
-            //     );
-            // }
         });
     }
 
@@ -237,13 +213,13 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
     protected async visitWhileLoop(whileLoop: J.WhileLoop, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitWhileLoop(whileLoop, p) as J.WhileLoop;
         return produceAsync(ret, async draft => {
-            draft.body = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(ret.body, this.style.beforeLeftBrace.whileLeftBrace), false);
+            draft.body = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(ret.body, this.style.beforeLeftBrace.whileLeftBrace), false);
             draft.condition = await this.spaceBefore(draft.condition, this.style.beforeParentheses.whileParentheses);
-            draft.condition.tree = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(draft.condition.tree, this.style.within.whileParentheses), this.style.within.whileParentheses);
+            draft.condition.tree = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(draft.condition.tree, this.style.within.whileParentheses), this.style.within.whileParentheses);
         });
     }
 
-    private async spaceAfter<T extends J>(right: J.RightPadded<T>, spaceAfter: boolean): Promise<J.RightPadded<T>> {
+    private async spaceAfterRightPadded<T extends J>(right: J.RightPadded<T>, spaceAfter: boolean): Promise<J.RightPadded<T>> {
         if (right.after.comments.length > 0) {
             // Perform the space rule for the suffix of the last comment only. Same as IntelliJ.
             const comments = SpacesVisitor.spaceLastCommentSuffix(right.after.comments, spaceAfter);
