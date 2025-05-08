@@ -188,7 +188,9 @@ export class JavaScriptParser extends Parser {
                     new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
                         .visit(sourceFile) as SourceFile,
                     draft => {
-                        this.styles && draft.markers.markers.push(...this.styles);
+                        if (this.styles) {
+                            draft.markers.markers = draft.markers.markers.concat(this.styles);
+                        }
                     }));
             } catch (error) {
                 result.push(this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error)));
