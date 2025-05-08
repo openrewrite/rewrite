@@ -59,8 +59,13 @@ public class LombokSupport {
         }
 
         String oldValue = System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
+        Class<?> shadowLoaderClass;
         try {
-            Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, parserClassLoader);
+            shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, parserClassLoader);
+        } catch (Exception e) {
+            shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, parserClassLoader.getParent());
+        }
+        try {
             Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
                     Class.forName("java.lang.ClassLoader"),
                     Class.forName("java.lang.String"),
