@@ -4040,6 +4040,7 @@ class MavenParserTest implements RewriteTest {
 
     @Nested
     class DependencyManagement {
+        // https://repo1.maven.org/maven2/org/apache/maven/plugins/maven-site-plugin/3.9.1/
         @Issue("https://github.com/openrewrite/rewrite/issues/5402")
         @Test
         void simple() {
@@ -4055,9 +4056,9 @@ class MavenParserTest implements RewriteTest {
                       <dependencyManagement>
                         <dependencies>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <version>3.4.5</version>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
                           </dependency>
                         </dependencies>
                       </dependencyManagement>
@@ -4085,8 +4086,8 @@ class MavenParserTest implements RewriteTest {
                         </dependencyManagement>
                         <dependencies>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
                           </dependency>
                         </dependencies>
                       </project>
@@ -4094,10 +4095,10 @@ class MavenParserTest implements RewriteTest {
                     spec -> spec.afterRecipe(pom -> {
                         MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                         List<ResolvedDependency> resolvedDependencies = resolution.getDependencies().get(Scope.Compile);
-                        assertThat(resolvedDependencies).satisfiesExactly(dep -> {
-                            assertThat(dep.getGav().getGroupId()).isEqualTo("org.springframework.boot");
-                            assertThat(dep.getGav().getArtifactId()).isEqualTo("spring-boot-cli");
-                            assertThat(dep.getGav().getVersion()).isEqualTo("3.4.5");
+                        assertThat(resolvedDependencies).satisfiesOnlyOnce(dep -> {
+                            assertThat(dep.getGav().getGroupId()).isEqualTo("org.apache.maven.plugins");
+                            assertThat(dep.getGav().getArtifactId()).isEqualTo("maven-site-plugin");
+                            assertThat(dep.getGav().getVersion()).isEqualTo("3.9.1");
                         });
                     })
                   )
@@ -4121,10 +4122,11 @@ class MavenParserTest implements RewriteTest {
                       <dependencyManagement>
                         <dependencies>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <version>3.4.5</version>
-                            <type>bin</type>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
                           </dependency>
                         </dependencies>
                       </dependencyManagement>
@@ -4152,9 +4154,10 @@ class MavenParserTest implements RewriteTest {
                         </dependencyManagement>
                         <dependencies>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <type>bin</type>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
                           </dependency>
                         </dependencies>
                       </project>
@@ -4162,10 +4165,10 @@ class MavenParserTest implements RewriteTest {
                     spec -> spec.afterRecipe(pom -> {
                         MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                         List<ResolvedDependency> resolvedDependencies = resolution.getDependencies().get(Scope.Compile);
-                        assertThat(resolvedDependencies).satisfiesExactly(dep -> {
-                            assertThat(dep.getGav().getGroupId()).isEqualTo("org.springframework.boot");
-                            assertThat(dep.getGav().getArtifactId()).isEqualTo("spring-boot-cli");
-                            assertThat(dep.getGav().getVersion()).isEqualTo("3.4.5");
+                        assertThat(resolvedDependencies).satisfiesOnlyOnce(dep -> {
+                            assertThat(dep.getGav().getGroupId()).isEqualTo("org.apache.maven.plugins");
+                            assertThat(dep.getGav().getArtifactId()).isEqualTo("maven-site-plugin");
+                            assertThat(dep.getGav().getVersion()).isEqualTo("3.9.1");
                         });
                     })
                   )
@@ -4189,15 +4192,16 @@ class MavenParserTest implements RewriteTest {
                       <dependencyManagement>
                         <dependencies>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <version>3.4.5</version>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
                           </dependency>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <version>3.4.5</version>
-                            <type>bin</type>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
                           </dependency>
                         </dependencies>
                       </dependencyManagement>
@@ -4225,8 +4229,8 @@ class MavenParserTest implements RewriteTest {
                         </dependencyManagement>
                         <dependencies>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
                           </dependency>
                         </dependencies>
                       </project>
@@ -4253,15 +4257,16 @@ class MavenParserTest implements RewriteTest {
                       <dependencyManagement>
                         <dependencies>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <version>3.4.5</version>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
                           </dependency>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <version>3.4.5</version>
-                            <type>bin</type>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
                           </dependency>
                         </dependencies>
                       </dependencyManagement>
@@ -4289,9 +4294,10 @@ class MavenParserTest implements RewriteTest {
                         </dependencyManagement>
                         <dependencies>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <type>bin</type>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
                           </dependency>
                         </dependencies>
                       </project>
@@ -4317,15 +4323,16 @@ class MavenParserTest implements RewriteTest {
                       <dependencyManagement>
                         <dependencies>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <version>3.4.5</version>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
                           </dependency>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <version>3.4.5</version>
-                            <type>bin</type>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
                           </dependency>
                         </dependencies>
                       </dependencyManagement>
@@ -4353,13 +4360,14 @@ class MavenParserTest implements RewriteTest {
                         </dependencyManagement>
                         <dependencies>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
                           </dependency>
                           <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-cli</artifactId>
-                            <type>bin</type>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
                           </dependency>
                         </dependencies>
                       </project>
