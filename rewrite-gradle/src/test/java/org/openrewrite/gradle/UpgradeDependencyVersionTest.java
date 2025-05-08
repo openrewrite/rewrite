@@ -1493,7 +1493,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           ),
           buildGradle(
             """
-            """),
+            """
+          ),
           lockFile(
             """
             # This is a Gradle generated file for dependency locking.
