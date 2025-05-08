@@ -37,6 +37,17 @@ class ChangePropertyKeyTest implements RewriteTest {
           null));
     }
 
+    @DocumentExample
+    @Test
+    void changeKey() {
+        rewriteRun(
+          properties(
+            "management.metrics.binders.files.enabled=true",
+            "management.metrics.enable.process.files=true"
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/575")
     @Test
     void preserveComment() {
@@ -50,17 +61,6 @@ class ChangePropertyKeyTest implements RewriteTest {
               # comment
               management.metrics.enable.process.files=true
               """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void changeKey() {
-        rewriteRun(
-          properties(
-            "management.metrics.binders.files.enabled=true",
-            "management.metrics.enable.process.files=true"
           )
         );
     }

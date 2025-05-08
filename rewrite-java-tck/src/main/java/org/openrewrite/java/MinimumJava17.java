@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledForJreRange;
 import org.junit.jupiter.api.condition.JRE;
 
@@ -28,7 +27,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Retention(RUNTIME)
 @Target({TYPE, METHOD})
-@Tag("java17")
 @EnabledForJreRange(min = JRE.JAVA_17)
 public @interface MinimumJava17 {
 }

@@ -454,4 +454,13 @@ class XmlParserTest implements RewriteTest {
     void acceptWithInvalidPaths(String path) {
         assertThat(new XmlParser().accept(Paths.get(path))).isFalse();
     }
+
+    @Test
+    void CRsWithNoLFs() {
+        rewriteRun(
+          xml(
+            "<?xml version=\"1.0\"?>CR<a>CR</a>".replace("CR", "\r")
+          )
+        );
+    }
 }

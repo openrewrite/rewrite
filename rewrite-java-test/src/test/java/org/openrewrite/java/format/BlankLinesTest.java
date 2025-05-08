@@ -38,6 +38,32 @@ import static org.openrewrite.java.Assertions.java;
 
 class BlankLinesTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void eachMethodOnItsOwnLine() {
+        rewriteRun(
+          blankLines(),
+          java(
+            """
+              public class Test {
+                  void a() {
+                  }    void b() {
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void a() {
+                  }
+                            
+                  void b() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> blankLines() {
         return blankLines(style -> style);
     }
@@ -81,32 +107,6 @@ class BlankLinesTest implements RewriteTest {
               public enum TheEnum {
                   FIRST,
                   SECOND
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void eachMethodOnItsOwnLine() {
-        rewriteRun(
-          blankLines(),
-          java(
-            """
-              public class Test {
-                  void a() {
-                  }    void b() {
-                  }
-              }
-              """,
-            """
-              public class Test {
-                  void a() {
-                  }
-                            
-                  void b() {
-                  }
               }
               """
           )

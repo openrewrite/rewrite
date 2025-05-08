@@ -56,6 +56,39 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         spec.recipe(new NoWhitespaceBefore());
     }
 
+    @DocumentExample
+    @Test
+    void fieldAccessDoNotAllowLineBreaks() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+            style.withDot(true)))),
+          java(
+            """
+              class Test {
+                  int m;
+
+                  static void method() {
+                      new Test()
+                              .m = 2;
+                      new Test() .m = 2;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int m;
+
+                  static void method() {
+                      new Test().m = 2;
+                      new Test().m = 2;
+                  }
+              }
+              """,
+            autoFormatIsIdempotent()
+          )
+        );
+    }
+
     private static List<NamedStyles> noWhitespaceBeforeStyle() {
         return noWhitespaceBeforeStyle(style -> style);
     }
@@ -97,39 +130,6 @@ class NoWhitespaceBeforeTest implements RewriteTest {
               class Test {
               }
               """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void fieldAccessDoNotAllowLineBreaks() {
-        rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withDot(true)))),
-          java(
-            """
-              class Test {
-                  int m;
-
-                  static void method() {
-                      new Test()
-                              .m = 2;
-                      new Test() .m = 2;
-                  }
-              }
-              """,
-            """
-              class Test {
-                  int m;
-
-                  static void method() {
-                      new Test().m = 2;
-                      new Test().m = 2;
-                  }
-              }
-              """,
-            autoFormatIsIdempotent()
           )
         );
     }

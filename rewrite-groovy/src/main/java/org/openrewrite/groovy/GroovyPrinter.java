@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 import static org.openrewrite.groovy.internal.Delimiter.DOUBLE_QUOTE_STRING;
+import static org.openrewrite.groovy.tree.G.Unary.Type.Spread;
 
 public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private final GroovyJavaPrinter delegate = new GroovyJavaPrinter();
@@ -133,6 +134,21 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitUnary(G.Unary unary, PrintOutputCapture<P> p) {
+        beforeSyntax(unary, Space.Location.UNARY_PREFIX, p);
+        switch (unary.getOperator()) {
+            case Spread:
+                p.append("*");
+                visit(unary.getExpression(), p);
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown unary operator.");
+        }
+        afterSyntax(unary, p);
+        return unary;
+    }
+
+    @Override
     public J visitBinary(G.Binary binary, PrintOutputCapture<P> p) {
         String keyword = "";
         switch (binary.getOperator()) {
@@ -147,6 +163,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 break;
             case In:
                 keyword = "in";
+                break;
+            case NotIn:
+                keyword = "!in";
                 break;
             case Spaceship:
                 keyword = "<=>";

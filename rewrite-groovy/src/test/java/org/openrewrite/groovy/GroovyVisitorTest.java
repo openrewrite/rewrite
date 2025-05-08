@@ -54,4 +54,97 @@ class GroovyVisitorTest implements RewriteTest {
           )
         );
     }
+  
+    @Test
+    void newArrayWithSize() {
+        rewriteRun(groovy(
+          """
+          class A {
+              static void main(String[] argv) {
+                  int[][][] addr = new int[4+3][3][5];
+              }
+          }
+          """
+        ));
+    }
+
+    @Test
+    void newArrayWithEmptyInitializer() {
+        rewriteRun(groovy(
+          """
+          class A {
+              static void main(String[] argv) {int[] addr = new int[]{}}
+          }
+          """
+        ));
+    }
+
+    @Test
+    void newArrayOfListOfStrings() {
+        rewriteRun(groovy(
+          """
+          class A {
+              static void main(String[] argv) {
+                  List<String>[] l = new List<String>[]{ new ArrayList<String>() };
+              }
+          }
+          """
+        ));
+    }
+
+    @Test
+    void newArrayWithInitializer() {
+        rewriteRun(groovy(
+          """
+          class A {
+              static void main(String[] argv) {
+                  int[] addr = new int[] {
+                      123,
+                      new Integer(456).intValue()
+                  };
+              }
+          }
+          """
+        ));
+    }
+
+    @Test
+    void dynamicallyTypedNewArrayWithSize() {
+        rewriteRun(groovy(
+          """
+          class A {
+              static void main(String[] argv) {
+                  def addr = new int[4+3][3][5];
+              }
+          }
+          """
+        ));
+    }
+
+    @Test
+    void returnNewArray() {
+        rewriteRun(groovy(
+          """
+            class TestMe{
+              String[] getArgs() {
+                return new String[0]
+              }
+            }
+            """
+        ));
+    }
+  
+    @Test
+    void spreadOperator() {
+        rewriteRun(groovy(
+          """
+            class A {
+                static void main(String[] argv) {
+                    def l = [1,2,3]
+                    System.out.printf("%d, %d, %d", *l);
+                }
+            }
+            """
+        ));
+    }
 }

@@ -39,6 +39,42 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class VariableNameUtilsTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void incrementExistingNumberPostFix() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
+                  if (identifier.getSimpleName().equals("name2")) {
+                      return identifier.withSimpleName(VariableNameUtils.generateVariableName("name1", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
+                  }
+                  return identifier;
+              }
+          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          java(
+            """
+              @SuppressWarnings("all")
+              class Test {
+                  int name = 0;
+                  void method(int name1) {
+                      int name2 = 0;
+                  }
+              }
+              """,
+            """
+              @SuppressWarnings("all")
+              class Test {
+                  int name = 0;
+                  void method(int name1) {
+                      int name3 = 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> baseTest(String scope, String expected) {
         return spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
             @Override
@@ -460,42 +496,6 @@ class VariableNameUtilsTest implements RewriteTest {
                           methodParam--;
                       } while (methodParam > 0);
                       boolean methodBlockB;
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void incrementExistingNumberPostFix() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
-                  if (identifier.getSimpleName().equals("name2")) {
-                      return identifier.withSimpleName(VariableNameUtils.generateVariableName("name1", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
-                  }
-                  return identifier;
-              }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
-          java(
-            """
-              @SuppressWarnings("all")
-              class Test {
-                  int name = 0;
-                  void method(int name1) {
-                      int name2 = 0;
-                  }
-              }
-              """,
-            """
-              @SuppressWarnings("all")
-              class Test {
-                  int name = 0;
-                  void method(int name1) {
-                      int name3 = 0;
                   }
               }
               """

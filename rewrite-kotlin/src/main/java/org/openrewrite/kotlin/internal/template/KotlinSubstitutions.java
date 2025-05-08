@@ -15,12 +15,12 @@
  */
 package org.openrewrite.kotlin.internal.template;
 
+import java.util.Collections;
 import org.openrewrite.java.internal.template.Substitutions;
-import org.openrewrite.java.tree.JavaType;
 
 public class KotlinSubstitutions extends Substitutions {
     public KotlinSubstitutions(String code, Object[] parameters) {
-        super(code, parameters);
+        super(code, Collections.emptySet(), parameters);
     }
 
     @Override
@@ -31,28 +31,5 @@ public class KotlinSubstitutions extends Substitutions {
     @Override
     protected String newPrimitiveParameter(String fqn, int index) {
         return newObjectParameter(fqn, index);
-    }
-
-    @Override
-    protected String newArrayParameter(JavaType elemType, int dimensions, int index) {
-        // generate literal of the form: `arrayOf(arrayOf<String?>())`
-        StringBuilder builder = new StringBuilder("/*__p" + index + "__*/");
-        for (int i = 0; i < dimensions; i++) {
-            builder.append("arrayOf");
-            if (i < dimensions - 1) {
-                builder.append('(');
-            }
-        }
-        builder.append('<');
-        if (elemType instanceof JavaType.Primitive) {
-            builder.append(((JavaType.Primitive) elemType).getKeyword());
-        } else if (elemType instanceof JavaType.FullyQualified) {
-            builder.append(((JavaType.FullyQualified) elemType).getFullyQualifiedName().replace("$", "."));
-        }
-        builder.append(">(");
-        for (int i = 0; i < dimensions; i++) {
-            builder.append(')');
-        }
-        return builder.toString();
     }
 }

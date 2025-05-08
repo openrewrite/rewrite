@@ -20,34 +20,40 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
-import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.format.BlankLinesVisitor;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonMap;
@@ -66,9 +72,6 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
-
-    @EqualsAndHashCode.Exclude
-    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -120,15 +123,19 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
      * it is much faster to produce these LST elements only once then manipulate their arguments.
      * This largely mimics how caching works in JavaTemplate. If we create a Gradle/GroovyTemplate this could be refactored.
      */
-    private static Map<String, Optional<G.CompilationUnit>> snippetCache(ExecutionContext ctx) {
+    private static Map<String, Optional<JavaSourceFile>> snippetCache(ExecutionContext ctx) {
         //noinspection unchecked
-        return (Map<String, Optional<G.CompilationUnit>>) ctx.getMessages()
+        return (Map<String, Optional<JavaSourceFile>>) ctx.getMessages()
                 .computeIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<String, Optional<G.CompilationUnit>>());
     }
 
-    private static Optional<G.CompilationUnit> parseAsGradle(String snippet, ExecutionContext ctx) {
+    private static Optional<JavaSourceFile> parseAsGradle(String snippet, boolean isKotlinDsl, ExecutionContext ctx) {
         return snippetCache(ctx)
-                .computeIfAbsent(snippet, s -> GradleParser.builder().build().parse(ctx, snippet)
+                .computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(Collections.singletonList(
+                        new Parser.Input(
+                                Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
+                                () -> new ByteArrayInputStream(snippet.getBytes(StandardCharsets.UTF_8))
+                        )), null, ctx)
                         .findFirst()
                         .map(maybeCu -> {
                             maybeCu.getMarkers()
@@ -136,7 +143,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                                     .ifPresent(per -> {
                                         throw new IllegalStateException("Encountered exception " + per.getExceptionType() + " with message " + per.getMessage() + " on snippet:\n" + snippet);
                                     });
-                            return (G.CompilationUnit) maybeCu;
+                            return (JavaSourceFile) maybeCu;
                         }));
     }
 
@@ -166,100 +173,130 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
 
-        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new JavaVisitor<ExecutionContext>() {
             @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
 
             @Override
-            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                gradleProject = cu.getMarkers().findFirst(GradleProject.class)
-                        .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) tree;
+                    gradleProject = cu.getMarkers().findFirst(GradleProject.class)
+                            .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
 
-                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new LinkedHashMap<>();
+                    Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new LinkedHashMap<>();
 
-                DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, mavenDownloadEvents, gradleProject, null);
-                for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
-                    for (ResolvedDependency resolved : configuration.getResolved()) {
-                        if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(),
-                                resolved.getArtifactId(), resolved.getVersion())) {
-                            try {
-                                String selected = versionSelector.select(resolved.getGav(), configuration.getName(),
-                                        version, versionPattern, ctx);
-                                if (selected == null || resolved.getVersion().equals(selected)) {
-                                    continue;
-                                }
+                    DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
+                    configurations:
+                    for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
+                        // Skip when there's a direct dependency, as per openrewrite/rewrite#5355
+                        for (Dependency dependency : configuration.getRequested()) {
+                            if (dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                                continue configurations;
+                            }
+                        }
+                        for (ResolvedDependency resolved : configuration.getResolved()) {
+                            if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(),
+                                    resolved.getArtifactId(), resolved.getVersion())) {
+                                try {
+                                    String selected = versionSelector.select(resolved.getGav(), configuration.getName(),
+                                            version, versionPattern, ctx);
+                                    if (selected == null || resolved.getVersion().equals(selected)) {
+                                        continue;
+                                    }
 
-                                GradleDependencyConfiguration constraintConfig = constraintConfiguration(configuration);
-                                if (constraintConfig == null) {
-                                    continue;
-                                }
+                                    GradleDependencyConfiguration constraintConfig = constraintConfiguration(configuration);
+                                    if (constraintConfig == null) {
+                                        continue;
+                                    }
 
-                                toUpdate.merge(
-                                        new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId()),
-                                        singletonMap(constraintConfig, selected),
-                                        (existing, update) -> {
-                                            Map<GradleDependencyConfiguration, String> all = new LinkedHashMap<>(existing);
-                                            all.putAll(update);
-                                            all.keySet().removeIf(c -> {
-                                                if (c == null) {
-                                                    return true; // TODO ?? how does this happen
-                                                }
-
-                                                for (GradleDependencyConfiguration config : all.keySet()) {
-                                                    if (c.allExtendsFrom().contains(config)) {
-                                                        return true;
+                                    toUpdate.merge(
+                                            new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId()),
+                                            singletonMap(constraintConfig, selected),
+                                            (existing, update) -> {
+                                                Map<GradleDependencyConfiguration, String> all = new LinkedHashMap<>(existing);
+                                                all.putAll(update);
+                                                all.keySet().removeIf(c -> {
+                                                    if (c == null) {
+                                                        return true; // TODO ?? how does this happen
                                                     }
 
-                                                    // TODO there has to be a better way!
-                                                    if (c.getName().equals("runtimeOnly")) {
-                                                        if (config.getName().equals("implementation")) {
+                                                    for (GradleDependencyConfiguration config : all.keySet()) {
+                                                        if (c.allExtendsFrom().contains(config)) {
                                                             return true;
                                                         }
-                                                    }
-                                                    if (c.getName().equals("testRuntimeOnly")) {
-                                                        if (config.getName().equals("testImplementation") ||
-                                                            config.getName().equals("implementation")) {
-                                                            return true;
+
+                                                        // TODO there has to be a better way!
+                                                        if (c.getName().equals("runtimeOnly")) {
+                                                            if (config.getName().equals("implementation")) {
+                                                                return true;
+                                                            }
+                                                        }
+                                                        if (c.getName().equals("testRuntimeOnly")) {
+                                                            if (config.getName().equals("testImplementation") ||
+                                                                    config.getName().equals("implementation")) {
+                                                                return true;
+                                                            }
                                                         }
                                                     }
-                                                }
-                                                return false;
-                                            });
-                                            return all;
-                                        }
-                                );
-                            } catch (MavenDownloadingException e) {
-                                return Markup.warn(cu, e);
+                                                    return false;
+                                                });
+                                                return all;
+                                            }
+                                    );
+                                } catch (MavenDownloadingException e) {
+                                    return Markup.warn(cu, e);
+                                }
                             }
                         }
                     }
-                }
 
-                if (!toUpdate.isEmpty()) {
-                    cu = (G.CompilationUnit) Preconditions.check(not(new UsesMethod<>(CONSTRAINTS_MATCHER)),
-                            new AddConstraintsBlock()).visitNonNull(cu, ctx);
+                    if (!toUpdate.isEmpty()) {
+                        cu = (JavaSourceFile) Preconditions.check(
+                                not(new JavaIsoVisitor<ExecutionContext>() {
+                                    @Override
+                                    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                        if (tree instanceof G.CompilationUnit) {
+                                            return new UsesMethod<>(CONSTRAINTS_MATCHER).visit(tree, ctx);
+                                        } else {
+                                            // K is not type attributed, so do things more manually
+                                            return super.visit(tree, ctx);
+                                        }
+                                    }
 
-                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
-                        Map<GradleDependencyConfiguration, String> configs = update.getValue();
-                        for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
-                            cu = (G.CompilationUnit) new AddConstraint(config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
-                                    update.getKey().getArtifactId(), config.getValue()), because).visitNonNull(cu, ctx);
+                                    @Override
+                                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                                        if (m.getSimpleName().equals("constraints") && withinBlock(getCursor(), "dependencies")) {
+                                            return SearchResult.found(m);
+                                        }
+                                        return m;
+                                    }
+                                }),
+                                new AddConstraintsBlock(cu instanceof K.CompilationUnit)
+                        ).visitNonNull(cu, ctx);
+
+                        for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
+                            Map<GradleDependencyConfiguration, String> configs = update.getValue();
+                            for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
+                                cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
+                                        update.getKey().getArtifactId(), config.getValue()), because).visitNonNull(cu, ctx);
+                            }
+                        }
+
+                        // Update dependency model so chained recipes will have correct information on what dependencies are present
+                        cu = cu.withMarkers(cu.getMarkers().setByType(updatedModel(gradleProject, toUpdate, ctx)));
+
+                        // Spring dependency management plugin stomps on constraints. Use an alternative mechanism it does not override
+                        if (gradleProject.getPlugins().stream()
+                                .anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
+                            cu = (JavaSourceFile) new DependencyConstraintToRule().getVisitor().visitNonNull(cu, ctx);
                         }
                     }
 
-                    // Update dependency model so chained recipes will have correct information on what dependencies are present
-                    cu = cu.withMarkers(cu.getMarkers()
-                            .removeByType(GradleProject.class)
-                            .add(updatedModel(gradleProject, toUpdate, ctx)));
-
-                    // Spring dependency management plugin stomps on constraints. Use an alternative mechanism it does not override
-                    if (gradleProject.getPlugins().stream()
-                            .anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
-                        cu = (G.CompilationUnit) new DependencyConstraintToRule().getVisitor().visitNonNull(cu, ctx);
-                    }
+                    return cu;
                 }
-
-                return cu;
+                return super.visit(tree, ctx);
             }
 
             private GradleProject updatedModel(GradleProject gradleProject, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate, ExecutionContext ctx) {
@@ -349,19 +386,23 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         });
     }
 
-    private static class AddConstraintsBlock extends GroovyIsoVisitor<ExecutionContext> {
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class AddConstraintsBlock extends JavaIsoVisitor<ExecutionContext> {
+        boolean isKotlinDsl;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
             if (DEPENDENCIES_DSL_MATCHER.matches(method)) {
-                G.CompilationUnit withConstraints = parseAsGradle(
+                G.CompilationUnit withConstraints = (G.CompilationUnit) parseAsGradle(
                         //language=groovy
                         "plugins { id 'java' }\n" +
                         "dependencies {\n" +
                         "    constraints {\n" +
                         "    }\n" +
-                        "}\n", ctx)
+                        "}\n", false, ctx)
                         .orElseThrow(() -> new IllegalStateException("Unable to parse constraints block"));
 
                 Statement constraints = FindMethods.find(withConstraints, "org.gradle.api.artifacts.dsl.DependencyHandler constraints(..)", true)
@@ -374,7 +415,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         .withMarkers(Markers.EMPTY);
 
                 return autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                    if(!(arg instanceof J.Lambda)) {
+                    if (!(arg instanceof J.Lambda)) {
                         return arg;
                     }
                     J.Lambda dependencies = (J.Lambda) arg;
@@ -388,6 +429,49 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     return dependencies.withBody(body.withStatements(
                             ListUtils.concat(constraints, statements)));
                 })), constraints, ctx, getCursor().getParentOrThrow());
+            } else if (isKotlinDsl && m.getSimpleName().equals("dependencies") && getCursor().getParent().firstEnclosing(J.MethodInvocation.class) == null) {
+                K.CompilationUnit withConstraints = (K.CompilationUnit) parseAsGradle(
+                        //language=kotlin
+                        "plugins { id(\"java\") }\n" +
+                        "dependencies {\n" +
+                        "    constraints {}\n" +
+                        "}\n", true, ctx)
+                        .orElseThrow(() -> new IllegalStateException("Unable to parse constraints block"));
+
+                J.MethodInvocation constraints = withConstraints.getStatements()
+                        .stream()
+                        .map(J.Block.class::cast)
+                        .flatMap(block -> block.getStatements().stream())
+                        .filter(J.MethodInvocation.class::isInstance)
+                        .map(J.MethodInvocation.class::cast)
+                        .filter(m2 -> m2.getSimpleName().equals("dependencies"))
+                        .flatMap(dependencies -> ((J.Block) ((J.Lambda) dependencies.getArguments().get(0)).getBody()).getStatements().stream())
+                        .filter(J.MethodInvocation.class::isInstance)
+                        .map(J.MethodInvocation.class::cast)
+                        .filter(m2 -> m2.getSimpleName().equals("constraints"))
+                        .findFirst()
+                        .map(m2 -> m2.withArguments(ListUtils.mapFirst(m2.getArguments(), arg -> {
+                            J.Lambda lambda = (J.Lambda) arg;
+                            return lambda.withBody(((J.Block) lambda.getBody()).withEnd(Space.format("\n")));
+                        })))
+                        .orElseThrow(() -> new IllegalStateException("Unable to find constraints block"))
+                        .withMarkers(Markers.EMPTY);
+
+                return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                    if (!(arg instanceof J.Lambda)) {
+                        return arg;
+                    }
+                    J.Lambda dependencies = (J.Lambda) arg;
+                    if (!(dependencies.getBody() instanceof J.Block)) {
+                        return m;
+                    }
+                    J.Block body = (J.Block) dependencies.getBody();
+
+                    List<Statement> statements = ListUtils.mapFirst(body.getStatements(), stat -> stat.withPrefix(stat.getPrefix().withWhitespace(
+                            BlankLinesVisitor.minimumLines(stat.getPrefix().getWhitespace(), 1))));
+                    return dependencies.withBody(body.withStatements(
+                            ListUtils.concat(autoFormat(constraints, ctx, getCursor().getParentOrThrow()), statements)));
+                }));
             }
 
             return m;
@@ -397,7 +481,8 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class AddConstraint extends GroovyIsoVisitor<ExecutionContext> {
+    private static class AddConstraint extends JavaIsoVisitor<ExecutionContext> {
+        boolean isKotlinDsl;
         String config;
         GroupArtifactVersion gav;
 
@@ -407,45 +492,54 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if(!CONSTRAINTS_MATCHER.matches(m)) {
+            if (!CONSTRAINTS_MATCHER.matches(m) && !(isKotlinDsl && m.getSimpleName().equals("constraints") && withinBlock(getCursor(), "dependencies"))) {
                 return m;
             }
             String ga = gav.getGroupId() + ":" + gav.getArtifactId();
-            AtomicReference<String> existingConstraintVersion = new AtomicReference<>();
-            J.MethodInvocation existingConstraint = FindMethods.find(m, CONSTRAINT_MATCHER, true).stream()
-                    .filter(J.MethodInvocation.class::isInstance)
-                    .map(J.MethodInvocation.class::cast)
-                    .filter(c -> c.getSimpleName().equals(config) && c.getArguments().stream()
-                            .anyMatch(arg -> {
-                                        if (!(arg instanceof J.Literal) || ((J.Literal) arg).getValue() == null) {
-                                            return false;
-                                        }
-                                        String value = ((J.Literal) arg).getValue().toString();
-                                        if (!value.startsWith(ga)) {
-                                            return false;
-                                        }
-                                        existingConstraintVersion.set(value.substring(value.lastIndexOf(':') + 1));
-                                        return true;
-                                    }
-                            )
-                    ).findFirst()
-                    .orElse(null);
-            if (Objects.equals(gav.getVersion(), existingConstraintVersion.get())) {
+            String existingConstraintVersion = null;
+            J.MethodInvocation existingConstraint = null;
+            MethodMatcher constraintMatcher = new MethodMatcher(CONSTRAINT_MATCHER, true);
+            for (Statement statement : ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements()) {
+                if (statement instanceof J.MethodInvocation || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation)) {
+                    J.MethodInvocation m2 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
+                    if (constraintMatcher.matches(m2)) {
+                        if (m2.getSimpleName().equals(config) && matchesConstraint(m2, ga)) {
+                            existingConstraint = m2;
+                            existingConstraintVersion = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue())).getVersion();
+                        }
+                    } else if (isKotlinDsl && m.getSimpleName().equals("constraints")) {
+                        if (m2.getSimpleName().equals(config) && matchesConstraint(m2, ga)) {
+                            existingConstraint = m2;
+                            existingConstraintVersion = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue())).getVersion();
+                        }
+                    }
+                }
+            }
+            if (Objects.equals(gav.getVersion(), existingConstraintVersion)) {
                 return m;
             }
-            if(existingConstraint == null) {
-                m = (J.MethodInvocation) new CreateConstraintVisitor(config, gav, because)
+            if (existingConstraint == null) {
+                m = (J.MethodInvocation) new CreateConstraintVisitor(config, gav, because, isKotlinDsl)
                         .visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
             } else {
-                m = (J.MethodInvocation) new UpdateConstraintVersionVisitor(gav, existingConstraint, because)
+                m = (J.MethodInvocation) new UpdateConstraintVersionVisitor(gav, existingConstraint, because, isKotlinDsl)
                         .visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
             }
             return m;
         }
+
+        private static boolean matchesConstraint(J.MethodInvocation m, String ga) {
+            Expression arg = m.getArguments().get(0);
+            if (!(arg instanceof J.Literal) || ((J.Literal) arg).getValue() == null) {
+                return false;
+            }
+            String value = ((J.Literal) arg).getValue().toString();
+            return value.startsWith(ga);
+        }
     }
 
     //language=groovy
-    private static final String INDIVIDUAL_CONSTRAINT_SNIPPET =
+    private static final String INDIVIDUAL_CONSTRAINT_SNIPPET_GROOVY =
             "plugins {\n" +
             "    id 'java'\n" +
             "}\n" +
@@ -454,8 +548,18 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             "        implementation('foobar')\n" +
             "    }\n" +
             "}";
+    //language=kotlin
+    private static final String INDIVIDUAL_CONSTRAINT_SNIPPET_KOTLIN =
+            "plugins {\n" +
+            "    id(\"java\")\n" +
+            "}\n" +
+            "dependencies {\n" +
+            "    constraints {\n" +
+            "        implementation(\"foobar\")\n" +
+            "    }\n" +
+            "}";
     //language=groovy
-    private static final String INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET =
+    private static final String INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY =
             "plugins {\n" +
             "    id 'java'\n" +
             "}\n" +
@@ -466,16 +570,30 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             "        }\n" +
             "    }\n" +
             "}";
+    //language=kotlin
+    private static final String INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN =
+            "plugins {\n" +
+            "    id(\"java\")\n" +
+            "}\n" +
+            "dependencies {\n" +
+            "    constraints {\n" +
+            "        implementation(\"foobar\") {\n" +
+            "            because(\"because\")\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class CreateConstraintVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class CreateConstraintVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         String config;
         GroupArtifactVersion gav;
 
         @Nullable
         String because;
+
+        boolean isKotlinDsl;
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -484,39 +602,71 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-            J.MethodInvocation constraint = parseAsGradle(because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET, ctx)
-                    .map(it -> (J.MethodInvocation) it.getStatements().get(1))
-                    .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
-                    .map(dependenciesClosure -> (J.Block)dependenciesClosure.getBody())
-                    .map(dependenciesBody -> (J.Return) dependenciesBody.getStatements().get(0))
-                    .map(returnConstraints -> (J.MethodInvocation) returnConstraints.getExpression())
-                    .map(constraintsInvocation -> (J.Lambda) constraintsInvocation.getArguments().get(0))
-                    .map(constraintsLambda -> (J.Block) constraintsLambda.getBody())
-                    .map(constraintsBlock -> (J.Return) constraintsBlock.getStatements().get(0))
-                    .map(returnConfiguration -> (J.MethodInvocation) returnConfiguration.getExpression())
-                    .map(it -> it.withName(it.getName().withSimpleName(config))
-                            .withArguments(ListUtils.map(it.getArguments(), arg -> {
-                                if (arg instanceof J.Literal) {
-                                    return ((J.Literal) requireNonNull(arg))
-                                            .withValue(gav.toString())
-                                            .withValueSource("'" + gav + "'");
-                                } else if (arg instanceof J.Lambda && because != null) {
-                                    return (Expression) new GroovyIsoVisitor<Integer>() {
-                                        @Override
-                                        public J.Literal visitLiteral(J.Literal literal, Integer integer) {
-                                            return literal.withValue(because)
-                                                    .withValueSource("'" + because + "'");
-                                        }
-                                    }.visitNonNull(arg, 0);
-                                }
-                                return arg;
-                            })))
-                    // Assign a unique ID so multiple constraints can be added
-                    .map(it -> it.withId(Tree.randomId()))
-                    .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
+            J.MethodInvocation constraint;
+            if (!isKotlinDsl) {
+                constraint = parseAsGradle(because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET_GROOVY : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, false, ctx)
+                        .map(G.CompilationUnit.class::cast)
+                        .map(it -> (J.MethodInvocation) it.getStatements().get(1))
+                        .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
+                        .map(dependenciesClosure -> (J.Block) dependenciesClosure.getBody())
+                        .map(dependenciesBody -> (J.Return) dependenciesBody.getStatements().get(0))
+                        .map(returnConstraints -> (J.MethodInvocation) returnConstraints.getExpression())
+                        .map(constraintsInvocation -> (J.Lambda) constraintsInvocation.getArguments().get(0))
+                        .map(constraintsLambda -> (J.Block) constraintsLambda.getBody())
+                        .map(constraintsBlock -> (J.Return) constraintsBlock.getStatements().get(0))
+                        .map(returnConfiguration -> (J.MethodInvocation) returnConfiguration.getExpression())
+                        .map(it -> it.withName(it.getName().withSimpleName(config))
+                                .withArguments(ListUtils.map(it.getArguments(), arg -> {
+                                    if (arg instanceof J.Literal) {
+                                        return ((J.Literal) requireNonNull(arg))
+                                                .withValue(gav.toString())
+                                                .withValueSource("'" + gav + "'");
+                                    } else if (arg instanceof J.Lambda && because != null) {
+                                        return (Expression) new GroovyIsoVisitor<Integer>() {
+                                            @Override
+                                            public J.Literal visitLiteral(J.Literal literal, Integer integer) {
+                                                return literal.withValue(because)
+                                                        .withValueSource("'" + because + "'");
+                                            }
+                                        }.visitNonNull(arg, 0);
+                                    }
+                                    return arg;
+                                })))
+                        // Assign a unique ID so multiple constraints can be added
+                        .map(it -> it.withId(Tree.randomId()))
+                        .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
+            } else {
+                constraint = parseAsGradle(because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET_KOTLIN : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
+                        .map(K.CompilationUnit.class::cast)
+                        .map(it -> (J.Block) it.getStatements().get(0))
+                        .map(it -> (J.MethodInvocation) it.getStatements().get(1))
+                        .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
+                        .map(dependenciesClosure -> (J.Block) dependenciesClosure.getBody())
+                        .map(dependenciesBody -> (J.MethodInvocation) dependenciesBody.getStatements().get(0))
+                        .map(constraintsInvocation -> (J.Lambda) constraintsInvocation.getArguments().get(0))
+                        .map(constraintsLambda -> (J.Block) constraintsLambda.getBody())
+                        .map(constraintsBlock -> (J.MethodInvocation) constraintsBlock.getStatements().get(0))
+                        .map(it -> it.withName(it.getName().withSimpleName(config))
+                                .withArguments(ListUtils.map(it.getArguments(), arg -> {
+                                    if (arg instanceof J.Literal) {
+                                        return ChangeStringLiteral.withStringValue((J.Literal) requireNonNull(arg), gav.toString());
+                                    } else if (arg instanceof J.Lambda && because != null) {
+                                        return (Expression) new KotlinIsoVisitor<Integer>() {
+                                            @Override
+                                            public J.Literal visitLiteral(J.Literal literal, Integer integer) {
+                                                return ChangeStringLiteral.withStringValue(literal, because);
+                                            }
+                                        }.visitNonNull(arg, 0);
+                                    }
+                                    return arg;
+                                })))
+                        // Assign a unique ID so multiple constraints can be added
+                        .map(it -> it.withId(Tree.randomId()))
+                        .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
+            }
 
             m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                if(!(arg instanceof J.Lambda)) {
+                if (!(arg instanceof J.Lambda)) {
                     return arg;
                 }
                 J.Lambda dependencies = (J.Lambda) arg;
@@ -527,19 +677,21 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
                 return dependencies.withBody(body.withStatements(
                         ListUtils.concat(constraint, body.getStatements())));
-            })), constraint, ctx, getCursor().getParentOrThrow());
+            })), ctx, getCursor().getParentOrThrow());
             return m;
         }
     }
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class UpdateConstraintVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class UpdateConstraintVersionVisitor extends JavaIsoVisitor<ExecutionContext> {
         GroupArtifactVersion gav;
         J.MethodInvocation existingConstraint;
 
         @Nullable
         String because;
+
+        boolean isKotlinDsl;
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -547,13 +699,13 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 return method;
             }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if(existingConstraint.isScope(m)) {
+            if (existingConstraint.isScope(m)) {
                 AtomicBoolean updatedBecause = new AtomicBoolean(false);
                 m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                    if(arg instanceof J.Literal) {
+                    if (arg instanceof J.Literal) {
                         String valueSource = ((J.Literal) arg).getValueSource();
                         char quote;
-                        if(valueSource == null) {
+                        if (valueSource == null) {
                             quote = '\'';
                         } else {
                             quote = valueSource.charAt(0);
@@ -563,18 +715,18 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     } else if (arg instanceof J.Lambda) {
                         arg = (Expression) new RemoveVersionVisitor().visitNonNull(arg, ctx);
                     }
-                    if(because != null) {
+                    if (because != null) {
                         Expression arg2 = (Expression) new UpdateBecauseTextVisitor(because)
                                 .visitNonNull(arg, ctx, getCursor());
-                        if(arg2 != arg) {
+                        if (arg2 != arg) {
                             updatedBecause.set(true);
                         }
                         return arg2;
                     }
                     return arg;
                 }));
-                if(because != null && !updatedBecause.get()) {
-                    m = (J.MethodInvocation) new CreateBecauseVisitor(because).visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
+                if (because != null && !updatedBecause.get()) {
+                    m = (J.MethodInvocation) new CreateBecauseVisitor(because, isKotlinDsl).visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
                 }
             }
             return m;
@@ -582,21 +734,21 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     }
 
     @SuppressWarnings("NullableProblems")
-    private static class RemoveVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class RemoveVersionVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
-        public  J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
+        public J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
             J.Return r = super.visitReturn(_return, ctx);
-            if(r.getExpression() == null) {
+            if (r.getExpression() == null) {
                 return null;
             }
             return r;
         }
 
         @Override
-        public  J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+        public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
+            if ("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
                 return null;
             }
             return m;
@@ -605,18 +757,19 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class UpdateBecauseTextVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class UpdateBecauseTextVisitor extends JavaIsoVisitor<ExecutionContext> {
         String because;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if(!"because".equals(m.getSimpleName())) {
+            if (!"because".equals(m.getSimpleName())) {
                 return m;
             }
             m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                if(arg instanceof J.Literal) {
+                if (arg instanceof J.Literal) {
                     char quote;
-                    if(((J.Literal) arg).getValueSource() == null) {
+                    if (((J.Literal) arg).getValueSource() == null) {
                         quote = '"';
                     } else {
                         quote = ((J.Literal) arg).getValueSource().charAt(0);
@@ -632,34 +785,76 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class CreateBecauseVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class CreateBecauseVisitor extends JavaIsoVisitor<ExecutionContext> {
         String because;
+        boolean isKotlinDsl;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            J.Lambda becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET, ctx)
-                    .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
-                    .map(J.MethodInvocation.class::cast)
-                    .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
-                    .map(dependenciesClosure -> ((J.Block)dependenciesClosure.getBody()).getStatements().get(0))
-                    .map(J.Return.class::cast)
-                    .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
-                    .map(J.Lambda.class::cast)
-                    .map(constraintsClosure -> ((J.Block)constraintsClosure.getBody()).getStatements().get(0))
-                    .map(J.Return.class::cast)
-                    .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
-                    .map(J.Lambda.class::cast)
-                    .map(it -> (J.Lambda) new GroovyIsoVisitor<Integer>() {
-                        @Override
-                        public J.Literal visitLiteral(J.Literal literal, Integer integer) {
-                            return literal.withValue(because)
-                                    .withValueSource("'" + because + "'");
-                        }
-                    }.visitNonNull(it, 0))
-                    .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
+            J.Lambda becauseArg;
+            if (!isKotlinDsl) {
+                becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, false, ctx)
+                        .map(G.CompilationUnit.class::cast)
+                        .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
+                        .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
+                        .map(dependenciesClosure -> ((J.Block) dependenciesClosure.getBody()).getStatements().get(0))
+                        .map(J.Return.class::cast)
+                        .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
+                        .map(J.Lambda.class::cast)
+                        .map(constraintsClosure -> ((J.Block) constraintsClosure.getBody()).getStatements().get(0))
+                        .map(J.Return.class::cast)
+                        .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
+                        .map(J.Lambda.class::cast)
+                        .map(it -> (J.Lambda) new GroovyIsoVisitor<Integer>() {
+                            @Override
+                            public J.Literal visitLiteral(J.Literal literal, Integer integer) {
+                                return literal.withValue(because)
+                                        .withValueSource("'" + because + "'");
+                            }
+                        }.visitNonNull(it, 0))
+                        .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
+            } else {
+                becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
+                        .map(K.CompilationUnit.class::cast)
+                        .map(cu -> (J.Block) cu.getStatements().get(0))
+                        .map(block -> (J.MethodInvocation) block.getStatements().get(1))
+                        .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
+                        .map(dependenciesClosure -> ((J.Block) dependenciesClosure.getBody()).getStatements().get(0))
+                        .map(J.Return.class::cast)
+                        .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
+                        .map(J.Lambda.class::cast)
+                        .map(constraintsClosure -> ((J.Block) constraintsClosure.getBody()).getStatements().get(0))
+                        .map(J.Return.class::cast)
+                        .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
+                        .map(J.Lambda.class::cast)
+                        .map(it -> (J.Lambda) new KotlinIsoVisitor<Integer>() {
+                            @Override
+                            public J.Literal visitLiteral(J.Literal literal, Integer integer) {
+                                return literal.withValue(because)
+                                        .withValueSource("\"" + because + "\"");
+                            }
+                        }.visitNonNull(it, 0))
+                        .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
+            }
             m = m.withArguments(ListUtils.concat(m.getArguments().subList(0, 1), becauseArg));
             m = autoFormat(m, ctx, getCursor().getParentOrThrow());
             return m;
         }
+    }
+
+    private static boolean withinBlock(Cursor cursor, String name) {
+        Cursor parentCursor = cursor.getParent();
+        while (parentCursor != null) {
+            if (parentCursor.getValue() instanceof J.MethodInvocation) {
+                J.MethodInvocation m = parentCursor.getValue();
+                if (m.getSimpleName().equals(name)) {
+                    return true;
+                }
+            }
+            parentCursor = parentCursor.getParent();
+        }
+
+        return false;
     }
 }

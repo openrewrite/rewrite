@@ -58,27 +58,6 @@ class BlankLinesTest implements RewriteTest {
     @Nested
     class KeepMaximumBlankLinesTest {
 
-        @Test
-        void keepMaximumBlankLinesInClassDeclarations() {
-            rewriteRun(
-              blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withInDeclarations(1))),
-              kotlin(
-                """
-                  class A {}
-
-
-
-                  class B {}
-                  """,
-                """
-                  class A {}
-
-                  class B {}
-                  """
-              )
-            );
-        }
-
         @DocumentExample
         @Test
         void keepMaximumInDeclarations() {
@@ -145,6 +124,27 @@ class BlankLinesTest implements RewriteTest {
                           SECOND
                       }
                   }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepMaximumBlankLinesInClassDeclarations() {
+            rewriteRun(
+              blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withInDeclarations(1))),
+              kotlin(
+                """
+                  class A {}
+
+
+
+                  class B {}
+                  """,
+                """
+                  class A {}
+
+                  class B {}
                   """
               )
             );

@@ -230,6 +230,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                 null,
                 paramNames,
                 null, null, null,
+                null,
                 null
         );
         typeCache.put(signature, method);

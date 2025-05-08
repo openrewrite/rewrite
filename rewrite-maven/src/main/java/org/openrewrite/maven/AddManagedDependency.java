@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
@@ -39,9 +38,6 @@ import static java.util.Objects.requireNonNull;
 public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Scanned> {
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
-
-    @EqualsAndHashCode.Exclude
-    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.apache.logging.log4j:ARTIFACT_ID:VERSION'.",
@@ -209,7 +205,6 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                     Validated<VersionComparator> versionValidation = Semver.validate(convertedVersion, versionPattern);
                     if (versionValidation.isValid()) {
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
-                        MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(mavenDownloadEvents);
                         try {
                             // The version of the dependency currently in use (if any) might influence the version comparator
                             // For example, "latest.patch" gives very different results depending on the version in use
@@ -229,8 +224,6 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(document);
-                        } finally {
-                            MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(null);
                         }
                     }
                 }

@@ -32,6 +32,35 @@ class FindDeprecatedMethodsTest implements RewriteTest {
         spec.recipe(new FindDeprecatedMethods(null, null));
     }
 
+    @DocumentExample
+    @Test
+    void findDeprecations() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  @Deprecated
+                  void test(int n) {
+                      if(n == 1) {
+                          test(n + 1);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  @Deprecated
+                  void test(int n) {
+                      if(n == 1) {
+                          /*~~>*/test(n + 1);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void ignoreDeprecationsInDeprecatedMethod() {
         rewriteRun(
@@ -68,35 +97,6 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                       int n = 1;
                       if(n == 1) {
                           test(n + 1);
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void findDeprecations() {
-        rewriteRun(
-          java(
-            """
-              class Test {
-                  @Deprecated
-                  void test(int n) {
-                      if(n == 1) {
-                          test(n + 1);
-                      }
-                  }
-              }
-              """,
-            """
-              class Test {
-                  @Deprecated
-                  void test(int n) {
-                      if(n == 1) {
-                          /*~~>*/test(n + 1);
                       }
                   }
               }

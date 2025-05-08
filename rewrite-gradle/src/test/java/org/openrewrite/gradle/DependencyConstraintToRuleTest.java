@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 
+@SuppressWarnings("GroovyAssignabilityCheck")
 class DependencyConstraintToRuleTest implements RewriteTest {
 
     @Override
@@ -64,6 +65,27 @@ class DependencyConstraintToRuleTest implements RewriteTest {
               }
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void buildscript() {
+        rewriteRun(
+          buildGradle(
+            """
+              buildscript {
+                  repositories { mavenCentral() }
+                  dependencies {
+                      constraints {
+                          implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                              because 'CVE-2024-BAD'
+                          }
+                      }
+                      classpath 'org.openrewrite:rewrite-java:7.0.0'
+                  }
               }
               """
           )

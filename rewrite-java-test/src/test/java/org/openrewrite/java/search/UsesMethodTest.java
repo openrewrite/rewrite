@@ -27,6 +27,37 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("RedundantOperationOnEmptyContainer")
 class UsesMethodTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void usesMethodReferences() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("A singleArg(String)"))),
+          java(
+            """
+              class Test {
+                  void test() {
+                      new java.util.ArrayList<String>().forEach(new A()::singleArg);
+                  }
+              }
+              """,
+            """
+              /*~~>*/class Test {
+                  void test() {
+                      new java.util.ArrayList<String>().forEach(new A()::singleArg);
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class A {
+                  public void singleArg(String s) {}
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1169")
     @Test
     void emptyConstructor() {
@@ -65,37 +96,6 @@ class UsesMethodTest implements RewriteTest {
               import java.util.Set;
               class Test {
                   Set<String> s = Thing.newConcurrentHashSet();
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void usesMethodReferences() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("A singleArg(String)"))),
-          java(
-            """
-              class Test {
-                  void test() {
-                      new java.util.ArrayList<String>().forEach(new A()::singleArg);
-                  }
-              }
-              """,
-            """
-              /*~~>*/class Test {
-                  void test() {
-                      new java.util.ArrayList<String>().forEach(new A()::singleArg);
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              class A {
-                  public void singleArg(String s) {}
               }
               """
           )

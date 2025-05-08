@@ -23,9 +23,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-public class InMemoryExecutionContext implements ExecutionContext {
+public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     @Nullable
-    private Map<String, Object> messages;
+    private volatile Map<String, Object> messages;
 
     private final Consumer<Throwable> onError;
     private final BiConsumer<Throwable, ExecutionContext> onTimeout;
@@ -53,8 +53,13 @@ public class InMemoryExecutionContext implements ExecutionContext {
     @Override
     public Map<String, @Nullable Object> getMessages() {
         if (messages == null) {
-            messages = new ConcurrentHashMap<>();
+            synchronized (this) {
+                if (messages == null) {
+                    messages = new ConcurrentHashMap<>();
+                }
+            }
         }
+        //noinspection DataFlowIssue
         return messages;
     }
 
@@ -89,5 +94,17 @@ public class InMemoryExecutionContext implements ExecutionContext {
     @Override
     public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
         return onTimeout;
+    }
+
+    @SuppressWarnings("MethodDoesntCallSuperMethod")
+    @Override
+    public InMemoryExecutionContext clone() {
+        InMemoryExecutionContext clone = new InMemoryExecutionContext();
+
+        clone.messages = new ConcurrentHashMap<>(getMessages());
+        //noinspection DataFlowIssue
+        clone.messages.computeIfPresent(DATA_TABLES, (key, dt) ->
+                new ConcurrentHashMap<>(((Map<?, ?>) dt)));
+        return clone;
     }
 }

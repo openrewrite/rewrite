@@ -38,6 +38,30 @@ import static org.openrewrite.groovy.Assertions.groovy;
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessaryPublicModifier", "ConstantConditions", "GrMethodMayBeStatic"})
 class GroovyTypeAttributionTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void typeFromClasspathResources() {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes("org.junit.jupiter.api.Test", null))
+            .parser(GroovyParser.builder()
+                .classpathFromResource(new InMemoryExecutionContext(), "junit-jupiter-api-5.+")),
+          groovy(
+                """
+            import org.junit.jupiter.api.Test
+            class A {
+                Test t
+            }
+            """,
+            """
+            import org.junit.jupiter.api.Test
+            class A {
+                /*~~>*/Test t
+            }
+            """
+          )
+        );
+    }
+
     @Test
     void defTypeAttributed() {
         rewriteRun(
@@ -212,29 +236,6 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 assertThat(substring.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.String");
             })
           )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void typeFromClasspathResources() {
-        rewriteRun(
-          spec -> spec.recipe(new FindTypes("org.junit.jupiter.api.Test", null))
-            .parser(GroovyParser.builder()
-                .classpathFromResource(new InMemoryExecutionContext(), "junit-jupiter-api-5.+")),
-          groovy(
-                """
-            import org.junit.jupiter.api.Test
-            class A {
-                Test t
-            }
-            """,
-            """
-            import org.junit.jupiter.api.Test
-            class A {
-                /*~~>*/Test t
-            }
-            """)
         );
     }
 

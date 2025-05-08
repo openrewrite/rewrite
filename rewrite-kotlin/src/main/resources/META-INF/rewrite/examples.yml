@@ -1,0 +1,367 @@
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangeAnnotationAttributeName
+examples:
+- description: ''
+  parameters:
+  - org.junit.jupiter.api.Tag
+  - value
+  - newValue
+  sources:
+  - before: |
+      package sample
+
+      import org.junit.jupiter.api.Tag
+      import org.junit.jupiter.api.Tags
+
+      class SampleTest {
+
+          @Tags(
+              value = [
+                  Tag(value = "Sample01"),
+                  Tag(value = "Sample02"),
+              ]
+          )
+          fun run() {
+          }
+      }
+    after: |
+      package sample
+
+      import org.junit.jupiter.api.Tag
+      import org.junit.jupiter.api.Tags
+
+      class SampleTest {
+
+          @Tags(
+              value = [
+                  Tag(newValue = "Sample01"),
+                  Tag(newValue = "Sample02"),
+              ]
+          )
+          fun run() {
+          }
+      }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangePackage
+examples:
+- description: ''
+  parameters:
+  - a.b
+  - x.y
+  - 'false'
+  sources:
+  - before: |
+      import a.b.Original
+
+      class A {
+          val type = Original()
+      }
+    after: |
+      import x.y.Original
+
+      class A {
+          val type = Original()
+      }
+    language: kotlin
+  - before: |
+      package a.b
+      class Original
+    after: |
+      package x.y
+      class Original
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangeType
+examples:
+- description: ''
+  parameters:
+  - file
+  - newFile
+  - 'false'
+  sources:
+  - before: |
+      class file {
+      }
+    after: |
+      class newFile {
+      }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.UseStaticImport
+examples:
+- description: ''
+  parameters:
+  - java.lang.Integer valueOf(..)
+  sources:
+  - before: |
+      val i = Integer.valueOf(1)
+    after: |
+      import java.lang.Integer.valueOf
+
+      val i = valueOf(1)
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindFields
+examples:
+- description: ''
+  parameters:
+  - java.lang.Integer
+  - 'false'
+  - MAX_VALUE
+  sources:
+  - before: |
+      import java.lang.Integer
+      import java.lang.Integer.MAX_VALUE
+
+      val i1 = java.lang.Integer.MAX_VALUE
+      val i2 = Integer.MAX_VALUE
+      val i3 = MAX_VALUE
+      val i4 = `MAX_VALUE`
+    after: |
+      import java.lang.Integer
+      import java.lang.Integer.MAX_VALUE
+
+      val i1 = /*~~>*/java.lang.Integer.MAX_VALUE
+      val i2 = /*~~>*/Integer.MAX_VALUE
+      val i3 = /*~~>*/MAX_VALUE
+      val i4 = /*~~>*/`MAX_VALUE`
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindMethods
+examples:
+- description: ''
+  parameters:
+  - java.lang.Integer decode(..)
+  - 'false'
+  sources:
+  - before: |
+      import java.lang.Integer
+      import java.lang.Integer.decode
+
+      val i1 = java.lang.Integer.decode("1")
+      val i2 = Integer.decode("1")
+      val i3 = decode("1")
+      val i4 = listOf("1").map {Integer::decode}
+      val i5 = listOf("1").map {::decode}
+      val i6 = listOf("1").map {::`decode`}
+    after: |
+      import java.lang.Integer
+      import java.lang.Integer.decode
+
+      val i1 = /*~~>*/java.lang.Integer.decode("1")
+      val i2 = /*~~>*/Integer.decode("1")
+      val i3 = /*~~>*/decode("1")
+      val i4 = listOf("1").map {Integer::/*~~>*/decode}
+      val i5 = listOf("1").map {::/*~~>*/decode}
+      val i6 = listOf("1").map {::/*~~>*/`decode`}
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.FindKotlinSources
+examples:
+- description: ''
+  parameters:
+  - 'false'
+  sources:
+  - before: |
+      class A
+    after: |
+      /*~~>*/class A
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.RenameTypeAlias
+examples:
+- description: ''
+  parameters:
+  - OldAlias
+  - NewAlias
+  - Test
+  sources:
+  - before: |
+      class Test
+      typealias OldAlias = Test
+    after: |
+      class Test
+      typealias NewAlias = Test
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.cleanup.EqualsMethodUsage
+examples:
+- description: ''
+  sources:
+  - before: |
+      fun isSame(obj1 : String, obj2: String) : Boolean {
+          val isSame = obj1.equals(obj2)
+      }
+    after: |
+      fun isSame(obj1 : String, obj2: String) : Boolean {
+          val isSame = obj1 == obj2
+      }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.cleanup.ImplicitParameterInLambda
+examples:
+- description: ''
+  sources:
+  - before: |
+      fun method() {
+          listOf(1, 2, 3).forEach { it -> it.and(6) }
+          val a: (Int) -> Int = { it -> it + 5 }
+      }
+    after: |
+      fun method() {
+          listOf(1, 2, 3).forEach { it.and(6) }
+          val a: (Int) -> Int = { it + 5 }
+      }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.cleanup.RemoveLambdaArgumentParentheses
+examples:
+- description: ''
+  sources:
+  - before: |
+      fun method(number: Int) {
+          val foo = number.let({ it + 1 })
+      }
+    after: |
+      fun method(number: Int) {
+          val foo = number.let { it + 1 }
+      }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.cleanup.RemoveTrailingComma
+examples:
+- description: ''
+  sources:
+  - before: |
+      fun method(arg1: String,
+                 arg2: String,
+      ) {}
+    after: |
+      fun method(arg1: String,
+                 arg2: String
+      ) {}
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.cleanup.RemoveTrailingSemicolon
+examples:
+- description: ''
+  sources:
+  - before: |
+      fun method() {
+          var foo = 1;
+          var bar: Int;
+          var baz: String = "a";
+      }
+    after: |
+      fun method() {
+          var foo = 1
+          var bar: Int
+          var baz: String = "a"
+      }
+    language: kotlin
+- description: ''
+  sources:
+  - before: |
+      fun method() {
+          var foo = 1; var bar: Int
+      }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.cleanup.ReplaceCharToIntWithCode
+examples:
+- description: ''
+  sources:
+  - before: |
+      fun decimalDigitalNumber(c : Char) : Int? {
+          if (c in '0'..'9') {
+              return c.toInt() - '0'.toInt()
+          }
+          return null
+      }
+    after: |
+      fun decimalDigitalNumber(c : Char) : Int? {
+          if (c in '0'..'9') {
+              return c.code - '0'.code
+          }
+          return null
+      }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.cleanup.UnnecessaryTypeParentheses
+examples:
+- description: ''
+  sources:
+  - before: |
+      val x : (Int) = 42
+      val y : (((Int))) = 42
+    after: |
+      val x : Int = 42
+      val y : Int = 42
+    language: kotlin
+- description: ''
+  sources:
+  - before: |
+      val sum : (Int, Int) -> (Int) = { a, b -> a + b }
+      val double : ((Int)) -> ((Int)) = { a -> a * 2 }
+    after: |
+      val sum : (Int, Int) -> Int = { a, b -> a + b }
+      val double : (Int) -> Int = { a -> a * 2 }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.format.AutoFormat
+examples:
+- description: ''
+  sources:
+  - before: |
+      /*
+       * This is a sample file.
+       */
+
+
+
+
+      package com.intellij.samples
+
+      class Test {
+      }
+    after: |
+      /*
+       * This is a sample file.
+       */
+
+
+      package com.intellij.samples
+
+      class Test {
+      }
+    language: kotlin

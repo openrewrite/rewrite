@@ -124,7 +124,8 @@ class VariableDeclarationsTest implements RewriteTest {
           def d2 = 10_000D
           def f1 = 10_000f
           def f2 = 10_000.0F
-          """)
+          """
+          )
         );
     }
 

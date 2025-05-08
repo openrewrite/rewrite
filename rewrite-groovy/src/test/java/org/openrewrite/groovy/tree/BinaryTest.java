@@ -65,6 +65,18 @@ class BinaryTest implements RewriteTest {
     }
 
     @Test
+    void notIn() {
+        rewriteRun(
+          groovy(
+            """
+              def a = []
+              boolean b = 42 !in a;
+              """
+          )
+        );
+    }
+
+    @Test
     void withVariable() {
         rewriteRun(
           groovy(
@@ -176,7 +188,8 @@ class BinaryTest implements RewriteTest {
           groovy(
             """
               def isString = "" instanceof java.lang.String
-              """)
+              """
+          )
         );
     }
 
@@ -190,7 +203,8 @@ class BinaryTest implements RewriteTest {
                   def value = 1
               }
               [ new A() ].findAll { it -> it.value == 1 } *. value = 2
-              """)
+              """
+          )
         );
     }
 

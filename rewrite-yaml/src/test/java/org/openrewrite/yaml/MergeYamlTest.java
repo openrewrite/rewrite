@@ -28,6 +28,49 @@ import static org.openrewrite.yaml.MergeYaml.InsertMode.Before;
 @SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
 class MergeYamlTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void nonExistentBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.spec",
+            //language=yaml
+            """
+              lifecycleRule:
+                  - action:
+                        type: Delete
+                    condition:
+                        age: 7
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                  bucketPolicyOnly: true
+              """,
+            """
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                  bucketPolicyOnly: true
+                  lifecycleRule:
+                      - action:
+                            type: Delete
+                        condition:
+                            age: 7
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/moderneinc/support-public/issues/5")
     @Test
     void scalarList() {
@@ -118,49 +161,6 @@ class MergeYamlTest implements RewriteTest {
                 application:
                   name: update
                   description: a description
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void nonExistentBlock() {
-        rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.spec",
-            //language=yaml
-            """
-              lifecycleRule:
-                  - action:
-                        type: Delete
-                    condition:
-                        age: 7
-              """,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null
-          )),
-          yaml(
-            """
-              apiVersion: storage.cnrm.cloud.google.com/v1beta1
-              kind: StorageBucket
-              spec:
-                  bucketPolicyOnly: true
-              """,
-            """
-              apiVersion: storage.cnrm.cloud.google.com/v1beta1
-              kind: StorageBucket
-              spec:
-                  bucketPolicyOnly: true
-                  lifecycleRule:
-                      - action:
-                            type: Delete
-                        condition:
-                            age: 7
               """
           )
         );
@@ -1484,7 +1484,8 @@ class MergeYamlTest implements RewriteTest {
                 - name: newName
                   jobs:
                     - newJob
-              """)
+              """
+          )
         );
     }
 
@@ -1678,7 +1679,8 @@ class MergeYamlTest implements RewriteTest {
               script: |
                 #!/bin/bash
                 echo "hello"
-              """)
+              """
+          )
         );
     }
 
@@ -1719,7 +1721,8 @@ class MergeYamlTest implements RewriteTest {
                     #!/bin/bash
                     echo "hellow"
                   something: else
-              """)
+              """
+          )
         );
     }
 
@@ -1765,7 +1768,8 @@ class MergeYamlTest implements RewriteTest {
                          #!/bin/bash
                           echo "hello"
                              echo "hello"
-              """)
+              """
+          )
         );
     }
 
@@ -1823,7 +1827,8 @@ class MergeYamlTest implements RewriteTest {
                           text: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
                       env:
                         SLACK_BOT_TOKEN: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
-              """)
+              """
+          )
         );
     }
 
@@ -1859,7 +1864,8 @@ class MergeYamlTest implements RewriteTest {
                   script: |-
                     #!/bin/bash
                     echo "hello"
-              """)
+              """
+          )
         );
     }
 
@@ -1894,7 +1900,8 @@ class MergeYamlTest implements RewriteTest {
                   script: >
                     #!/bin/bash
                     echo "hello"
-              """)
+              """
+          )
         );
     }
 

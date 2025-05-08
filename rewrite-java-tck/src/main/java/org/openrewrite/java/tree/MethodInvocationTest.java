@@ -90,15 +90,16 @@ class MethodInvocationTest implements RewriteTest {
                             
                   public <TTTT> TTTT generic(TTTT n, TTTT... ns) { return n; }
               }
-              """, spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
-                    if ("ns".equals(variable.getSimpleName())) {
-                        assertThat(variable.getPrefix().getWhitespace()).isEqualTo(" ");
+              """,
+                spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                        if ("ns".equals(variable.getSimpleName())) {
+                            assertThat(variable.getPrefix().getWhitespace()).isEqualTo(" ");
+                        }
+                        return super.visitVariable(variable, o);
                     }
-                    return super.visitVariable(variable, o);
-                }
-            })
+                })
           )
         );
     }
