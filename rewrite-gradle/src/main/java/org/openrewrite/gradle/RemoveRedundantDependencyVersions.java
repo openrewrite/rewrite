@@ -147,13 +147,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             continue;
                                         }
 
-                                        J.Literal key = (J.Literal) ((G.MapEntry) arg).getKey();
+                                        Object key = ((J.Literal) ((G.MapEntry) arg).getKey()).getValue();
                                         J.Literal value = (J.Literal) ((G.MapEntry) arg).getValue();
-                                        if ("group".equals(key.getValue())) {
+                                        if ("group".equals(key)) {
                                             groupId = (String) value.getValue();
-                                        } else if ("name".equals(key.getValue())) {
+                                        } else if ("name".equals(key)) {
                                             artifactId = (String) value.getValue();
-                                        } else if ("version".equals(key.getValue())) {
+                                        } else if ("version".equals(key)) {
                                             version = (String) value.getValue();
                                         }
                                     }
