@@ -108,8 +108,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         //language=markdown
         return "Upgrade the version of a dependency in a build.gradle file. " +
                "Supports updating dependency declarations of various forms:\n" +
-               "* `String` notation: `\"group:artifact:version\"` \n" +
-               "* `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
+               " * `String` notation: `\"group:artifact:version\"` \n" +
+               " * `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
                "Can update version numbers which are defined earlier in the same file in variable declarations.";
     }
 
@@ -133,16 +133,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
          * or a MavenDownloadingException representing an error during resolution.
          */
         Map<GroupArtifact, Object> gaToNewVersion = new HashMap<>();
+
+        Map<String, GradleProject> modules = new HashMap<>();
     }
 
     @Override
     public DependencyVersionState getInitialValue(ExecutionContext ctx) {
         return new DependencyVersionState();
-    }
-
-    @Override
-    public List<Recipe> getRecipeList() {
-        return singletonList(new UpdateDependencyLockFile());
     }
 
     @Override
@@ -165,7 +162,21 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class)
                             .orElse(null);
                 }
-                return super.visit(tree, ctx);
+                J visited = super.visit(tree, ctx);
+                if (visited == null) {
+                    return null;
+                }
+                visited.getMarkers().findFirst(GradleProject.class).ifPresent(project -> {
+                    String path = project.getPath();
+                    if (path.startsWith(":")) {
+                        path = path.substring(1);
+                    }
+                    if (!path.isEmpty()) {
+                        path += "/";
+                    }
+                    acc.modules.put(path.replaceAll(":", "/") + "gradle.lockfile", project);
+                });
+                return visited;
             }
 
             @Override
@@ -385,10 +396,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
+            private final UpdateDependencyLockFile updateLockFile = new UpdateDependencyLockFile(acc, groupId, artifactId);
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
-                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx);
+                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx) || updateLockFile.isAcceptable(sf, ctx);
             }
 
             @Override
@@ -399,6 +411,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         t = updateProperties.visitNonNull(t, ctx);
                     } else if (updateGradle.isAcceptable(sf, ctx)) {
                         t = updateGradle.visitNonNull(t, ctx);
+                    } else if (updateLockFile.isAcceptable(sf, ctx)) {
+                        t = updateLockFile.visitNonNull(t, ctx);
                     }
                 }
                 return t;
@@ -836,6 +850,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
             ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
             List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
+//            Pom managingDependency = resolvedPom.getManagingPom(gav.asGroupArtifact());
             org.openrewrite.maven.tree.Dependency newRequested = org.openrewrite.maven.tree.Dependency.builder()
                     .gav(gav)
                     .build();
@@ -852,6 +867,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 GradleDependencyConfiguration newGdc = gdc
                         .withRequested(ListUtils.map(gdc.getRequested(), requested -> maybeUpdateDependency(requested, newRequested)))
                         .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeUpdateResolvedDependency(resolved, newDep, new HashSet<>())));
+//                for (ResolvedManagedDependency resolvedDependency : resolvedPom.getDependencyManagement()) {
+//                    newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), maybeUpdateManagedResolvedDependency(resolvedDependency.getGav())));
+//                }
+//                if (managingDependency != null) {
+//                    newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), maybeUpdateManagedResolvedDependency(managingDependency.getGav())));
+//                }
                 anyChanged |= newGdc != gdc;
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
             }
@@ -872,6 +893,28 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
         return dep;
     }
+
+//    private static Function<ResolvedDependency, ResolvedDependency> maybeUpdateManagedResolvedDependency(GroupArtifactVersion gav) {
+//        return resolved -> {
+//            ResolvedDependency newResolvedDependency = ResolvedDependency.builder()
+//                    .gav(resolved.getGav().withGroupArtifact(gav.asGroupArtifact()).withVersion(gav.getVersion()))
+//                    .requested(resolved.getRequested())
+//                    .dependencies(resolved.getDependencies())
+//                    .build();
+//            return maybeUpdateResolvedDependency(resolved, newResolvedDependency, new HashSet<>());
+//        };
+//    }
+//
+//    private static Function<ResolvedDependency, ResolvedDependency> maybeUpdateManagedResolvedDependency(ResolvedGroupArtifactVersion gav) {
+//        return resolved -> {
+//            ResolvedDependency newResolvedDependency = ResolvedDependency.builder()
+//                    .gav(gav.withGroupArtifact(gav.asGroupArtifact()).withVersion(gav.getVersion()))
+//                    .requested(resolved.getRequested())
+//                    .dependencies(resolved.getDependencies())
+//                    .build();
+//            return maybeUpdateResolvedDependency(resolved, newResolvedDependency, new HashSet<>());
+//        };
+//    }
 
     private static ResolvedDependency maybeUpdateResolvedDependency(
             ResolvedDependency dep,

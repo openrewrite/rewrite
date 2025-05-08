@@ -18,16 +18,14 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -37,137 +35,90 @@ import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpdateDependencyLockFile extends ScanningRecipe<UpdateDependencyLockFile.Accumulator> {
+public class UpdateDependencyLockFile extends PlainTextVisitor<ExecutionContext> {
     private static final String[] EMPTY = new String[0];
 
-    @Override
-    public String getDisplayName() {
-        return "Update gradle dependency lock file";
+    UpgradeDependencyVersion.DependencyVersionState acc;
+    DependencyMatcher dependencyMatcher;
+
+    UpdateDependencyLockFile(UpgradeDependencyVersion.DependencyVersionState acc, String groupId, String artifactId) {
+        this.acc = acc;
+        this.dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
     }
 
     @Override
-    public String getDescription() {
-        //language=markdown
-        return "Update the version of a dependency in a gradle lockfile.";
-    }
-
-    public static class Accumulator {
-        Map<String, GradleProject> modules = new HashMap<>();
+    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+        return sourceFile instanceof PlainText;
     }
 
     @Override
-    public Accumulator getInitialValue(ExecutionContext ctx) {
-        return new Accumulator();
-    }
+    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+        Map<GroupArtifactVersion, SortedSet<String>> lockedVersions = new HashMap<>();
+        SortedSet<String> empty = new TreeSet<>();
+        List<String> comments = new ArrayList<>();
 
-    @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
-        //noinspection BooleanMethodIsAlwaysInverted
-        return new JavaVisitor<ExecutionContext>() {
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return (sourceFile instanceof G.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle")) ||
-                        (sourceFile instanceof K.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle.kts"));
-            }
-
-            @Override
-            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof JavaSourceFile) {
-                    tree.getMarkers().findFirst(GradleProject.class).ifPresent(project -> {
-                        String path = project.getPath();
-                        if (path.startsWith(":")) {
-                            path = path.substring(1);
-                        }
-                        if (!path.isEmpty()) {
-                            path += "/";
-                        }
-                        acc.modules.put(path.replaceAll(":", "/") + "gradle.lockfile", project);
-                    });
-                }
-                return super.visit(tree, ctx);
-            }
-        };
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if (acc.modules.isEmpty()) {
-            return TreeVisitor.noop();
+        if (tree == null) {
+            return null;
         }
-        return Preconditions.check(new FindSourceFiles("**/gradle.lockfile"), new PlainTextVisitor<ExecutionContext>() {
-            private final Map<GroupArtifactVersion, SortedSet<String>> lockedVersions = new HashMap<>();
-            private final Map<GroupArtifact, List<GroupArtifactVersion>> lockedArtifacts = new HashMap<>();
-            private final SortedSet<String> empty = new TreeSet<>();
-            private final List<String> comments = new ArrayList<>();
+        PlainText plainText = (PlainText) tree;
+        GradleProject gradleProject = acc.getModules().get(plainText.getSourcePath().toString());
+        if (gradleProject == null) {
+            return tree;
+        }
+        String text = plainText.getText();
+        if (StringUtils.isBlank(text)) {
+            return plainText;
+        }
 
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-                return sourceFile instanceof PlainText;
-            }
-
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
-                if (tree == null) {
-                    return null;
-                }
-                PlainText plainText = (PlainText) tree;
-                GradleProject gradleProject = acc.modules.get(plainText.getSourcePath().toString());
-                if (gradleProject == null) {
-                    return tree;
-                }
-                String text = plainText.getText();
-                if (StringUtils.isBlank(text)) {
-                    return plainText;
-                }
-
-                gradleProject.getConfigurations().forEach(conf -> {
-                    if (conf.isCanBeResolved()) {
-                        if (conf.getResolved().isEmpty()) {
-                            empty.add(conf.getName());
-                        } else {
-                            conf.getResolved().forEach(resolved -> {
-                                GroupArtifactVersion gav = resolved.getGav().asGroupArtifactVersion();
-                                lockedVersions.computeIfAbsent(gav, k -> new TreeSet<>()).add(conf.getName());
-                                lockedArtifacts.computeIfAbsent(gav.asGroupArtifact(), k -> new ArrayList<>()).add(gav);
-                            });
+        gradleProject.getConfigurations().forEach(conf -> {
+            if (conf.isCanBeResolved()) {
+                if (conf.getResolved().isEmpty()) {
+                    empty.add(conf.getName());
+                } else {
+                    for (ResolvedDependency resolved : conf.getDirectResolved()) {
+                        GroupArtifactVersion gav = resolved.getGav().asGroupArtifactVersion();
+                        if (dependencyMatcher.matches(gav.getGroupId(), gav.getArtifactId())) {
+                            Object result = acc.getGaToNewVersion().get(gav.asGroupArtifact());
+                            if (result != null && !(result instanceof Exception)) {
+                                lockedVersions.computeIfAbsent(gav.withVersion((String) result), k -> new TreeSet<>()).add(conf.getName());
+                                continue;
+                            }
                         }
+                        lockedVersions.computeIfAbsent(gav, k -> new TreeSet<>()).add(conf.getName());
                     }
-                });
-
-                Arrays.stream(text.split("\n")).forEach(lock -> {
-                    if (isComment(lock)) {
-                        comments.add(lock);
-                    }
-                });
-
-                SortedSet<String> locks = new TreeSet<>();
-                lockedVersions.forEach((gav, configurations) -> {
-                    String lock = asLock(gav, configurations);
-                    if (lock != null) {
-                        locks.add(lock);
-                    }
-                });
-
-                StringBuilder sb = new StringBuilder();
-                if (comments != null && !comments.isEmpty()) {
-                    sb.append(String.join("\n", comments));
                 }
-                if (comments != null && !comments.isEmpty() && locks != null && !locks.isEmpty()) {
-                    sb.append("\n");
-                }
-                if (locks != null && !locks.isEmpty()) {
-                    sb.append(String.join("\n", locks));
-                }
-                sb.append("\n")
-                        .append(asLock(null, empty));
-
-                PlainText newLockFileContent = plainText.withText(sb.toString());
-                if (newLockFileContent == plainText) {
-                    return tree;
-                }
-                return newLockFileContent;
             }
         });
+
+        Arrays.stream(text.split("\n")).forEach(lock -> {
+            if (isComment(lock)) {
+                comments.add(lock);
+            }
+        });
+
+        SortedSet<String> locks = new TreeSet<>();
+        lockedVersions.forEach((gav, configurations) -> {
+            String lock = asLock(gav, configurations);
+            if (lock != null) {
+                locks.add(lock);
+            }
+        });
+
+        StringBuilder sb = new StringBuilder();
+        if (comments != null && !comments.isEmpty()) {
+            sb.append(String.join("\n", comments));
+        }
+        if (comments != null && !comments.isEmpty() && locks != null && !locks.isEmpty()) {
+            sb.append("\n");
+        }
+        if (locks != null && !locks.isEmpty()) {
+            sb.append(String.join("\n", locks));
+        }
+        sb.append("\n").append(asLock(null, empty));
+        if (plainText.getText().contentEquals(sb)) {
+            return tree;
+        }
+        return plainText.withText(sb.toString());
     }
 
     private @Nullable String asLock(@Nullable GroupArtifactVersion gav, @Nullable Set<String> configurations) {
