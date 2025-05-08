@@ -191,8 +191,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 } else if (INDIVIDUAL_CONSTRAINTS_MATCHER.matches(m)) {
                                     if (!TypeUtils.isAssignableTo("org.gradle.api.artifacts.Dependency", requireNonNull(m.getMethodType()).getReturnType()) ||
                                             m.getArguments().isEmpty() ||
-                                            !(m.getArguments().get(0) instanceof J.Literal) ||
-                                            !(((J.Literal) m.getArguments().get(0)).getValue() instanceof String)) {
+                                            m.getArguments().get(0).getType() != JavaType.Primitive.String) {
                                         return m;
                                     }
                                     //noinspection DataFlowIssue
