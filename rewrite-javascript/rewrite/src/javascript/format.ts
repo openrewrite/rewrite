@@ -92,68 +92,13 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         //     c = {...c, leadingAnnotations: spaceBetweenAnnotations(c.leadingAnnotations)};
         // }
 
+        // TODO typeParameters - IntelliJ doesn't seem to provide a setting for angleBrackets spacing for Typescript (while it does for Java),
+        // thus we either introduce our own setting or just enforce the natural spacing with no setting
+
         return produce(ret, draft => {
             draft.body.prefix.whitespace = this.style.beforeLeftBrace.catchLeftBrace ? " " : "";
             // TODO if (classDecl.body.statements.length === 0) {
         }) as J.ClassDeclaration;
-
-        // TODO
-        // if (c.padding.typeParameters !== null) {
-        //     c = {
-        //         ...c,
-        //         padding: {
-        //             ...c.padding,
-        //             typeParameters: spaceBefore(
-        //                 c.padding.typeParameters,
-        //                 style.typeParameters.beforeOpeningAngleBracket
-        //             ),
-        //         },
-        //     };
-        // }
-        // if (c.padding.typeParameters !== null) {
-        //     const spaceWithinAngleBrackets = style.within.angleBrackets;
-        //     const typeParametersSize = c.padding.typeParameters.elements.length;
-        //     c = {
-        //         ...c,
-        //         padding: {
-        //             ...c.padding,
-        //             typeParameters: {
-        //                 ...c.padding.typeParameters,
-        //                 padding: {
-        //                     ...c.padding.typeParameters.padding,
-        //                     elements: c.padding.typeParameters.padding.elements.map(
-        //                         (elemContainer, index) => {
-        //                             if (index === 0) {
-        //                                 elemContainer = {
-        //                                     ...elemContainer,
-        //                                     element: spaceBefore(
-        //                                         elemContainer.element,
-        //                                         spaceWithinAngleBrackets
-        //                                     ),
-        //                                 };
-        //                             } else {
-        //                                 elemContainer = {
-        //                                     ...elemContainer,
-        //                                     element: spaceBefore(
-        //                                         elemContainer.element,
-        //                                         style.other.afterComma
-        //                                     ),
-        //                                 };
-        //                             }
-        //                             if (index === typeParametersSize - 1) {
-        //                                 elemContainer = spaceAfter(
-        //                                     elemContainer,
-        //                                     spaceWithinAngleBrackets
-        //                                 );
-        //                             }
-        //                             return elemContainer;
-        //                         }
-        //                     ),
-        //                 },
-        //             },
-        //         },
-        //     };
-        // }
     }
 
     protected async visitIf(iff: J.If, p: ExecutionContext): Promise<J | undefined> {
@@ -170,6 +115,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         return produceAsync(ret, async draft => {
             draft.body = ret.body && await this.spaceBefore(ret.body, this.style.beforeLeftBrace.functionLeftBrace);
             draft.parameters = await this.spaceBeforeContainer(ret.parameters, this.style.beforeParentheses.functionDeclarationParentheses);
+            // TODO typeParameters handling - see visitClassDeclaration
             // TODO
             // if (m.leadingAnnotations.length > 1) {
             //     m = m.withLeadingAnnotations(this.spaceBetweenAnnotations(m.leadingAnnotations));
@@ -208,31 +154,6 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
             //         )
             //     );
             // }
-            // if (m.annotations.typeParameters !== null) {
-            //     const spaceWithinAngleBrackets = this.style.within.angleBrackets;
-            //     const typeParametersSize = m.annotations.typeParameters.typeParameters.length;
-            //     m = m.annotations.withTypeParameters(
-            //         m.annotations.typeParameters.getPadding().withTypeParameters(
-            //             ListUtils.map(m.annotations.typeParameters.getPadding().typeParameters,
-            //                 (index, elemContainer) => {
-            //                     if (index === 0) {
-            //                         elemContainer = elemContainer.withElement(
-            //                             this.spaceBefore(elemContainer.element, spaceWithinAngleBrackets)
-            //                         );
-            //                     } else {
-            //                         elemContainer = elemContainer.withElement(
-            //                             this.spaceBefore(elemContainer.element, this.style.other.afterComma)
-            //                         );
-            //                     }
-            //                     if (index === typeParametersSize - 1) {
-            //                         elemContainer = this.spaceAfter(elemContainer, spaceWithinAngleBrackets);
-            //                     }
-            //                     return elemContainer;
-            //                 }
-            //             )
-            //         )
-            //     );
-            // }
         });
     }
 
@@ -250,6 +171,8 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
             } else if (ret.arguments.elements.length == 1) {
                 draft.arguments.elements[0] = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(draft.arguments.elements[0], this.style.within.functionCallParentheses), false);
             }
+
+            // TODO typeParameters handling - see visitClassDeclaration
 
             // TODO
             // m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), style.getBeforeParentheses().getMethodCall()));
@@ -275,30 +198,6 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
             //                         arg = spaceAfter(arg, style.getOther().getBeforeComma());
             //                     }
             //                     return arg;
-            //                 }
-            //             )
-            //         )
-            //     );
-            // }
-            // if (m.getPadding().getTypeParameters() !== null) {
-            //     m = m.getPadding().withTypeParameters(
-            //         spaceBefore(m.getPadding().getTypeParameters(),
-            //             style.getTypeArguments().getBeforeOpeningAngleBracket())
-            //     );
-            //     m = m.withName(spaceBefore(m.getName(), style.getTypeArguments().getAfterClosingAngleBracket()));
-            // }
-            // if (m.getPadding().getTypeParameters() !== null) {
-            //     m = m.getPadding().withTypeParameters(
-            //         m.getPadding().getTypeParameters().getPadding().withElements(
-            //             ListUtils.map(m.getPadding().getTypeParameters().getPadding().getElements(),
-            //                 (index: number, elemContainer: any) => {
-            //                     if (index !== 0) {
-            //                         elemContainer = elemContainer.withElement(
-            //                             spaceBefore(elemContainer.getElement(),
-            //                                 style.getTypeArguments().getAfterComma())
-            //                         );
-            //                     }
-            //                     return elemContainer;
             //                 }
             //             )
             //         )
