@@ -22,7 +22,7 @@ export const JavaScriptStyles = {
 }
 
 export const StyleKind = {
-    SpacesStyle: "org.openrewrite.style.SpacesStyle"
+    SpacesStyle: "org.openrewrite.javascript.style.SpacesStyle"
 } as const;
 
 export const StyleDetailKind = {
