@@ -75,17 +75,6 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
         }) as J.Binary;
     }
 
-    // TODO it works for methods, but the original SpacesVisitor does it differently (adding spaces after the preceding elements), so likely this is not needed
-    // protected async visitBlock(block: J.Block, p: ExecutionContext): Promise<J | undefined> {
-    //     const ret = await super.visitBlock(block, p);
-    //     if (isTree(ret)) {
-    //         const draft = createDraft(ret);
-    //         draft.prefix.whitespace = this.style.beforeLeftBrace.functionLeftBrace ? " " : ""; // TODO check the context and refer to proper setting
-    //         return finishDraft(draft) as J.Block;
-    //     }
-    //     return ret;
-    // }
-
     protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
         // TODO
@@ -160,11 +149,11 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
     protected async visitIf(iff: J.If, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitIf(iff, p) as J.If;
         return produceAsync(ret, async draft => {
-            draft.ifCondition = await this.spaceBefore(ret.ifCondition, this.style.beforeParentheses.ifParentheses);
+            draft.ifCondition = await this.spaceBefore(draft.ifCondition, this.style.beforeParentheses.ifParentheses);
+            draft.ifCondition.tree = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(draft.ifCondition.tree, this.style.within.ifParentheses), this.style.within.ifParentheses);
             draft.thenPart = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(ret.thenPart, this.style.beforeLeftBrace.ifLeftBrace), false);
         });
     }
-
 
     protected async visitMethodDeclaration(methodDecl: J.MethodDeclaration, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitMethodDeclaration(methodDecl, p) as J.MethodDeclaration;
@@ -333,6 +322,15 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
         const ret = await super.visitVariable(variable, p) as J.VariableDeclarations.NamedVariable;
         return produceAsync(ret, async draft => {
             draft.initializer = ret.initializer && await this.spaceBeforeLeftPaddedElement(ret.initializer, this.style.aroundOperators.assignment);
+        });
+    }
+
+    protected async visitWhileLoop(whileLoop: J.WhileLoop, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitWhileLoop(whileLoop, p) as J.WhileLoop;
+        return produceAsync(ret, async draft => {
+            draft.body = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(ret.body, this.style.beforeLeftBrace.whileLeftBrace), false);
+            draft.condition = await this.spaceBefore(draft.condition, this.style.beforeParentheses.whileParentheses);
+            draft.condition.tree = await this.spaceAfter(await this.spaceBeforeRightPaddedElement(draft.condition.tree, this.style.within.whileParentheses), this.style.within.whileParentheses);
         });
     }
 
