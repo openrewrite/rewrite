@@ -81,7 +81,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               }
               
               dependencies {
-                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation(platform(group: "org.springframework.boot", name: "spring-boot-dependencies", version: "3.3.3"))
                   implementation(group: "org.apache.commons", name: "commons-lang3", version: "3.14.0")
               }
               """,
@@ -95,7 +95,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               }
               
               dependencies {
-                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation(platform(group: "org.springframework.boot", name: "spring-boot-dependencies", version: "3.3.3"))
                   implementation(group: "org.apache.commons", name: "commons-lang3")
               }
               """
