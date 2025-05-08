@@ -17,6 +17,7 @@ export * from "./tree";
 export * from "./visitor";
 export * from "./assertions";
 export * from "./parser";
+export * from "./style";
 
 import "./print";
 import "./rpc";

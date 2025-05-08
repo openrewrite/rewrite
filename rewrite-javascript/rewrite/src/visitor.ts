@@ -144,12 +144,12 @@ export abstract class TreeVisitor<T extends Tree, P> {
             ((draft: Draft<T>) => ValidImmerRecipeReturnType<Draft<T>>) |
             ((draft: Draft<T>) => Promise<ValidImmerRecipeReturnType<Draft<T>>>)
     ): Promise<T> {
-        const draft: Draft<T> = createDraft(before);
-        (draft as Draft<Tree>).markers = await this.visitMarkers(before.markers, p);
-        if (recipe) {
-            await recipe(draft);
-        }
-        return finishDraft(draft) as T;
+        return produceAsync(before, async draft => {
+            draft.markers = await this.visitMarkers(before.markers, p);
+            if (recipe) {
+                await recipe(draft);
+            }
+        });
     }
 }
 

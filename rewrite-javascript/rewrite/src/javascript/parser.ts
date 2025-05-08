@@ -17,14 +17,17 @@ import * as ts from 'typescript';
 import {
     Comment,
     emptyContainer,
-    emptySpace, Expression,
+    emptySpace,
+    Expression,
     J,
     JavaMarkers,
     JavaType,
     NameTree,
     Statement,
     TextComment,
-    TrailingComma, TypedTree, TypeTree,
+    TrailingComma,
+    TypedTree,
+    TypeTree,
 } from '../java';
 import {isJavaScript, JS} from '.';
 import {
@@ -32,6 +35,7 @@ import {
     markers,
     Markers,
     MarkersKind,
+    NamedStyles,
     ParseExceptionResult,
     Parser,
     ParserInput,
@@ -59,17 +63,20 @@ import {produce} from "immer";
 import Kind = JS.Kind;
 
 export interface JavaScriptParserOptions extends ParserOptions {
+    styles?: NamedStyles[]
 }
 
 export class JavaScriptParser extends Parser {
 
     private readonly compilerOptions: ts.CompilerOptions;
+    private readonly styles?: NamedStyles[];
     private readonly sourceFileCache: Map<string, ts.SourceFile> = new Map();
     private oldProgram?: ts.Program;
 
     constructor({
                     ctx,
-                    relativeTo
+                    relativeTo,
+                    styles
                 }: JavaScriptParserOptions = {}) {
         super({ctx, relativeTo});
         this.compilerOptions = {
@@ -80,6 +87,7 @@ export class JavaScriptParser extends Parser {
             experimentalDecorators: true,
             emitDecoratorMetadata: true
         };
+        this.styles = styles;
     }
 
     reset(): this {
@@ -176,7 +184,12 @@ export class JavaScriptParser extends Parser {
             }
 
             try {
-                result.push(new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker).visit(sourceFile) as SourceFile);
+                result.push(produce(
+                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
+                        .visit(sourceFile) as SourceFile,
+                    draft => {
+                        this.styles && draft.markers.markers.push(...this.styles);
+                    }));
             } catch (error) {
                 result.push(this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error)));
             }

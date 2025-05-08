@@ -69,8 +69,7 @@ export interface ParseExceptionResult extends Marker {
     readonly treeType?: string;
 }
 
-// TODO, am I using this at all?
 export interface NamedStyles extends Marker {
-    readonly kind: typeof MarkersKind.RpcMarker
+    readonly kind: typeof MarkersKind.NamedStyles
     readonly data: {}
 }
