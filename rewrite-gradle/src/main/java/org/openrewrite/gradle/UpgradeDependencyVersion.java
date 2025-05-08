@@ -141,6 +141,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     @Override
+    public List<Recipe> getRecipeList() {
+        return singletonList(new UpdateDependencyLockFile());
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
 
         //noinspection BooleanMethodIsAlwaysInverted

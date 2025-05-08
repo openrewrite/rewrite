@@ -56,6 +56,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Preconditions.not;
@@ -167,6 +168,11 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             validated = validated.and(Semver.validate(version, versionPattern));
         }
         return validated;
+    }
+
+    @Override
+    public List<Recipe> getRecipeList() {
+        return singletonList(new UpdateDependencyLockFile());
     }
 
     @Override
