@@ -84,6 +84,9 @@ describe('AutoformatVisitor', () => {
                         console.log("finally");
                     }
                     const isTypeScriptFun = i > 3?"yes":"hell yeah!";
+                    for(   let j=1 ;j<=5 ;j++ ){
+                        console.log(\`Number: \` + j);
+                    }
                 `,
                 `
                     class K {
@@ -107,6 +110,9 @@ describe('AutoformatVisitor', () => {
                         console.log("finally");
                     }
                     const isTypeScriptFun = i > 3 ? "yes" : "hell yeah!";
+                    for (let j = 1; j <= 5; j++) {
+                        console.log(\`Number: \` + j);
+                    }
                 `)
             // @formatter:on
         )

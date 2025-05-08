@@ -98,6 +98,35 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         }) as J.ClassDeclaration;
     }
 
+    protected async visitForLoop(forLoop: J.ForLoop, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitForLoop(forLoop, p) as J.ForLoop;
+        return produceAsync(ret, async draft => {
+            draft.control.prefix.whitespace = this.style.beforeParentheses.forParentheses ? " " : "";
+            draft.control.init = await Promise.all(draft.control.init.map(async (oneInit, index) => {
+                if (oneInit.element.kind === JS.Kind.ScopedVariableDeclarations) {
+                    const scopedVD = oneInit.element as Draft<JS.ScopedVariableDeclarations>;
+                    if (scopedVD.scope != undefined) {
+                        scopedVD.scope.before.whitespace = "";
+                        scopedVD.variables[scopedVD.variables.length - 1].after.whitespace = "";
+                    }
+                }
+                oneInit.after.whitespace = "";
+                return await this.spaceBeforeRightPaddedElement(oneInit, index === 0 ? this.style.within.forParentheses : true);
+            }));
+            if (draft.control.condition) {
+                draft.control.condition.element.prefix.whitespace = " ";
+                draft.control.condition.after.whitespace = this.style.other.beforeForSemicolon ? " " : "";
+            }
+            draft.control.update = await Promise.all(draft.control.update.map(async (oneUpdate, index) => {
+                oneUpdate.element.prefix.whitespace = " ";
+                oneUpdate.after.whitespace = (index === draft.control.update.length - 1 ? this.style.within.forParentheses : this.style.other.beforeForSemicolon) ? " " : "";
+                return oneUpdate;
+            }));
+
+            draft.body = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(ret.body, this.style.beforeLeftBrace.forLeftBrace), false);
+        });
+    }
+
     protected async visitIf(iff: J.If, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitIf(iff, p) as J.If;
         return produceAsync(ret, async draft => {
