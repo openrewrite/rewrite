@@ -239,7 +239,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     return false;
                                 }
 
-                                if (isPulledInTransitively(dep)) {
+                                if (isPulledInExactlyTransitively(dep)) {
                                     return true;
                                 }
                                 
@@ -255,7 +255,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             }
 
                             // TODO Can we write this a little bit more performant?
-                            private boolean isPulledInTransitively(Dependency dep) {
+                            private boolean isPulledInExactlyTransitively(Dependency dep) {
                                 if (dep.getVersion() == null || !platforms.containsKey("implementation") || platforms.get("implementation").isEmpty()) {
                                     return false;
                                 }
