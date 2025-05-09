@@ -483,18 +483,17 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitForOfLoop(JS.ForOfLoop jSForOfLoop, RpcReceiveQueue q) {
-        return jSForOfLoop
-                .getPadding().withAwait(q.receive(jSForOfLoop.getPadding().getAwait(), el -> visitLeftPadded(el, q)))
-                .withControl(q.receive(jSForOfLoop.getControl(), el -> (JS.JSForInOfLoopControl) visitNonNull(el, q)))
-                .getPadding().withBody(q.receive(jSForOfLoop.getPadding().getBody(), el -> visitRightPadded(el, q)));
+    public J visitForOfLoop(JS.ForOfLoop forOfLoop, RpcReceiveQueue q) {
+        return forOfLoop
+                .withAwait(q.receive(forOfLoop.getAwait(), v -> visitSpace(v, q)))
+                .withLoop(q.receive(forOfLoop.getLoop(), v -> (J.ForEachLoop) visitNonNull(v, q)));
     }
 
     @Override
-    public J visitForInLoop(JS.ForInLoop jSForInLoop, RpcReceiveQueue q) {
-        return jSForInLoop
-                .withControl(q.receive(jSForInLoop.getControl(), el -> (JS.JSForInOfLoopControl) visitNonNull(el, q)))
-                .getPadding().withBody(q.receive(jSForInLoop.getPadding().getBody(), el -> visitRightPadded(el, q)));
+    public J visitForInLoop(JS.ForInLoop forInLoop, RpcReceiveQueue q) {
+        return forInLoop
+                .withControl(q.receive(forInLoop.getControl(), el -> (J.ForEachLoop.Control) visitNonNull(el, q)))
+                .getPadding().withBody(q.receive(forInLoop.getPadding().getBody(), el -> visitRightPadded(el, q)));
     }
 
     @Override

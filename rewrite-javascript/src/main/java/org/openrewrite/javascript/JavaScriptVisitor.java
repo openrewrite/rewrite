@@ -1057,9 +1057,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             f = (JS.ForOfLoop) temp;
         }
-        f = f.getPadding().withAwait(requireNonNull(visitLeftPadded(f.getPadding().getAwait(), JsLeftPadded.Location.FOR_OF_AWAIT, p)));
-        f = f.withControl(requireNonNull(visitAndCast(f.getControl(), p)));
-        f = f.getPadding().withBody(requireNonNull(visitRightPadded(f.getPadding().getBody(), JsRightPadded.Location.FOR_BODY, p)));
+        f = f.withLoop(requireNonNull(visitAndCast(f.getLoop(), p)));
         return f;
     }
 

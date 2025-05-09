@@ -1716,18 +1716,19 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitForOfLoop(loop: JS.ForOfLoop, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(loop, p);
         p.append("for");
-        if (loop.await.element) {
-            await this.visitLeftPaddedLocal("await", loop.await, p);
+        if (loop.await) {
+            await this.visitSpace(loop.await, p);
+            p.append("await");
         }
 
-        const control = loop.control;
+        const control = loop.loop.control;
         await this.visitSpace(control.prefix, p);
         p.append('(');
         await this.visitRightPadded(control.variable, p);
         p.append("of");
         await this.visitRightPadded(control.iterable, p);
         p.append(')');
-        await this.visitRightPadded(loop.body, p);
+        await this.visitRightPadded(loop.loop.body, p);
         await this.afterSyntax(loop, p);
         return loop;
     }

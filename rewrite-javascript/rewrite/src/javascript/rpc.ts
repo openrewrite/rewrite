@@ -420,17 +420,16 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return jSMethodDeclaration;
     }
 
-    override async visitForOfLoop(jSForOfLoop: JS.ForOfLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(jSForOfLoop, el => el.await, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(jSForOfLoop, el => el.control, el => this.visit(el, q));
-        await q.getAndSend(jSForOfLoop, el => el.body, el => this.visitRightPadded(el, q));
-        return jSForOfLoop;
+    override async visitForOfLoop(forOfLoop: JS.ForOfLoop, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(forOfLoop, el => el.await);
+        await q.getAndSend(forOfLoop, el => el.loop, el => this.visit(el, q));
+        return forOfLoop;
     }
 
-    override async visitForInLoop(jSForInLoop: JS.ForInLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(jSForInLoop, el => el.control, el => this.visit(el, q));
-        await q.getAndSend(jSForInLoop, el => el.body, el => this.visitRightPadded(el, q));
-        return jSForInLoop;
+    override async visitForInLoop(forInLoop: JS.ForInLoop, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(forInLoop, el => el.control, el => this.visit(el, q));
+        await q.getAndSend(forInLoop, el => el.body, el => this.visitRightPadded(el, q));
+        return forInLoop;
     }
 
     override async visitJSTry(jSTry: JS.JSTry, q: RpcSendQueue): Promise<J | undefined> {
@@ -1012,9 +1011,8 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitForOfLoop(forOfLoop: JS.ForOfLoop, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(forOfLoop);
-        draft.await = await q.receive(draft.await, el => this.visitLeftPadded(el, q));
-        draft.control = await q.receive(draft.control, el => this.visitDefined<JS.ForOfLoop.Control>(el, q));
-        draft.body = await q.receive(draft.body, el => this.visitRightPadded(el, q));
+        draft.await = await q.receive(draft.await);
+        draft.loop = await q.receive(draft.loop, el => this.visitDefined<J.ForEachLoop>(el, q));
         return finishDraft(draft);
     }
 

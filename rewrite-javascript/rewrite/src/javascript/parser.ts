@@ -2981,23 +2981,29 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            await: node.awaitModifier ? this.leftPadded(this.prefix(node.awaitModifier), true) : this.leftPadded(emptySpace, false),
-            control: {
-                kind: J.Kind.ForEachLoopControl,
+            await: node.awaitModifier && this.prefix(node.awaitModifier),
+            loop: {
+                kind: J.Kind.ForEachLoop,
                 id: randomId(),
-                prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                prefix: emptySpace,
                 markers: emptyMarkers,
-                variable: this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)),
-                iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
-            },
-            body: this.rightPadded(
-                this.convert(node.statement),
-                this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: JavaMarkers.Semicolon,
-                    id: randomId()
-                }) : emptyMarkers
-            )
+                control: {
+                    kind: J.Kind.ForEachLoopControl,
+                    id: randomId(),
+                    prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
+                    markers: emptyMarkers,
+                    variable: this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)),
+                    iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
+                },
+                body: this.rightPadded(
+                    this.convert(node.statement),
+                    this.semicolonPrefix(node.statement),
+                    node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
+                        kind: JavaMarkers.Semicolon,
+                        id: randomId()
+                    }) : emptyMarkers
+                )
+            }
         };
     }
 

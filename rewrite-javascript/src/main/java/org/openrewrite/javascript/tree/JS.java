@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -4233,53 +4234,37 @@ public interface JS extends J {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ForOfLoop implements JS, Loop {
-        @Nullable
-        @NonFinal
-        transient WeakReference<ForOfLoop.Padding> padding;
-
-        @With
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
+    @With
+    class ForOfLoop implements JS, Loop {
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
 
-        @With
         @Getter
         Space prefix;
 
-        @With
         @Getter
         Markers markers;
 
-        JLeftPadded<Boolean> await;
-
-        public boolean isAwait() {
-            return await.getElement();
-        }
-
-        public ForOfLoop withAwait(boolean await) {
-            return getPadding().withAwait(this.await.withElement(await));
-        }
-
-        @With
         @Getter
-        J.ForEachLoop.Control control;
+        @Nullable
+        Space await;
 
-        JRightPadded<Statement> body;
+        @Getter
+        J.ForEachLoop loop;
 
         @Override
         public Statement getBody() {
-            return body.getElement();
+            return loop.getBody();
         }
 
-        @Override
         @SuppressWarnings("unchecked")
+        @Override
         public ForOfLoop withBody(Statement body) {
-            return getPadding().withBody(this.body.withElement(body));
+            return withLoop(loop.withBody(body));
         }
 
         @Override
@@ -4291,43 +4276,6 @@ public interface JS extends J {
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
-        }
-
-        public ForOfLoop.Padding getPadding() {
-            ForOfLoop.Padding p;
-
-            if (this.padding == null) {
-                p = new ForOfLoop.Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new ForOfLoop.Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ForOfLoop t;
-
-            public JLeftPadded<Boolean> getAwait() {
-                return t.await;
-            }
-
-            public ForOfLoop withAwait(JLeftPadded<Boolean> await) {
-                return t.await == await ? t : new ForOfLoop(t.id, t.prefix, t.markers, await, t.control, t.body);
-            }
-
-            public JRightPadded<Statement> getBody() {
-                return t.body;
-            }
-
-            public ForOfLoop withBody(JRightPadded<Statement> body) {
-                return t.body == body ? t : new ForOfLoop(t.id, t.prefix, t.markers, t.await, t.control, body);
-            }
         }
     }
 

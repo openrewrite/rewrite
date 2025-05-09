@@ -488,9 +488,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitForOfLoop(forOfLoop: JS.ForOfLoop, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ForOfLoop>(forOfLoop, p, async draft => {
-            draft.await = await this.visitLeftPadded(forOfLoop.await, p);
-            draft.control = await this.visitDefined<JS.ForOfLoop.Control>(forOfLoop.control, p);
-            draft.body = await this.visitRightPadded(forOfLoop.body, p);
+            draft.loop = await this.visitDefined<J.ForEachLoop>(forOfLoop.loop, p);
         });
     }
 

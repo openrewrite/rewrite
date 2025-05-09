@@ -763,9 +763,8 @@ export namespace JS {
      */
     export interface ForOfLoop extends JS {
         readonly kind: typeof Kind.ForOfLoop;
-        readonly await: J.LeftPadded<boolean>;
-        readonly control: ForOfLoop.Control;
-        readonly body: J.RightPadded<Statement>;
+        readonly await?: J.Space;
+        readonly loop: J.ForEachLoop;
     }
 
     export namespace ForOfLoop {
