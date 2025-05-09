@@ -63,6 +63,8 @@ describe('AutoformatVisitor', () => {
             //language=typescript
             typescript(`
                     class K{
+                        constructor  ( ){
+                        }
                         m ( x :number  ,  y  :  number[] ) :number{
                             this.m( x, [1] );
                             return y[ 0 ];
@@ -97,6 +99,8 @@ describe('AutoformatVisitor', () => {
                 `,
                 `
                     class K {
+                        constructor() {
+                        }
                         m(x: number, y: number[]): number {
                             this.m(x, [1]);
                             return y[0];
