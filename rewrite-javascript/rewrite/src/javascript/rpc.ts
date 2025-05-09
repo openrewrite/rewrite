@@ -427,6 +427,12 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return jSForOfLoop;
     }
 
+    override async visitForInLoop(jSForInLoop: JS.ForInLoop, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(jSForInLoop, el => el.control, el => this.visit(el, q));
+        await q.getAndSend(jSForInLoop, el => el.body, el => this.visitRightPadded(el, q));
+        return jSForInLoop;
+    }
+
     override async visitJSTry(jSTry: JS.JSTry, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(jSTry, el => el.body, el => this.visit(el, q));
         await q.getAndSend(jSTry, el => el.catches, el => this.visit(el, q));
@@ -1008,6 +1014,13 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         const draft = createDraft(forOfLoop);
         draft.await = await q.receive(draft.await, el => this.visitLeftPadded(el, q));
         draft.control = await q.receive(draft.control, el => this.visitDefined<JS.ForOfLoop.Control>(el, q));
+        draft.body = await q.receive(draft.body, el => this.visitRightPadded(el, q));
+        return finishDraft(draft);
+    }
+
+    override async visitForInLoop(forInLoop: JS.ForInLoop, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(forInLoop);
+        draft.control = await q.receive(draft.control, el => this.visitDefined<JS.ForInLoop.Control>(el, q));
         draft.body = await q.receive(draft.body, el => this.visitRightPadded(el, q));
         return finishDraft(draft);
     }

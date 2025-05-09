@@ -601,11 +601,18 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitForOfLoop(JS.ForOfLoop forOfLoop, RpcSendQueue q) {
-        q.getAndSend(forOfLoop, el -> el.getPadding().getAwait(), el -> visitLeftPadded(el, q));
-        q.getAndSend(forOfLoop, JS.ForOfLoop::getControl, el -> visit(el, q));
-        q.getAndSend(forOfLoop, el -> el.getPadding().getBody(), el -> visitRightPadded(el, q));
-        return forOfLoop;
+    public J visitForOfLoop(JS.ForOfLoop jSForOfLoop, RpcSendQueue q) {
+        q.getAndSend(jSForOfLoop, el -> el.getPadding().getAwait(), el -> visitLeftPadded(el, q));
+        q.getAndSend(jSForOfLoop, JS.ForOfLoop::getControl, el -> visit(el, q));
+        q.getAndSend(jSForOfLoop, el -> el.getPadding().getBody(), el -> visitRightPadded(el, q));
+        return jSForOfLoop;
+    }
+
+    @Override
+    public J visitForInLoop(JS.ForInLoop jSForInLoop, RpcSendQueue q) {
+        q.getAndSend(jSForInLoop, JS.ForInLoop::getControl, el -> visit(el, q));
+        q.getAndSend(jSForInLoop, el -> el.getPadding().getBody(), el -> visitRightPadded(el, q));
+        return jSForInLoop;
     }
 
     @Override
