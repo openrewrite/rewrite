@@ -579,9 +579,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitExportAssignment(JS.ExportAssignment exportAssignment, RpcReceiveQueue q) {
         return exportAssignment
-                .withModifiers(q.receiveList(exportAssignment.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .getPadding().withExportEquals(q.receive(exportAssignment.getPadding().getExportEquals(), el -> visitLeftPadded(el, q)))
-                .withExpression(q.receive(exportAssignment.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
+                .withExportEquals(q.receive(exportAssignment.isExportEquals()))
+                .getPadding().withExpression(q.receive(exportAssignment.getPadding().getExpression(), el -> visitLeftPadded(el, q)));
     }
 
     @Override

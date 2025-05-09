@@ -971,15 +971,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitExportAssignment(es: JS.ExportAssignment, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(es, p);
         p.append("export");
-        for (const it of es.modifiers) {
-            await this.visitModifier(it, p);
-        }
-
-        if (es.exportEquals.element) {
-            await this.visitLeftPaddedLocal("=", es.exportEquals, p);
-        }
-
-        es.expression && await this.visit(es.expression, p);
+        await this.visitLeftPaddedLocal(es.exportEquals ? "=" : "default", es.expression, p);
         await this.afterSyntax(es, p);
         return es;
     }

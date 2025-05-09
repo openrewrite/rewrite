@@ -165,18 +165,6 @@ export namespace JS {
     }
 
     /**
-     * Represents an export statement in JavaScript or TypeScript.
-     * @example export { foo } from 'module';
-     */
-    export interface Export extends JS, Statement {
-        readonly kind: typeof Kind.Export;
-        readonly exports?: J.Container<Expression>;
-        readonly from?: J.Space;
-        readonly target?: J.Literal;
-        readonly initializer?: J.LeftPadded<Expression>;
-    }
-
-    /**
      * Represents an expression used as a statement.
      * @example obj.method();
      */
@@ -906,14 +894,14 @@ export namespace JS {
     }
 
     /**
-     * Represents a default export assignment.
+     * Represents an export assignment.
+     * @example export = foo;
      * @example export default foo;
      */
     export interface ExportAssignment extends JS, Statement {
         readonly kind: typeof Kind.ExportAssignment;
-        readonly modifiers: J.Modifier[];
-        readonly exportEquals: J.LeftPadded<boolean>;
-        readonly expression?: Expression;
+        readonly exportEquals: boolean;
+        readonly expression: J.LeftPadded<Expression>;
     }
 
     /**

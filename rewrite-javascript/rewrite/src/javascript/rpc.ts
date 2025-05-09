@@ -508,9 +508,8 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     override async visitExportAssignment(exportAssignment: JS.ExportAssignment, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(exportAssignment, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(exportAssignment, el => el.exportEquals, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(exportAssignment, el => el.expression, el => this.visit(el, q));
+        await q.getAndSend(exportAssignment, el => el.exportEquals);
+        await q.getAndSend(exportAssignment, el => el.expression, el => this.visitLeftPadded(el, q));
         return exportAssignment;
     }
 
@@ -1119,9 +1118,8 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitExportAssignment(exportAssignment: JS.ExportAssignment, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(exportAssignment);
-        draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
-        draft.exportEquals = await q.receive(draft.exportEquals, el => this.visitLeftPadded(el, q));
-        draft.expression = await q.receive(draft.expression, el => this.visitDefined<Expression>(el, q));
+        draft.exportEquals = await q.receive(draft.exportEquals);
+        draft.expression = await q.receive(draft.expression, el => this.visitLeftPadded(el, q));
         return finishDraft(draft);
     }
 

@@ -583,9 +583,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitExportAssignment(exportAssignment: JS.ExportAssignment, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ExportAssignment>(exportAssignment, p, async draft => {
-            draft.modifiers = await mapAsync(exportAssignment.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.exportEquals = await this.visitLeftPadded(exportAssignment.exportEquals, p);
-            draft.expression = exportAssignment.expression && await this.visitDefined<Expression>(exportAssignment.expression, p);
+            draft.expression = await this.visitLeftPadded<Expression>(exportAssignment.expression, p);
         });
     }
 

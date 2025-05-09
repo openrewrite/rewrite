@@ -677,10 +677,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             es = (JS.ExportAssignment) temp;
         }
-
-        es = es.withModifiers(requireNonNull(ListUtils.map(es.getModifiers(), e -> visitAndCast(e, p))));
-        es = es.getPadding().withExportEquals(requireNonNull(visitLeftPadded(es.getPadding().getExportEquals(), JsLeftPadded.Location.EXPORT_ASSIGNMENT_EXPORT_EQUALS, p)));
-        es = es.withExpression(visitAndCast(es.getExpression(), p));
+        es = es.getPadding().withExpression(requireNonNull(visitLeftPadded(es.getPadding().getExpression(), JsLeftPadded.Location.EXPORT_ASSIGNMENT_EXPRESSION, p)));
         return es;
     }
 

@@ -726,11 +726,8 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitExportAssignment(JS.ExportAssignment exportAssignment, RpcSendQueue q) {
-        q.getAndSendList(exportAssignment, JS.ExportAssignment::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        q.getAndSend(exportAssignment, el -> el.getPadding().getExportEquals(), el -> visitLeftPadded(el, q));
-        if (exportAssignment.getExpression() != null) {
-            q.getAndSend(exportAssignment, JS.ExportAssignment::getExpression, el -> visit(el, q));
-        }
+        q.getAndSend(exportAssignment, JS.ExportAssignment::isExportEquals);
+        q.getAndSend(exportAssignment, el -> el.getPadding().getExpression(), el -> visitLeftPadded(el, q));
         return exportAssignment;
     }
 

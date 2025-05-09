@@ -5306,22 +5306,17 @@ public interface JS extends J {
 
         @With
         @Getter
-        List<J.Modifier> modifiers;
+        boolean exportEquals;
 
-        JLeftPadded<Boolean> exportEquals;
+        JLeftPadded<Expression> expression;
 
-        public boolean isExportEquals() {
-            return exportEquals.getElement();
+        public Expression getExpression() {
+            return expression.getElement();
         }
 
-        public ExportAssignment withExportEquals(boolean isExportEquals) {
-            return getPadding().withExportEquals(JLeftPadded.withElement(this.exportEquals, isExportEquals));
+        public ExportAssignment withExpression(Expression expression) {
+            return getPadding().withExpression(JLeftPadded.withElement(this.expression, expression));
         }
-
-        @With
-        @Getter
-        @Nullable
-        Expression expression;
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
@@ -5352,12 +5347,12 @@ public interface JS extends J {
         public static class Padding {
             private final ExportAssignment t;
 
-            public JLeftPadded<Boolean> getExportEquals() {
-                return t.exportEquals;
+            public JLeftPadded<Expression> getExpression() {
+                return t.expression;
             }
 
-            public ExportAssignment withExportEquals(JLeftPadded<Boolean> exportEquals) {
-                return t.exportEquals == exportEquals ? t : new ExportAssignment(t.id, t.prefix, t.markers, t.modifiers, exportEquals, t.expression);
+            public ExportAssignment withExpression(JLeftPadded<Expression> expression) {
+                return t.expression == expression ? t : new ExportAssignment(t.id, t.prefix, t.markers, t.exportEquals, expression);
             }
         }
 

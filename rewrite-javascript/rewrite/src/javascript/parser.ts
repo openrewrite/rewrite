@@ -3646,15 +3646,17 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitExportAssignment(node: ts.ExportAssignment) {
+    visitExportAssignment(node: ts.ExportAssignment): JS.ExportAssignment {
         return {
             kind: JS.Kind.ExportAssignment,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
-            exportEquals: this.leftPadded(node.isExportEquals ? this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!) : emptySpace, (!!node.isExportEquals)),
-            expression: this.visit(node.expression)
+            exportEquals: !!node.isExportEquals,
+            expression: this.leftPadded(
+                this.prefix(this.findChildNode(node, node.isExportEquals ? ts.SyntaxKind.EqualsToken : ts.SyntaxKind.DefaultKeyword)!),
+                this.visit(node.expression)
+            )
         };
     }
 
