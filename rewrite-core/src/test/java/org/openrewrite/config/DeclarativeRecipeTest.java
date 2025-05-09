@@ -372,7 +372,7 @@ class DeclarativeRecipeTest implements RewriteTest {
           )
         );
         rewriteRun(
-          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(3),
+          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(2),
           text("1", "1+1+1")
         );
         assertThat(cycleCount).hasValue(3);
