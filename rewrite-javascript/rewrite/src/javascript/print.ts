@@ -97,11 +97,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return inferType;
     }
 
-    override async visitJsImport(jsImport: JS.JsImport, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitImportDeclaration(jsImport: JS.Import, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(jsImport, p);
-        for (const m of jsImport.modifiers) {
-            await this.visitModifier(m, p);
-        }
         p.append("import");
         jsImport.importClause && await this.visit(jsImport.importClause, p);
 
@@ -113,7 +110,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return jsImport;
     }
 
-    override async visitJsImportClause(jsImportClause: JS.JsImportClause, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitImportClause(jsImportClause: JS.ImportClause, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(jsImportClause, p);
 
         if (jsImportClause.typeOnly) {
@@ -932,7 +929,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return namedImports;
     }
 
-    override async visitJsImportSpecifier(jis: JS.JsImportSpecifier, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitImportSpecifier(jis: JS.ImportSpecifier, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(jis, p);
 
         if (jis.importType.element) {

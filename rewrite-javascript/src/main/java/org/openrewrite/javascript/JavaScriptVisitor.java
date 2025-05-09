@@ -260,25 +260,24 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return b;
     }
 
-    public J visitJsImport(JS.JsImport jsImport, P p) {
-        JS.JsImport i = jsImport;
+    public J visitImport(JS.Import jsImport, P p) {
+        JS.Import i = jsImport;
         i = i.withPrefix(visitSpace(i.getPrefix(), JsSpace.Location.IMPORT_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         Statement temp = (Statement) visitStatement(i, p);
-        if (!(temp instanceof JS.JsImport)) {
+        if (!(temp instanceof JS.Import)) {
             return temp;
         } else {
-            i = (JS.JsImport) temp;
+            i = (JS.Import) temp;
         }
-        i = i.withModifiers(requireNonNull(ListUtils.map(i.getModifiers(), e -> visitAndCast(e, p))));
         i = i.withImportClause(visitAndCast(i.getImportClause(), p));
         i = i.getPadding().withModuleSpecifier(requireNonNull(visitLeftPadded(i.getPadding().getModuleSpecifier(), JsLeftPadded.Location.JS_IMPORT_MODULE_SPECIFIER, p)));
         i = i.withAttributes(visitAndCast(i.getAttributes(), p));
         return i;
     }
 
-    public J visitJsImportClause(JS.JsImportClause jsImportClause, P p) {
-        JS.JsImportClause i = jsImportClause;
+    public J visitImportClause(JS.ImportClause jsImportClause, P p) {
+        JS.ImportClause i = jsImportClause;
         i = i.withPrefix(visitSpace(i.getPrefix(), JsSpace.Location.JS_IMPORT_CLAUSE_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.getPadding().withName(visitRightPadded(i.getPadding().getName(), JsRightPadded.Location.JS_IMPORT_CLAUSE_NAME, p));
@@ -301,15 +300,15 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return ne;
     }
 
-    public J visitJsImportSpecifier(JS.JsImportSpecifier jis, P p) {
-        JS.JsImportSpecifier i = jis;
+    public J visitImportSpecifier(JS.ImportSpecifier jis, P p) {
+        JS.ImportSpecifier i = jis;
         i = i.withPrefix(visitSpace(i.getPrefix(), JsSpace.Location.JS_IMPORT_SPECIFIER_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         Expression temp = (Expression) visitExpression(i, p);
-        if (!(temp instanceof JS.JsImportSpecifier)) {
+        if (!(temp instanceof JS.ImportSpecifier)) {
             return temp;
         } else {
-            i = (JS.JsImportSpecifier) temp;
+            i = (JS.ImportSpecifier) temp;
         }
         i = i.getPadding().withImportType(requireNonNull(visitLeftPadded(i.getPadding().getImportType(), JsLeftPadded.Location.JS_IMPORT_SPECIFIER_IMPORT_TYPE, p)));
         i = i.withSpecifier(requireNonNull(visitAndCast(i.getSpecifier(), p)));

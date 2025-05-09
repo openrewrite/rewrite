@@ -171,28 +171,27 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitJsImport(JS.JsImport jsImport, RpcSendQueue q) {
-        q.getAndSendList(jsImport, JS.JsImport::getModifiers, J.Modifier::getId, el -> visit(el, q));
+    public J visitImport(JS.Import jsImport, RpcSendQueue q) {
         if (jsImport.getImportClause() != null) {
-            q.getAndSend(jsImport, JS.JsImport::getImportClause, el -> visit(el, q));
+            q.getAndSend(jsImport, JS.Import::getImportClause, el -> visit(el, q));
         }
         q.getAndSend(jsImport, el -> el.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q));
         if (jsImport.getAttributes() != null) {
-            q.getAndSend(jsImport, JS.JsImport::getAttributes, el -> visit(el, q));
+            q.getAndSend(jsImport, JS.Import::getAttributes, el -> visit(el, q));
         }
         return jsImport;
     }
 
     @Override
-    public J visitJsImportClause(JS.JsImportClause jsImportClause, RpcSendQueue q) {
-        q.getAndSend(jsImportClause, JS.JsImportClause::isTypeOnly);
-        if (jsImportClause.getPadding().getName() != null) {
-            q.getAndSend(jsImportClause, el -> el.getPadding().getName(), el -> visitRightPadded(el, q));
+    public J visitImportClause(JS.ImportClause importClause, RpcSendQueue q) {
+        q.getAndSend(importClause, JS.ImportClause::isTypeOnly);
+        if (importClause.getPadding().getName() != null) {
+            q.getAndSend(importClause, el -> el.getPadding().getName(), el -> visitRightPadded(el, q));
         }
-        if (jsImportClause.getNamedBindings() != null) {
-            q.getAndSend(jsImportClause, JS.JsImportClause::getNamedBindings, el -> visit(el, q));
+        if (importClause.getNamedBindings() != null) {
+            q.getAndSend(importClause, JS.ImportClause::getNamedBindings, el -> visit(el, q));
         }
-        return jsImportClause;
+        return importClause;
     }
 
     @Override
@@ -205,13 +204,13 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitJsImportSpecifier(JS.JsImportSpecifier jsImportSpecifier, RpcSendQueue q) {
-        q.getAndSend(jsImportSpecifier, el -> el.getPadding().getImportType(), el -> visitLeftPadded(el, q));
-        q.getAndSend(jsImportSpecifier, JS.JsImportSpecifier::getSpecifier, el -> visit(el, q));
-        if (jsImportSpecifier.getType() != null) {
-            q.getAndSend(jsImportSpecifier, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+    public J visitImportSpecifier(JS.ImportSpecifier importSpecifier, RpcSendQueue q) {
+        q.getAndSend(importSpecifier, el -> el.getPadding().getImportType(), el -> visitLeftPadded(el, q));
+        q.getAndSend(importSpecifier, JS.ImportSpecifier::getSpecifier, el -> visit(el, q));
+        if (importSpecifier.getType() != null) {
+            q.getAndSend(importSpecifier, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         }
-        return jsImportSpecifier;
+        return importSpecifier;
     }
 
     @Override

@@ -63,9 +63,9 @@ export namespace JS {
         JSVariableDeclarations: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations",
         JsAssignmentOperation: "org.openrewrite.javascript.tree.JS$JsAssignmentOperation",
         JsBinary: "org.openrewrite.javascript.tree.JS$JsBinary",
-        JsImport: "org.openrewrite.javascript.tree.JS$JsImport",
-        JsImportClause: "org.openrewrite.javascript.tree.JS$JsImportClause",
-        JsImportSpecifier: "org.openrewrite.javascript.tree.JS$JsImportSpecifier",
+        Import: "org.openrewrite.javascript.tree.JS$Import",
+        ImportClause: "org.openrewrite.javascript.tree.JS$ImportClause",
+        ImportSpecifier: "org.openrewrite.javascript.tree.JS$ImportSpecifier",
         LiteralType: "org.openrewrite.javascript.tree.JS$LiteralType",
         MappedType: "org.openrewrite.javascript.tree.JS$MappedType",
         MappedTypeKeysRemapping: "org.openrewrite.javascript.tree.JS$MappedType$KeysRemapping",
@@ -224,10 +224,9 @@ export namespace JS {
      * Represents an import declaration in JavaScript.
      * @example import x from 'module';
      */
-    export interface JsImport extends JS, Statement {
-        readonly kind: typeof Kind.JsImport;
-        readonly modifiers: J.Modifier[];
-        readonly importClause?: JsImportClause;
+    export interface Import extends JS, Statement {
+        readonly kind: typeof Kind.Import;
+        readonly importClause?: ImportClause;
         readonly moduleSpecifier: J.LeftPadded<Expression>;
         readonly attributes?: ImportAttributes;
     }
@@ -236,8 +235,8 @@ export namespace JS {
      * Represents the clause of an import statement, including default and named bindings.
      * @example import {A, B as C} from 'module';
      */
-    export interface JsImportClause extends JS {
-        readonly kind: typeof Kind.JsImportClause;
+    export interface ImportClause extends JS {
+        readonly kind: typeof Kind.ImportClause;
         readonly typeOnly: boolean;
         readonly name?: J.RightPadded<J.Identifier>;
         readonly namedBindings?: Expression;
@@ -257,8 +256,8 @@ export namespace JS {
      * Represents a single specifier in a named import.
      * @example import { foo as bar } from 'baz';
      */
-    export interface JsImportSpecifier extends JS, Expression, TypedTree {
-        readonly kind: typeof Kind.JsImportSpecifier;
+    export interface ImportSpecifier extends JS, Expression, TypedTree {
+        readonly kind: typeof Kind.ImportSpecifier;
         readonly importType: J.LeftPadded<boolean>;
         readonly specifier: Expression;
         readonly type?: JavaType;

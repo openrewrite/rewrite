@@ -147,20 +147,19 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitJsImport(JS.JsImport jsImport, RpcReceiveQueue q) {
-        return jsImport
-                .withModifiers(q.receiveList(jsImport.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .withImportClause(q.receive(jsImport.getImportClause(), el -> (JS.JsImportClause) visitNonNull(el, q)))
-                .getPadding().withModuleSpecifier(q.receive(jsImport.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q)))
-                .withAttributes(q.receive(jsImport.getAttributes(), el -> (JS.ImportAttributes) visitNonNull(el, q)));
+    public J visitImport(JS.Import anImport, RpcReceiveQueue q) {
+        return anImport
+                .withImportClause(q.receive(anImport.getImportClause(), el -> (JS.ImportClause) visitNonNull(el, q)))
+                .getPadding().withModuleSpecifier(q.receive(anImport.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q)))
+                .withAttributes(q.receive(anImport.getAttributes(), el -> (JS.ImportAttributes) visitNonNull(el, q)));
     }
 
     @Override
-    public J visitJsImportClause(JS.JsImportClause jsImportClause, RpcReceiveQueue q) {
-        return jsImportClause
-                .withTypeOnly(q.receive(jsImportClause.isTypeOnly()))
-                .getPadding().withName(q.receive(jsImportClause.getPadding().getName(), el -> visitRightPadded(el, q)))
-                .withNamedBindings(q.receive(jsImportClause.getNamedBindings(), expr -> (Expression) visitNonNull(expr, q)));
+    public J visitImportClause(JS.ImportClause importClause, RpcReceiveQueue q) {
+        return importClause
+                .withTypeOnly(q.receive(importClause.isTypeOnly()))
+                .getPadding().withName(q.receive(importClause.getPadding().getName(), el -> visitRightPadded(el, q)))
+                .withNamedBindings(q.receive(importClause.getNamedBindings(), expr -> (Expression) visitNonNull(expr, q)));
     }
 
     @Override
@@ -171,11 +170,11 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitJsImportSpecifier(JS.JsImportSpecifier jsImportSpecifier, RpcReceiveQueue q) {
-        return jsImportSpecifier
-                .getPadding().withImportType(q.receive(jsImportSpecifier.getPadding().getImportType(), el -> visitLeftPadded(el, q)))
-                .withSpecifier(q.receive(jsImportSpecifier.getSpecifier(), expr -> (Expression) visitNonNull(expr, q)))
-                .withType(q.receive(jsImportSpecifier.getType(), type -> visitType(type, q)));
+    public J visitImportSpecifier(JS.ImportSpecifier importSpecifier, RpcReceiveQueue q) {
+        return importSpecifier
+                .getPadding().withImportType(q.receive(importSpecifier.getPadding().getImportType(), el -> visitLeftPadded(el, q)))
+                .withSpecifier(q.receive(importSpecifier.getSpecifier(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(importSpecifier.getType(), type -> visitType(type, q)));
     }
 
     @Override

@@ -126,15 +126,14 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return importType;
     }
 
-    override async visitJsImport(jsImport: JS.JsImport, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(jsImport, el => el.modifiers, el => el.id, el => this.visit(el, q));
+    override async visitImportDeclaration(jsImport: JS.Import, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(jsImport, el => el.importClause, el => this.visit(el, q));
         await q.getAndSend(jsImport, el => el.moduleSpecifier, el => this.visitLeftPadded(el, q));
         await q.getAndSend(jsImport, el => el.attributes, el => this.visit(el, q));
         return jsImport;
     }
 
-    override async visitJsImportClause(jsImportClause: JS.JsImportClause, q: RpcSendQueue): Promise<J | undefined> {
+    override async visitImportClause(jsImportClause: JS.ImportClause, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(jsImportClause, el => el.typeOnly);
         await q.getAndSend(jsImportClause, el => el.name, el => this.visitRightPadded(el, q));
         await q.getAndSend(jsImportClause, el => el.namedBindings, el => this.visit(el, q));
@@ -147,7 +146,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return namedImports;
     }
 
-    override async visitJsImportSpecifier(jsImportSpecifier: JS.JsImportSpecifier, q: RpcSendQueue): Promise<J | undefined> {
+    override async visitImportSpecifier(jsImportSpecifier: JS.ImportSpecifier, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(jsImportSpecifier, el => el.importType, el => this.visitLeftPadded(el, q));
         await q.getAndSend(jsImportSpecifier, el => el.specifier, el => this.visit(el, q));
         await q.getAndSend(jsImportSpecifier, el => asRef(el.type), el => this.visitType(el, q));
@@ -680,16 +679,15 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitJsImport(jsImport: JS.JsImport, q: RpcReceiveQueue): Promise<J | undefined> {
+    override async visitImportDeclaration(jsImport: JS.Import, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(jsImport);
-        draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
-        draft.importClause = await q.receive(draft.importClause, el => this.visitDefined<JS.JsImportClause>(el, q));
+        draft.importClause = await q.receive(draft.importClause, el => this.visitDefined<JS.ImportClause>(el, q));
         draft.moduleSpecifier = await q.receive(draft.moduleSpecifier, el => this.visitLeftPadded(el, q));
         draft.attributes = await q.receive(draft.attributes, el => this.visitDefined<JS.ImportAttributes>(el, q));
         return finishDraft(draft);
     }
 
-    override async visitJsImportClause(jsImportClause: JS.JsImportClause, q: RpcReceiveQueue): Promise<J | undefined> {
+    override async visitImportClause(jsImportClause: JS.ImportClause, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(jsImportClause);
         draft.typeOnly = await q.receive(draft.typeOnly);
         draft.name = await q.receive(draft.name, el => this.visitRightPadded(el, q));
@@ -704,7 +702,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitJsImportSpecifier(jsImportSpecifier: JS.JsImportSpecifier, q: RpcReceiveQueue): Promise<J | undefined> {
+    override async visitImportSpecifier(jsImportSpecifier: JS.ImportSpecifier, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(jsImportSpecifier);
         draft.importType = await q.receive(draft.importType, el => this.visitLeftPadded(el, q));
         draft.specifier = await q.receive(draft.specifier, el => this.visitDefined<Expression>(el, q));

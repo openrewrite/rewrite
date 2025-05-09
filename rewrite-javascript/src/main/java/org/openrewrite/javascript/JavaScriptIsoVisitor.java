@@ -68,8 +68,8 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.JsImport visitJsImport(JS.JsImport jsImport, P p) {
-        return (JS.JsImport) super.visitJsImport(jsImport, p);
+    public JS.Import visitImport(JS.Import anImport, P p) {
+        return (JS.Import) super.visitImport(anImport, p);
     }
 
     @Override

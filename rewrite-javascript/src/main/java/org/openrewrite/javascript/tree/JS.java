@@ -143,15 +143,15 @@ public interface JS extends J {
             return withCharsetName(charset.name());
         }
 
-        List<JRightPadded<Import>> imports;
+        List<JRightPadded<J.Import>> imports;
 
         @Override
-        public List<Import> getImports() {
+        public List<J.Import> getImports() {
             return JRightPadded.getElements(imports);
         }
 
         @Override
-        public JS.CompilationUnit withImports(List<Import> imports) {
+        public JS.CompilationUnit withImports(List<J.Import> imports) {
             return getPadding().withImports(JRightPadded.withElements(this.imports, imports));
         }
 
@@ -287,12 +287,12 @@ public interface JS extends J {
             private final JS.CompilationUnit t;
 
             @Override
-            public List<JRightPadded<Import>> getImports() {
+            public List<JRightPadded<J.Import>> getImports() {
                 return t.imports;
             }
 
             @Override
-            public JS.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
+            public JS.CompilationUnit withImports(List<JRightPadded<J.Import>> imports) {
                 return t.imports == imports ? t : new JS.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
                         imports, t.statements, t.eof);
             }
@@ -1188,11 +1188,11 @@ public interface JS extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class JsImport implements JS, Statement {
+    class Import implements JS, Statement {
 
         @Nullable
         @NonFinal
-        transient WeakReference<JsImport.Padding> padding;
+        transient WeakReference<JS.Import.Padding> padding;
 
         @Getter
         @With
@@ -1209,12 +1209,8 @@ public interface JS extends J {
 
         @With
         @Getter
-        List<J.Modifier> modifiers;
-
-        @With
-        @Getter
         @Nullable
-        JsImportClause importClause;
+        ImportClause importClause;
 
         JLeftPadded<Expression> moduleSpecifier;
 
@@ -1222,7 +1218,7 @@ public interface JS extends J {
             return moduleSpecifier.getElement();
         }
 
-        public JS.JsImport withModuleSpecifier(Expression moduleSpecifier) {
+        public JS.Import withModuleSpecifier(Expression moduleSpecifier) {
             return getPadding().withModuleSpecifier(JLeftPadded.withElement(this.moduleSpecifier, moduleSpecifier));
         }
 
@@ -1233,7 +1229,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitJsImport(this, p);
+            return v.visitImport(this, p);
         }
 
         @Override
@@ -1241,15 +1237,15 @@ public interface JS extends J {
             return new CoordinateBuilder.Statement(this);
         }
 
-        public JsImport.Padding getPadding() {
-            JsImport.Padding p;
+        public JS.Import.Padding getPadding() {
+            JS.Import.Padding p;
             if (this.padding == null) {
-                p = new JsImport.Padding(this);
+                p = new JS.Import.Padding(this);
                 this.padding = new WeakReference<>(p);
             } else {
                 p = this.padding.get();
                 if (p == null || p.t != this) {
-                    p = new JsImport.Padding(this);
+                    p = new JS.Import.Padding(this);
                     this.padding = new WeakReference<>(p);
                 }
             }
@@ -1258,14 +1254,14 @@ public interface JS extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final JsImport t;
+            private final JS.Import t;
 
             public JLeftPadded<Expression> getModuleSpecifier() {
                 return t.moduleSpecifier;
             }
 
-            public JsImport withModuleSpecifier(JLeftPadded<Expression> moduleSpecifier) {
-                return t.moduleSpecifier == moduleSpecifier ? t : new JsImport(t.id, t.prefix, t.markers, t.modifiers, t.importClause, moduleSpecifier, t.attributes);
+            public JS.Import withModuleSpecifier(JLeftPadded<Expression> moduleSpecifier) {
+                return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, moduleSpecifier, t.attributes);
             }
         }
     }
@@ -1274,7 +1270,7 @@ public interface JS extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class JsImportClause implements JS {
+    class ImportClause implements JS {
 
         @Nullable
         @NonFinal
@@ -1303,7 +1299,7 @@ public interface JS extends J {
             return name == null ? null : name.getElement();
         }
 
-        public JsImportClause withName(J.@Nullable Identifier name) {
+        public ImportClause withName(J.@Nullable Identifier name) {
             return getPadding().withName(JRightPadded.withElement(this.name, name));
         }
 
@@ -1314,7 +1310,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitJsImportClause(this, p);
+            return v.visitImportClause(this, p);
         }
 
 
@@ -1335,14 +1331,14 @@ public interface JS extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final JsImportClause t;
+            private final ImportClause t;
 
             public @Nullable JRightPadded<J.Identifier> getName() {
                 return t.name;
             }
 
-            public JsImportClause withName(@Nullable JRightPadded<J.Identifier> name) {
-                return t.name == name ? t : new JsImportClause(t.id, t.prefix, t.markers, t.typeOnly, name, t.namedBindings);
+            public ImportClause withName(@Nullable JRightPadded<J.Identifier> name) {
+                return t.name == name ? t : new ImportClause(t.id, t.prefix, t.markers, t.typeOnly, name, t.namedBindings);
             }
         }
     }
@@ -1428,10 +1424,10 @@ public interface JS extends J {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
-    final class JsImportSpecifier implements JS, Expression, TypedTree {
+    final class ImportSpecifier implements JS, Expression, TypedTree {
         @Nullable
         @NonFinal
-        transient WeakReference<JS.JsImportSpecifier.Padding> padding;
+        transient WeakReference<ImportSpecifier.Padding> padding;
 
         @With
         @EqualsAndHashCode.Include
@@ -1449,7 +1445,7 @@ public interface JS extends J {
             return importType.getElement();
         }
 
-        public JsImportSpecifier withImportType(boolean importType) {
+        public ImportSpecifier withImportType(boolean importType) {
             return getPadding().withImportType(JLeftPadded.withElement(this.importType, importType));
         }
 
@@ -1462,7 +1458,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitJsImportSpecifier(this, p);
+            return v.visitImportSpecifier(this, p);
         }
 
         @Override
@@ -1470,15 +1466,15 @@ public interface JS extends J {
             return new CoordinateBuilder.Expression(this);
         }
 
-        public JsImportSpecifier.Padding getPadding() {
-            JsImportSpecifier.Padding p;
+        public ImportSpecifier.Padding getPadding() {
+            ImportSpecifier.Padding p;
             if (this.padding == null) {
-                p = new JsImportSpecifier.Padding(this);
+                p = new ImportSpecifier.Padding(this);
                 this.padding = new WeakReference<>(p);
             } else {
                 p = this.padding.get();
                 if (p == null || p.t != this) {
-                    p = new JsImportSpecifier.Padding(this);
+                    p = new ImportSpecifier.Padding(this);
                     this.padding = new WeakReference<>(p);
                 }
             }
@@ -1487,14 +1483,14 @@ public interface JS extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final JS.JsImportSpecifier t;
+            private final ImportSpecifier t;
 
             public JLeftPadded<Boolean> getImportType() {
                 return t.importType;
             }
 
-            public JsImportSpecifier withImportType(JLeftPadded<Boolean> importType) {
-                return t.importType == importType ? t : new JsImportSpecifier(t.id, t.prefix, t.markers, importType, t.specifier, t.type);
+            public ImportSpecifier withImportType(JLeftPadded<Boolean> importType) {
+                return t.importType == importType ? t : new ImportSpecifier(t.id, t.prefix, t.markers, importType, t.specifier, t.type);
             }
         }
 

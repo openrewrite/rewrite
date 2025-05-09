@@ -155,19 +155,18 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJsImport(jsImport: JS.JsImport, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JsImport>(jsImport, p, async draft => {
-            draft.modifiers = await mapAsync(jsImport.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.importClause = jsImport.importClause && await this.visitDefined<JS.JsImportClause>(jsImport.importClause, p);
+    protected async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.Import>(jsImport, p, async draft => {
+            draft.importClause = jsImport.importClause && await this.visitDefined<JS.ImportClause>(jsImport.importClause, p);
             draft.moduleSpecifier = await this.visitLeftPadded(jsImport.moduleSpecifier, p);
             draft.attributes = jsImport.attributes && await this.visitDefined<JS.ImportAttributes>(jsImport.attributes, p);
         });
     }
 
-    protected async visitJsImportClause(jsImportClause: JS.JsImportClause, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JsImportClause>(jsImportClause, p, async draft => {
-            draft.name = jsImportClause.name && await this.visitRightPadded(jsImportClause.name, p);
-            draft.namedBindings = jsImportClause.namedBindings && await this.visitDefined<Expression>(jsImportClause.namedBindings, p);
+    protected async visitImportClause(importClause: JS.ImportClause, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.ImportClause>(importClause, p, async draft => {
+            draft.name = importClause.name && await this.visitRightPadded(importClause.name, p);
+            draft.namedBindings = importClause.namedBindings && await this.visitDefined<Expression>(importClause.namedBindings, p);
         });
     }
 
@@ -178,11 +177,11 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJsImportSpecifier(jsImportSpecifier: JS.JsImportSpecifier, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JsImportSpecifier>(jsImportSpecifier, p, async draft => {
-            draft.importType = await this.visitLeftPadded(jsImportSpecifier.importType, p);
-            draft.specifier = await this.visitDefined<Expression>(jsImportSpecifier.specifier, p);
-            draft.type = jsImportSpecifier.type && await this.visitType(jsImportSpecifier.type, p);
+    protected async visitImportSpecifier(importSpecifier: JS.ImportSpecifier, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.ImportSpecifier>(importSpecifier, p, async draft => {
+            draft.importType = await this.visitLeftPadded(importSpecifier.importType, p);
+            draft.specifier = await this.visitDefined<Expression>(importSpecifier.specifier, p);
+            draft.type = importSpecifier.type && await this.visitType(importSpecifier.type, p);
         });
     }
 
@@ -626,14 +625,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitInferType(tree as unknown as JS.InferType, p);
                 case JS.Kind.ImportType:
                     return this.visitImportType(tree as unknown as JS.ImportType, p);
-                case JS.Kind.JsImport:
-                    return this.visitJsImport(tree as unknown as JS.JsImport, p);
-                case JS.Kind.JsImportClause:
-                    return this.visitJsImportClause(tree as unknown as JS.JsImportClause, p);
+                case JS.Kind.Import:
+                    return this.visitImportDeclaration(tree as unknown as JS.Import, p);
+                case JS.Kind.ImportClause:
+                    return this.visitImportClause(tree as unknown as JS.ImportClause, p);
                 case JS.Kind.NamedImports:
                     return this.visitNamedImports(tree as unknown as JS.NamedImports, p);
-                case JS.Kind.JsImportSpecifier:
-                    return this.visitJsImportSpecifier(tree as unknown as JS.JsImportSpecifier, p);
+                case JS.Kind.ImportSpecifier:
+                    return this.visitImportSpecifier(tree as unknown as JS.ImportSpecifier, p);
                 case JS.Kind.JSVariableDeclarations:
                     return this.visitJSVariableDeclarations(tree as unknown as JS.JSVariableDeclarations, p);
                 case JS.Kind.JSNamedVariable:

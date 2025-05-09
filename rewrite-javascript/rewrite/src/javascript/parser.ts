@@ -1488,8 +1488,7 @@ export class JavaScriptParserVisitor {
                         .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newJEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []),
                 markers: emptyMarkers
             },
-            returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type)),
-            type: undefined
+            returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type))
         };
     }
 
@@ -3574,22 +3573,21 @@ export class JavaScriptParserVisitor {
         return this.mapIdentifier(node, 'import');
     }
 
-    visitImportDeclaration(node: ts.ImportDeclaration) {
+    visitImportDeclaration(node: ts.ImportDeclaration): JS.Import {
         return {
-            kind: JS.Kind.JsImport,
+            kind: JS.Kind.Import,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
             importClause: node.importClause && this.visit(node.importClause),
             moduleSpecifier: this.leftPadded(node.importClause ? this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!) : emptySpace, this.visit(node.moduleSpecifier)),
             attributes: node.attributes && this.visit(node.attributes)
         };
     }
 
-    visitImportClause(node: ts.ImportClause) {
+    visitImportClause(node: ts.ImportClause): JS.ImportClause {
         return {
-            kind: JS.Kind.JsImportClause,
+            kind: JS.Kind.ImportClause,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
@@ -3621,9 +3619,9 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitImportSpecifier(node: ts.ImportSpecifier) {
+    visitImportSpecifier(node: ts.ImportSpecifier): JS.ImportSpecifier {
         return {
-            kind: JS.Kind.JsImportSpecifier,
+            kind: JS.Kind.ImportSpecifier,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
@@ -3639,9 +3637,9 @@ export class JavaScriptParserVisitor {
                     markers: emptyMarkers,
                     propertyName: this.rightPadded(this.convert(node.propertyName), this.suffix(node.propertyName)),
                     alias: this.convert(node.name)
-                }
+                } as JS.Alias
                 : this.convert(node.name),
-            _type: this.mapType(node),
+            type: this.mapType(node),
         };
     }
 
