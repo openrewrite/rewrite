@@ -24,6 +24,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainTextParser;
 
+import java.nio.file.Paths;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1072,8 +1073,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         UpgradeDependencyVersion guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
         TreeVisitor<?, ExecutionContext> visitor = guava.getVisitor();
 
-        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow();
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow().withSourcePath(Paths.get("not-a-gradle-file.txt"));
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
+
+        sourceFile = PlainTextParser.builder().build().parse("empty=").findFirst().orElseThrow().withSourcePath(Paths.get("gradle.lockfile"));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isTrue();
+
+        sourceFile = PlainTextParser.builder().build().parse("empty=").findFirst().orElseThrow().withSourcePath(Paths.get("module/gradle.lockfile"));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isTrue();
 
         sourceFile = PropertiesParser.builder().build().parse("guavaVersion=29.0-jre").findFirst().orElseThrow();
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isTrue();
@@ -1426,6 +1433,121 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   implementation("com.google.guava:guava:${guavaVersion}")
               }
               """
+          )
+        );
+    }
+
+    //TODO In iteration 1 we are just bumping the one version in the lock file.
+    //     We will also do the transitive dependencies in next version.
+    //     One part at a time
+    @Test
+    void lockFileGetsUpdated() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "latest.patch", null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.0.0-M1'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.0.27'
+              }
+              """
+          ), lockFile(
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              org.apache.tomcat.embed:tomcat-embed-core:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              """,
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              org.apache.tomcat.embed:tomcat-embed-core:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              """
+          )
+        );
+    }
+
+    //TODO In iteration 1 we are just bumping the one version in the lock file.
+    //     We will also do the transitive dependencies in next version.
+    //     One part at a time
+    @Test
+    void multimoduleProject() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "latest.patch", null)),
+          settingsGradle(
+            """
+            rootProject.name = 'my-project'
+            include("moduleA")
+            """
+          ),
+          buildGradle(
+            """
+            """
+          ),
+          lockFile(
+            """
+            # This is a Gradle generated file for dependency locking.
+            # Manual edits can break the build and are not advised.
+            # This file is expected to be part of source control.
+            empty=
+            """,
+            spec -> spec.path("gradle.lockfile")
+          ),
+          //language=groovy
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.0.0-M1'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.0.27'
+              }
+              """,
+            spec -> spec.path("moduleA/build.gradle")
+          ), lockFile(
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              org.apache.tomcat.embed:tomcat-embed-core:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              """,
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              org.apache.tomcat.embed:tomcat-embed-core:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              """,
+            spec -> spec.path("moduleA/gradle.lockfile")
           )
         );
     }
