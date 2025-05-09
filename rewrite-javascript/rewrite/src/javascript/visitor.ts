@@ -112,7 +112,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     protected async visitDelete(delete_: JS.Delete, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.Delete>(delete_, p, async draft => {
             draft.expression = await this.visitDefined<Expression>(delete_.expression, p);
-            draft.type = delete_.type && await this.visitType(delete_.type, p);
         });
     }
 

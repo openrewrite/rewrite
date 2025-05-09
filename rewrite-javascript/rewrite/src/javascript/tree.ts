@@ -162,7 +162,6 @@ export namespace JS {
     export interface Delete extends JS, Statement, Expression {
         readonly kind: typeof Kind.Delete;
         readonly expression: Expression;
-        readonly type?: JavaType;
     }
 
     /**

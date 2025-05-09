@@ -113,9 +113,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitDelete(JS.Delete delete, RpcSendQueue q) {
         q.getAndSend(delete, JS.Delete::getExpression, el -> visit(el, q));
-        if (delete.getType() != null) {
-            q.getAndSend(delete, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
         return delete;
     }
 

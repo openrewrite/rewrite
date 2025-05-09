@@ -92,7 +92,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitDelete(delete_: JS.Delete, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(delete_, el => el.expression, el => this.visit(el, q));
-        await q.getAndSend(delete_, el => asRef(el.type), el => this.visitType(el, q));
         return delete_;
     }
 
@@ -653,7 +652,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitDelete(delete_: JS.Delete, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(delete_);
         draft.expression = await q.receive(draft.expression, el => this.visitDefined<Expression>(el, q));
-        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
 

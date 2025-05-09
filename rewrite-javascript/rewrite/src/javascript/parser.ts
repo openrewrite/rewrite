@@ -1615,7 +1615,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitConditionalType(node: ts.ConditionalTypeNode) {
+    visitConditionalType(node: ts.ConditionalTypeNode): JS.ConditionalType {
         return {
             kind: JS.Kind.ConditionalType,
             id: randomId(),
@@ -1961,7 +1961,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitArrayBindingPattern(node: ts.ArrayBindingPattern) {
+    visitArrayBindingPattern(node: ts.ArrayBindingPattern): JS.ArrayBindingPattern {
         return {
             kind: JS.Kind.ArrayBindingPattern,
             id: randomId(),
@@ -1972,7 +1972,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitBindingElement(node: ts.BindingElement) {
+    visitBindingElement(node: ts.BindingElement): JS.BindingElement {
         return {
             kind: JS.Kind.BindingElement,
             id: randomId(),
@@ -1987,7 +1987,7 @@ export class JavaScriptParserVisitor {
                 operator: this.leftPadded(emptySpace, JS.Unary.Type.Spread),
                 expression: this.convert<Expression>(node.name),
                 type: undefined
-            } : this.convert<TypedTree>(node.name),
+            } as JS.Unary : this.convert<TypedTree>(node.name),
             initializer: node.initializer && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert<Expression>(node.initializer)),
             variableType: this.mapVariableType(node)
         };
@@ -2276,14 +2276,13 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitDeleteExpression(node: ts.DeleteExpression) {
+    visitDeleteExpression(node: ts.DeleteExpression): JS.Delete {
         return {
             kind: JS.Kind.Delete,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            expression: this.convert(node.expression),
-            type: this.mapType(node)
+            expression: this.convert(node.expression)
         };
     }
 

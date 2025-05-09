@@ -103,8 +103,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitDelete(JS.Delete delete, RpcReceiveQueue q) {
         return delete
-                .withExpression(q.receive(delete.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
-                .withType(q.receive(delete.getType(), type -> visitType(type, q)));
+                .withExpression(q.receive(delete.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
     }
 
     @Override

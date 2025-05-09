@@ -613,8 +613,16 @@ public interface JS extends J {
         Markers markers;
         Expression expression;
 
-        @Nullable
-        JavaType type;
+        @Override
+        public @Nullable JavaType getType() {
+            return expression.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Delete withType(@Nullable JavaType type) {
+            return expression.withType(type);
+        }
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
