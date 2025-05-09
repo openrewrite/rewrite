@@ -67,6 +67,13 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitAlias(JS.Alias alias, RpcReceiveQueue q) {
+        return alias
+                .getPadding().withPropertyName(q.receive(alias.getPadding().getPropertyName(), el -> visitRightPadded(el, q)))
+                .withAlias(q.receive(alias.getAlias(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
     public J visitArrowFunction(JS.ArrowFunction arrowFunction, RpcReceiveQueue q) {
         return arrowFunction
                 .withLeadingAnnotations(q.receiveList(arrowFunction.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))

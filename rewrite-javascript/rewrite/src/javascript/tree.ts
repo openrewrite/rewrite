@@ -26,6 +26,7 @@ export interface JS extends J {
 export namespace JS {
     export const Kind = {
         ...TreeKind,
+        Alias: "org.openrewrite.javascript.tree.JS$Alias",
         ArrayBindingPattern: "org.openrewrite.javascript.tree.JS$ArrayBindingPattern",
         ArrowFunction: "org.openrewrite.javascript.tree.JS$ArrowFunction",
         Await: "org.openrewrite.javascript.tree.JS$Await",
@@ -105,6 +106,12 @@ export namespace JS {
     export interface CompilationUnit extends JavaScriptSourceFile, JS {
         readonly kind: typeof Kind.CompilationUnit;
         readonly eof: J.Space;
+    }
+
+    export interface Alias extends JS, Expression {
+        readonly kind: typeof Kind.Alias;
+        readonly propertyName: J.RightPadded<J.Identifier>;
+        readonly alias: Expression;
     }
 
     export interface ArrowFunction extends JS, Statement, Expression, TypedTree {

@@ -60,6 +60,12 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return cu;
     }
 
+    override async visitAlias(alias: JS.Alias, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(alias, el => el.propertyName, el => this.visitRightPadded(el, q));
+        await q.getAndSend(alias, el => el.alias, el => this.visit(el, q));
+        return alias;
+    }
+
     override async visitArrowFunction(arrowFunction: JS.ArrowFunction, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(arrowFunction, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
         await q.getAndSendList(arrowFunction, el => el.modifiers, el => el.id, el => this.visit(el, q));
@@ -615,6 +621,13 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.statements = await q.receiveListDefined(cu.statements, stmt => this.visitRightPadded(stmt, q));
         draft.eof = await q.receive(cu.eof, space => this.visitSpace(space, q));
 
+        return finishDraft(draft);
+    }
+
+    override async visitAlias(alias: JS.Alias, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(alias);
+        draft.propertyName = await q.receive(draft.propertyName, el => this.visitRightPadded(el, q));
+        draft.alias = await q.receive(draft.alias, el => this.visitDefined<Expression>(el, q));
         return finishDraft(draft);
     }
 

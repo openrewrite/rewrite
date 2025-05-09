@@ -308,6 +308,91 @@ public interface JS extends J {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
+    final class Alias implements JS, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<JS.Alias.Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        JRightPadded<J.Identifier> propertyName;
+
+        @With
+        Expression alias;
+
+        public J.Identifier getPropertyName() {
+            return propertyName.getElement();
+        }
+
+        public JS.Alias withPropertyName(J.Identifier propertyName) {
+            return getPadding().withPropertyName(this.propertyName.withElement(propertyName));
+        }
+
+        @Override
+        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
+            return v.visitAlias(this, p);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return propertyName.getElement().getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Alias withType(@Nullable JavaType type) {
+            return withPropertyName(propertyName.getElement().withType(type));
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public JS.Alias.Padding getPadding() {
+            JS.Alias.Padding p;
+            if (this.padding == null) {
+                p = new JS.Alias.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new JS.Alias.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final JS.Alias t;
+
+            public JRightPadded<J.Identifier> getPropertyName() {
+                return t.propertyName;
+            }
+
+            public JS.Alias withPropertyName(JRightPadded<J.Identifier> propertyName) {
+                return t.propertyName == propertyName ? t : new JS.Alias(t.id, t.prefix, t.markers, propertyName, t.alias);
+            }
+        }
+    }
+
     /**
      * A JavaScript `=>` is similar to a Java lambda, but additionally contains annotations, modifiers, type arguments.
      * The ArrowFunction prevents J.Lambda recipes from transforming the LST because an ArrowFunction

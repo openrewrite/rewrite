@@ -67,6 +67,13 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitAlias(JS.Alias alias, RpcSendQueue q) {
+        q.getAndSend(alias, el -> el.getPadding().getPropertyName(), el -> visitRightPadded(el, q));
+        q.getAndSend(alias, JS.Alias::getAlias, el -> visit(el, q));
+        return alias;
+    }
+
+    @Override
     public J visitArrowFunction(JS.ArrowFunction arrowFunction, RpcSendQueue q) {
         q.getAndSendList(arrowFunction, JS.ArrowFunction::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
         q.getAndSendList(arrowFunction, JS.ArrowFunction::getModifiers, J.Modifier::getId, el -> visit(el, q));

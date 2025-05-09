@@ -13,14 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+@NullMarked
+@NonNullFields
+package org.openrewrite.javascript.internal;
 
-describe('as mapping', () => {
-    const spec = new RecipeSpec();
-
-    test('primitive type', () => spec.rewriteRun(
-        //language=typescript
-        typescript('1 as number')
-    ));
-});
+import org.jspecify.annotations.NullMarked;
+import org.openrewrite.internal.lang.NonNullFields;

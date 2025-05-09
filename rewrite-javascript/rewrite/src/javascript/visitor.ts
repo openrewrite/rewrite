@@ -67,6 +67,13 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return finishDraft(draft) as J2;
     }
 
+    protected async visitAlias(alias: JS.Alias, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.Alias>(alias, p, async draft => {
+            draft.propertyName = await this.visitRightPadded(alias.propertyName, p);
+            draft.alias = await this.visitDefined<Expression>(alias.alias, p);
+        });
+    }
+
     protected async visitArrowFunction(arrowFunction: JS.ArrowFunction, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ArrowFunction>(arrowFunction, p, async draft => {
             draft.leadingAnnotations = await mapAsync(arrowFunction.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
@@ -620,6 +627,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         if (isJavaScript(j)) {
             const tree = j as JS;
             switch (tree.kind) {
+                case JS.Kind.Alias:
+                    return this.visitAlias(tree as unknown as JS.Alias, p);
                 case JS.Kind.ArrowFunction:
                     return this.visitArrowFunction(tree as unknown as JS.ArrowFunction, p);
                 case JS.Kind.Await:
