@@ -2907,7 +2907,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitForStatement(node: ts.ForStatement) {
+    visitForStatement(node: ts.ForStatement): J.ForLoop {
         return {
             kind: J.Kind.ForLoop,
             id: randomId(),
@@ -2950,14 +2950,14 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitForInStatement(node: ts.ForInStatement) {
+    visitForInStatement(node: ts.ForInStatement): JS.ForInLoop {
         return {
-            kind: JS.Kind.JSForInLoop,
+            kind: JS.Kind.ForInLoop,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
             control: {
-                kind: JS.Kind.JSForInOfLoopControl,
+                kind: J.Kind.ForEachLoopControl,
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 markers: emptyMarkers,
@@ -2975,15 +2975,15 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitForOfStatement(node: ts.ForOfStatement) {
+    visitForOfStatement(node: ts.ForOfStatement): JS.ForOfLoop {
         return {
-            kind: JS.Kind.JSForOfLoop,
+            kind: JS.Kind.ForOfLoop,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
             await: node.awaitModifier ? this.leftPadded(this.prefix(node.awaitModifier), true) : this.leftPadded(emptySpace, false),
             control: {
-                kind: JS.Kind.JSForInOfLoopControl,
+                kind: J.Kind.ForEachLoopControl,
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 markers: emptyMarkers,

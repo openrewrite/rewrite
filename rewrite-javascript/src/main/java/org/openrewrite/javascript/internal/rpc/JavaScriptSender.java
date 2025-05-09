@@ -601,25 +601,18 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitJSForOfLoop(JS.JSForOfLoop jSForOfLoop, RpcSendQueue q) {
+    public J visitForOfLoop(JS.ForOfLoop jSForOfLoop, RpcSendQueue q) {
         q.getAndSend(jSForOfLoop, el -> el.getPadding().getAwait(), el -> visitLeftPadded(el, q));
-        q.getAndSend(jSForOfLoop, JS.JSForOfLoop::getControl, el -> visit(el, q));
+        q.getAndSend(jSForOfLoop, JS.ForOfLoop::getControl, el -> visit(el, q));
         q.getAndSend(jSForOfLoop, el -> el.getPadding().getBody(), el -> visitRightPadded(el, q));
         return jSForOfLoop;
     }
 
     @Override
-    public J visitJSForInLoop(JS.JSForInLoop jSForInLoop, RpcSendQueue q) {
-        q.getAndSend(jSForInLoop, JS.JSForInLoop::getControl, el -> visit(el, q));
+    public J visitForInLoop(JS.ForInLoop jSForInLoop, RpcSendQueue q) {
+        q.getAndSend(jSForInLoop, JS.ForInLoop::getControl, el -> visit(el, q));
         q.getAndSend(jSForInLoop, el -> el.getPadding().getBody(), el -> visitRightPadded(el, q));
         return jSForInLoop;
-    }
-
-    @Override
-    public J visitJSForInOfLoopControl(JS.JSForInOfLoopControl jSForInOfLoopControl, RpcSendQueue q) {
-        q.getAndSend(jSForInOfLoopControl, el -> el.getPadding().getVariable(), el -> visitRightPadded(el, q));
-        q.getAndSend(jSForInOfLoopControl, el -> el.getPadding().getIterable(), el -> visitRightPadded(el, q));
-        return jSForInOfLoopControl;
     }
 
     @Override

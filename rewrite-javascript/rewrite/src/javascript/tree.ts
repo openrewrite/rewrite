@@ -54,9 +54,8 @@ export namespace JS {
         InferType: "org.openrewrite.javascript.tree.JS$InferType",
         Intersection: "org.openrewrite.javascript.tree.JS$Intersection",
         JSCatch: "org.openrewrite.javascript.tree.JS$JSTry$JSCatch",
-        JSForInLoop: "org.openrewrite.javascript.tree.JS$JSForInLoop",
-        JSForInOfLoopControl: "org.openrewrite.javascript.tree.JS$JSForInOfLoopControl",
-        JSForOfLoop: "org.openrewrite.javascript.tree.JS$JSForOfLoop",
+        ForInLoop: "org.openrewrite.javascript.tree.JS$ForInLoop",
+        ForOfLoop: "org.openrewrite.javascript.tree.JS$ForOfLoop",
         JSMethodDeclaration: "org.openrewrite.javascript.tree.JS$JSMethodDeclaration",
         JSNamedVariable: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations$JSNamedVariable",
         JSTry: "org.openrewrite.javascript.tree.JS$JSTry",
@@ -222,7 +221,7 @@ export namespace JS {
     }
 
     /**
-     * Represents an import declaration in JavaScript.
+     * Represents an import declaration.
      * @example import x from 'module';
      */
     export interface Import extends JS, Statement {
@@ -330,7 +329,7 @@ export namespace JS {
     }
 
     /**
-     * Represents a binary expression in JavaScript.
+     * Represents a binary expression.
      * @example a + b;
      */
     export interface JsBinary extends JS, Expression, TypedTree {
@@ -561,7 +560,7 @@ export namespace JS {
     }
 
     /**
-     * Represents an assignment operation in JavaScript.
+     * Represents an assignment operation.
      * @example a ||= b;
      */
     export interface JsAssignmentOperation extends JS, Statement, Expression, TypedTree {
@@ -677,7 +676,7 @@ export namespace JS {
     }
 
     /**
-     * Represents the `void` operator in JavaScript.
+     * Represents the `void` operator.
      * @example void 0;
      */
     export interface Void extends JS, Expression {
@@ -686,7 +685,7 @@ export namespace JS {
     }
 
     /**
-     * Represents a unary expression in JavaScript.
+     * Represents a unary expression.
      * @example !flag;
      */
     export interface Unary extends JS, Expression, TypedTree {
@@ -719,7 +718,7 @@ export namespace JS {
     }
 
     /**
-     * Represents a `with` statement in JavaScript.
+     * Represents a `with` statement.
      * @example with (obj) { console.log(a); }
      */
     export interface WithStatement extends JS, Statement {
@@ -758,34 +757,33 @@ export namespace JS {
     }
 
     /**
-     * Represents a for-of loop in JavaScript.
+     * Represents a for-of loop.
      * @example for (const x of arr) { }
+     * @example for await (const x of arr) { }
      */
-    export interface JSForOfLoop extends JS {
-        readonly kind: typeof Kind.JSForOfLoop;
+    export interface ForOfLoop extends JS {
+        readonly kind: typeof Kind.ForOfLoop;
         readonly await: J.LeftPadded<boolean>;
-        readonly control: JSForInOfLoopControl;
+        readonly control: ForOfLoop.Control;
         readonly body: J.RightPadded<Statement>;
     }
 
+    export namespace ForOfLoop {
+        export type Control = J.ForEachLoop.Control;
+    }
+
     /**
-     * Represents a for-in loop in JavaScript.
+     * Represents a for-in loop.
      * @example for (let key in obj) { }
      */
-    export interface JSForInLoop extends JS {
-        readonly kind: typeof Kind.JSForInLoop;
-        readonly control: JSForInOfLoopControl;
+    export interface ForInLoop extends JS {
+        readonly kind: typeof Kind.ForInLoop;
+        readonly control: ForInLoop.Control;
         readonly body: J.RightPadded<Statement>;
     }
 
-    /**
-     * Represents the control clause of for-in/of loops.
-     * @example for (const x of iterable)
-     */
-    export interface JSForInOfLoopControl extends JS {
-        readonly kind: typeof Kind.JSForInOfLoopControl;
-        readonly variable: J.RightPadded<J>;
-        readonly iterable: J.RightPadded<Expression>;
+    export namespace ForInLoop {
+        export type Control = J.ForEachLoop.Control;
     }
 
     /**

@@ -486,25 +486,18 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJSForOfLoop(jSForOfLoop: JS.JSForOfLoop, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JSForOfLoop>(jSForOfLoop, p, async draft => {
-            draft.await = await this.visitLeftPadded(jSForOfLoop.await, p);
-            draft.control = await this.visitDefined<JS.JSForInOfLoopControl>(jSForOfLoop.control, p);
-            draft.body = await this.visitRightPadded(jSForOfLoop.body, p);
+    protected async visitForOfLoop(forOfLoop: JS.ForOfLoop, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.ForOfLoop>(forOfLoop, p, async draft => {
+            draft.await = await this.visitLeftPadded(forOfLoop.await, p);
+            draft.control = await this.visitDefined<JS.ForOfLoop.Control>(forOfLoop.control, p);
+            draft.body = await this.visitRightPadded(forOfLoop.body, p);
         });
     }
 
-    protected async visitJSForInLoop(jSForInLoop: JS.JSForInLoop, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JSForInLoop>(jSForInLoop, p, async draft => {
-            draft.control = await this.visitDefined<JS.JSForInOfLoopControl>(jSForInLoop.control, p);
-            draft.body = await this.visitRightPadded(jSForInLoop.body, p);
-        });
-    }
-
-    protected async visitJSForInOfLoopControl(jSForInOfLoopControl: JS.JSForInOfLoopControl, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JSForInOfLoopControl>(jSForInOfLoopControl, p, async draft => {
-            draft.variable = await this.visitRightPadded(jSForInOfLoopControl.variable, p);
-            draft.iterable = await this.visitRightPadded(jSForInOfLoopControl.iterable, p);
+    protected async visitForInLoop(forInLoop: JS.ForInLoop, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.ForInLoop>(forInLoop, p, async draft => {
+            draft.control = await this.visitDefined<JS.ForInLoop.Control>(forInLoop.control, p);
+            draft.body = await this.visitRightPadded(forInLoop.body, p);
         });
     }
 
@@ -709,12 +702,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitIndexSignatureDeclaration(tree as unknown as JS.IndexSignatureDeclaration, p);
                 case JS.Kind.JSMethodDeclaration:
                     return this.visitJSMethodDeclaration(tree as unknown as JS.JSMethodDeclaration, p);
-                case JS.Kind.JSForOfLoop:
-                    return this.visitJSForOfLoop(tree as unknown as JS.JSForOfLoop, p);
-                case JS.Kind.JSForInLoop:
-                    return this.visitJSForInLoop(tree as unknown as JS.JSForInLoop, p);
-                case JS.Kind.JSForInOfLoopControl:
-                    return this.visitJSForInOfLoopControl(tree as unknown as JS.JSForInOfLoopControl, p);
+                case JS.Kind.ForOfLoop:
+                    return this.visitForOfLoop(tree as unknown as JS.ForOfLoop, p);
+                case JS.Kind.ForInLoop:
+                    return this.visitForInLoop(tree as unknown as JS.ForInLoop, p);
                 case JS.Kind.JSTry:
                     return this.visitJSTry(tree as unknown as JS.JSTry, p);
                 case JS.Kind.JSCatch:

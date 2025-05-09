@@ -24,7 +24,6 @@ import org.openrewrite.javascript.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
-import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
@@ -1048,15 +1047,15 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return isd;
     }
 
-    public J visitJSForOfLoop(JS.JSForOfLoop jsForOfLoop, P p) {
-        JS.JSForOfLoop f = jsForOfLoop;
+    public J visitForOfLoop(JS.ForOfLoop forOfLoop, P p) {
+        JS.ForOfLoop f = forOfLoop;
         f = f.withPrefix(visitSpace(f.getPrefix(), JsSpace.Location.FOR_OF_LOOP_PREFIX, p));
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
         Statement temp = (Statement) visitStatement(f, p);
-        if (!(temp instanceof JS.JSForOfLoop)) {
+        if (!(temp instanceof JS.ForOfLoop)) {
             return temp;
         } else {
-            f = (JS.JSForOfLoop) temp;
+            f = (JS.ForOfLoop) temp;
         }
         f = f.getPadding().withAwait(requireNonNull(visitLeftPadded(f.getPadding().getAwait(), JsLeftPadded.Location.FOR_OF_AWAIT, p)));
         f = f.withControl(requireNonNull(visitAndCast(f.getControl(), p)));
@@ -1064,28 +1063,19 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return f;
     }
 
-    public J visitJSForInLoop(JS.JSForInLoop jsForInLoop, P p) {
-        JS.JSForInLoop f = jsForInLoop;
+    public J visitForInLoop(JS.ForInLoop forInLoop, P p) {
+        JS.ForInLoop f = forInLoop;
         f = f.withPrefix(visitSpace(f.getPrefix(), JsSpace.Location.FOR_IN_LOOP_PREFIX, p));
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
         Statement temp = (Statement) visitStatement(f, p);
-        if (!(temp instanceof JS.JSForInLoop)) {
+        if (!(temp instanceof JS.ForInLoop)) {
             return temp;
         } else {
-            f = (JS.JSForInLoop) temp;
+            f = (JS.ForInLoop) temp;
         }
         f = f.withControl(requireNonNull(visitAndCast(f.getControl(), p)));
         f = f.getPadding().withBody(requireNonNull(visitRightPadded(f.getPadding().getBody(), JsRightPadded.Location.FOR_BODY, p)));
         return f;
-    }
-
-    public J visitJSForInOfLoopControl(JS.JSForInOfLoopControl jsForInOfLoopControl, P p) {
-        JS.JSForInOfLoopControl c = jsForInOfLoopControl;
-        c = c.withPrefix(visitSpace(c.getPrefix(), JsSpace.Location.FOR_LOOP_CONTROL_PREFIX, p));
-        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        c = c.getPadding().withVariable(requireNonNull(visitRightPadded(c.getPadding().getVariable(), JsRightPadded.Location.FOR_CONTROL_VAR, p)));
-        c = c.getPadding().withIterable(requireNonNull(visitRightPadded(c.getPadding().getIterable(), JsRightPadded.Location.FOR_CONTROL_ITER, p)));
-        return c;
     }
 
     public J visitJSTry(JS.JSTry jsTry, P p) {

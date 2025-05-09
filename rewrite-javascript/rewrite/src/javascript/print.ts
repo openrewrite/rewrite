@@ -1713,7 +1713,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return forLoop;
     }
 
-    override async visitJSForOfLoop(loop: JS.JSForOfLoop, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitForOfLoop(loop: JS.ForOfLoop, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(loop, p);
         p.append("for");
         if (loop.await.element) {
@@ -1732,7 +1732,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return loop;
     }
 
-    override async visitJSForInLoop(loop: JS.JSForInLoop, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitForInLoop(loop: JS.ForInLoop, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(loop, p);
         p.append("for");
 
