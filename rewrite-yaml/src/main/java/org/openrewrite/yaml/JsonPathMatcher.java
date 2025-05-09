@@ -28,14 +28,14 @@ import org.openrewrite.Tree;
 import org.openrewrite.yaml.internal.grammar.JsonPathLexer;
 import org.openrewrite.yaml.internal.grammar.JsonPathParser;
 import org.openrewrite.yaml.internal.grammar.JsonPathParserBaseVisitor;
-import org.openrewrite.yaml.internal.grammar.JsonPathParserVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.disjoint;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 /**
  * Provides methods for matching the given cursor location to a specified JsonPath expression.
@@ -54,50 +54,71 @@ public class JsonPathMatcher {
         this.jsonPath = jsonPath;
     }
 
-    public <T> Optional<T> find(Cursor cursor) {
-        return find0(cursor, resolvedAncestors(cursor));
+    /**
+     * Find all leaf nodes that match the JSONPath expression starting from the given cursor.
+     * For root expressions ($), returns empty list if cursor is not at document root.
+     *
+     * @param startCursor The cursor position to start matching from
+     * @return List of matching leaf nodes
+     */
+    public @Nullable List<Object> findMatchingLeaves(Cursor startCursor) {
+        // For root expressions, verify we're at document root
+        if (jsonPath.startsWith("$") && !isAtDocumentRoot(startCursor)) {
+            return Collections.emptyList();
+        }
+
+        JsonPathParser.JsonPathContext ctx = parse();
+        JsonPathYamlVisitor visitor = new JsonPathYamlVisitor(startCursor, startCursor.getValue());
+        Object result = visitor.visit(ctx);
+        if (result instanceof List) {
+            //noinspection unchecked
+            return (List<Object>) result;
+        } else //noinspection ConstantValue
+            if (result != null) {
+                return singletonList(result);
+            }
+        return jsonPath.startsWith("$") ? emptyList() : null;
     }
 
-    private <T> Optional<T> find0(Cursor cursor, List<Tree> cursorPath) {
-        if (cursorPath.isEmpty()) {
-            return Optional.empty();
-        }
-
-        Tree start;
-        if (jsonPath.startsWith(".") && !jsonPath.startsWith("..")) {
-            start = cursor.getValue();
-        } else {
-            start = cursorPath.get(0);
-        }
-        JsonPathParser.JsonPathContext ctx = parse();
-        // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
-        JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
-        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, start, stop, false);
-        Object result = v.visit(ctx);
-
-        //noinspection unchecked
-        return Optional.ofNullable((T) result);
+    private boolean isAtDocumentRoot(Cursor cursor) {
+        return cursor.getValue() instanceof Yaml.Document;
     }
 
     public boolean matches(Cursor cursor) {
-        List<Tree> cursorPath = resolvedAncestors(cursor);
-        Object cursorValue = cursorPath.get(cursorPath.size() - 1);
-        return find0(cursor, cursorPath).map(o -> {
-            if (o instanceof List) {
-                //noinspection unchecked
-                List<Object> l = (List<Object>) o;
-                return !disjoint(l, cursorPath) && l.contains(cursorValue);
-            } else {
-                return Objects.equals(o, cursorValue);
-            }
-        }).orElse(false);
+        Optional<List<Object>> matches = find(cursor);
+        return matches.isPresent() && matches.get().contains(cursor.<Yaml>getValue());
     }
 
-    private static List<Tree> resolvedAncestors(Cursor cursor) {
+    public Optional<List<Object>> find(Cursor cursor) {
+        List<Object> matches = jsonPath.startsWith("$") ? cursor.getNearestMessage("jsonpath:" + jsonPath) :
+                cursor.getMessage("jsonpath:" + jsonPath);
+        if (matches == null) {
+            if (jsonPath.startsWith("$") && !isAtDocumentRoot(cursor)) {
+                return find(cursor.getParentOrThrow());
+            }
+            Cursor parent = resolvedAncestors(cursor);
+            while (matches == null && parent.getParent() != null) {
+                if (parent.getValue() instanceof Tree) {
+                    matches = findMatchingLeaves(parent);
+                }
+                parent = parent.getParent();
+            }
+            if (matches != null) {
+                parent.putMessage("jsonpath:" + jsonPath, matches);
+            }
+        }
+        return Optional.ofNullable(matches);
+    }
+
+    private static Cursor resolvedAncestors(Cursor cursor) {
         ArrayDeque<Tree> deque = new ArrayDeque<>();
         Map<Tree, Tree> resolved = new IdentityHashMap<>();
-        for (Iterator<Object> it = cursor.getPath(Tree.class::isInstance); it.hasNext(); ) {
-            Tree tree = (Tree) it.next();
+        Cursor newCursor = null;
+        for (; cursor.getParent() != null; cursor = cursor.getParent()) {
+            if (!(cursor.getValue() instanceof Tree)) {
+                continue;
+            }
+            Tree tree = cursor.getValue();
             if (tree instanceof Yaml.Document) {
                 tree = new ReplaceAliasWithAnchorValueVisitor<Integer>() {
                     @Override
@@ -114,20 +135,15 @@ public class JsonPathMatcher {
                     }
                 }.visitNonNull(tree, 0);
                 deque.addFirst(tree);
+                newCursor = cursor.getParent();
                 break;
             }
             deque.addFirst(tree);
         }
-        ArrayList<Tree> list = new ArrayList<>(deque);
-        if (!resolved.isEmpty()) {
-            for (int i = 0; i < list.size(); i++) {
-                Tree tree = list.get(i);
-                if (resolved.containsKey(tree)) {
-                    list.set(i, resolved.get(tree));
-                }
-            }
+        for (Tree tree : deque) {
+            newCursor = new Cursor(newCursor, resolved.getOrDefault(tree, tree));
         }
-        return list;
+        return newCursor;
     }
 
     private JsonPathParser.JsonPathContext parse() {
@@ -144,16 +160,12 @@ public class JsonPathMatcher {
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     private static class JsonPathYamlVisitor extends JsonPathParserBaseVisitor<Object> {
 
-        private final List<Tree> cursorPath;
+        private final Cursor cursor;
         protected Object scope;
-        private final JsonPathParser.ExpressionContext stop;
-        private final boolean isRecursiveDescent;
 
-        public JsonPathYamlVisitor(List<Tree> cursorPath, Object scope, JsonPathParser.ExpressionContext stop, boolean isRecursiveDescent) {
-            this.cursorPath = cursorPath;
+        public JsonPathYamlVisitor(Cursor cursor, Object scope) {
+            this.cursor = cursor;
             this.scope = scope;
-            this.stop = stop;
-            this.isRecursiveDescent = isRecursiveDescent;
         }
 
         @Override
@@ -174,13 +186,17 @@ public class JsonPathMatcher {
         @Override
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
             MATCH:
-            if (ctx.ROOT() != null || ctx.start.getType() == JsonPathLexer.LBRACK) {
-                Tree first = cursorPath.get(0);
-                if (first instanceof Yaml.Document) {
-                    scope = ((Yaml.Document) first).getBlock();
-                    break MATCH;
+            if (ctx.ROOT() != null || "[".equals(ctx.start.getText())) {
+                Cursor c = cursor;
+                while (c.getParent() != null) {
+                    if (c.getValue() instanceof Yaml.Document) {
+                        scope = ((Yaml.Document) c.getValue()).getBlock();
+                        break MATCH;
+                    }
+                    c = c.getParent();
                 }
-                for (Tree tree : cursorPath) {
+                for (c = cursor; c.getParent() != null; c = c.getParent()) {
+                    Object tree = c.getValue();
                     if (tree instanceof Yaml.Mapping) {
                         scope = tree;
                         break MATCH;
@@ -204,34 +220,50 @@ public class JsonPathMatcher {
                 return null;
             }
 
-            Object result = null;
-            // A recursive descent at the start of the expression or declared in a filter must check the entire cursor patch.
-            // `$..foo` or `$.foo..bar[?($..buz == 'buz')]`
-            List<ParseTree> previous = ctx.getParent().getParent().children;
-            ParserRuleContext current = ctx.getParent();
-            if (previous.indexOf(current) - 1 < 0 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
-                List<Object> results = new ArrayList<>();
-                for (Tree path : cursorPath) {
-                    JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, path, null, false);
-                    for (int i = 1; i < ctx.getChildCount(); i++) {
-                        result = v.visit(ctx.getChild(i));
-                        if (result != null) {
-                            results.add(result);
-                        }
+            List<Object> results = new ArrayList<>();
+
+            // For all nested nodes under the current scope, try to match the pattern
+            collectRecursively(scope, ctx.getChild(1), results);
+
+            return getResultFromList(results);
+        }
+
+        private void collectRecursively(Object node, ParseTree matchCtx, List<Object> results) {
+            // Try to match at the current node
+            Object originalScope = scope;
+            scope = node;
+            Object result = visit(matchCtx);
+            if (result != null) {
+                if (result instanceof List) {
+                    if (!((List<?>) result).isEmpty()) {
+                        results.addAll((List<?>) result);
                     }
-                }
-                return results;
-                // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
-            } else {
-                JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, scope, null, true);
-                for (int i = 1; i < ctx.getChildCount(); i++) {
-                    result = v.visit(ctx.getChild(i));
-                    if (result != null) {
-                        break;
-                    }
+                } else {
+                    results.add(result);
                 }
             }
-            return result;
+            scope = originalScope;
+
+            // Recursively check all child nodes
+            if (node instanceof Yaml.Mapping) {
+                Yaml.Mapping obj = (Yaml.Mapping) node;
+                for (Yaml.Mapping.Entry entry : obj.getEntries()) {
+                    collectRecursively(entry.getValue(), matchCtx, results);
+                }
+            } else if (node instanceof Yaml.Sequence) {
+                Yaml.Sequence sequence = (Yaml.Sequence) node;
+                for (Yaml.Sequence.Entry entry : sequence.getEntries()) {
+                    collectRecursively(entry.getBlock(), matchCtx, results);
+                }
+            } else if (node instanceof Yaml.Scalar) {
+                collectRecursively(((Yaml.Scalar) node).getValue(), matchCtx, results);
+            } else if (node instanceof Yaml.Sequence.Entry) {
+                collectRecursively(((Yaml.Sequence.Entry) node).getBlock(), matchCtx, results);
+            } else if (node instanceof Yaml.Mapping.Entry) {
+                collectRecursively(((Yaml.Mapping.Entry) node).getValue(), matchCtx, results);
+            }
+
+            scope = originalScope;
         }
 
         @Override
@@ -327,42 +359,23 @@ public class JsonPathMatcher {
         public @Nullable Object visitProperty(JsonPathParser.PropertyContext ctx) {
             if (scope instanceof Yaml.Mapping) {
                 Yaml.Mapping mapping = (Yaml.Mapping) scope;
-                if (isRecursiveDescent) {
-                    scope = mapping.getEntries();
-                    Object result = getResultFromList(visitProperty(ctx));
-                    return getResultFromList(result);
-                } else {
-                    for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-                        if (entry instanceof Yaml.Mapping.Entry) {
-                            String key = entry.getKey().getValue();
-                            String name = ctx.StringLiteral() != null ?
-                                    unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
-                            if (key.equals(name)) {
-                                return entry;
-                            }
+                for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+                    if (entry instanceof Yaml.Mapping.Entry) {
+                        String key = entry.getKey().getValue();
+                        String name = ctx.StringLiteral() != null ?
+                                unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                        if (key.equals(name)) {
+                            return entry;
                         }
                     }
                 }
             } else if (scope instanceof Yaml.Mapping.Entry) {
                 Yaml.Mapping.Entry member = (Yaml.Mapping.Entry) scope;
 
-                List<Object> matches = new ArrayList<>();
                 String key = member.getKey().getValue();
                 String name = ctx.StringLiteral() != null ?
                         unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
-                if (isRecursiveDescent) {
-                    if (key.equals(name)) {
-                        matches.add(member);
-                    }
-                    if (!(member.getValue() instanceof Yaml.Scalar)) {
-                        scope = member.getValue();
-                        Object result = getResultFromList(visitProperty(ctx));
-                        if (result != null) {
-                            matches.add(result);
-                        }
-                    }
-                    return getResultFromList(matches);
-                } else if (((member.getValue() instanceof Yaml.Scalar))) {
+                if (((member.getValue() instanceof Yaml.Scalar))) {
                     return key.equals(name) ? member : null;
                 }
 
@@ -388,7 +401,6 @@ public class JsonPathMatcher {
                     scope = object;
                     Object result = visitProperty(ctx);
                     if (result instanceof List) {
-                        // Unwrap lists of results from visitProperty to match the position of the cursor.
                         matches.addAll(((List<Object>) result));
                     } else if (result != null) {
                         matches.add(result);
@@ -403,19 +415,18 @@ public class JsonPathMatcher {
         @Override
         public @Nullable Object visitWildcard(JsonPathParser.WildcardContext ctx) {
             if (scope instanceof Yaml.Mapping) {
-                Yaml.Mapping mapping = (Yaml.Mapping) scope;
-                return mapping.getEntries();
+                List<Object> matches = new ArrayList<>();
+                for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) scope).getEntries()) {
+                    matches.add(entry.getValue());
+                }
+                return getResultFromList(matches);
             } else if (scope instanceof Yaml.Mapping.Entry) {
                 Yaml.Mapping.Entry member = (Yaml.Mapping.Entry) scope;
                 return member.getValue();
             } else if (scope instanceof Yaml.Sequence) {
                 List<Object> matches = new ArrayList<>();
                 for (Yaml.Sequence.Entry entry : ((Yaml.Sequence) scope).getEntries()) {
-                    scope = entry;
-                    Object result = visitWildcard(ctx);
-                    if (result != null) {
-                        matches.add(result);
-                    }
+                    matches.add(entry.getBlock());
                 }
                 return getResultFromList(matches);
             } else if (scope instanceof Yaml.Sequence.Entry) {
@@ -426,23 +437,20 @@ public class JsonPathMatcher {
                 for (Object object : ((List<Object>) scope)) {
                     scope = object;
                     Object result = visitWildcard(ctx);
-                    if (result != null) {
+                    if (result instanceof List) {
+                        results.addAll(((List<Object>) result));
+                    } else if (result != null) {
                         results.add(result);
                     }
                 }
 
                 List<Object> matches = new ArrayList<>();
-                if (stop != null && stop == getExpressionContext(ctx)) {
-                    // Return the values of each result when the JsonPath ends with a wildcard.
-                    results.forEach(o -> matches.add(getValue(o)));
-                } else {
-                    // Unwrap lists of results from visitProperty to match the position of the cursor.
-                    for (Object result : results) {
-                        if (result instanceof List) {
-                            matches.addAll(((List<Object>) result));
-                        } else if (result != null) {
-                            matches.add(result);
-                        }
+                // Unwrap lists of results from visitProperty to match the position of the cursor.
+                for (Object result : results) {
+                    if (result instanceof List) {
+                        matches.addAll(((List<Object>) result));
+                    } else if (result != null) {
+                        matches.add(result);
                     }
                 }
 
@@ -477,8 +485,13 @@ public class JsonPathMatcher {
                         return scope;
                     }
                 } else if (scope instanceof Yaml.Mapping) {
-                    scope = ((Yaml.Mapping) scope).getEntries();
-                    return visitUnaryExpression(ctx);
+                    Yaml.Mapping mapping = (Yaml.Mapping) scope;
+                    for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+                        scope = entry;
+                        if (visitUnaryExpression(ctx) != null) {
+                            return entry;
+                        }
+                    }
                 } else if (scope instanceof Yaml.Mapping.Entry) {
                     Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) scope;
                     if (ctx.Identifier() != null || ctx.StringLiteral() != null) {
@@ -542,7 +555,7 @@ public class JsonPathMatcher {
                         matches.add(mappingOrEntry);
                     }
                 }
-                return matches;
+                return getResultFromList(matches);
             } else {
                 return getOperatorResult(lhs, operator, rhs);
             }
@@ -602,48 +615,81 @@ public class JsonPathMatcher {
         }
 
         @Override
+        public Object visitFilterExpression(JsonPathParser.FilterExpressionContext ctx) {
+            Object originalScope = scope;
+
+            List<Object> result = new ArrayList<>();
+            if (originalScope instanceof List) {
+                for (Object o : ((List<?>) originalScope)) {
+                    scope = o;
+                    if (super.visitFilterExpression(ctx) != null) {
+                        result.add(o);
+                    }
+                }
+            } else if (originalScope instanceof Yaml.Mapping.Entry && ((Yaml.Mapping.Entry) originalScope).getValue() instanceof Yaml.Sequence) {
+                Yaml.Sequence sequence = (Yaml.Sequence) ((Yaml.Mapping.Entry) originalScope).getValue();
+                for (Yaml.Sequence.Entry entry : sequence.getEntries()) {
+                    scope = entry.getBlock();
+                    if (super.visitFilterExpression(ctx) != null) {
+                        result.add(entry.getBlock());
+                    }
+                }
+            } else if (originalScope instanceof Yaml.Sequence.Entry && ((Yaml.Sequence.Entry) originalScope).getBlock() instanceof Yaml.Sequence) {
+                Yaml.Sequence array = (Yaml.Sequence) ((Yaml.Sequence.Entry) originalScope).getBlock();
+                for (Yaml.Sequence.Entry entry : array.getEntries()) {
+                    scope = entry.getBlock();
+                    if (super.visitFilterExpression(ctx) != null) {
+                        result.add(entry.getBlock());
+                    }
+                }
+            } else if (originalScope instanceof Yaml.Sequence) {
+                Yaml.Sequence sequence = (Yaml.Sequence) originalScope;
+                for (Yaml.Sequence.Entry value : sequence.getEntries()) {
+                    scope = value.getBlock();
+                    if (super.visitFilterExpression(ctx) != null) {
+                        result.add(value.getBlock());
+                    }
+                }
+            } else if (originalScope instanceof Yaml.Mapping) {
+                Yaml.Mapping mapping = (Yaml.Mapping) originalScope;
+                for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+                    scope = entry;
+                    if (super.visitFilterExpression(ctx) != null) {
+                        result.add(entry);
+                    }
+                }
+            } else {
+                Object o = super.visitFilterExpression(ctx);
+                if (o != null) {
+                    result.add(originalScope);
+                }
+            }
+            return getResultFromList(result);
+        }
+
+        @Override
         public @Nullable Object visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) {
             Object lhs = ctx.children.get(0);
             Object rhs = ctx.children.get(2);
 
             if (ctx.LOGICAL_OPERATOR() != null) {
-                String operator;
-                switch (ctx.LOGICAL_OPERATOR().getText()) {
-                    case ("&&"):
-                        operator = "&&";
-                        break;
-                    case ("||"):
-                        operator = "||";
-                        break;
-                    default:
-                        return false;
+                Object originalScope = scope;
+                Object lhsResult = getBinaryExpressionResult(ctx.children.get(0));
+                scope = originalScope;
+                Object rhsResult = getBinaryExpressionResult(ctx.children.get(2));
+                scope = originalScope;
+
+                if ("&&".equals(ctx.LOGICAL_OPERATOR().getText())) {
+                    if (lhsResult != null && rhsResult != null) {
+                        return scope;
+                    }
+                } else if ("||".equals(ctx.LOGICAL_OPERATOR().getText())) {
+                    if (lhsResult != null || rhsResult != null) {
+                        return scope;
+                    }
                 }
 
-                Object scopeOfLogicalOp = scope;
-                lhs = getBinaryExpressionResult(lhs);
-
-                scope = scopeOfLogicalOp;
-                rhs = getBinaryExpressionResult(rhs);
-                if ("&&".equals(operator) &&
-                    ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) &&
-                     (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
-                    // Return the result of the evaluated expression.
-                    if (lhs instanceof Yaml) {
-                        return rhs;
-                    } else if (rhs instanceof Yaml) {
-                        return lhs;
-                    }
-
-                    // Return the result of the expression that has the fewest matches.
-                    if (lhs instanceof List && rhs instanceof List && ((List<?>) lhs).size() != ((List<?>) rhs).size()) {
-                        return ((List<?>) lhs).size() < ((List<?>) rhs).size() ? lhs : rhs;
-                    }
-                    return scopeOfLogicalOp;
-                } else if ("||".equals(operator) &&
-                           ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) ||
-                            (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
-                    return scopeOfLogicalOp;
-                }
+                return null;
             } else if (ctx.EQUALITY_OPERATOR() != null) {
                 // Equality operators may resolve the LHS and RHS without caching scope.
                 Object originalScope = scope;
@@ -673,7 +719,7 @@ public class JsonPathMatcher {
                     if (!matches.isEmpty() && originalScope instanceof Yaml.Mapping.Entry && ((Yaml.Mapping.Entry) originalScope).getValue() instanceof Yaml.Mapping) {
                         return originalScope;
                     }
-                    return matches;
+                    return getResultFromList(matches);
                 } else {
                     if (originalScope instanceof Yaml.Mapping.Entry) {
                         if (getOperatorResult(lhs, operator, rhs) != null) {
@@ -732,10 +778,6 @@ public class JsonPathMatcher {
         }
 
         private boolean checkObjectEquality(Object lhs, String operator, Object rhs) {
-            if (lhs == null || rhs == null) {
-                return false;
-            }
-
             BiPredicate<Object, Object> predicate = (lh, rh) -> {
                 switch (operator) {
                     case "==":
@@ -780,32 +822,6 @@ public class JsonPathMatcher {
                 }
             }
             return results;
-        }
-
-        // Extract the value from a Json object.
-        private @Nullable Object getValue(Object result) {
-            if (result instanceof Yaml.Mapping.Entry) {
-                return getValue(((Yaml.Mapping.Entry) result).getValue());
-            } else if (result instanceof Yaml.Mapping) {
-                return ((Yaml.Mapping) result).getEntries();
-            } else if (result instanceof List) {
-                List<Object> list = new ArrayList<>();
-                for (Object o : ((List<Object>) result)) {
-                    Object value = getValue(o);
-                    if (value != null) {
-                        list.add(value);
-                    }
-                }
-                return list;
-            } else if (result instanceof Yaml.Sequence) {
-                return ((Yaml.Sequence) result).getEntries();
-            } else if (result instanceof Yaml.Scalar) {
-                return ((Yaml.Scalar) result).getValue();
-            } else if (result instanceof String) {
-                return result;
-            }
-
-            return null;
         }
 
         private static String unquoteStringLiteral(String literal) {
