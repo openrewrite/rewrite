@@ -78,9 +78,7 @@ class RecipeRunStatsTest implements RewriteTest {
               RecipeRunStats.Row row = rows.get(0);
               assertThat(row.getRecipe()).endsWith("RecipeWithApplicabilityTest");
               assertThat(row.getSourceFiles())
-                .as("Test framework will invoke the recipe once when it is expected to make a change, " +
-                    "then once again when it is expected to make no change")
-                .isEqualTo(2);
+                .isEqualTo(1);
               assertThat(row.getEditMaxNs()).isGreaterThan(0);
               assertThat(row.getEditTotalTimeNs())
                 .as("Cumulative time should be greater than any single visit time")
@@ -112,8 +110,8 @@ class RecipeRunStatsTest implements RewriteTest {
                   .hasSize(2);
                 for (RecipeRunStats.Row row : rows) {
                     assertThat(row.getSourceFiles())
-                      .as("If the same recipe runs with different parameters it shouldn't increment source files count")
-                      .isEqualTo(2);
+                      .as("If the same recipe runs with different parameters it shouldn't increment several times source files count")
+                      .isEqualTo(1);
                 }
             }).expectedCyclesThatMakeChanges(2),
           text("sem", "sam2")

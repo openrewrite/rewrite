@@ -181,6 +181,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         return null;
                     }
 
+                    recipeRunStats.recordSourceVisited(source);
                     SourceFile after = source;
 
                     try {
