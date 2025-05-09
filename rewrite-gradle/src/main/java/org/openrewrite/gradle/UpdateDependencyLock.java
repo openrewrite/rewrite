@@ -24,7 +24,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.text.PlainText;
@@ -33,21 +32,10 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.gradle.UpgradeDependencyVersion.replaceVersion;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
-
-    Map<GroupArtifact, String> versionOverrides;
-
-    public UpdateDependencyLock(Map<GroupArtifact, String> versionOverrides) {
-        this.versionOverrides = versionOverrides;
-    }
-
-    public UpdateDependencyLock() {
-        this(new HashMap<>());
-    }
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
@@ -82,18 +70,10 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
                         empty.add(conf.getName());
                     } else {
                         for (ResolvedDependency resolved : conf.getDirectResolved()) {
-                            lockedVersions.computeIfAbsent(getVersion(resolved), k -> new TreeSet<>()).add(conf.getName());
+                            lockedVersions.computeIfAbsent(resolved.getGav().asGroupArtifactVersion(), k -> new TreeSet<>()).add(conf.getName());
                         }
                     }
                 });
-
-        for (Map.Entry<GroupArtifactVersion, SortedSet<String>> entry : lockedVersions.entrySet()) {
-            if (versionOverrides.containsKey(entry.getKey().asGroupArtifact())) {
-                SortedSet<String> configurations = entry.getValue();
-                GroupArtifactVersion lockedVersion = entry.getKey();
-                project = replaceVersion(project, ctx, lockedVersion, configurations);
-            }
-        }
 
         Arrays.stream(text.split("\n")).forEach(lock -> {
             if (isComment(lock)) {
@@ -110,13 +90,13 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
         });
 
         StringBuilder sb = new StringBuilder();
-        if (comments != null && !comments.isEmpty()) {
+        if (!comments.isEmpty()) {
             sb.append(String.join("\n", comments));
         }
-        if (comments != null && !comments.isEmpty() && locks != null && !locks.isEmpty()) {
+        if (!comments.isEmpty() && !locks.isEmpty()) {
             sb.append("\n");
         }
-        if (locks != null && !locks.isEmpty()) {
+        if (!locks.isEmpty()) {
             sb.append(String.join("\n", locks));
         }
         sb.append("\n").append(asLock(null, empty));
@@ -125,14 +105,6 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
             return tree;
         }
         return plainText.withText(sb.toString()).withMarkers(tree.getMarkers().setByType(project));
-    }
-
-    private GroupArtifactVersion getVersion(ResolvedDependency dependency) {
-        GroupArtifactVersion gav = dependency.getGav().asGroupArtifactVersion();
-        if (versionOverrides.containsKey(gav.asGroupArtifact())) {
-            return gav.withVersion(versionOverrides.get(gav.asGroupArtifact()));
-        }
-        return gav;
     }
 
     private @Nullable String asLock(@Nullable GroupArtifactVersion gav, @Nullable Set<String> configurations) {
