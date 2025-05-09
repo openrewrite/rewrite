@@ -113,7 +113,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitDefaultType(JS.DefaultType defaultType, RpcSendQueue q) {
         q.getAndSend(defaultType, JS.DefaultType::getLeft, el -> visit(el, q));
-        q.getAndSend(defaultType, el -> asRef(el.getBeforeEquals()), el -> visitSpace(getValueNonNull(el), q));
+        q.getAndSend(defaultType, JS.DefaultType::getBeforeEquals, el -> visitSpace(getValueNonNull(el), q));
         q.getAndSend(defaultType, JS.DefaultType::getRight, el -> visit(el, q));
         if (defaultType.getType() != null) {
             q.getAndSend(defaultType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
@@ -136,7 +136,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
             q.getAndSend(export, el -> el.getPadding().getExports(), el -> visitContainer(el, q));
         }
         if (export.getFrom() != null) {
-            q.getAndSend(export, el -> asRef(el.getFrom()), el -> visitSpace(getValueNonNull(el), q));
+            q.getAndSend(export, JS.Export::getFrom, el -> visitSpace(getValueNonNull(el), q));
         }
         if (export.getTarget() != null) {
             q.getAndSend(export, JS.Export::getTarget, el -> visit(el, q));
@@ -257,7 +257,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
             q.getAndSend(jSVariableDeclarations, JS.JSVariableDeclarations::getTypeExpression, el -> visit(el, q));
         }
         if (jSVariableDeclarations.getVarargs() != null) {
-            q.getAndSend(jSVariableDeclarations, el -> asRef(el.getVarargs()), el -> visitSpace(getValueNonNull(el), q));
+            q.getAndSend(jSVariableDeclarations, JS.JSVariableDeclarations::getVarargs, el -> visitSpace(getValueNonNull(el), q));
         }
         q.getAndSendList(jSVariableDeclarations, el -> el.getPadding().getVariables(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return jSVariableDeclarations;
@@ -287,7 +287,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitImportTypeAttributes(JS.ImportTypeAttributes importTypeAttributes, RpcSendQueue q) {
         q.getAndSend(importTypeAttributes, el -> el.getPadding().getToken(), el -> visitRightPadded(el, q));
         q.getAndSend(importTypeAttributes, el -> el.getPadding().getElements(), el -> visitContainer(el, q));
-        q.getAndSend(importTypeAttributes, el -> asRef(el.getEnd()), el -> visitSpace(getValueNonNull(el), q));
+        q.getAndSend(importTypeAttributes, JS.ImportTypeAttributes::getEnd, el -> visitSpace(getValueNonNull(el), q));
         return importTypeAttributes;
     }
 

@@ -43,7 +43,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => asRef(j2.prefix), space => this.visitSpace(space, q));
+        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
         await q.sendMarkers(j, j2 => j2.markers);
         return j;
     }
@@ -56,7 +56,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(cu, c => c.fileAttributes);
         await q.getAndSendList(cu, c => c.imports, imp => imp.element.id, imp => this.visitRightPadded(imp, q));
         await q.getAndSendList(cu, c => c.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
-        await q.getAndSend(cu, c => asRef(c.eof), space => this.visitSpace(space, q));
+        await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
         return cu;
     }
 
@@ -92,7 +92,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitDefaultType(defaultType: JS.DefaultType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(defaultType, el => el.left, el => this.visit(el, q));
-        await q.getAndSend(defaultType, el => asRef(el.beforeEquals), el => this.visitSpace(el, q));
+        await q.getAndSend(defaultType, el => el.beforeEquals, el => this.visitSpace(el, q));
         await q.getAndSend(defaultType, el => el.right, el => this.visit(el, q));
         await q.getAndSend(defaultType, el => asRef(el.type), el => this.visitType(el, q));
         return defaultType;
@@ -106,7 +106,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitExport(export_: JS.Export, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(export_, el => el.exports, el => this.visitContainer(el, q));
-        await q.getAndSend(export_, el => asRef(el.from), el => this.visitSpace(el, q));
+        await q.getAndSend(export_, el => el.from, el => this.visitSpace(el, q));
         await q.getAndSend(export_, el => el.target, el => this.visit(el, q));
         await q.getAndSend(export_, el => el.initializer, el => this.visitLeftPadded(el, q));
         return export_;
@@ -181,7 +181,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSendList(jSVariableDeclarations, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
         await q.getAndSendList(jSVariableDeclarations, el => el.modifiers, el => el.id, el => this.visit(el, q));
         await q.getAndSend(jSVariableDeclarations, el => el.typeExpression, el => this.visit(el, q));
-        await q.getAndSend(jSVariableDeclarations, el => asRef(el.varargs), el => this.visitSpace(el, q));
+        await q.getAndSend(jSVariableDeclarations, el => el.varargs, el => this.visitSpace(el, q));
         await q.getAndSendList(jSVariableDeclarations, el => el.variables, el => el.element.id, el => this.visitRightPadded(el, q));
         return jSVariableDeclarations;
     }
@@ -203,7 +203,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     override async visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(importTypeAttributes, el => el.token, el => this.visitRightPadded(el, q));
         await q.getAndSend(importTypeAttributes, el => el.elements, el => this.visitContainer(el, q));
-        await q.getAndSend(importTypeAttributes, el => asRef(el.end), el => this.visitSpace(el, q));
+        await q.getAndSend(importTypeAttributes, el => el.end, el => this.visitSpace(el, q));
         return importTypeAttributes;
     }
 

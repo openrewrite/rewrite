@@ -28,7 +28,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     @Override
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
-        q.getAndSend(j, j2 -> asRef(j2.getPrefix()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(j, J::getPrefix, space -> visitSpace(getValueNonNull(space), q));
         q.sendMarkers(j, Tree::getMarkers);
         return j;
     }
@@ -106,7 +106,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitBlock(J.Block block, RpcSendQueue q) {
         q.getAndSend(block, b -> b.getPadding().getStatic(), s -> visitRightPadded(s, q));
         q.getAndSendList(block, b -> b.getPadding().getStatements(), r -> r.getElement().getId(), stmts -> visitRightPadded(stmts, q));
-        q.getAndSend(block, b -> asRef(b.getEnd()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(block, J.Block::getEnd, space -> visitSpace(getValueNonNull(space), q));
         return block;
     }
 
@@ -159,7 +159,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(cu, c -> c.getPadding().getPackageDeclaration(), pkg -> visitRightPadded(pkg, q));
         q.getAndSendList(cu, c -> c.getPadding().getImports(), r -> r.getElement().getId(), j -> visitRightPadded(j, q));
         q.getAndSendList(cu, J.CompilationUnit::getClasses, Tree::getId, j -> visit(j, q));
-        q.getAndSend(cu, c -> asRef(c.getEof()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(cu, J.CompilationUnit::getEof, space -> visitSpace(getValueNonNull(space), q));
         return cu;
     }
 
@@ -557,7 +557,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSendList(variableDeclarations, J.VariableDeclarations::getLeadingAnnotations, Tree::getId, a -> visit(a, q));
         q.getAndSendList(variableDeclarations, J.VariableDeclarations::getModifiers, Tree::getId, m -> visit(m, q));
         q.getAndSend(variableDeclarations, J.VariableDeclarations::getTypeExpression, type -> visit(type, q));
-        q.getAndSend(variableDeclarations, v -> asRef(v.getVarargs()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(variableDeclarations, J.VariableDeclarations::getVarargs, space -> visitSpace(getValueNonNull(space), q));
         q.getAndSendList(variableDeclarations, v -> v.getPadding().getVariables(), r -> r.getElement().getId(), v -> visitRightPadded(v, q));
         return variableDeclarations;
     }
@@ -584,12 +584,12 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     public <T> void visitLeftPadded(JLeftPadded<T> left, RpcSendQueue q) {
-        q.getAndSend(left, l -> asRef(l.getBefore()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(left, JLeftPadded::getBefore, space -> visitSpace(getValueNonNull(space), q));
         T element = left.getElement();
         if (element instanceof J) {
             q.getAndSend(left, JLeftPadded::getElement, elem -> visit((J) elem, q));
         } else if (element instanceof Space) {
-            q.getAndSend(left, r -> asRef(element), space -> visitSpace(getValueNonNull(space), q));
+            q.getAndSend(left, r -> element, space -> visitSpace(getValueNonNull(space), q));
         } else {
             q.getAndSend(left, JLeftPadded::getElement);
         }
@@ -601,16 +601,16 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         if (element instanceof J) {
             q.getAndSend(right, JRightPadded::getElement, elem -> visit((J) elem, q));
         } else if (element instanceof Space) {
-            q.getAndSend(right, r -> asRef(element), space -> visitSpace(getValueNonNull(space), q));
+            q.getAndSend(right, r -> element, space -> visitSpace(getValueNonNull(space), q));
         } else {
             q.getAndSend(right, JRightPadded::getElement);
         }
-        q.getAndSend(right, r -> asRef(r.getAfter()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(right, JRightPadded::getAfter, space -> visitSpace(getValueNonNull(space), q));
         q.sendMarkers(right, JRightPadded::getMarkers);
     }
 
     public <J2 extends J> void visitContainer(JContainer<J2> container, RpcSendQueue q) {
-        q.getAndSend(container, c -> asRef(c.getBefore()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(container, JContainer::getBefore, space -> visitSpace(getValueNonNull(space), q));
         q.getAndSendList(container, c -> c.getPadding().getElements(), e -> e.getElement().getId(), e -> visitRightPadded(e, q));
         q.sendMarkers(container, JContainer::getMarkers);
     }

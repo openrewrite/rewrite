@@ -26,7 +26,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async preVisit(j: J, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => asRef(j2.prefix), space => this.visitSpace(space, q));
+        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
         await q.sendMarkers(j, j2 => j2.markers);
         return j;
     }
@@ -452,7 +452,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(cu, c => c.packageDeclaration, pkg => this.visitRightPadded(pkg, q));
         await q.getAndSendList(cu, c => c.imports, imp => imp.element.id, imp => this.visitRightPadded(imp, q));
         await q.getAndSendList(cu, c => c.classes, cls => cls.id, cls => this.visit(cls, q));
-        await q.getAndSend(cu, c => asRef(c.eof), space => this.visitSpace(space, q));
+        await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
         return cu;
     }
 
@@ -485,7 +485,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitBlock(block: J.Block, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(block, b => b.static, s => this.visitRightPadded(s, q));
         await q.getAndSendList(block, b => b.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
-        await q.getAndSend(block, b => asRef(b.end), space => this.visitSpace(space, q));
+        await q.getAndSend(block, b => b.end, space => this.visitSpace(space, q));
         return block;
     }
 
@@ -507,7 +507,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSendList(varDecls, v => v.leadingAnnotations, annot => annot.id, annot => this.visit(annot, q));
         await q.getAndSendList(varDecls, v => v.modifiers, mod => mod.id, mod => this.visit(mod, q));
         await q.getAndSend(varDecls, v => v.typeExpression, type => this.visit(type, q));
-        await q.getAndSend(varDecls, v => asRef(v.varargs), space => this.visitSpace(space, q));
+        await q.getAndSend(varDecls, v => v.varargs, space => this.visitSpace(space, q));
         await q.getAndSendList(varDecls, v => v.variables, variable => variable.element.id, variable => this.visitRightPadded(variable, q));
         return varDecls;
     }
@@ -544,11 +544,11 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     public override async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
-        await q.getAndSend(left, l => asRef(l.before), space => this.visitSpace(space, q));
+        await q.getAndSend(left, l => l.before, space => this.visitSpace(space, q));
         if (isTree(left.element)) {
             await q.getAndSend(left, l => l.element, elem => this.visit(elem as J, q));
         } else if (isSpace(left.element)) {
-            await q.getAndSend(left, l => asRef(l.element), space => this.visitSpace(space as J.Space, q));
+            await q.getAndSend(left, l => l.element, space => this.visitSpace(space as J.Space, q));
         } else {
             await q.getAndSend(left, l => l.element);
         }
@@ -562,13 +562,13 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         } else {
             await q.getAndSend(right, r => r.element);
         }
-        await q.getAndSend(right, r => asRef(r.after), space => this.visitSpace(space, q));
+        await q.getAndSend(right, r => r.after, space => this.visitSpace(space, q));
         await q.sendMarkers(right, r => r.markers);
         return right;
     }
 
     public override async visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): Promise<J.Container<T>> {
-        await q.getAndSend(container, c => asRef(c.before), space => this.visitSpace(space, q));
+        await q.getAndSend(container, c => c.before, space => this.visitSpace(space, q));
         await q.getAndSendList(container, c => c.elements, elem => elem.element.id, elem => this.visitRightPadded(elem, q));
         await q.sendMarkers(container, c => c.markers);
         return container;
@@ -1406,18 +1406,20 @@ Object.values(J.Kind).forEach(kind => {
     }
 });
 
+const spaceCodec = RpcCodecs.forType(J.Kind.Space)!;
+
 // Register codecs for all Java markers with additional properties
 RpcCodecs.registerCodec(JavaMarkers.TrailingComma, {
         async rpcReceive(before: TrailingComma, q: RpcReceiveQueue): Promise<TrailingComma> {
             const draft = createDraft(before);
             draft.id = await q.receive(before.id);
-            draft.suffix = await q.receive(before.suffix, space => new JavaReceiver().visitSpace(space, q))
+            draft.suffix = await q.receive(before.suffix, space => spaceCodec.rpcReceive(space, q))
             return finishDraft(draft);
         },
 
         async rpcSend(after: TrailingComma, q: RpcSendQueue): Promise<void> {
             await q.getAndSend(after, a => a.id);
-            await q.getAndSend(after, a => asRef(a.suffix), space => new JavaSender().visitSpace(space, q));
+            await q.getAndSend(after, a => a.suffix, space => spaceCodec.rpcSend(space, q));
         }
     }
 );
