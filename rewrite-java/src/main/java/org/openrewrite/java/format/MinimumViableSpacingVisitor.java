@@ -212,6 +212,20 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.Case visitCase(J.Case _case, P p) {
+        J.Case c = super.visitCase(_case, p);
+
+        if (c.getGuard() != null) {
+            // At a minimum, we need a space between the guard and the case label
+            JContainer.Padding<J> padding = c.getPadding().getCaseLabels().getPadding();
+            return c.getPadding().withCaseLabels(padding.withElements(ListUtils.mapLast(padding.getElements(),
+                    last -> last != null && last.getAfter().isEmpty() ? last.withAfter(Space.SINGLE_SPACE) : last)));
+        }
+
+        return c;
+    }
+
+    @Override
     public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
