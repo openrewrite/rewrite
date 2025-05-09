@@ -46,15 +46,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     //     return cu;
     // }
 
-    override async visitAlias(alias: JS.Alias, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(alias, p);
-        await this.visitRightPadded(alias.propertyName, p);
-        p.append("as");
-        await this.visit(alias.alias, p);
-        await this.afterSyntax(alias, p);
-        return alias;
-    }
-
     override async visitAwait(awaitExpr: JS.Await, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(awaitExpr, p);
         p.append("await");

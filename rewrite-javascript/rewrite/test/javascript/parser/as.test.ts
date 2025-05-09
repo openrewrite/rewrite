@@ -20,7 +20,6 @@ describe('as mapping', () => {
     const spec = new RecipeSpec();
 
     test('primitive type', () => spec.rewriteRun(
-        //language=typescript
-        typescript('1 as number')
+        typescript("1 as number")
     ));
 });
