@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -1037,7 +1036,6 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("PR #5372 was reverted, due to regressions")
     void hiddenVariablesHierarchyRenameBase() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -1133,7 +1131,6 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("PR #5372 was reverted, due to regressions")
     void hiddenVariablesHierarchyRenameExtended() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -1229,7 +1226,6 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("PR #5372 was reverted, due to regressions")
     void hiddenVariablesHierarchyRenameLocal() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
