@@ -24,6 +24,7 @@ import org.openrewrite.javascript.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
+import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
@@ -220,6 +221,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             f = (JS.FunctionType) temp;
         }
+        f = f.withModifiers(requireNonNull(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p))));
         f = f.getPadding().withConstructorType(requireNonNull(visitLeftPadded(f.getPadding().getConstructorType(), JsLeftPadded.Location.FUNCTION_TYPE_CONSTRUCTOR, p)));
         f = f.withTypeParameters(visitAndCast(f.getTypeParameters(), p));
         f = f.getPadding().withParameters(requireNonNull(visitContainer(f.getPadding().getParameters(), JsContainer.Location.FUNCTION_TYPE_PARAMETERS, p)));

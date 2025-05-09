@@ -104,6 +104,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     override async visitFunctionType(functionType: JS.FunctionType, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSendList(functionType, el => el.modifiers, el => el.id, el => this.visit(el, q));
         await q.getAndSend(functionType, el => el.constructorType, el => this.visitLeftPadded(el, q));
         await q.getAndSend(functionType, el => el.typeParameters, el => this.visit(el, q));
         await q.getAndSend(functionType, el => el.parameters, el => this.visitContainer(el, q));
@@ -153,21 +154,21 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return jsImportSpecifier;
     }
 
-    override async visitJSVariableDeclarations(jSVariableDeclarations: JS.JSVariableDeclarations, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(jSVariableDeclarations, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
-        await q.getAndSendList(jSVariableDeclarations, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(jSVariableDeclarations, el => el.typeExpression, el => this.visit(el, q));
-        await q.getAndSend(jSVariableDeclarations, el => el.varargs, el => this.visitSpace(el, q));
-        await q.getAndSendList(jSVariableDeclarations, el => el.variables, el => el.element.id, el => this.visitRightPadded(el, q));
-        return jSVariableDeclarations;
+    override async visitJSVariableDeclarations(variable: JS.JSVariableDeclarations, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSendList(variable, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
+        await q.getAndSendList(variable, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        await q.getAndSend(variable, el => el.typeExpression, el => this.visit(el, q));
+        await q.getAndSend(variable, el => el.varargs, el => this.visitSpace(el, q));
+        await q.getAndSendList(variable, el => el.variables, el => el.element.id, el => this.visitRightPadded(el, q));
+        return variable;
     }
 
-    override async visitJSNamedVariable(jSNamedVariable: JS.JSVariableDeclarations.JSNamedVariable, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(jSNamedVariable, el => el.name, el => this.visit(el, q));
-        await q.getAndSendList(jSNamedVariable, el => el.dimensionsAfterName, el => el.element.whitespace + el.element.comments, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(jSNamedVariable, el => el.initializer, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(jSNamedVariable, el => el.variableType, el => this.visitType(el, q));
-        return jSNamedVariable;
+    override async visitJSNamedVariable(named: JS.JSVariableDeclarations.JSNamedVariable, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(named, el => el.name, el => this.visit(el, q));
+        await q.getAndSendList(named, el => el.dimensionsAfterName, el => el.element.whitespace + el.element.comments, el => this.visitLeftPadded(el, q));
+        await q.getAndSend(named, el => el.initializer, el => this.visitLeftPadded(el, q));
+        await q.getAndSend(named, el => el.variableType, el => this.visitType(el, q));
+        return named;
     }
 
     override async visitImportAttributes(importAttributes: JS.ImportAttributes, q: RpcSendQueue): Promise<J | undefined> {
@@ -655,6 +656,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitFunctionType(functionType: JS.FunctionType, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(functionType);
+        draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
         draft.constructorType = await q.receive(draft.constructorType, el => this.visitLeftPadded(el, q));
         draft.typeParameters = await q.receive(draft.typeParameters, el => this.visitDefined<J.TypeParameters>(el, q));
         draft.parameters = await q.receive(draft.parameters, el => this.visitContainer(el, q));
@@ -710,8 +712,8 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitJSVariableDeclarations(jSVariableDeclarations: JS.JSVariableDeclarations, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(jSVariableDeclarations);
+    override async visitJSVariableDeclarations(variable: JS.JSVariableDeclarations, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(variable);
         draft.leadingAnnotations = await q.receiveListDefined(draft.leadingAnnotations, el => this.visitDefined<J.Annotation>(el, q));
         draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
         draft.typeExpression = await q.receive(draft.typeExpression, el => this.visitDefined<TypeTree>(el, q));
@@ -720,8 +722,8 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitJSNamedVariable(jSNamedVariable: JS.JSVariableDeclarations.JSNamedVariable, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(jSNamedVariable);
+    override async visitJSNamedVariable(named: JS.JSVariableDeclarations.JSNamedVariable, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(named);
         draft.name = await q.receive(draft.name, el => this.visitDefined<Expression>(el, q));
         draft.dimensionsAfterName = await q.receiveListDefined(draft.dimensionsAfterName, el => this.visitLeftPadded(el, q));
         draft.initializer = await q.receive(draft.initializer, el => this.visitLeftPadded(el, q));

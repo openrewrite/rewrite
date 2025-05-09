@@ -1477,6 +1477,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
             constructorType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.NewKeyword)!), true),
             typeParameters: this.mapTypeParametersAsObject(node),
             parameters: {

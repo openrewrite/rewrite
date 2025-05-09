@@ -136,6 +136,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitFunctionType(JS.FunctionType functionType, RpcSendQueue q) {
+        q.getAndSendList(functionType, JS.FunctionType::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSend(functionType, el -> el.getPadding().getConstructorType(), el -> visitLeftPadded(el, q));
         if (functionType.getTypeParameters() != null) {
             q.getAndSend(functionType, JS.FunctionType::getTypeParameters, el -> visit(el, q));
@@ -214,30 +215,30 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitJSVariableDeclarations(JS.JSVariableDeclarations jSVariableDeclarations, RpcSendQueue q) {
-        q.getAndSendList(jSVariableDeclarations, JS.JSVariableDeclarations::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
-        q.getAndSendList(jSVariableDeclarations, JS.JSVariableDeclarations::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        if (jSVariableDeclarations.getTypeExpression() != null) {
-            q.getAndSend(jSVariableDeclarations, JS.JSVariableDeclarations::getTypeExpression, el -> visit(el, q));
+    public J visitJSVariableDeclarations(JS.JSVariableDeclarations variable, RpcSendQueue q) {
+        q.getAndSendList(variable, JS.JSVariableDeclarations::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
+        q.getAndSendList(variable, JS.JSVariableDeclarations::getModifiers, J.Modifier::getId, el -> visit(el, q));
+        if (variable.getTypeExpression() != null) {
+            q.getAndSend(variable, JS.JSVariableDeclarations::getTypeExpression, el -> visit(el, q));
         }
-        if (jSVariableDeclarations.getVarargs() != null) {
-            q.getAndSend(jSVariableDeclarations, JS.JSVariableDeclarations::getVarargs, el -> visitSpace(getValueNonNull(el), q));
+        if (variable.getVarargs() != null) {
+            q.getAndSend(variable, JS.JSVariableDeclarations::getVarargs, el -> visitSpace(getValueNonNull(el), q));
         }
-        q.getAndSendList(jSVariableDeclarations, el -> el.getPadding().getVariables(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
-        return jSVariableDeclarations;
+        q.getAndSendList(variable, el -> el.getPadding().getVariables(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
+        return variable;
     }
 
     @Override
-    public J visitJSVariableDeclarationsJSNamedVariable(JS.JSVariableDeclarations.JSNamedVariable jSNamedVariable, RpcSendQueue q) {
-        q.getAndSend(jSNamedVariable, JS.JSVariableDeclarations.JSNamedVariable::getName, el -> visit(el, q));
-        q.getAndSendList(jSNamedVariable, JS.JSVariableDeclarations.JSNamedVariable::getDimensionsAfterName, el -> el.getElement().getWhitespace() + el.getElement().getComments(), el -> visitLeftPadded(el, q));
-        if (jSNamedVariable.getPadding().getInitializer() != null) {
-            q.getAndSend(jSNamedVariable, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
+    public J visitJSVariableDeclarationsJSNamedVariable(JS.JSVariableDeclarations.JSNamedVariable named, RpcSendQueue q) {
+        q.getAndSend(named, JS.JSVariableDeclarations.JSNamedVariable::getName, el -> visit(el, q));
+        q.getAndSendList(named, JS.JSVariableDeclarations.JSNamedVariable::getDimensionsAfterName, el -> el.getElement().getWhitespace() + el.getElement().getComments(), el -> visitLeftPadded(el, q));
+        if (named.getPadding().getInitializer() != null) {
+            q.getAndSend(named, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
         }
-        if (jSNamedVariable.getVariableType() != null) {
-            q.getAndSend(jSNamedVariable, el -> asRef(el.getVariableType()), el -> visitType(getValueNonNull(el), q));
+        if (named.getVariableType() != null) {
+            q.getAndSend(named, el -> asRef(el.getVariableType()), el -> visitType(getValueNonNull(el), q));
         }
-        return jSNamedVariable;
+        return named;
     }
 
     @Override

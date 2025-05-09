@@ -123,6 +123,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitFunctionType(JS.FunctionType functionType, RpcReceiveQueue q) {
         return functionType
+                .withModifiers(q.receiveList(functionType.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
                 .getPadding().withConstructorType(q.receive(functionType.getPadding().getConstructorType(), el -> visitLeftPadded(el, q)))
                 .withTypeParameters(q.receive(functionType.getTypeParameters(), params -> (J.TypeParameters) visitNonNull(params, q)))
                 .getPadding().withParameters(q.receive(functionType.getPadding().getParameters(), el -> visitContainer(el, q)))
@@ -178,22 +179,22 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitJSVariableDeclarations(JS.JSVariableDeclarations jSVariableDeclarations, RpcReceiveQueue q) {
-        return jSVariableDeclarations
-                .withLeadingAnnotations(q.receiveList(jSVariableDeclarations.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
-                .withModifiers(q.receiveList(jSVariableDeclarations.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .withTypeExpression(q.receive(jSVariableDeclarations.getTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
-                .withVarargs(q.receive(jSVariableDeclarations.getVarargs(), space -> visitSpace(space, q)))
-                .getPadding().withVariables(q.receiveList(jSVariableDeclarations.getPadding().getVariables(), el -> visitRightPadded(el, q)));
+    public J visitJSVariableDeclarations(JS.JSVariableDeclarations variable, RpcReceiveQueue q) {
+        return variable
+                .withLeadingAnnotations(q.receiveList(variable.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
+                .withModifiers(q.receiveList(variable.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
+                .withTypeExpression(q.receive(variable.getTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
+                .withVarargs(q.receive(variable.getVarargs(), space -> visitSpace(space, q)))
+                .getPadding().withVariables(q.receiveList(variable.getPadding().getVariables(), el -> visitRightPadded(el, q)));
     }
 
     @Override
-    public J visitJSVariableDeclarationsJSNamedVariable(JS.JSVariableDeclarations.JSNamedVariable jSNamedVariable, RpcReceiveQueue q) {
-        return jSNamedVariable
-                .withName(q.receive(jSNamedVariable.getName(), expr -> (Expression) visitNonNull(expr, q)))
-                .withDimensionsAfterName(q.receiveList(jSNamedVariable.getDimensionsAfterName(), el -> visitLeftPadded(el, q)))
-                .getPadding().withInitializer(q.receive(jSNamedVariable.getPadding().getInitializer(), el -> visitLeftPadded(el, q)))
-                .withVariableType(q.receive(jSNamedVariable.getVariableType(), type -> (JavaType.Variable) visitType(type, q)));
+    public J visitJSVariableDeclarationsJSNamedVariable(JS.JSVariableDeclarations.JSNamedVariable named, RpcReceiveQueue q) {
+        return named
+                .withName(q.receive(named.getName(), expr -> (Expression) visitNonNull(expr, q)))
+                .withDimensionsAfterName(q.receiveList(named.getDimensionsAfterName(), el -> visitLeftPadded(el, q)))
+                .getPadding().withInitializer(q.receive(named.getPadding().getInitializer(), el -> visitLeftPadded(el, q)))
+                .withVariableType(q.receive(named.getVariableType(), type -> (JavaType.Variable) visitType(type, q)));
     }
 
     @Override

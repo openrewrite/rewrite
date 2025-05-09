@@ -879,6 +879,10 @@ public interface JS extends J {
         @With
         Markers markers;
 
+        @Getter
+        @With
+        List<Modifier> modifiers;
+
         JLeftPadded<Boolean> constructorType;
 
         public boolean isConstructorType() {
@@ -953,7 +957,7 @@ public interface JS extends J {
 
             public FunctionType withConstructorType(JLeftPadded<Boolean> constructor) {
                 return t.constructorType == constructor ? t :
-                        new FunctionType(t.id, t.prefix, t.markers, constructor, t.typeParameters, t.parameters, t.returnType, t.type);
+                        new FunctionType(t.id, t.prefix, t.markers, t.modifiers, constructor, t.typeParameters, t.parameters, t.returnType, t.type);
             }
 
             public JContainer<Statement> getParameters() {
@@ -961,7 +965,7 @@ public interface JS extends J {
             }
 
             public FunctionType withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new FunctionType(t.id, t.prefix, t.markers, t.constructorType, t.typeParameters, parameters, t.returnType, t.type);
+                return t.parameters == parameters ? t : new FunctionType(t.id, t.prefix, t.markers, t.modifiers, t.constructorType, t.typeParameters, parameters, t.returnType, t.type);
             }
 
             public JLeftPadded<Expression> getReturnType() {
@@ -969,7 +973,7 @@ public interface JS extends J {
             }
 
             public FunctionType withReturnType(JLeftPadded<Expression> returnType) {
-                return t.returnType == returnType ? t : new FunctionType(t.id, t.prefix, t.markers, t.constructorType, t.typeParameters, t.parameters, returnType, t.type);
+                return t.returnType == returnType ? t : new FunctionType(t.id, t.prefix, t.markers, t.modifiers, t.constructorType, t.typeParameters, t.parameters, returnType, t.type);
             }
         }
     }

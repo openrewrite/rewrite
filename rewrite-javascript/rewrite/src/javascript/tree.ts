@@ -191,6 +191,7 @@ export namespace JS {
      */
     export interface FunctionType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.FunctionType;
+        readonly modifiers: J.Modifier[];
         readonly constructorType: J.LeftPadded<boolean>;
         readonly typeParameters?: J.TypeParameters;
         readonly parameters: J.Container<Statement>;

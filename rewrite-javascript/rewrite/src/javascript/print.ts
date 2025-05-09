@@ -652,10 +652,12 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitFunctionType(functionType: JS.FunctionType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(functionType, p);
+        for (const m of functionType.modifiers) {
+            await this.visitModifier(m, p);
+        }
         if (functionType.constructorType.element) {
             await this.visitLeftPaddedLocal("new", functionType.constructorType, p);
         }
-
         const typeParameters = functionType.typeParameters;
         if (typeParameters) {
             await this.visitNodes(typeParameters.annotations, p);
