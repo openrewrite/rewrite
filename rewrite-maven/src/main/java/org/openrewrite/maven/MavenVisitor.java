@@ -308,8 +308,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
             if (groupId.equals(d.getGroupId()) &&
                 artifactId.equals(d.getArtifactId()) &&
-                (classifier == null || classifier.equals(d.getClassifier())) &&
-                (type == null || type.equals(d.getType()))) {
+                Objects.equals(classifier, d.getClassifier()) &&
+                d.getType().equals(type == null ? "jar" : type)) {
                 return d;
             }
         }
