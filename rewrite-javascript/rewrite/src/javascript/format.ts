@@ -34,6 +34,14 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         super();
     }
 
+    protected async visitArrayAccess(arrayAccess: J.ArrayAccess, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitArrayAccess(arrayAccess, p) as J.ArrayAccess;
+        return produce(ret, draft => {
+            draft.dimension.index.element.prefix.whitespace = this.style.within.arrayBrackets ? " " : "";
+            draft.dimension.index.after.whitespace = this.style.within.arrayBrackets ? " " : "";
+        });
+    }
+
     protected async visitBinary(binary: J.Binary, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitBinary(binary, p) as J.Binary;
         let property = false;
