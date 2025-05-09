@@ -57,8 +57,8 @@ import {
     isStatement,
     isValidSurrogateRange,
     TextSpan
-} from "./parserUtils";
-import {JavaScriptTypeMapping} from "./typeMapping";
+} from "./parser-utils";
+import {JavaScriptTypeMapping} from "./type-mapping";
 import {produce} from "immer";
 import Kind = JS.Kind;
 

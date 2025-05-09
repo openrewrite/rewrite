@@ -90,14 +90,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return conditionalType;
     }
 
-    override async visitDefaultType(defaultType: JS.DefaultType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(defaultType, el => el.left, el => this.visit(el, q));
-        await q.getAndSend(defaultType, el => el.beforeEquals, el => this.visitSpace(el, q));
-        await q.getAndSend(defaultType, el => el.right, el => this.visit(el, q));
-        await q.getAndSend(defaultType, el => asRef(el.type), el => this.visitType(el, q));
-        return defaultType;
-    }
-
     override async visitDelete(delete_: JS.Delete, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(delete_, el => el.expression, el => this.visit(el, q));
         await q.getAndSend(delete_, el => asRef(el.type), el => this.visitType(el, q));
@@ -654,15 +646,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         const draft = createDraft(conditionalType);
         draft.checkType = await q.receive(draft.checkType, el => this.visitDefined<Expression>(el, q));
         draft.condition = await q.receive(draft.condition, el => this.visitLeftPadded(el, q));
-        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
-        return finishDraft(draft);
-    }
-
-    override async visitDefaultType(defaultType: JS.DefaultType, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(defaultType);
-        draft.left = await q.receive(draft.left, el => this.visitDefined<Expression>(el, q));
-        draft.beforeEquals = await q.receive(draft.beforeEquals, el => this.visitSpace(el, q));
-        draft.right = await q.receive(draft.right, el => this.visitDefined<Expression>(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }

@@ -48,11 +48,6 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.DefaultType visitDefaultType(JS.DefaultType defaultType, P p) {
-        return (JS.DefaultType) super.visitDefaultType(defaultType, p);
-    }
-
-    @Override
     public JS.Delete visitDelete(JS.Delete delete, P p) {
         return (JS.Delete) super.visitDelete(delete, p);
     }

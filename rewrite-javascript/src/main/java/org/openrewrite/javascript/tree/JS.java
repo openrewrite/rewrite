@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 @SuppressWarnings("unused")
@@ -225,7 +226,6 @@ public interface JS extends J {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public <S, T extends S> T service(Class<S> service) {
             String serviceName = service.getName();
             try {
@@ -245,7 +245,7 @@ public interface JS extends J {
                     public JavaType visit(@Nullable JavaType javaType, AtomicInteger n) {
                         if (javaType != null && uniqueIdentity.test(javaType)) {
                             n.incrementAndGet();
-                            return super.visit(javaType, n);
+                            return super.visitNonNull(javaType, n);
                         }
                         //noinspection ConstantConditions
                         return javaType;
@@ -259,7 +259,7 @@ public interface JS extends J {
                 }
 
                 @Override
-                public JavaType visitType(@Nullable JavaType javaType, AtomicInteger n) {
+                public @Nullable JavaType visitType(@Nullable JavaType javaType, AtomicInteger n) {
                     return typeVisitor.visit(javaType, n);
                 }
             }.visit(this, n);
@@ -597,36 +597,6 @@ public interface JS extends J {
             public ConditionalType withCondition(JLeftPadded<J.Ternary> condition) {
                 return t.condition == condition ? t : new ConditionalType(t.id, t.prefix, t.markers, t.checkType, condition, t.type);
             }
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    @With
-    final class DefaultType implements JS, Expression, TypedTree, NameTree {
-
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        Expression left;
-        Space beforeEquals;
-        Expression right;
-
-        @Nullable
-        JavaType type;
-
-        @Override
-        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitDefaultType(this, p);
-        }
-
-        @Transient
-        @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
         }
     }
 
@@ -1210,10 +1180,11 @@ public interface JS extends J {
             return getPadding().withHasTypeof(this.hasTypeof.withElement(hasTypeof));
         }
 
+        @Nullable
         JContainer<J> argumentAndAttributes;
 
         public List<J> getArgumentAndAttributes() {
-            return argumentAndAttributes.getElements();
+            return argumentAndAttributes != null ? argumentAndAttributes.getElements() : emptyList();
         }
 
         public ImportType withArgumentAndAttributes(@Nullable List<J> argumentAndAttributes) {
@@ -1284,11 +1255,11 @@ public interface JS extends J {
                 return t.hasTypeof == hasTypeof ? t : new ImportType(t.id, t.prefix, t.markers, hasTypeof, t.argumentAndAttributes, t.qualifier, t.typeArguments, t.type);
             }
 
-            public JContainer<J> getArgumentAndAttributes() {
+            public @Nullable JContainer<J> getArgumentAndAttributes() {
                 return t.argumentAndAttributes;
             }
 
-            public ImportType withArgumentAndAttributes(JContainer<J> argumentAndAttributes) {
+            public ImportType withArgumentAndAttributes(@Nullable JContainer<J> argumentAndAttributes) {
                 return t.argumentAndAttributes == argumentAndAttributes ? t : new ImportType(t.id, t.prefix, t.markers, t.hasTypeof, argumentAndAttributes, t.qualifier, t.typeArguments, t.type);
             }
 
@@ -2226,7 +2197,7 @@ public interface JS extends J {
                     return t.nameType;
                 }
 
-                public KeysRemapping withNameType(JRightPadded<Expression> nameType) {
+                public KeysRemapping withNameType(@Nullable JRightPadded<Expression> nameType) {
                     return t.nameType == nameType ? t : new KeysRemapping(t.id, t.prefix, t.markers, t.typeParameter, nameType);
                 }
             }
@@ -2484,13 +2455,13 @@ public interface JS extends J {
 
         @Override
         public @Nullable JavaType getType() {
-            return initializer.getType();
+            return initializer == null ? null : initializer.getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public PropertyAssignment withType(@Nullable JavaType type) {
-            return initializer.getType() == type ? this : new PropertyAssignment(id, prefix, markers, name, assigmentToken, initializer.withType(type));
+            return initializer == null || initializer.getType() == type ? this : new PropertyAssignment(id, prefix, markers, name, assigmentToken, initializer.withType(type));
         }
 
         @Override
@@ -3490,7 +3461,7 @@ public interface JS extends J {
         }
 
         public TypePredicate withExpression(@Nullable Expression expression) {
-            return getPadding().withExpression(this.expression.withElement(expression));
+            return getPadding().withExpression(JLeftPadded.withElement(this.expression, expression));
         }
 
         @Getter
@@ -3829,6 +3800,7 @@ public interface JS extends J {
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
+            //noinspection unchecked
             return (T) this;
         }
 
@@ -4096,14 +4068,14 @@ public interface JS extends J {
             JavaType.@Nullable Variable variableType;
 
             @Override
-            public JavaType getType() {
+            public @Nullable JavaType getType() {
                 return variableType != null ? variableType.getType() : null;
             }
 
             @SuppressWarnings("unchecked")
             @Override
             public JSNamedVariable withType(@Nullable JavaType type) {
-                return variableType != null ? withVariableType(variableType.withType(type)) : this;
+                return type != null && variableType != null ? withVariableType(variableType.withType(type)) : this;
             }
 
             @Override
@@ -4281,7 +4253,7 @@ public interface JS extends J {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return methodType == null ? null : methodType.getReturnType();
         }
 
@@ -4658,12 +4630,12 @@ public interface JS extends J {
         @Nullable
         JLeftPadded<Block> finallie;
 
-        public @Nullable Block getFinallie() {
+        public @Nullable Block getFinally() {
             return finallie == null ? null : finallie.getElement();
         }
 
-        public JSTry withFinallie(@Nullable Block finallie) {
-            return getPadding().withFinallie(JLeftPadded.withElement(this.finallie, finallie));
+        public JSTry withFinally(@Nullable Block aFinally) {
+            return getPadding().withFinally(JLeftPadded.withElement(this.finallie, aFinally));
         }
 
         @Override
@@ -4722,12 +4694,12 @@ public interface JS extends J {
         public static class Padding {
             private final JSTry t;
 
-            public @Nullable JLeftPadded<Block> getFinallie() {
+            public @Nullable JLeftPadded<Block> getFinally() {
                 return t.finallie;
             }
 
-            public JSTry withFinallie(@Nullable JLeftPadded<Block> finallie) {
-                return t.finallie == finallie ? t : new JSTry(t.id, t.prefix, t.markers, t.body, t.catches, finallie);
+            public JSTry withFinally(@Nullable JLeftPadded<Block> aFinally) {
+                return t.finallie == aFinally ? t : new JSTry(t.id, t.prefix, t.markers, t.body, t.catches, aFinally);
             }
         }
     }
@@ -5240,7 +5212,7 @@ public interface JS extends J {
         JavaType.@Nullable Variable variableType;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return variableType != null ? variableType.getType() : null;
         }
 
@@ -5892,6 +5864,7 @@ public interface JS extends J {
             return expression.getType();
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public TypeTreeExpression withType(@Nullable JavaType type) {
             return expression.getType() == type ? this : new TypeTreeExpression(this.id, this.prefix, this.markers, this.expression.withType(type));

@@ -109,15 +109,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitDefaultType(defaultType: JS.DefaultType, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.DefaultType>(defaultType, p, async draft => {
-            draft.left = await this.visitDefined<Expression>(defaultType.left, p);
-            draft.beforeEquals = await this.visitSpace(defaultType.beforeEquals, p);
-            draft.right = await this.visitDefined<Expression>(defaultType.right, p);
-            draft.type = defaultType.type && await this.visitType(defaultType.type, p);
-        });
-    }
-
     protected async visitDelete(delete_: JS.Delete, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.Delete>(delete_, p, async draft => {
             draft.expression = await this.visitDefined<Expression>(delete_.expression, p);
@@ -637,8 +628,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitJsCompilationUnit(tree as unknown as JS.CompilationUnit, p);
                 case JS.Kind.ConditionalType:
                     return this.visitConditionalType(tree as unknown as JS.ConditionalType, p);
-                case JS.Kind.DefaultType:
-                    return this.visitDefaultType(tree as unknown as JS.DefaultType, p);
                 case JS.Kind.Delete:
                     return this.visitDelete(tree as unknown as JS.Delete, p);
                 case JS.Kind.Export:

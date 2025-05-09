@@ -149,23 +149,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
-    public J visitDefaultType(JS.DefaultType defaultType, P p) {
-        JS.DefaultType d = defaultType;
-        d = d.withPrefix(visitSpace(d.getPrefix(), Space.Location.ASSIGNMENT_PREFIX, p));
-        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
-        Expression temp = (Expression) visitExpression(d, p);
-        if (!(temp instanceof JS.DefaultType)) {
-            return temp;
-        } else {
-            d = (JS.DefaultType) temp;
-        }
-        d = d.withLeft(requireNonNull(visitAndCast(d.getLeft(), p)));
-        d = d.withBeforeEquals(visitSpace(d.getBeforeEquals(), Space.Location.ASSIGNMENT_OPERATION_PREFIX, p));
-        d = d.withRight(requireNonNull(visitAndCast(d.getRight(), p)));
-        d = d.withType(visitType(d.getType(), p));
-        return d;
-    }
-
     public J visitDelete(JS.Delete delete, P p) {
         JS.Delete d = delete;
         d = d.withPrefix(visitSpace(d.getPrefix(), JsSpace.Location.DELETE_PREFIX, p));
@@ -1146,8 +1129,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         t = t.withBody(requireNonNull(visitAndCast(t.getBody(), p)));
         t = t.withCatches(requireNonNull(visitAndCast(t.getCatches(), p)));
-        if (t.getPadding().getFinallie() != null) {
-            t = t.getPadding().withFinallie(requireNonNull(visitLeftPadded(t.getPadding().getFinallie(), JsLeftPadded.Location.JSTRY_FINALLY, p)));
+        if (t.getPadding().getFinally() != null) {
+            t = t.getPadding().withFinally(requireNonNull(visitLeftPadded(t.getPadding().getFinally(), JsLeftPadded.Location.JSTRY_FINALLY, p)));
         }
         return t;
     }

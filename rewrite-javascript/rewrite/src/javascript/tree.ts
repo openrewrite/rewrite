@@ -33,7 +33,6 @@ export namespace JS {
         BindingElement: "org.openrewrite.javascript.tree.JS$BindingElement",
         CompilationUnit: "org.openrewrite.javascript.tree.JS$CompilationUnit",
         ConditionalType: "org.openrewrite.javascript.tree.JS$ConditionalType",
-        DefaultType: "org.openrewrite.javascript.tree.JS$DefaultType",
         Delete: "org.openrewrite.javascript.tree.JS$Delete",
         Export: "org.openrewrite.javascript.tree.JS$Export",
         ExportAssignment: "org.openrewrite.javascript.tree.JS$ExportAssignment",
@@ -153,18 +152,6 @@ export namespace JS {
         readonly kind: typeof Kind.ConditionalType;
         readonly checkType: Expression;
         readonly condition: J.LeftPadded<J.Ternary>;
-        readonly type?: JavaType;
-    }
-
-    /**
-     * Represents a generic type with a default.
-     * @example type Foo<T = string> = T;
-     */
-    export interface DefaultType extends JS, Expression, TypedTree {
-        readonly kind: typeof Kind.DefaultType;
-        readonly left: Expression;
-        readonly beforeEquals: J.Space;
-        readonly right: Expression;
         readonly type?: JavaType;
     }
 

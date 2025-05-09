@@ -101,15 +101,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitDefaultType(JS.DefaultType defaultType, RpcReceiveQueue q) {
-        return defaultType
-                .withLeft(q.receive(defaultType.getLeft(), expr -> (Expression) visitNonNull(expr, q)))
-                .withBeforeEquals(q.receive(defaultType.getBeforeEquals(), space -> visitSpace(space, q)))
-                .withRight(q.receive(defaultType.getRight(), expr -> (Expression) visitNonNull(expr, q)))
-                .withType(q.receive(defaultType.getType(), type -> visitType(type, q)));
-    }
-
-    @Override
     public J visitDelete(JS.Delete delete, RpcReceiveQueue q) {
         return delete
                 .withExpression(q.receive(delete.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
@@ -531,7 +522,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return jSTry
                 .withBody(q.receive(jSTry.getBody(), block -> (J.Block) visitNonNull(block, q)))
                 .withCatches(q.receive(jSTry.getCatches(), el -> (JS.JSTry.JSCatch) visitNonNull(el, q)))
-                .getPadding().withFinallie(q.receive(jSTry.getPadding().getFinallie(), el -> visitLeftPadded(el, q)));
+                .getPadding().withFinally(q.receive(jSTry.getPadding().getFinally(), el -> visitLeftPadded(el, q)));
     }
 
     @Override

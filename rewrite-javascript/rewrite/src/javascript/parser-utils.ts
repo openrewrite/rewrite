@@ -107,7 +107,6 @@ const is_expressions: string[] = [
     JS.Kind.Await,
     JS.Kind.BindingElement,
     JS.Kind.ConditionalType,
-    JS.Kind.DefaultType,
     JS.Kind.Delete,
     JS.Kind.ExportSpecifier,
     JS.Kind.ExpressionWithTypeArguments,

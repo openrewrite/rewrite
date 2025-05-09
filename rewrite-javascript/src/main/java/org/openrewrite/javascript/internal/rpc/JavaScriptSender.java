@@ -111,17 +111,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitDefaultType(JS.DefaultType defaultType, RpcSendQueue q) {
-        q.getAndSend(defaultType, JS.DefaultType::getLeft, el -> visit(el, q));
-        q.getAndSend(defaultType, JS.DefaultType::getBeforeEquals, el -> visitSpace(getValueNonNull(el), q));
-        q.getAndSend(defaultType, JS.DefaultType::getRight, el -> visit(el, q));
-        if (defaultType.getType() != null) {
-            q.getAndSend(defaultType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
-        return defaultType;
-    }
-
-    @Override
     public J visitDelete(JS.Delete delete, RpcSendQueue q) {
         q.getAndSend(delete, JS.Delete::getExpression, el -> visit(el, q));
         if (delete.getType() != null) {
@@ -661,8 +650,8 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitJSTry(JS.JSTry jSTry, RpcSendQueue q) {
         q.getAndSend(jSTry, JS.JSTry::getBody, el -> visit(el, q));
         q.getAndSend(jSTry, JS.JSTry::getCatches, el -> visit(el, q));
-        if (jSTry.getPadding().getFinallie() != null) {
-            q.getAndSend(jSTry, el -> el.getPadding().getFinallie(), el -> visitLeftPadded(el, q));
+        if (jSTry.getPadding().getFinally() != null) {
+            q.getAndSend(jSTry, el -> el.getPadding().getFinally(), el -> visitLeftPadded(el, q));
         }
         return jSTry;
     }
