@@ -1136,7 +1136,7 @@ export class JavaScriptParserVisitor {
 
         if (ts.isComputedPropertyName(node.name)) {
             return {
-                kind: JS.Kind.JSMethodDeclaration,
+                kind: J.Kind.MethodDeclaration,
                 id: randomId(),
                 prefix: prefix,
                 markers: emptyMarkers,
@@ -1144,10 +1144,11 @@ export class JavaScriptParserVisitor {
                 modifiers: [], // no modifiers allowed
                 typeParameters: this.mapTypeParametersAsObject(node),
                 returnTypeExpression: this.mapTypeInfo(node),
+                nameAnnotations: [],
                 name: this.convert(node.name),
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 methodType: this.mapMethodType(node)
-            };
+            } as J.MethodDeclaration;
         }
 
         const name: J.Identifier = !node.name
@@ -1169,7 +1170,7 @@ export class JavaScriptParserVisitor {
             name: name,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             methodType: this.mapMethodType(node)
-        };
+        } as J.MethodDeclaration;
     }
 
     visitMethodDeclaration(node: ts.MethodDeclaration) {
@@ -1209,7 +1210,7 @@ export class JavaScriptParserVisitor {
         const name = node.name ? this.visit(node.name) : this.mapIdentifier(node, "");
         if (!(name.kind == J.Kind.Identifier)) {
             return {
-                kind: JS.Kind.JSMethodDeclaration,
+                kind: J.Kind.MethodDeclaration,
                 id: randomId(),
                 prefix: prefix,
                 markers: emptyMarkers,
@@ -1217,11 +1218,12 @@ export class JavaScriptParserVisitor {
                 modifiers: this.mapModifiers(node),
                 typeParameters: this.mapTypeParametersAsObject(node),
                 returnTypeExpression: this.mapTypeInfo(node),
+                nameAnnotations: [],
                 name: name,
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
                 methodType: this.mapMethodType(node)
-            };
+            } as J.MethodDeclaration;
         }
 
         return {
@@ -1238,7 +1240,7 @@ export class JavaScriptParserVisitor {
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
-        };
+        } as J.MethodDeclaration;
     }
 
     private mapTypeInfo(node: ts.MethodDeclaration | ts.PropertyDeclaration | ts.VariableDeclaration | ts.ParameterDeclaration

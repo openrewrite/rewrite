@@ -25,7 +25,6 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
-import org.openrewrite.javascript.internal.JavaScriptPrinter;
 import org.openrewrite.javascript.internal.rpc.JavaScriptReceiver;
 import org.openrewrite.javascript.internal.rpc.JavaScriptSender;
 import org.openrewrite.marker.Markers;
@@ -193,7 +192,8 @@ public interface JS extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new JavaScriptPrinter<>();
+            // FIXME decide how we will instantiate the JavaScriptRewriteRPC process to call print
+            throw new UnsupportedOperationException("TODO decide how we will instantiate the JavaScriptRewriteRPC process");
         }
 
         @Transient
@@ -2523,11 +2523,6 @@ public interface JS extends J {
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
-        }
-
-        @Override
-        public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new JavaScriptPrinter<>());
         }
 
         @RequiredArgsConstructor
