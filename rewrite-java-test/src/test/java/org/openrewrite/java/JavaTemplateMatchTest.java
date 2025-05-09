@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -1002,20 +1001,19 @@ class JavaTemplateMatchTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("PR #5374 was reverted, due to regressions")
     void matchMemberReferenceContainingParameter() {
         rewriteRun(
           spec -> spec
             .expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                JavaTemplate template = JavaTemplate.builder("java.util.Optional.ofNullable(#{any(java.lang.String)}).orElseGet(#{any(java.lang.Object)}::toString)").build();
+                JavaTemplate template = JavaTemplate.builder("java.util.function.Predicate.not(#{any(java.util.Set)}::contains)").build();
 
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                     JavaTemplate.Matcher matcher = template.matcher(getCursor());
                     if (matcher.find()) {
                         JavaTemplateSemanticallyEqual.TemplateMatchResult result = matcher.getMatchResult();
-                        assertThat(result.getMatchedParameters()).hasSize(2);
+                        assertThat(result.getMatchedParameters()).hasSize(1);
                         return SearchResult.found(template.apply(getCursor(), method.getCoordinates().replace(), result.getMatchedParameters().toArray()));
                     }
                     return super.visitMethodInvocation(method, executionContext);
@@ -1024,22 +1022,24 @@ class JavaTemplateMatchTest implements RewriteTest {
           //language=java
           java(
             """
-              import java.util.Optional;
+              import java.util.function.Predicate;
+              import java.util.Set;
 
               class Foo {
-                  @SuppressWarnings("all")
-                  void test() {
-                      Optional.ofNullable("foo").orElseGet("bar"::toString);
+                  Predicate<Object> test() {
+                      Set<String> set = Set.of("1", "2");
+                      return Predicate.not(set::contains);
                   }
               }
               """,
             """
-              import java.util.Optional;
+              import java.util.function.Predicate;
+              import java.util.Set;
 
               class Foo {
-                  @SuppressWarnings("all")
-                  void test() {
-                      /*~~>*/java.util.Optional.ofNullable("foo").orElseGet("bar"::toString);
+                  Predicate<Object> test() {
+                      Set<String> set = Set.of("1", "2");
+                      return /*~~>*/java.util.function.Predicate.not(set::contains);
                   }
               }
               """
