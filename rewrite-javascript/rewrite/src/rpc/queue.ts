@@ -46,37 +46,21 @@ function isRef(obj?: any): obj is Reference {
 
 export class RpcSendQueue {
     private q: RpcObjectData[] = [];
-    private next: Promise<void>;
-    private resolveNext!: (value: void) => void;
 
     private refCount = 1
     private before?: any;
 
     constructor(private readonly refs: WeakMap<Object, number>, private readonly trace: boolean) {
-        this.next = new Promise<void>(resolve => {
-            this.resolveNext = resolve;
-        });
     }
 
-    async* generate(after: any, before: any): AsyncGenerator<RpcObjectData> {
-        let next = this.next;
-        const top: Promise<void> = this.send(after, before);
-        let sendComplete = false
-        while (!sendComplete) {
-            // Race between waiting for the next data and the resolution of 'top'
-            await Promise.race([
-                next,
-                top.then(() => {
-                    sendComplete = true;
-                })
-            ]);
-            while (this.q.length !== 0) {
-                let result = this.q.shift()!;
-                yield result;
-            }
-            next = this.next;
-        }
-        return {state: RpcObjectState.END_OF_OBJECT};
+    async generate(after: any, before: any): Promise<RpcObjectData[]> {
+        await this.send(after, before);
+
+        const result = this.q;
+        result.push({state: RpcObjectState.END_OF_OBJECT});
+
+        this.q = [];
+        return result;
     }
 
     private put(d: RpcObjectData): void {
@@ -84,13 +68,6 @@ export class RpcSendQueue {
             d.trace = trace("Sender");
         }
         this.q.push(d);
-        // Resolve this existing promise
-        this.resolveNext();
-
-        // Create a new promise for the next value
-        this.next = new Promise<void>(resolve => {
-            this.resolveNext = resolve;
-        });
     }
 
     sendMarkers<T extends { markers: Markers }>(parent: T, markersFn: (parent: T) => any): Promise<void> {

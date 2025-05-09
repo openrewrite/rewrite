@@ -27,10 +27,10 @@ export class GetObject {
         batchSize: number,
         trace: boolean
     ): void {
-        const generators = new Map<string, AsyncGenerator<RpcObjectData>>();
+        const pendingData = new Map<string, RpcObjectData[]>();
         const localRefs = new WeakMap<any, number>();
 
-        connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async (request) => {
+        connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
             if (!localObjects.has(request.id)) {
                 return [
                     {state: RpcObjectState.DELETE},
@@ -38,29 +38,24 @@ export class GetObject {
                 ];
             }
 
-            const after = localObjects.get(request.id);
-            const before = remoteObjects.get(request.id);
+            let allData = pendingData.get(request.id);
+            if (!allData) {
+                const after = localObjects.get(request.id);
+                const before = remoteObjects.get(request.id);
 
-            let generator = generators.get(request.id);
-            if (!generator) {
-                generator = new RpcSendQueue(localRefs, trace).generate(after, before);
-                generators.set(request.id, generator);
-            }
+                allData = await new RpcSendQueue(localRefs, trace).generate(after, before);
+                pendingData.set(request.id, allData);
 
-            const batch: RpcObjectData[] = [];
-            for (let i = 0; i < batchSize; i++) {
-                const {value, done} = await generator.next();
-                batch.push(value);
-                if (done) {
-                    break;
-                }
-            }
-
-            if (batch[batch.length - 1].state === RpcObjectState.END_OF_OBJECT) {
-                generators.delete(request.id);
                 remoteObjects.set(request.id, after);
             }
+
+            const batch = allData.splice(0, batchSize);
+
+            // If we've sent all data, remove from pending
+            if (allData.length === 0) {
+                pendingData.delete(request.id);
+            }
+
             return batch;
         });
-    }
-}
+    }}
