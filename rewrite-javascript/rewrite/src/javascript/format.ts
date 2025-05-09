@@ -206,6 +206,25 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         }
         return ret;
     }
+
+    protected async visitSwitch(switchNode: J.Switch, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitSwitch(switchNode, p) as J.Switch;
+        return produceAsync(ret, async draft => {
+            draft.selector = await this.spaceBefore(draft.selector, this.style.beforeParentheses.switchParentheses);
+            draft.selector.tree = await this.spaceAfterRightPadded(
+                await this.spaceBeforeRightPaddedElement(draft.selector.tree, this.style.within.switchParentheses),
+                this.style.within.switchParentheses
+            );
+            draft.cases = await this.spaceBefore(draft.cases, this.style.beforeLeftBrace.switchLeftBrace);
+
+            for (const case_ of draft.cases.statements) {
+                if (case_.element.kind === J.Kind.Case) {
+                    (case_.element as Draft<J.Case>).caseLabels.elements[0].after.whitespace = "";
+                }
+            }
+        });
+    }
+
     protected async visitTernary(ternary: J.Ternary, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitTernary(ternary, p) as J.Ternary;
         return produceAsync(ret, async draft => {

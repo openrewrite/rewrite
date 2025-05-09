@@ -67,6 +67,14 @@ describe('AutoformatVisitor', () => {
                             this.m( x, [1] );
                             return y[ 0 ];
                         }
+                        s ( s: string ):number{
+                            switch( s  ){
+                                case "apple"  :
+                                    return 1;
+                                default   :
+                                    return 0;
+                            }
+                        }
                     }
                     if(   1>0 ){
                         console.log  (   "four"   ,    "three"  ,    "six"   );
@@ -92,6 +100,14 @@ describe('AutoformatVisitor', () => {
                         m(x: number, y: number[]): number {
                             this.m(x, [1]);
                             return y[0];
+                        }
+                        s(s: string): number {
+                            switch (s) {
+                                case "apple":
+                                    return 1;
+                                default:
+                                    return 0;
+                            }
                         }
                     }
                     if (1 > 0) {

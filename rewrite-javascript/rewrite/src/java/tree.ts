@@ -244,7 +244,7 @@ export namespace J {
         readonly label?: Identifier;
     }
 
-    export interface Case extends J {
+    export interface Case extends J, Statement {
         readonly kind: typeof Kind.Case;
         readonly type: Case.Type;
         readonly caseLabels: Container<J>;
