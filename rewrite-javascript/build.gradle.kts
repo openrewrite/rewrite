@@ -34,6 +34,21 @@ dependencies {
     integTestRuntimeOnly("org.junit.platform:junit-platform-suite-engine:latest.release")
 }
 
+tasks.withType<Javadoc> {
+    // generated ANTLR sources violate doclint
+    (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
+
+    // Items besides JavaParser due to lombok error which looks similar to this:
+    //     /openrewrite/rewrite/rewrite-javascript/src/main/java/org/openrewrite/javascript/tree/JS.java:4239: error: cannot find symbol
+    // @AllArgsConstructor(onConstructor_=@JsonCreator)
+    //                     ^
+    //   symbol:   method onConstructor_()
+    //   location: @interface AllArgsConstructor
+    // 1 error
+    exclude("**/JS.java")
+}
+
+
 extensions.configure<NodeExtension> {
     workDir.set(projectDir.resolve("rewrite"))
     npmWorkDir.set(projectDir.resolve("rewrite"))
