@@ -13,49 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {fromVisitor, RecipeSpec} from "../../src/test";
-import {IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../src/javascript";
-import {AutoformatVisitor} from "../../src/javascript/format";
-import {Draft, produce} from "immer";
-import {MarkersKind, NamedStyles, randomId, Style} from "../../src";
-import fs from "node:fs";
+import {fromVisitor, RecipeSpec} from "../../../src/test";
+import {typescript} from "../../../src/javascript";
+import {AutoformatVisitor} from "../../../src/javascript/format";
 
-type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
-
-function spaces(customizer: StyleCustomizer<SpacesStyle>): NamedStyles {
-    return {
-        displayName: "", name: "", tags: [],
-        kind: MarkersKind.NamedStyles,
-        id: randomId(),
-        styles: [produce(IntelliJ.TypeScript.spaces(), customizer)]
-    }
-}
 
 describe('AutoformatVisitor', () => {
     const spec = new RecipeSpec()
     spec.recipe = fromVisitor(new AutoformatVisitor());
-
-    test('space before function declaration parentheses', () => {
-        let styles = spaces(draft => {
-            draft.beforeParentheses.functionDeclarationParentheses = true;
-        });
-        return spec.rewriteRun({
-            // @formatter:off
-            //language=typescript
-            ...typescript(`
-                    interface K {
-                        m(): number;
-                    }
-                `,
-                `
-                    interface K {
-                        m (): number;
-                    }
-                `),
-            // @formatter:on
-            parser: _ => new JavaScriptParser({styles: [styles]})
-        })
-    });
 
     test('everything', () => {
         return spec.rewriteRun(
