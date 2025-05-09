@@ -1,3 +1,5 @@
+// noinspection TypeScriptCheckImport,TypeScriptUnresolvedReference,ES6UnusedImports
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -83,38 +85,41 @@ describe('import mapping', () => {
         spec.rewriteRun(
             //language=typescript
             typescript(`import {
-                 Client,
-                 defaultAxiosInstance,
-                 defaultHttpsAgent,
-                 type ElevationResponse,
-                 /*1*/ type  /*2*/ ElevationResponseSuper /*3*/ as   /*4*/ ERS   /*5*/ ,  /*6*/
-             } from "../src";`)
+                Client,
+                defaultAxiosInstance,
+                defaultHttpsAgent,
+                type ElevationResponse,
+                /*1*/ type  /*2*/ ElevationResponseSuper /*3*/ as   /*4*/ ERS   /*5*/,  /*6*/
+            } from "../src";`)
         ));
 
     test('type imports only', () =>
         spec.rewriteRun(
             //language=typescript
-            typescript(`import type { Component } from "react";`)
+            typescript(`import type {Component} from "react";`)
         ));
 
+    // noinspection JSDuplicatedDeclaration
     test('experimental: import with import attributes', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
-                 import Package from 'module-name' assert { type: "json" }
-                 import foo from 'module-name' with { type: "json" };
-                 /*{1}*/import/*{2}*/ foo /*{3}*/from /*{4}*/'module-name'/*{5}*/ with/*{6}*/ {/*{7}*/ type/*{8}*/: /*{9}*/"json", /*{10}*/ } /*{11}*/;
-             `)
+                import Package from 'module-name' assert {type: "json"}
+                import foo from 'module-name' with {type: "json"};
+                /*{1}*/
+                import/*{2}*/ foo /*{3}*/
+                    from /*{4}*/'module-name'/*{5}*/ with/*{6}*/ {/*{7}*/ type/*{8}*/: /*{9}*/"json", /*{10}*/} /*{11}*/;
+            `)
         ));
 
     test('import with import attributes', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
-                 import type { SpyInstance } from 'jest';
-                 ///*{1}*/import /*{2}*/type /*{3}*/{ /*{4}*/ SpyInstance /*{5}*/} /*{6}*/ from /*{7}*/ 'jest' /*{8}*/;
-                 import SpyInstance = jest.SpyInstance;
-             `)
+                import type {SpyInstance} from 'jest';
+                ///*{1}*/import /*{2}*/type /*{3}*/{ /*{4}*/ SpyInstance /*{5}*/} /*{6}*/ from /*{7}*/ 'jest' /*{8}*/;
+                import SpyInstance = jest.SpyInstance;
+            `)
         ));
 
     test('external module import', () =>
