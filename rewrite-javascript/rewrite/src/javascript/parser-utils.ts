@@ -44,7 +44,6 @@ const is_statements: string[] = [
     JS.Kind.ExportAssignment,
     JS.Kind.ExportDeclaration,
     JS.Kind.FunctionDeclaration,
-    JS.Kind.ForInLoop,
     JS.Kind.ForOfLoop,
     JS.Kind.ImportAttribute,
     JS.Kind.IndexSignatureDeclaration,

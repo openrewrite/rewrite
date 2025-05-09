@@ -54,7 +54,6 @@ export namespace JS {
         InferType: "org.openrewrite.javascript.tree.JS$InferType",
         Intersection: "org.openrewrite.javascript.tree.JS$Intersection",
         JSCatch: "org.openrewrite.javascript.tree.JS$JSTry$JSCatch",
-        ForInLoop: "org.openrewrite.javascript.tree.JS$ForInLoop",
         ForOfLoop: "org.openrewrite.javascript.tree.JS$ForOfLoop",
         JSMethodDeclaration: "org.openrewrite.javascript.tree.JS$JSMethodDeclaration",
         JSNamedVariable: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations$JSNamedVariable",
@@ -776,11 +775,7 @@ export namespace JS {
      * Represents a for-in loop.
      * @example for (let key in obj) { }
      */
-    export interface ForInLoop extends JS {
-        readonly kind: typeof Kind.ForInLoop;
-        readonly control: ForInLoop.Control;
-        readonly body: J.RightPadded<Statement>;
-    }
+    export type ForInLoop = J.ForEachLoop;
 
     export namespace ForInLoop {
         export type Control = J.ForEachLoop.Control;

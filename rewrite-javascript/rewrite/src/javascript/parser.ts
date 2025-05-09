@@ -2952,7 +2952,7 @@ export class JavaScriptParserVisitor {
 
     visitForInStatement(node: ts.ForInStatement): JS.ForInLoop {
         return {
-            kind: JS.Kind.ForInLoop,
+            kind: J.Kind.ForEachLoop,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,

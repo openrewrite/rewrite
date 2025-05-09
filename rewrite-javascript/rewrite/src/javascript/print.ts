@@ -1732,7 +1732,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return loop;
     }
 
-    override async visitForInLoop(loop: JS.ForInLoop, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitForEachLoop(loop: JS.ForInLoop, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(loop, p);
         p.append("for");
 

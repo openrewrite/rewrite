@@ -494,13 +494,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitForInLoop(forInLoop: JS.ForInLoop, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.ForInLoop>(forInLoop, p, async draft => {
-            draft.control = await this.visitDefined<JS.ForInLoop.Control>(forInLoop.control, p);
-            draft.body = await this.visitRightPadded(forInLoop.body, p);
-        });
-    }
-
     protected async visitJSTry(jSTry: JS.JSTry, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.JSTry>(jSTry, p, async draft => {
             draft.body = await this.visitDefined<J.Block>(jSTry.body, p);
@@ -704,8 +697,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitJSMethodDeclaration(tree as unknown as JS.JSMethodDeclaration, p);
                 case JS.Kind.ForOfLoop:
                     return this.visitForOfLoop(tree as unknown as JS.ForOfLoop, p);
-                case JS.Kind.ForInLoop:
-                    return this.visitForInLoop(tree as unknown as JS.ForInLoop, p);
                 case JS.Kind.JSTry:
                     return this.visitJSTry(tree as unknown as JS.JSTry, p);
                 case JS.Kind.JSCatch:

@@ -1063,21 +1063,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return f;
     }
 
-    public J visitForInLoop(JS.ForInLoop forInLoop, P p) {
-        JS.ForInLoop f = forInLoop;
-        f = f.withPrefix(visitSpace(f.getPrefix(), JsSpace.Location.FOR_IN_LOOP_PREFIX, p));
-        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
-        Statement temp = (Statement) visitStatement(f, p);
-        if (!(temp instanceof JS.ForInLoop)) {
-            return temp;
-        } else {
-            f = (JS.ForInLoop) temp;
-        }
-        f = f.withControl(requireNonNull(visitAndCast(f.getControl(), p)));
-        f = f.getPadding().withBody(requireNonNull(visitRightPadded(f.getPadding().getBody(), JsRightPadded.Location.FOR_BODY, p)));
-        return f;
-    }
-
     public J visitJSTry(JS.JSTry jsTry, P p) {
         JS.JSTry t = jsTry;
         t = t.withPrefix(visitSpace(t.getPrefix(), JsSpace.Location.JSTRY_PREFIX, p));
