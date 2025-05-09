@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -337,7 +336,7 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
-    void isAssignableToGenericTypeVariable1() {
+    void isAssignableToGenericTypeVariable() {
         rewriteRun(
           java(
             """
