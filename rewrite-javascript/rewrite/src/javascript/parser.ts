@@ -1898,14 +1898,14 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             head: this.visit(node.head),
-            templateSpans: node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
+            spans: node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
             type: this.mapType(node)
         }
     }
 
     visitTemplateLiteralTypeSpan(node: ts.TemplateLiteralTypeSpan) {
         return {
-            kind: JS.Kind.TemplateExpressionTemplateSpan,
+            kind: JS.Kind.TemplateExpressionSpan,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
@@ -2608,7 +2608,7 @@ export class JavaScriptParserVisitor {
         return undefined;
     }
 
-    visitConditionalExpression(node: ts.ConditionalExpression) {
+    visitConditionalExpression(node: ts.ConditionalExpression): J.Ternary {
         return {
             kind: J.Kind.Ternary,
             id: randomId(),
@@ -2621,19 +2621,19 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitTemplateExpression(node: ts.TemplateExpression) {
+    visitTemplateExpression(node: ts.TemplateExpression): JS.TemplateExpression {
         return {
             kind: JS.Kind.TemplateExpression,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
             head: this.visit(node.head),
-            templateSpans: node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
+            spans: node.templateSpans.map(s => this.rightPadded(this.visit(s), this.suffix(s))),
             type: this.mapType(node)
         }
     }
 
-    visitYieldExpression(node: ts.YieldExpression) {
+    visitYieldExpression(node: ts.YieldExpression): JS.Yield {
         return {
             kind: JS.Kind.Yield,
             id: randomId(),
@@ -2641,11 +2641,11 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             delegated: node.asteriskToken ? this.leftPadded(this.prefix(node.asteriskToken), true) : this.leftPadded(emptySpace, false),
             expression: node.expression && this.visit(node.expression),
-            _type: this.mapType(node),
+            type: this.mapType(node),
         };
     }
 
-    visitSpreadElement(node: ts.SpreadElement) {
+    visitSpreadElement(node: ts.SpreadElement): JS.Unary {
         return {
             kind: JS.Kind.Unary,
             id: randomId(),
@@ -2779,7 +2779,7 @@ export class JavaScriptParserVisitor {
 
     visitTemplateSpan(node: ts.TemplateSpan) {
         return {
-            kind: JS.Kind.TemplateExpressionTemplateSpan,
+            kind: JS.Kind.TemplateExpressionSpan,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,

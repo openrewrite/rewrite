@@ -418,7 +418,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitTemplateExpression(JS.TemplateExpression templateExpression, RpcSendQueue q) {
         q.getAndSend(templateExpression, JS.TemplateExpression::getHead, el -> visit(el, q));
-        q.getAndSendList(templateExpression, el -> el.getPadding().getTemplateSpans(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
+        q.getAndSendList(templateExpression, el -> el.getPadding().getSpans(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         if (templateExpression.getType() != null) {
             q.getAndSend(templateExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         }
@@ -426,10 +426,10 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitTemplateExpressionTemplateSpan(JS.TemplateExpression.TemplateSpan templateSpan, RpcSendQueue q) {
-        q.getAndSend(templateSpan, JS.TemplateExpression.TemplateSpan::getExpression, el -> visit(el, q));
-        q.getAndSend(templateSpan, JS.TemplateExpression.TemplateSpan::getTail, el -> visit(el, q));
-        return templateSpan;
+    public J visitTemplateExpressionSpan(JS.TemplateExpression.Span span, RpcSendQueue q) {
+        q.getAndSend(span, JS.TemplateExpression.Span::getExpression, el -> visit(el, q));
+        q.getAndSend(span, JS.TemplateExpression.Span::getTail, el -> visit(el, q));
+        return span;
     }
 
     @Override

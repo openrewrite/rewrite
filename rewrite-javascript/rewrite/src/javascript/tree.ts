@@ -80,7 +80,7 @@ export namespace JS {
         StatementExpression: "org.openrewrite.javascript.tree.JS$StatementExpression",
         TaggedTemplateExpression: "org.openrewrite.javascript.tree.JS$TaggedTemplateExpression",
         TemplateExpression: "org.openrewrite.javascript.tree.JS$TemplateExpression",
-        TemplateExpressionTemplateSpan: "org.openrewrite.javascript.tree.JS$TemplateExpression$TemplateSpan",
+        TemplateExpressionSpan: "org.openrewrite.javascript.tree.JS$TemplateExpression$TemplateSpan",
         TrailingTokenStatement: "org.openrewrite.javascript.tree.JS$TrailingTokenStatement",
         Tuple: "org.openrewrite.javascript.tree.JS$Tuple",
         TypeDeclaration: "org.openrewrite.javascript.tree.JS$TypeDeclaration",
@@ -528,7 +528,7 @@ export namespace JS {
     export interface TemplateExpression extends JS, Statement, Expression, TypeTree {
         readonly kind: typeof Kind.TemplateExpression;
         readonly head: J.Literal;
-        readonly templateSpans: J.RightPadded<TemplateExpression.TemplateSpan>[];
+        readonly spans: J.RightPadded<TemplateExpression.Span>[];
         readonly type?: JavaType;
     }
 
@@ -537,8 +537,8 @@ export namespace JS {
          * Represents a span in a template expression.
          * @example the `${expr}` and tail parts
          */
-        export interface TemplateSpan extends JS {
-            readonly kind: typeof Kind.TemplateExpressionTemplateSpan;
+        export interface Span extends JS {
+            readonly kind: typeof Kind.TemplateExpressionSpan;
             readonly expression: J;
             readonly tail: J.Literal;
         }

@@ -340,15 +340,15 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     protected async visitTemplateExpression(templateExpression: JS.TemplateExpression, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.TemplateExpression>(templateExpression, p, async draft => {
             draft.head = await this.visitDefined<J.Literal>(templateExpression.head, p);
-            draft.templateSpans = await mapAsync(templateExpression.templateSpans, item => this.visitRightPadded(item, p));
+            draft.spans = await mapAsync(templateExpression.spans, item => this.visitRightPadded(item, p));
             draft.type = templateExpression.type && await this.visitType(templateExpression.type, p);
         });
     }
 
-    protected async visitTemplateSpan(templateSpan: JS.TemplateExpression.TemplateSpan, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.TemplateExpression.TemplateSpan>(templateSpan, p, async draft => {
-            draft.expression = await this.visitDefined<J>(templateSpan.expression, p);
-            draft.tail = await this.visitDefined<J.Literal>(templateSpan.tail, p);
+    protected async visitTemplateExpressionSpan(span: JS.TemplateExpression.Span, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.TemplateExpression.Span>(span, p, async draft => {
+            draft.expression = await this.visitDefined<J>(span.expression, p);
+            draft.tail = await this.visitDefined<J.Literal>(span.tail, p);
         });
     }
 
@@ -695,8 +695,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitTaggedTemplateExpression(tree as unknown as JS.TaggedTemplateExpression, p);
                 case JS.Kind.TemplateExpression:
                     return this.visitTemplateExpression(tree as unknown as JS.TemplateExpression, p);
-                case JS.Kind.TemplateExpressionTemplateSpan:
-                    return this.visitTemplateSpan(tree as unknown as JS.TemplateExpression.TemplateSpan, p);
+                case JS.Kind.TemplateExpressionSpan:
+                    return this.visitTemplateExpressionSpan(tree as unknown as JS.TemplateExpression.Span, p);
                 case JS.Kind.TrailingTokenStatement:
                     return this.visitTrailingTokenStatement(tree as unknown as JS.TrailingTokenStatement, p);
                 case JS.Kind.Tuple:

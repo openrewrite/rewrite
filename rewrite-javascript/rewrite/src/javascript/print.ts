@@ -1155,12 +1155,12 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitTemplateExpression(templateExpression: JS.TemplateExpression, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(templateExpression, p);
         await this.visit(templateExpression.head, p);
-        await this.visitJsRightPaddedLocal(templateExpression.templateSpans, "", p);
+        await this.visitJsRightPaddedLocal(templateExpression.spans, "", p);
         await this.afterSyntax(templateExpression, p);
         return templateExpression;
     }
 
-    override async visitTemplateSpan(value: JS.TemplateExpression.TemplateSpan, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitTemplateExpressionSpan(value: JS.TemplateExpression.Span, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(value, p);
         await this.visit(value.expression, p);
         await this.visit(value.tail, p);

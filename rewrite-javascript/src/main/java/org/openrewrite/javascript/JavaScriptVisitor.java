@@ -556,13 +556,13 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             te = (JS.TemplateExpression) temp;
         }
         te = te.withHead(Objects.requireNonNull(visitAndCast(te.getHead(), p)));
-        te = te.getPadding().withTemplateSpans(Objects.requireNonNull(ListUtils.map(te.getPadding().getTemplateSpans(), t -> this.visitRightPadded(t, JsRightPadded.Location.TEMPLATE_EXPRESSION_TEMPLATE_SPAN, p))));
+        te = te.getPadding().withSpans(Objects.requireNonNull(ListUtils.map(te.getPadding().getSpans(), t -> this.visitRightPadded(t, JsRightPadded.Location.TEMPLATE_EXPRESSION_TEMPLATE_SPAN, p))));
         te = te.withType(visitType(te.getType(), p));
         return te;
     }
 
-    public J visitTemplateExpressionTemplateSpan(JS.TemplateExpression.TemplateSpan span, P p) {
-        JS.TemplateExpression.TemplateSpan s = span;
+    public J visitTemplateExpressionSpan(JS.TemplateExpression.Span span, P p) {
+        JS.TemplateExpression.Span s = span;
         s = s.withPrefix(visitSpace(s.getPrefix(), JsSpace.Location.TEMPLATE_EXPRESSION_SPAN_PREFIX, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         s = s.withExpression(Objects.requireNonNull(visitAndCast(s.getExpression(), p)));

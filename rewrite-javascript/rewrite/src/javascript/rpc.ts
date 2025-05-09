@@ -295,15 +295,15 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitTemplateExpression(templateExpression: JS.TemplateExpression, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(templateExpression, el => el.head, el => this.visit(el, q));
-        await q.getAndSendList(templateExpression, el => el.templateSpans, el => el.element.id, el => this.visitRightPadded(el, q));
+        await q.getAndSendList(templateExpression, el => el.spans, el => el.element.id, el => this.visitRightPadded(el, q));
         await q.getAndSend(templateExpression, el => asRef(el.type), el => this.visitType(el, q));
         return templateExpression;
     }
 
-    override async visitTemplateSpan(templateSpan: JS.TemplateExpression.TemplateSpan, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(templateSpan, el => el.expression, el => this.visit(el, q));
-        await q.getAndSend(templateSpan, el => el.tail, el => this.visit(el, q));
-        return templateSpan;
+    override async visitTemplateExpressionSpan(span: JS.TemplateExpression.Span, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(span, el => el.expression, el => this.visit(el, q));
+        await q.getAndSend(span, el => el.tail, el => this.visit(el, q));
+        return span;
     }
 
     override async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, q: RpcSendQueue): Promise<J | undefined> {
@@ -892,13 +892,13 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitTemplateExpression(templateExpression: JS.TemplateExpression, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(templateExpression);
         draft.head = await q.receive(draft.head, el => this.visitDefined<J.Literal>(el, q));
-        draft.templateSpans = await q.receiveListDefined(draft.templateSpans, el => this.visitRightPadded(el, q));
+        draft.spans = await q.receiveListDefined(draft.spans, el => this.visitRightPadded(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
 
-    override async visitTemplateSpan(templateSpan: JS.TemplateExpression.TemplateSpan, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(templateSpan);
+    override async visitTemplateExpressionSpan(span: JS.TemplateExpression.Span, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(span);
         draft.expression = await q.receive(draft.expression, el => this.visitDefined<J>(el, q));
         draft.tail = await q.receive(draft.tail, el => this.visitDefined<J.Literal>(el, q));
         return finishDraft(draft);

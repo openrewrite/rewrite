@@ -336,15 +336,15 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitTemplateExpression(JS.TemplateExpression templateExpression, RpcReceiveQueue q) {
         return templateExpression
                 .withHead(q.receive(templateExpression.getHead(), lit -> (J.Literal) visitNonNull(lit, q)))
-                .getPadding().withTemplateSpans(q.receiveList(templateExpression.getPadding().getTemplateSpans(), el -> visitRightPadded(el, q)))
+                .getPadding().withSpans(q.receiveList(templateExpression.getPadding().getSpans(), el -> visitRightPadded(el, q)))
                 .withType(q.receive(templateExpression.getType(), type -> visitType(type, q)));
     }
 
     @Override
-    public J visitTemplateExpressionTemplateSpan(JS.TemplateExpression.TemplateSpan templateSpan, RpcReceiveQueue q) {
-        return templateSpan
-                .withExpression(q.receive(templateSpan.getExpression(), el -> visitNonNull(el, q)))
-                .withTail(q.receive(templateSpan.getTail(), lit -> (J.Literal) visitNonNull(lit, q)));
+    public J visitTemplateExpressionSpan(JS.TemplateExpression.Span span, RpcReceiveQueue q) {
+        return span
+                .withExpression(q.receive(span.getExpression(), el -> visitNonNull(el, q)))
+                .withTail(q.receive(span.getTail(), lit -> (J.Literal) visitNonNull(lit, q)));
     }
 
     @Override

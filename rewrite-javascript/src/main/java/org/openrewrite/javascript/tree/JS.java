@@ -2978,14 +2978,14 @@ public interface JS extends J {
         @With
         J.Literal head;
 
-        List<JRightPadded<TemplateSpan>> templateSpans;
+        List<JRightPadded<Span>> spans;
 
-        public List<TemplateSpan> getTemplateSpans() {
-            return JRightPadded.getElements(templateSpans);
+        public List<Span> getSpans() {
+            return JRightPadded.getElements(spans);
         }
 
-        public TemplateExpression withTemplateSpans(List<TemplateSpan> spans) {
-            return getPadding().withTemplateSpans(JRightPadded.withElements(this.templateSpans, spans));
+        public TemplateExpression withSpans(List<Span> spans) {
+            return getPadding().withSpans(JRightPadded.withElements(this.spans, spans));
         }
 
         @With
@@ -3006,7 +3006,7 @@ public interface JS extends J {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
-        public static final class TemplateSpan implements JS {
+        public static final class Span implements JS {
             @With
             @EqualsAndHashCode.Include
             @Getter
@@ -3030,7 +3030,7 @@ public interface JS extends J {
 
             @Override
             public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-                return v.visitTemplateExpressionTemplateSpan(this, p);
+                return v.visitTemplateExpressionSpan(this, p);
             }
         }
 
@@ -3053,12 +3053,12 @@ public interface JS extends J {
         public static class Padding {
             private final TemplateExpression t;
 
-            public List<JRightPadded<TemplateSpan>> getTemplateSpans() {
-                return t.templateSpans;
+            public List<JRightPadded<Span>> getSpans() {
+                return t.spans;
             }
 
-            public TemplateExpression withTemplateSpans(List<JRightPadded<TemplateSpan>> templateSpans) {
-                return t.templateSpans == templateSpans ? t : new TemplateExpression(t.id, t.prefix, t.markers, t.head, templateSpans, t.type);
+            public TemplateExpression withSpans(List<JRightPadded<Span>> spans) {
+                return t.spans == spans ? t : new TemplateExpression(t.id, t.prefix, t.markers, t.head, spans, t.type);
             }
         }
     }
