@@ -50,6 +50,7 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -134,21 +135,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
          */
         Map<GroupArtifact, Object> gaToNewVersion = new HashMap<>();
 
-        UpdateDependencyLock.DependencyState dependencyState = new UpdateDependencyLock.DependencyState();
-
-        <T extends Tree> @Nullable T addGradleModule(@Nullable T t) {
-            return dependencyState.addGradleModule(t);
-        }
-
-        UpdateDependencyLock.DependencyState getDependencyState() {
-            if (dependencyState.getVersionOverrides().isEmpty()) {
-                gaToNewVersion.forEach((key, value) -> {
-                    if (value instanceof String) {
-                        dependencyState.getVersionOverrides().put(key, (String) value);
-                    }
-                });
-            }
-            return dependencyState;
+        Map<GroupArtifact, String> updatedVersions() {
+            return gaToNewVersion.entrySet().stream()
+                    .filter(e -> e.getValue() instanceof String)
+                    .collect(Collectors.toMap(Map.Entry::getKey, entry -> (String) entry.getValue()));
         }
     }
 
@@ -177,7 +167,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class)
                             .orElse(null);
                 }
-                return acc.addGradleModule(super.visit(tree, ctx));
+                return super.visit(tree, ctx);
             }
 
             @Override
@@ -397,7 +387,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
-            private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock(acc.getDependencyState());
+            private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock(acc.updatedVersions());
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {

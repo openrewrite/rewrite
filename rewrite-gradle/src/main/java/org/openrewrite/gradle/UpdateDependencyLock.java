@@ -6,6 +6,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -17,41 +18,20 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.gradle.UpgradeDependencyVersion.replaceVersion;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
 
-    DependencyState acc;
+    Map<GroupArtifact, String> versionOverrides;
 
-    @Value
-    public static class DependencyState {
-        Map<String, GradleProject> modules = new HashMap<>();
-        Map<GroupArtifact, String> versionOverrides = new HashMap<>();
+    public UpdateDependencyLock(Map<GroupArtifact, String> versionOverrides) {
+        this.versionOverrides = versionOverrides;
+    }
 
-        <T extends Tree> @Nullable T addGradleModule(@Nullable T tree) {
-            if (tree != null ) {
-                tree.getMarkers().findFirst(GradleProject.class).ifPresent(project -> {
-                    String path = project.getPath();
-                    if (path.startsWith(":")) {
-                        path = path.substring(1);
-                    }
-                    if (!path.isEmpty()) {
-                        path += "/";
-                    }
-                    modules.put(path.replaceAll(":", "/") + "gradle.lockfile", project);
-                });
-            }
-            return tree;
-        }
-
-        private GroupArtifactVersion getVersion(ResolvedDependency dependency) {
-            GroupArtifactVersion gav = dependency.getGav().asGroupArtifactVersion();
-            if (versionOverrides.containsKey(gav.asGroupArtifact())) {
-                return gav.withVersion(versionOverrides.get(gav.asGroupArtifact()));
-            }
-            return gav;
-        }
+    public UpdateDependencyLock() {
+        this(new HashMap<>());
     }
 
     @Override
@@ -60,35 +40,45 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
     }
 
     @Override
-    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+        if (tree == null) {
+            return null;
+        }
+        Optional<GradleProject> gradleProject = tree.getMarkers().findFirst(GradleProject.class);
+        if (!gradleProject.isPresent()) {
+            return tree;
+        }
+
         Map<GroupArtifactVersion, SortedSet<String>> lockedVersions = new HashMap<>();
         SortedSet<String> empty = new TreeSet<>();
         List<String> comments = new ArrayList<>();
 
-        if (tree == null) {
-            return null;
-        }
         PlainText plainText = (PlainText) tree;
-        GradleProject gradleProject = acc.getModules().get(plainText.getSourcePath().toString());
-        if (gradleProject == null) {
-            return tree;
-        }
         String text = plainText.getText();
         if (StringUtils.isBlank(text)) {
             return plainText;
         }
 
-        gradleProject.getConfigurations().forEach(conf -> {
-            if (conf.isCanBeResolved()) {
-                if (conf.getResolved().isEmpty()) {
-                    empty.add(conf.getName());
-                } else {
-                    for (ResolvedDependency resolved : conf.getDirectResolved()) {
-                        lockedVersions.computeIfAbsent(acc.getVersion(resolved), k -> new TreeSet<>()).add(conf.getName());
+        GradleProject project = gradleProject.get();
+        project.getConfigurations().stream()
+                .filter(GradleDependencyConfiguration::isCanBeResolved)
+                .forEach(conf -> {
+                    if (conf.getResolved().isEmpty()) {
+                        empty.add(conf.getName());
+                    } else {
+                        for (ResolvedDependency resolved : conf.getDirectResolved()) {
+                            lockedVersions.computeIfAbsent(getVersion(resolved), k -> new TreeSet<>()).add(conf.getName());
+                        }
                     }
-                }
+                });
+
+        for (Map.Entry<GroupArtifactVersion, SortedSet<String>> entry : lockedVersions.entrySet()) {
+            if (versionOverrides.containsKey(entry.getKey().asGroupArtifact())) {
+                SortedSet<String> configurations = entry.getValue();
+                GroupArtifactVersion lockedVersion = entry.getKey();
+                project = replaceVersion(project, ctx, lockedVersion, configurations);
             }
-        });
+        }
 
         Arrays.stream(text.split("\n")).forEach(lock -> {
             if (isComment(lock)) {
@@ -97,8 +87,8 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
         });
 
         SortedSet<String> locks = new TreeSet<>();
-        lockedVersions.forEach((gav, configurations) -> {
-            String lock = asLock(gav, configurations);
+        lockedVersions.forEach((gav, confs) -> {
+            String lock = asLock(gav, confs);
             if (lock != null) {
                 locks.add(lock);
             }
@@ -115,10 +105,19 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
             sb.append(String.join("\n", locks));
         }
         sb.append("\n").append(asLock(null, empty));
+
         if (plainText.getText().contentEquals(sb)) {
             return tree;
         }
-        return plainText.withText(sb.toString());
+        return plainText.withText(sb.toString()).withMarkers(tree.getMarkers().setByType(project));
+    }
+
+    private GroupArtifactVersion getVersion(ResolvedDependency dependency) {
+        GroupArtifactVersion gav = dependency.getGav().asGroupArtifactVersion();
+        if (versionOverrides.containsKey(gav.asGroupArtifact())) {
+            return gav.withVersion(versionOverrides.get(gav.asGroupArtifact()));
+        }
+        return gav;
     }
 
     private @Nullable String asLock(@Nullable GroupArtifactVersion gav, @Nullable Set<String> configurations) {
