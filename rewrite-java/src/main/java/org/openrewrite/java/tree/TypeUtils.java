@@ -455,12 +455,8 @@ public class TypeUtils {
             // Rest of the existing cases, passing through the position parameter
             else if (to instanceof JavaType.Variable) {
                 return isAssignableTo(((JavaType.Variable) to).getType(), from, position);
-            } else if (from instanceof JavaType.Variable) {
-                return isAssignableTo(to, ((JavaType.Variable) from).getType(), position);
             } else if (to instanceof JavaType.Method) {
                 return isAssignableTo(((JavaType.Method) to).getReturnType(), from, position);
-            } else if (from instanceof JavaType.Method) {
-                return isAssignableTo(to, ((JavaType.Method) from).getReturnType(), position);
             } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
                 JavaType.Array toArray = (JavaType.Array) to;
                 JavaType.Array fromArray = (JavaType.Array) from;
