@@ -31,7 +31,7 @@ describe('export keyword tests', () => {
             `)
         ));
 
-    test('type export', () =>
+    test('export declaration', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -39,7 +39,11 @@ describe('export keyword tests', () => {
                      fieldsById: FieldMetadataMap;
                      fieldsByName: FieldMetadataMap;
                  };
-             `),
+             `)
+        ));
+
+    test('export specifier', () =>
+        spec.rewriteRun(
             //language=typescript
             typescript(`
                  import type { SomeThing } from "./some-module.js";

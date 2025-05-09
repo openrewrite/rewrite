@@ -131,12 +131,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitFunctionType(functionType: JS.FunctionType, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.FunctionType>(functionType, p, async draft => {
-            draft.modifiers = await mapAsync(functionType.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.constructorType = await this.visitLeftPadded(functionType.constructorType, p);
             draft.typeParameters = functionType.typeParameters && await this.visitDefined<J.TypeParameters>(functionType.typeParameters, p);
             draft.parameters = await this.visitContainer(functionType.parameters, p);
             draft.returnType = await this.visitLeftPadded(functionType.returnType, p);
-            draft.type = functionType.type && await this.visitType(functionType.type, p);
         });
     }
 

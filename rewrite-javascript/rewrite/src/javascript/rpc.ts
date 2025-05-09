@@ -16,11 +16,7 @@
 import {JavaScriptVisitor} from "./visitor";
 import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {isJavaScript, JS} from "./tree";
-import {
-    Expression,
-    J,
-    JavaType, Statement, TypedTree, TypeTree
-} from "../java";
+import {Expression, J, JavaType, Statement, TypedTree, TypeTree} from "../java";
 import {createDraft, finishDraft} from "immer";
 import {JavaReceiver, JavaSender} from "../java/rpc";
 import {Cursor, Tree} from "../tree";
@@ -108,12 +104,10 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     override async visitFunctionType(functionType: JS.FunctionType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(functionType, el => el.modifiers, el => el.id, el => this.visit(el, q));
         await q.getAndSend(functionType, el => el.constructorType, el => this.visitLeftPadded(el, q));
         await q.getAndSend(functionType, el => el.typeParameters, el => this.visit(el, q));
         await q.getAndSend(functionType, el => el.parameters, el => this.visitContainer(el, q));
         await q.getAndSend(functionType, el => el.returnType, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(functionType, el => asRef(el.type), el => this.visitType(el, q));
         return functionType;
     }
 
@@ -662,12 +656,10 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitFunctionType(functionType: JS.FunctionType, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(functionType);
-        draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
         draft.constructorType = await q.receive(draft.constructorType, el => this.visitLeftPadded(el, q));
         draft.typeParameters = await q.receive(draft.typeParameters, el => this.visitDefined<J.TypeParameters>(el, q));
         draft.parameters = await q.receive(draft.parameters, el => this.visitContainer(el, q));
         draft.returnType = await q.receive(draft.returnType, el => this.visitLeftPadded(el, q));
-        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
 

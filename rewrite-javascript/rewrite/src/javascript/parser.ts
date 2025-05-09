@@ -1471,13 +1471,12 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitConstructorType(node: ts.ConstructorTypeNode) {
+    visitConstructorType(node: ts.ConstructorTypeNode): JS.FunctionType {
         return {
             kind: JS.Kind.FunctionType,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
             constructorType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.NewKeyword)!), true),
             typeParameters: this.mapTypeParametersAsObject(node),
             parameters: {

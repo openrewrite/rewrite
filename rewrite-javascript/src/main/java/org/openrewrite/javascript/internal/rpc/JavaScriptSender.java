@@ -136,16 +136,12 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitFunctionType(JS.FunctionType functionType, RpcSendQueue q) {
-        q.getAndSendList(functionType, JS.FunctionType::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSend(functionType, el -> el.getPadding().getConstructorType(), el -> visitLeftPadded(el, q));
         if (functionType.getTypeParameters() != null) {
             q.getAndSend(functionType, JS.FunctionType::getTypeParameters, el -> visit(el, q));
         }
         q.getAndSend(functionType, el -> el.getPadding().getParameters(), el -> visitContainer(el, q));
         q.getAndSend(functionType, el -> el.getPadding().getReturnType(), el -> visitLeftPadded(el, q));
-        if (functionType.getType() != null) {
-            q.getAndSend(functionType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
         return functionType;
     }
 

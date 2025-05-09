@@ -19,6 +19,7 @@
 import {SourceFile, TreeKind} from "../";
 import {Expression, J, JavaType, Statement, TypedTree, TypeTree,} from "../java";
 import getType = TypedTree.getType;
+import FunctionType = JS.FunctionType;
 
 export interface JS extends J {
 }
@@ -190,12 +191,10 @@ export namespace JS {
      */
     export interface FunctionType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.FunctionType;
-        readonly modifiers: J.Modifier[];
         readonly constructorType: J.LeftPadded<boolean>;
         readonly typeParameters?: J.TypeParameters;
         readonly parameters: J.Container<Statement>;
         readonly returnType: J.LeftPadded<Expression>;
-        readonly type?: JavaType;
     }
 
     /**
@@ -934,3 +933,4 @@ export function isJavaScript(tree: any): tree is JS {
 
 
 TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => getType(tree.initializer));
+TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: FunctionType) => getType(tree.returnType.element))

@@ -123,12 +123,10 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitFunctionType(JS.FunctionType functionType, RpcReceiveQueue q) {
         return functionType
-                .withModifiers(q.receiveList(functionType.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
                 .getPadding().withConstructorType(q.receive(functionType.getPadding().getConstructorType(), el -> visitLeftPadded(el, q)))
                 .withTypeParameters(q.receive(functionType.getTypeParameters(), params -> (J.TypeParameters) visitNonNull(params, q)))
                 .getPadding().withParameters(q.receive(functionType.getPadding().getParameters(), el -> visitContainer(el, q)))
-                .getPadding().withReturnType(q.receive(functionType.getPadding().getReturnType(), el -> visitLeftPadded(el, q)))
-                .withType(q.receive(functionType.getType(), type -> visitType(type, q)));
+                .getPadding().withReturnType(q.receive(functionType.getPadding().getReturnType(), el -> visitLeftPadded(el, q)));
     }
 
     @Override
