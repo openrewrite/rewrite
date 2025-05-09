@@ -24,7 +24,6 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
-import org.openrewrite.rpc.ValueCodec;
 
 import java.util.UUID;
 
@@ -42,7 +41,8 @@ public class TrailingComma implements Marker, RpcCodec<TrailingComma> {
 
     @Override
     public TrailingComma rpcReceive(TrailingComma before, RpcReceiveQueue q) {
-        return before.withId(q.receiveAndGet(before.getId(), ValueCodec.UUID))
+        return before
+                .withId(UUID.fromString(q.receiveAndGet(before.getId(), UUID::toString)))
                 .withSuffix(q.receive(before.getSuffix(), space -> new JavaReceiver().visitSpace(space, q)));
     }
 }

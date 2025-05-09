@@ -132,18 +132,20 @@ export function readSourceSync(sourcePath: ParserInput) {
 
 type ParserConstructor<T extends Parser> = new (...args: any[]) => T;
 
+export type ParserType = "javascript";
+
 export class Parsers {
-    private static registry: Record<string, ParserConstructor<Parser>> = {};
+    private static registry = new Map<ParserType, ParserConstructor<Parser>>();
 
     static registerParser<T extends Parser>(
-        name: string,
+        name: ParserType,
         parserClass: ParserConstructor<T>
     ): void {
-        Parsers.registry[name] = parserClass as ParserConstructor<Parser>;
+        Parsers.registry.set(name, parserClass as ParserConstructor<Parser>);
     }
 
-    static createParser(name: string, ...args: any[]): Parser {
-        const ParserClass = Parsers.registry[name];
+    static createParser(name: ParserType, ...args: any[]): Parser {
+        const ParserClass = Parsers.registry.get(name);
         if (!ParserClass) {
             throw new Error(`No parser registered with name: ${name}`);
         }

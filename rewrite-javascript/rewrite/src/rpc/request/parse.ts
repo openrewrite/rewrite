@@ -16,13 +16,12 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {ExecutionContext} from "../../execution";
 import {UUID} from "node:crypto";
-import {Parser, ParserInput, Parsers} from "../../parser";
+import {Parser, ParserInput, Parsers, ParserType} from "../../parser";
 
 export class Parse {
-    constructor(private readonly parser: string, private readonly inputs: {
-        text?: string,
-        path: string
-    }[], private readonly relativeTo?: string) {
+    constructor(private readonly parser: ParserType,
+                private readonly inputs: ParserInput[],
+                private readonly relativeTo?: string) {
     }
 
     static handle(connection: rpc.MessageConnection,
@@ -31,11 +30,7 @@ export class Parse {
             let parser: Parser | undefined = Parsers.createParser(request.parser, new ExecutionContext(), request.relativeTo);
 
             if (parser) {
-                const sourcePaths: ParserInput[] = request.inputs.map(i => i.text ? {
-                    text: i.text!,
-                    sourcePath: i.path
-                } : i.path!);
-                const parsed = await parser.parse(...sourcePaths);
+                const parsed = await parser.parse(...request.inputs);
                 return parsed.map(g => {
                     localObjects.set(g.id.toString(), g);
                     return g.id;

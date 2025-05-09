@@ -476,7 +476,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return cls;
     }
 
-    protected async visitClassDeclarationKind(kind: J.ClassDeclarationKind, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(kind, k => k.annotations, annot => annot.id, annot => this.visit(annot, q));
         await q.getAndSend(kind, k => k.type);
         return kind;
@@ -543,7 +543,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return space;
     }
 
-    public override async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
+    public override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
         await q.getAndSend(left, l => l.before, space => this.visitSpace(space, q));
         if (isTree(left.element)) {
             await q.getAndSend(left, l => l.element, elem => this.visit(elem as J, q));
@@ -1236,7 +1236,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitClassDeclarationKind(kind: J.ClassDeclarationKind, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(kind);
 
         draft.annotations = await q.receiveListDefined(kind.annotations, annot => this.visit(annot, q));
@@ -1316,7 +1316,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    public override async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
+    public override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
         if (!left) {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty left padding");
         }

@@ -23,12 +23,12 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
-import org.openrewrite.rpc.ValueCodec;
 
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -179,18 +179,18 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
 
     @Override
     public PlainText rpcReceive(PlainText t, RpcReceiveQueue q) {
-        return t.withId(q.receiveAndGet(t.getId(), ValueCodec.UUID))
+        return t.withId(UUID.fromString(q.receiveAndGet(t.getId(), UUID::toString)))
                 .withMarkers(q.receiveMarkers(t.getMarkers()))
-                .withSourcePath(q.receiveAndGet(t.getSourcePath(), ValueCodec.PATH))
-                .withCharset(q.receiveAndGet(t.getCharset(), ValueCodec.CHARSET))
+                .withSourcePath(Paths.get(q.receiveAndGet(t.getSourcePath(), Path::toString)))
+                .withCharset(Charset.forName(q.receiveAndGet(t.getCharset(), Charset::name)))
                 .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
                 .withChecksum(q.receive(t.getChecksum()))
                 .<PlainText>withFileAttributes(q.receive(t.getFileAttributes()))
-                .withText(q.receiveAndGet(t.getText(), ValueCodec.STRING))
+                .withText(q.receiveAndGet(t.getText(), String::toString))
                 .withSnippets(q.receiveList(t.getSnippets(), s -> s
-                        .withId(q.receiveAndGet(s.getId(), ValueCodec.UUID))
+                        .withId(UUID.fromString(q.receiveAndGet(s.getId(), UUID::toString)))
                         .withMarkers(q.receiveMarkers(s.getMarkers()))
-                        .withText(q.receiveAndGet(s.getText(), ValueCodec.STRING))));
+                        .withText(q.receiveAndGet(s.getText(), String::toString))));
     }
 
     @Value

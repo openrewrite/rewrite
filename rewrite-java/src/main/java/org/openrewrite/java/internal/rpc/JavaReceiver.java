@@ -19,15 +19,21 @@ import org.jspecify.annotations.NonNull;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcReceiveQueue;
-import org.openrewrite.rpc.ValueCodec;
+
+import java.nio.charset.Charset;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
+import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J preVisit(@NonNull J j, RpcReceiveQueue q) {
-        return ((J) j.withId(q.receiveAndGet(j.getId(), ValueCodec.UUID)))
+        return ((J) j.withId(UUID.fromString(q.receiveAndGet(j.getId(), UUID::toString))))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
     }
@@ -87,7 +93,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitAssignmentOperation(J.AssignmentOperation assignOp, RpcReceiveQueue q) {
         return assignOp
                 .withVariable(q.receive(assignOp.getVariable(), v -> (Expression) visitNonNull(v, q)))
-                .getPadding().withOperator(q.receive(assignOp.getPadding().getOperator(), o -> visitLeftPadded(o, q, ValueCodec.forEnum(J.AssignmentOperation.Type.class))))
+                .getPadding().withOperator(q.receive(assignOp.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(J.AssignmentOperation.Type.class))))
                 .withAssignment(q.receive(assignOp.getAssignment(), a -> (Expression) visitNonNull(a, q)))
                 .withType(q.receive(assignOp.getType(), t -> visitType(t, q)));
     }
@@ -96,7 +102,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitBinary(J.Binary binary, RpcReceiveQueue q) {
         return binary
                 .withLeft(q.receive(binary.getLeft(), l -> (Expression) visitNonNull(l, q)))
-                .getPadding().withOperator(q.receive(binary.getPadding().getOperator(), o -> visitLeftPadded(o, q, ValueCodec.forEnum(J.Binary.Type.class))))
+                .getPadding().withOperator(q.receive(binary.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(J.Binary.Type.class))))
                 .withRight(q.receive(binary.getRight(), r -> (Expression) visitNonNull(r, q)))
                 .withType(q.receive(binary.getType(), t -> visitType(t, q)));
     }
@@ -119,7 +125,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitCase(J.Case caseStmt, RpcReceiveQueue q) {
         return caseStmt
-                .withType(q.receiveAndGet(caseStmt.getType(), ValueCodec.forEnum(J.Case.Type.class)))
+                .withType(q.receiveAndGet(caseStmt.getType(), toEnum(J.Case.Type.class)))
                 .getPadding().withCaseLabels(q.receive(caseStmt.getPadding().getCaseLabels(), l -> visitContainer(l, q)))
                 .getPadding().withStatements(q.receive(caseStmt.getPadding().getStatements(), s -> visitContainer(s, q)))
                 .getPadding().withBody(q.receive(caseStmt.getPadding().getBody(), b -> visitRightPadded(b, q)))
@@ -144,15 +150,15 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     private J.ClassDeclaration.Kind visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcReceiveQueue q) {
         J.ClassDeclaration.Kind k = (J.ClassDeclaration.Kind) preVisit(kind, q);
         k = k.withAnnotations(q.receiveList(kind.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
-                .withType(q.receiveAndGet(kind.getType(), ValueCodec.forEnum(J.ClassDeclaration.Kind.Type.class)));
+                .withType(q.receiveAndGet(kind.getType(), toEnum(J.ClassDeclaration.Kind.Type.class)));
         return k;
     }
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, RpcReceiveQueue q) {
         return cu
-                .withSourcePath(q.receiveAndGet(cu.getSourcePath(), ValueCodec.PATH))
-                .withCharset(q.receiveAndGet(cu.getCharset(), ValueCodec.CHARSET))
+                .withSourcePath(Paths.get(q.receiveAndGet(cu.getSourcePath(), Path::toString)))
+                .withCharset(Charset.forName(q.receiveAndGet(cu.getCharset(), Charset::name)))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<J.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
@@ -373,8 +379,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitModifier(J.Modifier modifier, RpcReceiveQueue q) {
         return modifier
-                .withKeyword(q.receiveAndGet(modifier.getKeyword(), ValueCodec.STRING))
-                .withType(q.receiveAndGet(modifier.getType(), ValueCodec.forEnum(J.Modifier.Type.class)))
+                .withKeyword(q.receive(modifier.getKeyword()))
+                .withType(q.receiveAndGet(modifier.getType(), toEnum(J.Modifier.Type.class)))
                 .withAnnotations(q.receiveList(modifier.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)));
     }
 
@@ -543,7 +549,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitUnary(J.Unary unary, RpcReceiveQueue q) {
         return unary
-                .withOperator(q.receiveAndGet(unary.getOperator(), ValueCodec.forEnum(J.Unary.Type.class)))
+                .withOperator(q.receiveAndGet(unary.getOperator(), toEnum(J.Unary.Type.class)))
                 .withExpression(q.receive(unary.getExpression(), e -> (Expression) visitNonNull(e, q)))
                 .withType(q.receive(unary.getType(), t -> visitType(t, q)));
     }
@@ -578,7 +584,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitWildcard(J.Wildcard wildcard, RpcReceiveQueue q) {
         return wildcard
-                .withBound(q.receiveAndGet(wildcard.getBound(), ValueCodec.forEnum(J.Wildcard.Bound.class)))
+                .withBound(q.receiveAndGet(wildcard.getBound(), toEnum(J.Wildcard.Bound.class)))
                 .withBoundedType(q.receive(wildcard.getBoundedType(), b -> (TypeTree) visitNonNull(b, q)));
     }
 
@@ -627,10 +633,10 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withMarkers(q.receiveMarkers(left.getMarkers()));
     }
 
-    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q, ValueCodec<T> codec) {
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q, Function<Object, T> elementMapping) {
         return left
                 .withBefore(q.receive(left.getBefore(), s -> visitSpace(s, q)))
-                .withElement(q.receive(left.getElement(), codec::decode))
+                .withElement(q.receive(left.getElement(), elementMapping::apply))
                 .withMarkers(q.receiveMarkers(left.getMarkers()));
     }
 

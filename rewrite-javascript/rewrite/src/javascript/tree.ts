@@ -252,8 +252,8 @@ export namespace JS {
 
     export namespace ImportAttributes {
         export const enum Token {
-            With,
-            Assert
+            With = "With",
+            Assert = "Assert"
         }
     }
 
@@ -280,12 +280,12 @@ export namespace JS {
 
     export namespace JsBinary {
         export const enum Type {
-            As,
-            IdentityEquals,
-            IdentityNotEquals,
-            In,
-            QuestionQuestion,
-            Comma
+            As = "As",
+            IdentityEquals = "IdentityEquals",
+            IdentityNotEquals = "IdentityNotEquals",
+            In = "In",
+            QuestionQuestion = "QuestionQuestion",
+            Comma = "Comma"
         }
     }
 
@@ -339,9 +339,9 @@ export namespace JS {
 
     export namespace PropertyAssignment {
         export const enum Token {
-            Colon,
-            Equals,
-            Empty
+            Colon = "Colon",
+            Equals = "Equals",
+            Empty = "Empty"
         }
     }
 
@@ -361,11 +361,11 @@ export namespace JS {
 
     export namespace ScopedVariableDeclarations {
         export const enum Scope {
-            Const,
-            Let,
-            Var,
-            Using,
-            Import
+            Const = "Const",
+            Let = "Let",
+            Var = "Var",
+            Using = "Using",
+            Import = "Import"
         }
     }
 
@@ -439,11 +439,11 @@ export namespace JS {
 
     export namespace JsAssignmentOperation {
         export const enum Type {
-            QuestionQuestion,
-            And,
-            Or,
-            Power,
-            Exp
+            QuestionQuestion = "QuestionQuestion",
+            And = "And",
+            Or = "Or",
+            Power = "Power",
+            Exp = "Exp"
         }
     }
 
@@ -483,9 +483,9 @@ export namespace JS {
 
     export namespace TypeOperator {
         export const enum Type {
-            ReadOnly,
-            KeyOf,
-            Unique
+            ReadOnly = "ReadOnly",
+            KeyOf = "KeyOf",
+            Unique = "Unique"
         }
     }
 
@@ -523,12 +523,12 @@ export namespace JS {
 
     export namespace Unary {
         export const enum Type {
-            Spread,
-            Optional,
-            Exclamation,
-            QuestionDot,
-            QuestionDotWithDot,
-            Asterisk,
+            Spread = "Spread",
+            Optional = "Optional",
+            Exclamation = "Exclamation",
+            QuestionDot = "QuestionDot",
+            QuestionDotWithDot = "QuestionDotWithDot",
+            Asterisk = "Asterisk"
         }
     }
 

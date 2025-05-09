@@ -204,13 +204,13 @@ public class RewriteRpc {
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
     }
 
-    public List<SourceFile> parse(String parser, Iterable<Parser.Input> inputs, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public List<SourceFile> parse(String parser, Iterable<Parser.Input> inputs, @Nullable Path relativeTo) {
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
             if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
-                mappedInputs.add(new Parse.Input(input.getSource(ctx).readFully(), input.getPath().toString()));
+                mappedInputs.add(new Parse.StringInput(input.getSource(new InMemoryExecutionContext()).readFully(), input.getPath()));
             } else {
-                mappedInputs.add(new Parse.Input(null, input.getPath().toString()));
+                mappedInputs.add(new Parse.PathInput(input.getPath()));
             }
         }
 

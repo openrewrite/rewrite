@@ -165,7 +165,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return this.produceJava<J.ClassDeclaration>(classDecl, p, async draft => {
             draft.leadingAnnotations = await mapAsync(classDecl.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.modifiers = await mapAsync(classDecl.modifiers, m => this.visitDefined<J.Modifier>(m, p));
-            draft.classKind = await this.visitDefined(classDecl.classKind, p) as J.ClassDeclarationKind;
+            draft.classKind = await this.visitDefined(classDecl.classKind, p) as J.ClassDeclaration.Kind;
             draft.name = await this.visitDefined(classDecl.name, p) as J.Identifier;
             draft.typeParameters = await this.visitOptionalContainer(classDecl.typeParameters, p);
             draft.primaryConstructor = await this.visitOptionalContainer(classDecl.primaryConstructor, p);
@@ -177,8 +177,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitClassDeclarationKind(kind: J.ClassDeclarationKind, p: P): Promise<J | undefined> {
-        return this.produceJava<J.ClassDeclarationKind>(kind, p, async draft => {
+    protected async visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, p: P): Promise<J | undefined> {
+        return this.produceJava<J.ClassDeclaration.Kind>(kind, p, async draft => {
             draft.annotations = await mapAsync(kind.annotations, a => this.visitDefined<J.Annotation>(a, p));
         });
     }
@@ -667,11 +667,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitOptionalLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T> | undefined, p: P): Promise<J.LeftPadded<T> | undefined> {
+    protected async visitOptionalLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T> | undefined, p: P): Promise<J.LeftPadded<T> | undefined> {
         return left ? this.visitLeftPadded(left, p) : undefined;
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
+    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
         return produceAsync<J.LeftPadded<T>>(left, async draft => {
             draft.before = await this.visitSpace(left.before, p);
             if (isTree(left.element)) {
@@ -740,7 +740,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             case J.Kind.ClassDeclaration:
                 return this.visitClassDeclaration(t as J.ClassDeclaration, p);
             case J.Kind.ClassDeclarationKind:
-                return this.visitClassDeclarationKind(t as J.ClassDeclarationKind, p);
+                return this.visitClassDeclarationKind(t as J.ClassDeclaration.Kind, p);
             case J.Kind.CompilationUnit:
                 return this.visitCompilationUnit(t as J.CompilationUnit, p);
             case J.Kind.Continue:

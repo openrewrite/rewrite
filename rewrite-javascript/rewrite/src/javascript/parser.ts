@@ -451,7 +451,7 @@ export class JavaScriptParserVisitor {
         return ts;
     }
 
-    private leftPadded<T extends J | J.Space | number | boolean>(before: J.Space, t: T, markers?: Markers): J.LeftPadded<T> {
+    private leftPadded<T extends J | J.Space | number | string | boolean>(before: J.Space, t: T, markers?: Markers): J.LeftPadded<T> {
         return {
             kind: J.Kind.JLeftPadded,
             before: before,
@@ -484,7 +484,7 @@ export class JavaScriptParserVisitor {
                 prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
                 markers: emptyMarkers,
                 annotations: [],
-                type: J.ClassType.Class
+                type: J.ClassDeclaration.Kind.Type.Class
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
             typeParameters: this.mapTypeParametersAsJContainer(node),
@@ -2674,7 +2674,7 @@ export class JavaScriptParserVisitor {
                     prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
                     markers: emptyMarkers,
                     annotations: [],
-                    type: J.ClassType.Class
+                    type: J.ClassDeclaration.Kind.Type.Class
                 },
                 name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
                 typeParameters: this.mapTypeParametersAsJContainer(node),
@@ -3297,7 +3297,7 @@ export class JavaScriptParserVisitor {
                 prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
                 markers: emptyMarkers,
                 annotations: [],
-                type: J.ClassType.Interface
+                type: J.ClassDeclaration.Kind.Type.Interface
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
             typeParameters: this.mapTypeParametersAsJContainer(node),
@@ -3348,7 +3348,7 @@ export class JavaScriptParserVisitor {
                 prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
                 markers: emptyMarkers,
                 annotations: [],
-                type: J.ClassType.Enum
+                type: J.ClassDeclaration.Kind.Type.Enum
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
             body: {

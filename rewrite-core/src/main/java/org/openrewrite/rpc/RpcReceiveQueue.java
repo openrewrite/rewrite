@@ -23,6 +23,8 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -56,7 +58,6 @@ public class RpcReceiveQueue {
      * convert it to a string or fetch some nested object off of it.
      *
      * @param before The value to apply the function to, which may be null.
-     * @param codec  Used to encode the {@code before} value and decode the received value.
      * @param <T>    A before value ahead of the function call.
      * @param <U>    The return type of the function. This will match the type that is
      *               being received from the remote.
@@ -64,15 +65,13 @@ public class RpcReceiveQueue {
      * is NO_CHANGE or CHANGE, the function is applied to the before parameter, unless before
      * is null in which case the before state is assumed to be null.
      */
-    public <T> T receiveAndGet(@Nullable T before, ValueCodec<T> codec) {
-        Object received = receive(before == null ? null : codec.encode(before), null);
-        //noinspection ConstantValue
-        return received != null ? codec.decode(received) : null;
+    public <T, U> U receiveAndGet(@Nullable T before, Function<T, U> apply) {
+        return receive(before == null ? null : apply.apply(before), null);
     }
 
     public Markers receiveMarkers(Markers markers) {
         return receive(markers, m -> m
-                .withId(receiveAndGet(m.getId(), ValueCodec.UUID))
+                .withId(UUID.fromString(receiveAndGet(m.getId(), UUID::toString)))
                 .withMarkers(receiveList(m.getMarkers(), null)));
     }
 
@@ -125,6 +124,9 @@ public class RpcReceiveQueue {
                 // Intentional fall-through...
             case CHANGE:
                 T after;
+
+                // TODO handle enums here
+
                 if (onChange != null) {
                     after = onChange.apply(before);
                 } else if (before instanceof RpcCodec) {
@@ -159,7 +161,7 @@ public class RpcReceiveQueue {
             case CHANGE:
                 msg = take(); // the next message should be a CHANGE with a list of positions
                 assert msg.getState() == RpcObjectData.State.CHANGE;
-                List<Integer> positions = msg.getValue();
+                List<Integer> positions = requireNonNull(msg.getValue());
                 List<T> after = new ArrayList<>(positions.size());
                 for (int beforeIdx : positions) {
                     after.add(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange));
@@ -178,5 +180,23 @@ public class RpcReceiveQueue {
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * @param enumType The enumeration that we are creating or updating
+     * @param <T>      The enum type.
+     * @return An enum mapping function that can be used when receiving a string to convert
+     * it to an enum value.
+     */
+    public static <T extends Enum<?>> Function<Object, T> toEnum(Class<? extends T> enumType) {
+        return value -> {
+            for (T enumConstant : enumType.getEnumConstants()) {
+                if (enumConstant.name().equals(value)) {
+                    return enumConstant;
+                }
+            }
+            throw new IllegalArgumentException("Tried to map value " + value +
+                                               " to an enum of type " + enumType.getName());
+        };
     }
 }

@@ -49,7 +49,7 @@ public class JavaScriptParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        return client.parse("javascript", sources, relativeTo, ctx).stream();
+        return client.parse("javascript", sources, relativeTo).stream();
     }
 
     private final static List<String> EXTENSIONS = Collections.unmodifiableList(Arrays.asList(

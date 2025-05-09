@@ -21,12 +21,9 @@ import {json} from "../../src/json";
 import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
-import inspector from 'inspector';
 import {activate} from "../example-recipe";
 import {javascript, JS} from "../../src/javascript";
 import fs from "node:fs";
-
-const isDebugging = Boolean(inspector.url());
 
 describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
@@ -37,18 +34,7 @@ describe("Rewrite RPC", () => {
     beforeEach(async () => {
         // Create in-memory streams to simulate the pipes.
         const clientToServer = new PassThrough();
-        // if (isDebugging) {
-        //     clientToServer.on('data', chunk => {
-        //         console.debug('[server] ⇦ received:', `'${chunk.toString()}'`);
-        //     });
-        // }
-
         const serverToClient = new PassThrough();
-        // if (isDebugging) {
-        //     serverToClient.on('data', chunk => {
-        //         console.debug('[client] ⇦ received:', `'${chunk.toString()}'`);
-        //     });
-        // }
 
         const clientConnection = rpc.createMessageConnection(
             new rpc.StreamMessageReader(serverToClient),
@@ -76,8 +62,10 @@ describe("Rewrite RPC", () => {
     afterEach(() => {
         server.end();
         client.end();
-        fs.unlink('client.txt', () => {});
-        fs.unlink('server.txt', () => {});
+        fs.unlink('client.txt', () => {
+        });
+        fs.unlink('server.txt', () => {
+        });
     });
 
     test("print", () => spec.rewriteRun(

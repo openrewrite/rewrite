@@ -183,20 +183,20 @@ export namespace J {
 
     export namespace AssignmentOperation {
         export const enum Type {
-            Addition,
-            BitAnd,
-            BitOr,
-            BitXor,
-            Division,
-            Exponentiation,    // Raises the left operand to the power of the right operand. Used in Python
-            FloorDivision,     // Division rounding down to the nearest integer. Used in Python
-            LeftShift,
-            MatrixMultiplication, // Matrix multiplication. Used in Python
-            Modulo,
-            Multiplication,
-            RightShift,
-            Subtraction,
-            UnsignedRightShift
+            Addition = "Addition",
+            BitAnd = "BitAnd",
+            BitOr = "BitOr",
+            BitXor = "BitXor",
+            Division = "Division",
+            Exponentiation = "Exponentiation",    // Raises the left operand to the power of the right operand. Used in Python
+            FloorDivision = "FloorDivision",     // Division rounding down to the nearest integer. Used in Python
+            LeftShift = "LeftShift",
+            MatrixMultiplication = "MatrixMultiplication", // Matrix multiplication. Used in Python
+            Modulo = "Modulo",
+            Multiplication = "Multiplication",
+            RightShift = "RightShift",
+            Subtraction = "Subtraction",
+            UnsignedRightShift = "UnsignedRightShift"
         }
     }
 
@@ -210,25 +210,25 @@ export namespace J {
 
     export namespace Binary {
         export const enum Type {
-            Addition,
-            Subtraction,
-            Multiplication,
-            Division,
-            Modulo,
-            LessThan,
-            GreaterThan,
-            LessThanOrEqual,
-            GreaterThanOrEqual,
-            Equal,
-            NotEqual,
-            BitAnd,
-            BitOr,
-            BitXor,
-            LeftShift,
-            RightShift,
-            UnsignedRightShift,
-            Or,
-            And
+            Addition = "Addition",
+            Subtraction = "Subtraction",
+            Multiplication = "Multiplication",
+            Division = "Division",
+            Modulo = "Modulo",
+            LessThan = "LessThan",
+            GreaterThan = "GreaterThan",
+            LessThanOrEqual = "LessThanOrEqual",
+            GreaterThanOrEqual = "GreaterThanOrEqual",
+            Equal = "Equal",
+            NotEqual = "NotEqual",
+            BitAnd = "BitAnd",
+            BitOr = "BitOr",
+            BitXor = "BitXor",
+            LeftShift = "LeftShift",
+            RightShift = "RightShift",
+            UnsignedRightShift = "UnsignedRightShift",
+            Or = "Or",
+            And = "And"
         }
     }
 
@@ -264,7 +264,7 @@ export namespace J {
         readonly kind: typeof Kind.ClassDeclaration;
         readonly leadingAnnotations: Annotation[];
         readonly modifiers: Modifier[];
-        readonly classKind: ClassDeclarationKind;
+        readonly classKind: ClassDeclaration.Kind;
         readonly name: Identifier;
         readonly typeParameters?: Container<TypeParameter>;
         readonly primaryConstructor?: Container<Statement>;
@@ -275,10 +275,23 @@ export namespace J {
         readonly type?: JavaType.FullyQualified;
     }
 
-    export interface ClassDeclarationKind extends J {
-        readonly kind: typeof Kind.ClassDeclarationKind;
-        readonly annotations: Annotation[];
-        readonly type: ClassType;
+    export namespace ClassDeclaration {
+        export interface Kind extends J {
+            readonly kind: typeof J.Kind.ClassDeclarationKind;
+            readonly annotations: Annotation[];
+            readonly type: Kind.Type;
+        }
+
+        export namespace Kind {
+            export const enum Type {
+                Class = "Class",
+                Interface = "Interface",
+                Enum = "Enum",
+                Annotation = "Annotation",
+                Record = "Record",
+                Value = "Value"
+            }
+        }
     }
 
     export interface CompilationUnit extends JavaSourceFile, J {
@@ -484,27 +497,27 @@ export namespace J {
     }
 
     export const enum ModifierType {
-        Default,
-        Public,
-        Protected,
-        Private,
-        Abstract,
-        Static,
-        Final,
-        Sealed,
-        NonSealed,
-        Transient,
-        Volatile,
-        Synchronized,
-        Native,
-        Strictfp,
-        Async,
-        Reified,
-        Inline,
+        Default = "Default",
+        Public = "Public",
+        Protected = "Protected",
+        Private = "Private",
+        Abstract = "Abstract",
+        Static = "Static",
+        Final = "Final",
+        Sealed = "Sealed",
+        NonSealed = "NonSealed",
+        Transient = "Transient",
+        Volatile = "Volatile",
+        Synchronized = "Synchronized",
+        Native = "Native",
+        Strictfp = "Strictfp",
+        Async = "Async",
+        Reified = "Reified",
+        Inline = "Inline",
         /**
          * For modifiers not seen in Java this is used in conjunction with "keyword"
          */
-        LanguageExtension
+        LanguageExtension = "LanguageExtension"
     }
 
     export interface MultiCatch extends J, TypeTree {
@@ -651,14 +664,14 @@ export namespace J {
 
     export namespace Unary {
         export const enum Type {
-            PreIncrement,
-            PreDecrement,
-            PostIncrement,
-            PostDecrement,
-            Positive,
-            Negative,
-            Complement,
-            Not
+            PreIncrement = "PreIncrement",
+            PreDecrement = "PreDecrement",
+            PostIncrement = "PostIncrement",
+            PostDecrement = "PostDecrement",
+            Positive = "Positive",
+            Negative = "Negative",
+            Complement = "Complement",
+            Not = "Not"
         }
     }
 
@@ -689,13 +702,15 @@ export namespace J {
 
     export interface Wildcard extends J, TypeTree, Expression {
         readonly kind: typeof Kind.Wildcard;
-        readonly bound?: LeftPadded<WildcardBound>;
+        readonly bound?: LeftPadded<Wildcard.Bound>;
         readonly boundedType?: NameTree;
     }
 
-    export const enum WildcardBound {
-        Extends,
-        Super
+    export namespace Wildcard {
+        export const enum Bound {
+            Extends = "Extends",
+            Super = "Super"
+        }
     }
 
     export interface Yield extends J, Statement {
@@ -719,16 +734,7 @@ export namespace J {
         readonly text: string;
     }
 
-    export const enum ClassType {
-        Class,
-        Interface,
-        Enum,
-        Annotation,
-        Record,
-        Value
-    }
-
-    export interface LeftPadded<T extends J | Space | number | boolean> {
+    export interface LeftPadded<T extends J | Space | number | string | boolean> {
         readonly kind: typeof Kind.JLeftPadded;
         readonly before: Space;
         readonly element: T;

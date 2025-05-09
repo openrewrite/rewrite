@@ -15,9 +15,11 @@
  */
 package org.openrewrite.rpc.request;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.nio.file.Path;
 import java.util.List;
 
 @Value
@@ -29,11 +31,18 @@ public class Parse implements RpcRequest {
     @Nullable
     String relativeTo;
 
-    @Value
-    public static class Input {
-        @Nullable
-        String text;
+    public interface Input {
+    }
 
-        String path;
+    @Value
+    public static class StringInput implements Input {
+        String text;
+        Path sourcePath;
+    }
+
+    @Value
+    public static class PathInput implements Input {
+        @JsonValue
+        Path sourcePath;
     }
 }

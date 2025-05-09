@@ -1,5 +1,3 @@
-import {J} from "./tree";
-
 export interface JavaType {
     readonly kind: string;
 }
@@ -23,7 +21,7 @@ export namespace JavaType {
 
     export interface Class extends JavaType, FullyQualified {
         readonly kind: typeof Kind.Class,
-        readonly classKind: J.ClassType;
+        readonly classKind: Class.Kind;
         readonly fullyQualifiedName: string;
         readonly typeParameters: JavaType[];
         readonly supertype?: JavaType.Class;
@@ -32,6 +30,17 @@ export namespace JavaType {
         readonly interfaces: JavaType.Class[];
         readonly members: JavaType.Variable[];
         readonly methods: JavaType.Method[];
+    }
+
+    export namespace Class {
+        export const enum Kind {
+            Class = "Class",
+            Enum = "Enum",
+            Interface = "Interface",
+            Annotation = "Annotation",
+            Record = "Record",
+            Value = "Value"
+        }
     }
 
     export interface Annotation extends JavaType, FullyQualified {

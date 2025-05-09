@@ -683,19 +683,19 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitClassDeclaration(classDecl: J.ClassDeclaration, p: PrintOutputCapture): Promise<J | undefined> {
         let kind = "";
         switch (classDecl.classKind.type) {
-            case J.ClassType.Class:
+            case J.ClassDeclaration.Kind.Type.Class:
                 kind = "class";
                 break;
-            case J.ClassType.Enum:
+            case J.ClassDeclaration.Kind.Type.Enum:
                 kind = "enum";
                 break;
-            case J.ClassType.Interface:
+            case J.ClassDeclaration.Kind.Type.Interface:
                 kind = "interface";
                 break;
-            case J.ClassType.Annotation:
+            case J.ClassDeclaration.Kind.Type.Annotation:
                 kind = "@interface";
                 break;
-            case J.ClassType.Record:
+            case J.ClassDeclaration.Kind.Type.Record:
                 kind = "record";
                 break;
         }
@@ -713,7 +713,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         classDecl.typeParameters && await this.visitJContainerLocal("<", classDecl.typeParameters, ",", ">", p);
         classDecl.primaryConstructor && await this.visitJContainerLocal("(", classDecl.primaryConstructor, ",", ")", p);
         classDecl.extends && await this.visitJLeftPaddedLocal("extends", classDecl.extends, p);
-        classDecl.implements && await this.visitJContainerLocal(classDecl.classKind.type === J.ClassType.Interface ? "extends" : "implements",
+        classDecl.implements && await this.visitJContainerLocal(classDecl.classKind.type === J.ClassDeclaration.Kind.Type.Interface ? "extends" : "implements",
             classDecl.implements, ",", null, p);
         await this.visit(classDecl.body, p);
         await this.afterSyntax(classDecl, p);

@@ -548,7 +548,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return this.javaSender.visitRightPadded(right, q);
     }
 
-    override async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
+    override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
         return this.javaSender.visitLeftPadded(left, q);
     }
 
@@ -1180,7 +1180,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return this.javaReceiverDelegate.visitRightPadded(right, q)
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
+    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
         return this.javaReceiverDelegate.visitLeftPadded(left, q);
     }
 

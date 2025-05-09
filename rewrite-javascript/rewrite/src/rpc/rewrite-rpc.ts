@@ -30,12 +30,11 @@ import {
     VisitResponse
 } from "./request";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
-import {RpcCodecs} from "./codec";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
 import {WriteStream} from "fs";
-import {ParserInput, parserInputFile, parserInputRead} from "../parser";
+import {ParserInput} from "../parser";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
@@ -117,14 +116,11 @@ export class RewriteRpc {
         return cursor;
     }
 
-    async parse(parser: string, inputs: ParserInput[], relativeTo?: string, ctx?: ExecutionContext): Promise<SourceFile[]> {
+    async parse(parser: "javascript", inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
         const parsed: SourceFile[] = [];
         for (const g of await this.connection.sendRequest(
             new rpc.RequestType<Parse, string[], Error>("Parse"),
-            new Parse(parser, inputs.map(i => ({
-                path: parserInputFile(i),
-                text: i === "string" ? undefined : parserInputRead(i)
-            })), relativeTo)
+            new Parse(parser, inputs, relativeTo)
         )) {
             parsed.push(await this.getObject(g));
         }

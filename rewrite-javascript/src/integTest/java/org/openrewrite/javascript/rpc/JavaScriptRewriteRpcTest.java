@@ -22,9 +22,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.config.Environment;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
@@ -34,7 +36,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -122,6 +126,20 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
         Recipe recipe = client.prepareRecipe("org.openrewrite.npm.change-version",
           Map.of("version", "1.0.0"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Change version in `package.json`");
+    }
+
+    @Test
+    void parse() {
+        SourceFile cu = client.parse("javascript", List.of(Parser.Input.fromString(
+          Paths.get("test.js"), "const two = 1 + 1")), null).iterator().next();
+
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Binary visitBinary(J.Binary binary, Integer p) {
+                assertThat(binary.getOperator()).isEqualTo(J.Binary.Type.Addition);
+                return binary;
+            }
+        }.visit(cu, 0);
     }
 
     @Test
