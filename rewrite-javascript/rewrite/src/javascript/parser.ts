@@ -1623,21 +1623,18 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             checkType: this.visit(node.checkType),
             condition: {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.JLeftPadded,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExtendsKeyword)!),
-                elements: [this.rightPadded(
-                    {
-                        kind: J.Kind.Ternary,
-                        id: randomId(),
-                        prefix: emptySpace,
-                        markers: emptyMarkers,
-                        condition: this.convert(node.extendsType),
-                        truePart: this.leftPadded(this.suffix(node.extendsType), this.convert(node.trueType)),
-                        falsePart: this.leftPadded(this.suffix(node.trueType), this.convert(node.falseType)),
-                        type: this.mapType(node)
-                    },
-                    emptySpace
-                )],
+                element: {
+                    kind: J.Kind.Ternary,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    condition: this.convert(node.extendsType),
+                    truePart: this.leftPadded(this.suffix(node.extendsType), this.convert(node.trueType)),
+                    falsePart: this.leftPadded(this.suffix(node.trueType), this.convert(node.falseType)),
+                    type: this.mapType(node)
+                },
                 markers: emptyMarkers
             },
             type: this.mapType(node)

@@ -152,7 +152,7 @@ export namespace JS {
     export interface ConditionalType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.ConditionalType;
         readonly checkType: Expression;
-        readonly condition: J.Container<TypedTree>;
+        readonly condition: J.LeftPadded<J.Ternary>;
         readonly type?: JavaType;
     }
 

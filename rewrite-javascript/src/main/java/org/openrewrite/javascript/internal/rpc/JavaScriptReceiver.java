@@ -96,7 +96,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitConditionalType(JS.ConditionalType conditionalType, RpcReceiveQueue q) {
         return conditionalType
                 .withCheckType(q.receive(conditionalType.getCheckType(), expr -> (Expression) visitNonNull(expr, q)))
-                .getPadding().withCondition(q.receive(conditionalType.getPadding().getCondition(), el -> visitContainer(el, q)))
+                .getPadding().withCondition(q.receive(conditionalType.getPadding().getCondition(), el -> visitLeftPadded(el, q)))
                 .withType(q.receive(conditionalType.getType(), type -> visitType(type, q)));
     }
 

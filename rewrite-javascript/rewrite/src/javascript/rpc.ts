@@ -85,7 +85,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitConditionalType(conditionalType: JS.ConditionalType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(conditionalType, el => el.checkType, el => this.visit(el, q));
-        await q.getAndSend(conditionalType, el => el.condition, el => this.visitContainer(el, q));
+        await q.getAndSend(conditionalType, el => el.condition, el => this.visitLeftPadded(el, q));
         await q.getAndSend(conditionalType, el => asRef(el.type), el => this.visitType(el, q));
         return conditionalType;
     }
@@ -653,7 +653,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitConditionalType(conditionalType: JS.ConditionalType, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(conditionalType);
         draft.checkType = await q.receive(draft.checkType, el => this.visitDefined<Expression>(el, q));
-        draft.condition = await q.receive(draft.condition, el => this.visitContainer(el, q));
+        draft.condition = await q.receive(draft.condition, el => this.visitLeftPadded(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }

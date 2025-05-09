@@ -24,7 +24,8 @@ import org.openrewrite.javascript.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
-import java.util.Objects;
+
+import static java.util.Objects.requireNonNull;
 
 @SuppressWarnings("unused")
 public class JavaScriptVisitor<P> extends JavaVisitor<P> {
@@ -66,8 +67,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             a = (JS.Alias) temp;
         }
 
-        a = a.getPadding().withPropertyName(Objects.requireNonNull(visitRightPadded(a.getPadding().getPropertyName(), JsRightPadded.Location.ALIAS_PROPERTY_NAME, p)));
-        a = a.withAlias(Objects.requireNonNull(visitAndCast(a.getAlias(), p)));
+        a = a.getPadding().withPropertyName(requireNonNull(visitRightPadded(a.getPadding().getPropertyName(), JsRightPadded.Location.ALIAS_PROPERTY_NAME, p)));
+        a = a.withAlias(requireNonNull(visitAndCast(a.getAlias(), p)));
         return a;
     }
 
@@ -83,8 +84,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             a = (JS.ArrowFunction) temp;
         }
 
-        a = a.withLeadingAnnotations(Objects.requireNonNull(ListUtils.map(a.getLeadingAnnotations(), ann -> visitAndCast(ann, p))));
-        a = a.withModifiers(Objects.requireNonNull(ListUtils.map(a.getModifiers(), m -> visitAndCast(m, p))));
+        a = a.withLeadingAnnotations(requireNonNull(ListUtils.map(a.getLeadingAnnotations(), ann -> visitAndCast(ann, p))));
+        a = a.withModifiers(requireNonNull(ListUtils.map(a.getModifiers(), m -> visitAndCast(m, p))));
         a = a.withTypeParameters(visitAndCast(a.getTypeParameters(), p));
 
         a = a.withParameters(
@@ -94,14 +95,14 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         );
         a = a.withParameters(
                 a.getParameters().getPadding().withParameters(
-                        Objects.requireNonNull(ListUtils.map(a.getParameters().getPadding().getParameters(),
+                        requireNonNull(ListUtils.map(a.getParameters().getPadding().getParameters(),
                                 param -> visitRightPadded(param, JRightPadded.Location.LAMBDA_PARAM, p)
                         ))
                 )
         );
-        a = a.withParameters(Objects.requireNonNull(visitAndCast(a.getParameters(), p)));
+        a = a.withParameters(requireNonNull(visitAndCast(a.getParameters(), p)));
         a = a.withReturnTypeExpression(visitAndCast(a.getReturnTypeExpression(), p));
-        a = a.getPadding().withBody(Objects.requireNonNull(visitLeftPadded(a.getPadding().getBody(), JsLeftPadded.Location.LAMBDA_ARROW, p)));
+        a = a.getPadding().withBody(requireNonNull(visitLeftPadded(a.getPadding().getBody(), JsLeftPadded.Location.LAMBDA_ARROW, p)));
         a = a.withType(visitType(a.getType(), p));
         return a;
     }
@@ -116,7 +117,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             a = (JS.Await) temp;
         }
-        a = a.withExpression(Objects.requireNonNull(visitAndCast(a.getExpression(), p)));
+        a = a.withExpression(requireNonNull(visitAndCast(a.getExpression(), p)));
         return a;
     }
 
@@ -125,7 +126,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         b = b.withPrefix(visitSpace(b.getPrefix(), JsSpace.Location.BINDING_ELEMENT_PREFIX, p));
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
         b = b.withPropertyName(visitAndCast(b.getPropertyName(), p));
-        b = b.withName(Objects.requireNonNull(visitAndCast(b.getName(), p)));
+        b = b.withName(requireNonNull(visitAndCast(b.getName(), p)));
         if (b.getPadding().getInitializer() != null) {
             b = b.getPadding().withInitializer(visitLeftPadded(b.getPadding().getInitializer(),
                     JsLeftPadded.Location.BINDING_ELEMENT_INITIALIZER, p));
@@ -135,14 +136,15 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     public J visitConditionalType(JS.ConditionalType conditionalType, P p) {
-         JS.ConditionalType t = conditionalType;
+        JS.ConditionalType t = conditionalType;
         t = t.withPrefix(visitSpace(t.getPrefix(), JsSpace.Location.CONDITIONAL_TYPE_PREFIX, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
-        t = t.withCheckType(Objects.requireNonNull(visitAndCast(t.getCheckType(), p)));
+        t = t.withCheckType(requireNonNull(visitAndCast(t.getCheckType(), p)));
         if (t.getCheckType() instanceof NameTree) {
             t = t.withCheckType((Expression) visitTypeName((NameTree) t.getCheckType(), p));
         }
-        t = t.getPadding().withCondition(visitContainer(t.getPadding().getCondition(), JsContainer.Location.CONDITIONAL_TYPE_CONDITION, p));
+        t = t.getPadding().withCondition(requireNonNull(visitLeftPadded(t.getPadding().getCondition(),
+                JsLeftPadded.Location.CONDITIONAL_TYPE_CONDITION, p)));
         t = t.withType(visitType(t.getType(), p));
         return t;
     }
@@ -157,9 +159,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             d = (JS.DefaultType) temp;
         }
-        d = d.withLeft(Objects.requireNonNull(visitAndCast(d.getLeft(), p)));
+        d = d.withLeft(requireNonNull(visitAndCast(d.getLeft(), p)));
         d = d.withBeforeEquals(visitSpace(d.getBeforeEquals(), Space.Location.ASSIGNMENT_OPERATION_PREFIX, p));
-        d = d.withRight(Objects.requireNonNull(visitAndCast(d.getRight(), p)));
+        d = d.withRight(requireNonNull(visitAndCast(d.getRight(), p)));
         d = d.withType(visitType(d.getType(), p));
         return d;
     }
@@ -212,7 +214,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             es = (JS.ExpressionStatement) temp;
         }
         J expression = visit(es.getExpression(), p);
-        es = es.withExpression((Expression) Objects.requireNonNull(expression));
+        es = es.withExpression((Expression) requireNonNull(expression));
         return es;
     }
 
@@ -226,7 +228,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             st = (JS.TrailingTokenStatement) temp;
         }
-        st = st.getPadding().withExpression(Objects.requireNonNull(visitRightPadded(st.getPadding().getExpression(), JsRightPadded.Location.TRAILING_TOKEN_EXPRESSION, p)));
+        st = st.getPadding().withExpression(requireNonNull(visitRightPadded(st.getPadding().getExpression(), JsRightPadded.Location.TRAILING_TOKEN_EXPRESSION, p)));
         st = st.withType(visitType(st.getType(), p));
         return st;
     }
@@ -241,7 +243,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             ta = (JS.ExpressionWithTypeArguments) temp;
         }
-        ta = ta.withClazz(Objects.requireNonNull(visitAndCast(ta.getClazz(), p)));
+        ta = ta.withClazz(requireNonNull(visitAndCast(ta.getClazz(), p)));
         if (ta.getPadding().getTypeArguments() != null) {
             ta = ta.getPadding().withTypeArguments(visitContainer(ta.getPadding().getTypeArguments(), JsContainer.Location.EXPR_WITH_TYPE_ARG_PARAMETERS, p));
         }
@@ -259,11 +261,11 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             f = (JS.FunctionType) temp;
         }
-        f = f.withModifiers(Objects.requireNonNull(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p))));
-        f = f.getPadding().withConstructorType(Objects.requireNonNull(visitLeftPadded(f.getPadding().getConstructorType(), JsLeftPadded.Location.FUNCTION_TYPE_CONSTRUCTOR, p)));
+        f = f.withModifiers(requireNonNull(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p))));
+        f = f.getPadding().withConstructorType(requireNonNull(visitLeftPadded(f.getPadding().getConstructorType(), JsLeftPadded.Location.FUNCTION_TYPE_CONSTRUCTOR, p)));
         f = f.withTypeParameters(visitAndCast(f.getTypeParameters(), p));
-        f = f.getPadding().withParameters(Objects.requireNonNull(visitContainer(f.getPadding().getParameters(), JsContainer.Location.FUNCTION_TYPE_PARAMETERS, p)));
-        f = f.getPadding().withReturnType((Objects.requireNonNull(visitLeftPadded(f.getPadding().getReturnType(), JsLeftPadded.Location.FUNCTION_TYPE_RETURN_TYPE, p))));
+        f = f.getPadding().withParameters(requireNonNull(visitContainer(f.getPadding().getParameters(), JsContainer.Location.FUNCTION_TYPE_PARAMETERS, p)));
+        f = f.getPadding().withReturnType((requireNonNull(visitLeftPadded(f.getPadding().getReturnType(), JsLeftPadded.Location.FUNCTION_TYPE_RETURN_TYPE, p))));
         f = f.withType(visitType(f.getType(), p));
         return f;
     }
@@ -279,7 +281,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             t = (JS.InferType) temp;
         }
-        t = t.getPadding().withTypeParameter(Objects.requireNonNull(visitLeftPadded(t.getPadding().getTypeParameter(), JsLeftPadded.Location.INFER_TYPE_PARAMETER, p)));
+        t = t.getPadding().withTypeParameter(requireNonNull(visitLeftPadded(t.getPadding().getTypeParameter(), JsLeftPadded.Location.INFER_TYPE_PARAMETER, p)));
         t = t.withType(visitType(t.getType(), p));
         return t;
     }
@@ -294,9 +296,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             b = (JS.JsBinary) temp;
         }
-        b = b.withLeft(Objects.requireNonNull(visitAndCast(b.getLeft(), p)));
-        b = b.getPadding().withOperator(Objects.requireNonNull(visitLeftPadded(b.getPadding().getOperator(), JsLeftPadded.Location.BINARY_OPERATOR, p)));
-        b = b.withRight(Objects.requireNonNull(visitAndCast(b.getRight(), p)));
+        b = b.withLeft(requireNonNull(visitAndCast(b.getLeft(), p)));
+        b = b.getPadding().withOperator(requireNonNull(visitLeftPadded(b.getPadding().getOperator(), JsLeftPadded.Location.BINARY_OPERATOR, p)));
+        b = b.withRight(requireNonNull(visitAndCast(b.getRight(), p)));
         b = b.withType(visitType(b.getType(), p));
         return b;
     }
@@ -311,9 +313,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             i = (JS.JsImport) temp;
         }
-        i = i.withModifiers(Objects.requireNonNull(ListUtils.map(i.getModifiers(), e -> visitAndCast(e, p))));
+        i = i.withModifiers(requireNonNull(ListUtils.map(i.getModifiers(), e -> visitAndCast(e, p))));
         i = i.withImportClause(visitAndCast(i.getImportClause(), p));
-        i = i.getPadding().withModuleSpecifier(Objects.requireNonNull(visitLeftPadded(i.getPadding().getModuleSpecifier(), JsLeftPadded.Location.JS_IMPORT_MODULE_SPECIFIER, p)));
+        i = i.getPadding().withModuleSpecifier(requireNonNull(visitLeftPadded(i.getPadding().getModuleSpecifier(), JsLeftPadded.Location.JS_IMPORT_MODULE_SPECIFIER, p)));
         i = i.withAttributes(visitAndCast(i.getAttributes(), p));
         return i;
     }
@@ -337,7 +339,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             ne = (JS.NamedImports) temp;
         }
-        ne = ne.getPadding().withElements(Objects.requireNonNull(visitContainer(ne.getPadding().getElements(), JsContainer.Location.NAMED_IMPORTS_ELEMENTS, p)));
+        ne = ne.getPadding().withElements(requireNonNull(visitContainer(ne.getPadding().getElements(), JsContainer.Location.NAMED_IMPORTS_ELEMENTS, p)));
         ne = ne.withType(visitType(ne.getType(), p));
         return ne;
     }
@@ -352,8 +354,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             i = (JS.JsImportSpecifier) temp;
         }
-        i = i.getPadding().withImportType(Objects.requireNonNull(visitLeftPadded(i.getPadding().getImportType(), JsLeftPadded.Location.JS_IMPORT_SPECIFIER_IMPORT_TYPE, p)));
-        i = i.withSpecifier(Objects.requireNonNull(visitAndCast(i.getSpecifier(), p)));
+        i = i.getPadding().withImportType(requireNonNull(visitLeftPadded(i.getPadding().getImportType(), JsLeftPadded.Location.JS_IMPORT_SPECIFIER_IMPORT_TYPE, p)));
+        i = i.withSpecifier(requireNonNull(visitAndCast(i.getSpecifier(), p)));
         i = i.withType(visitType(i.getType(), p));
         return i;
     }
@@ -362,7 +364,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         JS.ImportAttributes i = importAttributes;
         i = i.withPrefix(visitSpace(i.getPrefix(), JsSpace.Location.JS_IMPORT_ATTRIBUTES_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
-        i = i.getPadding().withElements(Objects.requireNonNull(visitContainer(i.getPadding().getElements(), JsContainer.Location.JS_IMPORT_ATTRIBUTES_ELEMENTS, p)));
+        i = i.getPadding().withElements(requireNonNull(visitContainer(i.getPadding().getElements(), JsContainer.Location.JS_IMPORT_ATTRIBUTES_ELEMENTS, p)));
         return i;
     }
 
@@ -370,9 +372,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         JS.ImportTypeAttributes i = importTypeAttributes;
         i = i.withPrefix(visitSpace(i.getPrefix(), JsSpace.Location.JS_IMPORT_TYPE_ATTRIBUTES_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
-        i = i.getPadding().withToken(Objects.requireNonNull(visitRightPadded(i.getPadding().getToken(), JsRightPadded.Location.JS_IMPORT_TYPE_ATTRIBUTES_TOKEN, p)));
-        i = i.getPadding().withElements(Objects.requireNonNull(visitContainer(i.getPadding().getElements(), JsContainer.Location.JS_IMPORT_TYPE_ATTRIBUTES_ELEMENTS, p)));
-        i = i.withEnd(Objects.requireNonNull(visitSpace(i.getEnd(), JsSpace.Location.JS_IMPORT_TYPE_ATTRIBUTES_END_SUFFIX, p)));
+        i = i.getPadding().withToken(requireNonNull(visitRightPadded(i.getPadding().getToken(), JsRightPadded.Location.JS_IMPORT_TYPE_ATTRIBUTES_TOKEN, p)));
+        i = i.getPadding().withElements(requireNonNull(visitContainer(i.getPadding().getElements(), JsContainer.Location.JS_IMPORT_TYPE_ATTRIBUTES_ELEMENTS, p)));
+        i = i.withEnd(requireNonNull(visitSpace(i.getEnd(), JsSpace.Location.JS_IMPORT_TYPE_ATTRIBUTES_END_SUFFIX, p)));
         return i;
     }
 
@@ -380,8 +382,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         JS.ImportAttribute i = importAttribute;
         i = i.withPrefix(visitSpace(i.getPrefix(), JsSpace.Location.JS_IMPORT_ATTRIBUTE_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
-        i = i.withName(Objects.requireNonNull(visitAndCast(i.getName(), p)));
-        i = i.getPadding().withValue(Objects.requireNonNull(visitLeftPadded(i.getPadding().getValue(), JsLeftPadded.Location.JS_IMPORT_ATTRIBUTE_VALUE, p)));
+        i = i.withName(requireNonNull(visitAndCast(i.getName(), p)));
+        i = i.getPadding().withValue(requireNonNull(visitLeftPadded(i.getPadding().getValue(), JsLeftPadded.Location.JS_IMPORT_ATTRIBUTE_VALUE, p)));
         return i;
     }
 
@@ -389,7 +391,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         JS.LiteralType type = literalType;
         type = type.withPrefix(visitSpace(type.getPrefix(), JsSpace.Location.LITERAL_TYPE_PREFIX, p));
         type = type.withMarkers(visitMarkers(type.getMarkers(), p));
-        type = type.withLiteral(Objects.requireNonNull(visitAndCast(type.getLiteral(), p)));
+        type = type.withLiteral(requireNonNull(visitAndCast(type.getLiteral(), p)));
         return type;
     }
 
@@ -404,11 +406,11 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             t = (JS.MappedType) temp;
         }
         t = t.getPadding().withPrefixToken(visitLeftPadded(t.getPadding().getPrefixToken(), JsLeftPadded.Location.MAPPED_TYPE_PREFIX_TOKEN, p));
-        t = t.getPadding().withHasReadonly(Objects.requireNonNull(visitLeftPadded(t.getPadding().getHasReadonly(), JsLeftPadded.Location.MAPPED_TYPE_READONLY, p)));
-        t = t.withKeysRemapping(Objects.requireNonNull(visitAndCast(t.getKeysRemapping(), p)));
+        t = t.getPadding().withHasReadonly(requireNonNull(visitLeftPadded(t.getPadding().getHasReadonly(), JsLeftPadded.Location.MAPPED_TYPE_READONLY, p)));
+        t = t.withKeysRemapping(requireNonNull(visitAndCast(t.getKeysRemapping(), p)));
         t = t.getPadding().withSuffixToken(visitLeftPadded(t.getPadding().getSuffixToken(), JsLeftPadded.Location.MAPPED_TYPE_SUFFIX_TOKEN, p));
-        t = t.getPadding().withHasQuestionToken(Objects.requireNonNull(visitLeftPadded(t.getPadding().getHasQuestionToken(), JsLeftPadded.Location.MAPPED_TYPE_QUESTION_TOKEN, p)));
-        t = t.getPadding().withValueType(Objects.requireNonNull(visitContainer(t.getPadding().getValueType(), JsContainer.Location.MAPPED_TYPE_VALUE_TYPE, p)));
+        t = t.getPadding().withHasQuestionToken(requireNonNull(visitLeftPadded(t.getPadding().getHasQuestionToken(), JsLeftPadded.Location.MAPPED_TYPE_QUESTION_TOKEN, p)));
+        t = t.getPadding().withValueType(requireNonNull(visitContainer(t.getPadding().getValueType(), JsContainer.Location.MAPPED_TYPE_VALUE_TYPE, p)));
         return t;
     }
 
@@ -422,9 +424,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             m = (JS.MappedType.KeysRemapping) temp;
         }
-        m = m.getPadding().withTypeParameter(Objects.requireNonNull(visitRightPadded(m.getPadding().getTypeParameter(), JsRightPadded.Location.MAPPED_TYPE_KEYS_REMAPPING_TYPE_PARAMETER, p)));
+        m = m.getPadding().withTypeParameter(requireNonNull(visitRightPadded(m.getPadding().getTypeParameter(), JsRightPadded.Location.MAPPED_TYPE_KEYS_REMAPPING_TYPE_PARAMETER, p)));
         if (m.getNameType() != null) {
-            m = m.getPadding().withNameType(Objects.requireNonNull(visitRightPadded(m.getPadding().getNameType(), JsRightPadded.Location.MAPPED_TYPE_KEYS_REMAPPING_NAME_TYPE, p)));
+            m = m.getPadding().withNameType(requireNonNull(visitRightPadded(m.getPadding().getNameType(), JsRightPadded.Location.MAPPED_TYPE_KEYS_REMAPPING_NAME_TYPE, p)));
         }
         return m;
     }
@@ -439,8 +441,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             m = (JS.MappedType.MappedTypeParameter) temp;
         }
-        m = m.withName(Objects.requireNonNull(visitAndCast(m.getName(), p)));
-        m = m.getPadding().withIterateType(Objects.requireNonNull(visitLeftPadded(m.getPadding().getIterateType(), JsLeftPadded.Location.MAPPED_TYPE_MAPPED_TYPE_PARAMETER_ITERATE, p)));
+        m = m.withName(requireNonNull(visitAndCast(m.getName(), p)));
+        m = m.getPadding().withIterateType(requireNonNull(visitLeftPadded(m.getPadding().getIterateType(), JsLeftPadded.Location.MAPPED_TYPE_MAPPED_TYPE_PARAMETER_ITERATE, p)));
         return m;
     }
 
@@ -454,13 +456,13 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             o = (JS.ObjectBindingDeclarations) temp;
         }
-        o = o.withLeadingAnnotations(Objects.requireNonNull(ListUtils.map(o.getLeadingAnnotations(), a -> visitAndCast(a, p))));
-        o = o.withModifiers(Objects.requireNonNull(ListUtils.map(o.getModifiers(), e -> visitAndCast(e, p))));
+        o = o.withLeadingAnnotations(requireNonNull(ListUtils.map(o.getLeadingAnnotations(), a -> visitAndCast(a, p))));
+        o = o.withModifiers(requireNonNull(ListUtils.map(o.getModifiers(), e -> visitAndCast(e, p))));
         o = o.withTypeExpression(visitAndCast(o.getTypeExpression(), p));
         o = o.withTypeExpression(o.getTypeExpression() == null ?
                 null :
                 visitTypeName(o.getTypeExpression(), p));
-        o = o.getPadding().withBindings(Objects.requireNonNull(visitContainer(o.getPadding().getBindings(), JsContainer.Location.BINDING_ELEMENT, p)));
+        o = o.getPadding().withBindings(requireNonNull(visitContainer(o.getPadding().getBindings(), JsContainer.Location.BINDING_ELEMENT, p)));
         if (o.getPadding().getInitializer() != null) {
             o = o.getPadding().withInitializer(visitLeftPadded(o.getPadding().getInitializer(),
                     JsLeftPadded.Location.BINDING_ELEMENT_INITIALIZER, p));
@@ -478,7 +480,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             pa = (JS.PropertyAssignment) temp;
         }
-        pa = pa.getPadding().withName(Objects.requireNonNull(visitRightPadded(pa.getPadding().getName(), JsRightPadded.Location.PROPERTY_ASSIGNMENT_NAME, p)));
+        pa = pa.getPadding().withName(requireNonNull(visitRightPadded(pa.getPadding().getName(), JsRightPadded.Location.PROPERTY_ASSIGNMENT_NAME, p)));
         pa = pa.withInitializer(visitAndCast(pa.getInitializer(), p));
         return pa;
     }
@@ -493,8 +495,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             sa = (JS.SatisfiesExpression) temp;
         }
-        sa = sa.withExpression(Objects.requireNonNull(visitAndCast(sa.getExpression(), p)));
-        sa = sa.getPadding().withSatisfiesType(Objects.requireNonNull(visitLeftPadded(sa.getPadding().getSatisfiesType(), JsLeftPadded.Location.SATISFIES_EXPRESSION_TYPE, p)));
+        sa = sa.withExpression(requireNonNull(visitAndCast(sa.getExpression(), p)));
+        sa = sa.getPadding().withSatisfiesType(requireNonNull(visitLeftPadded(sa.getPadding().getSatisfiesType(), JsLeftPadded.Location.SATISFIES_EXPRESSION_TYPE, p)));
         return sa;
     }
 
@@ -508,9 +510,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             vd = (JS.ScopedVariableDeclarations) temp;
         }
-        vd = vd.withModifiers(Objects.requireNonNull(ListUtils.map(vd.getModifiers(), e -> visitAndCast(e, p))));
+        vd = vd.withModifiers(requireNonNull(ListUtils.map(vd.getModifiers(), e -> visitAndCast(e, p))));
         vd = vd.getPadding().withScope(visitLeftPadded(vd.getPadding().getScope(), JsLeftPadded.Location.SCOPED_VARIABLE_DECLARATIONS_SCOPE, p));
-        vd = vd.getPadding().withVariables(Objects.requireNonNull(ListUtils.map(vd.getPadding().getVariables(), e -> visitRightPadded(e, JsRightPadded.Location.SCOPED_VARIABLE_DECLARATIONS_VARIABLE, p))));
+        vd = vd.getPadding().withVariables(requireNonNull(ListUtils.map(vd.getPadding().getVariables(), e -> visitRightPadded(e, JsRightPadded.Location.SCOPED_VARIABLE_DECLARATIONS_VARIABLE, p))));
         return vd;
     }
 
@@ -523,11 +525,11 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             se = (JS.StatementExpression) temp;
         }
         J statement = visit(se.getStatement(), p);
-        se = se.withStatement((Statement) Objects.requireNonNull(statement));
+        se = se.withStatement((Statement) requireNonNull(statement));
         return se;
     }
 
-    public J visitTaggedTemplateExpression (JS.TaggedTemplateExpression taggedTemplateExpression, P p) {
+    public J visitTaggedTemplateExpression(JS.TaggedTemplateExpression taggedTemplateExpression, P p) {
         JS.TaggedTemplateExpression ta = taggedTemplateExpression;
         ta = ta.withPrefix(visitSpace(ta.getPrefix(), JsSpace.Location.TAGGED_TEMPLATE_EXPRESSION_PREFIX, p));
         ta = ta.withMarkers(visitMarkers(ta.getMarkers(), p));
@@ -541,7 +543,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         if (ta.getPadding().getTypeArguments() != null) {
             ta = ta.getPadding().withTypeArguments(visitContainer(ta.getPadding().getTypeArguments(), JsContainer.Location.TEMPLATE_EXPRESSION_TYPE_ARG_PARAMETERS, p));
         }
-        ta = ta.withTemplateExpression(Objects.requireNonNull(visitAndCast(ta.getTemplateExpression(), p)));
+        ta = ta.withTemplateExpression(requireNonNull(visitAndCast(ta.getTemplateExpression(), p)));
         return ta;
     }
 
@@ -555,8 +557,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             te = (JS.TemplateExpression) temp;
         }
-        te = te.withHead(Objects.requireNonNull(visitAndCast(te.getHead(), p)));
-        te = te.getPadding().withSpans(Objects.requireNonNull(ListUtils.map(te.getPadding().getSpans(), t -> this.visitRightPadded(t, JsRightPadded.Location.TEMPLATE_EXPRESSION_TEMPLATE_SPAN, p))));
+        te = te.withHead(requireNonNull(visitAndCast(te.getHead(), p)));
+        te = te.getPadding().withSpans(requireNonNull(ListUtils.map(te.getPadding().getSpans(), t -> this.visitRightPadded(t, JsRightPadded.Location.TEMPLATE_EXPRESSION_TEMPLATE_SPAN, p))));
         te = te.withType(visitType(te.getType(), p));
         return te;
     }
@@ -565,8 +567,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         JS.TemplateExpression.Span s = span;
         s = s.withPrefix(visitSpace(s.getPrefix(), JsSpace.Location.TEMPLATE_EXPRESSION_SPAN_PREFIX, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        s = s.withExpression(Objects.requireNonNull(visitAndCast(s.getExpression(), p)));
-        s = s.withTail(Objects.requireNonNull(visitAndCast(s.getTail(), p)));
+        s = s.withExpression(requireNonNull(visitAndCast(s.getExpression(), p)));
+        s = s.withTail(requireNonNull(visitAndCast(s.getTail(), p)));
         s = s.withTail(s.getTail());
         return s;
     }
@@ -581,7 +583,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             t = (JS.Tuple) temp;
         }
-        t = t.getPadding().withElements(Objects.requireNonNull(visitContainer(t.getPadding().getElements(), JsContainer.Location.TUPLE_ELEMENT, p)));
+        t = t.getPadding().withElements(requireNonNull(visitContainer(t.getPadding().getElements(), JsContainer.Location.TUPLE_ELEMENT, p)));
         t = t.withType(visitType(t.getType(), p));
         return t;
     }
@@ -596,10 +598,10 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             t = (JS.TypeDeclaration) temp;
         }
-        t = t.withModifiers(Objects.requireNonNull(ListUtils.map(t.getModifiers(), e -> visitAndCast(e, p))));
-        t = t.getPadding().withName(Objects.requireNonNull(visitLeftPadded(t.getPadding().getName(), JsLeftPadded.Location.TYPE_DECLARATION_NAME, p)));
+        t = t.withModifiers(requireNonNull(ListUtils.map(t.getModifiers(), e -> visitAndCast(e, p))));
+        t = t.getPadding().withName(requireNonNull(visitLeftPadded(t.getPadding().getName(), JsLeftPadded.Location.TYPE_DECLARATION_NAME, p)));
         t = t.withTypeParameters(visitAndCast(t.getTypeParameters(), p));
-        t = t.getPadding().withInitializer(Objects.requireNonNull(visitLeftPadded(t.getPadding().getInitializer(),
+        t = t.getPadding().withInitializer(requireNonNull(visitLeftPadded(t.getPadding().getInitializer(),
                 JsLeftPadded.Location.TYPE_DECLARATION_INITIALIZER, p)));
         t = t.withType(visitType(t.getType(), p));
         return t;
@@ -615,7 +617,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             t = (JS.TypeOperator) temp;
         }
-        t = t.getPadding().withExpression(Objects.requireNonNull(visitLeftPadded(t.getPadding().getExpression(), JsLeftPadded.Location.TYPE_OPERATOR_EXPRESSION, p)));
+        t = t.getPadding().withExpression(requireNonNull(visitLeftPadded(t.getPadding().getExpression(), JsLeftPadded.Location.TYPE_OPERATOR_EXPRESSION, p)));
         return t;
     }
 
@@ -629,8 +631,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             t = (JS.TypePredicate) temp;
         }
-        t = t.getPadding().withAsserts(Objects.requireNonNull(visitLeftPadded(t.getPadding().getAsserts(), JsLeftPadded.Location.TYPE_PREDICATE_ASSERTS, p)));
-        t = t.withParameterName(Objects.requireNonNull(visitAndCast(t.getParameterName(), p)));
+        t = t.getPadding().withAsserts(requireNonNull(visitLeftPadded(t.getPadding().getAsserts(), JsLeftPadded.Location.TYPE_PREDICATE_ASSERTS, p)));
+        t = t.withParameterName(requireNonNull(visitAndCast(t.getParameterName(), p)));
         t = t.getPadding().withExpression(visitLeftPadded(t.getPadding().getExpression(), JsLeftPadded.Location.TYPE_PREDICATE_EXPRESSION, p));
         return t;
     }
@@ -651,8 +653,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             u = (JS.Unary) temp2;
         }
-        u = u.getPadding().withOperator(Objects.requireNonNull(visitLeftPadded(u.getPadding().getOperator(), JLeftPadded.Location.UNARY_OPERATOR, p)));
-        u = u.withExpression(Objects.requireNonNull(visitAndCast(u.getExpression(), p)));
+        u = u.getPadding().withOperator(requireNonNull(visitLeftPadded(u.getPadding().getOperator(), JLeftPadded.Location.UNARY_OPERATOR, p)));
+        u = u.withExpression(requireNonNull(visitAndCast(u.getExpression(), p)));
         u = u.withType(visitType(u.getType(), p));
         return u;
     }
@@ -667,7 +669,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             u = (JS.Union) temp;
         }
-        u = u.getPadding().withTypes(Objects.requireNonNull(ListUtils.map(u.getPadding().getTypes(), t -> visitRightPadded(t, JsRightPadded.Location.UNION_TYPE, p))));
+        u = u.getPadding().withTypes(requireNonNull(ListUtils.map(u.getPadding().getTypes(), t -> visitRightPadded(t, JsRightPadded.Location.UNION_TYPE, p))));
         u = u.withType(visitType(u.getType(), p));
         return u;
     }
@@ -682,7 +684,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             u = (JS.Intersection) temp;
         }
-        u = u.getPadding().withTypes(Objects.requireNonNull(ListUtils.map(u.getPadding().getTypes(), t -> visitRightPadded(t, JsRightPadded.Location.INTERSECTION_TYPE, p))));
+        u = u.getPadding().withTypes(requireNonNull(ListUtils.map(u.getPadding().getTypes(), t -> visitRightPadded(t, JsRightPadded.Location.INTERSECTION_TYPE, p))));
         u = u.withType(visitType(u.getType(), p));
         return u;
     }
@@ -698,8 +700,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             ed = (JS.ExportDeclaration) temp;
         }
 
-        ed = ed.withModifiers(Objects.requireNonNull(ListUtils.map(ed.getModifiers(), e -> visitAndCast(e, p))));
-        ed = ed.getPadding().withTypeOnly(Objects.requireNonNull(visitLeftPadded(ed.getPadding().getTypeOnly(), JsLeftPadded.Location.EXPORT_DECLARATION_TYPE_ONLY, p)));
+        ed = ed.withModifiers(requireNonNull(ListUtils.map(ed.getModifiers(), e -> visitAndCast(e, p))));
+        ed = ed.getPadding().withTypeOnly(requireNonNull(visitLeftPadded(ed.getPadding().getTypeOnly(), JsLeftPadded.Location.EXPORT_DECLARATION_TYPE_ONLY, p)));
         ed = ed.withExportClause(visitAndCast(ed.getExportClause(), p));
         ed = ed.getPadding().withModuleSpecifier(visitLeftPadded(ed.getPadding().getModuleSpecifier(), JsLeftPadded.Location.EXPORT_DECLARATION_MODULE_SPECIFIER, p));
         ed = ed.withAttributes(visitAndCast(ed.getAttributes(), p));
@@ -717,8 +719,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             es = (JS.ExportAssignment) temp;
         }
 
-        es = es.withModifiers(Objects.requireNonNull(ListUtils.map(es.getModifiers(), e -> visitAndCast(e, p))));
-        es = es.getPadding().withExportEquals(Objects.requireNonNull(visitLeftPadded(es.getPadding().getExportEquals(), JsLeftPadded.Location.EXPORT_ASSIGNMENT_EXPORT_EQUALS, p)));
+        es = es.withModifiers(requireNonNull(ListUtils.map(es.getModifiers(), e -> visitAndCast(e, p))));
+        es = es.getPadding().withExportEquals(requireNonNull(visitLeftPadded(es.getPadding().getExportEquals(), JsLeftPadded.Location.EXPORT_ASSIGNMENT_EXPORT_EQUALS, p)));
         es = es.withExpression(visitAndCast(es.getExpression(), p));
         return es;
     }
@@ -733,7 +735,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             ne = (JS.NamedExports) temp;
         }
-        ne = ne.getPadding().withElements(Objects.requireNonNull(visitContainer(ne.getPadding().getElements(), JsContainer.Location.NAMED_EXPORTS_ELEMENTS, p)));
+        ne = ne.getPadding().withElements(requireNonNull(visitContainer(ne.getPadding().getElements(), JsContainer.Location.NAMED_EXPORTS_ELEMENTS, p)));
         ne = ne.withType(visitType(ne.getType(), p));
         return ne;
     }
@@ -748,8 +750,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             es = (JS.ExportSpecifier) temp;
         }
-        es = es.getPadding().withTypeOnly(Objects.requireNonNull(visitLeftPadded(es.getPadding().getTypeOnly(), JsLeftPadded.Location.EXPORT_SPECIFIER_TYPE_ONLY, p)));
-        es = es.withSpecifier(Objects.requireNonNull(visitAndCast(es.getSpecifier(), p)));
+        es = es.getPadding().withTypeOnly(requireNonNull(visitLeftPadded(es.getPadding().getTypeOnly(), JsLeftPadded.Location.EXPORT_SPECIFIER_TYPE_ONLY, p)));
+        es = es.withSpecifier(requireNonNull(visitAndCast(es.getSpecifier(), p)));
         es = es.withType(visitType(es.getType(), p));
         return es;
     }
@@ -764,8 +766,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             iat = (JS.IndexedAccessType) temp;
         }
-        iat = iat.withObjectType(Objects.requireNonNull(visitAndCast(iat.getObjectType(), p)));
-        iat = iat.withIndexType(Objects.requireNonNull(visitAndCast(iat.getIndexType(), p)));
+        iat = iat.withObjectType(requireNonNull(visitAndCast(iat.getObjectType(), p)));
+        iat = iat.withIndexType(requireNonNull(visitAndCast(iat.getIndexType(), p)));
         iat = iat.withType(visitType(iat.getType(), p));
         return iat;
     }
@@ -780,7 +782,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             iatit = (JS.IndexedAccessType.IndexType) temp;
         }
-        iatit = iatit.getPadding().withElement(Objects.requireNonNull(visitRightPadded(iatit.getPadding().getElement(), JsRightPadded.Location.INDEXED_ACCESS_TYPE_INDEX_TYPE_ELEMENT, p)));
+        iatit = iatit.getPadding().withElement(requireNonNull(visitRightPadded(iatit.getPadding().getElement(), JsRightPadded.Location.INDEXED_ACCESS_TYPE_INDEX_TYPE_ELEMENT, p)));
         iatit = iatit.withType(visitType(iatit.getType(), p));
         return iatit;
     }
@@ -797,7 +799,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             a = (J.AnnotatedType) temp;
         }
-        a = a.withAnnotations(Objects.requireNonNull(ListUtils.map(a.getAnnotations(), e -> visitAndCast(e, p))));
+        a = a.withAnnotations(requireNonNull(ListUtils.map(a.getAnnotations(), e -> visitAndCast(e, p))));
         //noinspection DataFlowIssue
         a = a.withTypeExpression(visitAndCast(a.getTypeExpression(), p));
         a = a.withTypeExpression(visitTypeName(a.getTypeExpression(), p));
@@ -842,8 +844,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             return null;
         }
         @SuppressWarnings("unchecked") List<JRightPadded<J2>> js = ListUtils.map(nameTrees.getPadding().getElements(),
-                t -> Objects.requireNonNull(t).getElement() instanceof NameTree ? (JRightPadded<J2>) visitTypeName((JRightPadded<NameTree>) t, p) : t);
-        return js == nameTrees.getPadding().getElements() ? nameTrees : JContainer.build(nameTrees.getBefore(), Objects.requireNonNull(js), Markers.EMPTY);
+                t -> requireNonNull(t).getElement() instanceof NameTree ? (JRightPadded<J2>) visitTypeName((JRightPadded<NameTree>) t, p) : t);
+        return js == nameTrees.getPadding().getElements() ? nameTrees : JContainer.build(nameTrees.getBefore(), requireNonNull(js), Markers.EMPTY);
     }
 
     public Space visitSpace(Space space, JsSpace.Location loc, P p) {
@@ -872,7 +874,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             t = (JS.TypeOf) temp;
         }
-        t = t.withExpression(Objects.requireNonNull(visitAndCast(t.getExpression(), p)));
+        t = t.withExpression(requireNonNull(visitAndCast(t.getExpression(), p)));
         t = t.withType(visitType(t.getType(), p));
         return t;
     }
@@ -887,7 +889,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             t = (JS.TypeQuery) temp;
         }
-        t = t.withTypeExpression(Objects.requireNonNull(visitAndCast(t.getTypeExpression(), p)));
+        t = t.withTypeExpression(requireNonNull(visitAndCast(t.getTypeExpression(), p)));
         if (t.getPadding().getTypeArguments() != null) {
             t = t.getPadding().withTypeArguments(visitContainer(t.getPadding().getTypeArguments(), JsContainer.Location.TYPE_QUERY_TYPE_ARGUMENTS, p));
         }
@@ -905,7 +907,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             v = (JS.Void) temp;
         }
-        v = v.withExpression(Objects.requireNonNull(visitAndCast(v.getExpression(), p)));
+        v = v.withExpression(requireNonNull(visitAndCast(v.getExpression(), p)));
         return v;
     }
 
@@ -919,7 +921,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             y = (JS.Yield) temp;
         }
-        y = y.getPadding().withDelegated(Objects.requireNonNull(this.visitLeftPadded(y.getPadding().getDelegated(), JsLeftPadded.Location.JS_YIELD_DELEGATED, p)));
+        y = y.getPadding().withDelegated(requireNonNull(this.visitLeftPadded(y.getPadding().getDelegated(), JsLeftPadded.Location.JS_YIELD_DELEGATED, p)));
         y = y.withExpression(visitAndCast(y.getExpression(), p));
         return y;
     }
@@ -934,24 +936,24 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             ti = (JS.TypeInfo) temp;
         }
-        ti = ti.withTypeIdentifier(Objects.requireNonNull(visitAndCast(ti.getTypeIdentifier(), p)));
+        ti = ti.withTypeIdentifier(requireNonNull(visitAndCast(ti.getTypeIdentifier(), p)));
         return ti;
     }
 
     public J visitJSVariableDeclarations(JS.JSVariableDeclarations multiVariable, P p) {
         JS.JSVariableDeclarations m = multiVariable.withPrefix(this.visitSpace(multiVariable.getPrefix(), JsSpace.Location.JSVARIABLE_DECLARATIONS_PREFIX, p));
         m = m.withMarkers(this.visitMarkers(m.getMarkers(), p));
-        Statement temp = (Statement)this.visitStatement(m, p);
+        Statement temp = (Statement) this.visitStatement(m, p);
         if (!(temp instanceof JS.JSVariableDeclarations)) {
             return temp;
         } else {
-            m = (JS.JSVariableDeclarations)temp;
-            m = m.withLeadingAnnotations(Objects.requireNonNull(ListUtils.map(m.getLeadingAnnotations(), a -> this.visitAndCast(a, p))));
-            m = m.withModifiers(Objects.requireNonNull(ListUtils.map(m.getModifiers(), e -> (J.Modifier) this.visitAndCast(e, p))));
+            m = (JS.JSVariableDeclarations) temp;
+            m = m.withLeadingAnnotations(requireNonNull(ListUtils.map(m.getLeadingAnnotations(), a -> this.visitAndCast(a, p))));
+            m = m.withModifiers(requireNonNull(ListUtils.map(m.getModifiers(), e -> (J.Modifier) this.visitAndCast(e, p))));
             m = m.withTypeExpression(this.visitAndCast(m.getTypeExpression(), p));
             m = m.withTypeExpression(m.getTypeExpression() == null ? null : this.visitTypeName(m.getTypeExpression(), p));
             m = m.withVarargs(m.getVarargs() == null ? null : this.visitSpace(m.getVarargs(), Space.Location.VARARGS, p));
-            m = m.getPadding().withVariables(Objects.requireNonNull(ListUtils.map(m.getPadding().getVariables(), t -> this.visitRightPadded(t, JsRightPadded.Location.JSNAMED_VARIABLE, p))));
+            m = m.getPadding().withVariables(requireNonNull(ListUtils.map(m.getPadding().getVariables(), t -> this.visitRightPadded(t, JsRightPadded.Location.JSNAMED_VARIABLE, p))));
             return m;
         }
     }
@@ -959,13 +961,13 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
     public J visitJSVariableDeclarationsJSNamedVariable(JS.JSVariableDeclarations.JSNamedVariable variable, P p) {
         JS.JSVariableDeclarations.JSNamedVariable v = variable.withPrefix(this.visitSpace(variable.getPrefix(), JsSpace.Location.JSVARIABLE_PREFIX, p));
         v = v.withMarkers(this.visitMarkers(v.getMarkers(), p));
-        v = v.withName(Objects.requireNonNull(this.visitAndCast(v.getName(), p)));
-        v = v.withDimensionsAfterName(Objects.requireNonNull(ListUtils.map(v.getDimensionsAfterName(), dim -> Objects.requireNonNull(dim).withBefore(this.visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p)).withElement(this.visitSpace((Space) dim.getElement(), Space.Location.DIMENSION, p)))));
+        v = v.withName(requireNonNull(this.visitAndCast(v.getName(), p)));
+        v = v.withDimensionsAfterName(requireNonNull(ListUtils.map(v.getDimensionsAfterName(), dim -> requireNonNull(dim).withBefore(this.visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p)).withElement(this.visitSpace((Space) dim.getElement(), Space.Location.DIMENSION, p)))));
         if (v.getPadding().getInitializer() != null) {
             v = v.getPadding().withInitializer(this.visitLeftPadded(v.getPadding().getInitializer(), JsLeftPadded.Location.JSVARIABLE_INITIALIZER, p));
         }
 
-        v = v.withVariableType((JavaType.Variable)this.visitType(v.getVariableType(), p));
+        v = v.withVariableType((JavaType.Variable) this.visitType(v.getVariableType(), p));
         return v;
     }
 
@@ -979,16 +981,16 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             m = (JS.JSMethodDeclaration) temp;
         }
-        m = m.withLeadingAnnotations(Objects.requireNonNull(ListUtils.map(m.getLeadingAnnotations(), a -> visitAndCast(a, p))));
-        m = m.withModifiers(Objects.requireNonNull(ListUtils.map(m.getModifiers(), e -> visitAndCast(e, p))));
+        m = m.withLeadingAnnotations(requireNonNull(ListUtils.map(m.getLeadingAnnotations(), a -> visitAndCast(a, p))));
+        m = m.withModifiers(requireNonNull(ListUtils.map(m.getModifiers(), e -> visitAndCast(e, p))));
         m = m.withTypeParameters(visitAndCast(m.getTypeParameters(), p));
         m = m.withReturnTypeExpression(visitAndCast(m.getReturnTypeExpression(), p));
         m = m.withReturnTypeExpression(
                 m.getReturnTypeExpression() == null ?
                         null :
                         visitTypeName(m.getReturnTypeExpression(), p));
-        m = m.withName(Objects.requireNonNull(this.visitAndCast(m.getName(), p)));
-        m = m.getPadding().withParameters(Objects.requireNonNull(visitContainer(m.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, p)));
+        m = m.withName(requireNonNull(this.visitAndCast(m.getName(), p)));
+        m = m.getPadding().withParameters(requireNonNull(visitContainer(m.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, p)));
         m = m.withBody(visitAndCast(m.getBody(), p));
         if (m.getPadding().getDefaultValue() != null) {
             m = m.getPadding().withDefaultValue(visitLeftPadded(m.getPadding().getDefaultValue(), JLeftPadded.Location.METHOD_DECLARATION_DEFAULT_VALUE, p));
@@ -1007,9 +1009,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             ns = (JS.NamespaceDeclaration) temp;
         }
-        ns = ns.withModifiers(Objects.requireNonNull(ListUtils.map(ns.getModifiers(), m -> visitAndCast(m, p))));
-        ns = ns.getPadding().withKeywordType(Objects.requireNonNull(visitLeftPadded(ns.getPadding().getKeywordType(), JsLeftPadded.Location.NAMESPACE_DECLARATION_KEYWORD_TYPE, p)));
-        ns = ns.getPadding().withName(Objects.requireNonNull(visitRightPadded(ns.getPadding().getName(), JsRightPadded.Location.NAMESPACE_DECLARATION_NAME, p)));
+        ns = ns.withModifiers(requireNonNull(ListUtils.map(ns.getModifiers(), m -> visitAndCast(m, p))));
+        ns = ns.getPadding().withKeywordType(requireNonNull(visitLeftPadded(ns.getPadding().getKeywordType(), JsLeftPadded.Location.NAMESPACE_DECLARATION_KEYWORD_TYPE, p)));
+        ns = ns.getPadding().withName(requireNonNull(visitRightPadded(ns.getPadding().getName(), JsRightPadded.Location.NAMESPACE_DECLARATION_NAME, p)));
         ns = ns.withBody(visitAndCast(ns.getBody(), p));
         return ns;
     }
@@ -1025,11 +1027,11 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             f = (JS.FunctionDeclaration) temp;
         }
 
-        f = f.withModifiers(Objects.requireNonNull(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p))));
-        f = f.getPadding().withAsteriskToken(Objects.requireNonNull(visitLeftPadded(f.getPadding().getAsteriskToken(), JsLeftPadded.Location.FUNCTION_DECLARATION_ASTERISK_TOKEN, p)));
-        f = f.getPadding().withName(Objects.requireNonNull(visitLeftPadded(f.getPadding().getName(), JsLeftPadded.Location.FUNCTION_DECLARATION_NAME, p)));
+        f = f.withModifiers(requireNonNull(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p))));
+        f = f.getPadding().withAsteriskToken(requireNonNull(visitLeftPadded(f.getPadding().getAsteriskToken(), JsLeftPadded.Location.FUNCTION_DECLARATION_ASTERISK_TOKEN, p)));
+        f = f.getPadding().withName(requireNonNull(visitLeftPadded(f.getPadding().getName(), JsLeftPadded.Location.FUNCTION_DECLARATION_NAME, p)));
         f = f.withTypeParameters(visitAndCast(f.getTypeParameters(), p));
-        f = f.getPadding().withParameters(Objects.requireNonNull(visitContainer(f.getPadding().getParameters(), JsContainer.Location.FUNCTION_DECLARATION_PARAMETERS, p)));
+        f = f.getPadding().withParameters(requireNonNull(visitContainer(f.getPadding().getParameters(), JsContainer.Location.FUNCTION_DECLARATION_PARAMETERS, p)));
         f = f.withReturnTypeExpression(visitAndCast(f.getReturnTypeExpression(), p));
         f = f.withBody(visitAndCast(f.getBody(), p));
         f = f.withType(visitType(f.getType(), p));
@@ -1048,7 +1050,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             t = (JS.TypeLiteral) temp;
         }
 
-        t = t.withMembers(Objects.requireNonNull(visitAndCast(t.getMembers(), p)));
+        t = t.withMembers(requireNonNull(visitAndCast(t.getMembers(), p)));
         t = t.withType(visitType(t.getType(), p));
         return t;
     }
@@ -1063,8 +1065,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             t = (JS.ImportType) temp;
         }
-        t = t.getPadding().withHasTypeof(Objects.requireNonNull(visitRightPadded(t.getPadding().getHasTypeof(), JsRightPadded.Location.IMPORT_TYPE_TYPEOF, p)));
-        t = t.getPadding().withArgumentAndAttributes(Objects.requireNonNull(visitContainer(t.getPadding().getArgumentAndAttributes(), JsContainer.Location.IMPORT_TYPE_ARGUMENTS_AND_ATTRIBUTES, p)));
+        t = t.getPadding().withHasTypeof(requireNonNull(visitRightPadded(t.getPadding().getHasTypeof(), JsRightPadded.Location.IMPORT_TYPE_TYPEOF, p)));
+        t = t.getPadding().withArgumentAndAttributes(requireNonNull(visitContainer(t.getPadding().getArgumentAndAttributes(), JsContainer.Location.IMPORT_TYPE_ARGUMENTS_AND_ATTRIBUTES, p)));
         t = t.getPadding().withQualifier(visitLeftPadded(t.getPadding().getQualifier(), JsLeftPadded.Location.IMPORT_TYPE_QUALIFIER, p));
         if (t.getPadding().getTypeArguments() != null) {
             t = t.getPadding().withTypeArguments(visitContainer(t.getPadding().getTypeArguments(), JsContainer.Location.IMPORT_TYPE_TYPE_ARGUMENTS, p));
@@ -1084,9 +1086,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             isd = (JS.IndexSignatureDeclaration) temp;
         }
 
-        isd = isd.withModifiers(Objects.requireNonNull(ListUtils.map(isd.getModifiers(), e -> visitAndCast(e, p))));
-        isd = isd.getPadding().withParameters(Objects.requireNonNull(visitContainer(isd.getPadding().getParameters(), JsContainer.Location.INDEXED_SIGNATURE_DECLARATION_PARAMETERS, p)));
-        isd = isd.getPadding().withTypeExpression(Objects.requireNonNull(visitLeftPadded(isd.getPadding().getTypeExpression(), JsLeftPadded.Location.INDEXED_SIGNATURE_DECLARATION_TYPE_EXPRESSION, p)));
+        isd = isd.withModifiers(requireNonNull(ListUtils.map(isd.getModifiers(), e -> visitAndCast(e, p))));
+        isd = isd.getPadding().withParameters(requireNonNull(visitContainer(isd.getPadding().getParameters(), JsContainer.Location.INDEXED_SIGNATURE_DECLARATION_PARAMETERS, p)));
+        isd = isd.getPadding().withTypeExpression(requireNonNull(visitLeftPadded(isd.getPadding().getTypeExpression(), JsLeftPadded.Location.INDEXED_SIGNATURE_DECLARATION_TYPE_EXPRESSION, p)));
         isd = isd.withType(visitType(isd.getType(), p));
         return isd;
     }
@@ -1101,9 +1103,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             f = (JS.JSForOfLoop) temp;
         }
-        f = f.getPadding().withAwait(Objects.requireNonNull(visitLeftPadded(f.getPadding().getAwait(), JsLeftPadded.Location.FOR_OF_AWAIT, p)));
-        f = f.withControl(Objects.requireNonNull(visitAndCast(f.getControl(), p)));
-        f = f.getPadding().withBody(Objects.requireNonNull(visitRightPadded(f.getPadding().getBody(), JsRightPadded.Location.FOR_BODY, p)));
+        f = f.getPadding().withAwait(requireNonNull(visitLeftPadded(f.getPadding().getAwait(), JsLeftPadded.Location.FOR_OF_AWAIT, p)));
+        f = f.withControl(requireNonNull(visitAndCast(f.getControl(), p)));
+        f = f.getPadding().withBody(requireNonNull(visitRightPadded(f.getPadding().getBody(), JsRightPadded.Location.FOR_BODY, p)));
         return f;
     }
 
@@ -1117,8 +1119,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             f = (JS.JSForInLoop) temp;
         }
-        f = f.withControl(Objects.requireNonNull(visitAndCast(f.getControl(), p)));
-        f = f.getPadding().withBody(Objects.requireNonNull(visitRightPadded(f.getPadding().getBody(), JsRightPadded.Location.FOR_BODY, p)));
+        f = f.withControl(requireNonNull(visitAndCast(f.getControl(), p)));
+        f = f.getPadding().withBody(requireNonNull(visitRightPadded(f.getPadding().getBody(), JsRightPadded.Location.FOR_BODY, p)));
         return f;
     }
 
@@ -1126,8 +1128,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         JS.JSForInOfLoopControl c = jsForInOfLoopControl;
         c = c.withPrefix(visitSpace(c.getPrefix(), JsSpace.Location.FOR_LOOP_CONTROL_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        c = c.getPadding().withVariable(Objects.requireNonNull(visitRightPadded(c.getPadding().getVariable(), JsRightPadded.Location.FOR_CONTROL_VAR, p)));
-        c = c.getPadding().withIterable(Objects.requireNonNull(visitRightPadded(c.getPadding().getIterable(), JsRightPadded.Location.FOR_CONTROL_ITER, p)));
+        c = c.getPadding().withVariable(requireNonNull(visitRightPadded(c.getPadding().getVariable(), JsRightPadded.Location.FOR_CONTROL_VAR, p)));
+        c = c.getPadding().withIterable(requireNonNull(visitRightPadded(c.getPadding().getIterable(), JsRightPadded.Location.FOR_CONTROL_ITER, p)));
         return c;
     }
 
@@ -1142,10 +1144,10 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             t = (JS.JSTry) temp;
         }
 
-        t = t.withBody(Objects.requireNonNull(visitAndCast(t.getBody(), p)));
-        t = t.withCatches(Objects.requireNonNull(visitAndCast(t.getCatches(), p)));
+        t = t.withBody(requireNonNull(visitAndCast(t.getBody(), p)));
+        t = t.withCatches(requireNonNull(visitAndCast(t.getCatches(), p)));
         if (t.getPadding().getFinallie() != null) {
-            t = t.getPadding().withFinallie(Objects.requireNonNull(visitLeftPadded(t.getPadding().getFinallie(), JsLeftPadded.Location.JSTRY_FINALLY, p)));
+            t = t.getPadding().withFinallie(requireNonNull(visitLeftPadded(t.getPadding().getFinallie(), JsLeftPadded.Location.JSTRY_FINALLY, p)));
         }
         return t;
     }
@@ -1155,8 +1157,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         c = c.withPrefix(visitSpace(c.getPrefix(), JsSpace.Location.JSCATCH_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
 
-        c = c.withParameter(Objects.requireNonNull(visitAndCast(c.getParameter(), p)));
-        c = c.withBody(Objects.requireNonNull(visitAndCast(c.getBody(), p)));
+        c = c.withParameter(requireNonNull(visitAndCast(c.getParameter(), p)));
+        c = c.withBody(requireNonNull(visitAndCast(c.getBody(), p)));
         return c;
     }
 
@@ -1170,7 +1172,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             c = (JS.ArrayBindingPattern) temp;
         }
-        c = c.getPadding().withElements(Objects.requireNonNull(visitContainer(c.getPadding().getElements(), JsContainer.Location.ARRAY_BINDING_PATTERN_ELEMENTS, p)));
+        c = c.getPadding().withElements(requireNonNull(visitContainer(c.getPadding().getElements(), JsContainer.Location.ARRAY_BINDING_PATTERN_ELEMENTS, p)));
         return c;
     }
 
@@ -1190,9 +1192,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             a = (JS.JsAssignmentOperation) temp2;
         }
-        a = a.withVariable(Objects.requireNonNull(visitAndCast(a.getVariable(), p)));
-        a = a.getPadding().withOperator(Objects.requireNonNull(visitLeftPadded(a.getPadding().getOperator(), JsLeftPadded.Location.ASSIGNMENT_OPERATION_OPERATOR, p)));
-        a = a.withAssignment(Objects.requireNonNull(visitAndCast(a.getAssignment(), p)));
+        a = a.withVariable(requireNonNull(visitAndCast(a.getVariable(), p)));
+        a = a.getPadding().withOperator(requireNonNull(visitLeftPadded(a.getPadding().getOperator(), JsLeftPadded.Location.ASSIGNMENT_OPERATION_OPERATOR, p)));
+        a = a.withAssignment(requireNonNull(visitAndCast(a.getAssignment(), p)));
         a = a.withType(visitType(a.getType(), p));
         return a;
     }
@@ -1208,7 +1210,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             a = (JS.TypeTreeExpression) temp;
         }
 
-        a = a.withExpression(Objects.requireNonNull(visitAndCast(a.getExpression(), p)));
+        a = a.withExpression(requireNonNull(visitAndCast(a.getExpression(), p)));
         a = a.withType(visitType(a.getType(), p));
         return a;
     }
@@ -1224,8 +1226,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             w = (JS.WithStatement) temp;
         }
 
-        w = w.withExpression(Objects.requireNonNull(visitAndCast(w.getExpression(), p)));
-        w = w.getPadding().withBody(Objects.requireNonNull(visitRightPadded(w.getPadding().getBody(), JsRightPadded.Location.WITH_BODY, p)));
+        w = w.withExpression(requireNonNull(visitAndCast(w.getExpression(), p)));
+        w = w.getPadding().withBody(requireNonNull(visitRightPadded(w.getPadding().getBody(), JsRightPadded.Location.WITH_BODY, p)));
         return w;
     }
 }

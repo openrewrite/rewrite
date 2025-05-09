@@ -104,7 +104,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     protected async visitConditionalType(conditionalType: JS.ConditionalType, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ConditionalType>(conditionalType, p, async draft => {
             draft.checkType = await this.visitDefined<Expression>(conditionalType.checkType, p);
-            draft.condition = await this.visitContainer(conditionalType.condition, p);
+            draft.condition = await this.visitLeftPadded(conditionalType.condition, p);
             draft.type = conditionalType.type && await this.visitType(conditionalType.type, p);
         });
     }

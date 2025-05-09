@@ -547,14 +547,14 @@ public interface JS extends J {
         @Getter
         Expression checkType;
 
-        JContainer<TypedTree> condition;
+        JLeftPadded<J.Ternary> condition;
 
-        public List<TypedTree> getCondition() {
-            return condition.getElements();
+        public J.Ternary getCondition() {
+            return condition.getElement();
         }
 
-        public ConditionalType withCondition(@Nullable List<TypedTree> bounds) {
-            return getPadding().withCondition(JContainer.withElementsNullable(this.condition, bounds));
+        public ConditionalType withCondition(J.Ternary condition) {
+            return getPadding().withCondition(JLeftPadded.withElement(this.condition, condition));
         }
 
         @With
@@ -590,11 +590,11 @@ public interface JS extends J {
         public static class Padding {
             private final ConditionalType t;
 
-            public JContainer<TypedTree> getCondition() {
+            public JLeftPadded<J.Ternary> getCondition() {
                 return t.condition;
             }
 
-            public ConditionalType withCondition(JContainer<TypedTree> condition) {
+            public ConditionalType withCondition(JLeftPadded<J.Ternary> condition) {
                 return t.condition == condition ? t : new ConditionalType(t.id, t.prefix, t.markers, t.checkType, condition, t.type);
             }
         }

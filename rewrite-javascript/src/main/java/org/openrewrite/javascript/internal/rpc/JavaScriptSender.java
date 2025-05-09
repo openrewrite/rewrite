@@ -103,7 +103,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitConditionalType(JS.ConditionalType conditionalType, RpcSendQueue q) {
         q.getAndSend(conditionalType, JS.ConditionalType::getCheckType, el -> visit(el, q));
-        q.getAndSend(conditionalType, el -> el.getPadding().getCondition(), el -> visitContainer(el, q));
+        q.getAndSend(conditionalType, el -> el.getPadding().getCondition(), el -> visitLeftPadded(el, q));
         if (conditionalType.getType() != null) {
             q.getAndSend(conditionalType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         }
