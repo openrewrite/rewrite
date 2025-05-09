@@ -117,23 +117,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitExport(JS.Export export, RpcSendQueue q) {
-        if (export.getPadding().getExports() != null) {
-            q.getAndSend(export, el -> el.getPadding().getExports(), el -> visitContainer(el, q));
-        }
-        if (export.getFrom() != null) {
-            q.getAndSend(export, JS.Export::getFrom, el -> visitSpace(getValueNonNull(el), q));
-        }
-        if (export.getTarget() != null) {
-            q.getAndSend(export, JS.Export::getTarget, el -> visit(el, q));
-        }
-        if (export.getPadding().getInitializer() != null) {
-            q.getAndSend(export, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
-        }
-        return export;
-    }
-
-    @Override
     public J visitExpressionStatement(JS.ExpressionStatement expressionStatement, RpcSendQueue q) {
         q.getAndSend(expressionStatement, JS.ExpressionStatement::getExpression, el -> visit(el, q));
         return expressionStatement;

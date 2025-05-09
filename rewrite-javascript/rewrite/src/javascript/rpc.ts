@@ -95,14 +95,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return delete_;
     }
 
-    override async visitExport(export_: JS.Export, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(export_, el => el.exports, el => this.visitContainer(el, q));
-        await q.getAndSend(export_, el => el.from, el => this.visitSpace(el, q));
-        await q.getAndSend(export_, el => el.target, el => this.visit(el, q));
-        await q.getAndSend(export_, el => el.initializer, el => this.visitLeftPadded(el, q));
-        return export_;
-    }
-
     override async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(expressionStatement, el => el.expression, el => this.visit(el, q));
         return expressionStatement;
@@ -652,15 +644,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitDelete(delete_: JS.Delete, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(delete_);
         draft.expression = await q.receive(draft.expression, el => this.visitDefined<Expression>(el, q));
-        return finishDraft(draft);
-    }
-
-    override async visitExport(export_: JS.Export, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(export_);
-        draft.exports = await q.receive(draft.exports, el => this.visitContainer(el, q));
-        draft.from = await q.receive(draft.from, el => this.visitSpace(el, q));
-        draft.target = await q.receive(draft.target, el => this.visitDefined<J.Literal>(el, q));
-        draft.initializer = await q.receive(draft.initializer, el => this.visitLeftPadded(el, q));
         return finishDraft(draft);
     }
 

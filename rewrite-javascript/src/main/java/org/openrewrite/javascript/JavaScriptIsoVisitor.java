@@ -53,11 +53,6 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.Export visitExport(JS.Export export, P p) {
-        return (JS.Export) super.visitExport(export, p);
-    }
-
-    @Override
     public JS.ExpressionStatement visitExpressionStatement(JS.ExpressionStatement statement, P p) {
         return (JS.ExpressionStatement) super.visitExpressionStatement(statement, p);
     }

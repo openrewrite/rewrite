@@ -163,30 +163,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return d;
     }
 
-    public J visitExport(JS.Export export, P p) {
-        JS.Export e = export;
-        e = e.withPrefix(visitSpace(e.getPrefix(), JsSpace.Location.EXPORT_PREFIX, p));
-        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
-        Statement temp = (Statement) visitStatement(e, p);
-        if (!(temp instanceof JS.Export)) {
-            return temp;
-        } else {
-            e = (JS.Export) temp;
-        }
-        if (e.getPadding().getExports() != null) {
-            e = e.getPadding().withExports(visitContainer(e.getPadding().getExports(), JsContainer.Location.EXPORT_ELEMENT, p));
-        }
-        if (e.getFrom() != null) {
-            e = e.withFrom(visitSpace(e.getFrom(), JsSpace.Location.EXPORT_FROM_PREFIX, p));
-        }
-        e = e.withTarget(visitAndCast(e.getTarget(), p));
-        if (e.getPadding().getInitializer() != null) {
-            e = e.getPadding().withInitializer(visitLeftPadded(e.getPadding().getInitializer(),
-                    JsLeftPadded.Location.EXPORT_INITIALIZER, p));
-        }
-        return e;
-    }
-
     public J visitExpressionStatement(JS.ExpressionStatement statement, P p) {
         JS.ExpressionStatement es = statement;
         es = es.withMarkers(visitMarkers(es.getMarkers(), p));
