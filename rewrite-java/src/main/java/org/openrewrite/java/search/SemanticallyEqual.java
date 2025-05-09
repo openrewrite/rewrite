@@ -932,6 +932,7 @@ public class SemanticallyEqual {
                     return memberRef;
                 }
 
+                visit(memberRef.getContaining(), compareTo.getContaining());
                 visitList(memberRef.getTypeParameters(), compareTo.getTypeParameters());
             }
             return memberRef;
