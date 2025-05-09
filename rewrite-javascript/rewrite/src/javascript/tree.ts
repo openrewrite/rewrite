@@ -99,23 +99,14 @@ export namespace JS {
     } as const;
 
     /**
-     * Represents a JavaScript source file containing imports and statements.
-     * @example // file.js
-     * import { readFile } from 'fs';
-     * console.log(readFile('path'));
-     */
-    export interface JavaScriptSourceFile extends JS, SourceFile {
-        readonly imports: J.RightPadded<J.Import>[];
-        readonly statements: J.RightPadded<Statement>[];
-    }
-
-    /**
      * Represents the root of a JavaScript AST (compilation unit).
      * @example // file.js as AST root
      * // statements and EOF marker
      */
-    export interface CompilationUnit extends JavaScriptSourceFile, JS {
+    export interface CompilationUnit extends JS, SourceFile {
         readonly kind: typeof Kind.CompilationUnit;
+        readonly imports: J.RightPadded<J.Import>[];
+        readonly statements: J.RightPadded<Statement>[];
         readonly eof: J.Space;
     }
 
