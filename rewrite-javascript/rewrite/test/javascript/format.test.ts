@@ -79,7 +79,7 @@ describe('AutoformatVisitor', () => {
                     if(   1>0 ){
                         console.log  (   "four"   ,    "three"  ,    "six"   );
                     }
-                    let i                                  = 1;
+                    let i                                  =   1;
                     while(   i<4   ){
                         i++;
                     }

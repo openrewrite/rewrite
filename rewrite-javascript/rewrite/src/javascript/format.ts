@@ -257,6 +257,28 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
+    protected async visitUnary(unary: J.Unary, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitUnary(unary, p) as J.Unary;
+        return produce(ret, draft => {
+            const spacing = this.style.aroundOperators.unary;
+
+            switch (draft.operator.element) {
+                case J.Unary.Type.PreIncrement:
+                case J.Unary.Type.PreDecrement:
+                case J.Unary.Type.Negative:
+                case J.Unary.Type.Positive:
+                case J.Unary.Type.Not:
+                case J.Unary.Type.Complement:
+                    draft.expression.prefix.whitespace = spacing ? " " : "";
+                    break;
+
+                case J.Unary.Type.PostIncrement:
+                case J.Unary.Type.PostDecrement:
+                    // postfix: don't add space after operand
+                    break;
+            }
+        });
+    }
     protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitVariable(variable, p) as J.VariableDeclarations.NamedVariable;
         return produceAsync(ret, async draft => {
