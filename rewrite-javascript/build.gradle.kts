@@ -70,11 +70,23 @@ val npmVersion = tasks.register("npmVersion", NpmTask::class) {
     )
 }
 
+// This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
+// For local development the user would typically have a `~/.npmrc` file with the token in it
+tasks.register("setupNpmrc") {
+    doLast {
+        if (project.hasProperty("npmAuthToken")) {
+            val npmrcFile = file("rewrite/.npmrc")
+            npmrcFile.writeText("//registry.npmjs.org/:_authToken=${project.property("npmAuthToken")}\n")
+        }
+    }
+}
+
 // Implicitly `--tag latest` if not specified
 val npmPublish = tasks.named<NpmTask>("npm_publish") {
     if (!project.hasProperty("releasing")) {
         args.set(listOf("--tag", "next"))
     }
+    dependsOn(tasks.named("setupNpmrc"))
 }
 
 open class RestorePackageJson : DefaultTask() {

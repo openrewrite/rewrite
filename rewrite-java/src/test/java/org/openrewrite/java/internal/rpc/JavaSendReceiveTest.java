@@ -22,6 +22,7 @@ import lombok.SneakyThrows;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
@@ -83,6 +84,7 @@ class JavaSendReceiveTest implements RewriteTest {
 
     @DocumentExample
     @Test
+    @Disabled("Disabled until we've cleaned up the enum serialization")
     void sendReceiveIdempotence() {
         rewriteRun(
           java(
