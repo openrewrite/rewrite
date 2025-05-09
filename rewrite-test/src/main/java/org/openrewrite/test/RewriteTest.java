@@ -118,6 +118,7 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     default void defaults(RecipeSpec spec) {
+        spec.recipe(Recipe.noop());
     }
 
     default void rewriteRun(SourceSpecs... sourceSpecs) {

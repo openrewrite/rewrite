@@ -50,7 +50,8 @@ public class RecipeSpec {
         return DEFAULTS.get();
     }
 
-    Recipe recipe = Recipe.noop();
+    @Nullable
+    Recipe recipe;
 
     /**
      * Default parsers to use if no more specific parser is set
