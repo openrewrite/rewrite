@@ -309,6 +309,124 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void removeDirectDependencyWithLowerVersionNumberIfDependencyIsLoadedTransitivelyWithHigherVersionNumber() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services:3.3.3")
+                  implementation("org.springframework:spring-webmvc:6.1.11")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDirectDependencyIfDependencyIsLoadedTransitivelyWithSameVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services:3.3.3")
+                  implementation("org.springframework:spring-webmvc:6.1.12")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDirectDependencyWithHigherVersionNumberIfDependencyIsLoadedTransitivelyWithLowerVersionNumber() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services:3.3.3")
+                  implementation("org.springframework:spring-webmvc:6.1.13")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services")
+                  implementation("org.springframework:spring-webmvc:6.1.13")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void transitiveConfiguration() {
         rewriteRun(
           buildGradle(
