@@ -44,8 +44,10 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 "Statistics used in analyzing the performance of recipes.");
     }
 
-    public void recordSourceVisited(SourceFile source) {
-        sourceFileVisited.add(source.getSourcePath());
+    public void recordSourceVisited(@Nullable SourceFile source) {
+        if (source != null) {
+            sourceFileVisited.add(source.getSourcePath());
+        }
     }
 
     public void recordSourceFileChanged(@Nullable SourceFile before, @Nullable SourceFile after) {
