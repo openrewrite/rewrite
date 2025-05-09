@@ -98,22 +98,41 @@ export namespace JS {
         Yield: "org.openrewrite.javascript.tree.JS$Yield",
     } as const;
 
+    /**
+     * Represents a JavaScript source file containing imports and statements.
+     * @example // file.js
+     * import { readFile } from 'fs';
+     * console.log(readFile('path'));
+     */
     export interface JavaScriptSourceFile extends JS, SourceFile {
         readonly imports: J.RightPadded<J.Import>[];
         readonly statements: J.RightPadded<Statement>[];
     }
 
+    /**
+     * Represents the root of a JavaScript AST (compilation unit).
+     * @example // file.js as AST root
+     * // statements and EOF marker
+     */
     export interface CompilationUnit extends JavaScriptSourceFile, JS {
         readonly kind: typeof Kind.CompilationUnit;
         readonly eof: J.Space;
     }
 
+    /**
+     * In a namespace import, aliases the contents of the namespace.
+     * @example import * as path from "path"
+     */
     export interface Alias extends JS, Expression {
         readonly kind: typeof Kind.Alias;
         readonly propertyName: J.RightPadded<J.Identifier>;
         readonly alias: Expression;
     }
 
+    /**
+     * Represents an arrow function expression.
+     * @example const f = (x: number) => x + 1;
+     */
     export interface ArrowFunction extends JS, Statement, Expression, TypedTree {
         readonly kind: typeof Kind.ArrowFunction;
         readonly leadingAnnotations: J.Annotation[];
@@ -125,12 +144,20 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents the `await` operator in an async function.
+     * @example const result = await fetchData();
+     */
     export interface Await extends JS, Expression {
         readonly kind: typeof Kind.Await;
         readonly expression: Expression;
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a TypeScript conditional type (ternary type).
+     * @example T extends U ? X : Y
+     */
     export interface ConditionalType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.ConditionalType;
         readonly checkType: Expression;
@@ -138,6 +165,10 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a generic type with a default.
+     * @example type Foo<T = string> = T;
+     */
     export interface DefaultType extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.DefaultType;
         readonly left: Expression;
@@ -146,12 +177,20 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents the `delete` operator.
+     * @example delete obj.prop;
+     */
     export interface Delete extends JS, Statement, Expression {
         readonly kind: typeof Kind.Delete;
         readonly expression: Expression;
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents an export statement in JavaScript or TypeScript.
+     * @example export { foo } from 'module';
+     */
     export interface Export extends JS, Statement {
         readonly kind: typeof Kind.Export;
         readonly exports?: J.Container<Expression>;
@@ -160,11 +199,19 @@ export namespace JS {
         readonly initializer?: J.LeftPadded<Expression>;
     }
 
+    /**
+     * Represents an expression used as a statement.
+     * @example obj.method();
+     */
     export interface ExpressionStatement extends JS, Statement, Expression {
         readonly kind: typeof Kind.ExpressionStatement;
         readonly expression: Expression;
     }
 
+    /**
+     * Represents an expression with type arguments (generic invocation).
+     * @example myFunc<number>(arg);
+     */
     export interface ExpressionWithTypeArguments extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.ExpressionWithTypeArguments;
         readonly clazz: J;
@@ -172,6 +219,10 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a TypeScript function type.
+     * @example type Fn = (x: number) => string;
+     */
     export interface FunctionType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.FunctionType;
         readonly modifiers: J.Modifier[];
@@ -182,12 +233,20 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents the `infer` keyword in conditional types.
+     * @example T extends (...args: any[]) => infer R ? R : any;
+     */
     export interface InferType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.InferType;
         readonly typeParameter: J.LeftPadded<J>;
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a dynamic import type.
+     * @example type T = import('module').Foo;
+     */
     export interface ImportType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.ImportType;
         readonly hasTypeof: J.RightPadded<boolean>;
@@ -197,6 +256,10 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents an import declaration in JavaScript.
+     * @example import x from 'module';
+     */
     export interface JsImport extends JS, Statement {
         readonly kind: typeof Kind.JsImport;
         readonly modifiers: J.Modifier[];
@@ -205,6 +268,10 @@ export namespace JS {
         readonly attributes?: ImportAttributes;
     }
 
+    /**
+     * Represents the clause of an import statement, including default and named bindings.
+     * @example import {A, B as C} from 'module';
+     */
     export interface JsImportClause extends JS {
         readonly kind: typeof Kind.JsImportClause;
         readonly typeOnly: boolean;
@@ -212,12 +279,20 @@ export namespace JS {
         readonly namedBindings?: Expression;
     }
 
+    /**
+     * Represents named imports in an import declaration.
+     * @example import { a, b } from 'fs';
+     */
     export interface NamedImports extends JS, Expression {
         readonly kind: typeof Kind.NamedImports;
         readonly elements: J.Container<Expression>;
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a single specifier in a named import.
+     * @example import { foo as bar } from 'baz';
+     */
     export interface JsImportSpecifier extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.JsImportSpecifier;
         readonly importType: J.LeftPadded<boolean>;
@@ -225,6 +300,10 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents JavaScript variable declarations (var, let, const).
+     * @example const x = 1, y = 2;
+     */
     export interface JSVariableDeclarations extends JS, Statement, TypedTree {
         readonly kind: typeof Kind.JSVariableDeclarations;
         readonly leadingAnnotations: J.Annotation[];
@@ -235,6 +314,10 @@ export namespace JS {
     }
 
     export namespace JSVariableDeclarations {
+        /**
+         * Represents a single named variable in a declaration.
+         * @example const { prop } = obj;
+         */
         export interface JSNamedVariable extends JS {
             readonly kind: typeof Kind.JSNamedVariable;
             readonly name: Expression;
@@ -244,6 +327,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents import assertion attributes.
+     * @example import data from './data.json' assert { type: 'json' };
+     */
     export interface ImportAttributes extends JS {
         readonly kind: typeof Kind.ImportAttributes;
         readonly token: ImportAttributes.Token;
@@ -257,6 +344,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents attributes for import type declarations.
+     * @example import type A from './module';
+     */
     export interface ImportTypeAttributes extends JS {
         readonly kind: typeof Kind.ImportTypeAttributes;
         readonly token: J.RightPadded<Expression>;
@@ -264,12 +355,20 @@ export namespace JS {
         readonly end: J.Space;
     }
 
+    /**
+     * Represents a single import assertion attribute key-value pair.
+     * @example assert { type: 'json' };
+     */
     export interface ImportAttribute extends JS, Statement {
         readonly kind: typeof Kind.ImportAttribute;
         readonly name: Expression;
         readonly value: J.LeftPadded<Expression>;
     }
 
+    /**
+     * Represents a binary expression in JavaScript.
+     * @example a + b;
+     */
     export interface JsBinary extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.JsBinary;
         readonly left: Expression;
@@ -289,6 +388,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents a literal type in TypeScript.
+     * @example type T = 'foo';
+     */
     export interface LiteralType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.LiteralType;
         readonly literal: Expression;
@@ -296,6 +399,10 @@ export namespace JS {
     }
 
 
+    /**
+     * Represents a mapped type in TypeScript.
+     * @example type Readonly<T> = { readonly [P in keyof T]: T[P] };
+     */
     export interface MappedType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.MappedType;
         readonly prefixToken?: J.LeftPadded<J.Literal>;
@@ -308,12 +415,20 @@ export namespace JS {
     }
 
     export namespace MappedType {
+        /**
+         * Represents key remapping in a mapped type.
+         * @example { [K in keyof T as Uppercase<K>]: T[K] }
+         */
         export interface KeysRemapping extends JS, Statement {
             readonly kind: typeof Kind.MappedTypeKeysRemapping;
             readonly typeParameter: J.RightPadded<MappedType.MappedTypeParameter>;
             readonly nameType?: J.RightPadded<Expression>;
         }
 
+        /**
+         * Represents a type parameter in a mapped type.
+         * @example [P in K]
+         */
         export interface MappedTypeParameter extends JS, Statement {
             readonly kind: typeof Kind.MappedTypeMappedTypeParameter;
             readonly name: Expression;
@@ -321,6 +436,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents object destructuring patterns.
+     * @example const { a, b } = obj;
+     */
     export interface ObjectBindingDeclarations extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.ObjectBindingDeclarations;
         readonly leadingAnnotations: J.Annotation[];
@@ -330,6 +449,10 @@ export namespace JS {
         readonly initializer?: J.LeftPadded<Expression>;
     }
 
+    /**
+     * Represents a property assignment in an object literal.
+     * @example { key: value }
+     */
     export interface PropertyAssignment extends JS, Statement, TypedTree {
         readonly kind: typeof Kind.PropertyAssignment;
         readonly name: J.RightPadded<Expression>;
@@ -345,6 +468,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents the `satisfies` operator in TypeScript.
+     * @example const x = { a: 1 } satisfies Foo;
+     */
     export interface SatisfiesExpression extends JS, Expression {
         readonly kind: typeof Kind.SatisfiesExpression;
         readonly expression: J;
@@ -352,6 +479,10 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents scoped variable declarations with keywords like const/let/var.
+     * @example let x = 10;
+     */
     export interface ScopedVariableDeclarations extends JS, Statement {
         readonly kind: typeof Kind.ScopedVariableDeclarations;
         readonly modifiers: J.Modifier[];
@@ -369,11 +500,19 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents an expression used directly as a statement.
+     * @example x();
+     */
     export interface StatementExpression extends JS, Statement, Expression {
         readonly kind: typeof Kind.StatementExpression;
         readonly statement: Statement;
     }
 
+    /**
+     * Represents a tagged template literal.
+     * @example html`<div>${content}</div>`;
+     */
     export interface TaggedTemplateExpression extends JS, Statement, Expression {
         readonly kind: typeof Kind.TaggedTemplateExpression;
         readonly tag?: J.RightPadded<Expression>;
@@ -382,6 +521,10 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a template string expression.
+     * @example `Hello ${name}`;
+     */
     export interface TemplateExpression extends JS, Statement, Expression, TypeTree {
         readonly kind: typeof Kind.TemplateExpression;
         readonly head: J.Literal;
@@ -390,6 +533,10 @@ export namespace JS {
     }
 
     export namespace TemplateExpression {
+        /**
+         * Represents a span in a template expression.
+         * @example the `${expr}` and tail parts
+         */
         export interface TemplateSpan extends JS {
             readonly kind: typeof Kind.TemplateExpressionTemplateSpan;
             readonly expression: J;
@@ -397,18 +544,30 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents a statement ending with a trailing token.
+     * @example function foo(){};
+     */
     export interface TrailingTokenStatement extends JS, Statement, Expression {
         readonly kind: typeof Kind.TrailingTokenStatement;
         readonly expression: J.RightPadded<J>;
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a tuple type in TypeScript.
+     * @example type T = [string, number];
+     */
     export interface Tuple extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.Tuple;
         readonly elements: J.Container<J>;
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a type alias declaration.
+     * @example type Foo = string;
+     */
     export interface TypeDeclaration extends JS, Statement, TypedTree {
         readonly kind: typeof Kind.TypeDeclaration;
         readonly modifiers: J.Modifier[];
@@ -418,17 +577,29 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents the `typeof` type operator in TypeScript.
+     * @example type T = typeof x;
+     */
     export interface TypeOf extends JS, Expression {
         readonly kind: typeof Kind.TypeOf;
         readonly expression: Expression;
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents an expression used as a type tree.
+     * @example (<T>value)
+     */
     export interface TypeTreeExpression extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.TypeTreeExpression;
         readonly expression: Expression;
     }
 
+    /**
+     * Represents an assignment operation in JavaScript.
+     * @example a ||= b;
+     */
     export interface JsAssignmentOperation extends JS, Statement, Expression, TypedTree {
         readonly kind: typeof Kind.JsAssignmentOperation;
         readonly variable: Expression;
@@ -447,6 +618,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents an indexed access type in TypeScript.
+     * @example type A = T['prop'];
+     */
     export interface IndexedAccessType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.IndexedAccessType;
         readonly objectType: TypeTree;
@@ -456,6 +631,10 @@ export namespace JS {
 
 
     export namespace IndexedAccessType {
+        /**
+         * Represents the index type in an indexed access.
+         * @example 'key'
+         */
         export interface IndexType extends JS {
             readonly kind: typeof Kind.IndexedAccessTypeIndexType;
             readonly element: J.RightPadded<TypeTree>;
@@ -463,6 +642,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents a typeof type query in TypeScript.
+     * @example type T = typeof obj;
+     */
     export interface TypeQuery extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.TypeQuery;
         readonly typeExpression: TypeTree;
@@ -470,11 +653,19 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents explicit type information.
+     * @example use in type cast contexts
+     */
     export interface TypeInfo extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.TypeInfo;
         readonly typeIdentifier: TypeTree;
     }
 
+    /**
+     * Represents TypeScript type operator keywords like readonly.
+     * @example type R = readonly number[];
+     */
     export interface TypeOperator extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.TypeOperator;
         readonly operator: TypeOperator.Type;
@@ -489,6 +680,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents a type predicate in TypeScript.
+     * @example function isString(x): x is string;
+     */
     export interface TypePredicate extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.TypePredicate;
         readonly asserts: J.LeftPadded<boolean>;
@@ -497,23 +692,39 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a union type in TypeScript.
+     * @example type U = A | B;
+     */
     export interface Union extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.Union;
         readonly types: J.RightPadded<Expression>[];
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents an intersection type in TypeScript.
+     * @example type I = A & B;
+     */
     export interface Intersection extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.Intersection;
         readonly types: J.RightPadded<Expression>[];
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents the `void` operator in JavaScript.
+     * @example void 0;
+     */
     export interface Void extends JS, Expression {
         readonly kind: typeof Kind.Void;
         readonly expression: Expression;
     }
 
+    /**
+     * Represents a unary expression in JavaScript.
+     * @example !flag;
+     */
     export interface Unary extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.Unary;
         readonly operator: J.LeftPadded<Unary.Type>;
@@ -532,6 +743,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents a yield expression in generators.
+     * @example yield value;
+     */
     export interface Yield extends JS, Expression {
         readonly kind: typeof Kind.Yield;
         readonly delegated: J.LeftPadded<boolean>;
@@ -539,12 +754,20 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a `with` statement in JavaScript.
+     * @example with (obj) { console.log(a); }
+     */
     export interface WithStatement extends JS, Statement {
         readonly kind: typeof Kind.WithStatement;
         readonly expression: J.ControlParentheses<Expression>;
         readonly body: J.RightPadded<Statement>;
     }
 
+    /**
+     * Represents an index signature in TypeScript interfaces.
+     * @example interface Foo { [key: string]: any; }
+     */
     export interface IndexSignatureDeclaration extends JS, Statement, TypedTree {
         readonly kind: typeof Kind.IndexSignatureDeclaration;
         readonly modifiers: J.Modifier[];
@@ -553,6 +776,10 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a method declaration in classes or objects.
+     * @example class A { myMethod() {} }
+     */
     export interface JSMethodDeclaration extends JS, Statement {
         readonly kind: typeof Kind.JSMethodDeclaration;
         readonly leadingAnnotations: J.Annotation[];
@@ -566,6 +793,10 @@ export namespace JS {
         readonly methodType?: JavaType.Method;
     }
 
+    /**
+     * Represents a for-of loop in JavaScript.
+     * @example for (const x of arr) { }
+     */
     export interface JSForOfLoop extends JS {
         readonly kind: typeof Kind.JSForOfLoop;
         readonly await: J.LeftPadded<boolean>;
@@ -573,18 +804,30 @@ export namespace JS {
         readonly body: J.RightPadded<Statement>;
     }
 
+    /**
+     * Represents a for-in loop in JavaScript.
+     * @example for (let key in obj) { }
+     */
     export interface JSForInLoop extends JS {
         readonly kind: typeof Kind.JSForInLoop;
         readonly control: JSForInOfLoopControl;
         readonly body: J.RightPadded<Statement>;
     }
 
+    /**
+     * Represents the control clause of for-in/of loops.
+     * @example for (const x of iterable)
+     */
     export interface JSForInOfLoopControl extends JS {
         readonly kind: typeof Kind.JSForInOfLoopControl;
         readonly variable: J.RightPadded<J>;
         readonly iterable: J.RightPadded<Expression>;
     }
 
+    /**
+     * Represents a try statement with optional catch and finally.
+     * @example try { } catch (e) { } finally { }
+     */
     export interface JSTry extends JS, Statement {
         readonly kind: typeof Kind.JSTry;
         readonly body: J.Block;
@@ -593,6 +836,10 @@ export namespace JS {
     }
 
     export namespace JSTry {
+        /**
+         * Represents a catch clause in a try statement.
+         * @example catch (e) { console.error(e); }
+         */
         export interface JSCatch extends JS {
             readonly kind: typeof Kind.JSCatch;
             readonly parameter: J.ControlParentheses<JSVariableDeclarations>;
@@ -600,6 +847,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents a namespace declaration in TypeScript.
+     * @example namespace MyNS { }
+     */
     export interface NamespaceDeclaration extends JS, Statement {
         readonly kind: typeof Kind.NamespaceDeclaration;
         readonly modifiers: J.Modifier[];
@@ -616,6 +867,10 @@ export namespace JS {
         }
     }
 
+    /**
+     * Represents a function declaration.
+     * @example function foo(arg: number): string {}
+     */
     export interface FunctionDeclaration extends JS, Statement, TypedTree {
         readonly kind: typeof Kind.FunctionDeclaration;
         readonly modifiers: J.Modifier[];
@@ -628,18 +883,30 @@ export namespace JS {
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a literal type object in TypeScript.
+     * @example type T = { a: number };
+     */
     export interface TypeLiteral extends JS, TypeTree {
         readonly kind: typeof Kind.TypeLiteral;
         readonly members: J.Block;
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents an array destructuring pattern.
+     * @example const [a, b] = arr;
+     */
     export interface ArrayBindingPattern extends JS, TypedTree {
         readonly kind: typeof Kind.ArrayBindingPattern;
         readonly elements: J.Container<Expression>;
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a named element in a binding pattern.
+     * @example const { x: alias } = obj;
+     */
     export interface BindingElement extends JS, Statement, TypeTree {
         readonly kind: typeof Kind.BindingElement;
         readonly propertyName?: J.RightPadded<Expression>;
@@ -648,6 +915,10 @@ export namespace JS {
         readonly variableType?: JavaType.Variable;
     }
 
+    /**
+     * Represents an export declaration (export ...).
+     * @example export class X {}
+     */
     export interface ExportDeclaration extends JS, Statement {
         readonly kind: typeof Kind.ExportDeclaration;
         readonly modifiers: J.Modifier[];
@@ -657,6 +928,10 @@ export namespace JS {
         readonly attributes?: ImportAttributes;
     }
 
+    /**
+     * Represents a default export assignment.
+     * @example export default foo;
+     */
     export interface ExportAssignment extends JS, Statement {
         readonly kind: typeof Kind.ExportAssignment;
         readonly modifiers: J.Modifier[];
@@ -664,12 +939,20 @@ export namespace JS {
         readonly expression?: Expression;
     }
 
+    /**
+     * Represents named exports in an export declaration.
+     * @example export { a, b };
+     */
     export interface NamedExports extends JS {
         readonly kind: typeof Kind.NamedExports;
         readonly elements: J.Container<Expression>;
         readonly type?: JavaType;
     }
 
+    /**
+     * Represents a specifier in a named export.
+     * @example export { foo as bar };
+     */
     export interface ExportSpecifier extends JS {
         readonly kind: typeof Kind.ExportSpecifier;
         readonly typeOnly: J.LeftPadded<boolean>;

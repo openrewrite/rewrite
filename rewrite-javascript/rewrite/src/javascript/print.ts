@@ -1071,9 +1071,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitArrayBindingPattern(abp: JS.ArrayBindingPattern, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(abp, p);
-
         await this.visitJsContainerLocal("[", abp.elements, ",", "]", p);
-
         await this.afterSyntax(abp, p);
         return abp;
     }
