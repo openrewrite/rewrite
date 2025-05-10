@@ -24,7 +24,6 @@ import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.function.Function;
@@ -49,15 +48,15 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
-        return ((J) j.withId(UUID.fromString(q.receiveAndGet(j.getId(), UUID::toString))))
+        return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
     }
 
     @Override
     public J visitCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
-        return cu.withSourcePath(Paths.get(q.receiveAndGet(cu.getSourcePath(), Path::toString)))
-                .withCharset(Charset.forName(q.receiveAndGet(cu.getCharset(), Charset::name)))
+        return cu.withSourcePath(q.receiveAndGet(cu.getSourcePath(), (String v) -> Paths.get(v)))
+                .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<JS.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
@@ -200,7 +199,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitImportAttributes(JS.ImportAttributes importAttributes, RpcReceiveQueue q) {
         return importAttributes
-                .withToken(Enum.valueOf(JS.ImportAttributes.Token.class, q.receiveAndGet(importAttributes.getToken(), Enum::name)))
+                .withToken(q.receiveAndGet(importAttributes.getToken(), toEnum(JS.ImportAttributes.Token.class)))
                 .getPadding().withElements(q.receive(importAttributes.getPadding().getElements(), el -> visitContainer(el, q)));
     }
 
@@ -275,7 +274,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitPropertyAssignment(JS.PropertyAssignment propertyAssignment, RpcReceiveQueue q) {
         return propertyAssignment
                 .getPadding().withName(q.receive(propertyAssignment.getPadding().getName(), el -> visitRightPadded(el, q)))
-                .withAssigmentToken(Enum.valueOf(JS.PropertyAssignment.AssigmentToken.class, q.receiveAndGet(propertyAssignment.getAssigmentToken(), Enum::name)))
+                .withAssigmentToken(q.receiveAndGet(propertyAssignment.getAssigmentToken(), toEnum(JS.PropertyAssignment.AssigmentToken.class)))
                 .withInitializer(q.receive(propertyAssignment.getInitializer(), expr -> (Expression) visitNonNull(expr, q)));
     }
 
@@ -403,7 +402,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitTypeOperator(JS.TypeOperator typeOperator, RpcReceiveQueue q) {
         return typeOperator
-                .withOperator(Enum.valueOf(JS.TypeOperator.Type.class, q.receiveAndGet(typeOperator.getOperator(), Enum::name)))
+                .withOperator(q.receiveAndGet(typeOperator.getOperator(), toEnum(JS.TypeOperator.Type.class)))
                 .getPadding().withExpression(q.receive(typeOperator.getPadding().getExpression(), el -> visitLeftPadded(el, q)));
     }
 

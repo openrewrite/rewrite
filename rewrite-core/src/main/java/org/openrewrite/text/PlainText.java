@@ -32,6 +32,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
@@ -179,18 +180,18 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
 
     @Override
     public PlainText rpcReceive(PlainText t, RpcReceiveQueue q) {
-        return t.withId(UUID.fromString(q.receiveAndGet(t.getId(), UUID::toString)))
+        return t.withId(q.receiveAndGet(t.getId(), UUID::fromString))
                 .withMarkers(q.receiveMarkers(t.getMarkers()))
-                .withSourcePath(Paths.get(q.receiveAndGet(t.getSourcePath(), Path::toString)))
-                .withCharset(Charset.forName(q.receiveAndGet(t.getCharset(), Charset::name)))
+                .withSourcePath(q.receiveAndGet(t.getSourcePath(), (String v) -> Paths.get(v)))
+                .withCharset(q.receiveAndGet(t.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
                 .withChecksum(q.receive(t.getChecksum()))
                 .<PlainText>withFileAttributes(q.receive(t.getFileAttributes()))
-                .withText(q.receiveAndGet(t.getText(), String::toString))
+                .withText(q.receiveAndGet(t.getText(), Function.identity()))
                 .withSnippets(q.receiveList(t.getSnippets(), s -> s
-                        .withId(UUID.fromString(q.receiveAndGet(s.getId(), UUID::toString)))
+                        .withId(q.receiveAndGet(s.getId(), UUID::fromString))
                         .withMarkers(q.receiveMarkers(s.getMarkers()))
-                        .withText(q.receiveAndGet(s.getText(), String::toString))));
+                        .withText(q.receiveAndGet(s.getText(), Function.identity()))));
     }
 
     @Value

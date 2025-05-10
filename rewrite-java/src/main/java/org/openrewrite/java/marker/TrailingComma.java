@@ -42,7 +42,7 @@ public class TrailingComma implements Marker, RpcCodec<TrailingComma> {
     @Override
     public TrailingComma rpcReceive(TrailingComma before, RpcReceiveQueue q) {
         return before
-                .withId(UUID.fromString(q.receiveAndGet(before.getId(), UUID::toString)))
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                 .withSuffix(q.receive(before.getSuffix(), space -> new JavaReceiver().visitSpace(space, q)));
     }
 }

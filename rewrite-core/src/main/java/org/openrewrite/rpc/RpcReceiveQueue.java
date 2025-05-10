@@ -65,13 +65,43 @@ public class RpcReceiveQueue {
      * is NO_CHANGE or CHANGE, the function is applied to the before parameter, unless before
      * is null in which case the before state is assumed to be null.
      */
-    public <T, U> U receiveAndGet(@Nullable T before, Function<T, U> apply) {
-        return receive(before == null ? null : apply.apply(before), null);
+    @SuppressWarnings("DataFlowIssue")
+    public <T, U> T receiveAndGet(@Nullable T before, Function<U, @Nullable T> mapping) {
+        RpcObjectData message = take();
+        if (logFile != null && message.getTrace() != null) {
+            logFile.println(message.withTrace(null));
+            logFile.println("  " + message.getTrace());
+            logFile.println("  " + Trace.traceReceiver());
+            logFile.flush();
+        }
+        Integer ref = null;
+        switch (message.getState()) {
+            case NO_CHANGE:
+                return before;
+            case DELETE:
+                return null;
+            case ADD:
+                ref = message.getRef();
+                if (refs.containsKey(ref)) {
+                    //noinspection unchecked
+                    return (@Nullable T) refs.get(ref);
+                }
+                // fall-through
+            case CHANGE:
+                U value = message.getValue();
+                T after = value != null ? mapping.apply(value) : null;
+                if (ref != null) {
+                    refs.put(ref, after);
+                }
+                return after;
+            default:
+                throw new UnsupportedOperationException("Unknown state type " + message.getState());
+        }
     }
 
     public Markers receiveMarkers(Markers markers) {
         return receive(markers, m -> m
-                .withId(UUID.fromString(receiveAndGet(m.getId(), UUID::toString)))
+                .withId(receiveAndGet(m.getId(), UUID::fromString))
                 .withMarkers(receiveList(m.getMarkers(), null)));
     }
 

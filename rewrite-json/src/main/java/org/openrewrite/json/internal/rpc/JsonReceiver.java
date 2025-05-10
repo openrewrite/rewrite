@@ -25,7 +25,6 @@ import org.openrewrite.json.tree.Space;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
@@ -35,7 +34,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     @Override
     public Json preVisit(@NonNull Json j, RpcReceiveQueue q) {
-        j = j.withId(UUID.fromString(q.receiveAndGet(j.getId(), UUID::toString)));
+        j = j.withId(q.receiveAndGet(j.getId(), UUID::fromString));
         j = j.withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)));
         j = j.withMarkers(q.receiveMarkers(j.getMarkers()));
         return j;
@@ -43,8 +42,8 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     @Override
     public Json visitDocument(Json.Document document, RpcReceiveQueue q) {
-        return document.withSourcePath(Paths.get(q.receiveAndGet(document.getSourcePath(), Path::toString)))
-                .withCharset(Charset.forName(q.receiveAndGet(document.getCharset(), Charset::name)))
+        return document.withSourcePath(q.receiveAndGet(document.getSourcePath(), (String v) -> Paths.get(v)))
+                .withCharset(q.receiveAndGet(document.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(document.isCharsetBomMarked()))
                 .withChecksum(q.receive(document.getChecksum()))
                 .withFileAttributes(q.receive(document.getFileAttributes()))
