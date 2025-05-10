@@ -20,7 +20,6 @@ import {
     emptySpace,
     Expression,
     J,
-    JavaMarkers,
     JavaType,
     NameTree,
     Statement,
@@ -29,7 +28,7 @@ import {
     TypedTree,
     TypeTree,
 } from '../java';
-import {isJavaScript, JS} from '.';
+import {DelegatedYield, isJavaScript, JS} from '.';
 import {
     emptyMarkers,
     markers,
@@ -293,7 +292,7 @@ export class JavaScriptParserVisitor {
             return this.rightPadded(j, this.semicolonPrefix(n), (n => {
                 const last = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile);
                 return last?.kind == ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: JavaMarkers.Semicolon,
+                    kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers;
             })?.(n));
@@ -501,7 +500,7 @@ export class JavaScriptParserVisitor {
                     this.convert(ce),
                     ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
                     ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                        kind: JavaMarkers.Semicolon,
+                        kind: J.Markers.Semicolon,
                         id: randomId()
                     }) : emptyMarkers
                 )),
@@ -1266,7 +1265,7 @@ export class JavaScriptParserVisitor {
                 this.convert(ce),
                 ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
                 ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: JavaMarkers.Semicolon,
+                    kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
             )),
@@ -1774,7 +1773,7 @@ export class JavaScriptParserVisitor {
                 elements: [this.rightPadded(this.visit(node.type), this.suffix(node.type)),
                     this.findChildNode(node, ts.SyntaxKind.SemicolonToken) ?
                         this.rightPadded(this.newJEmpty(emptySpace, markers({
-                            kind: JavaMarkers.Semicolon,
+                            kind: J.Markers.Semicolon,
                             id: randomId()
                         })), this.prefix(node.getLastToken()!))
                         : this.rightPadded(this.newJEmpty(), this.prefix(node.getLastToken()!))
@@ -1785,7 +1784,7 @@ export class JavaScriptParserVisitor {
                 before: emptySpace,
                 elements: [this.findChildNode(node, ts.SyntaxKind.SemicolonToken) ?
                     this.rightPadded(this.newJEmpty(this.prefix(this.findChildNode(node, ts.SyntaxKind.SemicolonToken)!), markers({
-                        kind: JavaMarkers.Semicolon,
+                        kind: J.Markers.Semicolon,
                         id: randomId()
                     })), this.prefix(node.getLastToken()!))
                     : this.rightPadded(this.newJEmpty(), this.prefix(node.getLastToken()!))
@@ -2024,7 +2023,7 @@ export class JavaScriptParserVisitor {
         const statements: J.RightPadded<Statement>[] = this.rightPaddedSeparatedList(
             [...statementList.getChildren(this.sourceFile)],
             (nodes, i) => i == nodes.length - 2 && nodes[i + 1].kind == ts.SyntaxKind.CommaToken ? markers({
-                kind: JavaMarkers.TrailingComma,
+                kind: J.Markers.TrailingComma,
                 id: randomId(),
                 suffix: this.prefix(nodes[i + 1])
             } as TrailingComma) : emptyMarkers
@@ -2173,7 +2172,7 @@ export class JavaScriptParserVisitor {
                 this.mapCommaSeparatedList(this.getParameterListNodes(node)) : {
                     ...emptyContainer<Expression>(),
                     markers: markers({
-                        kind: JavaMarkers.OmitParentheses,
+                        kind: J.Markers.OmitParentheses,
                         id: randomId()
                     })
                 },
@@ -2628,15 +2627,19 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitYieldExpression(node: ts.YieldExpression): JS.Yield {
+    visitYieldExpression(node: ts.YieldExpression): J.Yield {
         return {
-            kind: JS.Kind.Yield,
+            kind: J.Kind.Yield,
             id: randomId(),
             prefix: this.prefix(node),
-            markers: emptyMarkers,
-            delegated: node.asteriskToken ? this.leftPadded(this.prefix(node.asteriskToken), true) : this.leftPadded(emptySpace, false),
-            expression: node.expression && this.visit(node.expression),
-            type: this.mapType(node),
+            markers: node.asteriskToken ?
+                markers({
+                    kind: JS.Markers.DelegatedYield,
+                    id: randomId(),
+                    prefix: this.prefix(node.asteriskToken)
+                } as DelegatedYield) : emptyMarkers,
+            value: node.expression && this.visit(node.expression),
+            implicit: false
         };
     }
 
@@ -2688,7 +2691,7 @@ export class JavaScriptParserVisitor {
                         element: this.convert(ce),
                         after: ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
                         markers: ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                            kind: JavaMarkers.Semicolon,
+                            kind: J.Markers.Semicolon,
                             id: randomId()
                         }) : emptyMarkers
                     })),
@@ -2842,7 +2845,7 @@ export class JavaScriptParserVisitor {
             thenPart: this.rightPadded(
                 this.convert(node.thenStatement),
                 semicolonAfterThen ? this.prefix(node.thenStatement.getLastToken()!) : emptySpace,
-                semicolonAfterThen ? markers({kind: JavaMarkers.Semicolon, id: randomId()}) : emptyMarkers
+                semicolonAfterThen ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers
             ),
             elsePart: node.elseStatement && {
                 kind: J.Kind.IfElse,
@@ -2852,7 +2855,7 @@ export class JavaScriptParserVisitor {
                 body: this.rightPadded(
                     this.convert(node.elseStatement),
                     semicolonAfterElse ? this.prefix(node.elseStatement.getLastToken()!) : emptySpace,
-                    semicolonAfterElse ? markers({kind: JavaMarkers.Semicolon, id: randomId()}) : emptyMarkers
+                    semicolonAfterElse ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers
                 )
             }
         };
@@ -2867,7 +2870,7 @@ export class JavaScriptParserVisitor {
             body: this.rightPadded(this.visit(node.statement),
                 this.semicolonPrefix(node.statement),
                 node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: JavaMarkers.Semicolon,
+                    kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers),
             whileCondition: this.leftPadded(
@@ -2900,7 +2903,7 @@ export class JavaScriptParserVisitor {
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
                 node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: JavaMarkers.Semicolon,
+                    kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
             ),
@@ -2943,7 +2946,7 @@ export class JavaScriptParserVisitor {
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
                 node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: JavaMarkers.Semicolon,
+                    kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
             )
@@ -2968,7 +2971,7 @@ export class JavaScriptParserVisitor {
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
                 node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: JavaMarkers.Semicolon,
+                    kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
             )
@@ -2999,7 +3002,7 @@ export class JavaScriptParserVisitor {
                     this.convert(node.statement),
                     this.semicolonPrefix(node.statement),
                     node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
-                        kind: JavaMarkers.Semicolon,
+                        kind: J.Markers.Semicolon,
                         id: randomId()
                     }) : emptyMarkers
                 )
@@ -3054,7 +3057,7 @@ export class JavaScriptParserVisitor {
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
                 node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: JavaMarkers.Semicolon,
+                    kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
             ),
@@ -3094,7 +3097,7 @@ export class JavaScriptParserVisitor {
                     this.visit(node.statement),
                     this.semicolonPrefix(node.statement),
                     node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind == ts.SyntaxKind.SemicolonToken ? markers({
-                        kind: JavaMarkers.Semicolon,
+                        kind: J.Markers.Semicolon,
                         id: randomId()
                     }) : emptyMarkers
                 ),
@@ -4279,7 +4282,7 @@ export class JavaScriptParserVisitor {
     private trailingComma = (nodes: readonly ts.Node[]) => (ns: readonly ts.Node[], i: number) => {
         const last = i === ns.length - 2;
         return last ? markers({
-            kind: JavaMarkers.TrailingComma,
+            kind: J.Markers.TrailingComma,
             id: randomId(),
             suffix: this.prefix(nodes[2], false)
         } as TrailingComma) : emptyMarkers;
@@ -4404,12 +4407,12 @@ export class JavaScriptParserVisitor {
     private convertToken(token?: ts.Node) {
         if (token?.kind === ts.SyntaxKind.CommaToken) {
             return {
-                kind: JavaMarkers.TrailingComma,
+                kind: J.Markers.TrailingComma,
                 id: randomId(),
                 suffix: emptySpace
             };
         }
-        if (token?.kind === ts.SyntaxKind.SemicolonToken) return {kind: JavaMarkers.Semicolon, id: randomId()};
+        if (token?.kind === ts.SyntaxKind.SemicolonToken) return {kind: J.Markers.Semicolon, id: randomId()};
         return undefined;
     }
 

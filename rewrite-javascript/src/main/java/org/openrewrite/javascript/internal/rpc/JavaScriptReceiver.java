@@ -445,14 +445,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitYield(JS.Yield yield, RpcReceiveQueue q) {
-        return yield
-                .getPadding().withDelegated(q.receive(yield.getPadding().getDelegated(), el -> visitLeftPadded(el, q)))
-                .withExpression(q.receive(yield.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
-                .withType(q.receive(yield.getType(), type -> visitType(type, q)));
-    }
-
-    @Override
     public J visitWithStatement(JS.WithStatement withStatement, RpcReceiveQueue q) {
         return withStatement
                 .withExpression(q.receive(withStatement.getExpression(), expr -> (J.ControlParentheses<Expression>) visitNonNull(expr, q)))

@@ -101,10 +101,10 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitAssert(assert_: J.Assert, p: P): Promise<J | undefined> {
-        return this.produceJava<J.Assert>(assert_, p, async draft => {
-            draft.condition = await this.visitDefined(assert_.condition, p) as Expression;
-            draft.detail = await this.visitOptionalLeftPadded(assert_.detail, p);
+    protected async visitAssert(anAssert: J.Assert, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Assert>(anAssert, p, async draft => {
+            draft.condition = await this.visitDefined(anAssert.condition, p) as Expression;
+            draft.detail = await this.visitOptionalLeftPadded(anAssert.detail, p);
         });
     }
 
@@ -150,13 +150,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitCase(case_: J.Case, p: P): Promise<J | undefined> {
-        return this.produceJava<J.Case>(case_, p, async draft => {
-            draft.caseLabels = await this.visitContainer(case_.caseLabels, p);
-            draft.statements = await this.visitContainer(case_.statements, p);
-            draft.body = await this.visitOptionalRightPadded(case_.body, p);
-            if (case_.guard) {
-                draft.guard = await this.visitDefined(case_.guard, p) as Expression;
+    protected async visitCase(aCase: J.Case, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Case>(aCase, p, async draft => {
+            draft.caseLabels = await this.visitContainer(aCase.caseLabels, p);
+            draft.statements = await this.visitContainer(aCase.statements, p);
+            draft.body = await this.visitOptionalRightPadded(aCase.body, p);
+            if (aCase.guard) {
+                draft.guard = await this.visitDefined(aCase.guard, p) as Expression;
             }
         });
     }
@@ -300,17 +300,17 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitElse(else_: J.If.Else, p: P): Promise<J | undefined> {
-        return this.produceJava<J.If.Else>(else_, p, async draft => {
-            draft.body = await this.visitRightPadded(else_.body, p);
+    protected async visitElse(anElse: J.If.Else, p: P): Promise<J | undefined> {
+        return this.produceJava<J.If.Else>(anElse, p, async draft => {
+            draft.body = await this.visitRightPadded(anElse.body, p);
         });
     }
 
-    protected async visitImport(import_: J.Import, p: P): Promise<J | undefined> {
-        return this.produceJava<J.Import>(import_, p, async draft => {
-            draft.static = await this.visitLeftPadded(import_.static, p);
-            draft.qualid = await this.visitDefined(import_.qualid, p) as J.FieldAccess;
-            draft.alias = await this.visitOptionalLeftPadded(import_.alias, p);
+    protected async visitImport(anImport: J.Import, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Import>(anImport, p, async draft => {
+            draft.static = await this.visitLeftPadded(anImport.static, p);
+            draft.qualid = await this.visitDefined(anImport.qualid, p) as J.FieldAccess;
+            draft.alias = await this.visitOptionalLeftPadded(anImport.alias, p);
         });
     }
 
@@ -461,11 +461,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitPackage(package_: J.Package, p: P): Promise<J | undefined> {
-        return this.produceJava<J.Package>(package_, p, async draft => {
-            draft.expression = await this.visitDefined(package_.expression, p) as Expression;
-            if (package_.annotations) {
-                draft.annotations = await mapAsync(package_.annotations, a => this.visitDefined<J.Annotation>(a, p));
+    protected async visitPackage(aPackage: J.Package, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Package>(aPackage, p, async draft => {
+            draft.expression = await this.visitDefined(aPackage.expression, p) as Expression;
+            if (aPackage.annotations) {
+                draft.annotations = await mapAsync(aPackage.annotations, a => this.visitDefined<J.Annotation>(a, p));
             }
         });
     }
@@ -505,10 +505,10 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitSwitch(switch_: J.Switch, p: P): Promise<J | undefined> {
-        return this.produceJava<J.Switch>(switch_, p, async draft => {
-            draft.selector = await this.visitDefined(switch_.selector, p) as J.ControlParentheses<Expression>;
-            draft.cases = await this.visitDefined(switch_.cases, p) as J.Block;
+    protected async visitSwitch(aSwitch: J.Switch, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Switch>(aSwitch, p, async draft => {
+            draft.selector = await this.visitDefined(aSwitch.selector, p) as J.ControlParentheses<Expression>;
+            draft.cases = await this.visitDefined(aSwitch.cases, p) as J.Block;
         });
     }
 
@@ -647,9 +647,9 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitYield(yield_: J.Yield, p: P): Promise<J | undefined> {
-        return this.produceJava<J.Yield>(yield_, p, async draft => {
-            draft.value = await this.visitDefined(yield_.value, p) as Expression;
+    protected async visitYield(aYield: J.Yield, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Yield>(aYield, p, async draft => {
+            draft.value = await this.visitDefined(aYield.value, p) as Expression;
         });
     }
 

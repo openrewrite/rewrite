@@ -19,7 +19,6 @@ import {Expression, isSpace, J, TextComment} from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
 import {isTree} from "../tree";
-import {JavaMarkers, TrailingComma} from "./markers";
 import {JavaType} from "./type";
 
 export class JavaSender extends JavaVisitor<RpcSendQueue> {
@@ -328,10 +327,10 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return returnStmt;
     }
 
-    protected async visitSwitch(switchStmt: J.Switch, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(switchStmt, s => s.selector, sel => this.visit(sel, q));
-        await q.getAndSend(switchStmt, s => s.cases, block => this.visit(block, q));
-        return switchStmt;
+    protected async visitSwitch(aSwitch: J.Switch, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(aSwitch, s => s.selector, sel => this.visit(sel, q));
+        await q.getAndSend(aSwitch, s => s.cases, block => this.visit(block, q));
+        return aSwitch;
     }
 
     protected async visitSwitchExpression(switchExpr: J.SwitchExpression, q: RpcSendQueue): Promise<J | undefined> {
@@ -374,10 +373,10 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return resource;
     }
 
-    protected async visitTryCatch(catch_: J.TryCatch, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(catch_, c => c.parameter, param => this.visit(param, q));
-        await q.getAndSend(catch_, c => c.body, body => this.visit(body, q));
-        return catch_;
+    protected async visitTryCatch(aCatch: J.TryCatch, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(aCatch, c => c.parameter, param => this.visit(param, q));
+        await q.getAndSend(aCatch, c => c.body, body => this.visit(body, q));
+        return aCatch;
     }
 
     protected async visitTypeCast(typeCast: J.TypeCast, q: RpcSendQueue): Promise<J | undefined> {
@@ -837,7 +836,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitImport(importStmt: J.Import, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(importStmt);
 
-        draft.static = await q.receive(importStmt.static, static_ => this.visitLeftPadded(static_, q));
+        draft.static = await q.receive(importStmt.static, s => this.visitLeftPadded(s, q));
         draft.qualid = await q.receive(importStmt.qualid, qualid => this.visit(qualid, q));
         draft.alias = await q.receive(importStmt.alias, alias => this.visitLeftPadded(alias, q));
 
@@ -1405,21 +1404,3 @@ Object.values(J.Kind).forEach(kind => {
         RpcCodecs.registerCodec(kind, javaCodec);
     }
 });
-
-const spaceCodec = RpcCodecs.forType(J.Kind.Space)!;
-
-// Register codecs for all Java markers with additional properties
-RpcCodecs.registerCodec(JavaMarkers.TrailingComma, {
-        async rpcReceive(before: TrailingComma, q: RpcReceiveQueue): Promise<TrailingComma> {
-            const draft = createDraft(before);
-            draft.id = await q.receive(before.id);
-            draft.suffix = await q.receive(before.suffix, space => spaceCodec.rpcReceive(space, q))
-            return finishDraft(draft);
-        },
-
-        async rpcSend(after: TrailingComma, q: RpcSendQueue): Promise<void> {
-            await q.getAndSend(after, a => a.id);
-            await q.getAndSend(after, a => a.suffix, space => spaceCodec.rpcSend(space, q));
-        }
-    }
-);

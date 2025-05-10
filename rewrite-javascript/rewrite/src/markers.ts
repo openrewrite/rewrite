@@ -50,6 +50,14 @@ export interface Markers {
     readonly markers: Marker[]
 }
 
+export function findMarker<T extends Marker>(
+    markers: Markers,
+    kind: T["kind"]
+): T | undefined {
+    return markers.markers.find(
+        (m): m is T => m.kind === kind
+    );
+}
 export const emptyMarkers: Markers = {
     kind: MarkersKind.Markers,
     id: randomId(),

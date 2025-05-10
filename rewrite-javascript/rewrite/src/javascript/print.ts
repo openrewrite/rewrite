@@ -19,8 +19,9 @@ import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
-import {Comment, emptySpace, J, JavaMarkers, Statement, TextComment, TrailingComma, TypedTree} from "../java";
-import {Marker, Markers} from "../markers";
+import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
+import {findMarker, Marker, Markers} from "../markers";
+import {DelegatedYield} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -183,29 +184,31 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return aVoid;
     }
 
-    override async visitJsYield(yield_: JS.Yield, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(yield_, p);
+    override async visitYield(aYield: J.Yield, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(aYield, p);
 
         p.append("yield");
 
-        if (yield_.delegated.element) {
-            await this.visitLeftPaddedLocal("*", yield_.delegated, p);
+        const delegated = findMarker<DelegatedYield>(aYield.markers, JS.Markers.DelegatedYield);
+        if (delegated) {
+            await this.visitSpace(delegated.prefix, p);
+            p.append("*");
         }
 
-        yield_.expression && await this.visit(yield_.expression, p);
+        aYield.value && await this.visit(aYield.value, p);
 
-        await this.afterSyntax(yield_, p);
-        return yield_;
+        await this.afterSyntax(aYield, p);
+        return aYield;
     }
 
-    override async visitTry(try_: J.Try, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(try_, p);
+    override async visitTry(aTry: J.Try, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(aTry, p);
         p.append("try");
-        await this.visit(try_.body, p);
-        await this.visitNodes(try_.catches, p);
-        try_.finally && await this.visitJLeftPaddedLocal("finally", try_.finally, p);
-        await this.afterSyntax(try_, p);
-        return try_;
+        await this.visit(aTry.body, p);
+        await this.visitNodes(aTry.catches, p);
+        aTry.finally && await this.visitJLeftPaddedLocal("finally", aTry.finally, p);
+        await this.afterSyntax(aTry, p);
+        return aTry;
     }
 
     override async visitTryCatch(catch_: J.TryCatch, p: PrintOutputCapture): Promise<J | undefined> {
@@ -267,7 +270,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.afterSyntax(variable.element, p);
             if (i < variables.length - 1) {
                 p.append(",");
-            } else if (variable.markers.markers.find(m => m.kind === JavaMarkers.Semicolon)) {
+            } else if (variable.markers.markers.find(m => m.kind === J.Markers.Semicolon)) {
                 p.append(";");
             }
         }
@@ -499,7 +502,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
             if (i < variables.length - 1) {
                 p.append(",");
-            } else if (variable.markers.markers.find(m => m.kind === JavaMarkers.Semicolon)) {
+            } else if (variable.markers.markers.find(m => m.kind === J.Markers.Semicolon)) {
                 p.append(";");
             }
         }
@@ -1255,7 +1258,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             p.append("new");
             await this.visit(newClass.clazz, p);
 
-            if (!newClass.arguments.markers.markers.find(m => m.kind === JavaMarkers.OmitParentheses)) {
+            if (!newClass.arguments.markers.markers.find(m => m.kind === J.Markers.OmitParentheses)) {
                 await this.visitJContainerLocal("(", newClass.arguments, ",", ")", p);
             }
         }
@@ -1939,10 +1942,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     override async visitMarker<M extends Marker>(marker: M, p: PrintOutputCapture): Promise<M> {
-        if (marker.kind === JavaMarkers.Semicolon) {
+        if (marker.kind === J.Markers.Semicolon) {
             p.append(';');
         }
-        if (marker.kind === JavaMarkers.TrailingComma) {
+        if (marker.kind === J.Markers.TrailingComma) {
             p.append(',');
             await this.visitSpace((marker as unknown as TrailingComma).suffix, p);
         }

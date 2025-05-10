@@ -448,14 +448,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJsYield(yield_: JS.Yield, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.Yield>(yield_, p, async draft => {
-            draft.delegated = await this.visitLeftPadded(yield_.delegated, p);
-            draft.expression = yield_.expression && await this.visitDefined<Expression>(yield_.expression, p);
-            draft.type = yield_.type && await this.visitType(yield_.type, p);
-        });
-    }
-
     protected async visitWithStatement(withStatement: JS.WithStatement, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.WithStatement>(withStatement, p, async draft => {
             draft.expression = await this.visitDefined<J.ControlParentheses<Expression>>(withStatement.expression, p);
@@ -692,8 +684,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitVoid(tree as unknown as JS.Void, p);
                 case JS.Kind.Unary:
                     return this.visitJsUnary(tree as unknown as JS.Unary, p);
-                case JS.Kind.Yield:
-                    return this.visitJsYield(tree as unknown as JS.Yield, p);
                 case JS.Kind.WithStatement:
                     return this.visitWithStatement(tree as unknown as JS.WithStatement, p);
                 case JS.Kind.IndexSignatureDeclaration:

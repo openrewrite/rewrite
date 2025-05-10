@@ -140,7 +140,6 @@ const is_expressions: string[] = [
     JS.Kind.Unary,
     JS.Kind.Union,
     JS.Kind.Void,
-    JS.Kind.Yield,
     JS.Kind.ExpressionStatement,
     JS.Kind.StatementExpression
 ]

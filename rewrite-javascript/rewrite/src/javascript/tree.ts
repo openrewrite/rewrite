@@ -94,7 +94,6 @@ export namespace JS {
         Union: "org.openrewrite.javascript.tree.JS$Union",
         Void: "org.openrewrite.javascript.tree.JS$Void",
         WithStatement: "org.openrewrite.javascript.tree.JS$WithStatement",
-        Yield: "org.openrewrite.javascript.tree.JS$Yield",
     } as const;
 
     /**
@@ -705,17 +704,6 @@ export namespace JS {
             QuestionDotWithDot = "QuestionDotWithDot",
             Asterisk = "Asterisk"
         }
-    }
-
-    /**
-     * Represents a yield expression in generators.
-     * @example yield value;
-     */
-    export interface Yield extends JS, Expression {
-        readonly kind: typeof Kind.Yield;
-        readonly delegated: J.LeftPadded<boolean>;
-        readonly expression?: Expression;
-        readonly type?: JavaType;
     }
 
     /**

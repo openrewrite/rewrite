@@ -444,9 +444,4 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     public J.Wildcard visitWildcard(J.Wildcard wildcard, P p) {
         return (J.Wildcard) super.visitWildcard(wildcard, p);
     }
-
-    @Override
-    public J.Yield visitYield(J.Yield yield, P p) {
-        return (J.Yield) super.visitYield(yield, p);
-    }
 }

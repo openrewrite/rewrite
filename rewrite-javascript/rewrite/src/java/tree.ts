@@ -685,6 +685,10 @@ export namespace J {
     }
 
     export namespace VariableDeclarations {
+        /**
+         * Represents a single named variable declaration, potentially
+         * with an initializer.
+         */
         export interface NamedVariable extends J {
             readonly kind: typeof Kind.NamedVariable;
             readonly name: Identifier;

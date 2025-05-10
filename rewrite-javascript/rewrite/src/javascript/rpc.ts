@@ -386,13 +386,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return unary;
     }
 
-    override async visitJsYield(yield_: JS.Yield, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(yield_, el => el.delegated, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(yield_, el => el.expression, el => this.visit(el, q));
-        await q.getAndSend(yield_, el => asRef(el.type), el => this.visitType(el, q));
-        return yield_;
-    }
-
     override async visitWithStatement(withStatement: JS.WithStatement, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(withStatement, el => el.expression, el => this.visit(el, q));
         await q.getAndSend(withStatement, el => el.body, el => this.visitRightPadded(el, q));
@@ -966,14 +959,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitJsUnary(unary: JS.Unary, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(unary);
         draft.operator = await q.receive(draft.operator, el => this.visitLeftPadded(el, q));
-        draft.expression = await q.receive(draft.expression, el => this.visitDefined<Expression>(el, q));
-        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
-        return finishDraft(draft);
-    }
-
-    override async visitJsYield(yield_: JS.Yield, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(yield_);
-        draft.delegated = await q.receive(draft.delegated, el => this.visitLeftPadded(el, q));
         draft.expression = await q.receive(draft.expression, el => this.visitDefined<Expression>(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
