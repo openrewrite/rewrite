@@ -5492,12 +5492,11 @@ public interface JS extends J {
 
     }
 
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class JsAssignmentOperation implements JS, Statement, Expression, TypedTree {
+    final class AssignmentOperation implements JS, Statement, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -5525,7 +5524,7 @@ public interface JS extends J {
             return operator.getElement();
         }
 
-        public JsAssignmentOperation withOperator(Type operator) {
+        public JS.AssignmentOperation withOperator(Type operator) {
             return getPadding().withOperator(this.operator.withElement(operator));
         }
 
@@ -5540,7 +5539,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitJsAssignmentOperation(this, p);
+            return v.visitAssignmentOperation(this, p);
         }
 
         @Override
@@ -5563,15 +5562,15 @@ public interface JS extends J {
             Exp
         }
 
-        public JsAssignmentOperation.Padding getPadding() {
-            JsAssignmentOperation.Padding p;
+        public JS.AssignmentOperation.Padding getPadding() {
+            JS.AssignmentOperation.Padding p;
             if (this.padding == null) {
-                p = new JsAssignmentOperation.Padding(this);
+                p = new JS.AssignmentOperation.Padding(this);
                 this.padding = new WeakReference<>(p);
             } else {
                 p = this.padding.get();
                 if (p == null || p.t != this) {
-                    p = new JsAssignmentOperation.Padding(this);
+                    p = new JS.AssignmentOperation.Padding(this);
                     this.padding = new WeakReference<>(p);
                 }
             }
@@ -5585,14 +5584,14 @@ public interface JS extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final JsAssignmentOperation t;
+            private final JS.AssignmentOperation t;
 
-            public JLeftPadded<JsAssignmentOperation.Type> getOperator() {
+            public JLeftPadded<JS.AssignmentOperation.Type> getOperator() {
                 return t.operator;
             }
 
-            public JsAssignmentOperation withOperator(JLeftPadded<JsAssignmentOperation.Type> operator) {
-                return t.operator == operator ? t : new JsAssignmentOperation(t.id, t.prefix, t.markers, t.variable, operator, t.assignment, t.type);
+            public JS.AssignmentOperation withOperator(JLeftPadded<JS.AssignmentOperation.Type> operator) {
+                return t.operator == operator ? t : new JS.AssignmentOperation(t.id, t.prefix, t.markers, t.variable, operator, t.assignment, t.type);
             }
         }
     }

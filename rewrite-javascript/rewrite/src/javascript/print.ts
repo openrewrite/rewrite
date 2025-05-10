@@ -1427,7 +1427,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return assignOp;
     }
 
-    override async visitJsAssignmentOperation(assignOp: JS.JsAssignmentOperation, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitAssignmentOperationExtensions(assignOp: JS.AssignmentOperation, p: PrintOutputCapture): Promise<J | undefined> {
         let keyword = "";
         switch (assignOp.operator.element) {
             case JS.JsAssignmentOperation.Type.QuestionQuestion:

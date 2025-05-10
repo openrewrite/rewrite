@@ -2462,7 +2462,7 @@ export class JavaScriptParserVisitor {
 
             if (assignmentOperation !== undefined) {
                 return {
-                    kind: JS.Kind.JsAssignmentOperation,
+                    kind: JS.Kind.AssignmentOperation,
                     id: randomId(),
                     prefix: this.prefix(node),
                     markers: emptyMarkers,

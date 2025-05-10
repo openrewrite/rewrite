@@ -60,7 +60,7 @@ export namespace JS {
         JSNamedVariable: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations$JSNamedVariable",
         JSTry: "org.openrewrite.javascript.tree.JS$JSTry",
         JSVariableDeclarations: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations",
-        JsAssignmentOperation: "org.openrewrite.javascript.tree.JS$JsAssignmentOperation",
+        AssignmentOperation: "org.openrewrite.javascript.tree.JS$AssignmentOperation",
         Binary: "org.openrewrite.javascript.tree.JS$Binary",
         Import: "org.openrewrite.javascript.tree.JS$Import",
         ImportClause: "org.openrewrite.javascript.tree.JS$ImportClause",
@@ -564,8 +564,8 @@ export namespace JS {
      * Represents an assignment operation.
      * @example a ||= b;
      */
-    export interface JsAssignmentOperation extends JS, Statement, Expression, TypedTree {
-        readonly kind: typeof Kind.JsAssignmentOperation;
+    export interface AssignmentOperation extends JS, Statement, Expression, TypedTree {
+        readonly kind: typeof Kind.AssignmentOperation;
         readonly variable: Expression;
         readonly operator: J.LeftPadded<JsAssignmentOperation.Type>;
         readonly assignment: Expression;

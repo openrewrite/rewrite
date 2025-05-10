@@ -1119,21 +1119,21 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return c;
     }
 
-    public J visitJsAssignmentOperation(JS.JsAssignmentOperation assignOp, P p) {
-        JS.JsAssignmentOperation a = assignOp;
+    public J visitAssignmentOperation(JS.AssignmentOperation assignOp, P p) {
+        JS.AssignmentOperation a = assignOp;
         a = a.withPrefix(visitSpace(a.getPrefix(), JsSpace.Location.ASSIGNMENT_OPERATION_PREFIX, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         Statement temp = (Statement) visitStatement(a, p);
-        if (!(temp instanceof JS.JsAssignmentOperation)) {
+        if (!(temp instanceof JS.AssignmentOperation)) {
             return temp;
         } else {
-            a = (JS.JsAssignmentOperation) temp;
+            a = (JS.AssignmentOperation) temp;
         }
         Expression temp2 = (Expression) visitExpression(a, p);
-        if (!(temp2 instanceof JS.JsAssignmentOperation)) {
+        if (!(temp2 instanceof JS.AssignmentOperation)) {
             return temp2;
         } else {
-            a = (JS.JsAssignmentOperation) temp2;
+            a = (JS.AssignmentOperation) temp2;
         }
         a = a.withVariable(requireNonNull(visitAndCast(a.getVariable(), p)));
         a = a.getPadding().withOperator(requireNonNull(visitLeftPadded(a.getPadding().getOperator(), JsLeftPadded.Location.ASSIGNMENT_OPERATION_OPERATOR, p)));

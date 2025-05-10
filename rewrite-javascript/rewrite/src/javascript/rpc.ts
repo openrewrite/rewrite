@@ -315,12 +315,12 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return typeTreeExpression;
     }
 
-    override async visitJsAssignmentOperation(jsAssignmentOperation: JS.JsAssignmentOperation, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(jsAssignmentOperation, el => el.variable, el => this.visit(el, q));
-        await q.getAndSend(jsAssignmentOperation, el => el.operator, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(jsAssignmentOperation, el => el.assignment, el => this.visit(el, q));
-        await q.getAndSend(jsAssignmentOperation, el => asRef(el.type), el => this.visitType(el, q));
-        return jsAssignmentOperation;
+    override async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(assignmentOperation, el => el.variable, el => this.visit(el, q));
+        await q.getAndSend(assignmentOperation, el => el.operator, el => this.visitLeftPadded(el, q));
+        await q.getAndSend(assignmentOperation, el => el.assignment, el => this.visit(el, q));
+        await q.getAndSend(assignmentOperation, el => asRef(el.type), el => this.visitType(el, q));
+        return assignmentOperation;
     }
 
     override async visitIndexedAccessType(indexedAccessType: JS.IndexedAccessType, q: RpcSendQueue): Promise<J | undefined> {
@@ -889,8 +889,8 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitJsAssignmentOperation(jsAssignmentOperation: JS.JsAssignmentOperation, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(jsAssignmentOperation);
+    override async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(assignmentOperation);
         draft.variable = await q.receive(draft.variable, el => this.visitDefined<Expression>(el, q));
         draft.operator = await q.receive(draft.operator, el => this.visitLeftPadded(el, q));
         draft.assignment = await q.receive(draft.assignment, el => this.visitDefined<Expression>(el, q));

@@ -367,12 +367,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJsAssignmentOperation(jsAssignmentOperation: JS.JsAssignmentOperation, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JsAssignmentOperation>(jsAssignmentOperation, p, async draft => {
-            draft.variable = await this.visitDefined<Expression>(jsAssignmentOperation.variable, p);
-            draft.operator = await this.visitLeftPadded(jsAssignmentOperation.operator, p);
-            draft.assignment = await this.visitDefined<Expression>(jsAssignmentOperation.assignment, p);
-            draft.type = jsAssignmentOperation.type && await this.visitType(jsAssignmentOperation.type, p);
+    protected async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.AssignmentOperation>(assignmentOperation, p, async draft => {
+            draft.variable = await this.visitDefined<Expression>(assignmentOperation.variable, p);
+            draft.operator = await this.visitLeftPadded(assignmentOperation.operator, p);
+            draft.assignment = await this.visitDefined<Expression>(assignmentOperation.assignment, p);
+            draft.type = assignmentOperation.type && await this.visitType(assignmentOperation.type, p);
         });
     }
 
@@ -670,8 +670,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitTypeOf(tree as unknown as JS.TypeOf, p);
                 case JS.Kind.TypeTreeExpression:
                     return this.visitTypeTreeExpression(tree as unknown as JS.TypeTreeExpression, p);
-                case JS.Kind.JsAssignmentOperation:
-                    return this.visitJsAssignmentOperation(tree as unknown as JS.JsAssignmentOperation, p);
+                case JS.Kind.AssignmentOperation:
+                    return this.visitAssignmentOperationExtensions(tree as unknown as JS.AssignmentOperation, p);
                 case JS.Kind.IndexedAccessType:
                     return this.visitIndexedAccessType(tree as unknown as JS.IndexedAccessType, p);
                 case JS.Kind.IndexType:

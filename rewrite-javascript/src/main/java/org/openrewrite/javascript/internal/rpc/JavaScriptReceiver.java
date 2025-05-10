@@ -363,12 +363,12 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitJsAssignmentOperation(JS.JsAssignmentOperation jsAssignmentOperation, RpcReceiveQueue q) {
-        return jsAssignmentOperation
-                .withVariable(q.receive(jsAssignmentOperation.getVariable(), expr -> (Expression) visitNonNull(expr, q)))
-                .getPadding().withOperator(q.receive(jsAssignmentOperation.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.JsAssignmentOperation.Type.class))))
-                .withAssignment(q.receive(jsAssignmentOperation.getAssignment(), expr -> (Expression) visitNonNull(expr, q)))
-                .withType(q.receive(jsAssignmentOperation.getType(), type -> visitType(type, q)));
+    public J visitAssignmentOperation(JS.AssignmentOperation assignmentOperation, RpcReceiveQueue q) {
+        return assignmentOperation
+                .withVariable(q.receive(assignmentOperation.getVariable(), expr -> (Expression) visitNonNull(expr, q)))
+                .getPadding().withOperator(q.receive(assignmentOperation.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.AssignmentOperation.Type.class))))
+                .withAssignment(q.receive(assignmentOperation.getAssignment(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(assignmentOperation.getType(), type -> visitType(type, q)));
     }
 
     @Override
