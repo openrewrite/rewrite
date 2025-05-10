@@ -26,8 +26,8 @@ import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
 import org.jetbrains.kotlin.fir.resolve.inference.ConeTypeParameterBasedTypeVariable
-import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
-import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
+import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
+import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
@@ -67,9 +67,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 signature(type.lowerBound)
             }
 
-            is ConeStubTypeForChainInference -> {
-                signature(type.constructor.variable)
-            }
+            //TODO handle this case
+//            is ConeStubTypeForChainInference -> {
+//                signature(type.constructor.variable)
+//            }
 
             is ConeTypeProjection -> {
                 coneTypeProjectionSignature(type)
@@ -144,7 +145,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
 
             is FirStringConcatenationCall -> {
-                signature(type.typeRef)
+                signature(type.resolvedType)
             }
 
             is FirSuperReference -> {
@@ -168,11 +169,11 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
 
             is FirVariableAssignment -> {
-                signature(type.lValue.typeRef, parent)
+                signature(type.lValue.resolvedType, parent)
             }
 
             is FirExpression -> {
-                signature(type.typeRef)
+                signature(type.resolvedType)
             }
 
             is JavaElement -> {
@@ -216,10 +217,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         return when (type) {
             is ConeClassLikeType -> convertClassIdToFqn(type.classId)
             is ConeFlexibleType -> convertClassIdToFqn(type.lowerBound.classId)
-            is ConeTypeParameterType -> signature(type.type)
+            is ConeTypeParameterType -> signature(type)
             is FirClass -> convertClassIdToFqn(type.classId)
             is FirFile -> fileSignature(type)
-            is FirResolvedTypeRef -> classSignature(type.type)
+            is FirResolvedTypeRef -> classSignature(type.coneType)
             is FirResolvedQualifier -> convertClassIdToFqn(type.classId)
             else -> {
                 throw UnsupportedOperationException("Unsupported class type: ${type.javaClass.name}")
@@ -323,8 +324,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             function.symbol is FirConstructorSymbol -> classSignature(function.returnTypeRef)
             function.dispatchReceiverType != null -> classSignature(function.dispatchReceiverType!!)
             function.symbol.getOwnerLookupTag() != null && function.symbol.getOwnerLookupTag()!!
-                .toFirRegularClass(firSession) != null -> {
-                classSignature(function.symbol.getOwnerLookupTag()!!.toFirRegularClass(firSession)!!)
+                .toRegularClassSymbol(firSession) != null -> {
+                classSignature(function.symbol.getOwnerLookupTag()!!.toRegularClassSymbol(firSession)!!)
             }
 
             parent is FirClass -> classSignature(parent)
@@ -362,9 +363,9 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             if (resolvedSymbol.dispatchReceiverType is ConeClassLikeType) {
                 declaringSig = signature(resolvedSymbol.dispatchReceiverType)
             } else if (resolvedSymbol.containingClassLookupTag() != null &&
-                resolvedSymbol.containingClassLookupTag()!!.toFirRegularClass(firSession) != null
+                resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession) != null
             ) {
-                declaringSig = signature(resolvedSymbol.containingClassLookupTag()!!.toFirRegularClass(firSession))
+                declaringSig = signature(resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession))
             } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library) {
                 if (resolvedSymbol.fir.containerSource is JvmPackagePartSource) {
                     val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
@@ -383,7 +384,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 }
             }
         } else if (sym is FirFunctionSymbol<*>) {
-            declaringSig = signature(function.typeRef)
+            declaringSig = signature(function.resolvedType)
         }
         if (declaringSig == null) {
             declaringSig = signature(firFile)
@@ -392,10 +393,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         val sig = StringBuilder(declaringSig)
         when {
             sym is FirConstructorSymbol ||
-                    sym is FirSyntheticFunctionSymbol && sym.origin == FirDeclarationOrigin.SamConstructor -> sig.append("{name=<constructor>,return=${signature(function.typeRef)}")
+                    sym is FirSyntheticFunctionSymbol && sym.origin == FirDeclarationOrigin.SamConstructor -> sig.append("{name=<constructor>,return=${signature(function.resolvedType)}")
             sym is FirNamedFunctionSymbol -> {
                 sig.append("{name=${sym.name.asString()}")
-                sig.append(",return=${signature(function.typeRef)}")
+                sig.append(",return=${signature(function.resolvedType)}")
             }
 
             else -> throw UnsupportedOperationException("Unsupported function calleeReference: ${function.calleeReference.name}")
@@ -429,9 +430,9 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             val sig = signature(p.returnTypeRef, function)
             if (sig.startsWith("Generic{")) {
                 if (mapNames && args != null && args.containsKey(p.name.asString())) {
-                    genericArgumentTypes.add(signature(args[p.name.asString()]!!.typeRef, function))
+                    genericArgumentTypes.add(signature(args[p.name.asString()]!!.resolvedType, function))
                 } else if (index < function.arguments.size) {
-                    genericArgumentTypes.add(signature((function.arguments[index]).typeRef, function))
+                    genericArgumentTypes.add(signature((function.arguments[index]).resolvedType, function))
                 }
             } else {
                 genericArgumentTypes.add(sig)

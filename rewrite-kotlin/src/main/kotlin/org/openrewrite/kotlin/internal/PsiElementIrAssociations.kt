@@ -54,7 +54,7 @@ class PsiElementIrAssociations(private val typeMapping: KotlinIrTypeMapping, pri
                     if (element.metadata is FirMetadataSource) {
                         when (element.metadata) {
                             is FirMetadataSource.File -> {
-                                val source = (element.metadata!! as FirMetadataSource.File).files[0].source
+                                val source = (element.metadata!! as FirMetadataSource.File).source
                                 if (source is KtRealPsiSourceElement) {
                                     elementMap.computeIfAbsent(source.psi) { ArrayList() } += IrInfo(element, depth)
                                 }

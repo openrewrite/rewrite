@@ -51,17 +51,15 @@ import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
 import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
+import org.jetbrains.kotlin.fir.session.FirJvmSessionFactory;
 import org.jetbrains.kotlin.fir.session.FirSessionConfigurator;
-import org.jetbrains.kotlin.fir.session.FirSessionFactoryHelper;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
 import org.jetbrains.kotlin.load.kotlin.PackagePartProvider;
 import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.name.Name;
-import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
 import org.jetbrains.kotlin.psi.KtFile;
-import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatformAnalyzerServices;
 import org.jetbrains.kotlin.utils.PathUtil;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -445,7 +443,7 @@ public class KotlinParser implements Parser {
                 VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
                 providerFunction1);
 
-        AbstractProjectFileSearchScope sourceScope = projectEnvironment.getSearchScopeByPsiFiles(ktFiles, false);
+        AbstractProjectFileSearchScope sourceScope = projectEnvironment.getSearchScopeByPsiFiles(ktFiles);
         sourceScope.plus(projectEnvironment.getSearchScopeForProjectJavaSources());
 
         AbstractProjectFileSearchScope libraryScope = projectEnvironment.getSearchScopeForProjectLibraries();
@@ -472,24 +470,38 @@ public class KotlinParser implements Parser {
 
         Function1<FirSessionConfigurator, Unit> sessionConfigurator = session -> Unit.INSTANCE;
 
-        FirSession firSession = FirSessionFactoryHelper.INSTANCE.createSessionWithDependencies(
+        FirSession firSession = FirJvmSessionFactory.INSTANCE.createLibrarySession(
                 Name.identifier(module.getModuleName()),
-                JvmPlatforms.INSTANCE.getUnspecifiedJvmPlatform(),
-                JvmPlatformAnalyzerServices.INSTANCE,
                 sessionProvider,
+                null,
                 projectEnvironment,
+                null,
+                sourceScope.plus(libraryScope),
+                null,
                 languageVersionSettings,
-                sourceScope,
-                libraryScope,
-                compilerConfiguration.get(LOOKUP_TRACKER),
-                compilerConfiguration.get(ENUM_WHEN_TRACKER),
-                compilerConfiguration.get(IMPORT_TRACKER),
-                null, // Do not incrementally compile
-                emptyList(), // Add extension registrars when needed here.
-                true,
-                dependencyListBuilderProvider,
-                sessionConfigurator
+                null
         );
+
+        //TODO build session with dependencies
+
+//        FirSession firSession = FirSessionFactoryHelper.INSTANCE.createSessionWithDependencies(
+//                Name.identifier(module.getModuleName()),
+//                JvmPlatforms.INSTANCE.getUnspecifiedJvmPlatform(),
+//                JvmPlatformAnalyzerServices.INSTANCE,
+//                sessionProvider,
+//                projectEnvironment,
+//                languageVersionSettings,
+//                sourceScope,
+//                libraryScope,
+//                compilerConfiguration.get(LOOKUP_TRACKER),
+//                compilerConfiguration.get(ENUM_WHEN_TRACKER),
+//                compilerConfiguration.get(IMPORT_TRACKER),
+//                null, // Do not incrementally compile
+//                emptyList(), // Add extension registrars when needed here.
+//                true,
+//                dependencyListBuilderProvider,
+//                sessionConfigurator
+//        );
 
         List<FirFile> rawFir = FirUtilsKt.buildFirFromKtFiles(firSession, ktFiles);
         Pair<ScopeSession, List<FirFile>> result = AnalyseKt.runResolution(firSession, rawFir);
