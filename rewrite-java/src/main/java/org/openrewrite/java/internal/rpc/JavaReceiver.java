@@ -21,6 +21,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.function.Function;
@@ -156,7 +157,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, RpcReceiveQueue q) {
         return cu
-                .withSourcePath(q.receiveAndGet(cu.getSourcePath(), (String v) -> Paths.get(v)))
+                .withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
                 .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))

@@ -25,6 +25,7 @@ import org.openrewrite.json.tree.Space;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
@@ -42,7 +43,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     @Override
     public Json visitDocument(Json.Document document, RpcReceiveQueue q) {
-        return document.withSourcePath(q.receiveAndGet(document.getSourcePath(), (String v) -> Paths.get(v)))
+        return document.withSourcePath(q.<Path, String>receiveAndGet(document.getSourcePath(), Paths::get))
                 .withCharset(q.receiveAndGet(document.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(document.isCharsetBomMarked()))
                 .withChecksum(q.receive(document.getChecksum()))

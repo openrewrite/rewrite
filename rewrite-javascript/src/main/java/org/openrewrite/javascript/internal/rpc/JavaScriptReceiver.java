@@ -24,6 +24,7 @@ import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.function.Function;
@@ -55,7 +56,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
-        return cu.withSourcePath(q.receiveAndGet(cu.getSourcePath(), (String v) -> Paths.get(v)))
+        return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
                 .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))

@@ -182,7 +182,7 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
     public PlainText rpcReceive(PlainText t, RpcReceiveQueue q) {
         return t.withId(q.receiveAndGet(t.getId(), UUID::fromString))
                 .withMarkers(q.receiveMarkers(t.getMarkers()))
-                .withSourcePath(q.receiveAndGet(t.getSourcePath(), (String v) -> Paths.get(v)))
+                .withSourcePath(q.<Path, String>receiveAndGet(t.getSourcePath(), Paths::get))
                 .withCharset(q.receiveAndGet(t.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
                 .withChecksum(q.receive(t.getChecksum()))
