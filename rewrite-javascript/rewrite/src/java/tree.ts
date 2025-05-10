@@ -255,8 +255,8 @@ export namespace J {
 
     export namespace Case {
         export const enum Type {
-            Statement,
-            Rule
+            Statement = "Statement",
+            Rule = "Rule"
         }
     }
 
