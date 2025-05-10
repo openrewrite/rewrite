@@ -133,6 +133,13 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return jsImportClause;
     }
 
+    override async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(typeTreeExpression, p);
+        await this.visit(typeTreeExpression.expression, p);
+        await this.afterSyntax(typeTreeExpression, p);
+        return typeTreeExpression;
+    }
+
     override async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(namespaceDeclaration, p);
         for (const it of namespaceDeclaration.modifiers) {

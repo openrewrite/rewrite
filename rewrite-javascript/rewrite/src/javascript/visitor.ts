@@ -361,6 +361,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
+    protected async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.TypeTreeExpression>(typeTreeExpression, p, async draft => {
+            draft.expression = await this.visitDefined<Expression>(typeTreeExpression.expression, p);
+        });
+    }
+
     protected async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.AssignmentOperation>(assignmentOperation, p, async draft => {
             draft.variable = await this.visitDefined<Expression>(assignmentOperation.variable, p);
@@ -654,6 +660,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitTypeDeclaration(tree as unknown as JS.TypeDeclaration, p);
                 case JS.Kind.TypeOf:
                     return this.visitTypeOf(tree as unknown as JS.TypeOf, p);
+                case JS.Kind.TypeTreeExpression:
+                    return this.visitTypeTreeExpression(tree as unknown as JS.TypeTreeExpression, p);
                 case JS.Kind.AssignmentOperation:
                     return this.visitAssignmentOperationExtensions(tree as unknown as JS.AssignmentOperation, p);
                 case JS.Kind.IndexedAccessType:

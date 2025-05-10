@@ -1127,6 +1127,22 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return a;
     }
 
+    public J visitTypeTreeExpression(JS.TypeTreeExpression typeTreeExpression, P p) {
+        JS.TypeTreeExpression a = typeTreeExpression;
+        a = a.withPrefix(visitSpace(a.getPrefix(), JsSpace.Location.TYPE_TREE_EXPRESSION_PREFIX, p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(a, p);
+        if (!(temp instanceof JS.TypeTreeExpression)) {
+            return temp;
+        } else {
+            a = (JS.TypeTreeExpression) temp;
+        }
+
+        a = a.withExpression(requireNonNull(visitAndCast(a.getExpression(), p)));
+        a = a.withType(visitType(a.getType(), p));
+        return a;
+    }
+
     public J visitWithStatement(JS.WithStatement withStatement, P p) {
         JS.WithStatement w = withStatement;
         w = w.withPrefix(visitSpace(w.getPrefix(), JsSpace.Location.WITH_PREFIX, p));

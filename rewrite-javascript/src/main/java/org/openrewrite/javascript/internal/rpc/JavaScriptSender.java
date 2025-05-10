@@ -439,6 +439,12 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitTypeTreeExpression(JS.TypeTreeExpression typeTreeExpression, RpcSendQueue q) {
+        q.getAndSend(typeTreeExpression, JS.TypeTreeExpression::getExpression, el -> visit(el, q));
+        return typeTreeExpression;
+    }
+
+    @Override
     public J visitAssignmentOperation(JS.AssignmentOperation assignmentOperation, RpcSendQueue q) {
         q.getAndSend(assignmentOperation, JS.AssignmentOperation::getVariable, el -> visit(el, q));
         q.getAndSend(assignmentOperation, el -> el.getPadding().getOperator(), el -> visitLeftPadded(el, q));

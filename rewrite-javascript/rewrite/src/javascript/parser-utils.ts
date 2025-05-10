@@ -136,6 +136,7 @@ const is_expressions: string[] = [
     JS.Kind.TypeOperator,
     JS.Kind.TypePredicate,
     JS.Kind.TypeQuery,
+    JS.Kind.TypeTreeExpression,
     JS.Kind.Unary,
     JS.Kind.Union,
     JS.Kind.Void,

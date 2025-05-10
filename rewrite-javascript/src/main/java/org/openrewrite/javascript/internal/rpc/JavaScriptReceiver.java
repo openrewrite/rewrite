@@ -357,6 +357,12 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitTypeTreeExpression(JS.TypeTreeExpression typeTreeExpression, RpcReceiveQueue q) {
+        return typeTreeExpression
+                .withExpression(q.receive(typeTreeExpression.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
     public J visitAssignmentOperation(JS.AssignmentOperation assignmentOperation, RpcReceiveQueue q) {
         return assignmentOperation
                 .withVariable(q.receive(assignmentOperation.getVariable(), expr -> (Expression) visitNonNull(expr, q)))
