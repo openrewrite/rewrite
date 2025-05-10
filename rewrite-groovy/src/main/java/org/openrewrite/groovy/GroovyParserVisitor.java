@@ -1415,29 +1415,29 @@ public class GroovyParserVisitor {
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(expression, classVisitor);
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
             List<J.Modifier> modifiers = getModifiers();
-            TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
-
-            J.VariableDeclarations.NamedVariable namedVariable;
+            TypeTree typeExpr;
+            List<J.VariableDeclarations.NamedVariable> namedVariables;
             if (expression.isMultipleAssignmentDeclaration()) {
-                // def (a, b) = [1, 2]
-                throw new UnsupportedOperationException("Parsing multiple assignment (e.g.: def (a, b) = [1, 2]) is not implemented");
+                Space prefixBeforeOpenParentheses = whitespace();
+                typeExpr = visitTupleExpressionType(expression.getTupleExpression());
+                JContainer<J.Identifier> identifiers = visit(expression.getTupleExpression());
+                namedVariables = identifiers.getElements().stream()
+                        .map(this::createNamedVariable)
+                        .collect(toList());
+                namedVariables = ListUtils.mapFirst(namedVariables, first -> first.withPrefix(prefixBeforeOpenParentheses).withMarkers(Markers.build(singletonList(new OpenParentheses(randomId())))));
+                namedVariables = ListUtils.mapLast(namedVariables, last -> last.withMarkers(Markers.build(singletonList(new CloseParentheses(randomId())))));
             } else {
+                typeExpr = visitVariableExpressionType(expression.getVariableExpression());
                 J.Identifier name = visit(expression.getVariableExpression());
-                namedVariable = new J.VariableDeclarations.NamedVariable(
-                        randomId(),
-                        name.getPrefix(),
-                        Markers.EMPTY,
-                        name.withPrefix(EMPTY),
-                        emptyList(),
-                        null,
-                        typeMapping.variableType(name.getSimpleName(), typeExpr.getType())
-                );
+                namedVariables = new ArrayList<>(singletonList(createNamedVariable(name)));
             }
 
             if (!(expression.getRightExpression() instanceof EmptyExpression)) {
                 Space beforeAssign = sourceBefore("=");
                 Expression initializer = visit(expression.getRightExpression());
-                namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
+
+                // For destructuring assignments, add the initializer to the last variable
+                namedVariables.set(namedVariables.size()-1, namedVariables.get(namedVariables.size()-1).getPadding().withInitializer(padLeft(beforeAssign, initializer)));
             }
 
             J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
@@ -1449,13 +1449,25 @@ public class GroovyParserVisitor {
                     typeExpr,
                     null,
                     emptyList(),
-                    singletonList(JRightPadded.build(namedVariable))
+                    namedVariables.stream().map(JRightPadded::build).collect(toList())
             );
             if (multiVariable.isPresent()) {
                 variableDeclarations = variableDeclarations.withMarkers(variableDeclarations.getMarkers().add(multiVariable.get()));
             }
 
             queue.add(variableDeclarations);
+        }
+
+        private J.VariableDeclarations.NamedVariable createNamedVariable(J.Identifier name) {
+            return new J.VariableDeclarations.NamedVariable(
+                    randomId(),
+                    name.getPrefix(),
+                    Markers.EMPTY,
+                    name.withPrefix(EMPTY),
+                    emptyList(),
+                    null,
+                    typeMapping.variableType(name.getSimpleName(), name.getType())
+            );
         }
 
         private Optional<MultiVariable> maybeMultiVariable() {
@@ -2073,6 +2085,12 @@ public class GroovyParserVisitor {
             Space fmt = whitespace();
             skip("*");
             queue.add(new G.Unary(randomId(), fmt, Markers.EMPTY, JLeftPadded.build(G.Unary.Type.Spread), visit(spreadExpression.getExpression()), null));
+        }
+
+        public TypeTree visitTupleExpressionType(TupleExpression expression) {
+            String typeName = "";
+            JavaType type = typeMapping.type(expression.getType());
+            return new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), typeName, type, null);
         }
 
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
