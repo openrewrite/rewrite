@@ -19,6 +19,7 @@ import {typescript} from "../../../src/javascript";
 describe('with mapping', () => {
     const spec = new RecipeSpec();
 
+    // noinspection WithStatementJS
     test('with statement', () =>
         spec.rewriteRun(
             //language=typescript
@@ -29,6 +30,7 @@ describe('with mapping', () => {
              `)
         ));
 
+    // noinspection WithStatementJS
     test('with statement with comments', () =>
         spec.rewriteRun(
             //language=typescript
@@ -39,6 +41,7 @@ describe('with mapping', () => {
              `)
         ));
 
+    // noinspection TypeScriptUnresolvedReference,WithStatementJS
     test('with statement with try-catch', () =>
         spec.rewriteRun(
             //language=typescript
@@ -58,6 +61,7 @@ describe('with mapping', () => {
              `)
         ));
 
+    // noinspection WithStatementJS
     test('with statement with body without braces', () =>
         spec.rewriteRun(
             //language=typescript
@@ -66,13 +70,16 @@ describe('with mapping', () => {
              `)
         ));
 
+    // noinspection TypeScriptUnresolvedReference
     test('with statement with await expr', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
-                 export {};
-                 with ( await obj?.foo) {}
-             `)
+                export {};
+                // noinspection JSAnnotator
+                with (await obj?.foo) {
+                }
+            `)
         ));
 
     test('with statement with empty expr and body', () =>
@@ -94,6 +101,7 @@ describe('with mapping', () => {
              `)
         ));
 
+    // noinspection TypeScriptUnresolvedReference,WithStatementJS
     test('with statement with internal with statements', () =>
         spec.rewriteRun(
             //language=typescript

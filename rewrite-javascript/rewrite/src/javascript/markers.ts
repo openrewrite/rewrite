@@ -8,11 +8,14 @@ declare module "./tree" {
     namespace JS {
         export const Markers: {
             readonly DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield";
-            readonly TrailingComma: "org.openrewrite.java.marker.TrailingComma";
-            readonly OmitParentheses: "org.openrewrite.java.marker.OmitParentheses";
         };
     }
 }
+
+// At runtime actually attach it to JS
+(JS as any).Markers = {
+    DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield"
+} as const;
 
 export interface DelegatedYield extends Marker {
     readonly kind: typeof JS.Markers.DelegatedYield;

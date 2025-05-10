@@ -3040,7 +3040,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitWithStatement(node: ts.WithStatement) {
+    visitWithStatement(node: ts.WithStatement): JS.WithStatement {
         return {
             kind: JS.Kind.WithStatement,
             id: randomId(),

@@ -13,6 +13,13 @@ declare module "./tree" {
     }
 }
 
+// At runtime actually attach it to J
+(J as any).Markers = {
+    Semicolon:      "org.openrewrite.java.marker.Semicolon",
+    TrailingComma:  "org.openrewrite.java.marker.TrailingComma",
+    OmitParentheses:"org.openrewrite.java.marker.OmitParentheses"
+} as const;
+
 export interface Semicolon extends Marker {
     readonly kind: typeof J.Markers.Semicolon
 }
