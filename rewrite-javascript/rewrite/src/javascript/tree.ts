@@ -61,7 +61,7 @@ export namespace JS {
         JSTry: "org.openrewrite.javascript.tree.JS$JSTry",
         JSVariableDeclarations: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations",
         JsAssignmentOperation: "org.openrewrite.javascript.tree.JS$JsAssignmentOperation",
-        JsBinary: "org.openrewrite.javascript.tree.JS$JsBinary",
+        Binary: "org.openrewrite.javascript.tree.JS$Binary",
         Import: "org.openrewrite.javascript.tree.JS$Import",
         ImportClause: "org.openrewrite.javascript.tree.JS$ImportClause",
         ImportSpecifier: "org.openrewrite.javascript.tree.JS$ImportSpecifier",
@@ -266,6 +266,7 @@ export namespace JS {
     /**
      * Represents JavaScript variable declarations (var, let, const).
      * @example const x = 1, y = 2;
+     * @example const {a} = {a: 1};
      */
     export interface JSVariableDeclarations extends JS, Statement, TypedTree {
         readonly kind: typeof Kind.JSVariableDeclarations;
@@ -332,8 +333,8 @@ export namespace JS {
      * Represents a binary expression.
      * @example a + b;
      */
-    export interface JsBinary extends JS, Expression, TypedTree {
-        readonly kind: typeof Kind.JsBinary;
+    export interface Binary extends JS, Expression, TypedTree {
+        readonly kind: typeof Kind.Binary;
         readonly left: Expression;
         readonly operator: J.LeftPadded<JsBinary.Type>;
         readonly right: Expression;

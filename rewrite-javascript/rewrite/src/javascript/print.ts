@@ -1559,7 +1559,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return binary;
     }
 
-    override async visitJsBinary(binary: JS.JsBinary, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitBinaryExtensions(binary: JS.Binary, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(binary, p);
 
         await this.visit(binary.left, p);

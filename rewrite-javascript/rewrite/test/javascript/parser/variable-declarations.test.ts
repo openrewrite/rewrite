@@ -105,7 +105,7 @@ describe('variable declaration mapping', () => {
             `)
         ));
 
-    test('declaration with destruction', () =>
+    test('declaration with destructuring', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`

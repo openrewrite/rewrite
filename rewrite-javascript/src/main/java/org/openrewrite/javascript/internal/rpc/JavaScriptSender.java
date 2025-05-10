@@ -264,14 +264,14 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitJsBinary(JS.JsBinary jsBinary, RpcSendQueue q) {
-        q.getAndSend(jsBinary, JS.JsBinary::getLeft, el -> visit(el, q));
-        q.getAndSend(jsBinary, el -> el.getPadding().getOperator(), el -> visitLeftPadded(el, q));
-        q.getAndSend(jsBinary, JS.JsBinary::getRight, el -> visit(el, q));
-        if (jsBinary.getType() != null) {
-            q.getAndSend(jsBinary, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+    public J visitBinary(JS.Binary binary, RpcSendQueue q) {
+        q.getAndSend(binary, JS.Binary::getLeft, el -> visit(el, q));
+        q.getAndSend(binary, el -> el.getPadding().getOperator(), el -> visitLeftPadded(el, q));
+        q.getAndSend(binary, JS.Binary::getRight, el -> visit(el, q));
+        if (binary.getType() != null) {
+            q.getAndSend(binary, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         }
-        return jsBinary;
+        return binary;
     }
 
     @Override

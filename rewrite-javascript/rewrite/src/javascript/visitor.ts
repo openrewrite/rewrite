@@ -225,8 +225,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJsBinary(jsBinary: JS.JsBinary, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JsBinary>(jsBinary, p, async draft => {
+    protected async visitBinaryExtensions(jsBinary: JS.Binary, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.Binary>(jsBinary, p, async draft => {
             draft.left = await this.visitDefined<Expression>(jsBinary.left, p);
             draft.operator = await this.visitLeftPadded(jsBinary.operator, p);
             draft.right = await this.visitDefined<Expression>(jsBinary.right, p);
@@ -634,8 +634,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitImportTypeAttributes(tree as unknown as JS.ImportTypeAttributes, p);
                 case JS.Kind.ImportAttribute:
                     return this.visitImportAttribute(tree as unknown as JS.ImportAttribute, p);
-                case JS.Kind.JsBinary:
-                    return this.visitJsBinary(tree as unknown as JS.JsBinary, p);
+                case JS.Kind.Binary:
+                    return this.visitBinaryExtensions(tree as unknown as JS.Binary, p);
                 case JS.Kind.LiteralType:
                     return this.visitLiteralType(tree as unknown as JS.LiteralType, p);
                 case JS.Kind.MappedType:

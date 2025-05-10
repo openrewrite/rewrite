@@ -118,7 +118,7 @@ const is_expressions: string[] = [
     JS.Kind.InferType,
     JS.Kind.Intersection,
     JS.Kind.JsAssignmentOperation,
-    JS.Kind.JsBinary,
+    JS.Kind.Binary,
     JS.Kind.ImportSpecifier,
     JS.Kind.LiteralType,
     JS.Kind.MappedType,

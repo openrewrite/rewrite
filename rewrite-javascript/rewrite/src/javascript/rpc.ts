@@ -190,12 +190,12 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return importAttribute;
     }
 
-    override async visitJsBinary(jsBinary: JS.JsBinary, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(jsBinary, el => el.left, el => this.visit(el, q));
-        await q.getAndSend(jsBinary, el => el.operator, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(jsBinary, el => el.right, el => this.visit(el, q));
-        await q.getAndSend(jsBinary, el => asRef(el.type), el => this.visitType(el, q));
-        return jsBinary;
+    override async visitBinaryExtensions(binary: JS.Binary, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(binary, el => el.left, el => this.visit(el, q));
+        await q.getAndSend(binary, el => el.operator, el => this.visitLeftPadded(el, q));
+        await q.getAndSend(binary, el => el.right, el => this.visit(el, q));
+        await q.getAndSend(binary, el => asRef(el.type), el => this.visitType(el, q));
+        return binary;
     }
 
     override async visitLiteralType(literalType: JS.LiteralType, q: RpcSendQueue): Promise<J | undefined> {
@@ -746,8 +746,8 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitJsBinary(jsBinary: JS.JsBinary, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(jsBinary);
+    override async visitBinaryExtensions(binary: JS.Binary, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(binary);
         draft.left = await q.receive(draft.left, el => this.visitDefined<Expression>(el, q));
         draft.operator = await q.receive(draft.operator, el => this.visitLeftPadded(el, q));
         draft.right = await q.receive(draft.right, el => this.visitDefined<Expression>(el, q));

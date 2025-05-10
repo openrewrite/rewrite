@@ -2415,7 +2415,7 @@ export class JavaScriptParserVisitor {
 
         if (binaryOperator !== undefined) {
             return {
-                kind: JS.Kind.JsBinary,
+                kind: JS.Kind.Binary,
                 id: randomId(),
                 prefix: this.prefix(node),
                 markers: emptyMarkers,
@@ -2720,7 +2720,7 @@ export class JavaScriptParserVisitor {
 
     visitAsExpression(node: ts.AsExpression) {
         return {
-            kind: JS.Kind.JsBinary,
+            kind: JS.Kind.Binary,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,

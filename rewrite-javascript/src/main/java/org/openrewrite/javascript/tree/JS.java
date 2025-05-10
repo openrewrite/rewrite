@@ -1744,11 +1744,11 @@ public interface JS extends J {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
-    final class JsBinary implements JS, Expression, TypedTree {
+    final class Binary implements JS, Expression, TypedTree {
 
         @Nullable
         @NonFinal
-        transient WeakReference<JS.JsBinary.Padding> padding;
+        transient WeakReference<JS.Binary.Padding> padding;
 
         @With
         @EqualsAndHashCode.Include
@@ -1763,13 +1763,13 @@ public interface JS extends J {
         @With
         Expression left;
 
-        JLeftPadded<JS.JsBinary.Type> operator;
+        JLeftPadded<JS.Binary.Type> operator;
 
-        public JS.JsBinary.Type getOperator() {
+        public JS.Binary.Type getOperator() {
             return operator.getElement();
         }
 
-        public JS.JsBinary withOperator(JS.JsBinary.Type operator) {
+        public JS.Binary withOperator(JS.Binary.Type operator) {
             return getPadding().withOperator(this.operator.withElement(operator));
         }
 
@@ -1782,7 +1782,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitJsBinary(this, p);
+            return v.visitBinary(this, p);
         }
 
         @Transient
@@ -1801,15 +1801,15 @@ public interface JS extends J {
 
         }
 
-        public JS.JsBinary.Padding getPadding() {
-            JS.JsBinary.Padding p;
+        public JS.Binary.Padding getPadding() {
+            JS.Binary.Padding p;
             if (this.padding == null) {
-                p = new JS.JsBinary.Padding(this);
+                p = new JS.Binary.Padding(this);
                 this.padding = new WeakReference<>(p);
             } else {
                 p = this.padding.get();
                 if (p == null || p.t != this) {
-                    p = new JS.JsBinary.Padding(this);
+                    p = new JS.Binary.Padding(this);
                     this.padding = new WeakReference<>(p);
                 }
             }
@@ -1818,14 +1818,14 @@ public interface JS extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final JS.JsBinary t;
+            private final JS.Binary t;
 
-            public JLeftPadded<JS.JsBinary.Type> getOperator() {
+            public JLeftPadded<JS.Binary.Type> getOperator() {
                 return t.operator;
             }
 
-            public JS.JsBinary withOperator(JLeftPadded<JS.JsBinary.Type> operator) {
-                return t.operator == operator ? t : new JS.JsBinary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.type);
+            public JS.Binary withOperator(JLeftPadded<JS.Binary.Type> operator) {
+                return t.operator == operator ? t : new JS.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.type);
             }
         }
     }

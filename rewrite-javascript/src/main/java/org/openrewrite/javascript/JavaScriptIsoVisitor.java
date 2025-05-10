@@ -63,8 +63,8 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.JsBinary visitJsBinary(JS.JsBinary binary, P p) {
-        return (JS.JsBinary) super.visitJsBinary(binary, p);
+    public JS.Binary visitBinary(JS.Binary binary, P p) {
+        return (JS.Binary) super.visitBinary(binary, p);
     }
 
     @Override

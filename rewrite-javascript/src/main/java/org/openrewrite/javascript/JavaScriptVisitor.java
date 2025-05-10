@@ -244,15 +244,15 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
-    public J visitJsBinary(JS.JsBinary binary, P p) {
-        JS.JsBinary b = binary;
+    public J visitBinary(JS.Binary binary, P p) {
+        JS.Binary b = binary;
         b = b.withPrefix(visitSpace(b.getPrefix(), JsSpace.Location.BINARY_PREFIX, p));
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
         Expression temp = (Expression) visitExpression(b, p);
-        if (!(temp instanceof JS.JsBinary)) {
+        if (!(temp instanceof JS.Binary)) {
             return temp;
         } else {
-            b = (JS.JsBinary) temp;
+            b = (JS.Binary) temp;
         }
         b = b.withLeft(requireNonNull(visitAndCast(b.getLeft(), p)));
         b = b.getPadding().withOperator(requireNonNull(visitLeftPadded(b.getPadding().getOperator(), JsLeftPadded.Location.BINARY_OPERATOR, p)));

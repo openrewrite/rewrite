@@ -220,12 +220,12 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitJsBinary(JS.JsBinary jsBinary, RpcReceiveQueue q) {
-        return jsBinary
-                .withLeft(q.receive(jsBinary.getLeft(), expr -> (Expression) visitNonNull(expr, q)))
-                .getPadding().withOperator(q.receive(jsBinary.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.JsBinary.Type.class))))
-                .withRight(q.receive(jsBinary.getRight(), expr -> (Expression) visitNonNull(expr, q)))
-                .withType(q.receive(jsBinary.getType(), type -> visitType(type, q)));
+    public J visitBinary(JS.Binary binary, RpcReceiveQueue q) {
+        return binary
+                .withLeft(q.receive(binary.getLeft(), expr -> (Expression) visitNonNull(expr, q)))
+                .getPadding().withOperator(q.receive(binary.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.Binary.Type.class))))
+                .withRight(q.receive(binary.getRight(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(binary.getType(), type -> visitType(type, q)));
     }
 
     @Override
