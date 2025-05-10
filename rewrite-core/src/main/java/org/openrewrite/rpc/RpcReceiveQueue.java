@@ -188,15 +188,7 @@ public class RpcReceiveQueue {
      * @return An enum mapping function that can be used when receiving a string to convert
      * it to an enum value.
      */
-    public static <T extends Enum<?>> Function<Object, T> toEnum(Class<? extends T> enumType) {
-        return value -> {
-            for (T enumConstant : enumType.getEnumConstants()) {
-                if (enumConstant.name().equals(value)) {
-                    return enumConstant;
-                }
-            }
-            throw new IllegalArgumentException("Tried to map value " + value +
-                                               " to an enum of type " + enumType.getName());
-        };
+    public static <T extends Enum<T>> Function<Object, T> toEnum(Class<T> enumType) {
+        return value -> Enum.valueOf(enumType, (String) value);
     }
 }
