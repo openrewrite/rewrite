@@ -19,9 +19,11 @@ import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
 import org.openrewrite.marker.Markers;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -29,13 +31,17 @@ import java.util.function.UnaryOperator;
 import static java.util.Objects.requireNonNull;
 
 public class RpcReceiveQueue {
+    private final ObjenesisStd objenesis = new ObjenesisStd();
     private final List<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
+    private final @Nullable PrintStream logFile;
     private final Supplier<List<RpcObjectData>> pull;
 
-    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull) {
+    public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
+                           Supplier<List<RpcObjectData>> pull) {
         this.refs = refs;
         this.batch = new ArrayList<>();
+        this.logFile = logFile;
         this.pull = pull;
     }
 
@@ -52,7 +58,6 @@ public class RpcReceiveQueue {
      * convert it to a string or fetch some nested object off of it.
      *
      * @param before The value to apply the function to, which may be null.
-     * @param apply  A function that is called only when before is non-null.
      * @param <T>    A before value ahead of the function call.
      * @param <U>    The return type of the function. This will match the type that is
      *               being received from the remote.
@@ -65,8 +70,9 @@ public class RpcReceiveQueue {
     }
 
     public Markers receiveMarkers(Markers markers) {
-        return receive(markers, m -> m.withMarkers(
-                receiveList(m.getMarkers(), null)));
+        return receive(markers, m -> m
+                .withId(UUID.fromString(receiveAndGet(m.getId(), UUID::toString)))
+                .withMarkers(receiveList(m.getMarkers(), null)));
     }
 
     /**
@@ -94,6 +100,12 @@ public class RpcReceiveQueue {
     @SuppressWarnings("DataFlowIssue")
     public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
+        if (logFile != null && message.getTrace() != null) {
+            logFile.println(message.withTrace(null));
+            logFile.println("  " + message.getTrace());
+            logFile.println("  " + Trace.traceReceiver());
+            logFile.flush();
+        }
         Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:
@@ -106,12 +118,25 @@ public class RpcReceiveQueue {
                     //noinspection unchecked
                     return (T) refs.get(ref);
                 }
-                before = onChange == null || message.getValueType() == null ?
+                before = message.getValueType() == null ?
                         message.getValue() :
                         newObj(message.getValueType());
                 // Intentional fall-through...
             case CHANGE:
-                T after = onChange == null ? message.getValue() : onChange.apply(before);
+                T after;
+
+                // TODO handle enums here
+
+                if (onChange != null) {
+                    after = onChange.apply(before);
+                } else if (before instanceof RpcCodec) {
+                    //noinspection unchecked
+                    after = (T) ((RpcCodec<Object>) before).rpcReceive(before, this);
+                } else if (message.getValueType() == null) {
+                    after = message.getValue();
+                } else {
+                    after = before;
+                }
                 if (ref != null) {
                     refs.put(ref, after);
                 }
@@ -136,7 +161,7 @@ public class RpcReceiveQueue {
             case CHANGE:
                 msg = take(); // the next message should be a CHANGE with a list of positions
                 assert msg.getState() == RpcObjectData.State.CHANGE;
-                List<Integer> positions = msg.getValue();
+                List<Integer> positions = requireNonNull(msg.getValue());
                 List<T> after = new ArrayList<>(positions.size());
                 for (int beforeIdx : positions) {
                     after.add(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange));
@@ -147,13 +172,23 @@ public class RpcReceiveQueue {
         }
     }
 
-    private static <T> T newObj(String type) {
+    private <T> T newObj(String type) {
         try {
             Class<?> clazz = Class.forName(type);
             //noinspection unchecked
-            return (T) new ObjenesisStd().newInstance(clazz);
+            return (T) objenesis.newInstance(clazz);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * @param enumType The enumeration that we are creating or updating
+     * @param <T>      The enum type.
+     * @return An enum mapping function that can be used when receiving a string to convert
+     * it to an enum value.
+     */
+    public static <T extends Enum<T>> Function<Object, T> toEnum(Class<T> enumType) {
+        return value -> Enum.valueOf(enumType, (String) value);
     }
 }

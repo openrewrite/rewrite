@@ -66,6 +66,7 @@ dependencies {
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("io.moderne:jsonrpc:latest.integration")
 
     // For use in ClassGraphTypeMappingTest
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")

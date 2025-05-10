@@ -713,14 +713,14 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
               import java.util.function.Function
-
+              
               abstract class Test {
                   abstract fun a(f: Function<String, String>): Test
-
+              
                   fun method(s: String) {
                       a({
                           f -> s.toLowerCase()
-                          })
+                      })
                   }
               }
               """
@@ -1708,8 +1708,8 @@ class TabsAndIndentsTest implements RewriteTest {
                       return a(f)
                           .b {
                               t ->
-                                  c(f)
-                              }
+                              c(f)
+                          }
                   }
               }
               """

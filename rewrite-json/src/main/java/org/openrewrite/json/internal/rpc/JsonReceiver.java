@@ -43,14 +43,13 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     @Override
     public Json visitDocument(Json.Document document, RpcReceiveQueue q) {
-        String sourcePath = q.receiveAndGet(document.getSourcePath(), Path::toString);
-        return document.withSourcePath(Paths.get(sourcePath))
+        return document.withSourcePath(Paths.get(q.receiveAndGet(document.getSourcePath(), Path::toString)))
                 .withCharset(Charset.forName(q.receiveAndGet(document.getCharset(), Charset::name)))
                 .withCharsetBomMarked(q.receive(document.isCharsetBomMarked()))
                 .withChecksum(q.receive(document.getChecksum()))
                 .withFileAttributes(q.receive(document.getFileAttributes()))
                 .withValue(q.receive(document.getValue(), j -> (JsonValue) visitNonNull(j, q)))
-                .withEof(q.receive(document.getEof()));
+                .withEof(q.receive(document.getEof(), space -> visitSpace(space, q)));
     }
 
     @Override

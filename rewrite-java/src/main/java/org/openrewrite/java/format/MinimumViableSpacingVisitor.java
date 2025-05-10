@@ -201,7 +201,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
-        if (!(firstEnclosing instanceof J.Lambda)) {
+        if (!(firstEnclosing instanceof J.Lambda.Parameters)) {
             if (Space.firstPrefix(v.getVariables()).isEmpty()) {
                 v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
                         v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));

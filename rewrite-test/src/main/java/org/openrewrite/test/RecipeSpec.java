@@ -35,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,8 +44,10 @@ import static org.assertj.core.api.Assertions.fail;
 @SuppressWarnings("UnusedReturnValue")
 @Getter
 public class RecipeSpec {
+    public static Supplier<RecipeSpec> DEFAULTS = RecipeSpec::new;
+
     public static RecipeSpec defaults() {
-        return new RecipeSpec();
+        return DEFAULTS.get();
     }
 
     @Nullable

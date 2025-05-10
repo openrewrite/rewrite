@@ -1,0 +1,25 @@
+/tmp
+/out-tsc
+/dist
+
+/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/.pnp
+.pnp.js
+
+.vscode/*
+
+# Environment variable files
+.env
+.env.test
+.env.production
+.env.*.local
+
+tsconfig.build.tsbuildinfo
+/openrewrite-rewrite-*.tgz
+
+server.log
+npm.token
+.npmrc

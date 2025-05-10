@@ -1,0 +1,20 @@
+# Exclude test source files
+/test/
+/dist/test/
+
+# Exclude development dependency files
+/node_modules
+tsconfig*.json
+jest.config.js
+*.tsbuildinfo
+
+# Exclude local config files
+.env
+node_modules/
+
+# Exclude other unnecessary files
+.gitignore
+.editorconfig
+.eslintrc.js
+.prettierrc
+*.log

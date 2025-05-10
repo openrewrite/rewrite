@@ -31,8 +31,13 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -50,7 +55,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
-public interface J extends Tree {
+public interface J extends Tree, RpcCodec<J> {
 
     @SuppressWarnings("unchecked")
     @Override
@@ -99,6 +104,16 @@ public interface J extends Tree {
     @Deprecated
     default String printTrimmed() {
         return StringUtils.trimIndent(print());
+    }
+
+    @Override
+    default void rpcSend(J after, RpcSendQueue q) {
+        new JavaSender().visit(after, q);
+    }
+
+    @Override
+    default J rpcReceive(J before, RpcReceiveQueue q) {
+        return new JavaReceiver().visitNonNull(before, q);
     }
 
     @SuppressWarnings("unchecked")
@@ -329,7 +344,6 @@ public interface J extends Tree {
         @Nullable
         List<J.Annotation> annotations;
 
-        @Nullable // nullable for backwards compatibility only
         JLeftPadded<Space> dimension;
 
         JavaType type;
@@ -3376,6 +3390,11 @@ public interface J extends Tree {
                 return getPadding().withParameters(JRightPadded.withElements(this.parameters, parameters));
             }
 
+            @Override
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
+                return v.visitLambdaParameters(this, p);
+            }
+
             @Transient
             public CoordinateBuilder.Lambda.Parameters getCoordinates() {
                 return new CoordinateBuilder.Lambda.Parameters(this);
@@ -5699,6 +5718,11 @@ public interface J extends Tree {
 
         List<JRightPadded<TypeParameter>> typeParameters;
 
+        @Override
+        public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitTypeParameters(this, p);
+        }
+
         public List<TypeParameter> getTypeParameters() {
             return JRightPadded.getElements(typeParameters);
         }
@@ -6405,7 +6429,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public @Nullable JavaType getType() {
+        public JavaType getType() {
             return JavaType.Unknown.getInstance();
         }
 

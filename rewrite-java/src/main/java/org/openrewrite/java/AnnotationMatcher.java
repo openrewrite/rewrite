@@ -76,8 +76,8 @@ public class AnnotationMatcher {
 
     public boolean matches(J.Annotation annotation) {
         return matchesAnnotationName(annotation) &&
-                matchesSingleParameter(annotation) &&
-                matchesNamedParameters(annotation);
+               matchesSingleParameter(annotation) &&
+               matchesNamedParameters(annotation);
     }
 
     private boolean matchesAnnotationName(J.Annotation annotation) {
@@ -95,11 +95,17 @@ public class AnnotationMatcher {
                 return true;
             } else if (matchMetaAnnotations) {
                 for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
+                    //noinspection ConstantValue
+                    if (annotation == null) {
+                        // Workaround for parsing bug that caused these annotations
+                        // to sometimes be null.
+                        continue;
+                    }
                     if (seenAnnotations == null) {
                         seenAnnotations = new HashSet<>();
                     }
                     if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
-                            matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
+                        matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
                         return true;
                     }
                 }

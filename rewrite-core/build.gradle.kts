@@ -21,7 +21,7 @@ dependencies {
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
 
-    implementation("io.moderne:jsonrpc:latest.release")
+    implementation("io.moderne:jsonrpc:latest.integration")
     implementation("org.objenesis:objenesis:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")

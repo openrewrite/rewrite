@@ -393,15 +393,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             for (J.Modifier m : method.getModifiers()) {
                 visitModifier(m, p);
             }
-            J.TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
-            if (typeParameters != null) {
-                visit(typeParameters.getAnnotations(), p);
-                visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
-                visitMarkers(typeParameters.getMarkers(), p);
-                p.append('<');
-                visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
-                p.append('>');
-            }
+            visit(method.getAnnotations().getTypeParameters(), p);
             method.getMarkers().findFirst(RedundantDef.class).ifPresent(def -> {
                 visitSpace(def.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append("def");

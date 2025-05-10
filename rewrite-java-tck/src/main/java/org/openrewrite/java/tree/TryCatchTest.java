@@ -116,19 +116,19 @@ class TryCatchTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                            import java.io.File;
+              import java.io.File;
               import java.io.FileInputStream;
               import java.io.IOException;
-                            class Test {
-                                void test() {
-                                    File f = new File("file.txt");
-                                    try (FileInputStream fis = new FileInputStream(f) ; ) {
-                                    }
-                                    catch(IOException ignored) {
-                                    }
-                                }
-                            }
-                            """
+              class Test {
+                  void test() {
+                      File f = new File("file.txt");
+                      try (FileInputStream fis = new FileInputStream(f) ; ) {
+                      }
+                      catch(IOException ignored) {
+                      }
+                  }
+              }
+              """
           )
         );
     }
@@ -219,7 +219,7 @@ class TryCatchTest implements RewriteTest {
               import java.io.File;
               import java.io.FileInputStream;
               import java.util.Scanner;
-                            
+              
               class A {
                   void a() throws Exception {
                       FileInputStream fis = new FileInputStream("file.txt");
@@ -243,7 +243,7 @@ class TryCatchTest implements RewriteTest {
               import java.io.File;
               import java.io.FileInputStream;
               import java.util.Scanner;
-
+              
               class A {
                   void a() throws Exception {
                       FileInputStream fis = new FileInputStream("file.txt");
