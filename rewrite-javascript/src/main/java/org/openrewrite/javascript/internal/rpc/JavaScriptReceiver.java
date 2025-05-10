@@ -200,7 +200,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitImportAttributes(JS.ImportAttributes importAttributes, RpcReceiveQueue q) {
         return importAttributes
-                .withToken(q.receiveAndGet(importAttributes.getToken(), toEnum(JS.ImportAttributes.Token.class)))
+                .withToken(Enum.valueOf(JS.ImportAttributes.Token.class, q.receiveAndGet(importAttributes.getToken(), Enum::name)))
                 .getPadding().withElements(q.receive(importAttributes.getPadding().getElements(), el -> visitContainer(el, q)));
     }
 
@@ -275,7 +275,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitPropertyAssignment(JS.PropertyAssignment propertyAssignment, RpcReceiveQueue q) {
         return propertyAssignment
                 .getPadding().withName(q.receive(propertyAssignment.getPadding().getName(), el -> visitRightPadded(el, q)))
-                .withAssigmentToken(q.receiveAndGet(propertyAssignment.getAssigmentToken(), toEnum(JS.PropertyAssignment.AssigmentToken.class)))
+                .withAssigmentToken(Enum.valueOf(JS.PropertyAssignment.AssigmentToken.class, q.receiveAndGet(propertyAssignment.getAssigmentToken(), Enum::name)))
                 .withInitializer(q.receive(propertyAssignment.getInitializer(), expr -> (Expression) visitNonNull(expr, q)));
     }
 
@@ -403,7 +403,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitTypeOperator(JS.TypeOperator typeOperator, RpcReceiveQueue q) {
         return typeOperator
-                .withOperator(q.receiveAndGet(typeOperator.getOperator(), toEnum(JS.TypeOperator.Type.class)))
+                .withOperator(Enum.valueOf(JS.TypeOperator.Type.class, q.receiveAndGet(typeOperator.getOperator(), Enum::name)))
                 .getPadding().withExpression(q.receive(typeOperator.getPadding().getExpression(), el -> visitLeftPadded(el, q)));
     }
 
