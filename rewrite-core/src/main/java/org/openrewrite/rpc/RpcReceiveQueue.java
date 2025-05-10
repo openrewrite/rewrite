@@ -54,49 +54,21 @@ public class RpcReceiveQueue {
     }
 
     /**
-     * Receive a value from the queue and apply a function to it, usually to
-     * convert it to a string or fetch some nested object off of it.
+     * Receive a value from the queue and apply a function to it to convert it to the required
+     * type.
      *
-     * @param before The value to apply the function to, which may be null.
-     * @param <T>    A before value ahead of the function call.
-     * @param <U>    The return type of the function. This will match the type that is
-     *               being received from the remote.
-     * @return The received value. To set the correct before state when the received state
-     * is NO_CHANGE or CHANGE, the function is applied to the before parameter, unless before
-     * is null in which case the before state is assumed to be null.
+     * @param before  The value to apply the function to, which may be null.
+     * @param mapping Function to apply in case of ADD or CHANGE to convert the received value to
+     *                the desired type. Only applied when the value from the queue is not null.
+     * @param <T>     The property value type of the before and returned value.
+     * @param <U>     The type of the value as encoded by the data item read from the queue.
+     * @return The received and converted value. When the received state is NO_CHANGE then the
+     * before value will be returned.
      */
-    @SuppressWarnings("DataFlowIssue")
+    @SuppressWarnings({"DataFlowIssue", "ConstantValue", "unchecked"})
     public <T, U> T receiveAndGet(@Nullable T before, Function<U, @Nullable T> mapping) {
-        RpcObjectData message = take();
-        if (logFile != null && message.getTrace() != null) {
-            logFile.println(message.withTrace(null));
-            logFile.println("  " + message.getTrace());
-            logFile.println("  " + Trace.traceReceiver());
-            logFile.flush();
-        }
-        Integer ref = null;
-        switch (message.getState()) {
-            case NO_CHANGE:
-                return before;
-            case DELETE:
-                return null;
-            case ADD:
-                ref = message.getRef();
-                if (refs.containsKey(ref)) {
-                    //noinspection unchecked
-                    return (@Nullable T) refs.get(ref);
-                }
-                // fall-through
-            case CHANGE:
-                U value = message.getValue();
-                T after = value != null ? mapping.apply(value) : null;
-                if (ref != null) {
-                    refs.put(ref, after);
-                }
-                return after;
-            default:
-                throw new UnsupportedOperationException("Unknown state type " + message.getState());
-        }
+        T after = receive(before, null);
+        return after != null && after != before ? mapping.apply((U) after) : after;
     }
 
     public Markers receiveMarkers(Markers markers) {

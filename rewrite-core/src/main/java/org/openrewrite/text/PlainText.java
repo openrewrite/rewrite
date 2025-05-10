@@ -32,7 +32,6 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
@@ -187,11 +186,11 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
                 .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
                 .withChecksum(q.receive(t.getChecksum()))
                 .<PlainText>withFileAttributes(q.receive(t.getFileAttributes()))
-                .withText(q.receiveAndGet(t.getText(), Function.identity()))
+                .withText(q.receive(t.getText()))
                 .withSnippets(q.receiveList(t.getSnippets(), s -> s
                         .withId(q.receiveAndGet(s.getId(), UUID::fromString))
                         .withMarkers(q.receiveMarkers(s.getMarkers()))
-                        .withText(q.receiveAndGet(s.getText(), Function.identity()))));
+                        .withText(q.receive(s.getText()))));
     }
 
     @Value
