@@ -636,7 +636,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q, Function<Object, T> elementMapping) {
         return left
                 .withBefore(q.receive(left.getBefore(), s -> visitSpace(s, q)))
-                .withElement(q.receive(left.getElement(), elementMapping::apply))
+                .withElement(elementMapping.apply(q.receiveAndGet(left.getElement(), Function.identity())))
                 .withMarkers(q.receiveMarkers(left.getMarkers()));
     }
 
