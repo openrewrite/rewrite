@@ -310,11 +310,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return typeOf;
     }
 
-    override async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(typeTreeExpression, el => el.expression, el => this.visit(el, q));
-        return typeTreeExpression;
-    }
-
     override async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(assignmentOperation, el => el.variable, el => this.visit(el, q));
         await q.getAndSend(assignmentOperation, el => el.operator, el => this.visitLeftPadded(el, q));
@@ -873,12 +868,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         const draft = createDraft(typeOf);
         draft.expression = await q.receive(draft.expression, el => this.visitDefined<Expression>(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
-        return finishDraft(draft);
-    }
-
-    override async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(typeTreeExpression);
-        draft.expression = await q.receive(draft.expression, el => this.visitDefined<Expression>(el, q));
         return finishDraft(draft);
     }
 

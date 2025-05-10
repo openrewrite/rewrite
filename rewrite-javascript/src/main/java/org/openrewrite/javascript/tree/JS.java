@@ -5512,46 +5512,4 @@ public interface JS extends J {
             }
         }
     }
-
-
-    @Getter
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    final class TypeTreeExpression implements JS, Expression, TypeTree {
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        @With
-        Expression expression;
-
-        @Override
-        public @Nullable JavaType getType() {
-            return expression.getType();
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public TypeTreeExpression withType(@Nullable JavaType type) {
-            return expression.getType() == type ? this : new TypeTreeExpression(this.id, this.prefix, this.markers, this.expression.withType(type));
-        }
-
-        @Override
-        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitTypeTreeExpression(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-    }
 }

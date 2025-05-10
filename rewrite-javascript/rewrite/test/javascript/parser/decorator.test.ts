@@ -1,3 +1,5 @@
+// noinspection TypeScriptUnresolvedReference,TypeScriptValidateTypes,JSUnusedLocalSymbols
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -17,7 +19,6 @@ import {RecipeSpec} from "../../../src/test";
 import {typescript} from "../../../src/javascript";
 
 
-
 describe('class decorator mapping', () => {
     const spec = new RecipeSpec();
 
@@ -26,94 +27,107 @@ describe('class decorator mapping', () => {
             //language=typescript
             typescript('@foo class A {}')
         ));
+
     test('unqualified parens', () =>
         spec.rewriteRun(
             //language=typescript
             typescript('@foo( ) class A {}')
         ));
+
     test('qualified', () =>
         spec.rewriteRun(
             //language=typescript
             typescript('@foo . bar class A {}')
         ));
+
     test('qualified parens', () =>
         spec.rewriteRun(
             //language=typescript
             typescript('@foo . bar ( ) class A {}')
         ));
+
     test('parameter decorator with params', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
-               export class WorkspaceMemberWorkspaceEntity extends BaseWorkspaceEntity {
-                   @WorkspaceField({
-                       standardId: WORKSPACE_MEMBER_STANDARD_FIELD_IDS.name,
-                       type: FieldMetadataType.FULL_NAME,
-                       label: 'Name',
-                       description: 'Workspace member name',
-                       icon: 'IconCircleUser',
-                   })
-                   [NAME_FIELD_NAME]: FullNameMetadata;
-               }
-           `)
+                export class WorkspaceMemberWorkspaceEntity extends BaseWorkspaceEntity {
+                    @WorkspaceField({
+                        standardId: WORKSPACE_MEMBER_STANDARD_FIELD_IDS.name,
+                        type: FieldMetadataType.FULL_NAME,
+                        label: 'Name',
+                        description: 'Workspace member name',
+                        icon: 'IconCircleUser',
+                    })
+                    [NAME_FIELD_NAME]: FullNameMetadata;
+                }
+            `)
         ));
+
     test('decorator with type params', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
-               @StaticInterfaceImplement/*a*/<ISpriteAssembler>/*b*/()
-               export class SimpleSpriteAssembler {}
-           `)
+                @StaticInterfaceImplement/*a*/<ISpriteAssembler>/*b*/()
+                export class SimpleSpriteAssembler {
+                }
+            `)
         ));
+
     test('decorator with parenthesized expression', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
-               class SimpleSpriteAssembler {
-                   @/*a*/(/*b*/Ember.computed('fullName').readOnly()/*c*/)/*d*/
-                   get fullNameReadonly() {
-                       return 'fullName';
-                   }
-               }
-           `)
+                class SimpleSpriteAssembler {
+                    @/*a*/(/*b*/Ember.computed('fullName').readOnly()/*c*/)/*d*/
+                    get fullNameReadonly() {
+                        return 'fullName';
+                    }
+                }
+            `)
         ));
+
     test.skip('decorator on class expression', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
-               const Foo = (x => x)(@dec('') class { })
-           `)
+                const Foo = (x => x)(
+                    @dec('')
+                    class {
+                    })
+            `)
         ));
+
     test('class / method / params / properties decorators', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
-               @UseGuards(WorkspaceAuthGuard)
-               @Resolver()
-               export class RelationMetadataResolver {
-                   constructor(
-                       @Args('input')
-                       private readonly relationMetadataService: RelationMetadataService,
-                   ) {}
- 
-                   @Args('input') input: DeleteOneRelationInput;
- 
-                   @Mutation(() => RelationMetadataDTO)
-                   async deleteOneRelation(
-                       @Args('input') input: DeleteOneRelationInput,
-                       @AuthWorkspace() { id: workspaceId }: Workspace,
-                   ) {
-                       try {
-                           return await this.relationMetadataService.deleteOneRelation(
-                               input.id,
-                               workspaceId,
-                           );
-                       } catch (error) {
-                           relationMetadataGraphqlApiExceptionHandler(error);
-                       }
-                   }
-               }
-           `)
+                @UseGuards(WorkspaceAuthGuard)
+                @Resolver()
+                export class RelationMetadataResolver {
+                    constructor(
+                        @Args('input')
+                        private readonly relationMetadataService: RelationMetadataService,
+                    ) {
+                    }
+
+                    @Args('input') input: DeleteOneRelationInput;
+
+                    @Mutation(() => RelationMetadataDTO)
+                    async deleteOneRelation(
+                        @Args('input') input: DeleteOneRelationInput,
+                        @AuthWorkspace() {id: workspaceId}: Workspace,
+                    ) {
+                        try {
+                            return await this.relationMetadataService.deleteOneRelation(
+                                input.id,
+                                workspaceId,
+                            );
+                        } catch (error) {
+                            relationMetadataGraphqlApiExceptionHandler(error);
+                        }
+                    }
+                }
+            `)
         ));
 
     test.skip('decorator after modifiers', () =>
