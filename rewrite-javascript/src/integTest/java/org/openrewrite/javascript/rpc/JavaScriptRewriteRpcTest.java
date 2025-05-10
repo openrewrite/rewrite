@@ -129,9 +129,12 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parse() {
+    void parseAndPrintJavaScript() {
+        // language=javascript
+        String source = "const two = 1 + 1";
+
         SourceFile cu = client.parse("javascript", List.of(Parser.Input.fromString(
-          Paths.get("test.js"), "const two = 1 + 1")), null).iterator().next();
+          Paths.get("test.js"), source)), null).iterator().next();
 
         new JavaIsoVisitor<Integer>() {
             @Override
@@ -140,6 +143,8 @@ public class JavaScriptRewriteRpcTest implements RewriteTest {
                 return binary;
             }
         }.visit(cu, 0);
+
+        assertThat(client.print(cu)).isEqualTo(source);
     }
 
     @Test
