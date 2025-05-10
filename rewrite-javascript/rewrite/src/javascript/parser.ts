@@ -517,13 +517,7 @@ export class JavaScriptParserVisitor {
         for (let heritageClause of node.heritageClauses) {
             if (heritageClause.token == ts.SyntaxKind.ExtendsKeyword) {
                 const expression = this.visit(heritageClause.types[0]);
-                return this.leftPadded<TypeTree>(this.prefix(heritageClause.getFirstToken()!), {
-                    kind: JS.Kind.TypeTreeExpression,
-                    id: randomId(),
-                    prefix: emptySpace,
-                    markers: emptyMarkers,
-                    expression: expression
-                } as JS.TypeTreeExpression);
+                return this.leftPadded<TypeTree>(this.prefix(heritageClause.getFirstToken()!), expression);
             }
         }
         return undefined;
@@ -884,9 +878,9 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitDecorator(node: ts.Decorator) {
+    visitDecorator(node: ts.Decorator): J.Annotation | J.Unknown {
         let annotationType: NameTree | TypeTree;
-        let _arguments: J.Container<Expression> | undefined = undefined;
+        let args: J.Container<Expression> | undefined = undefined;
 
         if (ts.isCallExpression(node.expression)) {
             annotationType = {
@@ -897,19 +891,13 @@ export class JavaScriptParserVisitor {
                 clazz: this.convert<J>(node.expression.expression) as Expression,
                 typeArguments: node.expression.typeArguments && this.mapTypeArguments(this.suffix(node.expression.expression), node.expression.typeArguments)
             } as JS.ExpressionWithTypeArguments;
-            _arguments = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
+            args = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
         } else if (ts.isIdentifier(node.expression)) {
             annotationType = this.convert(node.expression);
         } else if (ts.isPropertyAccessExpression(node.expression)) {
             annotationType = this.convert(node.expression);
         } else if (ts.isParenthesizedExpression(node.expression)) {
-            annotationType = {
-                kind: JS.Kind.TypeTreeExpression,
-                id: randomId(),
-                prefix: this.prefix(node.expression),
-                markers: emptyMarkers,
-                expression: this.convert(node.expression) as Expression
-            } as JS.TypeTreeExpression;
+            annotationType = this.convert(node.expression) as Expression;
         } else {
             return this.visitUnknown(node);
         }
@@ -920,7 +908,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             annotationType: annotationType,
-            arguments: _arguments
+            arguments: args
         };
     }
 
@@ -2152,22 +2140,10 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: emptySpace,
                 markers: emptyMarkers,
-                clazz: {
-                    kind: JS.Kind.TypeTreeExpression,
-                    id: randomId(),
-                    prefix: emptySpace,
-                    markers: emptyMarkers,
-                    expression: this.visit(node.expression),
-                },
+                clazz: this.visit(node.expression),
                 typeParameters: this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments),
                 type: undefined
-            } : {
-                kind: JS.Kind.TypeTreeExpression,
-                id: randomId(),
-                prefix: emptySpace,
-                markers: emptyMarkers,
-                expression: this.visit(node.expression),
-            },
+            } : this.visit(node.expression),
             arguments: node.arguments ?
                 this.mapCommaSeparatedList(this.getParameterListNodes(node)) : {
                     ...emptyContainer<Expression>(),

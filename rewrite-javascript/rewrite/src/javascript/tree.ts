@@ -551,15 +551,6 @@ export namespace JS {
     }
 
     /**
-     * Represents an expression used as a type tree.
-     * @example (<T>value)
-     */
-    export interface TypeTreeExpression extends JS, Expression, TypeTree {
-        readonly kind: typeof Kind.TypeTreeExpression;
-        readonly expression: Expression;
-    }
-
-    /**
      * Represents an assignment operation.
      * @example a ||= b;
      */
