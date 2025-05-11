@@ -64,7 +64,7 @@ export namespace JS {
         LiteralType: "org.openrewrite.javascript.tree.JS$LiteralType",
         MappedType: "org.openrewrite.javascript.tree.JS$MappedType",
         MappedTypeKeysRemapping: "org.openrewrite.javascript.tree.JS$MappedType$KeysRemapping",
-        MappedTypeMappedTypeParameter: "org.openrewrite.javascript.tree.JS$MappedType$MappedTypeParameter",
+        MappedTypeParameter: "org.openrewrite.javascript.tree.JS$MappedType$Parameter",
         NamedExports: "org.openrewrite.javascript.tree.JS$NamedExports",
         NamedImports: "org.openrewrite.javascript.tree.JS$NamedImports",
         NamespaceDeclaration: "org.openrewrite.javascript.tree.JS$NamespaceDeclaration",
@@ -351,7 +351,7 @@ export namespace JS {
          */
         export interface KeysRemapping extends JS, Statement {
             readonly kind: typeof Kind.MappedTypeKeysRemapping;
-            readonly typeParameter: J.RightPadded<MappedType.MappedTypeParameter>;
+            readonly typeParameter: J.RightPadded<MappedType.Parameter>;
             readonly nameType?: J.RightPadded<Expression>;
         }
 
@@ -359,8 +359,8 @@ export namespace JS {
          * Represents a type parameter in a mapped type.
          * @example [P in K]
          */
-        export interface MappedTypeParameter extends JS, Statement {
-            readonly kind: typeof Kind.MappedTypeMappedTypeParameter;
+        export interface Parameter extends JS, Statement {
+            readonly kind: typeof Kind.MappedTypeParameter;
             readonly name: Expression;
             readonly iterateType: J.LeftPadded<TypeTree>;
         }

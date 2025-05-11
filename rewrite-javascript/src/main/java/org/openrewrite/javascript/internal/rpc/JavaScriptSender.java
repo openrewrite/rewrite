@@ -282,10 +282,10 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitMappedTypeMappedTypeParameter(JS.MappedType.MappedTypeParameter mappedTypeParameter, RpcSendQueue q) {
-        q.getAndSend(mappedTypeParameter, JS.MappedType.MappedTypeParameter::getName, el -> visit(el, q));
-        q.getAndSend(mappedTypeParameter, el -> el.getPadding().getIterateType(), el -> visitLeftPadded(el, q));
-        return mappedTypeParameter;
+    public J visitMappedTypeParameter(JS.MappedType.Parameter parameter, RpcSendQueue q) {
+        q.getAndSend(parameter, JS.MappedType.Parameter::getName, el -> visit(el, q));
+        q.getAndSend(parameter, el -> el.getPadding().getIterateType(), el -> visitLeftPadded(el, q));
+        return parameter;
     }
 
     @Override

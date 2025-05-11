@@ -1552,7 +1552,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 typeParameter: this.rightPadded(
                     {
-                        kind: Kind.MappedTypeMappedTypeParameter,
+                        kind: Kind.MappedTypeParameter,
                         id: randomId(),
                         prefix: this.prefix(node.typeParameter),
                         markers: emptyMarkers,

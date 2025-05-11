@@ -388,15 +388,15 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
-    public J visitMappedTypeMappedTypeParameter(JS.MappedType.MappedTypeParameter mappedTypeParameter, P p) {
-        JS.MappedType.MappedTypeParameter m = mappedTypeParameter;
+    public J visitMappedTypeParameter(JS.MappedType.Parameter parameter, P p) {
+        JS.MappedType.Parameter m = parameter;
         m = m.withPrefix(visitSpace(m.getPrefix(), JsSpace.Location.MAPPED_TYPE_MAPPED_TYPE_PARAMETER_PREFIX, p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
         Statement temp = (Statement) visitStatement(m, p);
-        if (!(temp instanceof JS.MappedType.MappedTypeParameter)) {
+        if (!(temp instanceof JS.MappedType.Parameter)) {
             return temp;
         } else {
-            m = (JS.MappedType.MappedTypeParameter) temp;
+            m = (JS.MappedType.Parameter) temp;
         }
         m = m.withName(requireNonNull(visitAndCast(m.getName(), p)));
         m = m.getPadding().withIterateType(requireNonNull(visitLeftPadded(m.getPadding().getIterateType(), JsLeftPadded.Location.MAPPED_TYPE_MAPPED_TYPE_PARAMETER_ITERATE, p)));

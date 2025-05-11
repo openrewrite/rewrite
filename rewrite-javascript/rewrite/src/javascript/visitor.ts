@@ -242,8 +242,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.MappedTypeParameter, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.MappedType.MappedTypeParameter>(mappedTypeParameter, p, async draft => {
+    protected async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.MappedType.Parameter>(mappedTypeParameter, p, async draft => {
             draft.name = await this.visitDefined<Expression>(mappedTypeParameter.name, p);
             draft.iterateType = await this.visitLeftPadded(mappedTypeParameter.iterateType, p);
         });
@@ -583,8 +583,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitMappedType(tree as unknown as JS.MappedType, p);
                 case JS.Kind.MappedTypeKeysRemapping:
                     return this.visitKeysRemapping(tree as unknown as JS.MappedType.KeysRemapping, p);
-                case JS.Kind.MappedTypeMappedTypeParameter:
-                    return this.visitMappedTypeParameter(tree as unknown as JS.MappedType.MappedTypeParameter, p);
+                case JS.Kind.MappedTypeParameter:
+                    return this.visitMappedTypeParameter(tree as unknown as JS.MappedType.Parameter, p);
                 case JS.Kind.ObjectBindingDeclarations:
                     return this.visitObjectBindingDeclarations(tree as unknown as JS.ObjectBindingDeclarations, p);
                 case JS.Kind.PropertyAssignment:

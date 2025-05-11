@@ -236,7 +236,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitMappedTypeMappedTypeParameter(JS.MappedType.MappedTypeParameter mappedTypeParameter, RpcReceiveQueue q) {
+    public J visitMappedTypeParameter(JS.MappedType.Parameter mappedTypeParameter, RpcReceiveQueue q) {
         return mappedTypeParameter
                 .withName(q.receive(mappedTypeParameter.getName(), expr -> (Expression) visitNonNull(expr, q)))
                 .getPadding().withIterateType(q.receive(mappedTypeParameter.getPadding().getIterateType(), el -> visitLeftPadded(el, q)));

@@ -1021,7 +1021,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return mappedTypeKeys;
     }
 
-    override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.MappedTypeParameter, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(mappedTypeParameter, p);
         await this.visit(mappedTypeParameter.name, p);
         await this.visitLeftPaddedLocal("in", mappedTypeParameter.iterateType, p);

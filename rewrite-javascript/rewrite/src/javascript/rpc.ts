@@ -205,7 +205,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return keysRemapping;
     }
 
-    override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.MappedTypeParameter, q: RpcSendQueue): Promise<J | undefined> {
+    override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(mappedTypeParameter, el => el.name, el => this.visit(el, q));
         await q.getAndSend(mappedTypeParameter, el => el.iterateType, el => this.visitLeftPadded(el, q));
         return mappedTypeParameter;
@@ -711,7 +711,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.MappedTypeParameter, q: RpcReceiveQueue): Promise<J | undefined> {
+    override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(mappedTypeParameter);
         draft.name = await q.receive(draft.name, el => this.visitDefined<Expression>(el, q));
         draft.iterateType = await q.receive(draft.iterateType, el => this.visitLeftPadded(el, q));

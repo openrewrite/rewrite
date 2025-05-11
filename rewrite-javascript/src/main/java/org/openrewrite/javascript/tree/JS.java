@@ -2039,13 +2039,13 @@ public interface JS extends J {
             @Getter
             Markers markers;
 
-            JRightPadded<MappedTypeParameter> typeParameter;
+            JRightPadded<Parameter> typeParameter;
 
-            public MappedTypeParameter getTypeParameter() {
+            public Parameter getTypeParameter() {
                 return typeParameter.getElement();
             }
 
-            public KeysRemapping withTypeParameter(MappedTypeParameter typeParameter) {
+            public KeysRemapping withTypeParameter(Parameter typeParameter) {
                 return getPadding().withTypeParameter(JRightPadded.withElement(this.typeParameter, typeParameter));
             }
 
@@ -2089,11 +2089,11 @@ public interface JS extends J {
             public static class Padding {
                 private final KeysRemapping t;
 
-                public JRightPadded<MappedTypeParameter> getTypeParameter() {
+                public JRightPadded<Parameter> getTypeParameter() {
                     return t.typeParameter;
                 }
 
-                public KeysRemapping withTypeParameter(JRightPadded<MappedTypeParameter> typeParameter) {
+                public KeysRemapping withTypeParameter(JRightPadded<Parameter> typeParameter) {
                     return t.typeParameter == typeParameter ? t : new KeysRemapping(t.id, t.prefix, t.markers, typeParameter, t.nameType);
                 }
 
@@ -2111,10 +2111,10 @@ public interface JS extends J {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
         @AllArgsConstructor(access = AccessLevel.PRIVATE)
-        public static final class MappedTypeParameter implements JS, Statement {
+        public static final class Parameter implements JS, Statement {
             @Nullable
             @NonFinal
-            transient WeakReference<MappedType.MappedTypeParameter.Padding> padding;
+            transient WeakReference<Parameter.Padding> padding;
 
             @With
             @EqualsAndHashCode.Include
@@ -2139,13 +2139,13 @@ public interface JS extends J {
                 return iterateType.getElement();
             }
 
-            public MappedTypeParameter withIterateType(TypeTree element) {
+            public Parameter withIterateType(TypeTree element) {
                 return getPadding().withIterateType(JLeftPadded.withElement(this.iterateType, element));
             }
 
             @Override
             public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-                return v.visitMappedTypeMappedTypeParameter(this, p);
+                return v.visitMappedTypeParameter(this, p);
             }
 
             @Override
@@ -2153,15 +2153,15 @@ public interface JS extends J {
                 return new CoordinateBuilder.Statement(this);
             }
 
-            public MappedTypeParameter.Padding getPadding() {
-                MappedTypeParameter.Padding p;
+            public Parameter.Padding getPadding() {
+                Parameter.Padding p;
                 if (this.padding == null) {
-                    p = new MappedTypeParameter.Padding(this);
+                    p = new Parameter.Padding(this);
                     this.padding = new WeakReference<>(p);
                 } else {
                     p = this.padding.get();
                     if (p == null || p.t != this) {
-                        p = new MappedTypeParameter.Padding(this);
+                        p = new Parameter.Padding(this);
                         this.padding = new WeakReference<>(p);
                     }
                 }
@@ -2170,14 +2170,14 @@ public interface JS extends J {
 
             @RequiredArgsConstructor
             public static class Padding {
-                private final MappedTypeParameter t;
+                private final Parameter t;
 
                 public JLeftPadded<TypeTree> getIterateType() {
                     return t.iterateType;
                 }
 
-                public MappedTypeParameter withIterateType(JLeftPadded<TypeTree> iterateType) {
-                    return t.iterateType == iterateType ? t : new MappedTypeParameter(t.id, t.prefix, t.markers, t.name, iterateType);
+                public Parameter withIterateType(JLeftPadded<TypeTree> iterateType) {
+                    return t.iterateType == iterateType ? t : new Parameter(t.id, t.prefix, t.markers, t.name, iterateType);
                 }
             }
         }
