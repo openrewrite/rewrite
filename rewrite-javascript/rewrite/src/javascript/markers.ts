@@ -10,6 +10,7 @@ declare module "./tree" {
             readonly Asterisk: "org.openrewrite.javascript.marker.Asterisk";
             readonly Optional: "org.openrewrite.javascript.marker.Optional";
             readonly NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion";
+            readonly Spread: "org.openrewrite.javascript.marker.Spread";
             readonly DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield";
         };
     }
@@ -20,7 +21,8 @@ declare module "./tree" {
     Asterisk: "org.openrewrite.javascript.marker.Asterisk",
     DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield",
     Optional: "org.openrewrite.javascript.marker.Optional",
-    NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion"
+    NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion",
+    Spread: "org.openrewrite.javascript.marker.Spread"
 } as const;
 
 /**
@@ -45,6 +47,11 @@ export interface Asterisk extends Marker {
 
 export interface NonNullAssertion extends Marker {
     readonly kind: typeof JS.Markers.NonNullAssertion;
+    readonly prefix: J.Space;
+}
+
+export interface Spread extends Marker {
+    readonly kind: typeof JS.Markers.Spread;
     readonly prefix: J.Space;
 }
 
@@ -73,3 +80,4 @@ registerPrefixedMarkerCodec<DelegatedYield>(JS.Markers.DelegatedYield);
 registerPrefixedMarkerCodec<Optional>(JS.Markers.Optional);
 registerPrefixedMarkerCodec<Asterisk>(JS.Markers.Asterisk);
 registerPrefixedMarkerCodec<NonNullAssertion>(JS.Markers.NonNullAssertion);
+registerPrefixedMarkerCodec<Spread>(JS.Markers.Spread);

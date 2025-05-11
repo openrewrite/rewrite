@@ -90,7 +90,6 @@ export namespace JS {
         TypePredicate: "org.openrewrite.javascript.tree.JS$TypePredicate",
         TypeQuery: "org.openrewrite.javascript.tree.JS$TypeQuery",
         TypeTreeExpression: "org.openrewrite.javascript.tree.JS$TypeTreeExpression",
-        Unary: "org.openrewrite.javascript.tree.JS$Unary",
         Union: "org.openrewrite.javascript.tree.JS$Union",
         Void: "org.openrewrite.javascript.tree.JS$Void",
         WithStatement: "org.openrewrite.javascript.tree.JS$WithStatement",
@@ -682,23 +681,6 @@ export namespace JS {
     export interface Void extends JS, Expression {
         readonly kind: typeof Kind.Void;
         readonly expression: Expression;
-    }
-
-    /**
-     * Represents a unary expression.
-     * @example !flag;
-     */
-    export interface Unary extends JS, Expression, TypedTree {
-        readonly kind: typeof Kind.Unary;
-        readonly operator: J.LeftPadded<Unary.Type>;
-        readonly expression: Expression;
-        readonly type?: JavaType;
-    }
-
-    export namespace Unary {
-        export const enum Type {
-            Spread = "Spread",
-        }
     }
 
     /**

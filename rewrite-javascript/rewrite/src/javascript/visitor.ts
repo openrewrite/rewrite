@@ -440,14 +440,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJsUnary(unary: JS.Unary, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.Unary>(unary, p, async draft => {
-            draft.operator = await this.visitLeftPadded(unary.operator, p);
-            draft.expression = await this.visitDefined<Expression>(unary.expression, p);
-            draft.type = unary.type && await this.visitType(unary.type, p);
-        });
-    }
-
     protected async visitWithStatement(withStatement: JS.WithStatement, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.WithStatement>(withStatement, p, async draft => {
             draft.expression = await this.visitDefined<J.ControlParentheses<Expression>>(withStatement.expression, p);
@@ -682,8 +674,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitIntersection(tree as unknown as JS.Intersection, p);
                 case JS.Kind.Void:
                     return this.visitVoid(tree as unknown as JS.Void, p);
-                case JS.Kind.Unary:
-                    return this.visitJsUnary(tree as unknown as JS.Unary, p);
                 case JS.Kind.WithStatement:
                     return this.visitWithStatement(tree as unknown as JS.WithStatement, p);
                 case JS.Kind.IndexSignatureDeclaration:

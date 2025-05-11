@@ -437,14 +437,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitUnary(JS.Unary unary, RpcReceiveQueue q) {
-        return unary
-                .getPadding().withOperator(q.receive(unary.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.Unary.Type.class))))
-                .withExpression(q.receive(unary.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
-                .withType(q.receive(unary.getType(), type -> visitType(type, q)));
-    }
-
-    @Override
     public J visitWithStatement(JS.WithStatement withStatement, RpcReceiveQueue q) {
         return withStatement
                 .withExpression(q.receive(withStatement.getExpression(), expr -> (J.ControlParentheses<Expression>) visitNonNull(expr, q)))

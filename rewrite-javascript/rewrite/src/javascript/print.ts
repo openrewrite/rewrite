@@ -20,8 +20,8 @@ import {JavaScriptVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
-import {findMarker, Marker, Markers} from "../markers";
-import {Asterisk, DelegatedYield, NonNullAssertion, Optional} from "./markers";
+import {findMarker, Marker, markers, Markers} from "../markers";
+import {Asterisk, DelegatedYield, NonNullAssertion, Optional, Spread} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -1649,23 +1649,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return unary;
     }
 
-    override async visitJsUnary(unary: JS.Unary, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(unary, p);
-
-        switch (unary.operator.element) {
-            case JS.Unary.Type.Spread:
-                await this.visitSpace(unary.operator.before, p);
-                p.append("...");
-                await this.visit(unary.expression, p);
-                break;
-            default:
-                break;
-        }
-
-        await this.afterSyntax(unary, p);
-        return unary;
-    }
-
     override async visitUnion(union: JS.Union, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(union, p);
 
@@ -1934,6 +1917,16 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitSpace((marker as unknown as TrailingComma).suffix, p);
         }
         return marker;
+    }
+
+    protected async preVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
+        for (const marker of tree.markers.markers) {
+            if (marker.kind === JS.Markers.Spread) {
+                await this.visitSpace((marker as Spread).prefix, p);
+                p.append("...");
+            }
+        }
+        return tree;
     }
 
     protected async postVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {

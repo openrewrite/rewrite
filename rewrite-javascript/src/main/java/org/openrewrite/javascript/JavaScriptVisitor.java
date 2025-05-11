@@ -594,28 +594,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
-    public J visitUnary(JS.Unary unary, P p) {
-        JS.Unary u = unary;
-        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.UNARY_PREFIX, p));
-        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
-        Statement temp = (Statement) visitStatement(u, p);
-        if (!(temp instanceof JS.Unary)) {
-            return temp;
-        } else {
-            u = (JS.Unary) temp;
-        }
-        Expression temp2 = (Expression) visitExpression(u, p);
-        if (!(temp2 instanceof JS.Unary)) {
-            return temp2;
-        } else {
-            u = (JS.Unary) temp2;
-        }
-        u = u.getPadding().withOperator(requireNonNull(visitLeftPadded(u.getPadding().getOperator(), JLeftPadded.Location.UNARY_OPERATOR, p)));
-        u = u.withExpression(requireNonNull(visitAndCast(u.getExpression(), p)));
-        u = u.withType(visitType(u.getType(), p));
-        return u;
-    }
-
     public J visitUnion(JS.Union union, P p) {
         JS.Union u = union;
         u = u.withPrefix(visitSpace(u.getPrefix(), JsSpace.Location.UNION_PREFIX, p));

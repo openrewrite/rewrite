@@ -379,13 +379,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return void_;
     }
 
-    override async visitJsUnary(unary: JS.Unary, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(unary, el => el.operator, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(unary, el => el.expression, el => this.visit(el, q));
-        await q.getAndSend(unary, el => asRef(el.type), el => this.visitType(el, q));
-        return unary;
-    }
-
     override async visitWithStatement(withStatement: JS.WithStatement, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(withStatement, el => el.expression, el => this.visit(el, q));
         await q.getAndSend(withStatement, el => el.body, el => this.visitRightPadded(el, q));
@@ -953,14 +946,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitVoid(void_: JS.Void, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(void_);
         draft.expression = await q.receive(draft.expression, el => this.visitDefined<Expression>(el, q));
-        return finishDraft(draft);
-    }
-
-    override async visitJsUnary(unary: JS.Unary, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(unary);
-        draft.operator = await q.receive(draft.operator, el => this.visitLeftPadded(el, q));
-        draft.expression = await q.receive(draft.expression, el => this.visitDefined<Expression>(el, q));
-        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
 

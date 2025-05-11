@@ -537,16 +537,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitUnary(JS.Unary unary, RpcSendQueue q) {
-        q.getAndSend(unary, el -> el.getPadding().getOperator(), el -> visitLeftPadded(el, q));
-        q.getAndSend(unary, JS.Unary::getExpression, el -> visit(el, q));
-        if (unary.getType() != null) {
-            q.getAndSend(unary, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
-        return unary;
-    }
-
-    @Override
     public J visitWithStatement(JS.WithStatement withStatement, RpcSendQueue q) {
         q.getAndSend(withStatement, JS.WithStatement::getExpression, el -> visit(el, q));
         q.getAndSend(withStatement, el -> el.getPadding().getBody(), el -> visitRightPadded(el, q));
