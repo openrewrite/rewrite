@@ -908,28 +908,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return ns;
     }
 
-    public J visitFunctionDeclaration(JS.FunctionDeclaration functionDeclaration, P p) {
-        JS.FunctionDeclaration f = functionDeclaration;
-        f = f.withPrefix(visitSpace(f.getPrefix(), JsSpace.Location.FUNCTION_DECLARATION_PREFIX, p));
-        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
-        Expression temp = (Expression) visitExpression(f, p);
-        if (!(temp instanceof JS.FunctionDeclaration)) {
-            return temp;
-        } else {
-            f = (JS.FunctionDeclaration) temp;
-        }
-
-        f = f.withModifiers(requireNonNull(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p))));
-        f = f.getPadding().withAsteriskToken(requireNonNull(visitLeftPadded(f.getPadding().getAsteriskToken(), JsLeftPadded.Location.FUNCTION_DECLARATION_ASTERISK_TOKEN, p)));
-        f = f.getPadding().withName(requireNonNull(visitLeftPadded(f.getPadding().getName(), JsLeftPadded.Location.FUNCTION_DECLARATION_NAME, p)));
-        f = f.withTypeParameters(visitAndCast(f.getTypeParameters(), p));
-        f = f.getPadding().withParameters(requireNonNull(visitContainer(f.getPadding().getParameters(), JsContainer.Location.FUNCTION_DECLARATION_PARAMETERS, p)));
-        f = f.withReturnTypeExpression(visitAndCast(f.getReturnTypeExpression(), p));
-        f = f.withBody(visitAndCast(f.getBody(), p));
-        f = f.withType(visitType(f.getType(), p));
-        return f;
-    }
-
     public J visitTypeLiteral(JS.TypeLiteral typeLiteral, P p) {
         JS.TypeLiteral t = typeLiteral;
         t = t.withPrefix(visitSpace(t.getPrefix(), JsSpace.Location.TYPE_LITERAL_PREFIX, p));

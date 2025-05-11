@@ -414,18 +414,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return namespaceDeclaration;
     }
 
-    override async visitFunctionDeclaration(functionDeclaration: JS.FunctionDeclaration, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(functionDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(functionDeclaration, el => el.asteriskToken, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(functionDeclaration, el => el.name, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(functionDeclaration, el => el.typeParameters, el => this.visit(el, q));
-        await q.getAndSend(functionDeclaration, el => el.parameters, el => this.visitContainer(el, q));
-        await q.getAndSend(functionDeclaration, el => el.returnTypeExpression, el => this.visit(el, q));
-        await q.getAndSend(functionDeclaration, el => el.body, el => this.visit(el, q));
-        await q.getAndSend(functionDeclaration, el => asRef(el.type), el => this.visitType(el, q));
-        return functionDeclaration;
-    }
-
     override async visitTypeLiteral(typeLiteral: JS.TypeLiteral, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(typeLiteral, el => el.members, el => this.visit(el, q));
         await q.getAndSend(typeLiteral, el => asRef(el.type), el => this.visitType(el, q));
@@ -960,19 +948,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.keywordType = await q.receive(draft.keywordType, el => this.visitLeftPadded(el, q));
         draft.name = await q.receive(draft.name, el => this.visitRightPadded(el, q));
         draft.body = await q.receive(draft.body, el => this.visitDefined<J.Block>(el, q));
-        return finishDraft(draft);
-    }
-
-    override async visitFunctionDeclaration(functionDeclaration: JS.FunctionDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(functionDeclaration);
-        draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
-        draft.asteriskToken = await q.receive(draft.asteriskToken, el => this.visitLeftPadded(el, q));
-        draft.name = await q.receive(draft.name, el => this.visitLeftPadded(el, q));
-        draft.typeParameters = await q.receive(draft.typeParameters, el => this.visitDefined<J.TypeParameters>(el, q));
-        draft.parameters = await q.receive(draft.parameters, el => this.visitContainer(el, q));
-        draft.returnTypeExpression = await q.receive(draft.returnTypeExpression, el => this.visitDefined<TypeTree>(el, q));
-        draft.body = await q.receive(draft.body, el => this.visitDefined<J>(el, q));
-        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
 

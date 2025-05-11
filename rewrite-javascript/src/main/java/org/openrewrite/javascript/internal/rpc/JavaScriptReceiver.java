@@ -477,19 +477,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitFunctionDeclaration(JS.FunctionDeclaration functionDeclaration, RpcReceiveQueue q) {
-        return functionDeclaration
-                .withModifiers(q.receiveList(functionDeclaration.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .getPadding().withAsteriskToken(q.receive(functionDeclaration.getPadding().getAsteriskToken(), el -> visitLeftPadded(el, q)))
-                .getPadding().withName(q.receive(functionDeclaration.getPadding().getName(), el -> visitLeftPadded(el, q)))
-                .withTypeParameters(q.receive(functionDeclaration.getTypeParameters(), params -> (J.TypeParameters) visitNonNull(params, q)))
-                .getPadding().withParameters(q.receive(functionDeclaration.getPadding().getParameters(), el -> visitContainer(el, q)))
-                .withReturnTypeExpression(q.receive(functionDeclaration.getReturnTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
-                .withBody(q.receive(functionDeclaration.getBody(), el -> visitNonNull(el, q)))
-                .withType(q.receive(functionDeclaration.getType(), type -> visitType(type, q)));
-    }
-
-    @Override
     public J visitTypeLiteral(JS.TypeLiteral typeLiteral, RpcReceiveQueue q) {
         return typeLiteral
                 .withMembers(q.receive(typeLiteral.getMembers(), block -> (J.Block) visitNonNull(block, q)))

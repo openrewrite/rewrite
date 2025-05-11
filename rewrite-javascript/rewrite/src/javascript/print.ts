@@ -21,7 +21,7 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {findMarker, Marker, Markers} from "../markers";
-import {Asterisk, DelegatedYield, NonNullAssertion, Optional, Spread} from "./markers";
+import {Asterisk, DelegatedYield, FunctionDeclaration, NonNullAssertion, Optional, Spread} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -458,36 +458,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return ident;
     }
 
-    override async visitFunctionDeclaration(functionDeclaration: JS.FunctionDeclaration, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(functionDeclaration, p);
-
-        for (const m of functionDeclaration.modifiers) {
-            await this.visitModifier(m, p);
-        }
-
-        await this.visitLeftPaddedLocal("function", functionDeclaration.asteriskToken, p);
-
-        await this.visitLeftPaddedLocal(functionDeclaration.asteriskToken.element ? "*" : "", functionDeclaration.name, p);
-
-        const typeParameters = functionDeclaration.typeParameters;
-        if (typeParameters) {
-            await this.visitNodes(typeParameters.annotations, p);
-            await this.visitSpace(typeParameters.prefix, p);
-            await this.visitMarkers(typeParameters.markers, p);
-            p.append("<");
-            await this.visitJRightPaddedLocal(typeParameters.typeParameters, ",", p);
-            p.append(">");
-        }
-
-        await this.visitContainerLocal("(", functionDeclaration.parameters, ",", ")", p);
-
-        functionDeclaration.returnTypeExpression && await this.visit(functionDeclaration.returnTypeExpression, p);
-        functionDeclaration.body && await this.visit(functionDeclaration.body, p);
-
-        await this.afterSyntax(functionDeclaration, p);
-        return functionDeclaration;
-    }
-
     override async visitBlock(block: J.Block, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(block, p);
 
@@ -653,6 +623,12 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visitNodes(method.leadingAnnotations, p);
         for (const m of method.modifiers) {
             await this.visitModifier(m, p);
+        }
+
+        let m;
+        if ((m = findMarker<FunctionDeclaration>(method, JS.Markers.FunctionDeclaration))) {
+            await this.visitSpace(m.prefix, p);
+            p.append("function");
         }
 
         const asterisk = findMarker<Asterisk>(method, JS.Markers.Asterisk);

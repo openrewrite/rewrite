@@ -580,27 +580,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitFunctionDeclaration(JS.FunctionDeclaration functionDeclaration, RpcSendQueue q) {
-        q.getAndSendList(functionDeclaration, JS.FunctionDeclaration::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        q.getAndSend(functionDeclaration, el -> el.getPadding().getAsteriskToken(), el -> visitLeftPadded(el, q));
-        q.getAndSend(functionDeclaration, el -> el.getPadding().getName(), el -> visitLeftPadded(el, q));
-        if (functionDeclaration.getTypeParameters() != null) {
-            q.getAndSend(functionDeclaration, JS.FunctionDeclaration::getTypeParameters, el -> visit(el, q));
-        }
-        q.getAndSend(functionDeclaration, el -> el.getPadding().getParameters(), el -> visitContainer(el, q));
-        if (functionDeclaration.getReturnTypeExpression() != null) {
-            q.getAndSend(functionDeclaration, JS.FunctionDeclaration::getReturnTypeExpression, el -> visit(el, q));
-        }
-        if (functionDeclaration.getBody() != null) {
-            q.getAndSend(functionDeclaration, JS.FunctionDeclaration::getBody, el -> visit(el, q));
-        }
-        if (functionDeclaration.getType() != null) {
-            q.getAndSend(functionDeclaration, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
-        return functionDeclaration;
-    }
-
-    @Override
     public J visitTypeLiteral(JS.TypeLiteral typeLiteral, RpcSendQueue q) {
         q.getAndSend(typeLiteral, JS.TypeLiteral::getMembers, el -> visit(el, q));
         if (typeLiteral.getType() != null) {

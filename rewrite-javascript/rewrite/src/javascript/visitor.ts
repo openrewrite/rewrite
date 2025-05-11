@@ -479,19 +479,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitFunctionDeclaration(functionDeclaration: JS.FunctionDeclaration, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.FunctionDeclaration>(functionDeclaration, p, async draft => {
-            draft.modifiers = await mapAsync(functionDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.asteriskToken = await this.visitLeftPadded(functionDeclaration.asteriskToken, p);
-            draft.name = await this.visitLeftPadded(functionDeclaration.name, p);
-            draft.typeParameters = functionDeclaration.typeParameters && await this.visitDefined<J.TypeParameters>(functionDeclaration.typeParameters, p);
-            draft.parameters = await this.visitContainer(functionDeclaration.parameters, p);
-            draft.returnTypeExpression = functionDeclaration.returnTypeExpression && await this.visitDefined<TypedTree>(functionDeclaration.returnTypeExpression, p);
-            draft.body = functionDeclaration.body && await this.visitDefined<J>(functionDeclaration.body, p);
-            draft.type = functionDeclaration.type && await this.visitType(functionDeclaration.type, p);
-        });
-    }
-
     protected async visitTypeLiteral(typeLiteral: JS.TypeLiteral, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.TypeLiteral>(typeLiteral, p, async draft => {
             draft.members = await this.visitDefined<J.Block>(typeLiteral.members, p);
@@ -656,8 +643,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitForInLoop(tree as unknown as JS.ForInLoop, p);
                 case JS.Kind.NamespaceDeclaration:
                     return this.visitNamespaceDeclaration(tree as unknown as JS.NamespaceDeclaration, p);
-                case JS.Kind.FunctionDeclaration:
-                    return this.visitFunctionDeclaration(tree as unknown as JS.FunctionDeclaration, p);
                 case JS.Kind.TypeLiteral:
                     return this.visitTypeLiteral(tree as unknown as JS.TypeLiteral, p);
                 case JS.Kind.ArrayBindingPattern:

@@ -27,7 +27,7 @@ import {
     TrailingComma,
     TypeTree, VariableDeclarator,
 } from '../java';
-import {Asterisk, DelegatedYield, JS, NonNullAssertion, Optional, Spread} from '.';
+import {Asterisk, DelegatedYield, FunctionDeclaration, JS, NonNullAssertion, Optional, Spread} from '.';
 import {
     emptyMarkers,
     markers,
@@ -1253,7 +1253,7 @@ export class JavaScriptParserVisitor {
         return this.visit(node.typeName);
     }
 
-    visitFunctionType(node: ts.FunctionTypeNode) {
+    visitFunctionType(node: ts.FunctionTypeNode): JS.FunctionType {
         return {
             kind: JS.Kind.FunctionType,
             id: randomId(),
@@ -1271,8 +1271,7 @@ export class JavaScriptParserVisitor {
                         .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newJEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []),
                 markers: emptyMarkers
             },
-            returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type)),
-            type: undefined
+            returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type))
         };
     }
 
@@ -1979,32 +1978,6 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             tree: this.rightPadded(this.convert(node.expression), this.prefix(node.getLastToken()!))
-        };
-    }
-
-    visitFunctionExpression(node: ts.FunctionExpression) {
-        return {
-            kind: JS.Kind.FunctionDeclaration,
-            id: randomId(),
-            prefix: this.prefix(node),
-            markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
-            asteriskToken: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FunctionKeyword)!), !!node.asteriskToken),
-            name: this.leftPadded(node.asteriskToken ? this.prefix(node.asteriskToken) : emptySpace, node.name ? this.visit(node.name) : {
-                kind: J.Kind.Identifier,
-                id: randomId(),
-                prefix: emptySpace,
-                markers: emptyMarkers,
-                annotations: [],
-                simpleName: "",
-                type: undefined,
-                fieldType: undefined
-            }),
-            typeParameters: this.mapTypeParametersAsObject(node),
-            parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-            returnTypeExpression: this.mapTypeInfo(node),
-            body: this.convert(node.body),
-            type: this.mapMethodType(node)
         };
     }
 
@@ -2970,15 +2943,44 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitFunctionDeclaration(node: ts.FunctionDeclaration) {
+    visitFunctionDeclaration(node: ts.FunctionDeclaration): J.MethodDeclaration {
+        return this.mapFunctionDeclaration(node);
+    }
+
+    visitFunctionExpression(node: ts.FunctionExpression): JS.StatementExpression {
         return {
-            kind: JS.Kind.FunctionDeclaration,
+            kind: JS.Kind.StatementExpression,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            statement: this.mapFunctionDeclaration(node)
+        };
+    }
+
+    private mapFunctionDeclaration(node: ts.FunctionDeclaration | ts.FunctionExpression): J.MethodDeclaration {
+        return {
+            kind: J.Kind.MethodDeclaration,
             id: randomId(),
             prefix: this.prefix(node),
-            markers: emptyMarkers,
+            markers: produce(emptyMarkers, draft => {
+                draft.markers.push({
+                    kind: JS.Markers.FunctionDeclaration,
+                    id: randomId(),
+                    prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.FunctionKeyword)!)
+                } as FunctionDeclaration);
+
+                if (node.asteriskToken) {
+                    draft.markers.push({
+                        kind: JS.Markers.Asterisk,
+                        id: randomId(),
+                        prefix: this.prefix(node.asteriskToken)
+                    } as Asterisk);
+                }
+            }),
+            leadingAnnotations: [],
+            nameAnnotations: [],
             modifiers: this.mapModifiers(node),
-            asteriskToken: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FunctionKeyword)!), !!node.asteriskToken),
-            name: this.leftPadded(node.asteriskToken ? this.prefix(node.asteriskToken) : emptySpace, node.name ? this.visit(node.name) : {
+            name: node.name ? this.visit(node.name) : {
                 kind: J.Kind.Identifier,
                 id: randomId(),
                 prefix: emptySpace,
@@ -2987,12 +2989,12 @@ export class JavaScriptParserVisitor {
                 simpleName: "",
                 type: undefined,
                 fieldType: undefined
-            }),
+            },
             typeParameters: this.mapTypeParametersAsObject(node),
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             returnTypeExpression: this.mapTypeInfo(node),
-            body: node.body && this.convert(node.body),
-            type: this.mapMethodType(node)
+            body: node.body && this.convert<J.Block>(node.body),
+            methodType: this.mapMethodType(node)
         };
     }
 

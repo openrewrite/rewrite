@@ -12,6 +12,7 @@ declare module "./tree" {
             readonly NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion";
             readonly Spread: "org.openrewrite.javascript.marker.Spread";
             readonly DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield";
+            readonly FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration";
         };
     }
 }
@@ -22,7 +23,8 @@ declare module "./tree" {
     DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield",
     Optional: "org.openrewrite.javascript.marker.Optional",
     NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion",
-    Spread: "org.openrewrite.javascript.marker.Spread"
+    Spread: "org.openrewrite.javascript.marker.Spread",
+    FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration",
 } as const;
 
 /**
@@ -55,6 +57,11 @@ export interface Spread extends Marker {
     readonly prefix: J.Space;
 }
 
+export interface FunctionDeclaration extends Marker {
+    readonly kind: typeof JS.Markers.FunctionDeclaration;
+    readonly prefix: J.Space;
+}
+
 /**
  * Registers an RPC codec for any marker that has a `prefix: J.Space` field.
  */
@@ -81,3 +88,4 @@ registerPrefixedMarkerCodec<Optional>(JS.Markers.Optional);
 registerPrefixedMarkerCodec<Asterisk>(JS.Markers.Asterisk);
 registerPrefixedMarkerCodec<NonNullAssertion>(JS.Markers.NonNullAssertion);
 registerPrefixedMarkerCodec<Spread>(JS.Markers.Spread);
+registerPrefixedMarkerCodec<FunctionDeclaration>(JS.Markers.FunctionDeclaration);

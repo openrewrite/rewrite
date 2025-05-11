@@ -42,7 +42,6 @@ export namespace JS {
         ExportSpecifier: "org.openrewrite.javascript.tree.JS$ExportSpecifier",
         ExpressionStatement: "org.openrewrite.javascript.tree.JS$ExpressionStatement",
         ExpressionWithTypeArguments: "org.openrewrite.javascript.tree.JS$ExpressionWithTypeArguments",
-        FunctionDeclaration: "org.openrewrite.javascript.tree.JS$FunctionDeclaration",
         FunctionType: "org.openrewrite.javascript.tree.JS$FunctionType",
         ImportAttribute: "org.openrewrite.javascript.tree.JS$ImportAttribute",
         ImportAttributes: "org.openrewrite.javascript.tree.JS$ImportAttributes",
@@ -432,8 +431,8 @@ export namespace JS {
     }
 
     /**
-     * Represents an expression used directly as a statement.
-     * @example x();
+     * Represents a statement used as an expression. The example shows a function expressions.
+     * @example const greet = function  (name: string) : string { return name; };
      */
     export interface StatementExpression extends JS, Statement, Expression {
         readonly kind: typeof Kind.StatementExpression;
@@ -746,22 +745,6 @@ export namespace JS {
             Module,
             Empty,
         }
-    }
-
-    /**
-     * Represents a function declaration.
-     * @example function foo(arg: number): string {}
-     */
-    export interface FunctionDeclaration extends JS, Statement, TypedTree {
-        readonly kind: typeof Kind.FunctionDeclaration;
-        readonly modifiers: J.Modifier[];
-        readonly asteriskToken: J.LeftPadded<boolean>;
-        readonly name: J.LeftPadded<J.Identifier>;
-        readonly typeParameters?: J.TypeParameters;
-        readonly parameters: J.Container<Statement>;
-        readonly returnTypeExpression?: TypeTree;
-        readonly body?: J;
-        readonly type?: JavaType;
     }
 
     /**
