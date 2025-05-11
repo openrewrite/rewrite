@@ -140,7 +140,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public Accumulator getInitialValue(ExecutionContext ctx) {
         Accumulator acc = new Accumulator();
         for (Recipe precondition : preconditions) {
-            if(isScanningRequired(precondition)) {
+            if (precondition instanceof ScanningRecipe && isScanningRequired(precondition)) {
                 acc.recipeToAccumulator.put(precondition, ((ScanningRecipe<?>) precondition).getInitialValue(ctx));
             }
         }
@@ -155,7 +155,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 for (Recipe precondition : preconditions) {
-                    if (isScanningRequired(precondition)) {
+                    if (precondition instanceof ScanningRecipe && isScanningRequired(precondition)) {
                         ScanningRecipe preconditionRecipe = (ScanningRecipe) precondition;
                         Object preconditionAcc = acc.recipeToAccumulator.get(precondition);
                         preconditionRecipe.getScanner(preconditionAcc)
@@ -344,7 +344,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {
         List<Recipe> mappedRecipeList = new ArrayList<>(recipeList.size());
         for (Recipe recipe : recipeList) {
-            if (isScanningRequired(recipe)) {
+            if (recipe instanceof ScanningRecipe && isScanningRequired(recipe)) {
                 mappedRecipeList.add(new BellwetherDecoratedScanningRecipe<>(bellwether, (ScanningRecipe<?>) recipe));
             } else {
                 mappedRecipeList.add(new BellwetherDecoratedRecipe(bellwether, recipe));

@@ -70,22 +70,18 @@ public class Visit implements RpcRequest {
         @Override
         protected Object handle(Visit request) throws Exception {
             Tree before = (Tree) getObject.apply(request.getTreeId());
-            localObjects.put(before.getId().toString(), before);
-
             Object p = getVisitorP(request);
 
             //noinspection unchecked
             TreeVisitor<?, Object> visitor = (TreeVisitor<?, Object>) instantiateVisitor(request, p);
 
-            SourceFile after = (SourceFile) visitor.visit(before, p, getCursor.apply(
+            Tree after = visitor.visit(before, p, getCursor.apply(
                     request.getCursor()));
             if (after == null) {
                 localObjects.remove(before.getId().toString());
             } else {
                 localObjects.put(after.getId().toString(), after);
             }
-
-            maybeUpdateExecutionContext(request.getP(), p);
 
             return new VisitResponse(before != after);
         }
@@ -120,9 +116,6 @@ public class Visit implements RpcRequest {
 
         private Object getVisitorP(Visit request) {
             Object p = getObject.apply(request.getP());
-            // This is likely to be reused in subsequent visits, so we keep it.
-            localObjects.put(request.getP(), p);
-
             if (p instanceof ExecutionContext) {
                 String visitorName = request.getVisitor();
 
@@ -141,24 +134,6 @@ public class Visit implements RpcRequest {
                 }
             }
             return p;
-        }
-
-        /**
-         * If the object is an instance of WatchableExecutionContext, and it has new messages,
-         * clone the underlying execution context and update the local state, so that when the
-         * remote asks for it, we see the ExecutionContext in CHANGE state.
-         *
-         * @param pId The ID of p
-         * @param p   An object, which may be an ExecutionContext
-         */
-        private void maybeUpdateExecutionContext(String pId, Object p) {
-            if (p instanceof WatchableExecutionContext && ((WatchableExecutionContext) p).hasNewMessages()) {
-                ExecutionContext ctx = ((WatchableExecutionContext) p).getDelegate();
-                while (ctx instanceof DelegatingExecutionContext) {
-                    ctx = ((DelegatingExecutionContext) ctx).getDelegate();
-                }
-                localObjects.put(pId, ((InMemoryExecutionContext) ctx).clone());
-            }
         }
     }
 }

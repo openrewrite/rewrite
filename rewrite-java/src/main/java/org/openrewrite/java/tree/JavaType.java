@@ -1392,6 +1392,11 @@ public interface JavaType {
 
             Stack<FullyQualified> interfaces = new Stack<>();
             interfaces.addAll(declaringType.getInterfaces());
+            FullyQualified supertype = declaringType.getSupertype();
+            while (supertype != null) {
+                interfaces.add(supertype);
+                supertype = supertype.getSupertype();
+            }
 
             while (!interfaces.isEmpty()) {
                 FullyQualified declaring = interfaces.pop();

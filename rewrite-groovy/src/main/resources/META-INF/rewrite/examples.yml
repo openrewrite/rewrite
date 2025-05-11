@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# 
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.groovy.format.AutoFormat
@@ -65,13 +64,6 @@ examples:
   - 'false'
   sources:
   - before: |
-      package a.b
-      class Original {}
-    after: |
-      package x.y
-      class Original {}
-    language: groovy
-  - before: |
       import a.b.Original
 
       class A {
@@ -83,6 +75,13 @@ examples:
       class A {
           Original type
       }
+    language: groovy
+  - before: |
+      package a.b
+      class Original {}
+    after: |
+      package x.y
+      class Original {}
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example

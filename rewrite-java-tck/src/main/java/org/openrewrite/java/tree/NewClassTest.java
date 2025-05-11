@@ -160,7 +160,7 @@ class NewClassTest implements RewriteTest {
               
               class Test {
                   List<Integer> l = new ArrayList<Integer>() {
-                      /** Javadoc */
+                      /* Javadoc */
                       @Override
                       public boolean isEmpty() {
                           return false;

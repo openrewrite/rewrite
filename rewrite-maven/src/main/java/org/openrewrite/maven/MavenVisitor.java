@@ -301,11 +301,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId) {
-        return findManagedDependency(groupId, artifactId, null);
-    }
-
-    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier) {
-        return findManagedDependency(groupId, artifactId, classifier, null);
+        return findManagedDependency(groupId, artifactId, null, null);
     }
 
     private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
