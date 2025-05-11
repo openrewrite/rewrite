@@ -698,7 +698,6 @@ export namespace JS {
     export namespace Unary {
         export const enum Type {
             Spread = "Spread",
-            Exclamation = "Exclamation",
             QuestionDot = "QuestionDot",
             QuestionDotWithDot = "QuestionDotWithDot",
             Asterisk = "Asterisk"

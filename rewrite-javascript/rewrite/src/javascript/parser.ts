@@ -1940,16 +1940,15 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            target: node.questionDotToken ?
-                {
-                    kind: JS.Kind.Unary,
-                    id: randomId(),
-                    prefix: emptySpace,
-                    markers: emptyMarkers,
-                    operator: this.leftPadded(this.suffix(node.expression), JS.Unary.Type.QuestionDot),
-                    expression: this.visit(node.expression),
-                    type: this.mapType(node)
-                } : this.convert(node.expression),
+            target: produce(this.convert<Expression>(node.expression), draft => {
+                if(node.questionDotToken) {
+                    draft.markers.markers.push({
+                        kind: JS.Markers.Optional,
+                        id: randomId(),
+                        prefix: this.suffix(node.expression)
+                    } as Optional);
+                }
+            }),
             name: this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), this.convert(node.name)),
             type: this.mapType(node)
         };
@@ -3045,7 +3044,7 @@ export class JavaScriptParserVisitor {
     visitVariableDeclaration(node: ts.VariableDeclaration): JS.JSVariableDeclarations.JSNamedVariable | J.VariableDeclarations.NamedVariable {
         const nameExpression: Expression = this.visit(node.name);
         const markers = produce(emptyMarkers, draft => {
-            if(node.exclamationToken) {
+            if (node.exclamationToken) {
                 draft.markers.push({
                     kind: JS.Markers.NonNullAssertion,
                     id: randomId(),
@@ -3072,18 +3071,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: markers,
-            name: node.exclamationToken ? {
-                kind: JS.Kind.Unary,
-                id: randomId(),
-                prefix: emptySpace,
-                markers: emptyMarkers,
-                operator: this.leftPadded(
-                    this.suffix(node.name),
-                    JS.Unary.Type.Exclamation
-                ),
-                expression: nameExpression,
-                type: this.mapType(node)
-            } as JS.Unary : nameExpression,
+            name: nameExpression,
             dimensionsAfterName: [],
             initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)),
             variableType: this.mapVariableType(node),

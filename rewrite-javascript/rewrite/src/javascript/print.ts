@@ -1658,11 +1658,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 p.append("...");
                 await this.visit(unary.expression, p);
                 break;
-            case JS.Unary.Type.QuestionDot:
-                await this.visit(unary.expression, p);
-                await this.visitSpace(unary.operator.before, p);
-                p.append("?");
-                break;
             case JS.Unary.Type.QuestionDotWithDot:
                 await this.visit(unary.expression, p);
                 await this.visitSpace(unary.operator.before, p);
