@@ -488,6 +488,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             }
 
             await this.visit(variable.element.name, p);
+            // print non-null assertions or optional
+            await this.postVisit(variable.element, p);
+
             await this.visitSpace(variable.after, p);
 
             if (multiVariable.typeExpression) {
@@ -1954,7 +1957,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 p.append("?");
             }
         }
-        return super.postVisit(tree, p);
+        return tree;
     }
 
     private printComment(comment: Comment, cursor: Cursor, p: PrintOutputCapture): void {

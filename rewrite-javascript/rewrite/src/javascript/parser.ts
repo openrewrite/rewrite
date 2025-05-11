@@ -3059,7 +3059,7 @@ export class JavaScriptParserVisitor {
                 kind: J.Kind.NamedVariable,
                 id: randomId(),
                 prefix: this.prefix(node),
-                markers: emptyMarkers,
+                markers: markers,
                 name: nameExpression as J.Identifier,
                 dimensionsAfterName: [],
                 initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)),
