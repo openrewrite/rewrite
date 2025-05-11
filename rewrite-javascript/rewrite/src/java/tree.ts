@@ -37,6 +37,9 @@ export interface NameTree extends TypedTree {
 export interface TypeTree extends NameTree {
 }
 
+export interface VariableDeclarator extends J {
+}
+
 export interface JavaSourceFile extends J, SourceFile {
     readonly packageDeclaration: J.RightPadded<J.Package>;
     readonly imports: J.RightPadded<J.Import>[];
@@ -50,6 +53,7 @@ export interface NameTree extends J {
 }
 
 export namespace J {
+    import NamedVariable = J.VariableDeclarations.NamedVariable;
     export const Kind = {
         ...TreeKind,
         AnnotatedType: "org.openrewrite.java.tree.J$AnnotatedType",
@@ -371,7 +375,7 @@ export namespace J {
         readonly parenthesizedType: Parentheses<TypeTree>;
     }
 
-    export interface Identifier extends J, TypeTree, Expression {
+    export interface Identifier extends J, TypeTree, Expression, VariableDeclarator {
         readonly kind: typeof Kind.Identifier;
         readonly annotations: Annotation[];
         readonly simpleName: string;
@@ -618,22 +622,24 @@ export namespace J {
 
     export interface Try extends J, Statement {
         readonly kind: typeof Kind.Try;
-        readonly resources?: Container<TryResource>;
+        readonly resources?: Container<Try.Resource>;
         readonly body: Block;
-        readonly catches: TryCatch[];
+        readonly catches: Try.Catch[];
         readonly finally?: LeftPadded<Block>;
     }
 
-    export interface TryResource extends J {
-        readonly kind: typeof Kind.TryResource;
-        readonly variableDeclarations: TypedTree;
-        readonly terminatedWithSemicolon: boolean;
-    }
+    export namespace Try {
+        export interface Resource extends J {
+            readonly kind: typeof Kind.TryResource;
+            readonly variableDeclarations: TypedTree;
+            readonly terminatedWithSemicolon: boolean;
+        }
 
-    export interface TryCatch extends J {
-        readonly kind: typeof Kind.TryCatch;
-        readonly parameter: ControlParentheses<VariableDeclarations>;
-        readonly body: Block;
+        export interface Catch extends J {
+            readonly kind: typeof Kind.TryCatch;
+            readonly parameter: ControlParentheses<VariableDeclarations>;
+            readonly body: Block;
+        }
     }
 
     export interface TypeCast extends J, TypedTree, Expression {
@@ -683,17 +689,13 @@ export namespace J {
         readonly modifiers: Modifier[];
         readonly typeExpression?: TypeTree;
         readonly varargs?: Space;
-        readonly variables: RightPadded<VariableDeclarations.NamedVariable>[];
+        readonly variables: RightPadded<NamedVariable>[];
     }
 
     export namespace VariableDeclarations {
-        /**
-         * Represents a single named variable declaration, potentially
-         * with an initializer.
-         */
         export interface NamedVariable extends J {
             readonly kind: typeof Kind.NamedVariable;
-            readonly name: Identifier;
+            readonly name: VariableDeclarator;
             readonly dimensionsAfterName: LeftPadded<Space>[];
             readonly initializer?: LeftPadded<Expression>;
             readonly variableType?: JavaType.Variable;

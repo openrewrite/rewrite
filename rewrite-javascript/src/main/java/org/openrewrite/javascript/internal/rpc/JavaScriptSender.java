@@ -215,33 +215,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitJSVariableDeclarations(JS.JSVariableDeclarations variable, RpcSendQueue q) {
-        q.getAndSendList(variable, JS.JSVariableDeclarations::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
-        q.getAndSendList(variable, JS.JSVariableDeclarations::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        if (variable.getTypeExpression() != null) {
-            q.getAndSend(variable, JS.JSVariableDeclarations::getTypeExpression, el -> visit(el, q));
-        }
-        if (variable.getVarargs() != null) {
-            q.getAndSend(variable, JS.JSVariableDeclarations::getVarargs, el -> visitSpace(getValueNonNull(el), q));
-        }
-        q.getAndSendList(variable, el -> el.getPadding().getVariables(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
-        return variable;
-    }
-
-    @Override
-    public J visitJSVariableDeclarationsJSNamedVariable(JS.JSVariableDeclarations.JSNamedVariable named, RpcSendQueue q) {
-        q.getAndSend(named, JS.JSVariableDeclarations.JSNamedVariable::getName, el -> visit(el, q));
-        q.getAndSendList(named, JS.JSVariableDeclarations.JSNamedVariable::getDimensionsAfterName, el -> el.getElement().getWhitespace() + el.getElement().getComments(), el -> visitLeftPadded(el, q));
-        if (named.getPadding().getInitializer() != null) {
-            q.getAndSend(named, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
-        }
-        if (named.getVariableType() != null) {
-            q.getAndSend(named, el -> asRef(el.getVariableType()), el -> visitType(getValueNonNull(el), q));
-        }
-        return named;
-    }
-
-    @Override
     public J visitImportAttributes(JS.ImportAttributes importAttributes, RpcSendQueue q) {
         q.getAndSend(importAttributes, JS.ImportAttributes::getToken);
         q.getAndSend(importAttributes, el -> el.getPadding().getElements(), el -> visitContainer(el, q));
@@ -593,23 +566,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(forInLoop, JS.ForInLoop::getControl, el -> visit(el, q));
         q.getAndSend(forInLoop, el -> el.getPadding().getBody(), el -> visitRightPadded(el, q));
         return forInLoop;
-    }
-
-    @Override
-    public J visitJSTry(JS.JSTry jSTry, RpcSendQueue q) {
-        q.getAndSend(jSTry, JS.JSTry::getBody, el -> visit(el, q));
-        q.getAndSend(jSTry, JS.JSTry::getCatches, el -> visit(el, q));
-        if (jSTry.getPadding().getFinally() != null) {
-            q.getAndSend(jSTry, el -> el.getPadding().getFinally(), el -> visitLeftPadded(el, q));
-        }
-        return jSTry;
-    }
-
-    @Override
-    public J visitJSTryJSCatch(JS.JSTry.JSCatch jSCatch, RpcSendQueue q) {
-        q.getAndSend(jSCatch, JS.JSTry.JSCatch::getParameter, el -> visit(el, q));
-        q.getAndSend(jSCatch, JS.JSTry.JSCatch::getBody, el -> visit(el, q));
-        return jSCatch;
     }
 
     @Override

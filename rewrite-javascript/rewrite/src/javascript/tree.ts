@@ -17,7 +17,7 @@
  */
 
 import {SourceFile, TreeKind} from "../";
-import {Expression, J, JavaType, Statement, TypedTree, TypeTree,} from "../java";
+import {Expression, J, JavaType, Statement, TypedTree, TypeTree, VariableDeclarator,} from "../java";
 import getType = TypedTree.getType;
 import FunctionType = JS.FunctionType;
 
@@ -54,13 +54,9 @@ export namespace JS {
         IndexedAccessTypeIndexType: "org.openrewrite.javascript.tree.JS$IndexedAccessType$IndexType",
         InferType: "org.openrewrite.javascript.tree.JS$InferType",
         Intersection: "org.openrewrite.javascript.tree.JS$Intersection",
-        JSCatch: "org.openrewrite.javascript.tree.JS$JSTry$JSCatch",
         ForInLoop: "org.openrewrite.javascript.tree.JS$ForInLoop",
         ForOfLoop: "org.openrewrite.javascript.tree.JS$ForOfLoop",
         ComputedPropertyMethodDeclaration: "org.openrewrite.javascript.tree.JS$ComputedPropertyMethodDeclaration",
-        JSNamedVariable: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations$JSNamedVariable",
-        JSTry: "org.openrewrite.javascript.tree.JS$JSTry",
-        JSVariableDeclarations: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations",
         AssignmentOperation: "org.openrewrite.javascript.tree.JS$AssignmentOperation",
         Binary: "org.openrewrite.javascript.tree.JS$Binary",
         Import: "org.openrewrite.javascript.tree.JS$Import",
@@ -263,34 +259,6 @@ export namespace JS {
     }
 
     /**
-     * Represents JavaScript variable declarations (var, let, const).
-     * @example const x = 1, y = 2;
-     * @example const {a} = {a: 1};
-     */
-    export interface JSVariableDeclarations extends JS, Statement, TypedTree {
-        readonly kind: typeof Kind.JSVariableDeclarations;
-        readonly leadingAnnotations: J.Annotation[];
-        readonly modifiers: J.Modifier[];
-        readonly typeExpression?: TypeTree;
-        readonly varargs?: J.Space;
-        readonly variables: J.RightPadded<JSVariableDeclarations.JSNamedVariable>[];
-    }
-
-    export namespace JSVariableDeclarations {
-        /**
-         * Represents a single named variable in a declaration.
-         * @example const { prop } = obj;
-         */
-        export interface JSNamedVariable extends JS {
-            readonly kind: typeof Kind.JSNamedVariable;
-            readonly name: Expression;
-            readonly dimensionsAfterName: J.LeftPadded<J.Space>[];
-            readonly initializer?: J.LeftPadded<Expression>;
-            readonly variableType?: JavaType.Variable;
-        }
-    }
-
-    /**
      * Represents import assertion attributes.
      * @example import data from './data.json' assert { type: 'json' };
      */
@@ -403,7 +371,7 @@ export namespace JS {
      * Represents object destructuring patterns.
      * @example const { a, b } = obj;
      */
-    export interface ObjectBindingDeclarations extends JS, Expression, TypedTree {
+    export interface ObjectBindingDeclarations extends JS, Expression, TypedTree, VariableDeclarator {
         readonly kind: typeof Kind.ObjectBindingDeclarations;
         readonly leadingAnnotations: J.Annotation[];
         readonly modifiers: J.Modifier[];
@@ -629,7 +597,7 @@ export namespace JS {
      * Represents TypeScript computed property name.
      * @example { [key]: value }
      */
-    export interface ComputedPropertyName extends JS, Expression, TypedTree {
+    export interface ComputedPropertyName extends JS, Expression, TypedTree, VariableDeclarator {
         readonly kind: typeof Kind.ComputedPropertyName;
         readonly expression: J.RightPadded<Expression>;
     }
@@ -761,29 +729,6 @@ export namespace JS {
     }
 
     /**
-     * Represents a try statement with optional catch and finally.
-     * @example try { } catch (e) { } finally { }
-     */
-    export interface JSTry extends JS, Statement {
-        readonly kind: typeof Kind.JSTry;
-        readonly body: J.Block;
-        readonly catches: JSTry.JSCatch;
-        readonly finally?: J.LeftPadded<J.Block>;
-    }
-
-    export namespace JSTry {
-        /**
-         * Represents a catch clause in a try statement.
-         * @example catch (e) { console.error(e); }
-         */
-        export interface JSCatch extends JS {
-            readonly kind: typeof Kind.JSCatch;
-            readonly parameter: J.ControlParentheses<JSVariableDeclarations>;
-            readonly body: J.Block;
-        }
-    }
-
-    /**
      * Represents a namespace declaration in TypeScript.
      * @example namespace MyNS { }
      */
@@ -833,7 +778,7 @@ export namespace JS {
      * Represents an array destructuring pattern.
      * @example const [a, b] = arr;
      */
-    export interface ArrayBindingPattern extends JS, TypedTree {
+    export interface ArrayBindingPattern extends JS, TypedTree, VariableDeclarator {
         readonly kind: typeof Kind.ArrayBindingPattern;
         readonly elements: J.Container<Expression>;
         readonly type?: JavaType;

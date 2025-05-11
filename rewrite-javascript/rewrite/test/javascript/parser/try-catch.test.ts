@@ -1,3 +1,5 @@
+// noinspection TypeScriptUnresolvedReference
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>

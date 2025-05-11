@@ -2520,7 +2520,7 @@ public interface J extends Tree, RpcCodec<J> {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @With
-    class Identifier implements J, TypeTree, Expression {
+    class Identifier implements J, TypeTree, Expression, VariableDeclarator {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -2554,6 +2554,11 @@ public interface J extends Tree, RpcCodec<J> {
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @Override
+        public List<Identifier> getNames() {
+            return singletonList(this);
         }
     }
 
@@ -6010,9 +6015,27 @@ public interface J extends Tree, RpcCodec<J> {
             @Getter
             Markers markers;
 
-            @With
-            @Getter
-            Identifier name;
+            VariableDeclarator name;
+
+            public Identifier getName() {
+                if (name.getNames().isEmpty()) {
+                    return new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                            emptyList(), "<dynamic>", name.getType(), null);
+                }
+                return name.getNames().iterator().next();
+            }
+
+            public NamedVariable withName(Identifier name) {
+                return withDeclarator(name);
+            }
+
+            public VariableDeclarator getDeclarator() {
+                return name;
+            }
+
+            public NamedVariable withDeclarator(VariableDeclarator declarator) {
+                return name == declarator ? this : new NamedVariable(id, prefix, markers, declarator, dimensionsAfterName, initializer, variableType);
+            }
 
             @With
             @Getter
@@ -6048,7 +6071,7 @@ public interface J extends Tree, RpcCodec<J> {
             }
 
             public String getSimpleName() {
-                return name.getSimpleName();
+                return getName().getSimpleName();
             }
 
             @Override

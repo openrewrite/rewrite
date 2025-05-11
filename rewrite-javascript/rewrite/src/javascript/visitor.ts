@@ -186,25 +186,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJSVariableDeclarations(jSVariableDeclarations: JS.JSVariableDeclarations, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JSVariableDeclarations>(jSVariableDeclarations, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(jSVariableDeclarations.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
-            draft.modifiers = await mapAsync(jSVariableDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.typeExpression = jSVariableDeclarations.typeExpression && await this.visitDefined<TypedTree>(jSVariableDeclarations.typeExpression, p);
-            draft.varargs = jSVariableDeclarations.varargs && await this.visitSpace(jSVariableDeclarations.varargs, p);
-            draft.variables = await mapAsync(jSVariableDeclarations.variables, item => this.visitRightPadded(item, p));
-        });
-    }
-
-    protected async visitJSNamedVariable(jSNamedVariable: JS.JSVariableDeclarations.JSNamedVariable, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JSVariableDeclarations.JSNamedVariable>(jSNamedVariable, p, async draft => {
-            draft.name = await this.visitDefined<Expression>(jSNamedVariable.name, p);
-            draft.dimensionsAfterName = await mapAsync(jSNamedVariable.dimensionsAfterName, item => this.visitLeftPadded(item, p));
-            draft.initializer = jSNamedVariable.initializer && await this.visitLeftPadded(jSNamedVariable.initializer, p);
-            draft.variableType = jSNamedVariable.variableType && (await this.visitType(jSNamedVariable.variableType, p) as JavaType.Variable);
-        });
-    }
-
     protected async visitImportAttributes(importAttributes: JS.ImportAttributes, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ImportAttributes>(importAttributes, p, async draft => {
             draft.elements = await this.visitContainer(importAttributes.elements, p);
@@ -489,21 +470,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJSTry(jSTry: JS.JSTry, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JSTry>(jSTry, p, async draft => {
-            draft.body = await this.visitDefined<J.Block>(jSTry.body, p);
-            draft.catches = await this.visitDefined<JS.JSTry.JSCatch>(jSTry.catches, p);
-            draft.finally = jSTry.finally && await this.visitLeftPadded(jSTry.finally, p);
-        });
-    }
-
-    protected async visitJSCatch(jSCatch: JS.JSTry.JSCatch, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JSTry.JSCatch>(jSCatch, p, async draft => {
-            draft.parameter = await this.visitDefined<J.ControlParentheses<JS.JSVariableDeclarations>>(jSCatch.parameter, p);
-            draft.body = await this.visitDefined<J.Block>(jSCatch.body, p);
-        });
-    }
-
     protected async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.NamespaceDeclaration>(namespaceDeclaration, p, async draft => {
             draft.modifiers = await mapAsync(namespaceDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p));
@@ -616,10 +582,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitNamedImports(tree as unknown as JS.NamedImports, p);
                 case JS.Kind.ImportSpecifier:
                     return this.visitImportSpecifier(tree as unknown as JS.ImportSpecifier, p);
-                case JS.Kind.JSVariableDeclarations:
-                    return this.visitJSVariableDeclarations(tree as unknown as JS.JSVariableDeclarations, p);
-                case JS.Kind.JSNamedVariable:
-                    return this.visitJSNamedVariable(tree as unknown as JS.JSVariableDeclarations.JSNamedVariable, p);
                 case JS.Kind.ImportAttributes:
                     return this.visitImportAttributes(tree as unknown as JS.ImportAttributes, p);
                 case JS.Kind.ImportTypeAttributes:
@@ -692,10 +654,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitForOfLoop(tree as unknown as JS.ForOfLoop, p);
                 case JS.Kind.ForInLoop:
                     return this.visitForInLoop(tree as unknown as JS.ForInLoop, p);
-                case JS.Kind.JSTry:
-                    return this.visitJSTry(tree as unknown as JS.JSTry, p);
-                case JS.Kind.JSCatch:
-                    return this.visitJSCatch(tree as unknown as JS.JSTry.JSCatch, p);
                 case JS.Kind.NamespaceDeclaration:
                     return this.visitNamespaceDeclaration(tree as unknown as JS.NamespaceDeclaration, p);
                 case JS.Kind.FunctionDeclaration:

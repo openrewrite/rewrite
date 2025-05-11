@@ -51,8 +51,6 @@ const is_statements: string[] = [
     JS.Kind.AssignmentOperation,
     JS.Kind.Import,
     JS.Kind.ComputedPropertyMethodDeclaration,
-    JS.Kind.JSTry,
-    JS.Kind.JSVariableDeclarations,
     JS.Kind.MappedTypeKeysRemapping,
     JS.Kind.MappedTypeMappedTypeParameter,
     JS.Kind.NamespaceDeclaration,

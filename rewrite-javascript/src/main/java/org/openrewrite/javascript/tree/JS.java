@@ -2187,7 +2187,7 @@ public interface JS extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ObjectBindingDeclarations implements JS, Expression, TypedTree {
+    final class ObjectBindingDeclarations implements JS, Expression, TypedTree, VariableDeclarator {
 
         @Nullable
         @NonFinal
@@ -2223,6 +2223,17 @@ public interface JS extends J {
 
         public List<J> getBindings() {
             return bindings.getElements();
+        }
+
+        @Override
+        public List<Identifier> getNames() {
+            List<Identifier> list = new ArrayList<>();
+            for (J j : bindings.getElements()) {
+                if (j instanceof Identifier) {
+                    list.add((Identifier) j);
+                }
+            }
+            return list;
         }
 
         public ObjectBindingDeclarations withBindings(List<J> bindings) {
@@ -3234,7 +3245,7 @@ public interface JS extends J {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
-    final class ComputedPropertyName implements JS, Expression, TypeTree {
+    final class ComputedPropertyName implements JS, Expression, TypeTree, VariableDeclarator {
 
         @Nullable
         @NonFinal
@@ -3295,6 +3306,19 @@ public interface JS extends J {
                 }
             }
             return p;
+        }
+
+        /**
+         * The name of a computed property names can not be known statically, since
+         * its whole purpose is to be dynamic. The name is the result of the evaluation of
+         * an arbitrary expression. Since any static analysis on names will not be able to
+         * act on such a name, we return an empty list.
+         *
+         * @return An empty list.
+         */
+        @Override
+        public List<Identifier> getNames() {
+            return emptyList();
         }
 
         @RequiredArgsConstructor
@@ -3731,233 +3755,6 @@ public interface JS extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class JSVariableDeclarations implements JS, Statement, TypedTree {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        List<Annotation> leadingAnnotations;
-
-        @With
-        @Getter
-        List<Modifier> modifiers;
-
-        @With
-        @Nullable
-        @Getter
-        TypeTree typeExpression;
-
-        @With
-        @Nullable
-        @Getter
-        Space varargs;
-
-        List<JRightPadded<JSNamedVariable>> variables;
-
-        public List<JSNamedVariable> getVariables() {
-            return JRightPadded.getElements(variables);
-        }
-
-        public JSVariableDeclarations withVariables(List<JSNamedVariable> vars) {
-            return getPadding().withVariables(JRightPadded.withElements(this.variables, vars));
-        }
-
-        @Override
-        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitJSVariableDeclarations(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        public JavaType.@Nullable FullyQualified getTypeAsFullyQualified() {
-            return typeExpression == null ? null : TypeUtils.asFullyQualified(typeExpression.getType());
-        }
-
-        @Override
-        public @Nullable JavaType getType() {
-            return typeExpression == null ? null : typeExpression.getType();
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public JSVariableDeclarations withType(@Nullable JavaType type) {
-            return typeExpression == null ? this :
-                    withTypeExpression(typeExpression.withType(type));
-        }
-
-        @Override
-        public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @RequiredArgsConstructor
-        @AllArgsConstructor(access = AccessLevel.PRIVATE)
-        public static final class JSNamedVariable implements JS, NameTree {
-            @Nullable
-            @NonFinal
-            transient WeakReference<JSNamedVariable.Padding> padding;
-
-            @With
-            @EqualsAndHashCode.Include
-            @Getter
-            UUID id;
-
-            @With
-            @Getter
-            Space prefix;
-
-            @With
-            @Getter
-            Markers markers;
-
-            @With
-            @Getter
-            Expression name;
-
-            @With
-            @Getter
-            List<JLeftPadded<Space>> dimensionsAfterName;
-
-            @Nullable
-            JLeftPadded<Expression> initializer;
-
-            public @Nullable Expression getInitializer() {
-                return initializer == null ? null : initializer.getElement();
-            }
-
-            public JSNamedVariable withInitializer(@Nullable Expression initializer) {
-                if (initializer == null) {
-                    return this.initializer == null ? this : new JSNamedVariable(id, prefix, markers, name, dimensionsAfterName, null, variableType);
-                }
-                return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
-            }
-
-            @With
-            @Getter
-            JavaType.@Nullable Variable variableType;
-
-            @Override
-            public @Nullable JavaType getType() {
-                return variableType != null ? variableType.getType() : null;
-            }
-
-            @SuppressWarnings("unchecked")
-            @Override
-            public JSNamedVariable withType(@Nullable JavaType type) {
-                return type != null && variableType != null ? withVariableType(variableType.withType(type)) : this;
-            }
-
-            @Override
-            public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-                return v.visitJSVariableDeclarationsJSNamedVariable(this, p);
-            }
-
-            public Cursor getDeclaringScope(Cursor cursor) {
-                return cursor.dropParentUntil(it ->
-                        it instanceof J.Block ||
-                        it instanceof J.Lambda ||
-                        it instanceof J.MethodDeclaration ||
-                        it == Cursor.ROOT_VALUE);
-            }
-
-            public boolean isField(Cursor cursor) {
-                Cursor declaringScope = getDeclaringScope(cursor);
-                return declaringScope.getValue() instanceof J.Block &&
-                       declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
-            }
-
-            public JSNamedVariable.Padding getPadding() {
-                JSNamedVariable.Padding p;
-                if (this.padding == null) {
-                    p = new JSNamedVariable.Padding(this);
-                    this.padding = new WeakReference<>(p);
-                } else {
-                    p = this.padding.get();
-                    if (p == null || p.t != this) {
-                        p = new JSNamedVariable.Padding(this);
-                        this.padding = new WeakReference<>(p);
-                    }
-                }
-                return p;
-            }
-
-            @Override
-            public String toString() {
-                return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
-            }
-
-            @RequiredArgsConstructor
-            public static class Padding {
-                private final JSNamedVariable t;
-
-                public @Nullable JLeftPadded<Expression> getInitializer() {
-                    return t.initializer;
-                }
-
-                public JSNamedVariable withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                    return t.initializer == initializer ? t : new JSNamedVariable(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.variableType);
-                }
-            }
-        }
-
-        public boolean hasModifier(Modifier.Type modifier) {
-            return Modifier.hasModifier(getModifiers(), modifier);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final JSVariableDeclarations t;
-
-            public List<JRightPadded<JSNamedVariable>> getVariables() {
-                return t.variables;
-            }
-
-            public JSVariableDeclarations withVariables(List<JRightPadded<JSNamedVariable>> variables) {
-                return t.variables == variables ? t : new JSVariableDeclarations(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeExpression, t.varargs, variables);
-            }
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
     final class ComputedPropertyMethodDeclaration implements JS, Statement, TypedTree {
         @Nullable
@@ -4219,113 +4016,6 @@ public interface JS extends J {
 
             public ForInLoop withBody(JRightPadded<Statement> body) {
                 return t.body == body ? t : new ForInLoop(t.id, t.prefix, t.markers, t.control, body);
-            }
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class JSTry implements JS, Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<JSTry.Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        Block body;
-
-        @With
-        @Getter
-        JSTry.JSCatch catches;
-
-        @Nullable
-        JLeftPadded<Block> finallie;
-
-        public @Nullable Block getFinally() {
-            return finallie == null ? null : finallie.getElement();
-        }
-
-        public JSTry withFinally(@Nullable Block aFinally) {
-            return getPadding().withFinally(JLeftPadded.withElement(this.finallie, aFinally));
-        }
-
-        @Override
-        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitJSTry(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class JSCatch implements JS {
-            @With
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            Space prefix;
-
-            @With
-            Markers markers;
-
-            @With
-            ControlParentheses<JSVariableDeclarations> parameter;
-
-            @With
-            Block body;
-
-            @Override
-            public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-                return v.visitJSTryJSCatch(this, p);
-            }
-        }
-
-        public JSTry.Padding getPadding() {
-            JSTry.Padding p;
-            if (this.padding == null) {
-                p = new JSTry.Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new JSTry.Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final JSTry t;
-
-            public @Nullable JLeftPadded<Block> getFinally() {
-                return t.finallie;
-            }
-
-            public JSTry withFinally(@Nullable JLeftPadded<Block> aFinally) {
-                return t.finallie == aFinally ? t : new JSTry(t.id, t.prefix, t.markers, t.body, t.catches, aFinally);
             }
         }
     }
@@ -4709,7 +4399,7 @@ public interface JS extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ArrayBindingPattern implements JS, Expression, TypedTree {
+    final class ArrayBindingPattern implements JS, Expression, TypedTree, VariableDeclarator {
 
         @Nullable
         @NonFinal
@@ -4736,6 +4426,17 @@ public interface JS extends J {
 
         public ArrayBindingPattern withElements(List<Expression> elements) {
             return getPadding().withElements(JContainer.withElements(this.elements, elements));
+        }
+
+        @Override
+        public List<Identifier> getNames() {
+            List<Identifier> list = new ArrayList<>();
+            for (Expression e : elements.getElements()) {
+                if (e instanceof Identifier) {
+                    list.add((Identifier) e);
+                }
+            }
+            return list;
         }
 
         @Nullable

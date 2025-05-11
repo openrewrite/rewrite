@@ -25,9 +25,9 @@ import {
     Statement,
     TextComment,
     TrailingComma,
-    TypeTree,
+    TypeTree, VariableDeclarator,
 } from '../java';
-import {Asterisk, DelegatedYield, isJavaScript, JS, NonNullAssertion, Optional, Spread} from '.';
+import {Asterisk, DelegatedYield, JS, NonNullAssertion, Optional, Spread} from '.';
 import {
     emptyMarkers,
     markers,
@@ -422,10 +422,6 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    // private rightPaddedList<N extends ts.Node, T extends J>(nodes: ts.NodeArray<N>, trailing: (node: N) => Space, markers?: (node: N) => Markers): J.RightPadded<T>[] {
-    //     return nodes.map(n => this.rightPadded(this.convert(n), trailing(n), markers?.(n)));
-    // }
-
     private rightPaddedList<N extends ts.Node, T extends J>(nodes: N[], trailing: (node: N) => J.Space, markers?: (node: N) => Markers): J.RightPadded<T>[] {
         return nodes.map(n => this.rightPadded(this.convert(n), trailing(n), markers?.(n)));
     }
@@ -757,44 +753,9 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitParameter(node: ts.ParameterDeclaration): J.VariableDeclarations | JS.JSVariableDeclarations {
-        const nameExpression: Expression = this.visit(node.name)
-        if (nameExpression.kind === J.Kind.Identifier) {
-            return {
-                kind: J.Kind.VariableDeclarations,
-                id: randomId(),
-                prefix: this.prefix(node),
-                markers: emptyMarkers,
-                leadingAnnotations: this.mapDecorators(node),
-                modifiers: this.mapModifiers(node),
-                typeExpression: this.mapTypeInfo(node),
-                variables: [this.rightPadded(
-                    {
-                        kind: J.Kind.NamedVariable,
-                        id: randomId(),
-                        prefix: this.prefix(node.name),
-                        markers: emptyMarkers,
-                        name: produce(nameExpression as J.Identifier, draft => {
-                            draft.markers = this.maybeAddOptionalMarker(draft, node);
-                            if (node.dotDotDotToken) {
-                                draft.markers.markers.push({
-                                    kind: JS.Markers.Spread,
-                                    id: randomId(),
-                                    prefix: this.prefix(node.dotDotDotToken)
-                                } as Spread);
-                            }
-                        }),
-                        dimensionsAfterName: [],
-                        initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
-                        variableType: this.mapVariableType(node)
-                    },
-                    this.suffix(node.name)
-                )]
-            } as J.VariableDeclarations;
-        }
-
+    visitParameter(node: ts.ParameterDeclaration): J.VariableDeclarations {
         return {
-            kind: JS.Kind.JSVariableDeclarations,
+            kind: J.Kind.VariableDeclarations,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
@@ -803,17 +764,17 @@ export class JavaScriptParserVisitor {
             typeExpression: this.mapTypeInfo(node),
             variables: [this.rightPadded(
                 {
-                    kind: JS.Kind.JSNamedVariable,
+                    kind: J.Kind.NamedVariable,
                     id: randomId(),
-                    prefix: this.prefix(node.name),
+                    prefix: node.dotDotDotToken ? this.prefix(node.dotDotDotToken) : this.prefix(node.name),
                     markers: emptyMarkers,
-                    name: produce(nameExpression, draft => {
+                    name: produce(this.convert<VariableDeclarator>(node.name), draft => {
                         draft.markers = this.maybeAddOptionalMarker(draft, node);
                         if (node.dotDotDotToken) {
                             draft.markers.markers.push({
                                 kind: JS.Markers.Spread,
                                 id: randomId(),
-                                prefix: this.prefix(node.dotDotDotToken)
+                                prefix: this.prefix(node.name)
                             } as Spread);
                         }
                     }),
@@ -897,8 +858,10 @@ export class JavaScriptParserVisitor {
                 )]
             };
         } else {
+            // FIXME We are mapping the literals in things like type ascii = { " ": 32; "!": 33; } to
+            //  named variables, which is not a good use of this construct.
             return {
-                kind: JS.Kind.JSVariableDeclarations,
+                kind: J.Kind.VariableDeclarations,
                 id: randomId(),
                 prefix: prefix,
                 markers: emptyMarkers,
@@ -907,7 +870,7 @@ export class JavaScriptParserVisitor {
                 typeExpression: this.mapTypeInfo(node),
                 variables: [this.rightPadded(
                     {
-                        kind: JS.Kind.JSNamedVariable,
+                        kind: J.Kind.NamedVariable,
                         id: randomId(),
                         prefix: this.prefix(node.name),
                         markers: emptyMarkers,
@@ -965,7 +928,7 @@ export class JavaScriptParserVisitor {
         }
 
         return {
-            kind: JS.Kind.JSVariableDeclarations,
+            kind: J.Kind.VariableDeclarations,
             id: randomId(),
             prefix: prefix,
             markers: emptyMarkers,
@@ -974,7 +937,7 @@ export class JavaScriptParserVisitor {
             typeExpression: this.mapTypeInfo(node),
             variables: [this.rightPadded(
                 {
-                    kind: JS.Kind.JSNamedVariable,
+                    kind: J.Kind.NamedVariable,
                     id: randomId(),
                     prefix: this.prefix(node.name),
                     markers: emptyMarkers,
@@ -1669,7 +1632,7 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: emptySpace,
                     markers: emptyMarkers,
-                    name: produce(this.visit(node.name) as J.Identifier, draft => {
+                    name: produce(this.convert<J.Identifier>(node.name), draft => {
                         draft.markers = this.maybeAddOptionalMarker(draft, node);
                         if (node.dotDotDotToken) {
                             draft.markers.markers.push({
@@ -2911,19 +2874,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitTryStatement(node: ts.TryStatement) {
-        if (node.catchClause?.variableDeclaration?.name && !ts.isIdentifier(node.catchClause?.variableDeclaration?.name)) {
-            return {
-                kind: JS.Kind.JSTry,
-                id: randomId(),
-                prefix: this.prefix(node),
-                markers: emptyMarkers,
-                body: this.visit(node.tryBlock),
-                catches: this.visit(node.catchClause),
-                finally: node.finallyBlock && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FinallyKeyword)!), this.visit(node.finallyBlock))
-            };
-        }
-
+    visitTryStatement(node: ts.TryStatement): J.Try {
         return {
             kind: J.Kind.Try,
             id: randomId(),
@@ -2945,41 +2896,25 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitVariableDeclaration(node: ts.VariableDeclaration): JS.JSVariableDeclarations.JSNamedVariable | J.VariableDeclarations.NamedVariable {
-        const nameExpression: Expression = this.visit(node.name);
-        const markers = produce(emptyMarkers, draft => {
-            if (node.exclamationToken) {
-                draft.markers.push({
-                    kind: JS.Markers.NonNullAssertion,
-                    id: randomId(),
-                    prefix: this.suffix(node.name)
-                } as NonNullAssertion);
-            }
-        });
-
-        if (nameExpression.kind === J.Kind.Identifier) {
-            return {
-                kind: J.Kind.NamedVariable,
-                id: randomId(),
-                prefix: this.prefix(node),
-                markers: markers,
-                name: nameExpression as J.Identifier,
-                dimensionsAfterName: [],
-                initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)),
-                variableType: this.mapVariableType(node),
-            } as J.VariableDeclarations.NamedVariable;
-        }
-
+    visitVariableDeclaration(node: ts.VariableDeclaration): J.VariableDeclarations.NamedVariable {
         return {
-            kind: JS.Kind.JSNamedVariable,
+            kind: J.Kind.NamedVariable,
             id: randomId(),
             prefix: this.prefix(node),
-            markers: markers,
-            name: nameExpression,
+            markers: produce(emptyMarkers, draft => {
+                if (node.exclamationToken) {
+                    draft.markers.push({
+                        kind: JS.Markers.NonNullAssertion,
+                        id: randomId(),
+                        prefix: this.suffix(node.name)
+                    } as NonNullAssertion);
+                }
+            }),
+            name: this.visit(node.name),
             dimensionsAfterName: [],
             initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)),
             variableType: this.mapVariableType(node),
-        } as JS.JSVariableDeclarations.JSNamedVariable;
+        } as J.VariableDeclarations.NamedVariable;
     }
 
     visitVariableDeclarationList(node: ts.VariableDeclarationList): JS.ScopedVariableDeclarations {
@@ -2999,6 +2934,7 @@ export class JavaScriptParserVisitor {
             };
             kind = node.getChildAt(1);
         }
+
         return {
             kind: JS.Kind.ScopedVariableDeclarations,
             id: randomId(),
@@ -3016,30 +2952,18 @@ export class JavaScriptParserVisitor {
                             : JS.ScopedVariableDeclarations.Scope.Var
             ),
             variables: node.declarations.map((declaration) => {
-                const declarationExpression = this.visit(declaration);
-
+                // FIXME this is suspect... we are creating a whole VariableDeclarations for each declaration?
                 return this.rightPadded(
-                    isJavaScript(declarationExpression)
-                        ? {
-                            kind: JS.Kind.JSVariableDeclarations,
-                            id: randomId(),
-                            prefix: this.prefix(declaration),
-                            markers: emptyMarkers,
-                            leadingAnnotations: [],
-                            modifiers: [],
-                            typeExpression: this.mapTypeInfo(declaration),
-                            variables: [this.rightPadded(declarationExpression as JS.JSVariableDeclarations.JSNamedVariable, emptySpace)],
-                        }
-                        : {
-                            kind: J.Kind.VariableDeclarations,
-                            id: randomId(),
-                            prefix: this.prefix(declaration),
-                            markers: emptyMarkers,
-                            leadingAnnotations: [],
-                            modifiers: [],
-                            typeExpression: this.mapTypeInfo(declaration),
-                            variables: [this.rightPadded(declarationExpression, emptySpace)]
-                        },
+                    {
+                        kind: J.Kind.VariableDeclarations,
+                        id: randomId(),
+                        prefix: this.prefix(declaration),
+                        markers: emptyMarkers,
+                        leadingAnnotations: [],
+                        modifiers: [],
+                        typeExpression: this.mapTypeInfo(declaration),
+                        variables: [this.rightPadded(this.visit(declaration), emptySpace)]
+                    },
                     this.suffix(declaration)
                 );
             })
@@ -3637,35 +3561,7 @@ export class JavaScriptParserVisitor {
         return this.convert(node.types[0]);
     }
 
-    visitCatchClause(node: ts.CatchClause) {
-        if (node.variableDeclaration?.name && !ts.isIdentifier(node.variableDeclaration?.name)) {
-            return {
-                kind: JS.Kind.JSCatch,
-                id: randomId(),
-                prefix: this.prefix(node),
-                markers: emptyMarkers,
-                parameter: {
-                    kind: J.Kind.ControlParentheses,
-                    id: randomId(),
-                    prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
-                    markers: emptyMarkers,
-                    tree: this.rightPadded(
-                        {
-                            kind: JS.Kind.JSVariableDeclarations,
-                            id: randomId(),
-                            prefix: this.prefix(node.variableDeclaration),
-                            markers: emptyMarkers,
-                            leadingAnnotations: [],
-                            modifiers: [],
-                            typeExpression: this.mapTypeInfo(node.variableDeclaration),
-                            variables: [this.rightPadded(this.visit(node.variableDeclaration), emptySpace)],
-                        },
-                        this.suffix(node.variableDeclaration))
-                },
-                body: this.visit(node.block)
-            }
-        }
-
+    visitCatchClause(node: ts.CatchClause): J.Try.Catch {
         return {
             kind: J.Kind.TryCatch,
             id: randomId(),

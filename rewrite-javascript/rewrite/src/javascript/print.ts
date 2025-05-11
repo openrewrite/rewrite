@@ -37,16 +37,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return cu;
     }
 
-    // override async visitCompilationUnit(cu: J.CompilationUnit, p: PrintOutputCapture): Promise<J | undefined> {
-    //     await this.beforeSyntax(cu, p);
-    //
-    //     //await this.visitJRightPadded(cu.getStatements(), "", p);
-    //
-    //     await this.visitSpace(cu.eof, p);
-    //     await this.afterSyntax(cu, p);
-    //     return cu;
-    // }
-
     override async visitAlias(alias: JS.Alias, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(alias, p);
         await this.visitRightPadded(alias.propertyName, p);
@@ -211,80 +201,15 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return aTry;
     }
 
-    override async visitTryCatch(catch_: J.TryCatch, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(catch_, p);
+    override async visitTryCatch(aCatch: J.Try.Catch, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(aCatch, p);
         p.append("catch");
-        if (catch_.parameter.tree.element.variables.length > 0) {
-            await this.visit(catch_.parameter, p);
+        if (aCatch.parameter.tree.element.variables.length > 0) {
+            await this.visit(aCatch.parameter, p);
         }
-        await this.visit(catch_.body, p);
-        await this.afterSyntax(catch_, p);
-        return catch_;
-    }
-
-    override async visitJSTry(jsTry: JS.JSTry, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(jsTry, p);
-        p.append("try");
-        await this.visit(jsTry.body, p);
-        await this.visit(jsTry.catches, p);
-        jsTry.finally && await this.visitLeftPaddedLocal("finally", jsTry.finally, p);
-        await this.afterSyntax(jsTry, p);
-        return jsTry;
-    }
-
-    override async visitJSCatch(jsCatch: JS.JSTry.JSCatch, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(jsCatch, p);
-        p.append("catch");
-        await this.visit(jsCatch.parameter, p);
-        await this.visit(jsCatch.body, p);
-        await this.afterSyntax(jsCatch, p);
-        return jsCatch;
-    }
-
-    override async visitJSVariableDeclarations(multiVariable: JS.JSVariableDeclarations, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(multiVariable, p);
-        await this.visitNodes(multiVariable.leadingAnnotations, p);
-        for (const it of multiVariable.modifiers) {
-            await this.visitModifier(it, p);
-        }
-
-        const variables = multiVariable.variables;
-        for (let i = 0; i < variables.length; i++) {
-            const variable = variables[i];
-            await this.beforeSyntax(variable.element, p);
-            if (multiVariable.varargs) {
-                p.append("...");
-            }
-
-            await this.visit(variable.element.name, p);
-
-            await this.visitSpace(variable.after, p);
-            if (multiVariable.typeExpression) {
-                await this.visit(multiVariable.typeExpression, p);
-            }
-
-            if (variable.element.initializer) {
-                await this.visitLeftPaddedLocal("=", variable.element.initializer, p);
-            }
-
-            await this.afterSyntax(variable.element, p);
-            if (i < variables.length - 1) {
-                p.append(",");
-            } else if (variable.markers.markers.find(m => m.kind === J.Markers.Semicolon)) {
-                p.append(";");
-            }
-        }
-
-        await this.afterSyntax(multiVariable, p);
-        return multiVariable;
-    }
-
-    override async visitJSNamedVariable(variable: JS.JSVariableDeclarations.JSNamedVariable, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(variable, p);
-        await this.visit(variable.name, p);
-        variable.initializer && await this.visitLeftPaddedLocal("=", variable.initializer, p);
-        await this.afterSyntax(variable, p);
-        return variable;
+        await this.visit(aCatch.body, p);
+        await this.afterSyntax(aCatch, p);
+        return aCatch;
     }
 
     override async visitArrayDimension(arrayDimension: J.ArrayDimension, p: PrintOutputCapture): Promise<J | undefined> {

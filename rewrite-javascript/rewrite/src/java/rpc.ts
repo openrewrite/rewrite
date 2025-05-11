@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaVisitor} from "./visitor";
-import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {asRef, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {Expression, isSpace, J, TextComment} from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
@@ -367,13 +367,13 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return tryStmt;
     }
 
-    protected async visitTryResource(resource: J.TryResource, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitTryResource(resource: J.Try.Resource, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(resource, r => r.variableDeclarations, variable => this.visit(variable, q));
         await q.getAndSend(resource, r => r.terminatedWithSemicolon);
         return resource;
     }
 
-    protected async visitTryCatch(aCatch: J.TryCatch, q: RpcSendQueue): Promise<J | undefined> {
+    protected async visitTryCatch(aCatch: J.Try.Catch, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(aCatch, c => c.parameter, param => this.visit(param, q));
         await q.getAndSend(aCatch, c => c.body, body => this.visit(body, q));
         return aCatch;
@@ -1065,7 +1065,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitTryResource(resource: J.TryResource, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitTryResource(resource: J.Try.Resource, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(resource);
 
         draft.variableDeclarations = await q.receive(resource.variableDeclarations, variables => this.visit(variables, q));
@@ -1074,7 +1074,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitTryCatch(tryCatch: J.TryCatch, q: RpcReceiveQueue): Promise<J | undefined> {
+    protected async visitTryCatch(tryCatch: J.Try.Catch, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(tryCatch);
 
         draft.parameter = await q.receive(tryCatch.parameter, param => this.visit(param, q));

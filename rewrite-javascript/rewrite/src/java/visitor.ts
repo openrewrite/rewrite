@@ -546,19 +546,19 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return this.produceJava<J.Try>(tryable, p, async draft => {
             draft.resources = await this.visitOptionalContainer(tryable.resources, p);
             draft.body = await this.visitDefined(tryable.body, p) as J.Block;
-            draft.catches = await mapAsync(tryable.catches, c => this.visitDefined<J.TryCatch>(c, p));
+            draft.catches = await mapAsync(tryable.catches, c => this.visitDefined<J.Try.Catch>(c, p));
             draft.finally = await this.visitOptionalLeftPadded(tryable.finally, p);
         });
     }
 
-    protected async visitTryResource(resource: J.TryResource, p: P): Promise<J | undefined> {
-        return this.produceJava<J.TryResource>(resource, p, async draft => {
+    protected async visitTryResource(resource: J.Try.Resource, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Try.Resource>(resource, p, async draft => {
             draft.variableDeclarations = await this.visitDefined(resource.variableDeclarations, p) as TypedTree;
         });
     }
 
-    protected async visitTryCatch(tryCatch: J.TryCatch, p: P): Promise<J | undefined> {
-        return this.produceJava<J.TryCatch>(tryCatch, p, async draft => {
+    protected async visitTryCatch(tryCatch: J.Try.Catch, p: P): Promise<J | undefined> {
+        return this.produceJava<J.Try.Catch>(tryCatch, p, async draft => {
             draft.parameter = await this.visitDefined(tryCatch.parameter, p) as J.ControlParentheses<J.VariableDeclarations>;
             draft.body = await this.visitDefined(tryCatch.body, p) as J.Block;
         });
@@ -830,9 +830,9 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             case J.Kind.Try:
                 return this.visitTry(t as J.Try, p);
             case J.Kind.TryResource:
-                return this.visitTryResource(t as J.TryResource, p);
+                return this.visitTryResource(t as J.Try.Resource, p);
             case J.Kind.TryCatch:
-                return this.visitTryCatch(t as J.TryCatch, p);
+                return this.visitTryCatch(t as J.Try.Catch, p);
             case J.Kind.TypeCast:
                 return this.visitTypeCast(t as J.TypeCast, p);
             case J.Kind.TypeParameter:
