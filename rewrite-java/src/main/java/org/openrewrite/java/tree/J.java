@@ -31,8 +31,13 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -50,7 +55,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
-public interface J extends Tree {
+public interface J extends Tree, RpcCodec<J> {
 
     @SuppressWarnings("unchecked")
     @Override
@@ -99,6 +104,16 @@ public interface J extends Tree {
     @Deprecated
     default String printTrimmed() {
         return StringUtils.trimIndent(print());
+    }
+
+    @Override
+    default void rpcSend(J after, RpcSendQueue q) {
+        new JavaSender().visit(after, q);
+    }
+
+    @Override
+    default J rpcReceive(J before, RpcReceiveQueue q) {
+        return new JavaReceiver().visitNonNull(before, q);
     }
 
     @SuppressWarnings("unchecked")
@@ -329,7 +344,6 @@ public interface J extends Tree {
         @Nullable
         List<J.Annotation> annotations;
 
-        @Nullable // nullable for backwards compatibility only
         JLeftPadded<Space> dimension;
 
         JavaType type;
@@ -2506,7 +2520,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @With
-    class Identifier implements J, TypeTree, Expression {
+    class Identifier implements J, TypeTree, Expression, VariableDeclarator {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -2540,6 +2554,11 @@ public interface J extends Tree {
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @Override
+        public List<Identifier> getNames() {
+            return singletonList(this);
         }
     }
 
@@ -3374,6 +3393,11 @@ public interface J extends Tree {
 
             public Parameters withParameters(List<J> parameters) {
                 return getPadding().withParameters(JRightPadded.withElements(this.parameters, parameters));
+            }
+
+            @Override
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
+                return v.visitLambdaParameters(this, p);
             }
 
             @Transient
@@ -5699,6 +5723,11 @@ public interface J extends Tree {
 
         List<JRightPadded<TypeParameter>> typeParameters;
 
+        @Override
+        public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitTypeParameters(this, p);
+        }
+
         public List<TypeParameter> getTypeParameters() {
             return JRightPadded.getElements(typeParameters);
         }
@@ -5986,9 +6015,27 @@ public interface J extends Tree {
             @Getter
             Markers markers;
 
-            @With
-            @Getter
-            Identifier name;
+            VariableDeclarator name;
+
+            public Identifier getName() {
+                if (name.getNames().isEmpty()) {
+                    return new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                            emptyList(), "<dynamic>", name.getType(), null);
+                }
+                return name.getNames().iterator().next();
+            }
+
+            public NamedVariable withName(Identifier name) {
+                return withDeclarator(name);
+            }
+
+            public VariableDeclarator getDeclarator() {
+                return name;
+            }
+
+            public NamedVariable withDeclarator(VariableDeclarator declarator) {
+                return name == declarator ? this : new NamedVariable(id, prefix, markers, declarator, dimensionsAfterName, initializer, variableType);
+            }
 
             @With
             @Getter
@@ -6024,7 +6071,7 @@ public interface J extends Tree {
             }
 
             public String getSimpleName() {
-                return name.getSimpleName();
+                return getName().getSimpleName();
             }
 
             @Override
@@ -6405,7 +6452,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public @Nullable JavaType getType() {
+        public JavaType getType() {
             return JavaType.Unknown.getInstance();
         }
 
