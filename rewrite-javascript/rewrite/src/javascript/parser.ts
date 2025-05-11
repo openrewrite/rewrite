@@ -1941,7 +1941,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             target: produce(this.convert<Expression>(node.expression), draft => {
-                if(node.questionDotToken) {
+                if (node.questionDotToken) {
                     draft.markers.markers.push({
                         kind: JS.Markers.Optional,
                         id: randomId(),
@@ -1954,23 +1954,21 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitElementAccessExpression(node: ts.ElementAccessExpression) {
+    visitElementAccessExpression(node: ts.ElementAccessExpression): J.ArrayAccess {
         return {
             kind: J.Kind.ArrayAccess,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            indexed: node.questionDotToken ?
-                {
-                    kind: JS.Kind.Unary,
-                    id: randomId(),
-                    prefix: emptySpace,
-                    markers: emptyMarkers,
-                    operator: this.leftPadded(this.suffix(node.expression), JS.Unary.Type.QuestionDotWithDot),
-                    expression: this.visit(node.expression),
-                    type: this.mapType(node)
-                } :
-                this.convert(node.expression),
+            indexed: produce(this.convert<Expression>(node.expression), draft => {
+                if (node.questionDotToken) {
+                    draft.markers.markers.push({
+                        kind: JS.Markers.Optional,
+                        id: randomId(),
+                        prefix: this.suffix(node.expression)
+                    } as Optional);
+                }
+            }),
             dimension: {
                 kind: J.Kind.ArrayDimension,
                 id: randomId(),
@@ -1981,7 +1979,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitCallExpression(node: ts.CallExpression) {
+    visitCallExpression(node: ts.CallExpression): J.MethodInvocation {
         const prefix = this.prefix(node);
         const typeArguments = node.typeArguments && this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments);
 
@@ -2001,15 +1999,16 @@ export class JavaScriptParserVisitor {
             select = undefined;
             name = this.convert(node.expression);
         } else if (node.questionDotToken) {
-            select = this.rightPadded({
-                    kind: JS.Kind.Unary,
-                    id: randomId(),
-                    prefix: emptySpace,
-                    markers: emptyMarkers,
-                    operator: this.leftPadded(this.suffix(node.expression), JS.Unary.Type.QuestionDotWithDot),
-                    expression: this.visit(node.expression),
-                    type: this.mapType(node)
-                },
+            select = this.rightPadded(
+                produce(this.convert<Expression>(node.expression), draft => {
+                    if (node.questionDotToken) {
+                        draft.markers.markers.push({
+                            kind: JS.Markers.Optional,
+                            id: randomId(),
+                            prefix: this.suffix(node.expression)
+                        } as Optional);
+                    }
+                }),
                 emptySpace
             )
         } else {

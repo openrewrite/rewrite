@@ -1658,11 +1658,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 p.append("...");
                 await this.visit(unary.expression, p);
                 break;
-            case JS.Unary.Type.QuestionDotWithDot:
-                await this.visit(unary.expression, p);
-                await this.visitSpace(unary.operator.before, p);
-                p.append("?.");
-                break;
             default:
                 break;
         }
@@ -1950,6 +1945,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             if (marker.kind === JS.Markers.Optional) {
                 await this.visitSpace((marker as Optional).prefix, p);
                 p.append("?");
+                if (this.cursor.parent?.value?.kind === J.Kind.MethodInvocation ||
+                    this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
+                    p.append(".");
+                }
             }
         }
         return tree;
