@@ -407,7 +407,7 @@ export namespace J {
     export interface InstanceOf extends J, Expression, TypedTree {
         readonly kind: typeof Kind.InstanceOf;
         readonly expression: RightPadded<Expression>;
-        readonly clazz: J;
+        readonly class: J;
         readonly pattern?: J;
         readonly type?: JavaType;
         readonly modifier?: Modifier;
@@ -543,7 +543,7 @@ export namespace J {
         readonly kind: typeof Kind.NewClass;
         readonly enclosing?: RightPadded<Expression>;
         readonly new: Space;
-        readonly clazz?: TypeTree;
+        readonly class?: TypeTree;
         readonly arguments: Container<Expression>;
         readonly body?: Block;
         readonly constructorType?: JavaType.Method;
@@ -563,7 +563,7 @@ export namespace J {
 
     export interface ParameterizedType extends J, TypeTree {
         readonly kind: typeof Kind.ParameterizedType;
-        readonly clazz: NameTree;
+        readonly class: NameTree;
         readonly typeParameters?: Container<Expression>;
         readonly type?: JavaType;
     }
@@ -644,7 +644,7 @@ export namespace J {
 
     export interface TypeCast extends J, TypedTree, Expression {
         readonly kind: typeof Kind.TypeCast;
-        readonly clazz: ControlParentheses<TypeTree>;
+        readonly class: ControlParentheses<TypeTree>;
         readonly expression: Expression;
     }
 
@@ -850,7 +850,7 @@ export namespace TypedTree {
     registerTypeGetter(J.Kind.NewClass, (tree: J.NewClass) => tree.constructorType?.returnType);
 
     // TODO ControlParentheses here isn't a TypedTree so why does this compile?
-    registerTypeGetter(J.Kind.TypeCast, (tree: J.TypeCast) => getType(tree.clazz));
+    registerTypeGetter(J.Kind.TypeCast, (tree: J.TypeCast) => getType(tree.class));
 
     registerTypeGetter(J.Kind.Empty, () => JavaType.unknownType);
     registerTypeGetter(J.Kind.MultiCatch, (tree: J.MultiCatch) => {

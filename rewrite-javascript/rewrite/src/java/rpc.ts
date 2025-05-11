@@ -203,7 +203,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitInstanceOf(instanceOf: J.InstanceOf, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(instanceOf, i => i.expression, expr => this.visitRightPadded(expr, q));
-        await q.getAndSend(instanceOf, i => i.clazz, clazz => this.visit(clazz, q));
+        await q.getAndSend(instanceOf, i => i.class, clazz => this.visit(clazz, q));
         await q.getAndSend(instanceOf, i => i.pattern, pattern => this.visit(pattern, q));
         await q.getAndSend(instanceOf, i => asRef(i.type), type => this.visitType(type, q));
         await q.getAndSend(instanceOf, i => i.modifier, modifier => this.visit(modifier, q));
@@ -286,7 +286,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitNewClass(newClass: J.NewClass, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(newClass, n => n.enclosing, encl => this.visitRightPadded(encl, q));
         await q.getAndSend(newClass, n => n.new, n => this.visitSpace(n, q));
-        await q.getAndSend(newClass, n => n.clazz, clazz => this.visit(clazz, q));
+        await q.getAndSend(newClass, n => n.class, clazz => this.visit(clazz, q));
         await q.getAndSend(newClass, n => n.arguments, args => this.visitContainer(args, q));
         await q.getAndSend(newClass, n => n.body, body => this.visit(body, q));
         await q.getAndSend(newClass, n => asRef(n.constructorType), type => this.visitType(type, q));
@@ -300,7 +300,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitParameterizedType(paramType: J.ParameterizedType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(paramType, p => p.clazz, clazz => this.visit(clazz, q));
+        await q.getAndSend(paramType, p => p.class, clazz => this.visit(clazz, q));
         await q.getAndSend(paramType, p => p.typeParameters, params => this.visitContainer(params, q));
         await q.getAndSend(paramType, p => asRef(p.type), type => this.visitType(type, q));
         return paramType;
@@ -380,7 +380,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitTypeCast(typeCast: J.TypeCast, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(typeCast, t => t.clazz, clazz => this.visit(clazz, q));
+        await q.getAndSend(typeCast, t => t.class, clazz => this.visit(clazz, q));
         await q.getAndSend(typeCast, t => t.expression, expr => this.visit(expr, q));
         return typeCast;
     }
@@ -847,7 +847,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const draft = createDraft(instanceOf);
 
         draft.expression = await q.receive(instanceOf.expression, expr => this.visitRightPadded(expr, q));
-        draft.clazz = await q.receive(instanceOf.clazz, clazz => this.visit(clazz, q));
+        draft.class = await q.receive(instanceOf.class, clazz => this.visit(clazz, q));
         draft.pattern = await q.receive(instanceOf.pattern, pattern => this.visit(pattern, q));
         draft.type = await q.receive(instanceOf.type, type => this.visitType(type, q));
         draft.modifier = await q.receive(instanceOf.modifier, mod => this.visit(mod, q));
@@ -963,7 +963,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.enclosing = await q.receive(newClass.enclosing, encl => this.visitRightPadded(encl, q));
         draft.new = await q.receive(newClass.new, new_ => this.visitSpace(new_, q));
-        draft.clazz = await q.receive(newClass.clazz, clazz => this.visit(clazz, q));
+        draft.class = await q.receive(newClass.class, clazz => this.visit(clazz, q));
         draft.arguments = await q.receive(newClass.arguments, args => this.visitContainer(args, q));
         draft.body = await q.receive(newClass.body, body => this.visit(body, q));
         draft.constructorType = await q.receive(newClass.constructorType, type => this.visitType(type, q) as unknown as JavaType.Method);
@@ -983,7 +983,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitParameterizedType(paramType: J.ParameterizedType, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(paramType);
 
-        draft.clazz = await q.receive(paramType.clazz, clazz => this.visit(clazz, q));
+        draft.class = await q.receive(paramType.class, clazz => this.visit(clazz, q));
         draft.typeParameters = await q.receive(paramType.typeParameters, params => this.visitContainer(params, q));
         draft.type = await q.receive(paramType.type, type => this.visitType(type, q));
 
@@ -1158,7 +1158,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitTypeCast(typeCast: J.TypeCast, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(typeCast);
 
-        draft.clazz = await q.receive(typeCast.clazz, typeExpr => this.visit(typeExpr, q));
+        draft.class = await q.receive(typeCast.class, typeExpr => this.visit(typeExpr, q));
         draft.expression = await q.receive(typeCast.expression, expr => this.visit(expr, q));
 
         return finishDraft(draft);

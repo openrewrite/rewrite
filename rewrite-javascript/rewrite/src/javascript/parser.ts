@@ -25,7 +25,8 @@ import {
     Statement,
     TextComment,
     TrailingComma,
-    TypeTree, VariableDeclarator,
+    TypeTree,
+    VariableDeclarator,
 } from '../java';
 import {Asterisk, DelegatedYield, FunctionDeclaration, JS, NonNullAssertion, Optional, Spread} from '.';
 import {
@@ -300,7 +301,7 @@ export class JavaScriptParserVisitor {
         });
     }
 
-    visitUnknown(node: ts.Node) {
+    visitUnknown(node: ts.Node): J.Unknown {
         return {
             kind: J.Kind.Unknown,
             id: randomId(),
@@ -466,7 +467,7 @@ export class JavaScriptParserVisitor {
         return last?.kind === token ? this.prefix(last) : emptySpace;
     }
 
-    visitClassDeclaration(node: ts.ClassDeclaration) {
+    visitClassDeclaration(node: ts.ClassDeclaration): J.ClassDeclaration {
         return {
             kind: J.Kind.ClassDeclaration,
             id: randomId(),
@@ -568,67 +569,67 @@ export class JavaScriptParserVisitor {
         return undefined;
     }
 
-    visitNumericLiteral(node: ts.NumericLiteral) {
+    visitNumericLiteral(node: ts.NumericLiteral): J.Literal {
         return this.mapLiteral(node, node.text); // FIXME value not in AST
     }
 
-    visitTrueKeyword(node: ts.TrueLiteral) {
+    visitTrueKeyword(node: ts.TrueLiteral): J.Literal {
         return this.mapLiteral(node, true);
     }
 
-    visitNumberKeyword(node: ts.Node) {
+    visitNumberKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'number');
     }
 
-    visitBooleanKeyword(node: ts.Node) {
+    visitBooleanKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'boolean');
     }
 
-    visitStringKeyword(node: ts.Node) {
+    visitStringKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'string');
     }
 
-    visitUndefinedKeyword(node: ts.Node) {
+    visitUndefinedKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'undefined');
     }
 
-    visitAnyKeyword(node: ts.Node) {
+    visitAnyKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'any');
     }
 
-    visitIntrinsicKeyword(node: ts.Node) {
+    visitIntrinsicKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'intrinsic');
     }
 
-    visitObjectKeyword(node: ts.Node) {
+    visitObjectKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'object');
     }
 
-    visitUnknownKeyword(node: ts.Node) {
+    visitUnknownKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'unknown');
     }
 
-    visitVoidKeyword(node: ts.Node) {
+    visitVoidKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'void');
     }
 
-    visitFalseKeyword(node: ts.FalseLiteral) {
+    visitFalseKeyword(node: ts.FalseLiteral): J.Literal {
         return this.mapLiteral(node, false);
     }
 
-    visitNullKeyword(node: ts.NullLiteral) {
+    visitNullKeyword(node: ts.NullLiteral): J.Literal {
         return this.mapLiteral(node, null);
     }
 
-    visitNeverKeyword(node: ts.Node) {
+    visitNeverKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'never');
     }
 
-    visitSymbolKeyword(node: ts.Node) {
+    visitSymbolKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'symbol');
     }
 
-    visitBigIntKeyword(node: ts.Node) {
+    visitBigIntKeyword(node: ts.Node): J.Identifier {
         return this.mapIdentifier(node, 'bigint');
     }
 
@@ -652,39 +653,39 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitBigIntLiteral(node: ts.BigIntLiteral) {
+    visitBigIntLiteral(node: ts.BigIntLiteral): J.Literal {
         return this.mapLiteral(node, node.text); // FIXME value not in AST
     }
 
-    visitStringLiteral(node: ts.StringLiteral) {
+    visitStringLiteral(node: ts.StringLiteral): J.Literal {
         return this.mapLiteral(node, node.text); // FIXME value not in AST
     }
 
-    visitJsxText(node: ts.JsxText) {
+    visitJsxText(node: ts.JsxText): J.Unknown {
         return this.visitUnknown(node);
     }
 
-    visitRegularExpressionLiteral(node: ts.RegularExpressionLiteral) {
+    visitRegularExpressionLiteral(node: ts.RegularExpressionLiteral): J.Literal {
         return this.mapLiteral(node, node.text); // FIXME value not in AST
     }
 
-    visitNoSubstitutionTemplateLiteral(node: ts.NoSubstitutionTemplateLiteral) {
+    visitNoSubstitutionTemplateLiteral(node: ts.NoSubstitutionTemplateLiteral): J.Literal {
         return this.mapLiteral(node, node.text); // FIXME value not in AST
     }
 
-    visitTemplateHead(node: ts.TemplateHead) {
+    visitTemplateHead(node: ts.TemplateHead): J.Literal {
         return this.mapLiteral(node, node.text);
     }
 
-    visitTemplateMiddle(node: ts.TemplateMiddle) {
+    visitTemplateMiddle(node: ts.TemplateMiddle): J.Literal {
         return this.mapLiteral(node, node.text);
     }
 
-    visitTemplateTail(node: ts.TemplateTail) {
+    visitTemplateTail(node: ts.TemplateTail): J.Literal {
         return this.mapLiteral(node, node.text);
     }
 
-    visitIdentifier(node: ts.Identifier) {
+    visitIdentifier(node: ts.Identifier): J.Identifier {
         return this.mapIdentifier(node, node.text);
     }
 
@@ -787,7 +788,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitDecorator(node: ts.Decorator) {
+    visitDecorator(node: ts.Decorator): J.Annotation | J.Unknown {
         let annotationType: NameTree | TypeTree;
         let _arguments: J.Container<Expression> | undefined = undefined;
 
@@ -828,109 +829,38 @@ export class JavaScriptParserVisitor {
     }
 
     visitPropertySignature(node: ts.PropertySignature) {
-        const prefix = this.prefix(node);
-        let nameExpression: Expression = this.visit(node.name);
-        nameExpression = produce(nameExpression, draft => {
-            draft.markers = this.maybeAddOptionalMarker(draft, node);
-        });
-
-        if (nameExpression.kind === J.Kind.Identifier) {
-            return {
-                kind: J.Kind.VariableDeclarations,
-                id: randomId(),
-                prefix: prefix,
-                markers: emptyMarkers,
-                leadingAnnotations: [], // no decorators allowed
-                modifiers: this.mapModifiers(node),
-                typeExpression: this.mapTypeInfo(node),
-                dimensionsBeforeName: [],
-                variables: [this.rightPadded(
-                    {
-                        kind: J.Kind.NamedVariable,
-                        id: randomId(),
-                        prefix: this.prefix(node.name),
-                        markers: emptyMarkers,
-                        name: nameExpression,
-                        dimensionsAfterName: [],
-                        variableType: this.mapVariableType(node)
-                    },
-                    emptySpace
-                )]
-            };
-        } else {
-            // FIXME We are mapping the literals in things like type ascii = { " ": 32; "!": 33; } to
-            //  named variables, which is not a good use of this construct.
-            return {
-                kind: J.Kind.VariableDeclarations,
-                id: randomId(),
-                prefix: prefix,
-                markers: emptyMarkers,
-                leadingAnnotations: [], // no decorators allowed
-                modifiers: this.mapModifiers(node),
-                typeExpression: this.mapTypeInfo(node),
-                variables: [this.rightPadded(
-                    {
-                        kind: J.Kind.NamedVariable,
-                        id: randomId(),
-                        prefix: this.prefix(node.name),
-                        markers: emptyMarkers,
-                        name: nameExpression,
-                        dimensionsAfterName: [],
-                        variableType: this.mapVariableType(node)
-                    },
-                    emptySpace
-                )]
-            };
-        }
-    }
-
-    visitPropertyDeclaration(node: ts.PropertyDeclaration) {
-        const prefix = this.prefix(node);
-        let nameExpression: Expression = this.visit(node.name)
-
-        nameExpression = produce(nameExpression, draft => {
-            draft.markers = this.maybeAddOptionalMarker(draft, node);
-
-            // This will be mutually exclusive with the optional token
-            if (node.exclamationToken) {
-                draft.markers.markers.push({
-                    kind: JS.Markers.NonNullAssertion,
-                    id: randomId(),
-                    prefix: this.suffix(node.name)
-                } as NonNullAssertion);
-            }
-        });
-
-        if (nameExpression.kind === J.Kind.Identifier) {
-            return {
-                kind: J.Kind.VariableDeclarations,
-                id: randomId(),
-                prefix: prefix,
-                markers: emptyMarkers,
-                leadingAnnotations: this.mapDecorators(node),
-                modifiers: this.mapModifiers(node),
-                typeExpression: this.mapTypeInfo(node),
-                dimensionsBeforeName: [],
-                variables: [this.rightPadded(
-                    {
-                        kind: J.Kind.NamedVariable,
-                        id: randomId(),
-                        prefix: this.prefix(node.name),
-                        markers: emptyMarkers,
-                        name: nameExpression,
-                        dimensionsAfterName: [],
-                        initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
-                        variableType: this.mapVariableType(node)
-                    },
-                    this.suffix(node.name)
-                )]
-            };
-        }
-
+        // FIXME We are mapping the literals in things like type ascii = { " ": 32; "!": 33; } to
+        //  named variables, which is not a good use of this construct.
         return {
             kind: J.Kind.VariableDeclarations,
             id: randomId(),
-            prefix: prefix,
+            prefix: this.prefix(node),
+            markers: emptyMarkers,
+            leadingAnnotations: [], // no decorators allowed
+            modifiers: this.mapModifiers(node),
+            typeExpression: this.mapTypeInfo(node),
+            variables: [this.rightPadded(
+                {
+                    kind: J.Kind.NamedVariable,
+                    id: randomId(),
+                    prefix: this.prefix(node.name),
+                    markers: emptyMarkers,
+                    name: produce(this.convert<VariableDeclarator>(node.name), draft => {
+                        draft.markers = this.maybeAddOptionalMarker(draft, node);
+                    }) as VariableDeclarator,
+                    dimensionsAfterName: [],
+                    variableType: this.mapVariableType(node)
+                },
+                emptySpace
+            )]
+        };
+    }
+
+    visitPropertyDeclaration(node: ts.PropertyDeclaration): J.VariableDeclarations {
+        return {
+            kind: J.Kind.VariableDeclarations,
+            id: randomId(),
+            prefix: this.prefix(node),
             markers: emptyMarkers,
             leadingAnnotations: this.mapDecorators(node),
             modifiers: this.mapModifiers(node),
@@ -941,11 +871,22 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: this.prefix(node.name),
                     markers: emptyMarkers,
-                    name: nameExpression,
+                    name: produce(this.convert<VariableDeclarator>(node.name), draft => {
+                        draft.markers = this.maybeAddOptionalMarker(draft, node);
+
+                        // This will be mutually exclusive with the optional token
+                        if (node.exclamationToken) {
+                            draft.markers.markers.push({
+                                kind: JS.Markers.NonNullAssertion,
+                                id: randomId(),
+                                prefix: this.suffix(node.name)
+                            } as NonNullAssertion);
+                        }
+                    }),
                     dimensionsAfterName: [],
                     initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
                     variableType: this.mapVariableType(node)
-                },
+                } as J.VariableDeclarations.NamedVariable,
                 emptySpace
             )]
         };
@@ -1079,7 +1020,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitConstructor(node: ts.ConstructorDeclaration) {
+    visitConstructor(node: ts.ConstructorDeclaration): J.MethodDeclaration {
         // using string literal for the following case: class A { "constructor"() {} }
         const constructorKeyword = node.getChildren()
             .find(n => (n.kind === ts.SyntaxKind.ConstructorKeyword) || ((n.kind === ts.SyntaxKind.StringLiteral) && (n.getText().includes("constructor"))))!;
@@ -1188,7 +1129,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitConstructSignature(node: ts.ConstructSignatureDeclaration) {
+    visitConstructSignature(node: ts.ConstructSignatureDeclaration): J.MethodDeclaration {
         return {
             kind: J.Kind.MethodDeclaration,
             id: randomId(),
@@ -1212,7 +1153,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitIndexSignature(node: ts.IndexSignatureDeclaration) {
+    visitIndexSignature(node: ts.IndexSignatureDeclaration): JS.IndexSignatureDeclaration {
         return {
             kind: JS.Kind.IndexSignatureDeclaration,
             id: randomId(),
@@ -1225,7 +1166,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitTypePredicate(node: ts.TypePredicateNode) {
+    visitTypePredicate(node: ts.TypePredicateNode): JS.TypePredicate {
         return {
             kind: JS.Kind.TypePredicate,
             id: randomId(),
@@ -1238,14 +1179,14 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitTypeReference(node: ts.TypeReferenceNode) {
+    visitTypeReference(node: ts.TypeReferenceNode): J.ParameterizedType {
         if (node.typeArguments) {
             return {
                 kind: J.Kind.ParameterizedType,
                 id: randomId(),
                 prefix: this.prefix(node),
                 markers: emptyMarkers,
-                clazz: this.visit(node.typeName),
+                class: this.visit(node.typeName),
                 typeParameters: this.mapTypeArguments(this.suffix(node.typeName), node.typeArguments),
                 type: this.mapType(node)
             }
@@ -1297,7 +1238,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitTypeQuery(node: ts.TypeQueryNode) {
+    visitTypeQuery(node: ts.TypeQueryNode): JS.TypeQuery {
         return {
             kind: JS.Kind.TypeQuery,
             id: randomId(),
@@ -1309,7 +1250,7 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitTypeLiteral(node: ts.TypeLiteralNode) {
+    visitTypeLiteral(node: ts.TypeLiteralNode): JS.TypeLiteral {
         return {
             kind: JS.Kind.TypeLiteral,
             id: randomId(),
@@ -1333,7 +1274,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitArrayType(node: ts.ArrayTypeNode) {
+    visitArrayType(node: ts.ArrayTypeNode): J.ArrayType {
         return {
             kind: J.Kind.ArrayType,
             id: randomId(),
@@ -1390,7 +1331,7 @@ export class JavaScriptParserVisitor {
         });
     }
 
-    visitUnionType(node: ts.UnionTypeNode) {
+    visitUnionType(node: ts.UnionTypeNode): JS.Union {
         const initialBar = getPreviousSibling(node.types[0]);
         return {
             kind: JS.Kind.Union,
@@ -1405,7 +1346,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitIntersectionType(node: ts.IntersectionTypeNode) {
+    visitIntersectionType(node: ts.IntersectionTypeNode): JS.Intersection {
         const initialAmpersand = getPreviousSibling(node.types[0]);
         return {
             kind: JS.Kind.Intersection,
@@ -1446,7 +1387,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitInferType(node: ts.InferTypeNode) {
+    visitInferType(node: ts.InferTypeNode): JS.InferType {
         return {
             kind: JS.Kind.InferType,
             id: randomId(),
@@ -1457,7 +1398,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitParenthesizedType(node: ts.ParenthesizedTypeNode) {
+    visitParenthesizedType(node: ts.ParenthesizedTypeNode): J.ParenthesizedTypeTree {
         return {
             kind: J.Kind.ParenthesizedTypeTree,
             id: randomId(),
@@ -1470,16 +1411,15 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(node),
                 markers: emptyMarkers,
                 tree: this.rightPadded(this.convert(node.type), this.prefix(node.getLastToken()!))
-            },
-            type: undefined
+            }
         };
     }
 
-    visitThisType(node: ts.ThisTypeNode) {
+    visitThisType(node: ts.ThisTypeNode): J.Identifier {
         return this.mapIdentifier(node, 'this');
     }
 
-    visitTypeOperator(node: ts.TypeOperatorNode) {
+    visitTypeOperator(node: ts.TypeOperatorNode): JS.TypeOperator {
         function mapTypeOperator(operator: ts.SyntaxKind.KeyOfKeyword | ts.SyntaxKind.UniqueKeyword | ts.SyntaxKind.ReadonlyKeyword): JS.TypeOperator.Type | undefined {
             switch (operator) {
                 case ts.SyntaxKind.KeyOfKeyword:
@@ -1501,7 +1441,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitIndexedAccessType(node: ts.IndexedAccessTypeNode) {
+    visitIndexedAccessType(node: ts.IndexedAccessTypeNode): JS.IndexedAccessType {
         return {
             kind: JS.Kind.IndexedAccessType,
             id: randomId(),
@@ -1515,12 +1455,12 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 element: this.rightPadded(this.convert(node.indexType), this.suffix(node.indexType)),
                 type: this.mapType(node.indexType)
-            },
+            } as JS.IndexedAccessType.IndexType,
             type: this.mapType(node)
         };
     }
 
-    visitMappedType(node: ts.MappedTypeNode) {
+    visitMappedType(node: ts.MappedTypeNode): JS.MappedType {
         function hasPrefixToken(readonlyToken?: ts.ReadonlyKeyword | ts.PlusToken | ts.MinusToken): boolean {
             return !!(readonlyToken && (readonlyToken.kind === ts.SyntaxKind.PlusToken || readonlyToken.kind === ts.SyntaxKind.MinusToken));
         }
@@ -1534,7 +1474,8 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            prefixToken: hasPrefixToken(node.readonlyToken) && this.leftPadded(this.prefix(node.readonlyToken!),
+            prefixToken: hasPrefixToken(node.readonlyToken) ? this.leftPadded(
+                this.prefix(node.readonlyToken!),
                 {
                     kind: J.Kind.Literal,
                     id: randomId(),
@@ -1543,7 +1484,8 @@ export class JavaScriptParserVisitor {
                     value: undefined, // FIXME verify
                     valueSource: node.readonlyToken!.getText(),
                     type: this.mapPrimitiveType(node.readonlyToken!)
-                }),
+                } as J.Literal
+            ) : undefined,
             hasReadonly: node.readonlyToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.ReadonlyKeyword)!), true) : this.leftPadded(emptySpace, false),
             keysRemapping: {
                 kind: JS.Kind.MappedTypeKeysRemapping,
@@ -1562,7 +1504,8 @@ export class JavaScriptParserVisitor {
                     this.suffix(node.typeParameter)),
                 nameType: node.nameType && this.rightPadded(this.visit(node.nameType), this.suffix(node.nameType))
             },
-            suffixToken: hasSuffixToken(node.questionToken) && this.leftPadded(this.prefix(node.questionToken!),
+            suffixToken: hasSuffixToken(node.questionToken) ? this.leftPadded(
+                this.prefix(node.questionToken!),
                 {
                     kind: J.Kind.Literal,
                     id: randomId(),
@@ -1571,8 +1514,8 @@ export class JavaScriptParserVisitor {
                     value: undefined, // FIXME verify
                     valueSource: node.questionToken!.getText(),
                     type: this.mapPrimitiveType(node.questionToken!)
-                }
-            ),
+                } as J.Literal
+            ) : undefined,
             hasQuestionToken: node.questionToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.QuestionToken)!), true) : this.leftPadded(emptySpace, false),
             valueType: node.type ? {
                 kind: J.Kind.JContainer,
@@ -1649,7 +1592,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitTemplateLiteralType(node: ts.TemplateLiteralTypeNode) {
+    visitTemplateLiteralType(node: ts.TemplateLiteralTypeNode): JS.TemplateExpression {
         return {
             kind: JS.Kind.TemplateExpression,
             id: randomId(),
@@ -1661,7 +1604,7 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitTemplateLiteralTypeSpan(node: ts.TemplateLiteralTypeSpan) {
+    visitTemplateLiteralTypeSpan(node: ts.TemplateLiteralTypeSpan): JS.TemplateExpression.Span {
         return {
             kind: JS.Kind.TemplateExpressionSpan,
             id: randomId(),
@@ -1672,7 +1615,7 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitImportType(node: ts.ImportTypeNode) {
+    visitImportType(node: ts.ImportTypeNode): JS.ImportType {
         let importTypeAttributes = undefined;
         if (node.attributes) {
             const openBraceIndex = node.attributes.getChildren().findIndex(n => n.kind === ts.SyntaxKind.OpenBraceToken);
@@ -1709,7 +1652,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitObjectBindingPattern(node: ts.ObjectBindingPattern) {
+    visitObjectBindingPattern(node: ts.ObjectBindingPattern): JS.ObjectBindingDeclarations {
         return {
             kind: JS.Kind.ObjectBindingDeclarations,
             id: randomId(),
@@ -1754,7 +1697,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitArrayLiteralExpression(node: ts.ArrayLiteralExpression) {
+    visitArrayLiteralExpression(node: ts.ArrayLiteralExpression): J.NewArray {
         return {
             kind: J.Kind.NewArray,
             id: randomId(),
@@ -1766,7 +1709,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitObjectLiteralExpression(node: ts.ObjectLiteralExpression) {
+    visitObjectLiteralExpression(node: ts.ObjectLiteralExpression): J.NewClass {
         return {
             kind: J.Kind.NewClass,
             id: randomId(),
@@ -1803,7 +1746,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitPropertyAccessExpression(node: ts.PropertyAccessExpression) {
+    visitPropertyAccessExpression(node: ts.PropertyAccessExpression): J.FieldAccess {
         return {
             kind: J.Kind.FieldAccess,
             id: randomId(),
@@ -1901,19 +1844,19 @@ export class JavaScriptParserVisitor {
         return this.mapIdentifier(node, node.getText());
     }
 
-    visitNewExpression(node: ts.NewExpression) {
+    visitNewExpression(node: ts.NewExpression): J.NewClass {
         return {
             kind: J.Kind.NewClass,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
             new: emptySpace,
-            clazz: node.typeArguments ? {
+            class: node.typeArguments ? {
                 kind: J.Kind.ParameterizedType,
                 id: randomId(),
                 prefix: emptySpace,
                 markers: emptyMarkers,
-                clazz: {
+                class: {
                     kind: JS.Kind.TypeTreeExpression,
                     id: randomId(),
                     prefix: emptySpace,
@@ -1922,13 +1865,13 @@ export class JavaScriptParserVisitor {
                 },
                 typeParameters: this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments),
                 type: undefined
-            } : {
+            } as J.ParameterizedType : {
                 kind: JS.Kind.TypeTreeExpression,
                 id: randomId(),
                 prefix: emptySpace,
                 markers: emptyMarkers,
                 expression: this.visit(node.expression),
-            },
+            } as JS.TypeTreeExpression,
             arguments: node.arguments ?
                 this.mapCommaSeparatedList(this.getParameterListNodes(node)) : {
                     ...emptyContainer<Expression>(),
@@ -1941,7 +1884,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitTaggedTemplateExpression(node: ts.TaggedTemplateExpression) {
+    visitTaggedTemplateExpression(node: ts.TaggedTemplateExpression): JS.TaggedTemplateExpression {
         return {
             kind: JS.Kind.TaggedTemplateExpression,
             id: randomId(),
@@ -1954,13 +1897,13 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitTypeAssertionExpression(node: ts.TypeAssertion) {
+    visitTypeAssertionExpression(node: ts.TypeAssertion): J.TypeCast {
         return {
             kind: J.Kind.TypeCast,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            clazz: {
+            class: {
                 kind: J.Kind.ControlParentheses,
                 id: randomId(),
                 prefix: this.prefix(node.getFirstToken()!),
@@ -1971,7 +1914,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitParenthesizedExpression(node: ts.ParenthesizedExpression) {
+    visitParenthesizedExpression(node: ts.ParenthesizedExpression): J.Parentheses<Expression> {
         return {
             kind: J.Kind.Parentheses,
             id: randomId(),
@@ -1981,7 +1924,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitArrowFunction(node: ts.ArrowFunction) {
+    visitArrowFunction(node: ts.ArrowFunction): JS.ArrowFunction {
         const openParenToken = this.findChildNode(node, ts.SyntaxKind.OpenParenToken);
         const isParenthesized = openParenToken != undefined;
         return {
@@ -2030,7 +1973,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitVoidExpression(node: ts.VoidExpression) {
+    visitVoidExpression(node: ts.VoidExpression): JS.Void {
         return {
             kind: JS.Kind.Void,
             id: randomId(),
@@ -2040,7 +1983,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitAwaitExpression(node: ts.AwaitExpression) {
+    visitAwaitExpression(node: ts.AwaitExpression): JS.Await {
         return {
             kind: JS.Kind.Await,
             id: randomId(),
@@ -2051,7 +1994,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitPrefixUnaryExpression(node: ts.PrefixUnaryExpression) {
+    visitPrefixUnaryExpression(node: ts.PrefixUnaryExpression): J.Unary | J.Unknown {
         let unaryOperator: J.Unary.Type | undefined;
         switch (node.operator) {
             case ts.SyntaxKind.PlusToken:
@@ -2088,7 +2031,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitPostfixUnaryExpression(node: ts.PostfixUnaryExpression) {
+    visitPostfixUnaryExpression(node: ts.PostfixUnaryExpression): J.Unary | J.Unknown {
         let unaryOperator: J.Unary.Type | undefined;
         switch (node.operator) {
             case ts.SyntaxKind.PlusPlusToken:
@@ -2110,11 +2053,11 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             operator: this.leftPadded(this.suffix(node.operand), unaryOperator),
             expression: this.convert(node.operand),
-            _type: this.mapType(node),
+            type: this.mapType(node),
         };
     }
 
-    visitBinaryExpression(node: ts.BinaryExpression) {
+    visitBinaryExpression(node: ts.BinaryExpression): J.Binary | J.AssignmentOperation | JS.AssignmentOperation | J.Assignment | JS.Binary | J.InstanceOf | J.Unknown {
         if (node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
             // assignment is also represented as `ts.BinaryExpression`
             return {
@@ -2156,7 +2099,7 @@ export class JavaScriptParserVisitor {
                 left: this.convert(node.left),
                 operator: this.leftPadded(this.prefix(node.operatorToken), binaryOperator as JS.Binary.Type),
                 right: this.convert(node.right),
-                _type: this.mapType(node),
+                type: this.mapType(node),
             };
         }
 
@@ -2167,7 +2110,7 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(node),
                 markers: emptyMarkers,
                 expression: this.rightPadded(this.convert(node.left), this.prefix(node.operatorToken)),
-                clazz: this.convert(node.right),
+                class: this.convert(node.right),
                 type: this.mapType(node),
             };
         }
@@ -2203,7 +2146,7 @@ export class JavaScriptParserVisitor {
                     variable: this.convert(node.left),
                     operator: this.leftPadded(this.prefix(node.operatorToken), assignmentOperation),
                     assignment: this.convert(node.right),
-                    _type: this.mapType(node),
+                    type: this.mapType(node),
                 }
             }
 
@@ -2454,7 +2397,7 @@ export class JavaScriptParserVisitor {
         return this.visit(node.expression);
     }
 
-    visitAsExpression(node: ts.AsExpression) {
+    visitAsExpression(node: ts.AsExpression): JS.Binary {
         return {
             kind: JS.Kind.Binary,
             id: randomId(),
@@ -2463,7 +2406,7 @@ export class JavaScriptParserVisitor {
             left: this.convert(node.expression),
             operator: this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), JS.Binary.Type.As),
             right: this.convert(node.type),
-            _type: this.mapType(node),
+            type: this.mapType(node),
         };
     }
 
@@ -2477,7 +2420,7 @@ export class JavaScriptParserVisitor {
         });
     }
 
-    visitMetaProperty(node: ts.MetaProperty) {
+    visitMetaProperty(node: ts.MetaProperty): J.FieldAccess {
         return {
             kind: J.Kind.FieldAccess,
             id: randomId(),
@@ -2489,12 +2432,12 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitSyntheticExpression(node: ts.SyntheticExpression) {
+    visitSyntheticExpression(node: ts.SyntheticExpression): J.Unknown {
         // SyntheticExpression is a special type of node used internally by the TypeScript compiler
         return this.visitUnknown(node);
     }
 
-    visitSatisfiesExpression(node: ts.SatisfiesExpression) {
+    visitSatisfiesExpression(node: ts.SatisfiesExpression): JS.SatisfiesExpression {
         return {
             kind: JS.Kind.SatisfiesExpression,
             id: randomId(),
@@ -2506,7 +2449,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitTemplateSpan(node: ts.TemplateSpan) {
+    visitTemplateSpan(node: ts.TemplateSpan): JS.TemplateExpression.Span {
         return {
             kind: JS.Kind.TemplateExpressionSpan,
             id: randomId(),
@@ -2517,11 +2460,11 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitSemicolonClassElement(node: ts.SemicolonClassElement) {
+    visitSemicolonClassElement(node: ts.SemicolonClassElement): J.Empty {
         return this.newJEmpty(this.semicolonPrefix(node));
     }
 
-    visitBlock(node: ts.Block) {
+    visitBlock(node: ts.Block): J.Block {
         return {
             kind: J.Kind.Block,
             id: randomId(),
@@ -2533,7 +2476,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitEmptyStatement(node: ts.EmptyStatement) {
+    visitEmptyStatement(node: ts.EmptyStatement): J.Empty {
         return this.newJEmpty(this.prefix(node));
     }
 
@@ -2558,7 +2501,7 @@ export class JavaScriptParserVisitor {
         } as JS.ExpressionStatement;
     }
 
-    visitIfStatement(node: ts.IfStatement) {
+    visitIfStatement(node: ts.IfStatement): J.If {
         const semicolonAfterThen = (node.thenStatement.getChildAt(node.thenStatement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken);
         const semicolonAfterElse = (node.elseStatement?.getChildAt(node.elseStatement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken);
         return {
@@ -2592,7 +2535,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitDoStatement(node: ts.DoStatement) {
+    visitDoStatement(node: ts.DoStatement): J.DoWhileLoop {
         return {
             kind: J.Kind.DoWhileLoop,
             id: randomId(),
@@ -2617,7 +2560,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitWhileStatement(node: ts.WhileStatement) {
+    visitWhileStatement(node: ts.WhileStatement): J.WhileLoop {
         return {
             kind: J.Kind.WhileLoop,
             id: randomId(),
@@ -2741,7 +2684,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitContinueStatement(node: ts.ContinueStatement) {
+    visitContinueStatement(node: ts.ContinueStatement): J.Continue {
         return {
             kind: J.Kind.Continue,
             id: randomId(),
@@ -2751,7 +2694,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitBreakStatement(node: ts.BreakStatement) {
+    visitBreakStatement(node: ts.BreakStatement): J.Break {
         return {
             kind: J.Kind.Break,
             id: randomId(),
@@ -2761,7 +2704,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitReturnStatement(node: ts.ReturnStatement) {
+    visitReturnStatement(node: ts.ReturnStatement): J.Return {
         return {
             kind: J.Kind.Return,
             id: randomId(),
@@ -2795,7 +2738,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitSwitchStatement(node: ts.SwitchStatement) {
+    visitSwitchStatement(node: ts.SwitchStatement): J.Switch {
         return {
             kind: J.Kind.Switch,
             id: randomId(),
@@ -2812,7 +2755,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitLabeledStatement(node: ts.LabeledStatement) {
+    visitLabeledStatement(node: ts.LabeledStatement): J.Label {
         return {
             kind: J.Kind.Label,
             id: randomId(),
@@ -2833,11 +2776,11 @@ export class JavaScriptParserVisitor {
                     }) : emptyMarkers
                 ),
                 type: this.mapType(node.statement)
-            }
+            } as JS.TrailingTokenStatement
         };
     }
 
-    visitThrowStatement(node: ts.ThrowStatement) {
+    visitThrowStatement(node: ts.ThrowStatement): J.Throw {
         return {
             kind: J.Kind.Throw,
             id: randomId(),
@@ -2859,7 +2802,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitDebuggerStatement(node: ts.DebuggerStatement) {
+    visitDebuggerStatement(node: ts.DebuggerStatement): JS.ExpressionStatement {
         return {
             kind: JS.Kind.ExpressionStatement,
             id: randomId(),
@@ -3008,7 +2951,7 @@ export class JavaScriptParserVisitor {
         return [];
     }
 
-    visitInterfaceDeclaration(node: ts.InterfaceDeclaration) {
+    visitInterfaceDeclaration(node: ts.InterfaceDeclaration): J.ClassDeclaration {
         return {
             kind: J.Kind.ClassDeclaration,
             id: randomId(),
@@ -3045,7 +2988,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitTypeAliasDeclaration(node: ts.TypeAliasDeclaration) {
+    visitTypeAliasDeclaration(node: ts.TypeAliasDeclaration): JS.TypeDeclaration {
         return {
             kind: JS.Kind.TypeDeclaration,
             id: randomId(),
@@ -3059,7 +3002,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitEnumDeclaration(node: ts.EnumDeclaration) {
+    visitEnumDeclaration(node: ts.EnumDeclaration): J.ClassDeclaration {
         return {
             kind: J.Kind.ClassDeclaration,
             id: randomId(),
@@ -3098,7 +3041,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitModuleDeclaration(node: ts.ModuleDeclaration) {
+    visitModuleDeclaration(node: ts.ModuleDeclaration): JS.NamespaceDeclaration {
         const body = node.body && this.visit(node.body as ts.Node);
 
         let namespaceKeyword = this.findChildNode(node, ts.SyntaxKind.NamespaceKeyword) ?? this.findChildNode(node, ts.SyntaxKind.ModuleKeyword);
@@ -3194,7 +3137,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitModuleBlock(node: ts.ModuleBlock) {
+    visitModuleBlock(node: ts.ModuleBlock): J.Block {
         return {
             kind: J.Kind.Block,
             id: randomId(),
@@ -3206,7 +3149,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitCaseBlock(node: ts.CaseBlock) {
+    visitCaseBlock(node: ts.CaseBlock): J.Block {
         return {
             kind: J.Kind.Block,
             id: randomId(),
@@ -3253,7 +3196,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration) {
+    visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.ScopedVariableDeclarations {
         const kind = this.findChildNode(node, ts.SyntaxKind.ImportKeyword)!;
 
         return {
@@ -3297,7 +3240,7 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitImportKeyword(node: ts.ImportExpression) {
+    visitImportKeyword(node: ts.ImportExpression): J.Identifier {
         // this is used for dynamic imports as in `await import('foo')`
         return this.mapIdentifier(node, 'import');
     }
@@ -3326,7 +3269,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitNamespaceImport(node: ts.NamespaceImport) {
+    visitNamespaceImport(node: ts.NamespaceImport): JS.Alias {
         return {
             kind: JS.Kind.Alias,
             id: randomId(),
@@ -3337,7 +3280,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitNamedImports(node: ts.NamedImports) {
+    visitNamedImports(node: ts.NamedImports): JS.NamedImports {
         return {
             kind: JS.Kind.NamedImports,
             id: randomId(),
@@ -3386,7 +3329,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitExportDeclaration(node: ts.ExportDeclaration) {
+    visitExportDeclaration(node: ts.ExportDeclaration): JS.ExportDeclaration {
         return {
             kind: JS.Kind.ExportDeclaration,
             id: randomId(),
@@ -3400,7 +3343,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitNamedExports(node: ts.NamedExports) {
+    visitNamedExports(node: ts.NamedExports): JS.NamedExports {
         return {
             kind: JS.Kind.NamedExports,
             id: randomId(),
@@ -3411,7 +3354,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitNamespaceExport(node: ts.NamespaceExport) {
+    visitNamespaceExport(node: ts.NamespaceExport): JS.Alias {
         return {
             kind: JS.Kind.Alias,
             id: randomId(),
@@ -3422,7 +3365,7 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitExportSpecifier(node: ts.ExportSpecifier) {
+    visitExportSpecifier(node: ts.ExportSpecifier): JS.ExportSpecifier {
         return {
             kind: JS.Kind.ExportSpecifier,
             id: randomId(),
@@ -3437,8 +3380,8 @@ export class JavaScriptParserVisitor {
                     markers: emptyMarkers,
                     propertyName: this.rightPadded(this.convert(node.propertyName), this.suffix(node.propertyName)),
                     alias: this.convert(node.name)
-                }
-                : this.convert(node.name),
+                } as JS.Alias
+                : this.convert<JS.Alias>(node.name),
             type: this.mapType(node)
         };
     }
@@ -3512,7 +3455,7 @@ export class JavaScriptParserVisitor {
         return this.visitUnknown(node);
     }
 
-    visitCaseClause(node: ts.CaseClause) {
+    visitCaseClause(node: ts.CaseClause): J.Case {
         return {
             kind: J.Kind.Case,
             id: randomId(),
@@ -3537,7 +3480,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitDefaultClause(node: ts.DefaultClause) {
+    visitDefaultClause(node: ts.DefaultClause): J.Case {
         return {
             kind: J.Kind.Case,
             id: randomId(),
@@ -3608,7 +3551,7 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitImportAttributes(node: ts.ImportAttributes) {
+    visitImportAttributes(node: ts.ImportAttributes): JS.ImportAttributes {
         const openBraceIndex = node.getChildren().findIndex(n => n.kind === ts.SyntaxKind.OpenBraceToken);
         const elements = this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(openBraceIndex, openBraceIndex + 3));
         return {
@@ -3621,7 +3564,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitImportAttribute(node: ts.ImportAttribute) {
+    visitImportAttribute(node: ts.ImportAttribute): JS.ImportAttribute {
         return {
             kind: JS.Kind.ImportAttribute,
             id: randomId(),
@@ -3632,7 +3575,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitPropertyAssignment(node: ts.PropertyAssignment) {
+    visitPropertyAssignment(node: ts.PropertyAssignment): JS.PropertyAssignment {
         return {
             kind: JS.Kind.PropertyAssignment,
             id: randomId(),
@@ -3644,7 +3587,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitShorthandPropertyAssignment(node: ts.ShorthandPropertyAssignment) {
+    visitShorthandPropertyAssignment(node: ts.ShorthandPropertyAssignment): JS.PropertyAssignment {
         return {
             kind: JS.Kind.PropertyAssignment,
             id: randomId(),

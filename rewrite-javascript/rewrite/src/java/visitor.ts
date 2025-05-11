@@ -317,7 +317,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitInstanceOf(instanceOf: J.InstanceOf, p: P): Promise<J | undefined> {
         return this.produceJava<J.InstanceOf>(instanceOf, p, async draft => {
             draft.expression = await this.visitRightPadded(instanceOf.expression, p);
-            draft.clazz = await this.visitDefined(instanceOf.clazz, p) as J;
+            draft.class = await this.visitDefined(instanceOf.class, p) as J;
             if (instanceOf.pattern) {
                 draft.pattern = await this.visitDefined(instanceOf.pattern, p) as J;
             }
@@ -440,8 +440,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
             draft.new = await this.visitSpace(newClass.new, p);
 
-            if (newClass.clazz) {
-                draft.clazz = await this.visitDefined(newClass.clazz, p) as TypedTree;
+            if (newClass.class) {
+                draft.class = await this.visitDefined(newClass.class, p) as TypedTree;
             }
 
             draft.arguments = await this.visitContainer(newClass.arguments, p);
@@ -472,7 +472,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected async visitParameterizedType(parameterizedType: J.ParameterizedType, p: P): Promise<J | undefined> {
         return this.produceJava<J.ParameterizedType>(parameterizedType, p, async draft => {
-            draft.clazz = await this.visitTypeName(parameterizedType.clazz, p);
+            draft.class = await this.visitTypeName(parameterizedType.class, p);
             draft.typeParameters = await this.visitOptionalContainer(parameterizedType.typeParameters, p);
             draft.type = await this.visitType(parameterizedType.type, p);
         });
@@ -566,7 +566,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected async visitTypeCast(typeCast: J.TypeCast, p: P): Promise<J | undefined> {
         return this.produceJava<J.TypeCast>(typeCast, p, async draft => {
-            draft.clazz = await this.visitDefined(typeCast.clazz, p) as J.ControlParentheses<TypedTree>;
+            draft.class = await this.visitDefined(typeCast.class, p) as J.ControlParentheses<TypedTree>;
             draft.expression = await this.visitDefined(typeCast.expression, p) as Expression;
         });
     }

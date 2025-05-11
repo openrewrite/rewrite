@@ -318,7 +318,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitInstanceOf(instanceOf: J.InstanceOf, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(instanceOf, p);
         await this.visitJRightPaddedLocalSingle(instanceOf.expression, "instanceof", p);
-        await this.visit(instanceOf.clazz, p);
+        await this.visit(instanceOf.class, p);
         instanceOf.pattern && await this.visit(instanceOf.pattern, p);
         await this.afterSyntax(instanceOf, p);
         return instanceOf;
@@ -1172,9 +1172,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         newClass.enclosing && await this.visitJRightPaddedLocalSingle(newClass.enclosing, ".", p);
         await this.visitSpace(newClass.new, p);
 
-        if (newClass.clazz) {
+        if (newClass.class) {
             p.append("new");
-            await this.visit(newClass.clazz, p);
+            await this.visit(newClass.class, p);
 
             if (!newClass.arguments.markers.markers.find(m => m.kind === J.Markers.OmitParentheses)) {
                 await this.visitJContainerLocal("(", newClass.arguments, ",", ")", p);
@@ -1266,7 +1266,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitParameterizedType(type: J.ParameterizedType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(type, p);
-        await this.visit(type.clazz, p);
+        await this.visit(type.class, p);
         type.typeParameters && await this.visitJContainerLocal("<", type.typeParameters, ",", ">", p);
         await this.afterSyntax(type, p);
         return type;
