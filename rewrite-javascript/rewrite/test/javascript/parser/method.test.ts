@@ -1,3 +1,5 @@
+// noinspection TypeScriptValidateTypes,TypeScriptUnresolvedReference,JSUnusedLocalSymbols
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -60,7 +62,7 @@ describe('method mapping', () => {
             //language=typescript
             typescript(`
                 class Handler {
-                    test(input  /*asda*/: string =    /*8asdas */ "hello world") {
+                    test(input  /*asda*/: string =    /*asdas */ "hello world") {
                         // hello world comment
                     }
                 }

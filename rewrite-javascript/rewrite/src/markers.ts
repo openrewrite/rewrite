@@ -36,7 +36,7 @@ export function marker(id: UUID, data?: {}): Marker {
     }
 }
 
-export function markers(... markers: Marker[]): Markers {
+export function markers(...markers: Marker[]): Markers {
     return {
         kind: MarkersKind.Markers,
         id: randomId(),
@@ -51,13 +51,14 @@ export interface Markers {
 }
 
 export function findMarker<T extends Marker>(
-    markers: Markers,
+    o: { markers: Markers },
     kind: T["kind"]
 ): T | undefined {
-    return markers.markers.find(
+    return o.markers.markers.find(
         (m): m is T => m.kind === kind
     );
 }
+
 export const emptyMarkers: Markers = {
     kind: MarkersKind.Markers,
     id: randomId(),

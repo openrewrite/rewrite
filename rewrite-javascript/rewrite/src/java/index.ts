@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-export * from "./markers";
 export * from "./type";
 export * from "./tree";
+export * from "./markers";
 export * from "./visitor";
 
 import "./print";
-import "./rpc";

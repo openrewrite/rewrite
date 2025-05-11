@@ -21,7 +21,7 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {findMarker, Marker, Markers} from "../markers";
-import {DelegatedYield} from "./markers";
+import {Asterisk, DelegatedYield, NonNullAssertion, Optional} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -189,7 +189,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         p.append("yield");
 
-        const delegated = findMarker<DelegatedYield>(aYield.markers, JS.Markers.DelegatedYield);
+        const delegated = findMarker<DelegatedYield>(aYield, JS.Markers.DelegatedYield);
         if (delegated) {
             await this.visitSpace(delegated.prefix, p);
             p.append("*");
@@ -502,7 +502,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
             if (i < variables.length - 1) {
                 p.append(",");
-            } else if (variable.markers.markers.find(m => m.kind === J.Markers.Semicolon)) {
+            } else if (findMarker(variable, J.Markers.Semicolon)) {
                 p.append(";");
             }
         }
@@ -725,6 +725,12 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visitNodes(method.leadingAnnotations, p);
         for (const m of method.modifiers) {
             await this.visitModifier(m, p);
+        }
+
+        const asterisk = findMarker<Asterisk>(method, JS.Markers.Asterisk);
+        if (asterisk) {
+            await this.visitSpace(asterisk.prefix, p);
+            p.append("*");
         }
 
         await this.visit(method.name, p);
@@ -1433,19 +1439,19 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitAssignmentOperationExtensions(assignOp: JS.AssignmentOperation, p: PrintOutputCapture): Promise<J | undefined> {
         let keyword = "";
         switch (assignOp.operator.element) {
-            case JS.JsAssignmentOperation.Type.QuestionQuestion:
+            case JS.AssignmentOperation.Type.QuestionQuestion:
                 keyword = "??=";
                 break;
-            case JS.JsAssignmentOperation.Type.And:
+            case JS.AssignmentOperation.Type.And:
                 keyword = "&&=";
                 break;
-            case JS.JsAssignmentOperation.Type.Or:
+            case JS.AssignmentOperation.Type.Or:
                 keyword = "||=";
                 break;
-            case JS.JsAssignmentOperation.Type.Power:
+            case JS.AssignmentOperation.Type.Power:
                 keyword = "**";
                 break;
-            case JS.JsAssignmentOperation.Type.Exp:
+            case JS.AssignmentOperation.Type.Exp:
                 keyword = "**=";
                 break;
         }
@@ -1569,22 +1575,22 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         let keyword = "";
 
         switch (binary.operator.element) {
-            case JS.JsBinary.Type.As:
+            case JS.Binary.Type.As:
                 keyword = "as";
                 break;
-            case JS.JsBinary.Type.IdentityEquals:
+            case JS.Binary.Type.IdentityEquals:
                 keyword = "===";
                 break;
-            case JS.JsBinary.Type.IdentityNotEquals:
+            case JS.Binary.Type.IdentityNotEquals:
                 keyword = "!==";
                 break;
-            case JS.JsBinary.Type.In:
+            case JS.Binary.Type.In:
                 keyword = "in";
                 break;
-            case JS.JsBinary.Type.QuestionQuestion:
+            case JS.Binary.Type.QuestionQuestion:
                 keyword = "??";
                 break;
-            case JS.JsBinary.Type.Comma:
+            case JS.Binary.Type.Comma:
                 keyword = ",";
                 break;
         }
@@ -1649,16 +1655,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 p.append("...");
                 await this.visit(unary.expression, p);
                 break;
-            case JS.Unary.Type.Optional:
-                await this.visit(unary.expression, p);
-                await this.visitSpace(unary.operator.before, p);
-                p.append("?");
-                break;
-            case JS.Unary.Type.Exclamation:
-                await this.visit(unary.expression, p);
-                await this.visitSpace(unary.operator.before, p);
-                p.append("!");
-                break;
             case JS.Unary.Type.QuestionDot:
                 await this.visit(unary.expression, p);
                 await this.visitSpace(unary.operator.before, p);
@@ -1668,11 +1664,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 await this.visit(unary.expression, p);
                 await this.visitSpace(unary.operator.before, p);
                 p.append("?.");
-                break;
-            case JS.Unary.Type.Asterisk:
-                p.append("*");
-                await this.visitSpace(unary.operator.before, p);
-                await this.visit(unary.expression, p);
                 break;
             default:
                 break;
@@ -1950,6 +1941,20 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitSpace((marker as unknown as TrailingComma).suffix, p);
         }
         return marker;
+    }
+
+    protected async postVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
+        for (const marker of tree.markers.markers) {
+            if (marker.kind === JS.Markers.NonNullAssertion) {
+                await this.visitSpace((marker as NonNullAssertion).prefix, p);
+                p.append("!");
+            }
+            if (marker.kind === JS.Markers.Optional) {
+                await this.visitSpace((marker as Optional).prefix, p);
+                p.append("?");
+            }
+        }
+        return super.postVisit(tree, p);
     }
 
     private printComment(comment: Comment, cursor: Cursor, p: PrintOutputCapture): void {

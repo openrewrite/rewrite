@@ -1,3 +1,5 @@
+// noinspection TypeScriptUnresolvedReference,TypeScriptValidateTypes,JSUnusedLocalSymbols
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -19,6 +21,7 @@ import {typescript} from "../../../src/javascript";
 describe('function mapping', () => {
     const spec = new RecipeSpec();
 
+    // noinspection JSUnusedLocalSymbols
     test('simple', () =>
         spec.rewriteRun(
             //language=typescript
@@ -409,8 +412,10 @@ describe('function mapping', () => {
         spec.rewriteRun(
             //language=typescript
             typescript(`
-                 export function getHeader(headers: ResponseHeaders, name: string): ResponseHeaderValue;
-             `)
+                // noinspection JSAnnotator
+
+                export function getHeader(headers: ResponseHeaders, name: string): ResponseHeaderValue;
+            `)
         ));
 
     test('function invocation', () =>

@@ -17,9 +17,9 @@ declare module "./tree" {
 
 // At runtime actually attach it to J
 (J as any).Markers = {
-    Semicolon:      "org.openrewrite.java.marker.Semicolon",
-    TrailingComma:  "org.openrewrite.java.marker.TrailingComma",
-    OmitParentheses:"org.openrewrite.java.marker.OmitParentheses"
+    Semicolon: "org.openrewrite.java.marker.Semicolon",
+    TrailingComma: "org.openrewrite.java.marker.TrailingComma",
+    OmitParentheses: "org.openrewrite.java.marker.OmitParentheses"
 } as const;
 
 export interface Semicolon extends Marker {
@@ -35,19 +35,17 @@ export interface OmitParentheses extends Marker {
     readonly kind: typeof J.Markers.OmitParentheses;
 }
 
-const spaceCodec = RpcCodecs.forType(J.Kind.Space)!;
-
 // Register codecs for all Java markers with additional properties
 RpcCodecs.registerCodec(J.Markers.TrailingComma, {
     async rpcReceive(before: TrailingComma, q: RpcReceiveQueue): Promise<TrailingComma> {
         const draft = createDraft(before);
         draft.id = await q.receive(before.id);
-        draft.suffix = await q.receive(before.suffix, space => spaceCodec.rpcReceive(space, q))
+        draft.suffix = await q.receive(before.suffix)
         return finishDraft(draft);
     },
 
     async rpcSend(after: TrailingComma, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.suffix, space => spaceCodec.rpcSend(space, q));
+        await q.getAndSend(after, a => a.suffix);
     }
 });

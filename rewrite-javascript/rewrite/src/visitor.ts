@@ -17,6 +17,7 @@ import {emptyMarkers, Marker, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
 import {createDraft, Draft, finishDraft, Objectish} from "immer";
 import {mapAsync} from "./util";
+import {JS} from "./javascript";
 
 /* Not exported beyond the internal immer module */
 export type ValidImmerRecipeReturnType<State> =

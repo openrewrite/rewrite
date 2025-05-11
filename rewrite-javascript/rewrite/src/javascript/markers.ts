@@ -7,6 +7,9 @@ import {createDraft, finishDraft} from "immer";
 declare module "./tree" {
     namespace JS {
         export const Markers: {
+            readonly Asterisk: "org.openrewrite.javascript.marker.Asterisk";
+            readonly Optional: "org.openrewrite.javascript.marker.Optional";
+            readonly NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion";
             readonly DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield";
         };
     }
@@ -14,11 +17,34 @@ declare module "./tree" {
 
 // At runtime actually attach it to JS
 (JS as any).Markers = {
-    DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield"
+    Asterisk: "org.openrewrite.javascript.marker.Asterisk",
+    DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield",
+    Optional: "org.openrewrite.javascript.marker.Optional",
+    NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion"
 } as const;
 
+/**
+ * The `yield*` operator in JavaScript is a special case of the `yield` operator,
+ * used in generator functions to yield to another iterator. This marker will
+ * be applied to a {@link J.Yield} expression.
+ */
 export interface DelegatedYield extends Marker {
     readonly kind: typeof JS.Markers.DelegatedYield;
+    readonly prefix: J.Space;
+}
+
+export interface Optional extends Marker {
+    readonly kind: typeof JS.Markers.Optional;
+    readonly prefix: J.Space;
+}
+
+export interface Asterisk extends Marker {
+    readonly kind: typeof JS.Markers.Asterisk;
+    readonly prefix: J.Space;
+}
+
+export interface NonNullAssertion extends Marker {
+    readonly kind: typeof JS.Markers.NonNullAssertion;
     readonly prefix: J.Space;
 }
 
@@ -28,20 +54,22 @@ export interface DelegatedYield extends Marker {
 function registerPrefixedMarkerCodec<M extends Marker & { prefix: J.Space }>(
     kind: M["kind"]
 ) {
-    const spaceCodec = RpcCodecs.forType(J.Kind.Space)!;
     RpcCodecs.registerCodec(kind, {
         async rpcReceive(before: M, q: RpcReceiveQueue): Promise<M> {
             const draft = createDraft(before);
             draft.id = await q.receive(before.id);
-            draft.prefix = await q.receive(before.prefix, space => spaceCodec.rpcReceive(space, q));
+            draft.prefix = await q.receive(before.prefix);
             return finishDraft(draft) as M;
         },
 
         async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
             await q.getAndSend(after, a => a.id);
-            await q.getAndSend(after, a => a.prefix, space => spaceCodec.rpcSend(space, q));
+            await q.getAndSend(after, a => a.prefix);
         }
     });
 }
 
 registerPrefixedMarkerCodec<DelegatedYield>(JS.Markers.DelegatedYield);
+registerPrefixedMarkerCodec<Optional>(JS.Markers.Optional);
+registerPrefixedMarkerCodec<Asterisk>(JS.Markers.Asterisk);
+registerPrefixedMarkerCodec<NonNullAssertion>(JS.Markers.NonNullAssertion);

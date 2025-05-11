@@ -1,3 +1,5 @@
+// noinspection JSUnusedLocalSymbols,TypeScriptUnresolvedReference
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -47,7 +49,7 @@ describe('type alias mapping', () => {
         spec.rewriteRun(
             //language=typescript
             typescript(`
-                 type Response<T, R, Y> = (x: T, y: R) => Y;;
+                 type Response<T, R, Y> = (x: T, y: R) => Y;
              `)
         ));
 
@@ -55,7 +57,7 @@ describe('type alias mapping', () => {
         spec.rewriteRun(
             //language=typescript
             typescript(`
-                 /*a*/type/*b*/ Response/*c*/</*d*/T/*e*/> /*f*/ = /*g*/(x: T, y: number) => string;;
+                 /*a*/type/*b*/ Response/*c*/</*d*/T/*e*/> /*f*/ = /*g*/(x: T, y: number) => string;
              `)
         ));
 

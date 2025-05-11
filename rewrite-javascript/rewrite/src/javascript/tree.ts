@@ -335,12 +335,12 @@ export namespace JS {
     export interface Binary extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.Binary;
         readonly left: Expression;
-        readonly operator: J.LeftPadded<JsBinary.Type>;
+        readonly operator: J.LeftPadded<Binary.Type>;
         readonly right: Expression;
         readonly type?: JavaType;
     }
 
-    export namespace JsBinary {
+    export namespace Binary {
         export const enum Type {
             As = "As",
             IdentityEquals = "IdentityEquals",
@@ -566,12 +566,12 @@ export namespace JS {
     export interface AssignmentOperation extends JS, Statement, Expression, TypedTree {
         readonly kind: typeof Kind.AssignmentOperation;
         readonly variable: Expression;
-        readonly operator: J.LeftPadded<JsAssignmentOperation.Type>;
+        readonly operator: J.LeftPadded<AssignmentOperation.Type>;
         readonly assignment: Expression;
         readonly type?: JavaType;
     }
 
-    export namespace JsAssignmentOperation {
+    export namespace AssignmentOperation {
         export const enum Type {
             QuestionQuestion = "QuestionQuestion",
             And = "And",
@@ -698,7 +698,6 @@ export namespace JS {
     export namespace Unary {
         export const enum Type {
             Spread = "Spread",
-            Optional = "Optional",
             Exclamation = "Exclamation",
             QuestionDot = "QuestionDot",
             QuestionDotWithDot = "QuestionDotWithDot",

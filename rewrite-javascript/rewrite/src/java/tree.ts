@@ -18,6 +18,8 @@
 
 import {emptyMarkers, Markers, SourceFile, Tree, TreeKind} from "../";
 import {JavaType} from "./type";
+import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {JavaReceiver, JavaSender} from "./rpc";
 
 export interface J extends Tree {
     readonly prefix: J.Space;
@@ -857,3 +859,34 @@ export namespace TypedTree {
     registerTypeGetter(J.Kind.Wildcard, () => JavaType.unknownType);
     registerTypeGetter(J.Kind.Unknown, () => JavaType.unknownType);
 }
+
+const javaReceiver = new JavaReceiver();
+const javaSender = new JavaSender();
+
+const javaCodec: RpcCodec<J> = {
+    async rpcReceive(before: J, q: RpcReceiveQueue): Promise<J> {
+        return (await javaReceiver.visit(before, q))!;
+    },
+
+    async rpcSend(after: J, q: RpcSendQueue): Promise<void> {
+        await javaSender.visit(after, q);
+    }
+}
+
+// Register codec for all Java AST node types
+Object.values(J.Kind).forEach(kind => {
+    if (kind === J.Kind.Space) {
+        RpcCodecs.registerCodec(kind, {
+                async rpcReceive(before: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
+                    return (await javaReceiver.visitSpace(before, q))!;
+                },
+
+                async rpcSend(after: J.Space, q: RpcSendQueue): Promise<void> {
+                    await javaSender.visitSpace(after, q);
+                }
+            }
+        );
+    } else {
+        RpcCodecs.registerCodec(kind, javaCodec);
+    }
+});
