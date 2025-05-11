@@ -50,7 +50,7 @@ const is_statements: string[] = [
     JS.Kind.IndexSignatureDeclaration,
     JS.Kind.AssignmentOperation,
     JS.Kind.Import,
-    JS.Kind.JSMethodDeclaration,
+    JS.Kind.ComputedPropertyMethodDeclaration,
     JS.Kind.JSTry,
     JS.Kind.JSVariableDeclarations,
     JS.Kind.MappedTypeKeysRemapping,

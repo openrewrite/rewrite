@@ -59,6 +59,7 @@ import {
 import {JavaScriptTypeMapping} from "./type-mapping";
 import {produce} from "immer";
 import Kind = JS.Kind;
+import ComputedPropertyName = JS.ComputedPropertyName;
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[]
@@ -725,21 +726,13 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitComputedPropertyName(node: ts.ComputedPropertyName): J.NewArray {
-        // using a `J.NewArray` is a bit of a trick; in the TS Compiler AST there is no array for this
+    visitComputedPropertyName(node: ts.ComputedPropertyName): JS.ComputedPropertyName {
         return {
-            kind: J.Kind.NewArray,
+            kind: JS.Kind.ComputedPropertyName,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            dimensions: [],
-            initializer: {
-                kind: J.Kind.JContainer,
-                before: emptySpace,
-                elements: [this.rightPadded(this.convert(node.expression), this.suffix(node.expression))],
-                markers: emptyMarkers
-            },
-            type: this.mapType(node)
+            expression: this.rightPadded(this.convert(node.expression), this.suffix(node.expression))
         };
     }
 
@@ -995,12 +988,12 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitMethodSignature(node: ts.MethodSignature) {
+    visitMethodSignature(node: ts.MethodSignature): J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration {
         const prefix = this.prefix(node);
 
         if (ts.isComputedPropertyName(node.name)) {
             return {
-                kind: JS.Kind.JSMethodDeclaration,
+                kind: JS.Kind.ComputedPropertyMethodDeclaration,
                 id: randomId(),
                 prefix: prefix,
                 markers: emptyMarkers,
@@ -1008,12 +1001,12 @@ export class JavaScriptParserVisitor {
                 modifiers: [], // no modifiers allowed
                 typeParameters: this.mapTypeParametersAsObject(node),
                 returnTypeExpression: this.mapTypeInfo(node),
-                name: produce(this.convert(node.name) as Expression, draft => {
+                name: produce(this.convert<ComputedPropertyName>(node.name), draft => {
                     draft.markers = this.maybeAddOptionalMarker(draft, node);
                 }),
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 methodType: this.mapMethodType(node)
-            } as JS.JSMethodDeclaration;
+            } as JS.ComputedPropertyMethodDeclaration;
         }
 
         let name: J.Identifier = !node.name
@@ -1040,7 +1033,7 @@ export class JavaScriptParserVisitor {
         } as J.MethodDeclaration;
     }
 
-    visitMethodDeclaration(node: ts.MethodDeclaration) {
+    visitMethodDeclaration(node: ts.MethodDeclaration): J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration {
         const prefix = this.prefix(node);
         const markers = produce(emptyMarkers, draft => {
             if (node.asteriskToken) {
@@ -1057,9 +1050,9 @@ export class JavaScriptParserVisitor {
             draft.markers = this.maybeAddOptionalMarker(draft, node);
         });
 
-        if (!(name.kind === J.Kind.Identifier)) {
+        if (ts.isComputedPropertyName(node.name)) {
             return {
-                kind: JS.Kind.JSMethodDeclaration,
+                kind: JS.Kind.ComputedPropertyMethodDeclaration,
                 id: randomId(),
                 prefix: prefix,
                 markers: markers,
@@ -1068,11 +1061,11 @@ export class JavaScriptParserVisitor {
                 typeParameters: this.mapTypeParametersAsObject(node),
                 returnTypeExpression: this.mapTypeInfo(node),
                 nameAnnotations: [],
-                name: name,
+                name: name as ComputedPropertyName,
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
                 methodType: this.mapMethodType(node)
-            } as JS.JSMethodDeclaration;
+            } as JS.ComputedPropertyMethodDeclaration;
         }
 
         return {
@@ -1104,7 +1097,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitClassStaticBlockDeclaration(node: ts.ClassStaticBlockDeclaration) {
+    visitClassStaticBlockDeclaration(node: ts.ClassStaticBlockDeclaration): J.Block {
         return {
             kind: J.Kind.Block,
             id: randomId(),
@@ -1142,22 +1135,22 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitGetAccessor(node: ts.GetAccessorDeclaration) {
+    visitGetAccessor(node: ts.GetAccessorDeclaration): J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration {
         const name = this.visit(node.name);
-        if (!(name.kind === J.Kind.Identifier)) {
+        if (ts.isComputedPropertyName(node.name)) {
             return {
-                kind: JS.Kind.JSMethodDeclaration,
+                kind: JS.Kind.ComputedPropertyMethodDeclaration,
                 id: randomId(),
                 prefix: this.prefix(node),
                 markers: emptyMarkers,
                 leadingAnnotations: this.mapDecorators(node),
                 modifiers: this.mapModifiers(node),
                 returnTypeExpression: this.mapTypeInfo(node),
-                name: name,
+                name: name as ComputedPropertyName,
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
                 methodType: this.mapMethodType(node)
-            };
+            } as JS.ComputedPropertyMethodDeclaration;
         }
 
         return {
@@ -1173,24 +1166,24 @@ export class JavaScriptParserVisitor {
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
-        };
+        } as J.MethodDeclaration;
     }
 
-    visitSetAccessor(node: ts.SetAccessorDeclaration) {
+    visitSetAccessor(node: ts.SetAccessorDeclaration): J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration {
         const name = this.visit(node.name);
-        if (!(name.kind === J.Kind.Identifier)) {
+        if (ts.isComputedPropertyName(node.name)) {
             return {
-                kind: JS.Kind.JSMethodDeclaration,
+                kind: JS.Kind.ComputedPropertyMethodDeclaration,
                 id: randomId(),
                 prefix: this.prefix(node),
                 markers: emptyMarkers,
                 leadingAnnotations: this.mapDecorators(node),
                 modifiers: this.mapModifiers(node),
-                name: name,
+                name: name as ComputedPropertyName,
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
                 methodType: this.mapMethodType(node)
-            };
+            } as JS.ComputedPropertyMethodDeclaration;
         }
 
         return {
@@ -1205,10 +1198,10 @@ export class JavaScriptParserVisitor {
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
-        };
+        } as J.MethodDeclaration;
     }
 
-    visitCallSignature(node: ts.CallSignatureDeclaration) {
+    visitCallSignature(node: ts.CallSignatureDeclaration): J.MethodDeclaration {
         return {
             kind: J.Kind.MethodDeclaration,
             id: randomId(),

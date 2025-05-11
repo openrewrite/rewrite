@@ -401,6 +401,12 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitComputedPropertyName(JS.ComputedPropertyName computedPropertyName, RpcReceiveQueue q) {
+        return computedPropertyName
+                .getPadding().withExpression(q.receive(computedPropertyName.getPadding().getExpression(), el -> visitRightPadded(el, q)));
+    }
+
+    @Override
     public J visitTypeOperator(JS.TypeOperator typeOperator, RpcReceiveQueue q) {
         return typeOperator
                 .withOperator(q.receiveAndGet(typeOperator.getOperator(), toEnum(JS.TypeOperator.Type.class)))
@@ -453,17 +459,16 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitJSMethodDeclaration(JS.JSMethodDeclaration jSMethodDeclaration, RpcReceiveQueue q) {
-        return jSMethodDeclaration
-                .withLeadingAnnotations(q.receiveList(jSMethodDeclaration.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
-                .withModifiers(q.receiveList(jSMethodDeclaration.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .withTypeParameters(q.receive(jSMethodDeclaration.getTypeParameters(), params -> (J.TypeParameters) visitNonNull(params, q)))
-                .withReturnTypeExpression(q.receive(jSMethodDeclaration.getReturnTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
-                .withName(q.receive(jSMethodDeclaration.getName(), expr -> (Expression) visitNonNull(expr, q)))
-                .getPadding().withParameters(q.receive(jSMethodDeclaration.getPadding().getParameters(), el -> visitContainer(el, q)))
-                .withBody(q.receive(jSMethodDeclaration.getBody(), block -> (J.Block) visitNonNull(block, q)))
-                .getPadding().withDefaultValue(q.receive(jSMethodDeclaration.getPadding().getDefaultValue(), el -> visitLeftPadded(el, q)))
-                .withMethodType(q.receive(jSMethodDeclaration.getMethodType(), type -> (JavaType.Method) visitType(type, q)));
+    public J visitComputedPropertyMethodDeclaration(JS.ComputedPropertyMethodDeclaration computedPropMethod, RpcReceiveQueue q) {
+        return computedPropMethod
+                .withLeadingAnnotations(q.receiveList(computedPropMethod.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
+                .withModifiers(q.receiveList(computedPropMethod.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
+                .withTypeParameters(q.receive(computedPropMethod.getTypeParameters(), params -> (J.TypeParameters) visitNonNull(params, q)))
+                .withReturnTypeExpression(q.receive(computedPropMethod.getReturnTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
+                .withName(q.receive(computedPropMethod.getName(), expr -> (JS.ComputedPropertyName) visitNonNull(expr, q)))
+                .getPadding().withParameters(q.receive(computedPropMethod.getPadding().getParameters(), el -> visitContainer(el, q)))
+                .withBody(q.receive(computedPropMethod.getBody(), block -> (J.Block) visitNonNull(block, q)))
+                .withMethodType(q.receive(computedPropMethod.getMethodType(), type -> (JavaType.Method) visitType(type, q)));
     }
 
     @Override

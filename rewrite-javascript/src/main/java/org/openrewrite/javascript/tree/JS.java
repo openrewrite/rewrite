@@ -3234,6 +3234,89 @@ public interface JS extends J {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
+    final class ComputedPropertyName implements JS, Expression, TypeTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        JRightPadded<Expression> expression;
+
+        public Expression getExpression() {
+            return expression.getElement();
+        }
+
+        public ComputedPropertyName withExpression(Expression expression) {
+            return getPadding().withExpression(this.expression.withElement(expression));
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return expression.getElement().getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ComputedPropertyName withType(@Nullable JavaType type) {
+            return type == getType() ? this : getPadding().withExpression(this.expression.withElement(this.expression.getElement().withType(type)));
+        }
+
+        @Override
+        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
+            return v.visitComputedPropertyName(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ComputedPropertyName t;
+
+            public JRightPadded<Expression> getExpression() {
+                return t.expression;
+            }
+
+            public ComputedPropertyName withExpression(JRightPadded<Expression> expression) {
+                return t.expression == expression ? t : new ComputedPropertyName(t.id, t.prefix, t.markers, expression);
+            }
+        }
+    }
+
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
     final class TypeOperator implements JS, Expression, TypeTree {
 
         @Nullable
@@ -3876,10 +3959,10 @@ public interface JS extends J {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
-    final class JSMethodDeclaration implements JS, Statement, TypedTree {
+    final class ComputedPropertyMethodDeclaration implements JS, Statement, TypedTree {
         @Nullable
         @NonFinal
-        transient WeakReference<JSMethodDeclaration.Padding> padding;
+        transient WeakReference<ComputedPropertyMethodDeclaration.Padding> padding;
 
         @With
         @EqualsAndHashCode.Include
@@ -3915,7 +3998,7 @@ public interface JS extends J {
 
         @With
         @Getter
-        Expression name; // simplified model by excluding IdentifierWithAnnotations
+        ComputedPropertyName name;
 
         JContainer<Statement> parameters;
 
@@ -3923,7 +4006,7 @@ public interface JS extends J {
             return parameters.getElements();
         }
 
-        public JSMethodDeclaration withParameters(List<Statement> parameters) {
+        public ComputedPropertyMethodDeclaration withParameters(List<Statement> parameters) {
             return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
         }
 
@@ -3935,28 +4018,14 @@ public interface JS extends J {
         @Nullable
         Block body;
 
-        /**
-         * For default values on definitions of annotation parameters.
-         */
-        @Nullable
-        JLeftPadded<Expression> defaultValue;
-
-        public @Nullable Expression getDefaultValue() {
-            return defaultValue == null ? null : defaultValue.getElement();
-        }
-
-        public JSMethodDeclaration withDefaultValue(@Nullable Expression defaultValue) {
-            return getPadding().withDefaultValue(JLeftPadded.withElement(this.defaultValue, defaultValue));
-        }
-
         @Getter
         JavaType.@Nullable Method methodType;
 
-        public JSMethodDeclaration withMethodType(JavaType.@Nullable Method type) {
+        public ComputedPropertyMethodDeclaration withMethodType(JavaType.@Nullable Method type) {
             if (type == this.methodType) {
                 return this;
             }
-            return new JSMethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, body, defaultValue, type);
+            return new ComputedPropertyMethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, body, type);
         }
 
         @Override
@@ -3966,13 +4035,13 @@ public interface JS extends J {
 
         @SuppressWarnings("unchecked")
         @Override
-        public JSMethodDeclaration withType(@Nullable JavaType type) {
+        public ComputedPropertyMethodDeclaration withType(@Nullable JavaType type) {
             throw new UnsupportedOperationException("To change the return type of this method declaration, use withMethodType(..)");
         }
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitJSMethodDeclaration(this, p);
+            return v.visitComputedPropertyMethodDeclaration(this, p);
         }
 
         public boolean isAbstract() {
@@ -3995,20 +4064,20 @@ public interface JS extends J {
 
         @Override
         public String toString() {
-            return "MethodDeclaration{" +
+            return "ComputedPropertyMethodDeclaration{" +
                    (getMethodType() == null ? "unknown" : getMethodType()) +
                    "}";
         }
 
-        public JSMethodDeclaration.Padding getPadding() {
-            JSMethodDeclaration.Padding p;
+        public ComputedPropertyMethodDeclaration.Padding getPadding() {
+            ComputedPropertyMethodDeclaration.Padding p;
             if (this.padding == null) {
-                p = new JSMethodDeclaration.Padding(this);
+                p = new ComputedPropertyMethodDeclaration.Padding(this);
                 this.padding = new WeakReference<>(p);
             } else {
                 p = this.padding.get();
                 if (p == null || p.t != this) {
-                    p = new JSMethodDeclaration.Padding(this);
+                    p = new ComputedPropertyMethodDeclaration.Padding(this);
                     this.padding = new WeakReference<>(p);
                 }
             }
@@ -4017,22 +4086,14 @@ public interface JS extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final JSMethodDeclaration t;
+            private final ComputedPropertyMethodDeclaration t;
 
             public JContainer<Statement> getParameters() {
                 return t.parameters;
             }
 
-            public JSMethodDeclaration withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new JSMethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.body, t.defaultValue, t.methodType);
-            }
-
-            public @Nullable JLeftPadded<Expression> getDefaultValue() {
-                return t.defaultValue;
-            }
-
-            public JSMethodDeclaration withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
-                return t.defaultValue == defaultValue ? t : new JSMethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.body, defaultValue, t.methodType);
+            public ComputedPropertyMethodDeclaration withParameters(JContainer<Statement> parameters) {
+                return t.parameters == parameters ? t : new ComputedPropertyMethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.body, t.methodType);
             }
         }
     }

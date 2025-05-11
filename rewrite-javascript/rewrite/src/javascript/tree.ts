@@ -33,6 +33,7 @@ export namespace JS {
         Await: "org.openrewrite.javascript.tree.JS$Await",
         BindingElement: "org.openrewrite.javascript.tree.JS$BindingElement",
         CompilationUnit: "org.openrewrite.javascript.tree.JS$CompilationUnit",
+        ComputedPropertyName: "org.openrewrite.javascript.tree.JS$ComputedPropertyName",
         ConditionalType: "org.openrewrite.javascript.tree.JS$ConditionalType",
         Delete: "org.openrewrite.javascript.tree.JS$Delete",
         Export: "org.openrewrite.javascript.tree.JS$Export",
@@ -56,7 +57,7 @@ export namespace JS {
         JSCatch: "org.openrewrite.javascript.tree.JS$JSTry$JSCatch",
         ForInLoop: "org.openrewrite.javascript.tree.JS$ForInLoop",
         ForOfLoop: "org.openrewrite.javascript.tree.JS$ForOfLoop",
-        JSMethodDeclaration: "org.openrewrite.javascript.tree.JS$JSMethodDeclaration",
+        ComputedPropertyMethodDeclaration: "org.openrewrite.javascript.tree.JS$ComputedPropertyMethodDeclaration",
         JSNamedVariable: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations$JSNamedVariable",
         JSTry: "org.openrewrite.javascript.tree.JS$JSTry",
         JSVariableDeclarations: "org.openrewrite.javascript.tree.JS$JSVariableDeclarations",
@@ -625,6 +626,15 @@ export namespace JS {
     }
 
     /**
+     * Represents TypeScript computed property name.
+     * @example { [key]: value }
+     */
+    export interface ComputedPropertyName extends JS, Expression, TypedTree {
+        readonly kind: typeof Kind.ComputedPropertyName;
+        readonly expression: J.RightPadded<Expression>;
+    }
+
+    /**
      * Represents TypeScript type operator keywords like readonly.
      * @example type R = readonly number[];
      */
@@ -707,18 +717,17 @@ export namespace JS {
 
     /**
      * Represents a method declaration in classes or objects.
-     * @example class A { myMethod() {} }
+     * @example class A { [Symbol.asyncIterator]() { ... } }
      */
-    export interface JSMethodDeclaration extends JS, Statement {
-        readonly kind: typeof Kind.JSMethodDeclaration;
+    export interface ComputedPropertyMethodDeclaration extends JS, Statement {
+        readonly kind: typeof Kind.ComputedPropertyMethodDeclaration;
         readonly leadingAnnotations: J.Annotation[];
         readonly modifiers: J.Modifier[];
         readonly typeParameters?: J.TypeParameters;
         readonly returnTypeExpression?: TypeTree;
-        readonly name: Expression;
+        readonly name: ComputedPropertyName;
         readonly parameters: J.Container<Statement>;
         readonly body?: J.Block;
-        readonly defaultValue?: J.LeftPadded<Expression>;
         readonly methodType?: JavaType.Method;
     }
 

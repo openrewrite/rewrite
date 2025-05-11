@@ -19,6 +19,7 @@ import {mapAsync, SourceFile, ValidImmerRecipeReturnType} from "../";
 import {Expression, J, JavaType, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
 import {isJavaScript, JS} from "./tree";
+import ComputedPropertyName = JS.ComputedPropertyName;
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
@@ -405,6 +406,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
+    protected async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.ComputedPropertyName>(computedPropertyName, p, async draft => {
+            draft.expression = await this.visitRightPadded(computedPropertyName.expression, p);
+        });
+    }
+
     protected async visitTypeOperator(typeOperator: JS.TypeOperator, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.TypeOperator>(typeOperator, p, async draft => {
             draft.expression = await this.visitLeftPadded(typeOperator.expression, p);
@@ -456,17 +463,16 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJSMethodDeclaration(jSMethodDeclaration: JS.JSMethodDeclaration, p: P): Promise<J | undefined> {
-        return this.produceJavaScript<JS.JSMethodDeclaration>(jSMethodDeclaration, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(jSMethodDeclaration.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
-            draft.modifiers = await mapAsync(jSMethodDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.typeParameters = jSMethodDeclaration.typeParameters && await this.visitDefined<J.TypeParameters>(jSMethodDeclaration.typeParameters, p);
-            draft.returnTypeExpression = jSMethodDeclaration.returnTypeExpression && await this.visitDefined<TypedTree>(jSMethodDeclaration.returnTypeExpression, p);
-            draft.name = await this.visitDefined<Expression>(jSMethodDeclaration.name, p);
-            draft.parameters = await this.visitContainer(jSMethodDeclaration.parameters, p);
-            draft.body = jSMethodDeclaration.body && await this.visitDefined<J.Block>(jSMethodDeclaration.body, p);
-            draft.defaultValue = jSMethodDeclaration.defaultValue && await this.visitLeftPadded(jSMethodDeclaration.defaultValue, p);
-            draft.methodType = jSMethodDeclaration.methodType && (await this.visitType(jSMethodDeclaration.methodType, p) as JavaType.Method);
+    protected async visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.ComputedPropertyMethodDeclaration>(computedPropMethod, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(computedPropMethod.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
+            draft.modifiers = await mapAsync(computedPropMethod.modifiers, item => this.visitDefined<J.Modifier>(item, p));
+            draft.typeParameters = computedPropMethod.typeParameters && await this.visitDefined<J.TypeParameters>(computedPropMethod.typeParameters, p);
+            draft.returnTypeExpression = computedPropMethod.returnTypeExpression && await this.visitDefined<TypedTree>(computedPropMethod.returnTypeExpression, p);
+            draft.name = await this.visitDefined<ComputedPropertyName>(computedPropMethod.name, p);
+            draft.parameters = await this.visitContainer(computedPropMethod.parameters, p);
+            draft.body = computedPropMethod.body && await this.visitDefined<J.Block>(computedPropMethod.body, p);
+            draft.methodType = computedPropMethod.methodType && (await this.visitType(computedPropMethod.methodType, p) as JavaType.Method);
         });
     }
 
@@ -586,6 +592,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitAwait(tree as unknown as JS.Await, p);
                 case JS.Kind.CompilationUnit:
                     return this.visitJsCompilationUnit(tree as unknown as JS.CompilationUnit, p);
+                case JS.Kind.ComputedPropertyName:
+                    return this.visitComputedPropertyName(tree as unknown as JS.ComputedPropertyName, p);
                 case JS.Kind.ConditionalType:
                     return this.visitConditionalType(tree as unknown as JS.ConditionalType, p);
                 case JS.Kind.Delete:
@@ -678,8 +686,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitWithStatement(tree as unknown as JS.WithStatement, p);
                 case JS.Kind.IndexSignatureDeclaration:
                     return this.visitIndexSignatureDeclaration(tree as unknown as JS.IndexSignatureDeclaration, p);
-                case JS.Kind.JSMethodDeclaration:
-                    return this.visitJSMethodDeclaration(tree as unknown as JS.JSMethodDeclaration, p);
+                case JS.Kind.ComputedPropertyMethodDeclaration:
+                    return this.visitComputedPropertyMethodDeclaration(tree as unknown as JS.ComputedPropertyMethodDeclaration, p);
                 case JS.Kind.ForOfLoop:
                     return this.visitForOfLoop(tree as unknown as JS.ForOfLoop, p);
                 case JS.Kind.ForInLoop:

@@ -118,6 +118,11 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.ComputedPropertyName visitComputedPropertyName(JS.ComputedPropertyName computedPropertyName, P p) {
+        return (JS.ComputedPropertyName) super.visitComputedPropertyName(computedPropertyName, p);
+    }
+
+    @Override
     public JS.TypeOperator visitTypeOperator(JS.TypeOperator typeOperator, P p) {
         return (JS.TypeOperator) super.visitTypeOperator(typeOperator, p);
     }

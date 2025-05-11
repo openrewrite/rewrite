@@ -20,6 +20,7 @@ import {Expression, J, JavaType, Statement, TypedTree, TypeTree} from "../java";
 import {createDraft, finishDraft} from "immer";
 import {JavaReceiver, JavaSender} from "../java/rpc";
 import {Cursor, Tree} from "../tree";
+import ComputedPropertyName = JS.ComputedPropertyName;
 
 class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     private javaSender: JavaScriptSenderDelegate;
@@ -348,6 +349,11 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return typeInfo;
     }
 
+    override async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(computedPropertyName, el => el.expression, el => this.visitRightPadded(el, q));
+        return computedPropertyName;
+    }
+
     override async visitTypeOperator(typeOperator: JS.TypeOperator, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(typeOperator, el => el.operator);
         await q.getAndSend(typeOperator, el => el.expression, el => this.visitLeftPadded(el, q));
@@ -393,17 +399,16 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return indexSignatureDeclaration;
     }
 
-    override async visitJSMethodDeclaration(jSMethodDeclaration: JS.JSMethodDeclaration, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(jSMethodDeclaration, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
-        await q.getAndSendList(jSMethodDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(jSMethodDeclaration, el => el.typeParameters, el => this.visit(el, q));
-        await q.getAndSend(jSMethodDeclaration, el => el.returnTypeExpression, el => this.visit(el, q));
-        await q.getAndSend(jSMethodDeclaration, el => el.name, el => this.visit(el, q));
-        await q.getAndSend(jSMethodDeclaration, el => el.parameters, el => this.visitContainer(el, q));
-        await q.getAndSend(jSMethodDeclaration, el => el.body, el => this.visit(el, q));
-        await q.getAndSend(jSMethodDeclaration, el => el.defaultValue, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(jSMethodDeclaration, el => el.methodType, el => this.visitType(el, q));
-        return jSMethodDeclaration;
+    override async visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSendList(computedPropMethod, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
+        await q.getAndSendList(computedPropMethod, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        await q.getAndSend(computedPropMethod, el => el.typeParameters, el => this.visit(el, q));
+        await q.getAndSend(computedPropMethod, el => el.returnTypeExpression, el => this.visit(el, q));
+        await q.getAndSend(computedPropMethod, el => el.name, el => this.visit(el, q));
+        await q.getAndSend(computedPropMethod, el => el.parameters, el => this.visitContainer(el, q));
+        await q.getAndSend(computedPropMethod, el => el.body, el => this.visit(el, q));
+        await q.getAndSend(computedPropMethod, el => el.methodType, el => this.visitType(el, q));
+        return computedPropMethod;
     }
 
     override async visitForOfLoop(forOfLoop: JS.ForOfLoop, q: RpcSendQueue): Promise<J | undefined> {
@@ -913,6 +918,12 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
+    override async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(computedPropertyName);
+        draft.expression = await q.receive(draft.expression, el => this.visitRightPadded(el, q));
+        return finishDraft(draft);
+    }
+
     override async visitTypeOperator(typeOperator: JS.TypeOperator, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(typeOperator);
         draft.operator = await q.receive(draft.operator);
@@ -965,16 +976,15 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitJSMethodDeclaration(jSMethodDeclaration: JS.JSMethodDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(jSMethodDeclaration);
+    override async visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(computedPropMethod);
         draft.leadingAnnotations = await q.receiveListDefined(draft.leadingAnnotations, el => this.visitDefined<J.Annotation>(el, q));
         draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
         draft.typeParameters = await q.receive(draft.typeParameters, el => this.visitDefined<J.TypeParameters>(el, q));
         draft.returnTypeExpression = await q.receive(draft.returnTypeExpression, el => this.visitDefined<TypeTree>(el, q));
-        draft.name = await q.receive(draft.name, el => this.visitDefined<Expression>(el, q));
+        draft.name = await q.receive(draft.name, el => this.visitDefined<ComputedPropertyName>(el, q));
         draft.parameters = await q.receive(draft.parameters, el => this.visitContainer(el, q));
         draft.body = await q.receive(draft.body, el => this.visitDefined<J.Block>(el, q));
-        draft.defaultValue = await q.receive(draft.defaultValue, el => this.visitLeftPadded(el, q));
         draft.methodType = await q.receive(draft.methodType, el => this.visitType(el, q) as any as JavaType.Method);
         return finishDraft(draft);
     }

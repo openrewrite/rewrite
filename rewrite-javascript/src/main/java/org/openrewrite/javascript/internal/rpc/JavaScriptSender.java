@@ -493,6 +493,12 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitComputedPropertyName(JS.ComputedPropertyName computedPropertyName, RpcSendQueue q) {
+        q.getAndSend(computedPropertyName, el -> el.getPadding().getExpression(), el -> visitRightPadded(el, q));
+        return computedPropertyName;
+    }
+
+    @Override
     public J visitTypeOperator(JS.TypeOperator typeOperator, RpcSendQueue q) {
         q.getAndSend(typeOperator, JS.TypeOperator::getOperator);
         q.getAndSend(typeOperator, el -> el.getPadding().getExpression(), el -> visitLeftPadded(el, q));
@@ -555,27 +561,24 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitJSMethodDeclaration(JS.JSMethodDeclaration jSMethodDeclaration, RpcSendQueue q) {
-        q.getAndSendList(jSMethodDeclaration, JS.JSMethodDeclaration::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
-        q.getAndSendList(jSMethodDeclaration, JS.JSMethodDeclaration::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        if (jSMethodDeclaration.getTypeParameters() != null) {
-            q.getAndSend(jSMethodDeclaration, JS.JSMethodDeclaration::getTypeParameters, el -> visit(el, q));
+    public J visitComputedPropertyMethodDeclaration(JS.ComputedPropertyMethodDeclaration computedPropMethod, RpcSendQueue q) {
+        q.getAndSendList(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
+        q.getAndSendList(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getModifiers, J.Modifier::getId, el -> visit(el, q));
+        if (computedPropMethod.getTypeParameters() != null) {
+            q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getTypeParameters, el -> visit(el, q));
         }
-        if (jSMethodDeclaration.getReturnTypeExpression() != null) {
-            q.getAndSend(jSMethodDeclaration, JS.JSMethodDeclaration::getReturnTypeExpression, el -> visit(el, q));
+        if (computedPropMethod.getReturnTypeExpression() != null) {
+            q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getReturnTypeExpression, el -> visit(el, q));
         }
-        q.getAndSend(jSMethodDeclaration, JS.JSMethodDeclaration::getName, el -> visit(el, q));
-        q.getAndSend(jSMethodDeclaration, el -> el.getPadding().getParameters(), el -> visitContainer(el, q));
-        if (jSMethodDeclaration.getBody() != null) {
-            q.getAndSend(jSMethodDeclaration, JS.JSMethodDeclaration::getBody, el -> visit(el, q));
+        q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getName, el -> visit(el, q));
+        q.getAndSend(computedPropMethod, el -> el.getPadding().getParameters(), el -> visitContainer(el, q));
+        if (computedPropMethod.getBody() != null) {
+            q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getBody, el -> visit(el, q));
         }
-        if (jSMethodDeclaration.getPadding().getDefaultValue() != null) {
-            q.getAndSend(jSMethodDeclaration, el -> el.getPadding().getDefaultValue(), el -> visitLeftPadded(el, q));
+        if (computedPropMethod.getMethodType() != null) {
+            q.getAndSend(computedPropMethod, el -> asRef(el.getMethodType()), el -> visitType(getValueNonNull(el), q));
         }
-        if (jSMethodDeclaration.getMethodType() != null) {
-            q.getAndSend(jSMethodDeclaration, el -> asRef(el.getMethodType()), el -> visitType(getValueNonNull(el), q));
-        }
-        return jSMethodDeclaration;
+        return computedPropMethod;
     }
 
     @Override

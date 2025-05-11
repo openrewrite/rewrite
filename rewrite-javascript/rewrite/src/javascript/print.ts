@@ -20,7 +20,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
-import {findMarker, Marker, markers, Markers} from "../markers";
+import {findMarker, Marker, Markers} from "../markers";
 import {Asterisk, DelegatedYield, NonNullAssertion, Optional, Spread} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
@@ -759,7 +759,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return method;
     }
 
-    override async visitJSMethodDeclaration(method: JS.JSMethodDeclaration, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitComputedPropertyMethodDeclaration(method: JS.ComputedPropertyMethodDeclaration, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(method, p);
         await this.visitSpace(emptySpace, p);
         await this.visitNodes(method.leadingAnnotations, p);
@@ -1189,6 +1189,14 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visit(typeOf.expression, p);
         await this.afterSyntax(typeOf, p);
         return typeOf;
+    }
+
+    protected async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(computedPropertyName, p);
+        p.append("[");
+        await this.visitJRightPaddedLocalSingle(computedPropertyName.expression, "]", p);
+        await this.afterSyntax(computedPropertyName, p);
+        return computedPropertyName;
     }
 
     override async visitTypeOperator(typeOperator: JS.TypeOperator, p: PrintOutputCapture): Promise<J | undefined> {
