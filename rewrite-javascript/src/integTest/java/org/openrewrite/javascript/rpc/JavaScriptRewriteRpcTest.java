@@ -48,7 +48,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 @Disabled
-public class JavaScriptRewriteRpcTest implements RewriteTest {
+class JavaScriptRewriteRpcTest implements RewriteTest {
     JavaScriptRewriteRpc client;
     PrintStream log;
 
