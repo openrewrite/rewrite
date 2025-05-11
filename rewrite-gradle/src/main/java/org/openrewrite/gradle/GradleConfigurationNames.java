@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.util;
+package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
@@ -22,7 +22,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-public class GradleConfigurationNames {
+class GradleConfigurationNames {
     private static final Set<String> gradleStandardConfigurations = new HashSet<>(Arrays.asList("api", "implementation", "compileOnly", "compileOnlyApi", "runtimeOnly", "testImplementation", "testCompileOnly", "testRuntimeOnly"));
 
     public static boolean isStandardConfiguration(String configuration) {

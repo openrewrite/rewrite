@@ -56,7 +56,7 @@ class GradleConfigurationFilter {
         }
     }
 
-    public void removeTransitiveConfigurationsContainingDependency(GroupArtifact dependency) {
+    public void removeConfigurationsContainingTransitiveDependency(GroupArtifact dependency) {
         Set<String> tmpConfigurations = new HashSet<>(filteredConfigurations);
         for (String tmpConfiguration : tmpConfigurations) {
             GradleDependencyConfiguration gdc = requireNonNull(gradleProject.getConfiguration(tmpConfiguration));

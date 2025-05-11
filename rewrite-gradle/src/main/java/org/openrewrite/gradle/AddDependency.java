@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
-import org.openrewrite.gradle.util.GradleConfigurationNames;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
@@ -228,7 +227,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
                         gradleConfigurationFilter.removeTransitiveConfigurations();
                         gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
-                        gradleConfigurationFilter.removeTransitiveConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
+                        gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
                         resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
 
                         if (resolvedConfigurations.isEmpty()) {
