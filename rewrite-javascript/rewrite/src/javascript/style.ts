@@ -24,10 +24,11 @@ export const JavaScriptStyles = {
 }
 
 export const StyleKind = {
-    SpacesStyle: "org.openrewrite.javascript.style.SpacesStyle"
+    SpacesStyle: "org.openrewrite.javascript.style.SpacesStyle",
+    WrappingAndBracesStyle: "org.openrewrite.java.style.WrappingAndBracesStyle",
 } as const;
 
-export const StyleDetailKind = {
+export const SpacesStyleDetailKind = {
     SpacesStyleBeforeParentheses: "org.openrewrite.javascript.style.SpacesStyle$BeforeParentheses",
     SpacesStyleAroundOperators: "org.openrewrite.javascript.style.SpacesStyle$AroundOperators",
     SpacesStyleBeforeLeftBrace: "org.openrewrite.javascript.style.SpacesStyle$BeforeLeftBrace",
@@ -50,7 +51,7 @@ export interface SpacesStyle extends Style {
 
 export namespace SpacesStyle {
     export interface BeforeParentheses {
-        readonly kind: typeof StyleDetailKind.SpacesStyleBeforeParentheses;
+        readonly kind: typeof SpacesStyleDetailKind.SpacesStyleBeforeParentheses;
         readonly functionDeclarationParentheses: boolean;
         readonly functionCallParentheses: boolean;
         readonly ifParentheses: boolean;
@@ -63,7 +64,7 @@ export namespace SpacesStyle {
     }
 
     export interface AroundOperators {
-        readonly kind: typeof StyleDetailKind.SpacesStyleAroundOperators;
+        readonly kind: typeof SpacesStyleDetailKind.SpacesStyleAroundOperators;
         readonly assignment: boolean;
         readonly logical: boolean;
         readonly equality: boolean;
@@ -79,7 +80,7 @@ export namespace SpacesStyle {
     }
 
     export interface BeforeLeftBrace {
-        readonly kind: typeof StyleDetailKind.SpacesStyleBeforeLeftBrace;
+        readonly kind: typeof SpacesStyleDetailKind.SpacesStyleBeforeLeftBrace;
         readonly functionLeftBrace: boolean;
         readonly ifLeftBrace: boolean;
         readonly elseLeftBrace: boolean;
@@ -94,7 +95,7 @@ export namespace SpacesStyle {
     }
 
     export interface BeforeKeywords {
-        readonly kind: typeof StyleDetailKind.SpacesStyleBeforeKeywords;
+        readonly kind: typeof SpacesStyleDetailKind.SpacesStyleBeforeKeywords;
         readonly elseKeyword: boolean;
         readonly whileKeyword: boolean;
         readonly catchKeyword: boolean;
@@ -102,7 +103,7 @@ export namespace SpacesStyle {
     }
 
     export interface Within {
-        readonly kind: typeof StyleDetailKind.SpacesStyleWithin;
+        readonly kind: typeof SpacesStyleDetailKind.SpacesStyleWithin;
         readonly indexAccessBrackets: boolean;
         readonly groupingParentheses: boolean;
         readonly functionDeclarationParentheses: boolean;
@@ -122,7 +123,7 @@ export namespace SpacesStyle {
     }
 
     export interface TernaryOperator {
-        readonly kind: typeof StyleDetailKind.SpacesStyleTernaryOperator;
+        readonly kind: typeof SpacesStyleDetailKind.SpacesStyleTernaryOperator;
         readonly beforeQuestionMark: boolean;
         readonly afterQuestionMark: boolean;
         readonly beforeColon: boolean;
@@ -130,7 +131,7 @@ export namespace SpacesStyle {
     }
 
     export interface Other {
-        readonly kind: typeof StyleDetailKind.SpacesStyleOther;
+        readonly kind: typeof SpacesStyleDetailKind.SpacesStyleOther;
         readonly beforeComma: boolean;
         readonly afterComma: boolean;
         readonly beforeForSemicolon: boolean;
@@ -145,6 +146,23 @@ export namespace SpacesStyle {
 }
 
 
+export const WrappingAndBracesStyleDetailKind = {
+    WrappingAndBracesStyleIfStatement: "org.openrewrite.java.style.WrappingAndBracesStyle$IfStatement",
+} as const;
+
+export interface WrappingAndBracesStyle extends Style {
+    // TODO add more flags; this is what we have in Java, but IntelliJ has way more settings
+    readonly kind: typeof StyleKind.WrappingAndBracesStyle;
+    readonly ifStatement: WrappingAndBracesStyle.IfStatement;
+}
+
+export namespace WrappingAndBracesStyle {
+    export interface IfStatement {
+        readonly kind: typeof WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement;
+        readonly elseOnNewLine: boolean;
+    }
+}
+
 export namespace IntelliJ {
     export namespace JavaScript {
         export const defaults: NamedStyles<typeof JavaScriptStyles.IntelliJ> = {
@@ -154,14 +172,14 @@ export namespace IntelliJ {
             displayName: "IntelliJ IDEA",
             description: "Default IntelliJ IDEA code style.",
             tags: [],
-            styles: [spaces()],
+            styles: [spaces(), wrappingAndBraces()],
         }
 
         export function spaces(): SpacesStyle {
             return {
                 kind: StyleKind.SpacesStyle,
                 beforeParentheses: {
-                    kind: StyleDetailKind.SpacesStyleBeforeParentheses,
+                    kind: SpacesStyleDetailKind.SpacesStyleBeforeParentheses,
                     functionDeclarationParentheses: false,
                     functionCallParentheses: false,
                     ifParentheses: true,
@@ -173,7 +191,7 @@ export namespace IntelliJ {
                     inAsyncArrowFunction: true
                 },
                 aroundOperators: {
-                    kind: StyleDetailKind.SpacesStyleAroundOperators,
+                    kind: SpacesStyleDetailKind.SpacesStyleAroundOperators,
                     assignment: true,
                     logical: true,
                     equality: true,
@@ -188,7 +206,7 @@ export namespace IntelliJ {
                     afterUnaryNotAndNotNull: false
                 },
                 beforeLeftBrace: {
-                    kind: StyleDetailKind.SpacesStyleBeforeLeftBrace,
+                    kind: SpacesStyleDetailKind.SpacesStyleBeforeLeftBrace,
                     functionLeftBrace: true,
                     ifLeftBrace: true,
                     elseLeftBrace: true,
@@ -202,14 +220,14 @@ export namespace IntelliJ {
                     classInterfaceModuleLeftBrace: true
                 },
                 beforeKeywords: {
-                    kind: StyleDetailKind.SpacesStyleBeforeKeywords,
+                    kind: SpacesStyleDetailKind.SpacesStyleBeforeKeywords,
                     elseKeyword: true,
                     whileKeyword: true,
                     catchKeyword: true,
                     finallyKeyword: true
                 },
                 within: {
-                    kind: StyleDetailKind.SpacesStyleWithin,
+                    kind: SpacesStyleDetailKind.SpacesStyleWithin,
                     indexAccessBrackets: false,
                     groupingParentheses: false,
                     functionDeclarationParentheses: false,
@@ -228,14 +246,14 @@ export namespace IntelliJ {
                     typeAssertions: false
                 },
                 ternaryOperator: {
-                    kind: StyleDetailKind.SpacesStyleTernaryOperator,
+                    kind: SpacesStyleDetailKind.SpacesStyleTernaryOperator,
                     beforeQuestionMark: true,
                     afterQuestionMark: true,
                     beforeColon: true,
                     afterColon: true
                 },
                 other: {
-                    kind: StyleDetailKind.SpacesStyleOther,
+                    kind: SpacesStyleDetailKind.SpacesStyleOther,
                     beforeComma: false,
                     afterComma: true,
                     beforeForSemicolon: false,
@@ -249,7 +267,18 @@ export namespace IntelliJ {
                 },
             };
         }
+
+        export function wrappingAndBraces(): WrappingAndBracesStyle {
+            return {
+                kind: StyleKind.WrappingAndBracesStyle,
+                ifStatement: {
+                    kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement,
+                    elseOnNewLine: false
+                }
+            };
+        }
     }
+
     export namespace TypeScript {
         export const defaults: NamedStyles<typeof JavaScriptStyles.IntelliJ> = {
             kind: JavaScriptStyles.IntelliJ,
@@ -258,14 +287,14 @@ export namespace IntelliJ {
             displayName: "IntelliJ IDEA",
             description: "Default IntelliJ IDEA code style.",
             tags: [],
-            styles: [spaces()],
+            styles: [spaces(), wrappingAndBraces()],
         }
 
         export function spaces(): SpacesStyle {
             return {
                 kind: StyleKind.SpacesStyle,
                 beforeParentheses: {
-                    kind: StyleDetailKind.SpacesStyleBeforeParentheses,
+                    kind: SpacesStyleDetailKind.SpacesStyleBeforeParentheses,
                     functionDeclarationParentheses: false,
                     functionCallParentheses: false,
                     ifParentheses: true,
@@ -277,7 +306,7 @@ export namespace IntelliJ {
                     inAsyncArrowFunction: true
                 },
                 aroundOperators: {
-                    kind: StyleDetailKind.SpacesStyleAroundOperators,
+                    kind: SpacesStyleDetailKind.SpacesStyleAroundOperators,
                     assignment: true,
                     logical: true,
                     equality: true,
@@ -292,7 +321,7 @@ export namespace IntelliJ {
                     afterUnaryNotAndNotNull: false
                 },
                 beforeLeftBrace: {
-                    kind: StyleDetailKind.SpacesStyleBeforeLeftBrace,
+                    kind: SpacesStyleDetailKind.SpacesStyleBeforeLeftBrace,
                     functionLeftBrace: true,
                     ifLeftBrace: true,
                     elseLeftBrace: true,
@@ -306,14 +335,14 @@ export namespace IntelliJ {
                     classInterfaceModuleLeftBrace: false
                 },
                 beforeKeywords: {
-                    kind: StyleDetailKind.SpacesStyleBeforeKeywords,
+                    kind: SpacesStyleDetailKind.SpacesStyleBeforeKeywords,
                     elseKeyword: true,
                     whileKeyword: true,
                     catchKeyword: true,
                     finallyKeyword: true
                 },
                 within: {
-                    kind: StyleDetailKind.SpacesStyleWithin,
+                    kind: SpacesStyleDetailKind.SpacesStyleWithin,
                     indexAccessBrackets: false,
                     groupingParentheses: false,
                     functionDeclarationParentheses: false,
@@ -332,14 +361,14 @@ export namespace IntelliJ {
                     typeAssertions: false
                 },
                 ternaryOperator: {
-                    kind: StyleDetailKind.SpacesStyleTernaryOperator,
+                    kind: SpacesStyleDetailKind.SpacesStyleTernaryOperator,
                     beforeQuestionMark: true,
                     afterQuestionMark: true,
                     beforeColon: true,
                     afterColon: true
                 },
                 other: {
-                    kind: StyleDetailKind.SpacesStyleOther,
+                    kind: SpacesStyleDetailKind.SpacesStyleOther,
                     beforeComma: false,
                     afterComma: true,
                     beforeForSemicolon: false,
@@ -351,6 +380,16 @@ export namespace IntelliJ {
                     beforeTypeReferenceColon: false,
                     afterTypeReferenceColon: true
                 },
+            };
+        }
+
+        export function wrappingAndBraces(): WrappingAndBracesStyle {
+            return {
+                kind: StyleKind.WrappingAndBracesStyle,
+                ifStatement: {
+                    kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement,
+                    elseOnNewLine: false
+                }
             };
         }
     }
