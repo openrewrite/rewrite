@@ -67,10 +67,8 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSendList(arrowFunction, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
         await q.getAndSendList(arrowFunction, el => el.modifiers, el => el.id, el => this.visit(el, q));
         await q.getAndSend(arrowFunction, el => el.typeParameters, el => this.visit(el, q));
-        await q.getAndSend(arrowFunction, el => el.parameters, el => this.visit(el, q));
+        await q.getAndSend(arrowFunction, el => el.lambda, el => this.visit(el, q));
         await q.getAndSend(arrowFunction, el => el.returnTypeExpression, el => this.visit(el, q));
-        await q.getAndSend(arrowFunction, el => el.body, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(arrowFunction, el => asRef(el.type), el => this.visitType(el, q));
         return arrowFunction;
     }
 
@@ -554,10 +552,8 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.leadingAnnotations = await q.receiveListDefined(draft.leadingAnnotations, el => this.visitDefined<J.Annotation>(el, q));
         draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
         draft.typeParameters = await q.receive(draft.typeParameters, el => this.visitDefined<J.TypeParameters>(el, q));
-        draft.parameters = await q.receive(draft.parameters, el => this.visitDefined<J.Lambda.Parameters>(el, q));
+        draft.lambda = await q.receive(draft.lambda, el => this.visitDefined<J.Lambda>(el, q));
         draft.returnTypeExpression = await q.receive(draft.returnTypeExpression, el => this.visitDefined<TypeTree>(el, q));
-        draft.body = await q.receive(draft.body, el => this.visitLeftPadded(el, q));
-        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
 

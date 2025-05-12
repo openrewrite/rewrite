@@ -396,61 +396,36 @@ public interface JS extends J {
 
     /**
      * A JavaScript `=>` is similar to a Java lambda, but additionally contains annotations, modifiers, type arguments.
-     * The ArrowFunction prevents J.Lambda recipes from transforming the LST because an ArrowFunction
-     * may not be transformed in the same way as a J.Lambda.
      */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    @Data
-    final class ArrowFunction implements JS, Statement, Expression, TypedTree {
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
+    @With
+    class ArrowFunction implements JS, Statement, Expression, TypedTree {
 
-        @Nullable
-        @NonFinal
-        transient WeakReference<ArrowFunction.Padding> padding;
-
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Space prefix;
-
-        @With
         Markers markers;
-
-        @With
         List<J.Annotation> leadingAnnotations;
-
-        @With
         List<J.Modifier> modifiers;
-
-        @Getter
-        @With
         J.@Nullable TypeParameters typeParameters;
+        J.Lambda lambda;
 
-        @With
-        Lambda.Parameters parameters;
-
-        @With
-        @Getter
         @Nullable
         TypeTree returnTypeExpression;
 
-        JLeftPadded<J> body;
-
-        public J getBody() {
-            return body.getElement();
+        @Override
+        public @Nullable JavaType getType() {
+            return lambda.getType();
         }
 
-        public ArrowFunction withBody(J body) {
-            return getPadding().withBody(JLeftPadded.withElement(this.body, body));
+        @SuppressWarnings("unchecked")
+        @Override
+        public ArrowFunction withType(@Nullable JavaType type) {
+            return withLambda(lambda.withType(type));
         }
-
-        @With
-        @Nullable
-        JavaType type;
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
@@ -462,35 +437,6 @@ public interface JS extends J {
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
-
-        public ArrowFunction.Padding getPadding() {
-            ArrowFunction.Padding p;
-            if (this.padding == null) {
-                p = new ArrowFunction.Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.f != this) {
-                    p = new ArrowFunction.Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ArrowFunction f;
-
-            public JLeftPadded<J> getBody() {
-                return f.body;
-            }
-
-            public ArrowFunction withBody(JLeftPadded<J> body) {
-                return f.body == body ? f : new ArrowFunction(f.id, f.prefix, f.markers, f.leadingAnnotations, f.modifiers, f.typeParameters, f.parameters, f.returnTypeExpression, body, f.type);
-            }
-        }
-
     }
 
     @Getter
