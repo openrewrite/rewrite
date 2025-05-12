@@ -16,6 +16,9 @@
 import {AfterRecipeText, dedentAfter, SourceSpec} from "../test";
 import {JavaScriptParser} from "./parser";
 import {JS} from "./tree";
+import ts from 'typescript';
+
+const sourceFileCache: Map<String, ts.SourceFile> = new Map();
 
 export function javascript(before: string | null, after?: AfterRecipeText): SourceSpec<JS.CompilationUnit> {
     return {
@@ -23,7 +26,7 @@ export function javascript(before: string | null, after?: AfterRecipeText): Sour
         before: before,
         after: dedentAfter(after),
         ext: 'js',
-        parser: () => new JavaScriptParser()
+        parser: () => new JavaScriptParser(undefined, sourceFileCache)
     };
 }
 
@@ -33,6 +36,6 @@ export function typescript(before: string | null, after?: AfterRecipeText): Sour
         before: before,
         after: dedentAfter(after),
         ext: 'ts',
-        parser: () => new JavaScriptParser()
+        parser: () => new JavaScriptParser(undefined, sourceFileCache)
     };
 }

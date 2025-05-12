@@ -70,14 +70,15 @@ export class JavaScriptParser extends Parser {
 
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly styles?: NamedStyles[];
-    private readonly sourceFileCache: Map<string, ts.SourceFile> = new Map();
     private oldProgram?: ts.Program;
 
     constructor({
                     ctx,
                     relativeTo,
                     styles
-                }: JavaScriptParserOptions = {}) {
+                }: JavaScriptParserOptions = {},
+                private readonly sourceFileCache: Map<String, ts.SourceFile> = new Map()
+                ) {
         super({ctx, relativeTo});
         this.compilerOptions = {
             target: ts.ScriptTarget.Latest,
