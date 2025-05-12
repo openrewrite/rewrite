@@ -89,9 +89,9 @@ val npmVersion = tasks.register("npmVersion", NpmTask::class) {
 // For local development the user would typically have a `~/.npmrc` file with the token in it
 tasks.register("setupNpmrc") {
     doLast {
-        if (project.hasProperty("npmAuthToken")) {
+        if (project.hasProperty("nodeAuthToken")) {
             val npmrcFile = file("rewrite/.npmrc")
-            npmrcFile.writeText("//registry.npmjs.org/:_authToken=${project.property("npmAuthToken")}\n")
+            npmrcFile.writeText("//registry.npmjs.org/:_authToken=${project.property("nodeAuthToken")}\n")
         }
     }
 }
