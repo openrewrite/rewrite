@@ -28,8 +28,11 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
         const wrappingAndBracesStyle = styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle;
         let t: R | undefined = tree as R;
         // TODO possibly cursor.fork
-        t = t && await new SpacesVisitor(spacesStyle).visit(t, p, cursor);
+
+        // TODO add it once we have the newlines visitor
+        // t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
         t = t && await new WrappingAndBracesVisitor(wrappingAndBracesStyle).visit(t, p, cursor);
+        t = t && await new SpacesVisitor(spacesStyle).visit(t, p, cursor);
         return t;
     }
 }
@@ -543,5 +546,195 @@ export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext
             ];
         }
         return modifiers;
+    }
+}
+
+
+export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionContext> {
+    constructor() {
+        super();
+    }
+
+    override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
+        // Note - for some reason the original MinimumViableSpacingVisitor.java doesn't have it
+        // and only has the logic in MinimumViableSpacingTest.defaults
+        const ret = await super.visitSpace(space, p) as J.Space;
+        return ret && produce(ret, draft => {
+            draft.whitespace = "";
+        });
+    }
+
+    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J | undefined> {
+        let c = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
+        let first = c.leadingAnnotations.length === 0;
+
+        if (c.modifiers.length > 0) {
+            if (!first && c.modifiers[0].prefix.whitespace === "") {
+                c = produce(c, draft => {
+                    draft.modifiers[0].prefix.whitespace = " ";
+                });
+            }
+            c = produce(c, draft => {
+                draft.modifiers = draft.modifiers.map((m, i) => i > 0 && m.prefix.whitespace === "" ?
+                    {...m, prefix: {...m.prefix, whitespace: " "}} : m);
+            });
+            first = false;
+        }
+
+        if (c.classKind.prefix.whitespace === "" && !first) {
+            c = produce(c, draft => {
+                draft.classKind.prefix.whitespace = " ";
+            });
+            first = false;
+        }
+
+        c = produce(c, draft => {
+            draft.name.prefix.whitespace = " ";
+        });
+
+        if (c.typeParameters && c.typeParameters.elements.length > 0 && c.typeParameters.before.whitespace === "" && !first) {
+            c = produce(c, draft => {
+                draft.typeParameters!.before.whitespace = " ";
+            });
+        }
+
+        if (c.extends && c.extends.before.whitespace === "") {
+            c = produce(c, draft => {
+                draft.extends!.before.whitespace = " ";
+            });
+        }
+
+        if (c.implements && c.implements.before.whitespace === "") {
+            c = produce(c, draft => {
+                draft.implements!.before.whitespace = " ";
+                if (draft.implements != undefined && draft.implements.elements.length > 0) {
+                    draft.implements.elements[0].element.prefix.whitespace = " ";
+                }
+            });
+        }
+
+        c = produce(c, draft => {
+            draft.body.prefix.whitespace = "";
+        });
+
+        return c;
+    }
+
+    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J | undefined> {
+        let m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+        let first = m.leadingAnnotations.length === 0;
+
+        if (m.modifiers.length > 0) {
+            if (!first && m.modifiers[0].prefix.whitespace === "") {
+                m = produce(m, draft => {
+                    draft.modifiers[0].prefix.whitespace = " ";
+                });
+            }
+            m = produce(m, draft => {
+                draft.modifiers = draft.modifiers.map((mod, i) =>
+                    i > 0 && mod.prefix.whitespace === "" ?
+                        {...mod, prefix: {...mod.prefix, whitespace: " "}} : mod
+                );
+            });
+            first = false;
+        }
+
+        if (m.typeParameters && m.typeParameters.typeParameters.length > 0 && m.typeParameters.prefix.whitespace === "" && !first) {
+            m = produce(m, draft => {
+                draft.typeParameters!.prefix.whitespace = " ";
+            });
+            first = false;
+        }
+
+        if (m.returnTypeExpression && m.returnTypeExpression.prefix.whitespace === "" && !first) {
+            m = produce(m, draft => {
+                if (m.returnTypeExpression!.kind === J.Kind.AnnotatedType) {
+                    const ann = (m.returnTypeExpression as J.AnnotatedType).annotations;
+                    (m.returnTypeExpression as Draft<J.AnnotatedType>).annotations = ann.map((a, i) =>
+                        i === 0 ? {...a, prefix: {...a.prefix, whitespace: " "}} : a
+                    );
+                } else {
+                    draft.returnTypeExpression!.prefix.whitespace = " ";
+                }
+            });
+        }
+
+        if (!first && m.name.prefix.whitespace === "") {
+            m = produce(m, draft => {
+                draft.name.prefix.whitespace = " ";
+            });
+        }
+
+        if (m.throws && m.throws.before.whitespace === "") {
+            m = produce(m, draft => {
+                draft.throws!.before.whitespace = " ";
+            });
+        }
+
+        return m;
+    }
+
+    protected async visitNewClass(newClass: J.NewClass, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitNewClass(newClass, p) as J.NewClass;
+        return produce(ret, draft => {
+            if (draft.class != undefined) {
+                draft.class.prefix.whitespace = " ";
+            }
+        });
+    }
+
+    protected async visitReturn(returnNode: J.Return, p: ExecutionContext): Promise<J | undefined> {
+        const r = await super.visitReturn(returnNode, p) as J.Return;
+        if (r.expression && r.expression.prefix.whitespace === "" &&
+            !r.markers.markers.find(m => m.id === "org.openrewrite.java.marker.ImplicitReturn")) {
+            return produce(r, draft => {
+                draft.expression!.prefix.whitespace = " ";
+            });
+        }
+        return r;
+    }
+
+    protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitScopedVariableDeclarations(scopedVariableDeclarations, p) as JS.ScopedVariableDeclarations;
+        return ret.scope && produce(ret, draft => {
+            draft.variables[0].element.prefix.whitespace = " ";
+        });
+    }
+
+    protected async visitVariableDeclarations(v: J.VariableDeclarations, p: ExecutionContext): Promise<J | undefined> {
+        let ret = await super.visitVariableDeclarations(v, p) as J.VariableDeclarations;
+        let first = ret.leadingAnnotations.length === 0;
+
+        if (first && ret.modifiers.length > 0) {
+            ret = produce(ret, draft => {
+                draft.modifiers = draft.modifiers.map((m, i) =>
+                    i > 0 && m.prefix.whitespace === "" ?
+                        {...m, prefix: {...m.prefix, whitespace: " "}} : m
+                );
+            });
+            first = false;
+        }
+
+        if (!first) {
+            ret = produce(ret, draft => {
+                draft.variables[0].element.prefix.whitespace = " ";
+            });
+        }
+
+        return ret;
+    }
+
+
+    protected async visitCase(caseNode: J.Case, p: ExecutionContext): Promise<J | undefined> {
+        const c = await super.visitCase(caseNode, p) as J.Case;
+
+        if (c.guard && c.caseLabels.elements.length > 0 && c.caseLabels.elements[c.caseLabels.elements.length - 1].after.whitespace === "") {
+            return produce(c, draft => {
+                const last = draft.caseLabels.elements.length - 1;
+                draft.caseLabels.elements[last].after.whitespace = " ";
+            });
+        }
+
+        return c;
     }
 }
