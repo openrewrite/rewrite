@@ -137,7 +137,7 @@ export class ChangeText extends Recipe {
 }
 
 export class ChangeVersion extends Recipe {
-    name = "org.openrewrite.example.npm.local-change-version";
+    name = "org.openrewrite.example.npm.change-version";
     displayName = "Change version in `package.json`";
     description = "Change the version in both `package.json` and `package-lock.json`.";
 
