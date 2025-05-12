@@ -639,4 +639,49 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     public J.Wildcard visitWildcard(J.Wildcard wildcard, P p) {
         return (J.Wildcard) super.visitWildcard(wildcard, p);
     }
+
+    @Override
+    public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, P p) {
+        return (J.DeconstructionPattern) super.visitDeconstructionPattern(deconstructionPattern, p);
+    }
+
+    @Override
+    public J.Erroneous visitErroneous(J.Erroneous erroneous, P p) {
+        return (J.Erroneous) super.visitErroneous(erroneous, p);
+    }
+
+    @Override
+    public J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, P p) {
+        return (J.Lambda.Parameters) super.visitLambdaParameters(parameters, p);
+    }
+
+    @Override
+    public J.Modifier visitModifier(J.Modifier modifer, P p) {
+        return (J.Modifier) super.visitModifier(modifer, p);
+    }
+
+    @Override
+    public J.NullableType visitNullableType(J.NullableType nullableType, P p) {
+        return (J.NullableType) super.visitNullableType(nullableType, p);
+    }
+
+    @Override
+    public J.ParenthesizedTypeTree visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, P p) {
+        return (J.ParenthesizedTypeTree) super.visitParenthesizedTypeTree(parTree, p);
+    }
+
+    @Override
+    public J.TypeParameters visitTypeParameters(J.TypeParameters typeParameters, P p) {
+        return (J.TypeParameters) super.visitTypeParameters(typeParameters, p);
+    }
+
+    @Override
+    public J.Unknown visitUnknown(J.Unknown unknown, P p) {
+        return (J.Unknown) super.visitUnknown(unknown, p);
+    }
+
+    @Override
+    public J.Unknown.Source visitUnknownSource(J.Unknown.Source source, P p) {
+        return (J.Unknown.Source) super.visitUnknownSource(source, p);
+    }
 }
