@@ -363,7 +363,7 @@ class AddPlatformDependencyTest implements RewriteTest {
       "integrationTestAnnotationProcessor,annotationProcessor"})
     void addEnforcedPlatformDependencyWithExplicitConfiguration(String recipeConfiguration, String gradleConfiguration) {
         rewriteRun(
-          spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, recipeConfiguration, null)),
+          spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, recipeConfiguration, true)),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest"))),
