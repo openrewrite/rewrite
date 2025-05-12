@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.markers;
+package org.openrewrite.javascript.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 @Value
 @With
-public class Comma implements Marker {
+public class Asterisk implements Marker {
     UUID id;
+    Space prefix;
 }
