@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.markers;
+package org.openrewrite.javascript.marker;
 
 import lombok.Value;
 import lombok.With;
@@ -23,6 +23,6 @@ import java.util.UUID;
 
 @Value
 @With
-public class Braces implements Marker {
+public class Comma implements Marker {
     UUID id;
 }

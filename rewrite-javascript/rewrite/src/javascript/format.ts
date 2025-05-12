@@ -16,16 +16,21 @@
 import {JS} from "./tree";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, J} from "../java";
+import {Comment, J, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isTree, Tree} from "../tree";
-import {SpacesStyle, styleFromSourceFile, StyleKind} from "./style";
+import {SpacesStyle, styleFromSourceFile, StyleKind, WrappingAndBracesStyle} from "./style";
 import {produceAsync} from "../visitor";
 
 export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
     async visit<R extends J>(tree: Tree, p: ExecutionContext, cursor?: Cursor): Promise<R | undefined> {
         const spacesStyle = styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle;
-        return new SpacesVisitor(spacesStyle).visit(tree, p, cursor); // TODO possibly cursor.fork, when we have more visitors
+        const wrappingAndBracesStyle = styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle;
+        let t: R | undefined = tree as R;
+        // TODO possibly cursor.fork
+        t = t && await new SpacesVisitor(spacesStyle).visit(t, p, cursor);
+        t = t && await new WrappingAndBracesVisitor(wrappingAndBracesStyle).visit(t, p, cursor);
+        return t;
     }
 }
 
@@ -395,5 +400,148 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
 
     private static isNotSingleSpace(str: string): boolean {
         return this.isOnlySpaces(str) && str !== " ";
+    }
+}
+
+export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext> {
+    constructor(private readonly style: WrappingAndBracesStyle) {
+        super();
+    }
+
+    public async visitStatement(statement: Statement, p: ExecutionContext): Promise<Statement> {
+        const j = await super.visitStatement(statement, p) as Statement;
+        const parent = this.cursor.parent?.value;
+        if (parent?.kind === J.Kind.Block && j.kind !== J.Kind.EnumValueSet) {
+            if (!j.prefix.whitespace.includes("\n")) {
+                return produce(j, draft => {
+                    draft.prefix.whitespace = "\n" + draft.prefix.whitespace;
+                });
+            }
+        }
+        return j;
+    }
+
+    protected async visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): Promise<J.VariableDeclarations> {
+        const v = await super.visitVariableDeclarations(multiVariable, p) as J.VariableDeclarations;
+        const parent = this.cursor.parent?.value;
+        if (parent?.kind === J.Kind.Block) {
+            return produce(v, draft => {
+                draft.leadingAnnotations = this.withNewlines(draft.leadingAnnotations);
+                if (draft.leadingAnnotations.length > 0) {
+                    if (draft.modifiers.length > 0) {
+                        draft.modifiers = this.withNewlineModifiers(draft.modifiers);
+                    } else if (draft.typeExpression && !draft.typeExpression.prefix.whitespace.includes("\n")) {
+                        draft.typeExpression.prefix.whitespace = "\n" + draft.typeExpression.prefix.whitespace;
+                    }
+                }
+            });
+        }
+        return v;
+    }
+
+    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J.MethodDeclaration> {
+        const m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+        return produce(m, draft => {
+            draft.leadingAnnotations = this.withNewlines(draft.leadingAnnotations);
+            if (draft.leadingAnnotations.length > 0) {
+                if (draft.modifiers.length > 0) {
+                    draft.modifiers = this.withNewlineModifiers(draft.modifiers);
+                } else if (draft.typeParameters && !draft.typeParameters.prefix.whitespace.includes("\n")) {
+                    draft.typeParameters.prefix.whitespace = "\n" + draft.typeParameters.prefix.whitespace;
+                } else if (draft.returnTypeExpression && !draft.returnTypeExpression.prefix.whitespace.includes("\n")) {
+                    draft.returnTypeExpression.prefix.whitespace = "\n" + draft.returnTypeExpression.prefix.whitespace;
+                } else if (!draft.name.prefix.whitespace.includes("\n")) {
+                    draft.name.prefix.whitespace = "\n" + draft.name.prefix.whitespace;
+                }
+            }
+        });
+    }
+
+    protected async visitElse(elsePart: J.If.Else, p: ExecutionContext): Promise<J.If.Else> {
+        const e = await super.visitElse(elsePart, p) as J.If.Else;
+        const hasBody = e.body.element.kind === J.Kind.Block || e.body.element.kind === J.Kind.If;
+
+        return produce(e, draft => {
+            if (hasBody) {
+                const shouldHaveNewline = this.style.ifStatement.elseOnNewLine;
+                const hasNewline = draft.prefix.whitespace.includes("\n");
+                if (shouldHaveNewline && !hasNewline) {
+                    draft.prefix.whitespace = "\n" + draft.prefix.whitespace;
+                } else if (!shouldHaveNewline && hasNewline) {
+                    draft.prefix.whitespace = "";
+                }
+            }
+        });
+    }
+
+    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J.ClassDeclaration> {
+        const j = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
+        return produce(j, draft => {
+            draft.leadingAnnotations = this.withNewlines(draft.leadingAnnotations);
+            if (draft.leadingAnnotations.length > 0) {
+                if (draft.modifiers.length > 0) {
+                    draft.modifiers = this.withNewlineModifiers(draft.modifiers);
+                } else {
+                    const kind = draft.classKind;
+                    if (!kind.prefix.whitespace.includes("\n")) {
+                        kind.prefix.whitespace = "\n" + kind.prefix.whitespace;
+                    }
+                }
+            }
+        });
+    }
+
+    protected async visitBlock(block: J.Block, p: ExecutionContext): Promise<J.Block> {
+        const b = await super.visitBlock(block, p) as J.Block;
+        return produce(b, draft => {
+            if (!draft.end.whitespace.includes("\n") && (draft.statements.length == 0 || !draft.statements[draft.statements.length - 1].after.whitespace.includes("\n"))) {
+                draft.end = this.withNewlineSpace(draft.end);
+            }
+        });
+    }
+
+    protected async visitSwitch(aSwitch: J.Switch, p: ExecutionContext): Promise<J | undefined> {
+        return super.visitSwitch(aSwitch, p);
+    }
+
+    private withNewlines<T extends { prefix: J.Space }>(list: T[]): T[] {
+        return list.map((a, index) => {
+            if (index > 0 && !a.prefix.whitespace.includes("\n")) {
+                return produce(a, draft => {
+                    draft.prefix.whitespace = "\n" + draft.prefix.whitespace;
+                });
+            }
+            return a;
+        });
+    }
+
+    private withNewlineSpace(space: J.Space): J.Space {
+        if (space.comments.length === 0) {
+            space = produce(space, draft => {
+               draft.whitespace = "\n" + space.whitespace;
+            });
+        }
+        // TODO clarify the situation with Comment.isMultiline and then add this case
+        // else if (space.comments[space.comments.length - 1].isMultiline) {
+        //     space = space.withComments(ListUtils.mapLast(space.comments, c => c.withSuffix("\n")));
+        // }
+
+        return space;
+    }
+
+    private withNewlineModifiers(modifiers: J.Modifier[]): J.Modifier[] {
+        if (modifiers.length === 0) {
+            return modifiers;
+        }
+        const first = modifiers[0];
+        if (!first.prefix.whitespace.includes("\n")) {
+            return [
+                produce(first, draft => {
+                    draft.prefix.whitespace = "\n" + draft.prefix.whitespace;
+                }),
+                ...modifiers.slice(1),
+            ];
+        }
+        return modifiers;
     }
 }
