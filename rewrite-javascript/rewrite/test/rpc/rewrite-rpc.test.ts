@@ -93,22 +93,20 @@ describe("Rewrite RPC", () => {
     );
 
     test("prepareRecipe", async () => {
-        const recipe = await client.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
+        const recipe = await client.prepareRecipe("org.openrewrite.example.text.change-text", {text: "hello"});
         expect(recipe.displayName).toEqual("Change text");
         expect(recipe.instanceName()).toEqual("Change text to 'hello'");
     });
 
-    describe.skip("this fails until recipes-npm is updated with the latest code", () => {
-        test("installRecipes", async () => {
-            const installed = await client.installRecipes(
-                {packageName: "@openrewrite/recipes-npm"}
-            );
-            expect(installed.recipesInstalled).toBeGreaterThan(0);
-        });
+    test("installRecipes", async () => {
+        const installed = await client.installRecipes(
+            {packageName: "@openrewrite/recipes-npm"}
+        );
+        expect(installed.recipesInstalled).toBeGreaterThan(0);
     });
 
     test("runRecipe", async () => {
-        spec.recipe = await client.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.change-text", {text: "hello"});
         await spec.rewriteRun(
             {
                 ...text(
@@ -121,7 +119,7 @@ describe("Rewrite RPC", () => {
     });
 
     test("run a JSON recipe", async () => {
-        spec.recipe = await client.prepareRecipe("org.openrewrite.npm.change-version", {version: "1.0.0"});
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.npm.change-version", {version: "1.0.0"});
         await spec.rewriteRun(
             {
                 //language=json
@@ -145,7 +143,7 @@ describe("Rewrite RPC", () => {
     });
 
     test("runScanningRecipeThatGenerates", async () => {
-        spec.recipe = await client.prepareRecipe("org.openrewrite.text.create-text", {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.create-text", {
             text: "hello",
             sourcePath: "hello.txt"
         });
@@ -161,7 +159,7 @@ describe("Rewrite RPC", () => {
     });
 
     test("runRecipeWithRecipeList", async () => {
-        spec.recipe = await client.prepareRecipe("org.openrewrite.text.with-recipe-list");
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.with-recipe-list");
         await spec.rewriteRun(
             text(
                 "hi",
@@ -171,7 +169,7 @@ describe("Rewrite RPC", () => {
     });
 
     test("runRecipeUpdatingAllTrees", async () => {
-        spec.recipe = await client.prepareRecipe("org.openrewrite.javascript.replace-id");
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.replace-id");
         await spec.rewriteRun(
             javascript(
                 //language=javascript

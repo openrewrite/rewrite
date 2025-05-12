@@ -23,12 +23,12 @@ describe("recipes", () => {
         const recipeRegistry = new RecipeRegistry();
         activate(recipeRegistry);
         const recipe = recipeRegistry.all.get(
-            "org.openrewrite.text.change-text")
+            "org.openrewrite.example.text.change-text")
         expect(recipe).toBeDefined()
         expect(new recipe!()).toBeInstanceOf(ChangeText)
 
         expect(await new recipe!().descriptor()).toEqual({
-            name: "org.openrewrite.text.change-text",
+            name: "org.openrewrite.example.text.change-text",
             displayName: "Change text",
             instanceName: "Change text to 'undefined'",
             description: "Change the text of a file.",
