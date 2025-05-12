@@ -72,13 +72,14 @@ export class JavaScriptParser extends Parser {
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
 
-    constructor({
-                    ctx,
-                    relativeTo,
-                    styles
-                }: JavaScriptParserOptions = {},
-                private readonly sourceFileCache: Map<String, ts.SourceFile> = new Map()
-                ) {
+    constructor(
+        {
+            ctx,
+            relativeTo,
+            styles
+        }: JavaScriptParserOptions = {},
+        private readonly sourceFileCache: Map<String, ts.SourceFile> = new Map()
+    ) {
         super({ctx, relativeTo});
         this.compilerOptions = {
             target: ts.ScriptTarget.Latest,
@@ -86,7 +87,8 @@ export class JavaScriptParser extends Parser {
             allowJs: true,
             esModuleInterop: true,
             experimentalDecorators: true,
-            emitDecoratorMetadata: true
+            emitDecoratorMetadata: true,
+            jsx: ts.JsxEmit.Preserve
         };
         this.styles = styles;
     }
@@ -3415,51 +3417,51 @@ export class JavaScriptParserVisitor {
     }
 
     visitJsxElement(node: ts.JsxElement) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxSelfClosingElement(node: ts.JsxSelfClosingElement) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxOpeningElement(node: ts.JsxOpeningElement) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxClosingElement(node: ts.JsxClosingElement) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxFragment(node: ts.JsxFragment) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxOpeningFragment(node: ts.JsxOpeningFragment) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxClosingFragment(node: ts.JsxClosingFragment) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxAttribute(node: ts.JsxAttribute) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxAttributes(node: ts.JsxAttributes) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxSpreadAttribute(node: ts.JsxSpreadAttribute) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxExpression(node: ts.JsxExpression) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitJsxNamespacedName(node: ts.JsxNamespacedName) {
-        return this.visitUnknown(node);
+        throw new Error("Boom")
     }
 
     visitCaseClause(node: ts.CaseClause): J.Case {
