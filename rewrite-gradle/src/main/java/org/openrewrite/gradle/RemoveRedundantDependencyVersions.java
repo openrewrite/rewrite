@@ -88,7 +88,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Nullable
     List<String> except;
 
-    public enum Comparator { ANY, EQ, LT, LTE, GT, GTE }
+    public enum Comparator {ANY, EQ, LT, LTE, GT, GTE}
 
     @Override
     public String getDisplayName() {
@@ -131,8 +131,10 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         .groupId(groupPattern)
                                         .artifactId(artifactPattern)
                                         .get(getCursor())
-                                        .ifPresent(it -> directDependencies.add(it.getResolvedDependency()));
-                                
+                                        .ifPresent(it -> {
+                                            directDependencies.add(it.getResolvedDependency());
+                                        });
+
                                 if (!platformMatcher.matches(m) && !enforcedPlatformMatcher.matches(m)) {
                                     return m;
                                 }
@@ -204,7 +206,18 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         return m;
                                     }
                                     //noinspection DataFlowIssue
-                                    if (shouldRemoveRedundantConstraintOrImplementation((String) ((J.Literal) m.getArguments().get(0)).getValue(), m.getSimpleName())) {
+                                    String value = (String) ((J.Literal) m.getArguments().get(0)).getValue();
+                                    Dependency dependency = DependencyStringNotationConverter.parse(value);
+                                    try {
+                                        Object parent = getCursor().dropParentUntil(obj -> obj instanceof J.MethodInvocation && ((J.MethodInvocation) obj).getSimpleName().equals("constraints")).getValue();
+                                        if (parent != null && shouldRemoveRedundantConstraint(dependency, gp.getConfiguration(m.getSimpleName()))) {
+                                            return null;
+                                        }
+                                        return m;
+                                    } catch (Exception ignore) {
+                                    }
+
+                                    if (shouldRemoveRedundantImplementation(dependency)) {
                                         return null;
                                     }
                                 }
@@ -220,69 +233,63 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 return r;
                             }
 
-                            boolean shouldRemoveRedundantConstraintOrImplementation(String dependencyNotation, String configurationName) {
-                                return shouldRemoveRedundantConstraintOrImplementation(
-                                        DependencyStringNotationConverter.parse(dependencyNotation),
-                                        gp.getConfiguration(configurationName));
-                            }
-
-                            boolean shouldRemoveRedundantConstraintOrImplementation(@Nullable Dependency dep, @Nullable GradleDependencyConfiguration c) {
-                                if (c == null || dep == null || dep.getVersion() == null) {
+                            private boolean shouldRemoveRedundantImplementation(Dependency dependency) {
+                                if(platforms == null || platforms.get("implementation") == null || platforms.get("implementation").isEmpty()) {
                                     return false;
                                 }
-                                if (dep.getVersion().contains("[") || dep.getVersion().contains("!!")) {
+
+                                if ((groupPattern != null && !StringUtils.matchesGlob(dependency.getGroupId(), groupPattern)) ||
+                                        (artifactPattern != null && !StringUtils.matchesGlob(dependency.getArtifactId(), artifactPattern))) {
+                                    return false;
+                                }
+                                for (ResolvedDependency d : directDependencies) {
+                                    //ignore self
+                                    if (d.getGroupId().equals(dependency.getGroupId()) && d.getArtifactId().equals(dependency.getArtifactId())) {
+                                        continue;
+                                    }
+
+                                    if (d.getDependencies() == null) {
+                                        continue;
+                                    }
+
+                                    String dependencyManagedVersion = platforms.get("implementation")
+                                            .stream()
+                                            .flatMap(e -> e.getDependencyManagement().stream())
+                                            .filter(e -> e.getGroupId().equals(dependency.getGroupId()))
+                                            .filter(e -> e.getArtifactId().equals(dependency.getArtifactId()))
+                                            .map(e -> e.getVersion())
+                                            .findFirst()
+                                            .orElse(null);
+
+                                    ResolvedDependency resolvedDependency = d.findDependency(dependency.getGroupId(), dependency.getArtifactId());
+                                    if (resolvedDependency != null && (dependency.getVersion() == null || VERSION_COMPARATOR.compare(dependency.getVersion(), dependencyManagedVersion) <= 0)) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }
+
+                            boolean shouldRemoveRedundantConstraint(@Nullable Dependency constraint, @Nullable GradleDependencyConfiguration c) {
+                                if (c == null || constraint == null || constraint.getVersion() == null) {
+                                    return false;
+                                }
+                                if (constraint.getVersion().contains("[") || constraint.getVersion().contains("!!")) {
                                     // https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
                                     return false;
                                 }
-                                if ((groupPattern != null && !StringUtils.matchesGlob(dep.getGroupId(), groupPattern)) ||
-                                        (artifactPattern != null && !StringUtils.matchesGlob(dep.getArtifactId(), artifactPattern))) {
+                                if ((groupPattern != null && !StringUtils.matchesGlob(constraint.getGroupId(), groupPattern)) ||
+                                        (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
                                     return false;
                                 }
-
-                                if (isPulledInExactlyTransitively(dep)) {
-                                    return true;
-                                }
-                                
                                 return Stream.concat(
                                                 Stream.of(c),
                                                 gp.configurationsExtendingFrom(c, true).stream()
                                         )
                                         .filter(GradleDependencyConfiguration::isCanBeResolved)
                                         .distinct()
-                                        .map(conf -> conf.findResolvedDependency(requireNonNull(dep.getGroupId()), dep.getArtifactId()))
+                                        .map(conf -> conf.findResolvedDependency(requireNonNull(constraint.getGroupId()), constraint.getArtifactId()))
                                         .filter(Objects::nonNull)
-                                        .anyMatch(resolvedDependency -> VERSION_COMPARATOR.compare(null, resolvedDependency.getVersion(), dep.getVersion()) > 0);
-                            }
-
-                            // TODO Can we write this a little bit more performant?
-                            private boolean isPulledInExactlyTransitively(Dependency dep) {
-                                if (dep.getVersion() == null || !platforms.containsKey("implementation") || platforms.get("implementation").isEmpty()) {
-                                    return false;
-                                }
-
-                                // TODO support multiple platform tags
-                                ResolvedManagedDependency x = platforms.get("implementation").get(0).getDependencyManagement().stream()
-                                        .filter(it -> it.getGroupId().equals(dep.getGroupId()) && it.getArtifactId().equals(dep.getArtifactId()))
-                                        .findFirst()
-                                        .orElse(null);
-
-                                if (x == null || !dep.getVersion().equals(x.getVersion())) {
-                                    return false;
-                                }
-
-                                for (ResolvedDependency d : directDependencies) {
-                                    // ignore 'ourself'
-                                    if (d.getGav().getGroupId().equals(dep.getGroupId()) && d.getGav().getArtifactId().equals(dep.getArtifactId())) {
-                                        continue;
-                                    }
-
-                                    ResolvedDependency dependency = d.findDependency(dep.getGroupId(), dep.getArtifactId());
-                                    if (dependency != null && dependency.getVersion().equals(dep.getVersion())) {
-                                        return true;
-                                    }
-                                }
-                                
-                                return false;
+                                        .anyMatch(resolvedDependency -> VERSION_COMPARATOR.compare(null, resolvedDependency.getVersion(), constraint.getVersion()) > 0);
                             }
                         }.visitNonNull(cu, ctx);
 

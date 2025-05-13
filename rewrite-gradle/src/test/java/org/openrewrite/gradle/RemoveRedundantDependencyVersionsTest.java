@@ -427,6 +427,56 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void handleSeveralPlatformDependencies() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                   implementation(platform("org.springframework.cloud:spring-cloud-dependencies:2024.0.0"))
+                   implementation("org.springframework.boot:spring-boot-starter-web-services")
+                   implementation("org.springframework.cloud:spring-cloud-starter-config")
+                   implementation("org.springframework:spring-webmvc:6.1.10")
+                   implementation("org.springframework.boot:spring-boot-starter-actuator:3.3.3")
+                   implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
+                   implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.1.0")
+                   implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.1.1")
+                   implementation("org.springframework.cloud:spring-cloud-starter-gateway:4.1.2")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                   implementation(platform("org.springframework.cloud:spring-cloud-dependencies:2024.0.0"))
+                   implementation("org.springframework.boot:spring-boot-starter-web-services")
+                   implementation("org.springframework.cloud:spring-cloud-starter-config")
+                   implementation("org.springframework.boot:spring-boot-starter-actuator")
+                   implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
+                   implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+                   implementation("org.springframework.cloud:spring-cloud-starter-gateway")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void transitiveConfiguration() {
         rewriteRun(
           buildGradle(
