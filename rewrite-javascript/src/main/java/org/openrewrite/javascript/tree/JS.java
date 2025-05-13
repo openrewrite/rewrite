@@ -509,6 +509,7 @@ public interface JS extends J {
         @Nullable
         JavaType type;
 
+        @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -2481,8 +2482,7 @@ public interface JS extends J {
         @Nullable
         JLeftPadded<Scope> scope;
 
-        @Nullable
-        public Scope getScope() {
+        public @Nullable Scope getScope() {
             return scope != null ? scope.getElement() : null;
         }
 
@@ -2545,8 +2545,7 @@ public interface JS extends J {
                 return t.variables == variables ? t : new ScopedVariableDeclarations(t.id, t.prefix, t.markers, t.modifiers, t.scope, variables);
             }
 
-            @Nullable
-            public JLeftPadded<Scope> getScope() {
+            public @Nullable JLeftPadded<Scope> getScope() {
                 return t.scope;
             }
 
@@ -3412,8 +3411,7 @@ public interface JS extends J {
         @Nullable
         JLeftPadded<Expression> expression;
 
-        @Nullable
-        public Expression getExpression() {
+        public @Nullable Expression getExpression() {
             return expression != null ? expression.getElement() : null;
         }
 
@@ -4453,8 +4451,7 @@ public interface JS extends J {
         @Nullable
         JLeftPadded<Expression> moduleSpecifier;
 
-        @Nullable
-        public Expression getModuleSpecifier() {
+        public @Nullable Expression getModuleSpecifier() {
             return moduleSpecifier != null ? moduleSpecifier.getElement() : null;
         }
 
@@ -4504,8 +4501,7 @@ public interface JS extends J {
                 return t.typeOnly == typeOnly ? t : new ExportDeclaration(t.id, t.prefix, t.markers, t.modifiers, typeOnly, t.exportClause, t.moduleSpecifier, t.attributes);
             }
 
-            @Nullable
-            public JLeftPadded<Expression> getModuleSpecifier() {
+            public @Nullable JLeftPadded<Expression> getModuleSpecifier() {
                 return t.moduleSpecifier;
             }
 
