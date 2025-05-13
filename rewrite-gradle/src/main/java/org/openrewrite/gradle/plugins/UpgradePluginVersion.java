@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.singletonList;
 
+@SuppressWarnings("DuplicatedCode")
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.DependencyVersionState> {
@@ -97,7 +98,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     public static class DependencyVersionState {
         Map<String, String> versionPropNameToPluginId = new HashMap<>();
-        Map<String, String> pluginIdToNewVersion = new HashMap<>();
+        Map<String, @Nullable String> pluginIdToNewVersion = new HashMap<>();
     }
 
     @Override
@@ -163,7 +164,6 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     if (currentVersion != null) {
                         String resolvedVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
                                 .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
-                        assert resolvedVersion != null;
                         acc.pluginIdToNewVersion.put(pluginId, resolvedVersion);
                     } else if (versionArgs.get(0) instanceof G.GString) {
                         G.GString gString = (G.GString) versionArgs.get(0);
@@ -211,7 +211,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
                         Optional<String> finalVersion = versionComparator.upgrade(currentVersion, singletonList(resolvedVersion));
                         if (finalVersion.isPresent()) {
-                            return entry.withValue(entry.getValue().withText(resolvedVersion));
+                            return entry.withValue(entry.getValue().withText(finalVersion.get()));
                         }
                     }
                 }
