@@ -55,14 +55,13 @@ extensions.configure<NodeExtension> {
     nodeProjectDir.set(projectDir.resolve("rewrite"))
 }
 
-//FIXME can we enable tests? The parser tests run really slowly somehow...
-//val npmTest = tasks.named("npm_test")
-//tasks.check {
-//    dependsOn(
-//        tasks.named("npmInstall"),
-//        npmTest
-//    )
-//}
+val npmTest = tasks.named("npm_test")
+tasks.check {
+    dependsOn(
+        tasks.named("npmInstall"),
+        npmTest
+    )
+}
 
 
 val npmRunBuild = tasks.named("npm_run_build")

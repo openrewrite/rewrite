@@ -123,7 +123,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @Test
     void prepareRecipe() {
         installRecipes();
-        Recipe recipe = client.prepareRecipe("org.openrewrite.npm.change-version",
+        Recipe recipe = client.prepareRecipe("org.openrewrite.example.npm.change-version",
           Map.of("version", "1.0.0"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Change version in `package.json`");
     }
@@ -178,7 +178,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         installRecipes();
         rewriteRun(
           spec -> spec
-            .recipe(client.prepareRecipe("org.openrewrite.npm.change-version",
+            .recipe(client.prepareRecipe("org.openrewrite.example.npm.change-version",
               Map.of("version", "1.0.0")))
             .expectedCyclesThatMakeChanges(1),
           json(

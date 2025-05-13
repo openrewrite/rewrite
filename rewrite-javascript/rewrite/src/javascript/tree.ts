@@ -122,10 +122,8 @@ export namespace JS {
         readonly leadingAnnotations: J.Annotation[];
         readonly modifiers: J.Modifier[];
         readonly typeParameters?: J.TypeParameters;
-        readonly parameters: J.Lambda.Parameters;
+        readonly lambda: J.Lambda;
         readonly returnTypeExpression?: TypeTree;
-        readonly body: J.LeftPadded<J>;
-        readonly type?: JavaType;
     }
 
     /**
