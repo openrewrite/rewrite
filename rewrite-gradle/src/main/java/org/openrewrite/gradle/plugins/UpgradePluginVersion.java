@@ -25,11 +25,10 @@ import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
-import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -44,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.singletonList;
 
@@ -59,10 +59,10 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
-                          "Defaults to `latest.release`.",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
+                    "Defaults to `latest.release`.",
             example = "29.X",
             required = false)
     @Nullable
@@ -70,7 +70,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -105,11 +105,27 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
         return new DependencyVersionState();
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    private boolean isPluginVersion(Cursor cursor) {
+        if (!(cursor.getValue() instanceof J.MethodInvocation)) {
+            return false;
+        }
+        J.MethodInvocation maybeVersion = cursor.getValue();
+        if (!"version".equals(maybeVersion.getSimpleName())) {
+            return false;
+        }
+        Cursor parent = cursor.dropParentUntil(it -> (it instanceof J.MethodInvocation) || it == Cursor.ROOT_VALUE);
+        if (!(parent.getValue() instanceof J.MethodInvocation)) {
+            return false;
+        }
+        J.MethodInvocation maybePlugins = parent.getValue();
+        return "plugins".equals(maybePlugins.getSimpleName());
+    }
+
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
-        MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
-        MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
-        GroovyVisitor<ExecutionContext> groovyVisitor = new GroovyVisitor<ExecutionContext>() {
+
+        JavaVisitor<ExecutionContext> javaVisitor = new JavaVisitor<ExecutionContext>() {
             @Nullable
             private GradleProject gradleProject;
 
@@ -117,48 +133,41 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             private GradleSettings gradleSettings;
 
             @Override
-            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
-                gradleSettings = cu.getMarkers().findFirst(GradleSettings.class).orElse(null);
-
-                if (gradleProject == null && gradleSettings == null) {
-                    return cu;
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                if (tree instanceof SourceFile) {
+                    gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    gradleSettings = tree.getMarkers().findFirst(GradleSettings.class).orElse(null);
                 }
-
-                return super.visitCompilationUnit(cu, ctx);
+                return super.visit(tree, executionContext);
             }
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!(versionMatcher.matches(m) &&
-                      m.getSelect() instanceof J.MethodInvocation &&
-                      pluginMatcher.matches(m.getSelect()))) {
+                if (!isPluginVersion(getCursor())) {
                     return m;
                 }
+                assert m.getSelect() != null;
                 List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
                 if (!(pluginArgs.get(0) instanceof J.Literal)) {
                     return m;
                 }
-                String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
+                String pluginId = literalValue(pluginArgs.get(0));
                 if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
                     return m;
                 }
 
                 List<Expression> versionArgs = m.getArguments();
                 try {
-                    if (versionArgs.get(0) instanceof J.Literal) {
-                        String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
-                        if (currentVersion == null) {
-                            return m;
-                        }
-
+                    String currentVersion = literalValue(versionArgs.get(0));
+                    if (currentVersion != null) {
                         String resolvedVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
                                 .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
+                        assert resolvedVersion != null;
                         acc.pluginIdToNewVersion.put(pluginId, resolvedVersion);
                     } else if (versionArgs.get(0) instanceof G.GString) {
                         G.GString gString = (G.GString) versionArgs.get(0);
-                        if (gString == null || gString.getStrings().isEmpty() || !(gString.getStrings().get(0) instanceof G.GString.Value)) {
+                        if (gString.getStrings().isEmpty() || !(gString.getStrings().get(0) instanceof G.GString.Value)) {
                             return m;
                         }
 
@@ -168,6 +177,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                                 .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
 
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
+                        assert resolvedPluginVersion != null;
                         acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
                     }
                 } catch (MavenDownloadingException e) {
@@ -176,13 +186,11 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 return m;
             }
         };
-        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), groovyVisitor);
+        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor);
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
-        MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
-        MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
         PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -210,29 +218,22 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 return entry;
             }
         };
-        GroovyVisitor<ExecutionContext> groovyVisitor = new GroovyVisitor<ExecutionContext>() {
+        JavaVisitor<ExecutionContext> javaVisitor = new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!(versionMatcher.matches(m) &&
-                      m.getSelect() instanceof J.MethodInvocation &&
-                      pluginMatcher.matches(m.getSelect()))) {
+                if (!isPluginVersion(getCursor())) {
                     return m;
                 }
+                assert m.getSelect() != null;
                 List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
-                if (!(pluginArgs.get(0) instanceof J.Literal)) {
-                    return m;
-                }
-                String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
+                String pluginId = literalValue(pluginArgs.get(0));
                 if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
                     return m;
                 }
 
                 List<Expression> versionArgs = m.getArguments();
-                if (!(versionArgs.get(0) instanceof J.Literal)) {
-                    return m;
-                }
-                String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
+                String currentVersion = literalValue(m.getArguments().get(0));
                 if (currentVersion == null) {
                     return m;
                 }
@@ -240,9 +241,26 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (resolvedVersion == null) {
                     return m;
                 }
-                return m.withArguments(ListUtils.map(versionArgs, v -> ChangeStringLiteral.withStringValue((J.Literal) v, resolvedVersion)));
+                return m.withArguments(ListUtils.map(versionArgs, v -> {
+                    assert v != null;
+                    return ChangeStringLiteral.withStringValue(v, resolvedVersion);
+                }));
             }
         };
-        return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), groovyVisitor));
+        return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor));
+    }
+
+    @SuppressWarnings("DataFlowIssue")
+    @Nullable
+    private String literalValue(Expression expr) {
+        AtomicReference<String> value = new AtomicReference<>(null);
+        new JavaVisitor<Integer>() {
+            @Override
+            public J visitLiteral(J.Literal literal, Integer integer) {
+                value.set((String) literal.getValue());
+                return literal;
+            }
+        }.visit(expr, 0);
+        return value.get();
     }
 }
