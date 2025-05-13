@@ -258,6 +258,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             .filter(e -> e.getGroupId().equals(dependency.getGroupId()))
                                             .filter(e -> e.getArtifactId().equals(dependency.getArtifactId()))
                                             .map(e -> e.getVersion())
+                                            .sorted((a,b) -> VERSION_COMPARATOR.compare(b, a))
                                             .findFirst()
                                             .orElse(null);
 
