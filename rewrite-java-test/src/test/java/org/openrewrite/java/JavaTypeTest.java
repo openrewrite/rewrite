@@ -179,4 +179,28 @@ class JavaTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/apache/maven/pull/2291")
+    @Test
+    void overrideFromClass() {
+        rewriteRun(
+          java(
+            """
+              import java.io.FileNotFoundException;
+              class A {
+                  @Override
+                  public String toString() {
+                      return "A";
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(
+              ((J.MethodDeclaration)
+                cu.getClasses().get(0)
+                  .getBody().getStatements().get(0))
+                .getMethodType().isOverride())
+              .isTrue())
+          )
+        );
+    }
 }
