@@ -27,7 +27,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new RemoveRedundantDependencyVersions(null, null, null, null));
+          .recipe(new RemoveRedundantDependencyVersions(null, null, null));
     }
 
     @DocumentExample

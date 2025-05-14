@@ -80,19 +80,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Nullable
     Comparator onlyIfManagedVersionIs;
 
-    @Option(displayName = "Except",
-            description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe." +
-                    " GAV versions are ignored if provided.",
-            example = "com.jcraft:jsch",
-            required = false)
-    @Nullable
-    List<String> except;
-
     public enum Comparator { ANY, EQ, LT, LTE, GT, GTE }
 
     @Override
     public String getDisplayName() {
-        return "Remove redundant explicit dependency versions";
+        return "Remove redundant explicit dependencies and versions";
     }
 
     @Override
