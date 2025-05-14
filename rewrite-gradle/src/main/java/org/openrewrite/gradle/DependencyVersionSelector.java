@@ -42,7 +42,6 @@ import static java.util.Objects.requireNonNull;
 @Incubating(since = "8.17.0")
 @Value
 public class DependencyVersionSelector {
-    @Nullable
     MavenMetadataFailures metadataFailures;
 
     @Nullable
@@ -187,6 +186,7 @@ public class DependencyVersionSelector {
                 return Optional.empty();
             }
             List<MavenRepository> repos = determineRepos(configuration);
+            // There is still at least one place where this is null that remains to be fixed
             MavenMetadata mavenMetadata = metadataFailures == null ?
                     downloadMetadata(gav.getGroupId(), gav.getArtifactId(), repos, ctx) :
                     metadataFailures.insertRows(ctx, () -> downloadMetadata(gav.getGroupId(), gav.getArtifactId(),

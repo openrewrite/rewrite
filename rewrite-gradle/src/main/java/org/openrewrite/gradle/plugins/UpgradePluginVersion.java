@@ -32,6 +32,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.properties.PropertiesVisitor;
@@ -52,6 +53,9 @@ import static java.util.Collections.singletonList;
 @EqualsAndHashCode(callSuper = false)
 public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.DependencyVersionState> {
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
+
+    @EqualsAndHashCode.Exclude
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`, as a glob expression.",
@@ -162,7 +166,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 try {
                     String currentVersion = literalValue(versionArgs.get(0));
                     if (currentVersion != null) {
-                        String resolvedVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
+                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
                                 .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
                         acc.pluginIdToNewVersion.put(pluginId, resolvedVersion);
                     } else if (versionArgs.get(0) instanceof G.GString) {
@@ -173,7 +177,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
                         G.GString.Value gStringValue = (G.GString.Value) gString.getStrings().get(0);
                         String versionVariableName = gStringValue.getTree().toString();
-                        String resolvedPluginVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
+                        String resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
                                 .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
 
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
