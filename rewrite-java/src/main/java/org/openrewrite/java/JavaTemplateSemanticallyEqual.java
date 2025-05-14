@@ -195,5 +195,15 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             Markers markers = empty.getMarkers();
             return markers.getMarkers().size() == 1 && markers.getMarkers().get(0) instanceof TemplateParameter;
         }
+
+        @Override
+        protected boolean isOfType(JavaType target, JavaType source) {
+            return isAssignableTo(target, source);
+        }
+
+        @Override
+        protected boolean isAssignableTo(JavaType to, JavaType from) {
+            return TypeUtils.isAssignableTo(to, from, TypeUtils.TypeMode.INFER);
+        }
     }
 }
