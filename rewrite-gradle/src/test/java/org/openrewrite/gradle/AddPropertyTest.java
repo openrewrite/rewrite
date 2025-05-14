@@ -120,8 +120,8 @@ class AddPropertyTest implements RewriteTest {
           properties(
             //language=properties
             """
-              aaa=true
-              zzz=true
+            aaa=true
+            zzz=true
             """,
             //language=properties
             """
