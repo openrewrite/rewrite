@@ -198,7 +198,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
 
         @Override
         protected boolean isOfType(JavaType target, JavaType source) {
-            return isAssignableTo(target, source);
+            return TypeUtils.isAssignableTo(target, source, TypeUtils.TypeMode.INFER);
         }
 
         @Override
