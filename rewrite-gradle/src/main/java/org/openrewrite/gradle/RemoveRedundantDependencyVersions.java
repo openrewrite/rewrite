@@ -88,7 +88,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Nullable
     List<String> except;
 
-    public enum Comparator {ANY, EQ, LT, LTE, GT, GTE}
+    public enum Comparator { ANY, EQ, LT, LTE, GT, GTE }
 
     @Override
     public String getDisplayName() {
@@ -242,6 +242,16 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         (artifactPattern != null && !StringUtils.matchesGlob(dependency.getArtifactId(), artifactPattern))) {
                                     return false;
                                 }
+
+                                String dependencyManagedVersion = platforms.get("implementation")
+                                        .stream()
+                                        .flatMap(e -> e.getDependencyManagement().stream())
+                                        .filter(e -> e.getGroupId().equals(dependency.getGroupId()))
+                                        .filter(e -> e.getArtifactId().equals(dependency.getArtifactId()))
+                                        .map(ResolvedManagedDependency::getVersion)
+                                        .max(VERSION_COMPARATOR)
+                                        .orElse(null);
+
                                 for (ResolvedDependency d : directDependencies) {
                                     //ignore self
                                     if (d.getGroupId().equals(dependency.getGroupId()) && d.getArtifactId().equals(dependency.getArtifactId())) {
@@ -252,14 +262,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         continue;
                                     }
 
-                                    String dependencyManagedVersion = platforms.get("implementation")
-                                            .stream()
-                                            .flatMap(e -> e.getDependencyManagement().stream())
-                                            .filter(e -> e.getGroupId().equals(dependency.getGroupId()))
-                                            .filter(e -> e.getArtifactId().equals(dependency.getArtifactId()))
-                                            .map(ResolvedManagedDependency::getVersion)
-                                            .max(VERSION_COMPARATOR)
-                                            .orElse(null);
 
                                     ResolvedDependency resolvedDependency = d.findDependency(dependency.getGroupId(), dependency.getArtifactId());
                                     if (resolvedDependency != null && (dependency.getVersion() == null || VERSION_COMPARATOR.compare(dependency.getVersion(), dependencyManagedVersion) <= 0)) {
