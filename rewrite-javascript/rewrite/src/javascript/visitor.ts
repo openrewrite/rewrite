@@ -28,27 +28,27 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-    override async visitExpression(expression: Expression, p: P): Promise<J | undefined> {
+    protected override async visitExpression(expression: Expression, p: P): Promise<J | undefined> {
         return expression;
     }
 
     // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-    override async visitStatement(statement: Statement, p: P): Promise<J | undefined> {
+    protected override async visitStatement(statement: Statement, p: P): Promise<J | undefined> {
         return statement;
     }
 
     // noinspection JSUnusedLocalSymbols
-    override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+    protected override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
         return space;
     }
 
     // noinspection JSUnusedLocalSymbols
-    override async visitType(javaType: JavaType | undefined, p: P): Promise<JavaType | undefined> {
+    protected override async visitType(javaType: JavaType | undefined, p: P): Promise<JavaType | undefined> {
         return javaType;
     }
 
     // noinspection JSUnusedLocalSymbols
-    override async visitTypeName<N extends NameTree>(nameTree: N, p: P): Promise<N> {
+    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: P): Promise<N> {
         return nameTree;
     }
 
