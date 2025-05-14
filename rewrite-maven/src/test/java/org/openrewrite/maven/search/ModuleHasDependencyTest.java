@@ -27,7 +27,7 @@ class ModuleHasDependencyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ModuleHasDependency("org.openrewrite", "rewrite-maven", "8.52.0", null));
+        spec.recipe(new ModuleHasDependency("org.openrewrite", "rewrite-maven", null, "8.52.0", null));
     }
 
     @DocumentExample

@@ -45,30 +45,39 @@ public class ModuleHasDependency extends ScanningRecipe<ModuleHasDependency.Accu
                "If the search result you want is instead just the build.gradle(.kts) file applying the plugin, use the `FindDependency` recipe instead.";
     }
 
-    @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
-            example = "com.google.guava")
-    String groupId;
+    @Option(displayName = "Group pattern",
+            description = "Group glob pattern used to match dependencies.",
+            example = "com.fasterxml.jackson.module")
+    String groupIdPattern;
 
-    @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
-            example = "guava")
-    String artifactId;
+    @Option(displayName = "Artifact pattern",
+            description = "Artifact glob pattern used to match dependencies.",
+            example = "jackson-module-*")
+    String artifactIdPattern;
+
+    @Option(displayName = "Scope",
+            description = "Match dependencies with the specified scope. All scopes are searched by default.",
+            valid = {"compile", "test", "runtime", "provided", "system"},
+            example = "compile",
+            required = false)
+    @Nullable
+    String scope;
 
     @Option(displayName = "Version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "3.0.0",
+            description = "Match only dependencies with the specified version. " +
+                          "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
+                          "All versions are searched by default.",
+            example = "1.x",
             required = false)
     @Nullable
     String version;
 
-    @Option(displayName = "Version pattern",
-            description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
-            example = "-jre",
-            required = false)
+    @Option(displayName = "Only direct",
+            description = "If enabled, transitive dependencies will not be considered. All dependencies are searched by default.",
+            required = false,
+            example = "true")
     @Nullable
-    String versionPattern;
+    Boolean onlyDirect;
 
     @Value
     public static class Accumulator {
@@ -89,7 +98,7 @@ public class ModuleHasDependency extends ScanningRecipe<ModuleHasDependency.Accu
                 tree.getMarkers()
                         .findFirst(JavaProject.class)
                         .ifPresent(jp -> {
-                            Tree t = new FindDependency(groupId, artifactId, version, versionPattern).getVisitor().visit(tree, ctx);
+                            Tree t = new DependencyInsight(groupIdPattern, artifactIdPattern, scope, version, onlyDirect).getVisitor().visit(tree, ctx);
                             if (t != tree) {
                                 acc.getProjectsWithDependency().add(jp);
                             }
@@ -111,7 +120,7 @@ public class ModuleHasDependency extends ScanningRecipe<ModuleHasDependency.Accu
                 }
                 JavaProject jp = maybeJp.get();
                 if (acc.getProjectsWithDependency().contains(jp)) {
-                    return SearchResult.found(tree, "Module has dependency: " + groupId + ":" + artifactId + (version == null ? "" : ":" + version));
+                    return SearchResult.found(tree, "Module has dependency: " + groupIdPattern + ":" + artifactIdPattern + (version == null ? "" : ":" + version));
                 }
                 return tree;
             }
