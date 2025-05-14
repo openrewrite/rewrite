@@ -183,6 +183,23 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusionWithRegex() {
         rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/.*/))]"))),
+          yaml(
+            """
+              logging.level.org.zalando.lombok: TRACE
+              """,
+            """
+              logging:
+                level:
+                  org.zalando.lombok: TRACE
+              """
+          )
+        );
+    }
+
+    @Test
+    void exclusionWithRegexWithSubLevel() {
+        rewriteRun(
           spec -> spec.recipe(new UnfoldProperties(List.of("$..[?(@property.match(/some.*/))]"))),
           yaml(
             """
