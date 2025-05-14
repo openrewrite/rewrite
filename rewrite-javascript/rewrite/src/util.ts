@@ -15,8 +15,8 @@
  */
 export async function mapAsync<T, U>(arr: T[], fn: (t: T, i: number) => Promise<U | undefined>): Promise<U[]> {
     const results: U[] = [];
-    for (let i = 0; i < arr.length; i++) {
-        const result = await fn(arr[i], i);
+    for await (const [i, item] of arr.entries()) {
+        const result = await fn(item, i);
         if (result !== undefined) {
             results.push(result);
         }
