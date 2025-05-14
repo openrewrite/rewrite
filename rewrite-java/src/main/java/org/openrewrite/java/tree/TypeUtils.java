@@ -240,6 +240,9 @@ public class TypeUtils {
         if (isPseudoType(to) || isPseudoType(from)) {
             return false;
         }
+        if (to == from) {
+            return true;
+        }
         
         // Try to match captures
         if (mode.get() == TO && isTypeVariable(to) || mode.get() == FROM && isTypeVariable(from)) {
