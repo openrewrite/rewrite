@@ -460,8 +460,10 @@ public class DependencyConstraintToRule extends Recipe {
     }
 
     private static boolean isEmptyDependenciesBlock(J.MethodInvocation m) {
-        if (!m.getSimpleName().equals("dependencies"))
-            return false;
+        if (!m.getSimpleName().equals("dependencies")) {
+        }
+        if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
+        }
         // dependencies should always take a single "closure"
         if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda))
             return false;
