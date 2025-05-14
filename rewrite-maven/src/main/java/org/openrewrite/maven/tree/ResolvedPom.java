@@ -71,11 +71,11 @@ public class ResolvedPom {
     Iterable<String> activeProfiles = emptyList();
 
     public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
+        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects, List<Pom> ancestry) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
@@ -87,6 +87,7 @@ public class ResolvedPom {
         this.plugins = plugins;
         this.pluginManagement = pluginManagement;
         this.subprojects = subprojects;
+        this.ancestry = ancestry;
     }
 
     @NonFinal
@@ -125,6 +126,10 @@ public class ResolvedPom {
     @Builder.Default
     @Nullable // on older LSTs, this field is not yet present
     List<String> subprojects = emptyList();
+
+    @NonFinal
+    @Builder.Default
+    List<Pom> ancestry = emptyList();
 
     /**
      * Deduplicate dependencies and dependency management dependencies
@@ -186,6 +191,7 @@ public class ResolvedPom {
                 emptyList(),
                 emptyList(),
                 emptyList(),
+                emptyList(),
                 emptyList()
         ).resolver(ctx, downloader).resolve();
 
@@ -242,6 +248,16 @@ public class ResolvedPom {
         }
         for (int i = 0; i < resolvedPluginManagement.size(); i++) {
             if (!pluginManagement.get(i).equals(resolvedPluginManagement.get(i))) {
+                return resolved;
+            }
+        }
+
+        List<Pom> resolvedAncestry = resolved.getAncestry();
+        if (ancestry == null || ancestry.size() != resolvedAncestry.size()) {
+            return resolved;
+        }
+        for (int i = 0; i < resolvedAncestry.size(); i++) {
+            if (!ancestry.get(i).equals(resolvedAncestry.get(i))) {
                 return resolved;
             }
         }
@@ -404,6 +420,10 @@ public class ResolvedPom {
 
             resolveParentDependenciesRecursively(new ArrayList<>(pomAncestry));
             resolveParentPluginsRecursively(new ArrayList<>(pomAncestry));
+
+            //We do want to build up the list of ancestors here.
+            resolvePomAncestryRecursively(pomAncestry);
+            ResolvedPom.this.ancestry = pomAncestry;
         }
 
         private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
@@ -523,6 +543,29 @@ public class ResolvedPom {
 
         }
 
+        private void resolvePomAncestryRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
+            Pom pom = pomAncestry.get(0);
+
+            if (pom.getParent() != null) {
+                Pom parentPom = resolveParentPom(pom);
+
+                MavenExecutionContextView.view(ctx)
+                        .getResolutionListener()
+                        .parent(parentPom, pom);
+
+                for (Pom ancestor : pomAncestry) {
+                    if (ancestor.getGav().equals(parentPom.getGav())) {
+                        // parent cycle
+                        return;
+                    }
+                }
+
+                pomAncestry.add(0, parentPom);
+                resolvePomAncestryRecursively(pomAncestry);
+            }
+
+        }
+
         private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
             @SuppressWarnings("DataFlowIssue") GroupArtifactVersion gav = getValues(pom.getParent().getGav());
             if (gav.getVersion() == null) {
@@ -554,7 +597,7 @@ public class ResolvedPom {
                         boolean found = false;
                         for (Dependency reqDep : requestedDependencies) {
                             if (reqDep.getGav().getGroupId().equals(incReqDep.getGav().getGroupId()) &&
-                                reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
+                                    reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
                                 found = true;
                                 break;
                             }
@@ -695,7 +738,7 @@ public class ResolvedPom {
                     // PHASE
                     String mergedPhase = currentExecution.getPhase();
                     if (incomingExecution.getPhase() != null &&
-                        !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
+                            !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
                         mergedPhase = incomingExecution.getPhase();
                     }
                     // CONFIGURATION
@@ -875,8 +918,8 @@ public class ResolvedPom {
                             // Add one to the depth to account for the BOM which brings it in
                             int depthPlusBom = depth + 1;
                             if (existing == null || existing.depth > depthPlusBom ||
-                                // If they have the same depth prefer the explicitly defined one
-                                (existing.depth == depthPlusBom && existing.getDependency().getBomGav() != null && managed.getBomGav() == null)) {
+                                    // If they have the same depth prefer the explicitly defined one
+                                    (existing.depth == depthPlusBom && existing.getDependency().getBomGav() != null && managed.getBomGav() == null)) {
 
                                 return new ResolvedManagedDependencyDepth(managed, depthPlusBom);
                             }
@@ -908,16 +951,7 @@ public class ResolvedPom {
         }
 
         private boolean isAlreadyResolved(GroupArtifactVersion groupArtifactVersion, List<Pom> pomAncestry) {
-            for (int i = 1; i < pomAncestry.size(); i++) { // skip current pom
-                Pom pom = pomAncestry.get(i);
-                ResolvedGroupArtifactVersion alreadyResolvedGav = pom.getGav();
-                if (alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId()) &&
-                    alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId()) &&
-                    alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
-                    return true;
-                }
-            }
-            return false;
+            return pomAncestry.stream().anyMatch(alreadyResolved -> groupArtifactVersion.equals(alreadyResolved.getGav().asGroupArtifactVersion()));
         }
     }
 
@@ -994,8 +1028,8 @@ public class ResolvedPom {
                     }
 
                     if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
-                        (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
-                        (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
+                            (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
+                            (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
                         throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
                     }
 
@@ -1005,7 +1039,8 @@ public class ResolvedPom {
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
                         resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
+                                emptyList(), initialRepositories, emptyList(), emptyList(),
+                                emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
@@ -1049,7 +1084,7 @@ public class ResolvedPom {
                             d2 = d2.withExclusions(ListUtils.concatAll(d2.getExclusions(), d.getExclusions()));
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
-                                    matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
                                     if (resolved.getEffectiveExclusions().isEmpty()) {
                                         resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                     }
@@ -1085,10 +1120,25 @@ public class ResolvedPom {
         return dependencies;
     }
 
+    public @Nullable Pom getManagingPom(GroupArtifact ga) {
+        for (Pom pom : this.ancestry) {
+            for (ManagedDependency managedDependency : pom.getDependencyManagement()) {
+                if (managedDependency instanceof Defined) {
+                    Defined defined = (Defined) managedDependency;
+                    if (ga.getGroupId().equals(defined.getGav().getGroupId()) &&
+                            ga.getArtifactId().equals(defined.getGav().getArtifactId())) {
+                        return pom;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
         for (ResolvedDependency it : dependencies) {
             if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId()) &&
-                (Objects.equals(classifier, it.getClassifier()))) {
+                    (Objects.equals(classifier, it.getClassifier()))) {
                 return true;
             }
         }

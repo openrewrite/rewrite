@@ -66,10 +66,11 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
         project.getConfigurations().stream()
                 .filter(GradleDependencyConfiguration::isCanBeResolved)
                 .forEach(conf -> {
-                    if (conf.getResolved().isEmpty()) {
+                    List<ResolvedDependency> transitivelyResolvedDependencies = conf.getResolved();
+                    if (transitivelyResolvedDependencies.isEmpty()) {
                         empty.add(conf.getName());
                     } else {
-                        for (ResolvedDependency resolved : conf.getDirectResolved()) {
+                        for (ResolvedDependency resolved : transitivelyResolvedDependencies) {
                             lockedVersions.computeIfAbsent(resolved.getGav().asGroupArtifactVersion(), k -> new TreeSet<>()).add(conf.getName());
                         }
                     }

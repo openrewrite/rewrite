@@ -1437,9 +1437,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    //TODO In iteration 1 we are just bumping the one version in the lock file.
-    //     We will also do the transitive dependencies in next version.
-    //     One part at a time
     @Test
     void lockFileGetsUpdated() {
         rewriteRun(
@@ -1476,24 +1473,23 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               # Manual edits can break the build and are not advised.
               # This file is expected to be part of source control.
               org.apache.tomcat.embed:tomcat-embed-core:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.apache.tomcat:tomcat-annotations-api:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               empty=annotationProcessor,testAnnotationProcessor
               """
           )
         );
     }
 
-    //TODO In iteration 1 we are just bumping the one version in the lock file.
-    //     We will also do the transitive dependencies in next version.
-    //     One part at a time
     @Test
-    void multimoduleProject() {
-        rewriteRun(
-            spec -> spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "latest.patch", null)),
+    void multimoduleProjectLockFile() {
+        rewriteRun(spec ->
+            spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "latest.patch", null)),
           settingsGradle(
             """
             rootProject.name = 'my-project'
             include("moduleA")
+            include("moduleB")
+            include("moduleC")
             """
           ),
           buildGradle(
@@ -1542,22 +1538,116 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               # Manual edits can break the build and are not advised.
               # This file is expected to be part of source control.
               org.apache.tomcat.embed:tomcat-embed-core:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.apache.tomcat:tomcat-annotations-api:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               empty=annotationProcessor,testAnnotationProcessor
               """,
             spec -> spec.path("moduleA/gradle.lockfile")
+          ),
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'com.fasterxml.jackson.core:jackson-core:2.15.4'
+                  implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.4'
+                  implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.4'
+              }
+              """,
+            spec -> spec.path("moduleB/build.gradle")
+          ), lockfile(
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              com.fasterxml.jackson.core:jackson-annotations:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.fasterxml.jackson.core:jackson-core:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.fasterxml.jackson.core:jackson-databind:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.fasterxml.jackson:jackson-bom:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              """,
+            spec -> spec.path("moduleB/gradle.lockfile")
+          ),
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.apache.tomcat:tomcat-annotations-api:10.0.0-M1'
+              }
+              """,
+            spec -> spec.path("moduleC/build.gradle")
+          ), lockfile(
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              """,
+            spec -> spec.path("moduleC/gradle.lockfile")
           )
         );
     }
 
-    //TODO In iteration 1 we are just bumping the one version in the lock file.
-    //     We will also do the transitive dependencies in next version.
-    //     One part at a time
+
+
+    @Test
+    void bomGetsUpdatedInLockFile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml*", "jackson-core", "2.15.4", null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'com.fasterxml.jackson.core:jackson-core:2.15.3'
+                  implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.3'
+                  implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.3'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'com.fasterxml.jackson.core:jackson-core:2.15.4'
+                  implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.3'
+                  implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.3'
+              }
+              """
+          ), lockfile(
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              com.fasterxml.jackson.core:jackson-annotations:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.fasterxml.jackson.core:jackson-core:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.fasterxml.jackson.core:jackson-databind:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.fasterxml.jackson:jackson-bom:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              """,
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              com.fasterxml.jackson.core:jackson-annotations:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.fasterxml.jackson.core:jackson-core:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.fasterxml.jackson.core:jackson-databind:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.fasterxml.jackson:jackson-bom:2.15.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              """
+          )
+        );
+    }
+
     @Test
     void multiProject() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi())
-            .recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "latest.patch", null)),
+            spec -> spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "latest.patch", null)),
           buildGradle(
             """
               plugins { id 'java' }
@@ -1590,7 +1680,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               # Manual edits can break the build and are not advised.
               # This file is expected to be part of source control.
               org.apache.tomcat.embed:tomcat-embed-core:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.apache.tomcat:tomcat-annotations-api:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               empty=annotationProcessor,testAnnotationProcessor
               """,
             spec -> spec.path("moduleA/gradle.lockfile")
@@ -1649,7 +1739,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               # Manual edits can break the build and are not advised.
               # This file is expected to be part of source control.
               org.apache.tomcat.embed:tomcat-embed-core:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.apache.tomcat:tomcat-annotations-api:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               empty=annotationProcessor,testAnnotationProcessor
               """,
             spec -> spec.path("moduleB/moduleC/gradle.lockfile")
