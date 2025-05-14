@@ -252,16 +252,6 @@ public class ResolvedPom {
             }
         }
 
-        List<Pom> resolvedAncestry = resolved.getAncestry();
-        if (ancestry == null || ancestry.size() != resolvedAncestry.size()) {
-            return resolved;
-        }
-        for (int i = 0; i < resolvedAncestry.size(); i++) {
-            if (!ancestry.get(i).equals(resolvedAncestry.get(i))) {
-                return resolved;
-            }
-        }
-
         return this;
     }
 
