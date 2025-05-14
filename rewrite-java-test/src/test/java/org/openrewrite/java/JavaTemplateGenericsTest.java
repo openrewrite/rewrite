@@ -88,7 +88,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("PR #5374 was reverted, due to regressions")
     void expressionTest() {
         var template = JavaTemplate.builder("!#{iterable:any(java.lang.Iterable<T>)}.iterator().hasNext()")
           .genericTypes("T")
