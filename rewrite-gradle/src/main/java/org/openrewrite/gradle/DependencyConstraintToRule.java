@@ -467,8 +467,9 @@ public class DependencyConstraintToRule extends Recipe {
             return false;
         }
         // `dependencies` should always take a single "closure"
-        if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda))
+        if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
             return false;
+        }
         J.Lambda l = (J.Lambda) m.getArguments().get(0);
         if (l.getBody() instanceof J.Block) {
             J.Block b = (J.Block) l.getBody();
