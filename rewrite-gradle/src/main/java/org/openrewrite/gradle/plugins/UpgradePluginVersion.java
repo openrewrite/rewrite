@@ -134,12 +134,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             private GradleSettings gradleSettings;
 
             @Override
-            public @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     gradleSettings = tree.getMarkers().findFirst(GradleSettings.class).orElse(null);
                 }
-                return super.visit(tree, executionContext);
+                return super.visit(tree, ctx);
             }
 
             @Override
@@ -251,8 +251,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
     }
 
     @SuppressWarnings("DataFlowIssue")
-    @Nullable
-    private String literalValue(Expression expr) {
+    private @Nullable String literalValue(Expression expr) {
         AtomicReference<String> value = new AtomicReference<>(null);
         new JavaVisitor<Integer>() {
             @Override
