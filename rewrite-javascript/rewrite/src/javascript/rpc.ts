@@ -51,7 +51,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(cu, c => c.charsetBomMarked);
         await q.getAndSend(cu, c => c.checksum);
         await q.getAndSend(cu, c => c.fileAttributes);
-        await q.getAndSendList(cu, c => c.imports, imp => imp.element.id, imp => this.visitRightPadded(imp, q));
         await q.getAndSendList(cu, c => c.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
         await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
         return cu;
@@ -533,7 +532,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.charsetBomMarked = await q.receive(cu.charsetBomMarked);
         draft.checksum = await q.receive(cu.checksum);
         draft.fileAttributes = await q.receive(cu.fileAttributes);
-        draft.imports = await q.receiveListDefined(cu.imports, imp => this.visitRightPadded(imp, q));
         draft.statements = await q.receiveListDefined(cu.statements, stmt => this.visitRightPadded(stmt, q));
         draft.eof = await q.receive(cu.eof, space => this.visitSpace(space, q));
 

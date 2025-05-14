@@ -94,7 +94,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
-            draft.imports = await mapAsync(compilationUnit.imports, imp => this.visitRightPadded(imp, p));
             draft.statements = await mapAsync(compilationUnit.statements, stmt => this.visitRightPadded(stmt, p));
             draft.eof = await this.visitSpace(compilationUnit.eof, p);
         });
