@@ -60,7 +60,7 @@ class LockDependencyVersionsTest implements RewriteTest {
               }
               """
           ),
-          lockFile(
+          lockfile(
             null,
             """
               # This is a Gradle generated file for dependency locking.
@@ -96,7 +96,7 @@ class LockDependencyVersionsTest implements RewriteTest {
               }
               """
           ),
-          lockFile(
+          lockfile(
             """
               # This is a Gradle generated file for dependency locking.
               # Manual edits can break the build and are not advised.
@@ -164,7 +164,7 @@ class LockDependencyVersionsTest implements RewriteTest {
               """,
             spec -> spec.path("module2/build.gradle")
           ),
-          lockFile(
+          lockfile(
             """
               # This is a Gradle generated file for dependency locking.
               # Manual edits can break the build and are not advised.
@@ -172,7 +172,7 @@ class LockDependencyVersionsTest implements RewriteTest {
               empty=
               """
           ),
-          lockFile(
+          lockfile(
             """
               # This is a Gradle generated file for dependency locking.
               # Manual edits can break the build and are not advised.
@@ -196,7 +196,7 @@ class LockDependencyVersionsTest implements RewriteTest {
               """,
             spec -> spec.path("module1/gradle.lockfile")
           ),
-          lockFile(
+          lockfile(
             """
               # This is a Gradle generated file for dependency locking.
               # Manual edits can break the build and are not advised.
@@ -265,7 +265,7 @@ class LockDependencyVersionsTest implements RewriteTest {
               """,
             spec -> spec.path("module2/build.gradle")
           ),
-          lockFile(
+          lockfile(
             null,
             """
               # This is a Gradle generated file for dependency locking.
@@ -274,7 +274,7 @@ class LockDependencyVersionsTest implements RewriteTest {
               empty=
               """
           ),
-          lockFile(
+          lockfile(
             null,
             """
               # This is a Gradle generated file for dependency locking.
@@ -288,7 +288,7 @@ class LockDependencyVersionsTest implements RewriteTest {
               """,
             spec -> spec.path("module1/gradle.lockfile")
           ),
-          lockFile(
+          lockfile(
             null,
             """
               # This is a Gradle generated file for dependency locking.

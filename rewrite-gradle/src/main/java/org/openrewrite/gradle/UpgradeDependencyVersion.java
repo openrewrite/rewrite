@@ -225,7 +225,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         String versionVariableName = declaredVersion;
                         GroupArtifact ga = new GroupArtifact(declaredGroupId, declaredArtifactId);
                         if (gradleProject != null) {
-                            acc.getConfigurationPerGAPerModule().computeIfAbsent(gradleProject.getPath(), k -> new HashMap<>())
+                            acc.getConfigurationPerGAPerModule().computeIfAbsent(getGradleProjectKey(gradleProject), k -> new HashMap<>())
                                     .computeIfAbsent(ga, k -> new HashSet<>())
                                     .add(m.getSimpleName());
                         }
@@ -295,7 +295,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         String versionVariableName = declaredVersion;
                         GroupArtifact ga = new GroupArtifact(declaredGroupId, declaredArtifactId);
                         if (gradleProject != null) {
-                            acc.getConfigurationPerGAPerModule().computeIfAbsent(gradleProject.getPath(), k -> new HashMap<>())
+                            acc.getConfigurationPerGAPerModule().computeIfAbsent(getGradleProjectKey(gradleProject), k -> new HashMap<>())
                                     .computeIfAbsent(ga, k -> new HashSet<>())
                                     .add(m.getSimpleName());
                         }
@@ -355,7 +355,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             }
                             GroupArtifact ga = new GroupArtifact(dep.getGroupId(), dep.getArtifactId());
                             if (gradleProject != null) {
-                                acc.getConfigurationPerGAPerModule().computeIfAbsent(gradleProject.getPath(), k -> new HashMap<>())
+                                acc.getConfigurationPerGAPerModule().computeIfAbsent(getGradleProjectKey(gradleProject), k -> new HashMap<>())
                                         .computeIfAbsent(ga, k -> new HashSet<>())
                                         .add(m.getSimpleName());
                             }
@@ -415,7 +415,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     Optional<GradleProject> projectMarker = t.getMarkers().findFirst(GradleProject.class);
                     if ((tree != t || updateLockFile.isAcceptable(sf, ctx)) && projectMarker.isPresent()) {
                         GradleProject gradleProject = projectMarker.get();
-                        Map<GroupArtifact, Set<String>> configurationsPerGa = acc.getConfigurationPerGAPerModule().getOrDefault(gradleProject.getPath(), emptyMap());
+                        Map<GroupArtifact, Set<String>> configurationsPerGa = acc.getConfigurationPerGAPerModule().getOrDefault(getGradleProjectKey(gradleProject), emptyMap());
                         for (Map.Entry<GroupArtifact, Object> newVersion : acc.getGaToNewVersion().entrySet()) {
                             if (newVersion.getValue() instanceof String) {
                                 GroupArtifactVersion gav = new GroupArtifactVersion(newVersion.getKey().getGroupId(), newVersion.getKey().getArtifactId(), (String) newVersion.getValue());
@@ -897,5 +897,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
         traversalHistory.add(dep);
         return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep, new HashSet<>(traversalHistory))));
+    }
+
+    private static String getGradleProjectKey(GradleProject project) {
+        if (StringUtils.isBlank(project.getGroup())) {
+            return project.getName();
+        }
+        if (":".equals(project.getPath())) {
+            return project.getGroup();
+        }
+        return project.getGroup() + project.getPath();
     }
 }

@@ -181,25 +181,25 @@ public class Assertions {
         return gradle;
     }
 
-    public static SourceSpecs lockFile(@Nullable String before) {
-        return lockFile(before, s -> {
+    public static SourceSpecs lockfile(@Nullable String before) {
+        return lockfile(before, s -> {
         });
     }
 
-    public static SourceSpecs lockFile(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
+    public static SourceSpecs lockfile(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
         SourceSpec<PlainText> lockFile = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, null);
         lockFile.path("gradle.lockfile");
         spec.accept(lockFile);
         return lockFile;
     }
 
-    public static SourceSpecs lockFile(@Nullable String before, @Nullable String after) {
-        return lockFile(before, after, s -> {
+    public static SourceSpecs lockfile(@Nullable String before, @Nullable String after) {
+        return lockfile(before, after, s -> {
         });
     }
 
-    public static SourceSpecs lockFile(@Nullable String before, @Nullable String after,
-                            Consumer<SourceSpec<PlainText>> spec) {
+    public static SourceSpecs lockfile(@Nullable String before, @Nullable String after,
+                                       Consumer<SourceSpec<PlainText>> spec) {
         SourceSpec<PlainText> lockFile = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, s-> after);
         lockFile.path("gradle.lockfile");
         spec.accept(lockFile);
