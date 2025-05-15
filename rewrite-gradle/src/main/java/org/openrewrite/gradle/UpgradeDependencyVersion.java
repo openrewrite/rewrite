@@ -849,7 +849,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
             ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
             List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
-            Pom managingDependency = resolvedPom.getManagingPom(gav.asGroupArtifact());
+            ResolvedPom managingDependency = resolvedPom.getManagingPom(gav.asGroupArtifact());
             org.openrewrite.maven.tree.Dependency newRequested = org.openrewrite.maven.tree.Dependency.builder()
                     .gav(gav)
                     .build();
@@ -929,7 +929,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep, new HashSet<>(traversalHistory))));
     }
 
-    private static String getGradleProjectKey(GradleProject project) {
+    static String getGradleProjectKey(GradleProject project) {
         if (StringUtils.isBlank(project.getGroup())) {
             return project.getName();
         }
