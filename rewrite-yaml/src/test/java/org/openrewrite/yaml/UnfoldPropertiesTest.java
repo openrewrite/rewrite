@@ -226,7 +226,7 @@ class UnfoldPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void exclusionWithParentAndMatchAll() {
+    void exclusionWithSingleLineAndMatchAll() {
         rewriteRun(
           spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/.*/))]"))),
           yaml(
@@ -239,6 +239,33 @@ class UnfoldPropertiesTest implements RewriteTest {
                 level:
                   com.company.extern.service: DEBUG
                   com.another.package: INFO
+              """
+          )
+        );
+    }
+
+    @Test
+    void exclusionWithSingleLineAndGroupMatcherAndMatchAll() {
+        rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[root.group][?(@property.match(/^sub.*group\\./))][?(@property.match(/.*/))]"))),
+          yaml(
+            """
+              root.group.sub1.group.org.key1: value1
+              root.group.sub1.group.org.key2: value2
+              root.group.sub2.group.org.keya: valuea
+              root.group.sub2.group.com.keyb: valueb
+              """,
+            """
+              root:
+                group:
+                  sub1:
+                    group:
+                      org.key1: value1
+                      org.key2: value2
+                  sub2:
+                    group:
+                      org.keya: valuea
+                      com.keyb: valueb
               """
           )
         );
