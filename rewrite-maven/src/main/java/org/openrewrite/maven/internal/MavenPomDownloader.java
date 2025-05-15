@@ -68,6 +68,9 @@ public class MavenPomDownloader {
     private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
 
     private static final String SNAPSHOT = "SNAPSHOT";
+    private static final String LATEST = "LATEST";
+    private static final String RELEASE = "RELEASE";
+    private static final List<String> NAMED_VERSIONS = Arrays.asList(LATEST, RELEASE);
 
 
     private final MavenPomCache mavenCache;
@@ -259,7 +262,7 @@ public class MavenPomDownloader {
                     String baseUri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
                                      requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
                                      gav.getArtifactId() + '/' +
-                                     (gav.getVersion() == null ? "" : gav.getVersion() + '/');
+                                     (gav.getVersion() == null || NAMED_VERSIONS.contains(gav.getVersion().toUpperCase()) ? "" : gav.getVersion() + '/');
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
@@ -534,8 +537,9 @@ public class MavenPomDownloader {
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "pom");
 
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
-        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         GroupArtifactVersion originalGav = gav;
+        gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
+        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         gav = handleSnapshotTimestampVersion(gav);
         List<String> uris = new ArrayList<>();
 
@@ -753,6 +757,29 @@ public class MavenPomDownloader {
         }
 
         return gav.getVersion();
+    }
+
+    private GroupArtifactVersion resolveNamedVersion(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories, ExecutionContext ctx) {
+        if (gav.getVersion() == null) {
+            return gav;
+        }
+        String version = gav.getVersion().toUpperCase();
+        if (NAMED_VERSIONS.contains(version)) {
+            MavenMetadata mavenMetadata;
+            try {
+                mavenMetadata = downloadMetadata(gav, containingPom, repositories);
+            } catch (MavenDownloadingException e) {
+                //This can happen if the artifact only exists in the local maven cache. In this case, just return the original
+                return gav;
+            }
+
+            if (RELEASE.equals(version)) {
+                return gav.withVersion(mavenMetadata.getVersioning().getRelease());
+            } else if (LATEST.equals(version)) {
+                return gav.withVersion(mavenMetadata.getVersioning().getLatest());
+            }
+        }
+        return gav;
     }
 
     Iterable<MavenRepository> distinctNormalizedRepositories(
