@@ -226,6 +226,61 @@ class UnfoldPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void exclusionWithSingleLineAndMatchAll() {
+        rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/.*/))]"))),
+          yaml(
+            """
+              logging.level.com.company.extern.service: DEBUG
+              logging.level.com.another.package: INFO
+              """,
+            """
+              logging:
+                level:
+                  com.company.extern.service: DEBUG
+                  com.another.package: INFO
+              """
+          )
+        );
+    }
+
+    @Test
+    /* Currently "property matchers" operate on the full yaml property key (e.g. "root.group.sub1.group.org.key1").
+        this means a regex can match over actual properties. (e.g. "[?(@property.match(/^root.*sub1\./))]" matches "root.group.sub1").
+        This test shows the behavior. Should we prefer matching on the exact properties?
+     */
+    void exclusionWithSingleLineAndGroupMatcherAndMatchAll() {
+        rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[root.group][?(@property.match(/^sub.*group\\./))][?(@property.match(/.*/))]"))),
+          yaml(
+            """
+              root.group.sub1.group.org.key1: value1
+              root.group.sub1.group.org.key2: value2
+              root.group.sub2.group.org.keya: valuea
+              root.group.sub2.group.com.keyb: valueb
+              root.group.sub3.org.group.com.c: valuec
+              """,
+            """
+              root:
+                group:
+                  sub1:
+                    group:
+                      org.key1: value1
+                      org.key2: value2
+                  sub2:
+                    group:
+                      org.keya: valuea
+                      com.keyb: valueb
+                  sub3:
+                    org:
+                      group:
+                        com.c: valuec
+              """
+          )
+        );
+    }
+
+    @Test
     void mergeDuplicatedSections() {
         rewriteRun(
           yaml(
