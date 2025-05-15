@@ -413,14 +413,15 @@ export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext
 
     public async visitStatement(statement: Statement, p: ExecutionContext): Promise<Statement> {
         const j = await super.visitStatement(statement, p) as Statement;
-        const parent = this.cursor.parent?.value;
-        if (parent?.kind === J.Kind.Block && j.kind !== J.Kind.EnumValueSet) {
-            if (!j.prefix.whitespace.includes("\n")) {
-                return produce(j, draft => {
-                    draft.prefix.whitespace = "\n" + draft.prefix.whitespace;
-                });
-            }
-        }
+        // TODO is it needed?
+        // const parent = this.cursor.parent?.value;
+        // if (parent?.kind === J.Kind.Block && j.kind !== J.Kind.EnumValueSet) {
+        //     if (!j.prefix.whitespace.includes("\n")) {
+        //         return produce(j, draft => {
+        //             draft.prefix.whitespace = "\n" + draft.prefix.whitespace;
+        //         });
+        //     }
+        // }
         return j;
     }
 
