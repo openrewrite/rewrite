@@ -245,6 +245,10 @@ class UnfoldPropertiesTest implements RewriteTest {
     }
 
     @Test
+    /* Currently "property matchers" operate on the full yaml property key (e.g. "root.group.sub1.group.org.key1").
+        this means a regex can match over actual properties. (e.g. "[?(@property.match(/^root.*sub1\./))]" matches "root.group.sub1").
+        This test shows the behavior. Should we prefer matching on the exact properties?
+     */
     void exclusionWithSingleLineAndGroupMatcherAndMatchAll() {
         rewriteRun(
           spec -> spec.recipe(new UnfoldProperties(List.of("$..[root.group][?(@property.match(/^sub.*group\\./))][?(@property.match(/.*/))]"))),
@@ -254,6 +258,7 @@ class UnfoldPropertiesTest implements RewriteTest {
               root.group.sub1.group.org.key2: value2
               root.group.sub2.group.org.keya: valuea
               root.group.sub2.group.com.keyb: valueb
+              root.group.sub3.org.group.com.c: valuec
               """,
             """
               root:
@@ -266,6 +271,10 @@ class UnfoldPropertiesTest implements RewriteTest {
                     group:
                       org.keya: valuea
                       com.keyb: valueb
+                  sub3:
+                    org:
+                      group:
+                        com.c: valuec
               """
           )
         );
