@@ -143,7 +143,7 @@ public class GradleDependencyConfiguration implements Serializable {
                 ResolvedDependency alreadyPresent = alreadyResolved.get(ga);
                 Version newVersion = new Version(dependency.getVersion());
                 Version presentVersion = new Version(alreadyPresent.getVersion());
-                if (presentVersion.compareTo(newVersion) >= 0) {
+                if (presentVersion.compareTo(newVersion) > 0) {
                     continue;
                 }
             }

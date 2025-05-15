@@ -71,11 +71,11 @@ public class ResolvedPom {
     Iterable<String> activeProfiles = emptyList();
 
     public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), null);
+        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects, @Nullable ResolvedPom parent) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
@@ -87,7 +87,6 @@ public class ResolvedPom {
         this.plugins = plugins;
         this.pluginManagement = pluginManagement;
         this.subprojects = subprojects;
-        this.parent = parent;
     }
 
     @NonFinal
@@ -126,11 +125,6 @@ public class ResolvedPom {
     @Builder.Default
     @Nullable // on older LSTs, this field is not yet present
     List<String> subprojects = emptyList();
-
-    @NonFinal
-    @Builder.Default
-    @Nullable
-    ResolvedPom parent = null;
 
     /**
      * Deduplicate dependencies and dependency management dependencies
@@ -192,8 +186,7 @@ public class ResolvedPom {
                 emptyList(),
                 emptyList(),
                 emptyList(),
-                emptyList(),
-                null
+                emptyList()
         ).resolver(ctx, downloader).resolve();
 
         for (Map.Entry<String, String> property : resolved.getProperties().entrySet()) {
@@ -411,10 +404,6 @@ public class ResolvedPom {
 
             resolveParentDependenciesRecursively(new ArrayList<>(pomAncestry));
             resolveParentPluginsRecursively(new ArrayList<>(pomAncestry));
-
-            if (requested.getParent() != null) {
-                ResolvedPom.this.parent = resolveParentPom(requested).resolve(activeProfiles, downloader, ctx);
-            }
         }
 
         private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
@@ -1008,7 +997,7 @@ public class ResolvedPom {
                     if (resolvedPom == null) {
                         resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
                                 emptyList(), initialRepositories, emptyList(), emptyList(),
-                                emptyList(), emptyList(), emptyList(), emptyList(), null);
+                                emptyList(), emptyList(), emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
@@ -1086,24 +1075,6 @@ public class ResolvedPom {
         }
 
         return dependencies;
-    }
-
-    public @Nullable ResolvedPom getManagingPom(GroupArtifact ga) {
-        LinkedList<ResolvedPom> pomAncestry = new LinkedList<>();
-        ResolvedPom parent = this.parent;
-        while (parent != null) {
-            pomAncestry.push(parent);
-            parent = parent.getParent();
-        }
-        for (ResolvedPom pom : pomAncestry) {
-            for (ResolvedManagedDependency managedDependency : pom.getDependencyManagement()) {
-                if (ga.getGroupId().equals(managedDependency.getGav().getGroupId()) &&
-                        ga.getArtifactId().equals(managedDependency.getGav().getArtifactId())) {
-                    return pom;
-                }
-            }
-        }
-        return null;
     }
 
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {

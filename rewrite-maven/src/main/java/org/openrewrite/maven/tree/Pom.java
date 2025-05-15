@@ -213,8 +213,7 @@ public class Pom {
                 dependencies,
                 plugins,
                 pluginManagement,
-                subprojects,
-                null)
+                subprojects)
                 .resolve(ctx, downloader);
     }
 

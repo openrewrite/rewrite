@@ -1596,6 +1596,75 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void bomGetsUpdatedInLockFile() {
         rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("io.pivotal.cfenv", "java-cfenv-boot", "3.4.0", null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation "io.pivotal.cfenv:java-cfenv-boot:3.3.0"
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation "io.pivotal.cfenv:java-cfenv-boot:3.4.0"
+              }
+              """
+          ), lockfile(
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              com.cedarsoftware:java-util:2.17.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.cedarsoftware:json-io:4.30.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              io.micrometer:micrometer-commons:1.13.6=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              io.micrometer:micrometer-observation:1.13.6=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              io.pivotal.cfenv:java-cfenv-boot:3.3.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              io.pivotal.cfenv:java-cfenv-jdbc:3.3.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              io.pivotal.cfenv:java-cfenv:3.3.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework.boot:spring-boot-dependencies:3.3.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework.boot:spring-boot:3.3.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-aop:6.1.14=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-beans:6.1.14=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-context:6.1.14=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-core:6.1.14=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-expression:6.1.14=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-jcl:6.1.14=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              """,
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              com.cedarsoftware:java-util:3.2.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              com.cedarsoftware:json-io:4.51.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              io.micrometer:micrometer-commons:1.14.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              io.micrometer:micrometer-observation:1.14.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              io.pivotal.cfenv:java-cfenv-boot:3.4.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              io.pivotal.cfenv:java-cfenv-jdbc:3.4.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              io.pivotal.cfenv:java-cfenv:3.4.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework.boot:spring-boot-dependencies:3.4.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework.boot:spring-boot:3.4.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-aop:6.2.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-beans:6.2.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-context:6.2.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-core:6.2.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-expression:6.2.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.springframework:spring-jcl:6.2.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              """
+          )
+        );
+    }
+
+    @Test
+    void jacksonBomGetsUpdatedInLockFile() {
+        rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml*", "jackson-core", "2.15.4", null)),
           //language=groovy
           buildGradle(

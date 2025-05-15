@@ -849,7 +849,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
             ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
             List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
-            ResolvedPom managingDependency = resolvedPom.getManagingPom(gav.asGroupArtifact());
             org.openrewrite.maven.tree.Dependency newRequested = org.openrewrite.maven.tree.Dependency.builder()
                     .gav(gav)
                     .build();
@@ -868,9 +867,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeUpdateResolvedDependency(resolved, newDep, new HashSet<>())));
                 for (ResolvedManagedDependency resolvedDependency : resolvedPom.getDependencyManagement()) {
                     newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), maybeUpdateManagedResolvedDependency(resolvedDependency.getGav())));
-                }
-                if (managingDependency != null) {
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), maybeUpdateManagedResolvedDependency(managingDependency.getGav())));
                 }
                 anyChanged |= newGdc != gdc;
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
@@ -897,17 +893,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return resolved -> {
             ResolvedDependency newResolvedDependency = ResolvedDependency.builder()
                     .gav(resolved.getGav().withGroupArtifact(gav.asGroupArtifact()).withVersion(gav.getVersion()))
-                    .requested(resolved.getRequested())
-                    .dependencies(resolved.getDependencies())
-                    .build();
-            return maybeUpdateResolvedDependency(resolved, newResolvedDependency, new HashSet<>());
-        };
-    }
-
-    private static Function<ResolvedDependency, ResolvedDependency> maybeUpdateManagedResolvedDependency(ResolvedGroupArtifactVersion gav) {
-        return resolved -> {
-            ResolvedDependency newResolvedDependency = ResolvedDependency.builder()
-                    .gav(gav.withGroupArtifact(gav.asGroupArtifact()).withVersion(gav.getVersion()))
                     .requested(resolved.getRequested())
                     .dependencies(resolved.getDependencies())
                     .build();

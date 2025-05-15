@@ -618,13 +618,29 @@ public class MavenPomDownloader {
                 } else {
                     try {
                         try {
-                            byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
+                            byte[] pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
 
                             Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
                             RawPom rawPom = RawPom.parse(
-                                    new ByteArrayInputStream(responseBody),
+                                    new ByteArrayInputStream(pomResponseBody),
                                     Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
                             );
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(pomResponseBody)))) {
+                                String line;
+                                while ((line = reader.readLine()) != null) {
+                                    if (line.contains("published-with-gradle-metadata")) {
+                                        // as some artifacts do not have the bom as dependency listed, we need to add it by fetching the gradle metadata module.
+                                        pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString().replaceFirst(".pom$", ".module"));
+                                        RawGradleModule module = RawGradleModule.parse(new ByteArrayInputStream(pomResponseBody));
+                                        for (Dependency dependency : module.getDependencies("apiElements", "platform")) {
+                                            rawPom.getDependencies().getDependencies().add(
+                                                    new RawPom.Dependency(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), null, null, null, null, null)
+                                            );
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
@@ -1165,5 +1181,4 @@ public class MavenPomDownloader {
         }
         return null;
     }
-
 }
