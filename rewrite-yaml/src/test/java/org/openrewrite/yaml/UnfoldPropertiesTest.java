@@ -226,6 +226,25 @@ class UnfoldPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void exclusionWithParentAndMatchAll() {
+        rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/.*/))]"))),
+          yaml(
+            """
+              logging.level.com.company.extern.service: DEBUG
+              logging.level.com.another.package: INFO
+              """,
+            """
+              logging:
+                level:
+                  com.company.extern.service: DEBUG
+                  com.another.package: INFO
+              """
+          )
+        );
+    }
+
+    @Test
     void mergeDuplicatedSections() {
         rewriteRun(
           yaml(
