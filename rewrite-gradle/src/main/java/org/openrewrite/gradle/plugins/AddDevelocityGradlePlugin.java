@@ -159,7 +159,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     GradleSettings gradleSettings = maybeGradleSettings.get();
 
                     try {
-                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, null, gradleSettings), ctx);
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(metadataFailures, null, gradleSettings), ctx);
                         if (newVersion == null) {
                             return cu;
                         }
@@ -184,7 +184,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     GradleProject gradleProject = maybeGradleProject.get();
 
                     try {
-                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, gradleProject, null), ctx);
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(metadataFailures, gradleProject, null), ctx);
                         if (newVersion == null) {
                             return cu;
                         }

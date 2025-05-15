@@ -28,27 +28,27 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-    override async visitExpression(expression: Expression, p: P): Promise<J | undefined> {
+    protected override async visitExpression(expression: Expression, p: P): Promise<J | undefined> {
         return expression;
     }
 
     // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-    override async visitStatement(statement: Statement, p: P): Promise<J | undefined> {
+    protected override async visitStatement(statement: Statement, p: P): Promise<J | undefined> {
         return statement;
     }
 
     // noinspection JSUnusedLocalSymbols
-    override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+    protected override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
         return space;
     }
 
     // noinspection JSUnusedLocalSymbols
-    override async visitType(javaType: JavaType | undefined, p: P): Promise<JavaType | undefined> {
+    protected override async visitType(javaType: JavaType | undefined, p: P): Promise<JavaType | undefined> {
         return javaType;
     }
 
     // noinspection JSUnusedLocalSymbols
-    override async visitTypeName<N extends NameTree>(nameTree: N, p: P): Promise<N> {
+    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: P): Promise<N> {
         return nameTree;
     }
 
@@ -76,6 +76,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitArrowFunction(arrowFunction: JS.ArrowFunction, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(arrowFunction, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ArrowFunction) {
+            return statement;
+        }
+        arrowFunction = statement as JS.ArrowFunction;
+
         return this.produceJavaScript<JS.ArrowFunction>(arrowFunction, p, async draft => {
             draft.leadingAnnotations = await mapAsync(arrowFunction.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
             draft.modifiers = await mapAsync(arrowFunction.modifiers, item => this.visitDefined<J.Modifier>(item, p));
@@ -94,7 +100,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
-            draft.imports = await mapAsync(compilationUnit.imports, imp => this.visitRightPadded(imp, p));
             draft.statements = await mapAsync(compilationUnit.statements, stmt => this.visitRightPadded(stmt, p));
             draft.eof = await this.visitSpace(compilationUnit.eof, p);
         });
@@ -109,12 +114,24 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitDelete(delete_: JS.Delete, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(delete_, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.Delete) {
+            return statement;
+        }
+        delete_ = statement as JS.Delete;
+
         return this.produceJavaScript<JS.Delete>(delete_, p, async draft => {
             draft.expression = await this.visitDefined<Expression>(delete_.expression, p);
         });
     }
 
     protected async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(expressionStatement, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ExpressionStatement) {
+            return statement;
+        }
+        expressionStatement = statement as JS.ExpressionStatement;
+
         return this.produceJavaScript<JS.ExpressionStatement>(expressionStatement, p, async draft => {
             draft.expression = await this.visitDefined<Expression>(expressionStatement.expression, p);
         });
@@ -199,6 +216,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitImportAttribute(importAttribute: JS.ImportAttribute, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(importAttribute, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ImportAttribute) {
+            return statement;
+        }
+        importAttribute = statement as JS.ImportAttribute;
+
         return this.produceJavaScript<JS.ImportAttribute>(importAttribute, p, async draft => {
             draft.name = await this.visitDefined<Expression>(importAttribute.name, p);
             draft.value = await this.visitLeftPadded(importAttribute.value, p);
@@ -258,6 +281,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(propertyAssignment, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.PropertyAssignment) {
+            return statement;
+        }
+        propertyAssignment = statement as JS.PropertyAssignment;
+
         return this.produceJavaScript<JS.PropertyAssignment>(propertyAssignment, p, async draft => {
             draft.name = await this.visitRightPadded(propertyAssignment.name, p);
             draft.initializer = propertyAssignment.initializer && await this.visitDefined<Expression>(propertyAssignment.initializer, p);
@@ -273,6 +302,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(scopedVariableDeclarations, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ScopedVariableDeclarations) {
+            return statement;
+        }
+        scopedVariableDeclarations = statement as JS.ScopedVariableDeclarations;
+
         return this.produceJavaScript<JS.ScopedVariableDeclarations>(scopedVariableDeclarations, p, async draft => {
             draft.modifiers = await mapAsync(scopedVariableDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.scope = scopedVariableDeclarations.scope && await this.visitLeftPadded(scopedVariableDeclarations.scope, p);
@@ -281,12 +316,24 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitStatementExpression(statementExpression: JS.StatementExpression, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(statementExpression, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.StatementExpression) {
+            return statement;
+        }
+        statementExpression = statement as JS.StatementExpression;
+
         return this.produceJavaScript<JS.StatementExpression>(statementExpression, p, async draft => {
             draft.statement = await this.visitDefined<Statement>(statementExpression.statement, p);
         });
     }
 
     protected async visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(taggedTemplateExpression, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.TaggedTemplateExpression) {
+            return statement;
+        }
+        taggedTemplateExpression = statement as JS.TaggedTemplateExpression;
+
         return this.produceJavaScript<JS.TaggedTemplateExpression>(taggedTemplateExpression, p, async draft => {
             draft.tag = taggedTemplateExpression.tag && await this.visitRightPadded(taggedTemplateExpression.tag, p);
             draft.typeArguments = taggedTemplateExpression.typeArguments && await this.visitContainer(taggedTemplateExpression.typeArguments, p);
@@ -296,6 +343,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitTemplateExpression(templateExpression: JS.TemplateExpression, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(templateExpression, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.TemplateExpression) {
+            return statement;
+        }
+        templateExpression = statement as JS.TemplateExpression;
+
         return this.produceJavaScript<JS.TemplateExpression>(templateExpression, p, async draft => {
             draft.head = await this.visitDefined<J.Literal>(templateExpression.head, p);
             draft.spans = await mapAsync(templateExpression.spans, item => this.visitRightPadded(item, p));
@@ -311,6 +364,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(trailingTokenStatement, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.TrailingTokenStatement) {
+            return statement;
+        }
+        trailingTokenStatement = statement as JS.TrailingTokenStatement;
+
         return this.produceJavaScript<JS.TrailingTokenStatement>(trailingTokenStatement, p, async draft => {
             draft.expression = await this.visitRightPadded(trailingTokenStatement.expression, p);
             draft.type = trailingTokenStatement.type && await this.visitType(trailingTokenStatement.type, p);
@@ -325,6 +384,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(typeDeclaration, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.TypeDeclaration) {
+            return statement;
+        }
+        typeDeclaration = statement as JS.TypeDeclaration;
+
         return this.produceJavaScript<JS.TypeDeclaration>(typeDeclaration, p, async draft => {
             draft.modifiers = await mapAsync(typeDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.name = await this.visitLeftPadded(typeDeclaration.name, p);
@@ -427,6 +492,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitWithStatement(withStatement: JS.WithStatement, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(withStatement, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.WithStatement) {
+            return statement;
+        }
+        withStatement = statement as JS.WithStatement;
+
         return this.produceJavaScript<JS.WithStatement>(withStatement, p, async draft => {
             draft.expression = await this.visitDefined<J.ControlParentheses<Expression>>(withStatement.expression, p);
             draft.body = await this.visitRightPadded(withStatement.body, p);
@@ -434,6 +505,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(indexSignatureDeclaration, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.IndexSignatureDeclaration) {
+            return statement;
+        }
+        indexSignatureDeclaration = statement as JS.IndexSignatureDeclaration;
+
         return this.produceJavaScript<JS.IndexSignatureDeclaration>(indexSignatureDeclaration, p, async draft => {
             draft.modifiers = await mapAsync(indexSignatureDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.parameters = await this.visitContainer(indexSignatureDeclaration.parameters, p);
@@ -443,6 +520,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(computedPropMethod, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ComputedPropertyMethodDeclaration) {
+            return statement;
+        }
+        computedPropMethod = statement as JS.ComputedPropertyMethodDeclaration;
+
         return this.produceJavaScript<JS.ComputedPropertyMethodDeclaration>(computedPropMethod, p, async draft => {
             draft.leadingAnnotations = await mapAsync(computedPropMethod.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
             draft.modifiers = await mapAsync(computedPropMethod.modifiers, item => this.visitDefined<J.Modifier>(item, p));
@@ -469,6 +552,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(namespaceDeclaration, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.NamespaceDeclaration) {
+            return statement;
+        }
+        namespaceDeclaration = statement as JS.NamespaceDeclaration;
+
         return this.produceJavaScript<JS.NamespaceDeclaration>(namespaceDeclaration, p, async draft => {
             draft.modifiers = await mapAsync(namespaceDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.keywordType = await this.visitLeftPadded(namespaceDeclaration.keywordType, p);
@@ -492,6 +581,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitBindingElement(bindingElement: JS.BindingElement, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(bindingElement, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.BindingElement) {
+            return statement;
+        }
+        bindingElement = statement as JS.BindingElement;
+
         return this.produceJavaScript<JS.BindingElement>(bindingElement, p, async draft => {
             draft.propertyName = bindingElement.propertyName && await this.visitRightPadded(bindingElement.propertyName, p);
             draft.name = await this.visitDefined<TypedTree>(bindingElement.name, p);
@@ -501,6 +596,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(exportDeclaration, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ExportDeclaration) {
+            return statement;
+        }
+        exportDeclaration = statement as JS.ExportDeclaration;
+
         return this.produceJavaScript<JS.ExportDeclaration>(exportDeclaration, p, async draft => {
             draft.modifiers = await mapAsync(exportDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.typeOnly = await this.visitLeftPadded(exportDeclaration.typeOnly, p);
@@ -511,6 +612,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitExportAssignment(exportAssignment: JS.ExportAssignment, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(exportAssignment, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ExportAssignment) {
+            return statement;
+        }
+        exportAssignment = statement as JS.ExportAssignment;
+
         return this.produceJavaScript<JS.ExportAssignment>(exportAssignment, p, async draft => {
             draft.expression = await this.visitLeftPadded<Expression>(exportAssignment.expression, p);
         });

@@ -53,7 +53,6 @@ export interface NameTree extends J {
 }
 
 export namespace J {
-    import NamedVariable = J.VariableDeclarations.NamedVariable;
     export const Kind = {
         ...TreeKind,
         AnnotatedType: "org.openrewrite.java.tree.J$AnnotatedType",
@@ -689,7 +688,7 @@ export namespace J {
         readonly modifiers: Modifier[];
         readonly typeExpression?: TypeTree;
         readonly varargs?: Space;
-        readonly variables: RightPadded<NamedVariable>[];
+        readonly variables: RightPadded<J.VariableDeclarations.NamedVariable>[];
     }
 
     export namespace VariableDeclarations {

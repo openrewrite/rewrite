@@ -13,13 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-export async function mapAsync<T, U>(arr: T[], fn: (t: T, i: number) => Promise<U | undefined>): Promise<U[]> {
-    const results: U[] = [];
-    for (let i = 0; i < arr.length; i++) {
-        const result = await fn(arr[i], i);
-        if (result !== undefined) {
-            results.push(result);
+
+import {describe} from "@jest/globals";
+import {mapAsync} from "../src";
+
+describe("mapAsync", () => {
+    test("sequential execution", async () => {
+        // given
+        let global = "";
+        const arr = ["four", "three", "six"];
+        function task(item: string, idx: number) {
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    global = global + item;
+                    resolve("irrelevant");
+                }, item.length);
+            });
         }
-    }
-    return results;
-}
+
+        // when
+        await mapAsync(arr, task);
+
+        // test
+        expect(global).toEqual("fourthreesix");
+    });
+});
