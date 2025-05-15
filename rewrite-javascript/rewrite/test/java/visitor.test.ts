@@ -34,9 +34,8 @@ describe('visitor', () => {
 
         // when
         await spec.rewriteRun(
-            // TODO something is off with the rewriteRun logic, it doesn't work without the after, even if before==after
             //language=typescript
-            typescript('class A {}', 'class A {}')
+            typescript('class A {}')
         );
 
         // test
