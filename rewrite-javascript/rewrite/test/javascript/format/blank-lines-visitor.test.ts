@@ -105,10 +105,6 @@ describe('BlankLinesVisitor', () => {
             typescript(`
                  class A {
                  }
-                `,
-                `
-                 class A {
-                 }
                 `)
             // @formatter:on
         );
