@@ -16,21 +16,23 @@
 import {JS} from "./tree";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, J, Statement} from "../java";
+import {Comment, J, JavaType, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isTree, Tree} from "../tree";
-import {SpacesStyle, styleFromSourceFile, StyleKind, WrappingAndBracesStyle} from "./style";
+import {SpacesStyle, styleFromSourceFile, StyleKind, WrappingAndBracesStyle, BlankLinesStyle} from "./style";
 import {produceAsync} from "../visitor";
 
 export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
     async visit<R extends J>(tree: Tree, p: ExecutionContext, cursor?: Cursor): Promise<R | undefined> {
         const spacesStyle = styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle;
         const wrappingAndBracesStyle = styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle;
+        const blankLinesStyle = styleFromSourceFile(StyleKind.BlankLinesStyle, tree) as BlankLinesStyle;
         let t: R | undefined = tree as R;
         // TODO possibly cursor.fork
 
-        // TODO add it once we have the newlines visitor
+        // TODO enable them once we have the indenting visitor
         // t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
+        // t = t && await new BlankLinesVisitor(blankLinesStyle).visit(t, p, cursor);
         t = t && await new WrappingAndBracesVisitor(wrappingAndBracesStyle).visit(t, p, cursor);
         t = t && await new SpacesVisitor(spacesStyle).visit(t, p, cursor);
         return t;
@@ -737,5 +739,170 @@ export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionCont
         }
 
         return c;
+    }
+}
+
+export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
+    constructor(private readonly style: BlankLinesStyle) {
+        super();
+    }
+
+    override async visit<R extends J>(tree: Tree, p: ExecutionContext, cursor?: Cursor): Promise<R | undefined> {
+        if (tree.kind === JS.Kind.CompilationUnit) {
+            const cu = produce(tree as JS.CompilationUnit, draft => {
+                if (draft.prefix.comments.length == 0) {
+                    draft.prefix.whitespace = "";
+                }
+            });
+            return super.visit(cu, p, cursor);
+        }
+
+        return super.visit(tree, p, cursor);
+    }
+
+    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J.ClassDeclaration> {
+        let ret = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
+        if (!ret.body) return ret;
+        return produce(ret, draft => {
+            const statements = draft.body.statements;
+            if (statements.length > 0) {
+                this.keepMaximumBlankLines(draft.body.statements[0].element, 0);
+
+                for (let i = 1; i < statements.length; i++) {
+                    const previousElement = statements[i - 1].element;
+                    let currentElement = statements[i].element;
+                    if (previousElement.kind == J.Kind.VariableDeclarations || currentElement.kind == J.Kind.VariableDeclarations) {
+                        this.minimumBlankLines(currentElement, 1 + this.style.minimum.aroundField) // TODO aroundFieldInInterface
+                    }
+                    if (previousElement.kind == J.Kind.MethodDeclaration || currentElement.kind == J.Kind.MethodDeclaration) {
+                        this.minimumBlankLines(currentElement, 1 + this.style.minimum.aroundMethod) // TODO aroundMethodInInterface
+                    }
+                    this.keepMaximumBlankLines(currentElement, this.style.keepMaximum.inCode);
+                    draft.body.statements[i].element = currentElement;
+                }
+            }
+
+            const cu = this.cursor.firstEnclosing((x: any): x is JS.CompilationUnit => x.kind === JS.Kind.CompilationUnit) as JS.CompilationUnit | undefined;
+            const topLevelIndex = cu?.statements.findIndex(s => s.element.id == draft.id);
+
+            if (topLevelIndex !== undefined) {
+                const isImportJustBeforeThis = topLevelIndex > 0 && cu?.statements[topLevelIndex - 1].element.kind === JS.Kind.Import;
+
+                if (isImportJustBeforeThis) {
+                    this.minimumBlankLines(draft, this.style.minimum.afterImports ?? 0);
+                }
+                if (topLevelIndex > 0) {
+                    this.minimumBlankLines(draft, this.style.minimum.aroundClass);
+                }
+                this.keepMaximumBlankLines(draft, this.style.keepMaximum.inCode);
+            }
+        });
+    }
+
+    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J.MethodDeclaration> {
+        let j = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+        if (!j.body) return j;
+
+        // TODO check if it's relevant to TS/JS
+        // j = produce(j, draft => {
+        //     if (draft.body!.statements.length === 0) {
+        //
+        //         let end = this.minimumLines(draft.body!.end.whitespace, this.style.minimum.beforeMethodBody);
+        //         if (!end.whitespace.includes("\n") && this.style.minimum.beforeMethodBody > 0) {
+        //             end = { ...end, whitespace: "\n".repeat(this.style.minimum.beforeMethodBody) };
+        //         }
+        //         draft.body!.end = end;
+        //     } else {
+        //         draft.body!.statements[0] = this.minimumLines(draft.body!.statements[0], this.style.minimum.beforeMethodBody);
+        //     }
+        // });
+
+        return j;
+    }
+
+    override async visitStatement(statement: Statement, p: ExecutionContext): Promise<Statement> {
+        const ret = await super.visitStatement(statement, p) as Statement;
+        const parent = this.cursor.parent?.value;
+        const grandparent = this.cursor.parent?.parent?.value;
+
+        return produce(ret, draft => {
+            if (grandparent?.kind === J.Kind.ClassDeclaration && parent?.kind === J.Kind.Block) {
+                const classDecl = grandparent as J.ClassDeclaration;
+                const block = parent as J.Block;
+
+                const isFirst = block.statements.length > 0 && block.statements[0].element.id === draft.id;
+                if (!isFirst) {
+                    if (draft.kind === J.Kind.VariableDeclarations) {
+                        const declMax = classDecl.classKind.type === J.ClassDeclaration.Kind.Type.Interface
+                            ? this.style.minimum.aroundFieldInInterface ?? 0
+                            : this.style.minimum.aroundField;
+                        this.minimumBlankLines(draft, declMax);
+                    } else if (draft.kind === J.Kind.MethodDeclaration) {
+                        const declMax = classDecl.classKind.type === J.ClassDeclaration.Kind.Type.Interface
+                            ? this.style.minimum.aroundMethodInInterface ?? 0
+                            : this.style.minimum.aroundMethod;
+                        this.minimumBlankLines(draft, declMax);
+                    } else if (draft.kind === J.Kind.Block) {
+                        this.minimumBlankLines(draft, this.style.minimum.aroundFunction);
+                    } else if (draft.kind === J.Kind.ClassDeclaration) {
+                        this.minimumBlankLines(draft, this.style.minimum.aroundClass);
+                    }
+                    this.keepMaximumBlankLines(draft, this.style.keepMaximum.inCode);
+                }
+            }
+        });
+    }
+
+    protected async visitBlock(block: J.Block, p: ExecutionContext): Promise<J.Block> {
+        const b = await super.visitBlock(block, p) as J.Block;
+        return produce(b, draft => {
+            // TODO check if it's relevant to TS/JS
+            // draft.end = this.keepMaximumLines(draft.end, this.style.keepMaximum.beforeEndOfBlock);
+        });
+    }
+
+    protected async visitEnumValue(enumValue: J.EnumValue, p: ExecutionContext): Promise<J.EnumValue> {
+        const e = await super.visitEnumValue(enumValue, p) as J.EnumValue;
+        this.keepMaximumBlankLines(e, this.style.keepMaximum.inCode);
+        return e;
+    }
+    // TODO check if it's relevant to TS/JS
+    // protected async visitNewClass(newClass: J.NewClass, p: ExecutionContext): Promise<J.NewClass> {
+    //     const j = await super.visitNewClass(newClass, p) as J.NewClass;
+    //     if (!j.body) return j;
+    //
+    //     return produce(j, draft => {
+    //         if (draft.body!.statements.length > 0) {
+    //             draft.body!.statements[0] = this.minimumLines(draft.body!.statements[0].whitespace, this.style.minimum.afterFunction ?? 0);
+    //         }
+    //     });
+    // }
+
+    private keepMaximumBlankLines<T extends J>(node: Draft<T>, max: number) {
+        const whitespace = node.prefix.whitespace;
+        const blankLines = BlankLinesVisitor.countNewlines(whitespace) - 1;
+        if (blankLines > max) {
+            let idx = 0;
+            for (let i = 0; i < blankLines - max + 1; i++, idx++) {
+                idx = whitespace.indexOf('\n', idx);
+            }
+            idx--;
+            node.prefix.whitespace = whitespace.substring(idx);
+        }
+    }
+
+    private minimumBlankLines<T extends J>(node: Draft<T>, min: number) {
+        if (min <= 0) {
+            return;
+        }
+        const currentNewlines = BlankLinesVisitor.countNewlines(node.prefix.whitespace);
+        const needed = min - currentNewlines + 1;
+        if (needed > 0) {
+            node.prefix.whitespace = "\n".repeat(needed) + node.prefix.whitespace;
+        }
+    }
+
+    private static countNewlines(s: string): number {
+        return [...s].filter(c => c === "\n").length;
     }
 }
