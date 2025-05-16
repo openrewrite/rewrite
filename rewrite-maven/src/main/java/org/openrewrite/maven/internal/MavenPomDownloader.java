@@ -640,6 +640,10 @@ public class MavenPomDownloader {
                                         break;
                                     }
                                 }
+                            } catch (HttpSenderResponseException e) {
+                                if (e.getResponseCode() != 404) {
+                                    throw e;
+                                }
                             }
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
