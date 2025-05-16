@@ -28,7 +28,6 @@ public class FullyQualifyMemberReference<P> extends JavaVisitor<P> {
     private final JavaType memberToFullyQualify;
 
     @Override
-    @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         if (memberToFullyQualify instanceof JavaType.Method || memberToFullyQualify instanceof JavaType.Variable) {
             return super.visitCompilationUnit(cu, p);
