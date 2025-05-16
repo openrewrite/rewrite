@@ -49,8 +49,7 @@ import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@Getter
-@Setter
+@Data
 @XmlRootElement(name = "project")
 @SuppressWarnings("unused")
 public class RawPom {

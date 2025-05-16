@@ -908,7 +908,16 @@ public class ResolvedPom {
         }
 
         private boolean isAlreadyResolved(GroupArtifactVersion groupArtifactVersion, List<Pom> pomAncestry) {
-            return pomAncestry.stream().anyMatch(alreadyResolved -> groupArtifactVersion.equals(alreadyResolved.getGav().asGroupArtifactVersion()));
+            for (int i = 1; i < pomAncestry.size(); i++) { // skip current pom
+                Pom pom = pomAncestry.get(i);
+                ResolvedGroupArtifactVersion alreadyResolvedGav = pom.getGav();
+                if (alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId()) &&
+                        alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId()) &&
+                        alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 
