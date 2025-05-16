@@ -139,7 +139,6 @@ class LockDependencyVersionsTest implements RewriteTest {
               com.fasterxml.jackson.core:jackson-databind:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               com.fasterxml.jackson:jackson-bom:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               empty=annotationProcessor,testAnnotationProcessor
-              
               """,
             """
               # This is a Gradle generated file for dependency locking.
@@ -215,7 +214,6 @@ class LockDependencyVersionsTest implements RewriteTest {
               com.fasterxml.jackson.core:jackson-databind:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               com.fasterxml.jackson:jackson-bom:2.15.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               empty=annotationProcessor,testAnnotationProcessor
-              
               """,
             """
               # This is a Gradle generated file for dependency locking.
@@ -239,7 +237,6 @@ class LockDependencyVersionsTest implements RewriteTest {
               com.fasterxml.jackson.core:jackson-databind:2.15.2=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               com.fasterxml.jackson:jackson-bom:2.15.2=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               empty=annotationProcessor,testAnnotationProcessor
-              
               """,
             """
               # This is a Gradle generated file for dependency locking.
