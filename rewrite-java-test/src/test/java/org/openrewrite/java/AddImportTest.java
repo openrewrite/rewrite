@@ -223,19 +223,19 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package com.acme.bank;
-
+              
               import com.acme.bank.*;
-
+              
               class Foo {
               }
               """,
             """
               package com.acme.bank;
-
+              
               import com.acme.bank.*;
-
+              
               import com.acme.bank.Record;
-
+              
               class Foo {
               }
               """,
@@ -592,11 +592,11 @@ class AddImportTest implements RewriteTest {
               java(
                 """
                   package a;
-
+                  
                   import c.C0;
                   import c.c.C1;
                   import c.c.c.C2;
-
+                  
                   class A {}
                   """,
                 String.format("""
