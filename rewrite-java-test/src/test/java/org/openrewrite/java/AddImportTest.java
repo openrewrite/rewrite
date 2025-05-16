@@ -223,19 +223,19 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package com.acme.bank;
-              
+
               import com.acme.bank.*;
-              
+
               class Foo {
               }
               """,
             """
               package com.acme.bank;
-              
+
               import com.acme.bank.*;
-              
+
               import com.acme.bank.Record;
-              
+
               class Foo {
               }
               """,
@@ -592,18 +592,18 @@ class AddImportTest implements RewriteTest {
               java(
                 """
                   package a;
-    
+
                   import c.C0;
                   import c.c.C1;
                   import c.c.c.C2;
-    
+
                   class A {}
                   """,
                 String.format("""
                     package a;
-      
+
                     %s
-      
+
                     class A {}
                     """,
                   expectedImports.stream().map(i -> "import " + i + ";").collect(Collectors.joining("\n"))
@@ -1100,7 +1100,7 @@ class AddImportTest implements RewriteTest {
                 import java.util.Collections;
                 import java.util.Map;
                 import java.util.Set;
-  
+
                 @SuppressWarnings("ALL")
                 class Test {
                     List list;
@@ -1113,7 +1113,7 @@ class AddImportTest implements RewriteTest {
                 import java.util.List;
                 import java.util.Map;
                 import java.util.Set;
-  
+
                 @SuppressWarnings("ALL")
                 class Test {
                     List list;
@@ -1466,6 +1466,138 @@ class AddImportTest implements RewriteTest {
                */
               class Foo {}
               """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyOnAmbiguousImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                  maybeAddImport("java.sql.Date");
+                  JavaTemplate template = JavaTemplate.builder(
+                      "Date sqlDate = new Date(System.currentTimeMillis());")
+                    .imports("java.sql.Date")
+                    .build();
+                  return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)),
+          java(
+            """
+              import java.util.Date;
+
+              class Ambiguous {
+                  Date date = new Date(System.currentTimeMillis());
+              }
+              """,
+              """
+              import java.util.Date;
+
+              class Ambiguous {
+                  java.sql.Date sqlDate = new java.sql.Date(System.currentTimeMillis());
+                  Date date = new Date(System.currentTimeMillis());
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyOnAmbiguousStaticFieldImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                  maybeAddImport("java.awt.Color", "RED", true);
+                  maybeAddImport("java.awt.Color", true);
+                  JavaTemplate template = JavaTemplate.builder(
+                      "Color color = RED;")
+                    .imports("java.awt.Color")
+                    .staticImports("java.awt.Color.RED")
+                    .build();
+                  return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1))
+          .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+              package com.example;
+
+              public class CustomColor {
+                  public static final String RED = "red";
+              }
+              """
+          )),
+          java(
+            """
+              import static com.example.CustomColor.RED;
+
+              class Ambiguous {
+                  void method() {
+                      // RED is from com.example.CustomColor
+                      System.out.println(RED);
+                  }
+              }
+              """,
+              """
+              import java.awt.Color;
+              
+              import static com.example.CustomColor.RED;
+
+              class Ambiguous {
+                  Color color = java.awt.Color.RED;
+                  void method() {
+                      // RED is from com.example.CustomColor
+                      System.out.println(RED);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyOnAmbiguousStaticMethodImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                  maybeAddImport("java.util.Arrays", "sort", true);
+                  maybeAddImport("java.util.List", true);
+                  JavaTemplate template = JavaTemplate.builder(
+                      "List<Integer> list = sort(new int[]{1, 2, 3});")
+                    .imports("java.util.List")
+                    .staticImports("java.util.Arrays.sort")
+                    .build();
+                  return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)),
+          java(
+            """
+              import static java.util.Collections.sort;
+              
+              import java.util.ArrayList;
+
+              class Ambiguous {
+                  void method() {
+                      sort(new ArrayList<String>());
+                  }
+              }
+              """,
+              """
+              import static java.util.Collections.sort;
+              
+              import java.util.ArrayList;
+              import java.util.List;
+              
+              class Ambiguous {
+                  List<Integer> list = java.util.Arrays.sort(new int[]{1, 2, 3});
+                  void method() {
+                      sort(new ArrayList<String>());
+                  }
+              }
+              """
           )
         );
     }
