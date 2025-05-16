@@ -1315,7 +1315,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
         resolutionResult = resolutionResult.resolveDependencies(new MavenPomDownloader(Collections.emptyMap(), new InMemoryExecutionContext(), null, null), new InMemoryExecutionContext());
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
-        assertThat(deps).hasSize(34);
+        assertThat(deps).hasSize(35);
     }
 
 

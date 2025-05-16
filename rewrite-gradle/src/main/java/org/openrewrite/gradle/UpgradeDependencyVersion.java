@@ -51,6 +51,7 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
+import java.util.function.Function;
 
 import static java.util.Collections.*;
 
@@ -865,6 +866,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 GradleDependencyConfiguration newGdc = gdc
                         .withRequested(ListUtils.map(gdc.getRequested(), requested -> maybeUpdateDependency(requested, newRequested)))
                         .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeUpdateResolvedDependency(resolved, newDep, new HashSet<>())));
+                if (hasBomWithoutDependencies(newDep)) {
+                    for (ResolvedManagedDependency resolvedDependency : resolvedPom.getDependencyManagement()) {
+                        newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), maybeUpdateManagedResolvedDependency(resolvedDependency.getGav())));
+                    }
+                }
                 anyChanged |= newGdc != gdc;
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
             }
@@ -886,6 +892,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return dep;
     }
 
+    private static Function<ResolvedDependency, ResolvedDependency> maybeUpdateManagedResolvedDependency(GroupArtifactVersion gav) {
+        return resolved -> {
+            ResolvedDependency newResolvedDependency = ResolvedDependency.builder()
+                    .gav(resolved.getGav().withGroupArtifact(gav.asGroupArtifact()).withVersion(gav.getVersion()))
+                    .requested(resolved.getRequested())
+                    .dependencies(resolved.getDependencies())
+                    .build();
+            return maybeUpdateResolvedDependency(resolved, newResolvedDependency, new HashSet<>());
+        };
+    }
+
     private static ResolvedDependency maybeUpdateResolvedDependency(
             ResolvedDependency dep,
             ResolvedDependency newDep,
@@ -900,7 +917,22 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep, new HashSet<>(traversalHistory))));
     }
 
-    private static String getGradleProjectKey(GradleProject project) {
+    // Some dependencies like jackson-bom do not publish a .module file and only contain dependencyManagement section.
+    // In that case we want to update the versions of the managed dependencies.
+    // If a module file is pushed, and it contains dependencies, we do not need to resolve using dependencyManagement as the bom will have dependencies on the overridden versions.
+    private static boolean hasBomWithoutDependencies(ResolvedDependency dep) {
+        if ("bom".equals(dep.getType()) && dep.getDependencies().isEmpty()) {
+            return true;
+        }
+        for (ResolvedDependency d : dep.getDependencies()) {
+            if (hasBomWithoutDependencies(d)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static String getGradleProjectKey(GradleProject project) {
         if (StringUtils.isBlank(project.getGroup())) {
             return project.getName();
         }
