@@ -77,6 +77,39 @@ class LockDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void preserveNewLineEOFIfPresent() {
+        rewriteRun(spec ->
+            spec.beforeRecipe(withToolingApi())
+              .recipe(new LockDependencyVersions()),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.0.27'
+                  implementation 'org.apache.tomcat:tomcat-annotations-api:10.0.0-M1'
+              }
+              """
+          ),
+          lockfile(
+            """
+              # This is a Gradle generated file for dependency locking.
+              # Manual edits can break the build and are not advised.
+              # This file is expected to be part of source control.
+              org.apache.tomcat.embed:tomcat-embed-core:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.apache.tomcat:tomcat-annotations-api:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              empty=annotationProcessor,testAnnotationProcessor
+              
+              """
+          )
+        );
+    }
+
+    @Test
     void updateGradleLock() {
         rewriteRun(spec ->
             spec.beforeRecipe(withToolingApi())

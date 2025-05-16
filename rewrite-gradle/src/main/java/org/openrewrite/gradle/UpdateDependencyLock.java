@@ -101,6 +101,9 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
             sb.append(String.join("\n", locks));
         }
         sb.append("\n").append(asLock(null, empty));
+        if (text.endsWith("\n")) {
+            sb.append("\n");
+        }
 
         if (plainText.getText().contentEquals(sb)) {
             return tree;
