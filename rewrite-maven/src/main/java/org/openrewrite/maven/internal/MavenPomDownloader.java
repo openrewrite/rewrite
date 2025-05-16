@@ -634,7 +634,7 @@ public class MavenPomDownloader {
                                         RawGradleModule module = RawGradleModule.parse(new ByteArrayInputStream(pomResponseBody));
                                         for (Dependency dependency : module.getDependencies("apiElements", "platform")) {
                                             rawPom.getDependencies().getDependencies().add(
-                                                    new RawPom.Dependency(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), null, null, null, null, null)
+                                                    new RawPom.Dependency(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), null, "bom", null, null, null)
                                             );
                                         }
                                         break;

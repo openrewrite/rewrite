@@ -99,7 +99,6 @@ public class RawPom {
     @Nullable
     String packaging;
 
-    @Nullable
     Dependencies dependencies;
 
     @Nullable
