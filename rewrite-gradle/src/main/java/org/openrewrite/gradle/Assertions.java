@@ -26,6 +26,8 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.UncheckedConsumer;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Paths;
 import java.util.List;
@@ -177,5 +179,30 @@ public class Assertions {
         gradle.path("settings.gradle.kts");
         spec.accept(gradle);
         return gradle;
+    }
+
+    static SourceSpecs lockFile(@Nullable String before) {
+        return lockFile(before, s -> {
+        });
+    }
+
+    static SourceSpecs lockFile(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> lockFile = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, null);
+        lockFile.path("gradle.lockfile");
+        spec.accept(lockFile);
+        return lockFile;
+    }
+
+    static SourceSpecs lockFile(@Nullable String before, @Nullable String after) {
+        return lockFile(before, after, s -> {
+        });
+    }
+
+    static SourceSpecs lockFile(@Nullable String before, @Nullable String after,
+                            Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> lockFile = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, s-> after);
+        lockFile.path("gradle.lockfile");
+        spec.accept(lockFile);
+        return lockFile;
     }
 }

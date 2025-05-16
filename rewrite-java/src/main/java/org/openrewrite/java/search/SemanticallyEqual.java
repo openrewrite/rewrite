@@ -1526,12 +1526,12 @@ public class SemanticallyEqual {
             return firstTypeName;
         }
 
-        protected boolean isOfType(@Nullable JavaType target, @Nullable JavaType source) {
+        protected boolean isOfType(JavaType target, JavaType source) {
             return TypeUtils.isOfType(target, source);
         }
 
-        protected boolean isAssignableTo(@Nullable JavaType target, @Nullable JavaType source) {
-            return TypeUtils.isAssignableTo(target, source);
+        protected boolean isAssignableTo(JavaType to, JavaType from) {
+            return TypeUtils.isAssignableTo(to, from);
         }
     }
 }

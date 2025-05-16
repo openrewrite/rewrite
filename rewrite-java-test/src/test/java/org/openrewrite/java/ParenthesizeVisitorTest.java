@@ -511,6 +511,9 @@ class ParenthesizeVisitorTest implements RewriteTest {
               
                       // Assignment inside other expressions
                       int result6 = (a = b) + c;
+
+                      // Switch expression
+                      int result7 = (switch(a) { default -> "one";}).length();
                   }
               }
               """,
@@ -539,6 +542,9 @@ class ParenthesizeVisitorTest implements RewriteTest {
               
                       // Assignment inside other expressions
                       int result6 = (a = b) + c;
+
+                      // Switch expression
+                      int result7 = (switch(a) { default -> "one";}).length();
                   }
               }
               """

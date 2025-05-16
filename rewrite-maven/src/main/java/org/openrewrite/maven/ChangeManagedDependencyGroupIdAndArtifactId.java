@@ -181,7 +181,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (changed) {
                         maybeUpdateModel();
-                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
+                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
                         if (isNewDependencyPresent) {
                             doAfterVisit(new RemoveContentVisitor<>(t, true, true));
                             maybeUpdateModel();

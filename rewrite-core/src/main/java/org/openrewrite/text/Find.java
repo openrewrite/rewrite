@@ -97,6 +97,14 @@ public class Find extends Recipe {
     @Nullable
     Boolean description;
 
+    @Option(displayName = "Context size for Datatable",
+            description = "The number of characters to include in the datatable before and after the match. Default `0`, " +
+                    "`-1` indicates that the whole text should be used.",
+            required = false,
+            example = "50")
+    @Nullable
+    Integer contextSize;
+
     @Override
     public String getInstanceName() {
         return String.format("Find text `%s`", find);
@@ -106,6 +114,7 @@ public class Find extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
         TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
+
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
@@ -164,23 +173,40 @@ public class Find extends Recipe {
                     }
 
                     int startLine = lastNewLineIndex + 1;
-                    int endLine = rawText.indexOf('\n', matcher.end());
+                    int endLine = nextNewLineIndex > matcher.end() ? nextNewLineIndex : rawText.indexOf('\n', matcher.end());
                     if (endLine == -1) {
                         endLine = rawText.length();
                     }
 
-                    //noinspection StringBufferReplaceableByString
-                    textMatches.insertRow(ctx, new TextMatches.Row(
-                            sourceFilePath,
-                            new StringBuilder(endLine - startLine + 3)
-                                    .append(rawText, startLine, matchStart)
-                                    .append("~~>")
-                                    .append(rawText, matchStart, endLine)
-                                    .toString()
-                    ));
+                    String context = truncateContext(endLine, startLine, matcher, matchStart, rawText);
+
+                    textMatches.insertRow(ctx, new TextMatches.Row(sourceFilePath, context));
                 } while (matcher.find());
                 snippets.add(snippet(rawText.substring(previousEnd)));
                 return plainText.withText("").withSnippets(snippets);
+            }
+
+            private String truncateContext(int endLine, int startLine, Matcher matcher, int matchStart, String rawText) {
+                String matchText = matcher.group();
+                int contextLength = contextSize == null ? 0 : contextSize;
+                int contextStart = contextLength == -1 ? startLine : matchStart - contextLength;
+                int contextEnd = contextLength == -1 ? endLine : matchStart + matchText.length() + contextLength;
+
+                StringBuilder sb = new StringBuilder();
+
+                if (contextStart > startLine) {
+                    sb.append("...");
+                }
+
+                sb.append(rawText, Math.max(contextStart, startLine), matchStart)
+                        .append("~~>")
+                        .append(rawText, matchStart, Math.min(contextEnd, endLine));
+
+                if (contextEnd < endLine) {
+                    sb.append("...");
+                }
+
+                return sb.toString();
             }
         };
         if (filePattern != null) {

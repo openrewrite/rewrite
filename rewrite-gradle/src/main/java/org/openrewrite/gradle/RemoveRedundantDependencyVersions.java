@@ -47,14 +47,16 @@ import org.openrewrite.semver.VersionComparator;
 import java.util.*;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.gradle.RemoveRedundantDependencyVersions.Comparator.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveRedundantDependencyVersions extends Recipe {
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                          "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                    "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.*",
             required = false)
     @Nullable
@@ -62,7 +64,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                          "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                    "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava*",
             required = false)
     @Nullable
@@ -70,8 +72,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Only if managed version is ...",
             description = "Only remove the explicit version if the managed version has the specified comparative relationship to the explicit version. " +
-                          "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
-                          "Default `eq`.",
+                    "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
+                    "Default `eq`.",
             valid = {"ANY", "EQ", "LT", "LTE", "GT", "GTE"},
             required = false)
     @Nullable
@@ -79,20 +81,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Except",
             description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe." +
-                          " GAV versions are ignored if provided.",
+                    " GAV versions are ignored if provided.",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable
     List<String> except;
 
-    public enum Comparator {
-        ANY,
-        EQ,
-        LT,
-        LTE,
-        GT,
-        GTE
-    }
+    public enum Comparator { ANY, EQ, LT, LTE, GT, GTE }
 
     @Override
     public String getDisplayName() {
@@ -110,9 +105,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(
-                new IsBuildGradle<>(),
-                new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
                     GradleProject gp;
                     final Map<String, List<ResolvedPom>> platforms = new HashMap<>();
 
@@ -135,20 +128,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     return m;
                                 }
 
+                                GroupArtifactVersion gav = null;
                                 if (m.getArguments().get(0) instanceof J.Literal) {
                                     J.Literal l = (J.Literal) m.getArguments().get(0);
-                                    if (l.getType() != JavaType.Primitive.String) {
-                                        return m;
-                                    }
-
-                                    Dependency dependency = DependencyStringNotationConverter.parse((String) l.getValue());
-                                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                                    try {
-                                        ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()), null, null, gp.getMavenRepositories())
-                                                .resolve(Collections.emptyList(), mpd, ctx);
-                                        platforms.computeIfAbsent(getCursor().getParent(1).firstEnclosing(J.MethodInvocation.class).getSimpleName(), k -> new ArrayList<>()).add(platformPom);
-                                    } catch (MavenDownloadingException e) {
-                                        return m;
+                                    if (l.getType() == JavaType.Primitive.String) {
+                                        Dependency dependency = DependencyStringNotationConverter.parse((String) l.getValue());
+                                        gav = new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
                                     }
                                 } else if (m.getArguments().get(0) instanceof G.MapEntry) {
                                     String groupId = null;
@@ -156,45 +141,33 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     String version = null;
 
                                     for (Expression arg : m.getArguments()) {
-                                        if (!(arg instanceof G.MapEntry)) {
+                                        if (!(arg instanceof G.MapEntry &&
+                                                ((G.MapEntry) arg).getKey().getType() == JavaType.Primitive.String &&
+                                                ((G.MapEntry) arg).getValue().getType() == JavaType.Primitive.String)) {
                                             continue;
                                         }
 
-                                        G.MapEntry entry = (G.MapEntry) arg;
-                                        if (!(entry.getKey() instanceof J.Literal) || !(entry.getValue() instanceof J.Literal)) {
-                                            continue;
-                                        }
-
-                                        J.Literal key = (J.Literal) entry.getKey();
-                                        J.Literal value = (J.Literal) entry.getValue();
-                                        if (key.getType() != JavaType.Primitive.String || value.getType() != JavaType.Primitive.String) {
-                                            continue;
-                                        }
-
-                                        switch ((String) key.getValue()) {
-                                            case "group":
-                                                groupId = (String) value.getValue();
-                                                break;
-                                            case "name":
-                                                artifactId = (String) value.getValue();
-                                                break;
-                                            case "version":
-                                                version = (String) value.getValue();
-                                                break;
+                                        Object key = ((J.Literal) ((G.MapEntry) arg).getKey()).getValue();
+                                        if ("group".equals(key)) {
+                                            groupId = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
+                                        } else if ("name".equals(key)) {
+                                            artifactId = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
+                                        } else if ("version".equals(key)) {
+                                            version = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
                                         }
                                     }
 
-                                    if (groupId == null || artifactId == null || version == null) {
-                                        return m;
+                                    if (groupId != null && artifactId != null && version != null) {
+                                        gav = new GroupArtifactVersion(groupId, artifactId, version);
                                     }
-
+                                }
+                                if (gav != null) {
                                     MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                                     try {
-                                        ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(groupId, artifactId, version), null, null, gp.getMavenRepositories())
-                                                .resolve(Collections.emptyList(), mpd, ctx);
-                                        platforms.computeIfAbsent(getCursor().getParent(1).firstEnclosing(J.MethodInvocation.class).getSimpleName(), k -> new ArrayList<>()).add(platformPom);
-                                    } catch (MavenDownloadingException e) {
-                                        return m;
+                                        ResolvedPom platformPom = mpd.download(gav, null, null, gp.getMavenRepositories())
+                                                .resolve(emptyList(), mpd, ctx);
+                                        platforms.computeIfAbsent(getCursor().getParentOrThrow(1).firstEnclosingOrThrow(J.MethodInvocation.class).getSimpleName(), k -> new ArrayList<>()).add(platformPom);
+                                    } catch (MavenDownloadingException ignored) {
                                     }
                                 }
                                 return m;
@@ -206,29 +179,23 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                                 if (CONSTRAINTS_MATCHER.matches(m)) {
-                                    if (m.getArguments().isEmpty() || !(m.getArguments().get(0) instanceof J.Lambda)) {
+                                    if (m.getArguments().isEmpty() ||
+                                            !(m.getArguments().get(0) instanceof J.Lambda) ||
+                                            !(((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block)) {
                                         return m;
                                     }
-                                    J.Lambda l = (J.Lambda) m.getArguments().get(0);
-                                    if (!(l.getBody() instanceof J.Block)) {
-                                        return m;
-                                    }
-                                    J.Block b = (J.Block) l.getBody();
-                                    if (b.getStatements().isEmpty()) {
-                                        //noinspection DataFlowIssue
+                                    if (((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
                                         return null;
                                     }
                                     return m;
                                 } else if (INDIVIDUAL_CONSTRAINTS_MATCHER.matches(m)) {
-                                    if (!TypeUtils.isAssignableTo("org.gradle.api.artifacts.Dependency", requireNonNull(m.getMethodType()).getReturnType())) {
-                                        return m;
-                                    }
-                                    if (m.getArguments().isEmpty() || !(m.getArguments().get(0) instanceof J.Literal) || !(((J.Literal) m.getArguments().get(0)).getValue() instanceof String)) {
+                                    if (!TypeUtils.isAssignableTo("org.gradle.api.artifacts.Dependency", requireNonNull(m.getMethodType()).getReturnType()) ||
+                                            m.getArguments().isEmpty() ||
+                                            m.getArguments().get(0).getType() != JavaType.Primitive.String) {
                                         return m;
                                     }
                                     //noinspection DataFlowIssue
                                     if (shouldRemoveRedundantConstraint((String) ((J.Literal) m.getArguments().get(0)).getValue(), m.getSimpleName())) {
-                                        //noinspection DataFlowIssue
                                         return null;
                                     }
                                 }
@@ -239,7 +206,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             public J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
                                 J.Return r = super.visitReturn(_return, ctx);
                                 if (r.getExpression() == null) {
-                                    //noinspection DataFlowIssue
                                     return null;
                                 }
                                 return r;
@@ -255,12 +221,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 if (c == null || constraint == null || constraint.getVersion() == null) {
                                     return false;
                                 }
-                                if(constraint.getVersion().contains("[") || constraint.getVersion().contains("!!")) {
+                                if (constraint.getVersion().contains("[") || constraint.getVersion().contains("!!")) {
                                     // https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
                                     return false;
                                 }
                                 if ((groupPattern != null && !StringUtils.matchesGlob(constraint.getGroupId(), groupPattern)) ||
-                                    (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
+                                        (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
                                     return false;
                                 }
                                 return Stream.concat(
@@ -291,15 +257,15 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         }
 
                         GradleDependency gradleDependency = maybeGradleDependency.get();
-                        ResolvedDependency d = gradleDependency.getResolvedDependency();
-                        if (StringUtils.isBlank(d.getVersion())) {
+                        ResolvedDependency dep = gradleDependency.getResolvedDependency();
+                        if (StringUtils.isBlank(dep.getVersion())) {
                             return m;
                         }
 
                         if (platforms.containsKey(m.getSimpleName())) {
                             for (ResolvedPom platform : platforms.get(m.getSimpleName())) {
-                                String managedVersion = platform.getManagedVersion(d.getGroupId(), d.getArtifactId(), null, d.getRequested().getClassifier());
-                                if (matchesComparator(managedVersion, d.getVersion())) {
+                                String managedVersion = platform.getManagedVersion(dep.getGroupId(), dep.getArtifactId(), null, dep.getRequested().getClassifier());
+                                if (matchesComparator(managedVersion, dep.getVersion())) {
                                     return maybeRemoveVersion(m);
                                 }
                             }
@@ -309,8 +275,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             for (GradleDependencyConfiguration configuration : gdc.allExtendsFrom()) {
                                 if (platforms.containsKey(configuration.getName())) {
                                     for (ResolvedPom platform : platforms.get(configuration.getName())) {
-                                        String managedVersion = platform.getManagedVersion(d.getGroupId(), d.getArtifactId(), null, d.getRequested().getClassifier());
-                                        if (matchesComparator(managedVersion, d.getVersion())) {
+                                        String managedVersion = platform.getManagedVersion(dep.getGroupId(), dep.getArtifactId(), null, dep.getRequested().getClassifier());
+                                        if (matchesComparator(managedVersion, dep.getVersion())) {
                                             return maybeRemoveVersion(m);
                                         }
                                     }
@@ -324,23 +290,20 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     private J.MethodInvocation maybeRemoveVersion(J.MethodInvocation m) {
                         if (m.getArguments().get(0) instanceof J.Literal) {
                             J.Literal l = (J.Literal) m.getArguments().get(0);
-                            if (l.getType() != JavaType.Primitive.String) {
-                                return m;
+                            if (l.getType() == JavaType.Primitive.String) {
+                                Dependency dep = DependencyStringNotationConverter.parse((String) l.getValue());
+                                if (dep == null || dep.getClassifier() != null || dep.getExt() != null) {
+                                    return m;
+                                }
+                                return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
+                                        ChangeStringLiteral.withStringValue(l, dep.withVersion(null).toStringNotation()))
+                                );
                             }
-
-                            Dependency dep = DependencyStringNotationConverter.parse((String) l.getValue())
-                                    .withVersion(null);
-                            if (dep.getClassifier() != null || dep.getExt() != null) {
-                                return m;
-                            }
-
-                            return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue(l, dep.toStringNotation())));
                         } else if (m.getArguments().get(0) instanceof G.MapLiteral) {
                             return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                                 G.MapLiteral mapLiteral = (G.MapLiteral) arg;
                                 return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), entry -> {
-                                    if (entry.getKey() instanceof J.Literal &&
-                                        "version".equals(((J.Literal) entry.getKey()).getValue())) {
+                                    if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
                                         return null;
                                     }
                                     return entry;
@@ -349,8 +312,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         } else if (m.getArguments().get(0) instanceof G.MapEntry) {
                             return m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                                 G.MapEntry entry = (G.MapEntry) arg;
-                                if (entry.getKey() instanceof J.Literal &&
-                                    "version".equals(((J.Literal) entry.getKey()).getValue())) {
+                                if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
                                     return null;
                                 }
                                 return entry;
@@ -366,7 +328,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         if (onlyIfManagedVersionIs != null) {
             return onlyIfManagedVersionIs;
         }
-        return Comparator.EQ;
+        return EQ;
     }
 
     private boolean matchesComparator(@Nullable String managedVersion, String requestedVersion) {
@@ -374,20 +336,19 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         if (managedVersion == null) {
             return false;
         }
-        if (comparator == Comparator.ANY) {
+        if (comparator == ANY) {
             return true;
         }
         if (!isExact(managedVersion)) {
             return false;
         }
-        int comparison = new LatestIntegration(null)
-                .compare(null, managedVersion, requestedVersion);
+        int comparison = new LatestIntegration(null).compare(null, managedVersion, requestedVersion);
         if (comparison < 0) {
-            return comparator == Comparator.LT || comparator == Comparator.LTE;
+            return comparator == LT || comparator == LTE;
         } else if (comparison > 0) {
-            return comparator == Comparator.GT || comparator == Comparator.GTE;
+            return comparator == GT || comparator == GTE;
         } else {
-            return comparator == Comparator.EQ || comparator == Comparator.LTE || comparator == Comparator.GTE;
+            return comparator == EQ || comparator == LTE || comparator == GTE;
         }
     }
 

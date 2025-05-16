@@ -22,7 +22,40 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PropertyPlaceholderHelperTest {
 
     @Test
-    void dashed() {
+    void nested() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("%%{%%{k1}}", k -> switch (k) {
+            case "k1" -> "k2";
+            case "k2" -> "jon";
+            default -> throw new UnsupportedOperationException();
+        });
+        assertThat(s).isEqualTo("jon");
+    }
+
+    @Test
+    void notOnlyPlaceholders() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("Oh, %%{k1} there %%{k2}!", k -> switch (k) {
+            case "k1" -> "hi";
+            case "k2" -> "jon";
+            default -> throw new UnsupportedOperationException();
+        });
+        assertThat(s).isEqualTo("Oh, hi there jon!");
+    }
+
+    @Test
+    void dashedSeparation() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("%%{k1}-%%{k2}", k -> switch (k) {
+            case "k1" -> "hi";
+            case "k2" -> "jon";
+            default -> throw new UnsupportedOperationException();
+        });
+        assertThat(s).isEqualTo("hi-jon");
+    }
+
+    @Test
+    void spaceSeparation() {
         var helper = new PropertyPlaceholderHelper("%%{", "}", null);
         var s = helper.replacePlaceholders("%%{k1} %%{k2}", k -> switch (k) {
             case "k1" -> "hi";
@@ -30,5 +63,40 @@ class PropertyPlaceholderHelperTest {
             default -> throw new UnsupportedOperationException();
         });
         assertThat(s).isEqualTo("hi jon");
+    }
+
+    @Test
+    void noSeparation() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("%%{k1}%%{k2}", k -> switch (k) {
+            case "k1" -> "hi";
+            case "k2" -> "jon";
+            default -> throw new UnsupportedOperationException();
+        });
+        assertThat(s).isEqualTo("hijon");
+    }
+
+    @Test
+    void withValueSeparatorAndValueReplacement() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", ",");
+        var s = helper.replacePlaceholders("%%{k1,oh} %%{k2}", k -> switch (k) {
+            case "k1" -> "hi";
+            case "k2" -> "jon";
+            // Note: this needs to not throw an exception because there won't be a match for "k1,oh" as a placeholder
+            default -> null;
+        });
+        assertThat(s).isEqualTo("hi jon");
+    }
+
+    @Test
+    void withValueSeparatorAndNullReplacement() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", ",");
+        var s = helper.replacePlaceholders("%%{k1,oh}%%{k2}", k -> switch (k) {
+            case "k1" -> null;
+            case "k2" -> "jon";
+            // Note: this needs to not throw an exception because there won't be a match for "k1,oh" as a placeholder
+            default -> null;
+        });
+        assertThat(s).isEqualTo("ohjon");
     }
 }

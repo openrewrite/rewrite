@@ -43,10 +43,12 @@ import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 @Value
 @Builder
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<PlainText> {
 
     @Builder.Default
     @With
+    @EqualsAndHashCode.Include
     UUID id = Tree.randomId();
 
     @With

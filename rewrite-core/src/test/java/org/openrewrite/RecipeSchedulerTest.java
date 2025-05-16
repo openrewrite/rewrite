@@ -16,12 +16,15 @@
 package org.openrewrite;
 
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
+import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -70,6 +73,19 @@ class RecipeSchedulerTest implements RewriteTest {
             "hello",
             "~~(boom)~~>hello"
           )
+        );
+    }
+
+    @Test
+    void exceptionDuringGenerate() {
+        rewriteRun(
+          spec -> spec.recipe(new BoomGenerateRecipe())
+            .executionContext(new InMemoryExecutionContext())
+            .dataTable(SourcesFileErrors.Row.class, rows ->
+              assertThat(rows)
+                .singleElement()
+                .extracting(SourcesFileErrors.Row::getRecipe)
+                .isEqualTo("org.openrewrite.BoomGenerateRecipe"))
         );
     }
 
@@ -157,6 +173,36 @@ class BoomRecipe extends Recipe {
                 throw new BoomException();
             }
         };
+    }
+}
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+class BoomGenerateRecipe extends ScanningRecipe<Integer> {
+
+    @Override
+    public String getDisplayName() {
+        return "Boom generate";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Throws a boom exception during ScanningRecipe.generate().";
+    }
+
+    @Override
+    public Integer getInitialValue(ExecutionContext ctx) {
+        return 0;
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Integer acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(Integer acc, ExecutionContext ctx) {
+        throw new BoomException();
     }
 }
 

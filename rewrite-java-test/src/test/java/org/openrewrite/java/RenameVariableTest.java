@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
@@ -121,7 +122,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   private String name;
-                  
+              
                   /**
                    * The length of <code>name</code> added to the length of {@link #name}.
                    *
@@ -135,7 +136,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   private String _name;
-                  
+              
                   /**
                    * The length of <code>name</code> added to the length of {@link #_name}.
                    *
@@ -222,11 +223,11 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-                            
+              
               public class A<T> {
                   private String _val;
                   private String name;
-                   
+              
                   A(String name, String _val) {
                       this._val = _val;
                       this.name = name;
@@ -235,11 +236,11 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-                            
+              
               public class A<T> {
                   private String v;
                   private String name;
-                   
+              
                   A(String name, String v) {
                       this.v = v;
                       this.name = name;
@@ -820,7 +821,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class B {
                   int n;
-                            
+              
                   {
                       n++; // do not change.
                       int n;
@@ -829,7 +830,7 @@ class RenameVariableTest implements RewriteTest {
                       if(n + 1 == 2) {}
                       n++;
                   }
-                 
+              
                   public int foo(int n) {
                       return n + this.n;
                   }
@@ -838,7 +839,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class B {
                   int n;
-                            
+              
                   {
                       n++; // do not change.
                       int n1;
@@ -847,7 +848,7 @@ class RenameVariableTest implements RewriteTest {
                       if(n1 + 1 == 2) {}
                       n1++;
                   }
-                 
+              
                   public int foo(int n2) {
                       return n2 + this.n;
                   }
@@ -1312,6 +1313,114 @@ class RenameVariableTest implements RewriteTest {
                       visible.hidden = changed;
                       changed.hidden.hidden = changed.hidden = this.hidden = changed;
                       return this;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/5369")
+    void hiddenVariablesGetRenamedCorrectlyInBlocks() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().get(0).isField(getCursor()) || multiVariable.getPrefix().getComments().isEmpty()) {
+                      return multiVariable;
+                  }
+                  doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            """
+              public class A {
+                  int n;
+  
+                  public void blocks() {
+                      {
+                          //only this one is in scope
+                          int n = 0;
+                          int x = n;
+                      }
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  int n;
+  
+                  public void blocks() {
+                      {
+                          //only this one is in scope
+                          int n1 = 0;
+                          int x = n1;
+                      }
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/5369")
+    void hiddenVariablesGetRenamedCorrectlyInClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+
+              @Override
+              public J visitBlock(J.Block block, ExecutionContext ctx) {
+                  if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof J.ClassDeclaration) {
+                      for (Statement statement : block.getStatements()) {
+                          if (statement instanceof J.VariableDeclarations) {
+                              doAfterVisit(new RenameVariable<>(((J.VariableDeclarations) statement).getVariables().get(0), "n1"));
+                          }
+                      }
+                  }
+                  return super.visitBlock(block, ctx);
+              }
+          })),
+          java(
+            """
+              public class A {
+                  int n;
+  
+                  public void blocks() {
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  int n1;
+  
+                  public void blocks() {
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
                   }
               }
               """

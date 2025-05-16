@@ -485,14 +485,15 @@ public interface RewriteTest extends SourceSpecs {
             SourceFile source = specForSourceFile.getKey();
             if (source instanceof ParseError) {
                 ParseError parseError = (ParseError) source;
-                if (parseError.getErroneous() != null) {
-                    assertContentEquals(
-                            parseError,
-                            parseError.getText(),
-                            parseError.getErroneous().printAll(),
-                            "Bug in source parser or printer resulted in the following difference for"
-                    );
+                if (parseError.getErroneous() == null) {
+                    throw parseError.toException();
                 }
+                assertContentEquals(
+                        parseError,
+                        parseError.getText(),
+                        parseError.getErroneous().printAll(),
+                        "Bug in source parser or printer resulted in the following difference for"
+                );
             }
 
             for (Result result : allResults) {

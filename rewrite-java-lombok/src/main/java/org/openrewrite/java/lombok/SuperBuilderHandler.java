@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,15 +18,15 @@ package org.openrewrite.java.lombok;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.ListBuffer;
-import lombok.Builder;
 import lombok.core.AnnotationValues;
 import lombok.core.HandlerPriority;
 import lombok.core.LombokImmutableList;
 import lombok.core.LombokNode;
+import lombok.experimental.SuperBuilder;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
-import lombok.javac.handlers.HandleBuilder;
 import lombok.javac.handlers.HandleConstructor;
+import lombok.javac.handlers.HandleSuperBuilder;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -34,13 +34,16 @@ import java.util.Map;
 
 import static lombok.core.AST.Kind.ANNOTATION;
 
+/**
+ * A crude copy of {@link BuilderHandler}.
+ */
 @HandlerPriority(-1024)
-public class BuilderHandler extends JavacAnnotationHandler<Builder> {
+public class SuperBuilderHandler extends JavacAnnotationHandler<SuperBuilder> {
     @Override
-    public void handle(AnnotationValues<Builder> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
+    public void handle(AnnotationValues<SuperBuilder> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
         JavacNode parent = javacNode.up();
         if (!(parent.get() instanceof JCTree.JCClassDecl)) {
-            new HandleBuilder().handle(annotationValues, jcAnnotation, javacNode);
+            new HandleSuperBuilder().handle(annotationValues, jcAnnotation, javacNode);
             return;
         }
         Map<JCTree.JCModifiers, FlagAndAnnotations> modifiersRestoreMap = new HashMap<>();
@@ -49,9 +52,9 @@ public class BuilderHandler extends JavacAnnotationHandler<Builder> {
         try {
             childrenField = LombokNode.class.getDeclaredField("children");
             childrenField.setAccessible(true);
-            // The Lombok handler for the @Builder annotation sets the init expression to null for fields annotated
+            // The Lombok handler for the @SuperBuilder annotation sets the init expression to null for fields annotated
             // with @Builder.Default. Unlike typical Lombok behavior, which either creates new methods or fields, the
-            // handler for Builder annotation modifies the existing variable declaration. As a result, the AST-to-LST
+            // handler for SuperBuilder annotation modifies the existing variable declaration. As a result, the AST-to-LST
             // converter never encounters the init expression, causing it to behave unexpectedly.
             // Additionally, the @Builder.Default annotation generates a private method named $default$<varname>,
             // which is unlikely to be called in original code. Therefore, it is safe to temporarily remove the
@@ -75,7 +78,7 @@ public class BuilderHandler extends JavacAnnotationHandler<Builder> {
         } catch (NoSuchFieldException | IllegalAccessException e) {
             // On exception just continue with the original handler
         }
-        new HandleBuilder().handle(annotationValues, jcAnnotation, javacNode);
+        new HandleSuperBuilder().handle(annotationValues, jcAnnotation, javacNode);
 
         // restore values
         for (Map.Entry<JCTree.JCModifiers, FlagAndAnnotations> entry : modifiersRestoreMap.entrySet()) {

@@ -77,7 +77,9 @@ public class CheckstyleConfigLoader {
                                 noWhitespaceBeforeStyle(conf),
                                 operatorWrapStyle(conf),
                                 typecastParenPadStyle(conf),
-                                unnecessaryParentheses(conf))
+                                unnecessaryParentheses(conf),
+                                customImportOrderStyle(conf),
+                                unusedImportsStyles(conf))
                         .filter(Objects::nonNull)
                         .flatMap(Set::stream)
                         .collect(toSet()));
@@ -531,6 +533,16 @@ public class CheckstyleConfigLoader {
                 .collect(Collectors.toSet());
     }
 
+    private static @Nullable Set<UnusedImportsStyle> unusedImportsStyles(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("UnusedImports");
+        if (moduleList == null) {
+            return null;
+        }
+        return moduleList.stream()
+            .map(module -> new UnusedImportsStyle(parseBoolean(module.properties.get("processJavadoc"))))
+            .collect(toSet());
+    }
+
     protected static class Module {
         private final String name;
         private final Map<String, String> properties;
@@ -570,6 +582,27 @@ public class CheckstyleConfigLoader {
         }
         return moduleList.stream()
                 .map(module -> new ExplicitInitializationStyle(module.prop("onlyObjectReferences", false)))
+                .collect(Collectors.toSet());
+    }
+
+    private static @Nullable Set<CustomImportOrderStyle> customImportOrderStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("CustomImportOrder");
+        if (moduleList == null) {
+            return null;
+        }
+
+        return moduleList.stream()
+                .map(module -> {
+                    boolean separateLineBetweenGroups = parseBoolean(module.properties.get("separateLineBetweenGroups"));
+                    boolean sortImportsInGroupAlphabetically = parseBoolean(module.properties.get("sortImportsInGroupAlphabetically"));
+                    String specialImportsRegExp = module.properties.get("specialImportsRegExp");
+                    String standardPackageRegExp = module.properties.get("standardPackageRegExp");
+                    String thirdPartyPackageRegExp = module.properties.get("thirdPartyPackageRegExp");
+                    List<CustomImportOrderStyle.GroupWithDepth> customImportOrderRules = CustomImportOrderStyle
+                            .parseImportOrder(module.properties.get("customImportOrderRules"));
+                    return new CustomImportOrderStyle(customImportOrderRules, separateLineBetweenGroups, sortImportsInGroupAlphabetically,
+                            specialImportsRegExp, standardPackageRegExp, thirdPartyPackageRegExp);
+                })
                 .collect(Collectors.toSet());
     }
 

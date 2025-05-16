@@ -37,7 +37,6 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.java.isolated.internal.JavacTreeMaker.TypeTag.matchesUnknownType;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -48,7 +47,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     private final JavaTypeCache typeCache;
 
     public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
-        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || matchesUnknownType(type) ||
+        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || isUnknownType(type) ||
                 type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
@@ -490,7 +489,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR
-                || matchesUnknownType(symbol.type)) {
+                || isUnknownType(symbol.type)) {
             return null;
         }
 
@@ -555,7 +554,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     exceptionTypes.add(javaType);
                 }
             }
-        } else if (matchesUnknownType(selectType)) {
+        } else if (isUnknownType(selectType)) {
             returnType = JavaType.Unknown.getInstance();
         }
 
@@ -777,5 +776,12 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             return annotationElementValue(((Attribute.Enum) value).value);
         }
         return JavaType.Unknown.getInstance();
+    }
+
+    /**
+     * Check for the `UnknownType` which existed up until JDK 22; starting with JDK 23 only the `ErrorType` is used
+     */
+    public static boolean isUnknownType(@Nullable Type type) {
+        return type != null && type.getClass().getName().equals("com.sun.tools.javac.code.Type$UnknownType");
     }
 }

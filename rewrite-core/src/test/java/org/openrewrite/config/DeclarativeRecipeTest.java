@@ -336,7 +336,7 @@ class DeclarativeRecipeTest implements RewriteTest {
     void exposesUnderlyingDataTables() {
         DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
           "test", emptySet(), null, URI.create("dummy"), true, Collections.emptyList());
-        dr.addUninitialized(new Find("sam", null, null, null, null, null, null));
+        dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
         dr.initialize(List.of(), Map.of());
         assertThat(dr.getDataTableDescriptors()).anyMatch(it -> "org.openrewrite.table.TextMatches".equals(it.getName()));
     }
@@ -372,7 +372,7 @@ class DeclarativeRecipeTest implements RewriteTest {
           )
         );
         rewriteRun(
-          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(3),
+          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(2),
           text("1", "1+1+1")
         );
         assertThat(cycleCount).hasValue(3);

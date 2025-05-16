@@ -35,7 +35,7 @@ class AddPluginTest implements RewriteTest {
     void addPluginWithConfiguration() {
         rewriteRun(
           spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0",
-            "<configuration>\n<activeRecipes>\n<recipe>io.moderne.FindTest</recipe>\n</activeRecipes>\n</configuration>",
+            "<configuration><activeRecipes><recipe>io.moderne.FindTest</recipe></activeRecipes></configuration>",
             null, null, null)),
           pomXml(
             """

@@ -69,7 +69,7 @@ public class RemoveDuplicateDependencies extends Recipe {
 
             @SuppressWarnings("DataFlowIssue")
             @Override
-            public  Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependenciesTag()) {
                     getCursor().putMessage("dependencies", new HashMap<DependencyKey, Xml.Tag>());
                 } else if (isManagedDependenciesTag()) {
@@ -88,11 +88,18 @@ public class RemoveDuplicateDependencies extends Recipe {
                     Map<DependencyKey, Xml.Tag> dependencies = getCursor().getNearestMessage("managedDependencies");
                     DependencyKey dependencyKey = getManagedDependencyKey(tag);
                     if (dependencyKey != null) {
-                        Xml.Tag existing = dependencies.putIfAbsent(dependencyKey, tag);
-                        if (existing != null && existing != tag) {
-                            maybeUpdateModel();
-                            return null;
+                        // Additionally compare classifier and type, which are only partially compared in `findManagedDependency`
+                        String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
+                        String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse("jar"));
+                        if (Objects.equals(classifier, dependencyKey.getClassifier()) &&
+                                Objects.equals(type, dependencyKey.getType())) {
+                            Xml.Tag existing = dependencies.putIfAbsent(dependencyKey, tag);
+                            if (existing != null && existing != tag) {
+                                maybeUpdateModel();
+                                return null;
+                            }
                         }
+
                     }
                 }
                 return super.visitTag(tag, ctx);
@@ -114,9 +121,9 @@ public class RemoveDuplicateDependencies extends Recipe {
                         Dependency req = resolvedDependency.getRequested();
                         String reqGroup = req.getGroupId();
                         if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                            Objects.equals(req.getArtifactId(), tag.getChildValue("artifactId").orElse(null)) &&
-                            Objects.equals(Optional.ofNullable(req.getType()).orElse("jar"), tag.getChildValue("type").orElse("jar")) &&
-                            Objects.equals(req.getClassifier(), tag.getChildValue("classifier").orElse(null))) {
+                                Objects.equals(req.getArtifactId(), tag.getChildValue("artifactId").orElse(null)) &&
+                                Objects.equals(Optional.ofNullable(req.getType()).orElse("jar"), tag.getChildValue("type").orElse("jar")) &&
+                                Objects.equals(req.getClassifier(), tag.getChildValue("classifier").orElse(null))) {
                             return DependencyKey.from(resolvedDependency, scope);
                         }
                     }
