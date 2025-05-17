@@ -45,7 +45,7 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings("ConstantConditions")
-public class KotlinTypeMappingTest {
+class KotlinTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
     private static final K.CompilationUnit cu;
     private static final K.ClassDeclaration goatClassDeclaration;
@@ -343,7 +343,7 @@ public class KotlinTypeMappingTest {
         JavaType.Class c = (JavaType.Class) firstMethodParameter("javaType");
         assertThat(c.getFullyQualifiedName()).isEqualTo("java.lang.Object");
         assertThat(c.getSupertype()).isNull();
-        assertThat(c.getMethods()).hasSize(12);
+        assertThat(c.getMethods()).hasSize(13);
 
         // Assert generic type parameters have the correct type bounds.
         JavaType.Method method = c.getMethods().stream().filter(it -> "getClass".equals(it.getName())).findFirst().orElse(null);
