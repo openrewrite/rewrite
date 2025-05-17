@@ -24,15 +24,16 @@ import org.openrewrite.Tree;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -53,7 +54,6 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
             return tree;
         }
 
-        Set<GroupArtifact> lockedArtifacts = new HashSet<>();
         Set<String> lockedConfigurations = new HashSet<>();
         Map<GroupArtifactVersion, SortedSet<String>> lockedVersions = new HashMap<>();
         SortedSet<String> empty = new TreeSet<>();
@@ -69,7 +69,7 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
             if (isComment(lock)) {
                 comments.add(lock);
             } else {
-                parseLockedConfigurations(lock, lockedArtifacts, lockedConfigurations);
+                lockedConfigurations.addAll(parseLockedConfigurations(lock));
             }
         });
 
@@ -84,9 +84,7 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
                         empty.add(configuration);
                     } else {
                         for (ResolvedDependency resolved : transitivelyResolvedDependencies) {
-                            if (lockedArtifacts.contains(resolved.getGav().asGroupArtifact())) {
-                                lockedVersions.computeIfAbsent(resolved.getGav().asGroupArtifactVersion(), k -> new TreeSet<>()).add(configuration);
-                            }
+                            lockedVersions.computeIfAbsent(resolved.getGav().asGroupArtifactVersion(), k -> new TreeSet<>()).add(configuration);
                         }
                     }
                 });
@@ -135,20 +133,14 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
         return entry.startsWith("# ");
     }
 
-    private void parseLockedConfigurations(String lock, Set<GroupArtifact> lockedArtifacts, Set<String> lockedConfigurations) {
+    private Set<String> parseLockedConfigurations(String lock) {
         String[] parts = lock.split("=");
         if (parts.length != 2) {
-            return;
+            return emptySet();
         }
-        Arrays.stream(parts[1].split(","))
+        return Arrays.stream(parts[1].split(","))
                 .map(String::trim)
                 .filter(conf -> !conf.isEmpty())
-                .forEach(lockedConfigurations::add);
-
-        String[] gavParts = parts[0].split(":");
-        if (gavParts.length != 3) {
-            return;
-        }
-        lockedArtifacts.add(new GroupArtifact(gavParts[0], gavParts[1]));
+                .collect(Collectors.toSet());
     }
 }
