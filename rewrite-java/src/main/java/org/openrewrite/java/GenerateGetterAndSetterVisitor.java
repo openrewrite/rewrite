@@ -18,10 +18,14 @@ package org.openrewrite.java;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.trait.ScopedVariable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import static java.util.Collections.emptyList;
 
@@ -38,9 +42,20 @@ public class GenerateGetterAndSetterVisitor<P> extends JavaIsoVisitor<P> {
         this.capitalizedFieldName = StringUtils.capitalize(fieldName);
     }
 
+    private Map<J.Identifier, ScopedVariable> scopedVariableMap = new HashMap<>();
+
+    @Override
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
+        new ScopedVariable.Matcher().asVisitor(var -> {
+            scopedVariableMap.put(var.getIdentifier(), var);
+            return var.getTree();
+        }).visit(cu, p);
+        return super.visitCompilationUnit(cu, p);
+    }
+
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        if (variable.isField(getCursor()) && variable.getSimpleName().equals(fieldName)) {
+        if (scopedVariableMap.get(variable.getName()).isField(getCursor()) && variable.getSimpleName().equals(fieldName)) {
             getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, "varCursor", getCursor());
         }
         return super.visitVariable(variable, p);
