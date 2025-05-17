@@ -31,10 +31,8 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySortedSet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -152,17 +150,5 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
             return;
         }
         lockedArtifacts.add(new GroupArtifact(gavParts[0], gavParts[1]));
-    }
-
-    private SortedSet<String> parseEmptyConfigurations(String lock) {
-        String[] parts = lock.split("=");
-        if (parts.length != 2) {
-            return emptySortedSet();
-        }
-        String[] configurations = parts[1].split(",");
-        return Arrays.stream(configurations)
-                .map(String::trim)
-                .filter(conf -> !conf.isEmpty())
-                .collect(Collectors.toCollection(TreeSet::new));
     }
 }
