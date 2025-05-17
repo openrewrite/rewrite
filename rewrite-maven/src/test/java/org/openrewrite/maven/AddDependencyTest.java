@@ -1469,10 +1469,11 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/5433")
     @Test
     void doNotAddDependencyTransitivelyProvidedByBom() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("org.springframework", "spring-webmvc", "5.3.20",
+          spec -> spec.recipe(new AddDependency("org.springframework", "spring-webmvc", "5.3.31",
             null, null, null, null, null, null, null, null, true)),
           mavenProject(
             "project",
