@@ -87,9 +87,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, Set<String> imports,
+    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, String expressionType, Set<String> imports,
                          Set<String> genericTypes, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
-        this(code, genericTypes, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports));
+        this(code, genericTypes, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports, expressionType));
     }
 
     private static JavaParser.Builder<?, ?> augmentClasspath(JavaParser.Builder<?, ?> parserBuilder) {
@@ -181,6 +181,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private final Set<String> genericTypes = new HashSet<>();
 
         private boolean contextSensitive;
+        private String expressionType = "Object";
 
         private JavaParser.Builder<?, ?> parser = org.openrewrite.java.JavaParser.fromJavaVersion();
 
@@ -209,6 +210,25 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
          */
         public Builder contextSensitive() {
             this.contextSensitive = true;
+            return this;
+        }
+
+        /**
+         * In context-free templates involving generic types, the type often cannot be inferred automatically.
+         * <p>
+         * Common examples include:
+         * <ul>
+         *   <li>{@code new ArrayList<>()}</li>
+         *   <li>{@code Collections.emptyList()}</li>
+         *   <li>{@code String::valueOf}</li>
+         * </ul>
+         * In such cases, the type must be specified manually.
+         */
+        public Builder expressionType(String expressionType) {
+            if (StringUtils.isBlank(expressionType)) {
+                throw new IllegalArgumentException("Type must not be blank");
+            }
+            this.expressionType = expressionType;
             return this;
         }
 
@@ -259,7 +279,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(contextSensitive, parser.clone(), code, imports, genericTypes,
+            return new JavaTemplate(contextSensitive, parser.clone(), code, expressionType, imports, genericTypes,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }
