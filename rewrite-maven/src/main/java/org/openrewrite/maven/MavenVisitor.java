@@ -307,9 +307,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
         for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
             if (groupId.equals(d.getGroupId()) &&
-                    artifactId.equals(d.getArtifactId()) &&
-                    (classifier == null || classifier.equals(d.getClassifier())) &&
-                    (type == null || type.equals(d.getType()))) {
+                artifactId.equals(d.getArtifactId()) &&
+                (classifier == null || classifier.equals(d.getClassifier())) &&
+                (type == null || type.equals(d.getType()))) {
                 return d;
             }
         }

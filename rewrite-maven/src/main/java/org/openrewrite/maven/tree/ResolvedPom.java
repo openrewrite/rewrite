@@ -951,7 +951,7 @@ public class ResolvedPom {
                 d = getValues(d, depth);
                 try {
                     if (depth == 0 && d.getVersion() == null) {
-                        throw new MavenDownloadingException("No version provided for direct dependency", null, dd.getDependency().getGav());
+                        throw new MavenDownloadingException("No version provided for direct dependency " + d.getGav(), null, dd.getDependency().getGav());
                     }
                     if (d.getVersion() == null || (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType()) && !"bom".equals(d.getType())))) {
                         continue;
