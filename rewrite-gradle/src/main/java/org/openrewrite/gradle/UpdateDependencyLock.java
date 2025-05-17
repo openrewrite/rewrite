@@ -30,8 +30,10 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -52,6 +54,7 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
             return tree;
         }
 
+        Set<String> lockedConfigurations = new HashSet<>();
         Map<GroupArtifactVersion, SortedSet<String>> lockedVersions = new HashMap<>();
         SortedSet<String> empty = new TreeSet<>();
         List<String> comments = new ArrayList<>();
@@ -62,25 +65,29 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
             return plainText;
         }
 
-        GradleProject project = gradleProject.get();
-        project.getConfigurations().stream()
-                .filter(GradleDependencyConfiguration::isCanBeResolved)
-                .forEach(conf -> {
-                    List<ResolvedDependency> transitivelyResolvedDependencies = conf.getResolved();
-                    if (transitivelyResolvedDependencies.isEmpty()) {
-                        empty.add(conf.getName());
-                    } else {
-                        for (ResolvedDependency resolved : transitivelyResolvedDependencies) {
-                            lockedVersions.computeIfAbsent(resolved.getGav().asGroupArtifactVersion(), k -> new TreeSet<>()).add(conf.getName());
-                        }
-                    }
-                });
-
         Arrays.stream(text.split("\n")).forEach(lock -> {
             if (isComment(lock)) {
                 comments.add(lock);
+            } else {
+                lockedConfigurations.addAll(parseLockedConfigurations(lock));
             }
         });
+
+        GradleProject project = gradleProject.get();
+        project.getConfigurations().stream()
+                .filter(GradleDependencyConfiguration::isCanBeResolved)
+                .filter(configuration -> lockedConfigurations.contains(configuration.getName()))
+                .forEach(conf -> {
+                    List<ResolvedDependency> transitivelyResolvedDependencies = conf.getResolved();
+                    String configuration = conf.getName();
+                    if (transitivelyResolvedDependencies.isEmpty()) {
+                        empty.add(configuration);
+                    } else {
+                        for (ResolvedDependency resolved : transitivelyResolvedDependencies) {
+                            lockedVersions.computeIfAbsent(resolved.getGav().asGroupArtifactVersion(), k -> new TreeSet<>()).add(configuration);
+                        }
+                    }
+                });
 
         SortedSet<String> locks = new TreeSet<>();
         lockedVersions.forEach((gav, confs) -> {
@@ -124,5 +131,16 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
 
     private static boolean isComment(String entry) {
         return entry.startsWith("# ");
+    }
+
+    private Set<String> parseLockedConfigurations(String lock) {
+        String[] parts = lock.split("=");
+        if (parts.length != 2) {
+            return emptySet();
+        }
+        return Arrays.stream(parts[1].split(","))
+                .map(String::trim)
+                .filter(conf -> !conf.isEmpty())
+                .collect(Collectors.toSet());
     }
 }
