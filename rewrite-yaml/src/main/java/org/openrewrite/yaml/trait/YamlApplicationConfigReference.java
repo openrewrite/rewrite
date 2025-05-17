@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 public class YamlApplicationConfigReference extends YamlReference {
     Cursor cursor;
     Kind kind;
+    
 
     public static class Provider extends YamlProvider {
         private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.(yaml|yml)$").asPredicate();
@@ -63,6 +64,7 @@ public class YamlApplicationConfigReference extends YamlReference {
         @Override
         public SimpleTraitMatcher<YamlReference> getMatcher() {
             return matcher;
+            
         }
     }
 }
