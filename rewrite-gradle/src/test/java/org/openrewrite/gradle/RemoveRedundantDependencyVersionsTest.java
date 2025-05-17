@@ -27,7 +27,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new RemoveRedundantDependencyVersions(null, null, null, null));
+          .recipe(new RemoveRedundantDependencyVersions(null, null, null));
     }
 
     @DocumentExample
@@ -302,6 +302,174 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       }
                   }
                   implementation 'org.springframework.boot:spring-boot:3.4.2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDirectDependencyWithLowerVersionNumberIfDependencyIsLoadedTransitivelyWithHigherVersionNumber() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services:3.3.3")
+                  implementation("org.springframework:spring-webmvc:6.1.11")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDirectDependencyIfDependencyIsLoadedTransitivelyWithSameVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services:3.3.3")
+                  implementation("org.springframework:spring-webmvc:6.1.12")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDirectDependencyWithHigherVersionNumberIfDependencyIsLoadedTransitivelyWithLowerVersionNumber() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services:3.3.3")
+                  implementation("org.springframework:spring-webmvc:6.1.13")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services")
+                  implementation("org.springframework:spring-webmvc:6.1.13")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handleSeveralPlatformDependencies() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                   implementation(platform("org.springframework.cloud:spring-cloud-dependencies:2024.0.0"))
+                   implementation("org.springframework.boot:spring-boot-starter-web-services")
+                   implementation("org.springframework.cloud:spring-cloud-starter-config")
+                   implementation("org.springframework:spring-webmvc:6.1.10")
+                   implementation("org.springframework.boot:spring-boot-starter-actuator:3.3.3")
+                   implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
+                   implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.1.0")
+                   implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.1.1")
+                   implementation("org.springframework.cloud:spring-cloud-starter-gateway:4.1.2")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                   implementation(platform("org.springframework.cloud:spring-cloud-dependencies:2024.0.0"))
+                   implementation("org.springframework.boot:spring-boot-starter-web-services")
+                   implementation("org.springframework.cloud:spring-cloud-starter-config")
+                   implementation("org.springframework.boot:spring-boot-starter-actuator")
+                   implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
+                   implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+                   implementation("org.springframework.cloud:spring-cloud-starter-gateway")
               }
               """
           )

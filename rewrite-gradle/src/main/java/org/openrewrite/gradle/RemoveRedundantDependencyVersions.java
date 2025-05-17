@@ -39,6 +39,7 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestIntegration;
@@ -80,24 +81,16 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Nullable
     Comparator onlyIfManagedVersionIs;
 
-    @Option(displayName = "Except",
-            description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe." +
-                    " GAV versions are ignored if provided.",
-            example = "com.jcraft:jsch",
-            required = false)
-    @Nullable
-    List<String> except;
-
     public enum Comparator { ANY, EQ, LT, LTE, GT, GTE }
 
     @Override
     public String getDisplayName() {
-        return "Remove redundant explicit dependency versions";
+        return "Remove redundant explicit dependencies and versions";
     }
 
     @Override
     public String getDescription() {
-        return "Remove explicitly-specified dependency versions that are managed by a Gradle `platform`/`enforcedPlatform`.";
+        return "Remove explicitly-specified dependencies and dependency versions that are managed by a Gradle `platform`/`enforcedPlatform`.";
     }
 
     private static final MethodMatcher CONSTRAINTS_MATCHER = new MethodMatcher("DependencyHandlerSpec constraints(..)");
@@ -109,6 +102,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
                     GradleProject gp;
                     final Map<String, List<ResolvedPom>> platforms = new HashMap<>();
+                    final List<ResolvedDependency> directDependencies = new ArrayList<>();
 
                     @Override
                     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
@@ -125,6 +119,15 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+
+                                new GradleDependency.Matcher()
+                                        .groupId(groupPattern)
+                                        .artifactId(artifactPattern)
+                                        .get(getCursor())
+                                        .ifPresent(it -> {
+                                            directDependencies.add(it.getResolvedDependency());
+                                        });
+
                                 if (!platformMatcher.matches(m) && !enforcedPlatformMatcher.matches(m)) {
                                     return m;
                                 }
@@ -196,7 +199,18 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         return m;
                                     }
                                     //noinspection DataFlowIssue
-                                    if (shouldRemoveRedundantConstraint((String) ((J.Literal) m.getArguments().get(0)).getValue(), m.getSimpleName())) {
+                                    String value = (String) ((J.Literal) m.getArguments().get(0)).getValue();
+                                    Dependency dependency = DependencyStringNotationConverter.parse(value);
+                                    try {
+                                        Object parent = getCursor().dropParentUntil(obj -> obj instanceof J.MethodInvocation && ((J.MethodInvocation) obj).getSimpleName().equals("constraints")).getValue();
+                                        if (parent != null && shouldRemoveRedundantConstraint(dependency, gp.getConfiguration(m.getSimpleName()))) {
+                                            return null;
+                                        }
+                                        return m;
+                                    } catch (Exception ignore) {
+                                    }
+
+                                    if (shouldRemoveRedundantImplementation(dependency)) {
                                         return null;
                                     }
                                 }
@@ -212,10 +226,42 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 return r;
                             }
 
-                            boolean shouldRemoveRedundantConstraint(String dependencyNotation, String configurationName) {
-                                return shouldRemoveRedundantConstraint(
-                                        DependencyStringNotationConverter.parse(dependencyNotation),
-                                        gp.getConfiguration(configurationName));
+                            private boolean shouldRemoveRedundantImplementation(Dependency dependency) {
+                                if(platforms == null || platforms.get("implementation") == null || platforms.get("implementation").isEmpty()) {
+                                    return false;
+                                }
+
+                                if ((groupPattern != null && !StringUtils.matchesGlob(dependency.getGroupId(), groupPattern)) ||
+                                        (artifactPattern != null && !StringUtils.matchesGlob(dependency.getArtifactId(), artifactPattern))) {
+                                    return false;
+                                }
+
+                                String dependencyManagedVersion = platforms.get("implementation")
+                                        .stream()
+                                        .flatMap(e -> e.getDependencyManagement().stream())
+                                        .filter(e -> e.getGroupId().equals(dependency.getGroupId()))
+                                        .filter(e -> e.getArtifactId().equals(dependency.getArtifactId()))
+                                        .map(ResolvedManagedDependency::getVersion)
+                                        .max(VERSION_COMPARATOR)
+                                        .orElse(null);
+
+                                for (ResolvedDependency d : directDependencies) {
+                                    //ignore self
+                                    if (d.getGroupId().equals(dependency.getGroupId()) && d.getArtifactId().equals(dependency.getArtifactId())) {
+                                        continue;
+                                    }
+
+                                    if (d.getDependencies() == null) {
+                                        continue;
+                                    }
+
+
+                                    ResolvedDependency resolvedDependency = d.findDependency(dependency.getGroupId(), dependency.getArtifactId());
+                                    if (resolvedDependency != null && (dependency.getVersion() == null || VERSION_COMPARATOR.compare(dependency.getVersion(), dependencyManagedVersion) <= 0)) {
+                                        return true;
+                                    }
+                                }
+                                return false;
                             }
 
                             boolean shouldRemoveRedundantConstraint(@Nullable Dependency constraint, @Nullable GradleDependencyConfiguration c) {
