@@ -26,6 +26,7 @@ import org.openrewrite.test.MockHttpSender;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
@@ -53,7 +54,7 @@ class RemoteArchiveTest {
 
     @Test
     void gradleWrapperDownloadFails() throws Exception {
-        URL distributionUrl = new URL("http://example");
+        URL distributionUrl = URI.create("http://example").toURL();
         ExecutionContext ctx = new InMemoryExecutionContext();
 
         HttpSenderExecutionContextView.view(ctx)

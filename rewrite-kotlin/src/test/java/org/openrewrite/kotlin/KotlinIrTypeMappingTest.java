@@ -141,7 +141,7 @@ public class KotlinIrTypeMappingTest {
                 .findFirst()
                 .orElseThrow()
                 .getValueParameters()
-                .get(0)
+                .getFirst()
                 .getType()).toString();
     }
 
