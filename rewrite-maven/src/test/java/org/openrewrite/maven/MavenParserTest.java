@@ -273,7 +273,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).get(0);
+                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).getFirst();
                   assertThat(dependency.getVersion()).isEqualTo("4.9");
               })
             )
@@ -302,7 +302,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).get(0);
+                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).getFirst();
                   assertThat(dependency.getVersion()).isEqualTo("4.9");
               })
             )
@@ -332,7 +332,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).get(0);
+                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).getFirst();
                   assertThat(dependency.getVersion()).isEqualTo("4.6");
               })
             )
@@ -362,7 +362,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).get(0);
+                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).getFirst();
                   assertThat(dependency.getVersion()).isEqualTo("4.9");
               })
             )
@@ -505,7 +505,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml ->
               assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
-                .findDependencies("com.google.guava", "guava", null).get(0).getVersion())
+                .findDependencies("com.google.guava", "guava", null).getFirst().getVersion())
                 .isEqualTo("14.0")
             )
           )
@@ -607,10 +607,10 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml -> {
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom()
-                  .getRepositories().get(0).getId())
+                  .getRepositories().getFirst().getId())
                   .isEqualTo("coolId");
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom()
-                  .getRepositories().get(0).getUri())
+                  .getRepositories().getFirst().getUri())
                   .isEqualTo("https://repository.apache.org/content/repositories/snapshots");
             })
           )
@@ -648,10 +648,10 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml -> {
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
-                  .get(Scope.Test).get(0).getLicenses().get(0).getType())
+                  .get(Scope.Test).getFirst().getLicenses().getFirst().getType())
                   .isEqualTo(License.Type.Eclipse);
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
-                  .get(Scope.Test).get(0).getType())
+                  .get(Scope.Test).getFirst().getType())
                   .isEqualTo("jar");
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPackaging())
                   .isEqualTo("pom");
@@ -1088,8 +1088,8 @@ class MavenParserTest implements RewriteTest {
 
             assertThat(maven.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
               .hasSize(1)
-              .matches(deps -> deps.get(0).getGroupId().equals("com.foo") &&
-                deps.get(0).getArtifactId().equals("bar"));
+              .matches(deps -> deps.getFirst().getGroupId().equals("com.foo") &&
+                deps.getFirst().getArtifactId().equals("bar"));
             mockRepo.shutdown();
         }
     }
@@ -1122,7 +1122,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
-                  .get(Scope.Compile).get(0).getVersion())
+                  .get(Scope.Compile).getFirst().getVersion())
                   .isEqualTo("0.1.0-SNAPSHOT")
               )
             ),
@@ -1246,7 +1246,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
-                  .get(Scope.Compile).get(0).getVersion())
+                  .get(Scope.Compile).getFirst().getVersion())
                   .isEqualTo("0.1.0-SNAPSHOT")
               )
             )
@@ -1576,7 +1576,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml ->
               assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
-                .getPom().getRequested().getProfiles().get(0).getActivation())
+                .getPom().getRequested().getProfiles().getFirst().getActivation())
                 .isNull()
             )
           )
@@ -1607,7 +1607,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml -> {
                 ProfileActivation activation = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
-                  .getPom().getRequested().getProfiles().get(0).getActivation();
+                  .getPom().getRequested().getProfiles().getFirst().getActivation();
                 assertThat(activation).isNotNull();
                 assertThat(activation.getActiveByDefault()).isNull();
                 assertThat(activation.getJdk()).isNull();
@@ -1643,7 +1643,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml -> {
                 ProfileActivation activation = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
-                  .getPom().getRequested().getProfiles().get(0).getActivation();
+                  .getPom().getRequested().getProfiles().getFirst().getActivation();
                 assertThat(activation).isNotNull();
                 assertThat(activation.getActiveByDefault()).isTrue();
             })
@@ -1700,8 +1700,8 @@ class MavenParserTest implements RewriteTest {
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
                   .hasSize(7)
-                  .matches(deps -> deps.get(0).getArtifactId().equals("guava") &&
-                    deps.get(0).getVersion().equals("29.0-jre"))
+                  .matches(deps -> deps.getFirst().getArtifactId().equals("guava") &&
+                    deps.getFirst().getVersion().equals("29.0-jre"))
               )
             )
           )
@@ -2637,7 +2637,7 @@ class MavenParserTest implements RewriteTest {
               </project>
               """,
             spec -> spec.afterRecipe(pomXml -> {
-                  Plugin plugin = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0);
+                  Plugin plugin = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst();
                   assertThat(plugin.getArtifactId()).isEqualTo("maven-compiler-plugin");
                   assertThat(plugin.getConfiguration()).isNotNull();
               }
@@ -2667,7 +2667,7 @@ class MavenParserTest implements RewriteTest {
               </project>
               """,
             spec -> spec.afterRecipe(pomXml -> {
-                  Plugin plugin = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0);
+                  Plugin plugin = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst();
                   assertThat(plugin.getArtifactId()).isEqualTo("maven-compiler-plugin");
                   assertThat(plugin.getConfiguration()).isNull();
               }
@@ -2694,7 +2694,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins()
-                  .get(0).getArtifactId())
+                  .getFirst().getArtifactId())
                   .isEqualTo("maven-compiler-plugin")
               )
             )
@@ -2754,7 +2754,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml ->
               assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPluginManagement()
-                .get(0).getArtifactId())
+                .getFirst().getArtifactId())
                 .isEqualTo("maven-compiler-plugin")
             )
           )
@@ -2779,7 +2779,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPluginManagement()
-                  .get(0).getArtifactId())
+                  .getFirst().getArtifactId())
                   .isEqualTo("maven-compiler-plugin")
               )
             )
@@ -2920,7 +2920,7 @@ class MavenParserTest implements RewriteTest {
                   </project>
                 """,
               spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0).getConfiguration())
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst().getConfiguration())
                   .hasSize(2)
                   .anyMatch(elem -> elem.asText().equals("11"))
                   .anyMatch(elem -> elem.asText().equals("17"))
@@ -2990,7 +2990,7 @@ class MavenParserTest implements RewriteTest {
                   </project>
                 """,
               spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0).getConfiguration())
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst().getConfiguration())
                   .hasSize(1)
                   .isEqualTo(JsonNodeFactory.instance.objectNode()
                     .set("resources", JsonNodeFactory.instance.objectNode()
@@ -3059,7 +3059,7 @@ class MavenParserTest implements RewriteTest {
                   </project>
                 """,
               spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0).getConfiguration())
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst().getConfiguration())
                   .hasSize(1)
                   .isEqualTo(JsonNodeFactory.instance.objectNode()
                     .set("resources", JsonNodeFactory.instance.objectNode()
@@ -3131,7 +3131,7 @@ class MavenParserTest implements RewriteTest {
                   </project>
                 """,
               spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0).getConfiguration())
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst().getConfiguration())
                   .hasSize(1)
                   .isEqualTo(JsonNodeFactory.instance.objectNode()
                     .set("resources", JsonNodeFactory.instance.objectNode()
@@ -3323,7 +3323,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(pomXml -> {
                   MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().get(0).getGav();
+                  GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().getFirst().getGav();
                   assertThat(gav.getGroupId()).isEqualTo("junit");
                   assertThat(gav.getArtifactId()).isEqualTo("junit");
                   assertThat(gav.getVersion()).isEqualTo("4.13.2");
@@ -3353,7 +3353,7 @@ class MavenParserTest implements RewriteTest {
                   """,
                 spec -> spec.afterRecipe(pomXml -> {
                     MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                    GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().get(0).getGav();
+                    GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().getFirst().getGav();
                     assertThat(gav.getGroupId()).isEqualTo("junit");
                     assertThat(gav.getArtifactId()).isEqualTo("junit");
                     assertThat(gav.getVersion()).isEqualTo("4.13.2");

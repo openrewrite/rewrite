@@ -820,17 +820,17 @@ class LombokTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                List<Statement> statements = cu.getClasses().get(0).getBody().getStatements();
-                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(0)).getVariables().get(0).getVariableType()).getFlags())
+                List<Statement> statements = cu.getClasses().getFirst().getBody().getStatements();
+                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.getFirst()).getVariables().getFirst().getVariableType()).getFlags())
                   .as("Field 'a' explicitly specifies its modifiers, overriding the lombok defaults")
                   .containsExactlyInAnyOrder(Flag.Public, Flag.Final);
-                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(1)).getVariables().get(0).getVariableType()).getFlags())
+                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(1)).getVariables().getFirst().getVariableType()).getFlags())
                   .as("Field 'b' does not specify its modifiers, so it should use the lombok defaults")
                   .containsExactlyInAnyOrder(Flag.Private, Flag.Final);
-                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(2)).getVariables().get(0).getVariableType()).getFlags())
+                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(2)).getVariables().getFirst().getVariableType()).getFlags())
                   .as("Field 'c' is annotated with @NonFinal, so it should not be final")
                   .containsExactlyInAnyOrder(Flag.Private);
-                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(3)).getVariables().get(0).getVariableType()).getFlags())
+                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(3)).getVariables().getFirst().getVariableType()).getFlags())
                   .as("Field 'd' is annotated with @PackagePrivate, so it should be package-private")
                   .containsExactlyInAnyOrder(Flag.Final);
             })

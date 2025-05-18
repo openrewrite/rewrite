@@ -489,7 +489,7 @@ class AutodetectTest implements RewriteTest {
 
         assertThat(importLayout.getLayout()).hasSize(5);
 
-        assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
+        assertThat(importLayout.getLayout().getFirst()).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
 
         assertThat(importLayout.getLayout().get(1))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
@@ -547,7 +547,7 @@ class AutodetectTest implements RewriteTest {
 
         assertThat(importLayout.getLayout()).hasSize(5);
 
-        assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllAliases.class);
+        assertThat(importLayout.getLayout().getFirst()).isInstanceOf(ImportLayoutStyle.Block.AllAliases.class);
 
         assertThat(importLayout.getLayout().get(1))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
@@ -592,7 +592,7 @@ class AutodetectTest implements RewriteTest {
         var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
-        assertThat(importLayout.getLayout().get(0))
+        assertThat(importLayout.getLayout().getFirst())
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> "java\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 

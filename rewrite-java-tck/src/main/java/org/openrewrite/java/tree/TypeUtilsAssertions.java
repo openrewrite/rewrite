@@ -101,7 +101,7 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
 
     private JavaType getLast(String type) {
         return Optional.ofNullable(types.get(type))
-          .map(list -> list.get(list.size() - 1))
+          .map(list -> list.getLast())
           .orElseThrow(() -> new IllegalArgumentException("Type not found: " + type));
     }
 }

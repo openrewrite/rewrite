@@ -70,8 +70,8 @@ class TypeCastTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-                J.VariableDeclarations s = (J.VariableDeclarations) m.getBody().getStatements().get(0);
+                J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                J.VariableDeclarations s = (J.VariableDeclarations) m.getBody().getStatements().getFirst();
                 assertThat(s.getType()).isInstanceOf(JavaType.Intersection.class);
                 JavaType.Intersection intersection = (JavaType.Intersection) s.getType();
                 assertThat(intersection.getBounds()).satisfiesExactly(

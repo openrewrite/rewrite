@@ -50,7 +50,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
-                  J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().get(0);
+                  J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().getFirst();
                   if ("o".equals(variable.getSimpleName())) {
                       Expression exp = Objects.requireNonNull(variable.getInitializer());
                       J.MethodInvocation res1 = invalidPrintf.apply(getCursor(), multiVariable.getCoordinates().replace(), exp);

@@ -48,7 +48,7 @@ public interface JavaTypeMappingTest {
     }
 
     default JavaType firstMethodParameter(String methodName) {
-        return methodType(methodName).getParameterTypes().get(0);
+        return methodType(methodName).getParameterTypes().getFirst();
     }
 
     @Test
@@ -136,45 +136,45 @@ public interface JavaTypeMappingTest {
     default void parameterized() {
         JavaType.Parameterized parameterized = (JavaType.Parameterized) firstMethodParameter("parameterized");
         assertThat(parameterized.getType().getFullyQualifiedName()).isEqualTo("org.openrewrite.java.PT");
-        assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
+        assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
     }
 
     @Test
     default void generic() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().get(0);
+        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
-        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
 
-        generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(methodType("generic").getReturnType()).getTypeParameters().get(0);
+        generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(methodType("generic").getReturnType()).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
-        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
     }
 
     @Test
     default void genericContravariant() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().get(0);
+        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(CONTRAVARIANT);
-        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).
                 isEqualTo("org.openrewrite.java.C");
     }
 
     @Test
     default void genericMultipleBounds() {
         List<JavaType> typeParameters = goatType().getTypeParameters();
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParameters.get(typeParameters.size() - 1);
+        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParameters.getLast();
         assertThat(generic.getName()).isEqualTo("S");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
-        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.PT");
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.PT");
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(1)).getFullyQualifiedName()).
                 isEqualTo("org.openrewrite.java.C");
     }
 
     @Test
     default void genericUnbounded() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericUnbounded")).getTypeParameters().get(0);
+        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericUnbounded")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("U");
         assertThat(generic.getVariance()).isEqualTo(INVARIANT);
         assertThat(generic.getBounds()).isEmpty();
@@ -183,13 +183,13 @@ public interface JavaTypeMappingTest {
     @Test
     default void genericRecursive() {
         JavaType.Parameterized param = (JavaType.Parameterized) firstMethodParameter("genericRecursive");
-        JavaType typeParam = param.getTypeParameters().get(0);
+        JavaType typeParam = param.getTypeParameters().getFirst();
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParam;
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
-        assertThat(TypeUtils.asArray(generic.getBounds().get(0))).isNotNull();
+        assertThat(TypeUtils.asArray(generic.getBounds().getFirst())).isNotNull();
 
-        JavaType.GenericTypeVariable elemType = (JavaType.GenericTypeVariable) TypeUtils.asArray(generic.getBounds().get(0)).getElemType();
+        JavaType.GenericTypeVariable elemType = (JavaType.GenericTypeVariable) TypeUtils.asArray(generic.getBounds().getFirst()).getElemType();
         assertThat(elemType.getName()).isEqualTo("U");
         assertThat(elemType.getVariance()).isEqualTo(COVARIANT);
         assertThat(elemType.getBounds()).hasSize(1);
@@ -202,7 +202,7 @@ public interface JavaTypeMappingTest {
 
         assertThat(parameterized).isNotNull();
         assertThat(parameterized.getType().getFullyQualifiedName()).isEqualTo("org.openrewrite.java.PT");
-        assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
+        assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
     }
 
     @Test
@@ -214,7 +214,7 @@ public interface JavaTypeMappingTest {
     @Test
     default void inheritedJavaTypeGoat() {
         JavaType.Parameterized clazz = (JavaType.Parameterized) firstMethodParameter("inheritedJavaTypeGoat");
-        assertThat(clazz.getTypeParameters().get(0).toString()).isEqualTo("Generic{T}");
+        assertThat(clazz.getTypeParameters().getFirst().toString()).isEqualTo("Generic{T}");
         assertThat(clazz.getTypeParameters().get(1).toString()).isEqualTo("Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}");
         assertThat(clazz.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat<Generic{T}, Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}>");
     }
@@ -223,7 +223,7 @@ public interface JavaTypeMappingTest {
     @Test
     default void genericIntersectionType() {
         JavaType.GenericTypeVariable clazz = (JavaType.GenericTypeVariable) firstMethodParameter("genericIntersection");
-        assertThat(clazz.getBounds().get(0).toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat$TypeA");
+        assertThat(clazz.getBounds().getFirst().toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat$TypeA");
         assertThat(clazz.getBounds().get(1).toString()).isEqualTo("org.openrewrite.java.PT<Generic{U extends org.openrewrite.java.JavaTypeGoat$TypeA & org.openrewrite.java.C}>");
         assertThat(clazz.getBounds().get(2).toString()).isEqualTo("org.openrewrite.java.C");
         assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}");
@@ -285,14 +285,14 @@ public interface JavaTypeMappingTest {
     @Test
     default void throwsGenericExceptions() {
         JavaType.Method method = methodType("throwsGenericException");
-        JavaType ex = method.getThrownExceptions().get(0);
+        JavaType ex = method.getThrownExceptions().getFirst();
 
         assertThat(ex).isInstanceOf(JavaType.GenericTypeVariable.class);
 
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) ex;
         assertThat(generic.getName()).isEqualTo("T");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
-        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0))
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst())
                 .getFullyQualifiedName()).isEqualTo("java.io.FileNotFoundException");
     }
 }

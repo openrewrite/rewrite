@@ -51,7 +51,7 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
           .map(G.CompilationUnit.class::cast)
           .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
           .getClasses()
-          .get(0)
+          .getFirst()
           .getType()
         );
     }
@@ -69,7 +69,7 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
           .map(G.CompilationUnit.class::cast)
           .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
           .getStatements()
-          .get(0);
+          .getFirst();
 
         Set<JavaType> uniqueTypes = Collections.newSetFromMap(new IdentityHashMap<>());
         Map<String, JavaType> typeBySignatureAfterMapping = new HashMap<>();

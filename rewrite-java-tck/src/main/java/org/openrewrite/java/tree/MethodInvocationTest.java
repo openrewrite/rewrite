@@ -41,7 +41,7 @@ class MethodInvocationTest implements RewriteTest {
                         .getFullyQualifiedName());
 
                       var effectParams = method.getMethodType().getParameterTypes();
-                      assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(effectParams.get(0))
+                      assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(effectParams.getFirst())
                         .getFullyQualifiedName());
                       assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(TypeUtils.asArray(effectParams.get(1))
                         .getElemType()).getFullyQualifiedName());
@@ -74,7 +74,7 @@ class MethodInvocationTest implements RewriteTest {
                       var methType = method.getMethodType();
                       assertThat(TypeUtils.asFullyQualified(methType.getReturnType()).getFullyQualifiedName())
                         .isEqualTo("java.lang.Integer");
-                      assertThat(TypeUtils.asFullyQualified(methType.getParameterTypes().get(0)).getFullyQualifiedName())
+                      assertThat(TypeUtils.asFullyQualified(methType.getParameterTypes().getFirst()).getFullyQualifiedName())
                         .isEqualTo("java.lang.Integer");
                       assertThat(TypeUtils.asFullyQualified(TypeUtils.asArray(methType.getParameterTypes().get(1)).getElemType())
                         .getFullyQualifiedName()).isEqualTo("java.lang.Integer");

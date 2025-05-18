@@ -111,7 +111,7 @@ class ImportTest implements RewriteTest {
               import c.c.C;
               """,
             spec -> spec.afterRecipe(cu -> {
-                var b = cu.getImports().get(0);
+                var b = cu.getImports().getFirst();
                 var c = cu.getImports().get(1);
                 assertThat(b.compareTo(c)).isLessThan(0);
                 assertThat(c.compareTo(b)).isGreaterThan(0);
@@ -129,7 +129,7 @@ class ImportTest implements RewriteTest {
               import org.springframework.context.annotation.Configuration;
               """,
             spec -> spec.afterRecipe(cu -> {
-                var b = cu.getImports().get(0);
+                var b = cu.getImports().getFirst();
                 var c = cu.getImports().get(1);
                 assertThat(b.compareTo(c)).isLessThan(0);
                 assertThat(c.compareTo(b)).isGreaterThan(0);
@@ -167,7 +167,7 @@ class ImportTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getImports().get(0).getPackageName()).isEqualTo("org.openrewrite.BadPackage");
+                assertThat(cu.getImports().getFirst().getPackageName()).isEqualTo("org.openrewrite.BadPackage");
                 assertThat(cu.getImports().get(1).getPackageName()).isEqualTo("org.openrewrite.BadPackage");
             })
           )
