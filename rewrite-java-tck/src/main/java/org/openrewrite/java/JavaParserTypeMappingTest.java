@@ -81,9 +81,9 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                JavaType.Class t = asClass(cu.getClasses().getFirst().getAllAnnotations().getFirst().getType());
+                JavaType.Class t = asClass(cu.getClasses().get(0).getAllAnnotations().get(0).getType());
                 assertThat(t.getMethods().stream().filter(m -> m.getName().equals("scalar"))
-                  .map(JavaType.Method::getDefaultValue).map(dv -> dv.getFirst())).containsExactly("1");
+                  .map(JavaType.Method::getDefaultValue).map(dv -> dv.get(0))).containsExactly("1");
                 assertThat(t.getMethods().stream().filter(m -> m.getName().equals("array"))
                   .map(JavaType.Method::getDefaultValue).flatMap(dv -> dv.stream())).hasSize(2);
             })
@@ -99,12 +99,12 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
           java(
             "abstract class TypeA<T extends Number> extends java.util.ArrayList<T> {}",
             spec -> spec.afterRecipe(cu -> {
-                Parameterized typeA = asParameterized(cu.getClasses().getFirst().getType());
-                assertThat(asGeneric(typeA.getTypeParameters().getFirst()).toString())
+                Parameterized typeA = asParameterized(cu.getClasses().get(0).getType());
+                assertThat(asGeneric(typeA.getTypeParameters().get(0)).toString())
                   .isEqualTo("Generic{T extends java.lang.Number}");
                 Parameterized typeASuperType = asParameterized(typeA.getSupertype());
                 assertThat(typeASuperType.toString()).isEqualTo("java.util.ArrayList<Generic{T extends java.lang.Number}>");
-                assertThat(asClass(typeASuperType.getType()).getTypeParameters().getFirst().toString()).isEqualTo("Generic{E}");
+                assertThat(asClass(typeASuperType.getType()).getTypeParameters().get(0).toString()).isEqualTo("Generic{E}");
             })
           ),
           java(
@@ -115,10 +115,10 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                JavaType.Class typeB = asClass(cu.getClasses().getFirst().getType());
+                JavaType.Class typeB = asClass(cu.getClasses().get(0).getType());
                 assertThat(typeB.getSupertype().toString()).isEqualTo("TypeA<java.lang.Integer>");
                 Parameterized typeBSuperType = asParameterized(typeB.getSupertype());
-                assertThat(asClass(typeBSuperType.getType()).getTypeParameters().getFirst().toString())
+                assertThat(asClass(typeBSuperType.getType()).getTypeParameters().get(0).toString())
                   .isEqualTo("Generic{T extends java.lang.Number}");
             })
           ),
@@ -130,12 +130,12 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                Parameterized typeC = asParameterized(cu.getClasses().getFirst().getType());
-                assertThat(asGeneric(typeC.getTypeParameters().getFirst()).toString())
+                Parameterized typeC = asParameterized(cu.getClasses().get(0).getType());
+                assertThat(asGeneric(typeC.getTypeParameters().get(0)).toString())
                   .isEqualTo("Generic{T extends java.lang.String}");
                 Parameterized typeCSuperType = asParameterized(typeC.getSupertype());
                 assertThat(typeCSuperType.toString()).isEqualTo("java.util.ArrayList<Generic{T extends java.lang.String}>");
-                assertThat(asClass(typeCSuperType.getType()).getTypeParameters().getFirst().toString())
+                assertThat(asClass(typeCSuperType.getType()).getTypeParameters().get(0).toString())
                   .isEqualTo("Generic{E}");
             })
           )
@@ -293,12 +293,12 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
-                  J.Identifier param = ((J.VariableDeclarations) lambda.getParameters().getParameters().getFirst())
-                    .getVariables().getFirst().getName();
+                  J.Identifier param = ((J.VariableDeclarations) lambda.getParameters().getParameters().get(0))
+                    .getVariables().get(0).getName();
                   if ("it1".equals(param.getSimpleName())) {
                       assertThat(param.getType().toString()).isEqualTo("MakeEasyToFind$MultiMap");
                   } else if ("it2".equals(param.getSimpleName())) {
-                      assertThat(TypeUtils.asParameterized(param.getType()).getTypeParameters().getFirst().toString())
+                      assertThat(TypeUtils.asParameterized(param.getType()).getTypeParameters().get(0).toString())
                         .isEqualTo("MakeEasyToFind$MultiMap$Inner");
                   }
                   return super.visitLambda(lambda, executionContext);

@@ -48,11 +48,11 @@ class AnnotationTest implements RewriteTest {
               public class A {}
               """,
                 spec -> spec.afterRecipe(cu -> {
-                            J.ClassDeclaration c = cu.getClasses().getFirst();
+                            J.ClassDeclaration c = cu.getClasses().get(0);
                             JavaType.Class type = (JavaType.Class) c.getType();
-                            JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().getFirst();
+                            JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
                             assertThat(a.getValues()).hasSize(1);
-                            assertThat(a.getValues().getFirst().getValue()).isEqualTo(singletonList("ALL"));
+                            assertThat(a.getValues().get(0).getValue()).isEqualTo(singletonList("ALL"));
                         }
                 )
           )
@@ -272,7 +272,7 @@ class AnnotationTest implements RewriteTest {
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
                     AnnotationService service = service(AnnotationService.class);
                     assertThat(service.getAllAnnotations(getCursor())).hasSize(1);
-                    assertThat(service.getAllAnnotations(getCursor()).getFirst().getSimpleName()).isEqualTo("Deprecated");
+                    assertThat(service.getAllAnnotations(getCursor()).get(0).getSimpleName()).isEqualTo("Deprecated");
                     return method;
                 }
             }.visit(cu, 0))
@@ -313,7 +313,7 @@ class AnnotationTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 AnnotationService service = cu.service(AnnotationService.class);
-                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
                 assertThat(service.getAllAnnotations(new Cursor(null, field))).satisfiesExactly(
                   leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
                 );
@@ -325,7 +325,7 @@ class AnnotationTest implements RewriteTest {
                   multi2 -> assertThat(multi2.getSimpleName()).isEqualTo("Multi2")
                 );
 
-                J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(1);
+                J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
                 assertThat(service.getAllAnnotations(new Cursor(null, method))).satisfiesExactly(
                   leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
                 );
@@ -370,13 +370,13 @@ class AnnotationTest implements RewriteTest {
                         public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
                             if (arrayType.getElementType() instanceof J.ArrayType) {
                                 if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
-                                    assertThat(arrayType.getAnnotations().getFirst().getAnnotationType().toString()).isEqualTo("A1");
+                                    assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A1");
                                     assertThat(arrayType.toString()).isEqualTo("Integer @A1 [] @A2 [ ]");
                                     firstDimension.set(true);
                                 }
                             } else {
                                 if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
-                                    assertThat(arrayType.getAnnotations().getFirst().getAnnotationType().toString()).isEqualTo("A2");
+                                    assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A2");
                                     assertThat(arrayType.toString()).isEqualTo("Integer @A2 [ ]");
                                     secondDimension.set(true);
                                 }
@@ -452,7 +452,7 @@ class AnnotationTest implements RewriteTest {
                 spec -> spec.afterRecipe(cu -> {
                     J.ClassDeclaration c = cu.getClasses().get(1);
                     JavaType.Class type = (JavaType.Class) c.getType();
-                    JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().getFirst();
+                    JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
                     assertThat(a.getValues()).satisfiesExactly(
                             v -> {
                                 assertThat(v.getElement()).isIn(a.getMethods());
@@ -496,22 +496,22 @@ class AnnotationTest implements RewriteTest {
             }
             """
         ).toList();
-        J.CompilationUnit cu = (J.CompilationUnit) sourceFiles.getFirst();
+        J.CompilationUnit cu = (J.CompilationUnit) sourceFiles.get(0);
 
-        J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
-        J.MethodInvocation mi = (J.MethodInvocation) md.getBody().getStatements().getFirst();
-        JavaType.Annotation annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().getFirst();
+        J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+        J.MethodInvocation mi = (J.MethodInvocation) md.getBody().getStatements().get(0);
+        JavaType.Annotation annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
 
         // Thread.currentThread().stop();
         assertEquals("java.lang.Deprecated", annotation.getType().getFullyQualifiedName());
-        assertEquals("since", ((JavaType.Method) annotation.getValues().getFirst().getElement()).getName());
-        assertEquals("1.2", annotation.getValues().getFirst().getValue());
+        assertEquals("since", ((JavaType.Method) annotation.getValues().get(0).getElement()).getName());
+        assertEquals("1.2", annotation.getValues().get(0).getValue());
         assertEquals("forRemoval", ((JavaType.Method) annotation.getValues().get(1).getElement()).getName());
         assertEquals(Boolean.TRUE, annotation.getValues().get(1).getValue());
 
         // Thread.currentThread().getContextClassLoader();
         mi = (J.MethodInvocation) md.getBody().getStatements().get(1);
-        annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().getFirst();
+        annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
         assertEquals("jdk.internal.reflect.CallerSensitive", annotation.getType().getFullyQualifiedName());
         assertTrue(annotation.getValues().isEmpty());
     }
@@ -534,12 +534,12 @@ class AnnotationTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.ClassDeclaration c = cu.getClasses().getFirst();
+                J.ClassDeclaration c = cu.getClasses().get(0);
                 JavaType.Class type = (JavaType.Class) c.getType();
-                JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().getFirst();
+                JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
                 assertThat(a.getValues()).hasSize(1);
-                JavaType.Annotation.SingleElementValue v = (JavaType.Annotation.SingleElementValue) a.getValues().getFirst();
-                assertThat(v.getElement()).isSameAs(a.getMethods().getFirst());
+                JavaType.Annotation.SingleElementValue v = (JavaType.Annotation.SingleElementValue) a.getValues().get(0);
+                assertThat(v.getElement()).isSameAs(a.getMethods().get(0));
                 assertThat(v.getValue()).isInstanceOf(JavaType.Array.class);
                 JavaType.Array array = (JavaType.Array) v.getValue();
                 assertThat(array.getElemType()).isInstanceOf(JavaType.Primitive.class);

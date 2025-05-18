@@ -191,7 +191,7 @@ class EnumTest implements RewriteTest {
              }
              """,
             spec -> spec.afterRecipe( cu -> {
-                J.EnumValueSet enumValueStatement = (J.EnumValueSet) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                J.EnumValueSet enumValueStatement = (J.EnumValueSet) cu.getClasses().get(0).getBody().getStatements().get(0);
                 assert enumValueStatement.getEnums().isEmpty();
                 assert enumValueStatement.isTerminatedWithSemicolon();
             })

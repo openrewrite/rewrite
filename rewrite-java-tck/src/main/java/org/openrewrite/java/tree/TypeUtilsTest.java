@@ -42,7 +42,7 @@ class TypeUtilsTest implements RewriteTest {
 
     static Consumer<SourceSpec<J.CompilationUnit>> typeIsPresent() {
         return s -> s.afterRecipe(cu -> {
-            var fooMethodType = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
+            var fooMethodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
             assertThat(TypeUtils.findOverriddenMethod(fooMethodType)).isPresent();
         });
     }
@@ -109,7 +109,7 @@ class TypeUtilsTest implements RewriteTest {
               }
               """,
             s -> s.afterRecipe(cu -> {
-                var fooMethodType = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
+                var fooMethodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
                 assertThat(TypeUtils.findOverriddenMethod(fooMethodType)).isEmpty();
             })
           )
@@ -177,8 +177,8 @@ class TypeUtilsTest implements RewriteTest {
               }
               """,
             s -> s.afterRecipe(cu -> {
-                var methods = cu.getClasses().getFirst().getBody().getStatements();
-                assertThat(TypeUtils.findOverriddenMethod(((J.MethodDeclaration) methods.getFirst()).getMethodType())).isEmpty();
+                var methods = cu.getClasses().get(0).getBody().getStatements();
+                assertThat(TypeUtils.findOverriddenMethod(((J.MethodDeclaration) methods.get(0)).getMethodType())).isEmpty();
                 assertThat(TypeUtils.findOverriddenMethod(((J.MethodDeclaration) methods.get(1)).getMethodType())).isPresent();
             })
           )
@@ -270,8 +270,8 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
-                    J.VariableDeclarations.NamedVariable li = ((J.VariableDeclarations) classDecl.getBody().getStatements().getFirst()).getVariables().getFirst();
-                    J.VariableDeclarations.NamedVariable lo = ((J.VariableDeclarations) classDecl.getBody().getStatements().get(1)).getVariables().getFirst();
+                    J.VariableDeclarations.NamedVariable li = ((J.VariableDeclarations) classDecl.getBody().getStatements().get(0)).getVariables().get(0);
+                    J.VariableDeclarations.NamedVariable lo = ((J.VariableDeclarations) classDecl.getBody().getStatements().get(1)).getVariables().get(0);
                     JavaType.Parameterized listIntegerType = ((JavaType.Parameterized) li.getVariableType().getType());
                     JavaType.Parameterized listObjectType = ((JavaType.Parameterized) lo.getVariableType().getType());
 
@@ -355,9 +355,9 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Object o) {
-                    JavaType paramType = method.getMethodType().getParameterTypes().getFirst();
+                    JavaType paramType = method.getMethodType().getParameterTypes().get(0);
                     assertThat(paramType).isInstanceOf(JavaType.Parameterized.class);
-                    JavaType argType = method.getArguments().getFirst().getType();
+                    JavaType argType = method.getArguments().get(0).getType();
                     assertThat(argType).isInstanceOf(JavaType.Parameterized.class);
                     assertThat(TypeUtils.isAssignableTo(paramType, argType)).isTrue();
                     return method;
@@ -389,7 +389,7 @@ class TypeUtilsTest implements RewriteTest {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
                     if (method.getSimpleName().equals("test")) {
-                        J.Return return_ = (J.Return) method.getBody().getStatements().getFirst();
+                        J.Return return_ = (J.Return) method.getBody().getStatements().get(0);
                         J.TypeCast cast = (J.TypeCast) return_.getExpression();
                         assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), Invariant)).isFalse();
                         assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), Out)).isTrue();
@@ -431,11 +431,11 @@ class TypeUtilsTest implements RewriteTest {
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
                     if (method.getSimpleName().equals("test")) {
                         J.Block block = getCursor().getParentTreeCursor().getValue();
-                        J.MethodDeclaration consumeClass = (J.MethodDeclaration) block.getStatements().getFirst();
+                        J.MethodDeclaration consumeClass = (J.MethodDeclaration) block.getStatements().get(0);
                         J.MethodDeclaration consumeMethod = (J.MethodDeclaration) block.getStatements().get(1);
-                        J.VariableDeclarations.NamedVariable list = ((J.VariableDeclarations) method.getBody().getStatements().getFirst()).getVariables().getFirst();
-                        JavaType consumeClassParamType = ((J.VariableDeclarations) consumeClass.getParameters().getFirst()).getVariables().getFirst().getType();
-                        JavaType consumeMethodParamType = ((J.VariableDeclarations) consumeMethod.getParameters().getFirst()).getVariables().getFirst().getType();
+                        J.VariableDeclarations.NamedVariable list = ((J.VariableDeclarations) method.getBody().getStatements().get(0)).getVariables().get(0);
+                        JavaType consumeClassParamType = ((J.VariableDeclarations) consumeClass.getParameters().get(0)).getVariables().get(0).getType();
+                        JavaType consumeMethodParamType = ((J.VariableDeclarations) consumeMethod.getParameters().get(0)).getVariables().get(0).getType();
 
                         assertThat(TypeUtils.isAssignableTo(consumeClassParamType, list.getType(), Out)).isTrue();
                         assertThat(TypeUtils.isAssignableTo(consumeMethodParamType, list.getType(), Out)).isTrue();
@@ -583,7 +583,7 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<ExecutionContext>() {
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                    J.VariableDeclarations o = (J.VariableDeclarations) classDecl.getBody().getStatements().getFirst();
+                    J.VariableDeclarations o = (J.VariableDeclarations) classDecl.getBody().getStatements().get(0);
                     J.VariableDeclarations oa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(1);
                     J.VariableDeclarations sa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(2);
                     J.VariableDeclarations ia = (J.VariableDeclarations) classDecl.getBody().getStatements().get(3);
@@ -653,7 +653,7 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
-                    J.VariableDeclarations oa = (J.VariableDeclarations) classDecl.getBody().getStatements().getFirst();
+                    J.VariableDeclarations oa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(0);
                     J.VariableDeclarations sa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(1);
                     JavaType objectArray = oa.getType();
                     JavaType stringArray = sa.getType();
