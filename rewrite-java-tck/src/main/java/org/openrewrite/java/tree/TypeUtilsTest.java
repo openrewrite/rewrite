@@ -1434,6 +1434,8 @@ class TypeUtilsTest implements RewriteTest {
               abstract class Comp implements Comparable<Comp> {}
               abstract class Ext extends Comp {}
               enum EnumType { A, B, C }
+              abstract class CompT<T extends CompT<T>> implements Comparable<T> {}
+              abstract class ExtT extends CompT<ExtT> {}
               
               class Test<E extends Enum<E>, C extends Comparable<? super C>, T> {
                   E e;
@@ -1443,6 +1445,9 @@ class TypeUtilsTest implements RewriteTest {
                   Ext ext;
                   EnumType enumType;
                   Comparable<Comp> comparable;
+                  CompT<?> compT;
+                  CompT<ExtT> compT;
+                  ExtT extT;
               }
               """,
             spec -> spec.afterRecipe(cu -> {
@@ -1450,6 +1455,11 @@ class TypeUtilsTest implements RewriteTest {
                       assertions.isOfType("Comp", "Comp").isTrue();
                       assertions.isOfType("Ext", "Ext").isTrue();
                       assertions.isOfType("EnumType", "EnumType").isTrue();
+
+                      assertions.isOfType("CompT<?>", "CompT<?>").isTrue();
+                      assertions.isOfType("CompT<ExtT>", "CompT<ExtT>").isTrue();
+                      assertions.isOfType("ExtT", "ExtT").isTrue();
+                      assertions.isOfType("CompT<ExtT>", "ExtT").isFalse();
 
                       assertions.isAssignableTo("E", "EnumType", BOUND).isFalse();
                       assertions.isAssignableTo("E", "EnumType", INFER).isTrue();
@@ -1465,6 +1475,13 @@ class TypeUtilsTest implements RewriteTest {
 
                       assertions.isAssignableTo("Comparable<Comp>", "Comp").isTrue();
                       assertions.isAssignableTo("Comparable<Comp>", "Ext").isTrue();
+
+                      assertions.isAssignableTo("CompT<?>", "CompT<ExtT>").isTrue();
+                      assertions.isAssignableTo("CompT<ExtT>", "CompT<ExtT>").isTrue();
+                      assertions.isAssignableTo("CompT<ExtT>", "CompT<?>").isFalse();
+                      assertions.isAssignableTo("CompT<?>", "ExtT").isTrue();
+                      assertions.isAssignableTo("CompT<ExtT>", "ExtT").isTrue();
+                      assertions.isAssignableTo("ExtT", "ExtT").isTrue();
                   }
               }
             )

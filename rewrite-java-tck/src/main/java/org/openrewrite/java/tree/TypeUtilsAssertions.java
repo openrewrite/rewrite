@@ -24,6 +24,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import java.util.*;
 
 import static org.openrewrite.java.tree.TypeUtils.TypeMode.BOUND;
+import static org.openrewrite.java.tree.TypeUtils.TypeMode.INFER;
 
 class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
     Map<String, List<JavaType>> types = new HashMap<>();
@@ -69,7 +70,7 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
         JavaType toType = getFirst(to);
         JavaType fromType = getLast(from);
         return assertThat(TypeUtils.isAssignableTo(toType, fromType, mode))
-          .describedAs("isAssignableTo(%s, %s, %s)", to, from, mode);
+          .describedAs("isAssignableTo(%s, %s, %s)", to, from, describe(mode));
     }
 
     public BooleanAssert isOfType(String to, String from) {
@@ -80,7 +81,17 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
         JavaType toType = getFirst(to);
         JavaType fromType = getLast(from);
         return assertThat(TypeUtils.isOfType(toType, fromType, mode))
-          .describedAs("isOfType(%s, %s, %s)", to, from, mode);
+          .describedAs("isOfType(%s, %s, %s)", to, from, describe(mode));
+    }
+
+    private String describe(TypeUtils.TypeMode mode) {
+        if (mode == BOUND) {
+            return "BOUND";
+        } else if (mode == INFER) {
+            return "INFER";
+        } else {
+            return String.valueOf(mode);
+        }
     }
 
     public StringAssert toString(String type) {
