@@ -670,6 +670,7 @@ public class TypeUtils {
             @Override
             public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
                 if (!replacements.containsKey(generic)) {
+                    replacements.put(generic, generic);
                     JavaType.GenericTypeVariable resolved = (JavaType.GenericTypeVariable) super.visitGenericTypeVariable(generic, replacements);
                     replacements.put(generic, resolved);
                     return resolved;
