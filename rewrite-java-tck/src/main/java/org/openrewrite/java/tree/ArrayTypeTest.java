@@ -51,11 +51,11 @@ class ArrayTypeTest implements RewriteTest {
                       // Construct a new J.ArrayType from an old LST model.
                       List<JRightPadded<Space>> dimensions = new ArrayList<>();
                       assert arrayType.getDimension() != null;
-                      dimensions.addFirst(JRightPadded.build(arrayType.getDimension().getBefore()).withAfter(arrayType.getDimension().getElement()));
+                      dimensions.add(0, JRightPadded.build(arrayType.getDimension().getBefore()).withAfter(arrayType.getDimension().getElement()));
                       TypeTree elementType = arrayType.getElementType();
                       while (elementType instanceof J.ArrayType elementArrayType) {
                           assert elementArrayType.getDimension() != null;
-                          dimensions.addFirst(JRightPadded.build(elementArrayType.getDimension().getBefore()).withAfter(elementArrayType.getDimension().getElement()));
+                          dimensions.add(0, JRightPadded.build(elementArrayType.getDimension().getBefore()).withAfter(elementArrayType.getDimension().getElement()));
                           elementType = elementArrayType.getElementType();
                       }
                       //noinspection deprecation
