@@ -88,7 +88,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("PR #5374 was reverted, due to regressions")
     void expressionTest() {
         var template = JavaTemplate.builder("!#{iterable:any(java.lang.Iterable<T>)}.iterator().hasNext()")
           .genericTypes("T")
@@ -117,6 +116,46 @@ class JavaTemplateGenericsTest implements RewriteTest {
               class Test {
                   boolean test() {
                       return /*~~>*/!List.of("1").iterator().hasNext();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void recursiveType() {
+        var template = JavaTemplate.builder("#{enumAssert:any(org.assertj.core.api.AbstractIterableAssert<?, ?, E, ?>)}.size().isLessThan(#{size:any(int)}).returnToIterable()")
+          .genericTypes("E")
+          .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())).build();
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+              }
+          })),
+          java(
+            """
+              import com.google.common.collect.ImmutableSet;
+              import org.assertj.core.api.AbstractAssert;
+              import org.assertj.core.api.Assertions;
+              
+              class Test {
+                  void test() {
+                      Assertions.assertThat(ImmutableSet.of(1)).size().isLessThan(2).returnToIterable();
+                  }
+              }
+              """,
+            """
+              import com.google.common.collect.ImmutableSet;
+              import org.assertj.core.api.AbstractAssert;
+              import org.assertj.core.api.Assertions;
+              
+              class Test {
+                  void test() {
+                      /*~~>*/Assertions.assertThat(ImmutableSet.of(1)).size().isLessThan(2).returnToIterable();
                   }
               }
               """

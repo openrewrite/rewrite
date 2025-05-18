@@ -23,6 +23,8 @@ import org.openrewrite.java.JavaIsoVisitor;
 
 import java.util.*;
 
+import static org.openrewrite.java.tree.TypeUtils.TypeMode.BOUND;
+
 class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
     Map<String, List<JavaType>> types = new HashMap<>();
 
@@ -39,7 +41,7 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
                 }
                 for (J.VariableDeclarations.NamedVariable variable : multiVariable.getVariables()) {
                     types.computeIfAbsent(variable.getSimpleName(), k -> new ArrayList<>(2))
-                      .add(Objects.requireNonNull(variable.getVariableType()));
+                      .add(Objects.requireNonNull(Objects.requireNonNull(variable.getVariableType()).getType()));
                 }
                 return super.visitVariableDeclarations(multiVariable, o);
             }
@@ -60,25 +62,25 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
     }
 
     public BooleanAssert isAssignableTo(String to, String from) {
-        return isAssignableTo(to, from, false);
+        return isAssignableTo(to, from, BOUND);
     }
 
-    public BooleanAssert isAssignableTo(String to, String from, boolean capture) {
+    public BooleanAssert isAssignableTo(String to, String from, TypeUtils.TypeMode mode) {
         JavaType toType = getFirst(to);
         JavaType fromType = getLast(from);
-        return assertThat(TypeUtils.isAssignableTo(toType, fromType))
-          .describedAs("isAssignableTo(%s, %s, %s)", to, from, capture);
+        return assertThat(TypeUtils.isAssignableTo(toType, fromType, mode))
+          .describedAs("isAssignableTo(%s, %s, %s)", to, from, mode);
     }
 
     public BooleanAssert isOfType(String to, String from) {
-        return isOfType(to, from, false);
+        return isOfType(to, from, BOUND);
     }
 
-    public BooleanAssert isOfType(String to, String from, boolean capture) {
+    public BooleanAssert isOfType(String to, String from, TypeUtils.TypeMode mode) {
         JavaType toType = getFirst(to);
         JavaType fromType = getLast(from);
-        return assertThat(TypeUtils.isOfType(toType, fromType))
-          .describedAs("isOfType(%s, %s, %s)", to, from, capture);
+        return assertThat(TypeUtils.isOfType(toType, fromType, mode))
+          .describedAs("isOfType(%s, %s, %s)", to, from, mode);
     }
 
     public StringAssert toString(String type) {
