@@ -42,7 +42,7 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
                 }
                 for (J.VariableDeclarations.NamedVariable variable : multiVariable.getVariables()) {
                     types.computeIfAbsent(variable.getSimpleName(), k -> new ArrayList<>(2))
-                      .add(Objects.requireNonNull(Objects.requireNonNull(variable.getVariableType()).getType()));
+                      .add(Objects.requireNonNull(variable.getVariableType()).getType());
                 }
                 return super.visitVariableDeclarations(multiVariable, o);
             }

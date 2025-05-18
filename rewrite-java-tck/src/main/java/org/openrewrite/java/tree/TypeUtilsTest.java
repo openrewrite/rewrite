@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -1425,9 +1426,20 @@ class TypeUtilsTest implements RewriteTest {
           )
         );
     }
-
+    abstract class CompT<T extends CompT<T>> implements Comparable<T> {}
+    abstract class ExtT<T> extends CompT<ExtT<T>> {}
     @Test
     void recursiveTypes() {
+        CompT<?> compT;
+        CompT<ExtT<Integer>> compExtT;
+        ExtT<Integer> extT = new ExtT<Integer>() {
+            @Override
+            public int compareTo(@NotNull TypeUtilsTest.ExtT<Integer> o) {
+                return 0;
+            }
+        };
+        compExtT = extT;
+
         rewriteRun(
           java(
             """
@@ -1435,7 +1447,7 @@ class TypeUtilsTest implements RewriteTest {
               abstract class Ext extends Comp {}
               enum EnumType { A, B, C }
               abstract class CompT<T extends CompT<T>> implements Comparable<T> {}
-              abstract class ExtT extends CompT<ExtT> {}
+              abstract class ExtT<T> extends CompT<ExtT<T>> {}
               
               class Test<E extends Enum<E>, C extends Comparable<? super C>, T> {
                   E e;
@@ -1446,8 +1458,8 @@ class TypeUtilsTest implements RewriteTest {
                   EnumType enumType;
                   Comparable<Comp> comparable;
                   CompT<?> compT;
-                  CompT<ExtT> compT;
-                  ExtT extT;
+                  CompT<ExtT<Integer>> compExtT;
+                  ExtT<Integer> extT;
               }
               """,
             spec -> spec.afterRecipe(cu -> {
@@ -1457,9 +1469,9 @@ class TypeUtilsTest implements RewriteTest {
                       assertions.isOfType("EnumType", "EnumType").isTrue();
 
                       assertions.isOfType("CompT<?>", "CompT<?>").isTrue();
-                      assertions.isOfType("CompT<ExtT>", "CompT<ExtT>").isTrue();
-                      assertions.isOfType("ExtT", "ExtT").isTrue();
-                      assertions.isOfType("CompT<ExtT>", "ExtT").isFalse();
+                      assertions.isOfType("CompT<ExtT<Integer>>", "CompT<ExtT<Integer>>").isTrue();
+                      assertions.isOfType("ExtT<Integer>", "ExtT<Integer>").isTrue();
+                      assertions.isOfType("CompT<ExtT<Integer>>", "ExtT<Integer>").isFalse();
 
                       assertions.isAssignableTo("E", "EnumType", BOUND).isFalse();
                       assertions.isAssignableTo("E", "EnumType", INFER).isTrue();
@@ -1476,12 +1488,12 @@ class TypeUtilsTest implements RewriteTest {
                       assertions.isAssignableTo("Comparable<Comp>", "Comp").isTrue();
                       assertions.isAssignableTo("Comparable<Comp>", "Ext").isTrue();
 
-                      assertions.isAssignableTo("CompT<?>", "CompT<ExtT>").isTrue();
-                      assertions.isAssignableTo("CompT<ExtT>", "CompT<ExtT>").isTrue();
-                      assertions.isAssignableTo("CompT<ExtT>", "CompT<?>").isFalse();
-                      assertions.isAssignableTo("CompT<?>", "ExtT").isTrue();
-                      assertions.isAssignableTo("CompT<ExtT>", "ExtT").isTrue();
-                      assertions.isAssignableTo("ExtT", "ExtT").isTrue();
+                      assertions.isAssignableTo("CompT<?>", "CompT<ExtT<Integer>>").isTrue();
+                      assertions.isAssignableTo("CompT<ExtT<Integer>>", "CompT<ExtT<Integer>>").isTrue();
+                      assertions.isAssignableTo("CompT<ExtT<Integer>>", "CompT<?>").isFalse();
+                      assertions.isAssignableTo("CompT<?>", "ExtT<Integer>").isTrue();
+                      assertions.isAssignableTo("CompT<ExtT<Integer>>", "ExtT<Integer>").isTrue();
+                      assertions.isAssignableTo("ExtT<Integer>", "ExtT<Integer>").isTrue();
                   }
               }
             )

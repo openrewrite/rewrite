@@ -126,7 +126,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
     void recursiveType() {
         var template = JavaTemplate.builder("#{enumAssert:any(org.assertj.core.api.AbstractIterableAssert<?, ?, E, ?>)}.size().isLessThan(#{size:any(int)}).returnToIterable()")
           .genericTypes("E")
-          .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())).build();
+          .javaParser(JavaParser.fromJavaVersion().classpath("assertj-core"))
+          .build();
 
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

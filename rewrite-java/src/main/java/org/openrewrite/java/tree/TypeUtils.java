@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
+import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
 
@@ -659,10 +660,45 @@ public class TypeUtils {
         }
         List<JavaType> resolvedTypeParameters = new ArrayList<>();
         for (JavaType tp : target.getTypeParameters()) {
-            //noinspection SuspiciousMethodCalls
-            resolvedTypeParameters.add(typeVariableMap.getOrDefault(tp, tp));
+            resolvedTypeParameters.add(resolveTypeParameters(tp, typeVariableMap));
         }
         return tgt.withTypeParameters(resolvedTypeParameters);
+    }
+
+    private static JavaType resolveTypeParameters(JavaType type, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+        Set<JavaType.GenericTypeVariable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        return Objects.requireNonNull(new JavaTypeVisitor<Map<JavaType.GenericTypeVariable, JavaType>>() {
+            @Override
+            public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                if (!visited.add(generic)) {
+                    return generic;
+                } else if (replacements.containsKey(generic)){
+                    return replacements.get(generic);
+                } else {
+                    return super.visitGenericTypeVariable(generic, replacements);
+                }
+            }
+
+            @Override
+            public JavaType visitClass(JavaType.Class aClass, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return aClass;
+            }
+
+            @Override
+            public JavaType visitAnnotation(JavaType.Annotation annotation, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return annotation;
+            }
+
+            @Override
+            public JavaType visitMethod(JavaType.Method method, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return method;
+            }
+
+            @Override
+            public JavaType visitVariable(JavaType.Variable variable, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return variable;
+            }
+        }.visit(type, replacements));
     }
 
     // Contract: from is FullyQualified, Array or Primitive
