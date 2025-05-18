@@ -666,37 +666,21 @@ public class TypeUtils {
     }
 
     private static JavaType resolveTypeParameters(JavaType type, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
-        Set<JavaType.GenericTypeVariable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         return Objects.requireNonNull(new JavaTypeVisitor<Map<JavaType.GenericTypeVariable, JavaType>>() {
             @Override
             public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
-                if (!visited.add(generic)) {
-                    return generic;
-                } else if (replacements.containsKey(generic)){
-                    return replacements.get(generic);
+                if (!replacements.containsKey(generic)) {
+                    JavaType.GenericTypeVariable resolved = (JavaType.GenericTypeVariable) super.visitGenericTypeVariable(generic, replacements);
+                    replacements.put(generic, resolved);
+                    return resolved;
                 } else {
-                    return super.visitGenericTypeVariable(generic, replacements);
+                    return replacements.get(generic);
                 }
             }
 
             @Override
             public JavaType visitClass(JavaType.Class aClass, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
                 return aClass;
-            }
-
-            @Override
-            public JavaType visitAnnotation(JavaType.Annotation annotation, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
-                return annotation;
-            }
-
-            @Override
-            public JavaType visitMethod(JavaType.Method method, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
-                return method;
-            }
-
-            @Override
-            public JavaType visitVariable(JavaType.Variable variable, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
-                return variable;
             }
         }.visit(type, replacements));
     }
@@ -1190,10 +1174,10 @@ public class TypeUtils {
     public static class TypeMode {
         public static final TypeMode INFER = new TypeMode(null, null, TO, null);
         public static final TypeMode BOUND = new TypeMode(null, null, Mode.NONE, null);
-        private @Nullable JavaType target;
-        private @Nullable JavaType source;
-        private Mode mode;
-        private @Nullable TypeMode parent;
+        private final @Nullable JavaType target;
+        private final @Nullable JavaType source;
+        private final Mode mode;
+        private final @Nullable TypeMode parent;
 
         enum Mode {
             TO, FROM, NONE;
