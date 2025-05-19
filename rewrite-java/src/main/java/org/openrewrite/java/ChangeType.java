@@ -32,6 +32,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.internal.StringUtils.decapitalize;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -368,6 +369,19 @@ public class ChangeType extends Recipe {
                     }
                 }
 
+                // Rename variable if it matches class name (starting with a lowercase character)
+                if (ident.getSimpleName().equals(decapitalize(className))) {
+                    if (targetType instanceof JavaType.FullyQualified) {
+                        String newName = decapitalize(((JavaType.FullyQualified) targetType).getClassName());
+
+                        ident = ident.withSimpleName(newName);
+
+                        if (ident.getFieldType() != null) {
+                            ident = ident.withFieldType(ident.getFieldType().withName(newName));
+                        }
+                    }
+                }
+
                 // Recreate any static imports as needed
                 if (sf != null) {
                     for (J.Import anImport : sf.getImports()) {
@@ -385,6 +399,15 @@ public class ChangeType extends Recipe {
             }
             ident = ident.withType(updateType(ident.getType()));
             return visitAndCast(ident, ctx, super::visitIdentifier);
+        }
+
+        @Override
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
+            J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, executionContext);
+            if (v.getVariableType() != null && !v.getSimpleName().equals(v.getVariableType().getName())) {
+                return v.withVariableType(v.getVariableType().withName(v.getSimpleName()));
+            }
+            return v;
         }
 
         @Override
