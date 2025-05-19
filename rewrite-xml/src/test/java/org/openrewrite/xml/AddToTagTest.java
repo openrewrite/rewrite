@@ -66,8 +66,8 @@ class AddToTagTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  if (x.getRoot().getChildren().get(0).getChildren().size() == 0) {
-                      doAfterVisit(new AddToTagVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                  if (x.getRoot().getChildren().getFirst().getChildren().size() == 0) {
+                      doAfterVisit(new AddToTagVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).getFirst(),
                         Xml.Tag.build("<property name=\"myprop\" ref=\"collaborator\"/>")));
                   }
                   return super.visitDocument(x, ctx);

@@ -286,6 +286,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.ParenthesizedTypeTree visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, P p) {
+        return (J.ParenthesizedTypeTree) super.visitParenthesizedTypeTree(parTree, p);
+    }
+
+    @Override
     public J.Primitive visitPrimitive(J.Primitive primitive, P p) {
         return (J.Primitive) super.visitPrimitive(primitive, p);
     }

@@ -510,9 +510,9 @@ class VariableNameUtilsTest implements RewriteTest {
               @Override
               public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
                   lambda = super.visitLambda(lambda, ctx);
-                  if (((J.VariableDeclarations) lambda.getParameters().getParameters().get(0)).getVariables().get(0).getSimpleName().startsWith("i")) {
-                      J.VariableDeclarations declarations = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
-                      J.VariableDeclarations.NamedVariable variable = declarations.getVariables().get(0);
+                  if (((J.VariableDeclarations) lambda.getParameters().getParameters().getFirst()).getVariables().getFirst().getSimpleName().startsWith("i")) {
+                      J.VariableDeclarations declarations = (J.VariableDeclarations) lambda.getParameters().getParameters().getFirst();
+                      J.VariableDeclarations.NamedVariable variable = declarations.getVariables().getFirst();
                       variable = variable.withName(variable.getName().withSimpleName(VariableNameUtils.generateVariableName("j", new Cursor(getCursor(), lambda), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER)));
                       lambda = lambda.withParameters(lambda.getParameters().withParameters(List.of(declarations.withVariables(List.of(variable)))));
                   }

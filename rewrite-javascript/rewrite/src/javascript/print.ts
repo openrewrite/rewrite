@@ -753,20 +753,24 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             p.append(">");
         }
 
-        if (arrowFunction.parameters.parenthesized) {
-            await this.visitSpace(arrowFunction.parameters.prefix, p);
+        const lambda = arrowFunction.lambda;
+
+        if (lambda.parameters.parenthesized) {
+            await this.visitSpace(lambda.parameters.prefix, p);
             p.append("(");
-            await this.visitJRightPaddedLocal(arrowFunction.parameters.parameters, ",", p);
+            await this.visitJRightPaddedLocal(lambda.parameters.parameters, ",", p);
             p.append(")");
         } else {
-            await this.visitJRightPaddedLocal(arrowFunction.parameters.parameters, ",", p);
+            await this.visitJRightPaddedLocal(lambda.parameters.parameters, ",", p);
         }
 
         if (arrowFunction.returnTypeExpression) {
             await this.visit(arrowFunction.returnTypeExpression, p);
         }
 
-        await this.visitLeftPaddedLocal("=>", arrowFunction.body, p);
+        await this.visitSpace(lambda.arrow, p);
+        p.append("=>");
+        await this.visit(lambda.body, p);
 
         await this.afterSyntax(arrowFunction, p);
         return arrowFunction;

@@ -448,7 +448,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public List<Contributor> getContributors() {
         if (contributors == null) {
             Map<NameEmail, Integer> contributorToLineCount = new HashMap<>();
-            contributors = new ArrayList<>();
+            List<Contributor> combined = new ArrayList<>();
             for (Recipe recipe : getRecipeList()) {
                 for (Contributor contributor : recipe.getContributors()) {
                     NameEmail nameEmail = new NameEmail(contributor.getName(), contributor.getEmail());
@@ -456,9 +456,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 }
             }
             for (Map.Entry<NameEmail, Integer> contributorEntry : contributorToLineCount.entrySet()) {
-                contributors.add(new Contributor(contributorEntry.getKey().getName(), contributorEntry.getKey().getEmail(), contributorEntry.getValue()));
+                combined.add(new Contributor(contributorEntry.getKey().getName(), contributorEntry.getKey().getEmail(), contributorEntry.getValue()));
             }
-            contributors.sort(Comparator.comparing(Contributor::getLineCount).reversed());
+            combined.sort(Comparator.comparing(Contributor::getLineCount).reversed());
+            contributors = combined;
         }
         return contributors;
     }

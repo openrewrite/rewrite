@@ -71,7 +71,7 @@ class ScalarTest implements RewriteTest {
             foo # look mom, no mapping
             """,
                 spec -> spec.afterRecipe(documents -> {
-                    Yaml.Block maybeScalar = documents.getDocuments().get(0).getBlock();
+                    Yaml.Block maybeScalar = documents.getDocuments().getFirst().getBlock();
                     Assertions.assertThat(maybeScalar).isInstanceOf(Yaml.Scalar.class);
                 }))
         );

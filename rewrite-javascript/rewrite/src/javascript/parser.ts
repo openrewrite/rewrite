@@ -279,7 +279,6 @@ export class JavaScriptParserVisitor {
             sourcePath: this.sourcePath,
             charsetName: bomAndTextEncoding.encoding,
             charsetBomMarked: bomAndTextEncoding.hasBom,
-            imports: [],
             statements: this.semicolonPaddedStatementList(node.statements),
             eof: this.prefix(node.endOfFileToken)
         };
@@ -1936,20 +1935,26 @@ export class JavaScriptParserVisitor {
             leadingAnnotations: [],
             modifiers: this.mapModifiers(node),
             typeParameters: node.typeParameters && this.mapTypeParametersAsObject(node),
-            parameters: {
-                kind: J.Kind.LambdaParameters,
+            lambda: {
+                kind: J.Kind.Lambda,
                 id: randomId(),
-                prefix: isParenthesized ? this.prefix(openParenToken) : emptySpace,
                 markers: emptyMarkers,
-                parenthesized: isParenthesized,
-                parameters: node.parameters.length > 0 ?
-                    node.parameters.map(p => this.rightPadded(this.convert(p), this.suffix(p)))
-                        .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newJEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []) :
-                    isParenthesized ? [this.rightPadded(this.newJEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))] : [],
-            },
-            returnTypeExpression: this.mapTypeInfo(node),
-            body: this.leftPadded(this.prefix(node.equalsGreaterThanToken), this.convert(node.body)),
-            type: this.mapType(node)
+                parameters: {
+                    kind: J.Kind.LambdaParameters,
+                    id: randomId(),
+                    prefix: isParenthesized ? this.prefix(openParenToken) : emptySpace,
+                    markers: emptyMarkers,
+                    parenthesized: isParenthesized,
+                    parameters: node.parameters.length > 0 ?
+                        node.parameters.map(p => this.rightPadded(this.convert(p), this.suffix(p)))
+                            .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newJEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []) :
+                        isParenthesized ? [this.rightPadded(this.newJEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))] : [],
+                },
+                arrow: this.prefix(node.equalsGreaterThanToken),
+                body: this.convert(node.body),
+                type: this.mapType(node)
+            } as J.Lambda,
+            returnTypeExpression: this.mapTypeInfo(node)
         };
     }
 

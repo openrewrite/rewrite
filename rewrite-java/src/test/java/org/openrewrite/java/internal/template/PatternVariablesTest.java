@@ -85,8 +85,8 @@ class PatternVariablesTest {
                     .findFirst()
                     .map(J.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
-            J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-            @SuppressWarnings("DataFlowIssue") J.If ifStatement = (J.If) method.getBody().getStatements().get(0);
+            J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+            @SuppressWarnings("DataFlowIssue") J.If ifStatement = (J.If) method.getBody().getStatements().getFirst();
             return simplifiedPatternVariableCondition(ifStatement.getIfCondition().getTree(), null);
         }
     }
@@ -149,9 +149,9 @@ class PatternVariablesTest {
                     .findFirst()
                     .map(J.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
-            J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+            J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
             //noinspection DataFlowIssue
-            return method.getBody().getStatements().get(0);
+            return method.getBody().getStatements().getFirst();
         }
     }
 }

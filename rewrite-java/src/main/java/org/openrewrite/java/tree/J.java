@@ -959,6 +959,14 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java break statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * break;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -993,6 +1001,18 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a switch case label in a switch statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * switch(x) {
+     *     case 1:
+     *         doSomething();
+     *         break;
+     * }
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -1216,6 +1236,15 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java class declaration.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * public class MyClass {
+     * }
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -1487,6 +1516,17 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java compilation unit (a source file).
+     *
+     * <p>Example:
+     * <pre>{@code
+     * package com.example;
+     *
+     * public class MyClass {
+     * }
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -1698,6 +1738,14 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java continue statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * continue;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -1732,6 +1780,16 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java do-while loop statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * do {
+     *     // body
+     * } while (condition);
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1826,6 +1884,14 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents an empty statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * ;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -1863,6 +1929,17 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a constant in an enum declaration.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * enum Color {
+     *     RED,
+     *     GREEN
+     * }
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -1898,6 +1975,17 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a set of enum values in an enum declaration.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * enum Color {
+     *     RED,
+     *     GREEN;
+     * }
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1975,6 +2063,14 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents access to a field of an object or class.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * object.field;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -2115,6 +2211,16 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java for-each loop statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * for (String s : list) {
+     *     // body
+     * }
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2284,6 +2390,16 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java for loop statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * for (int i = 0; i < n; i++) {
+     *     // body
+     * }
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2472,8 +2588,14 @@ public interface J extends Tree, RpcCodec<J> {
     }
 
     /**
-     * Java does not allow for parenthesis around TypeTree in places like a type cast where a J.ControlParenthesis is
+     * Represents a parenthesized type tree. Java does not allow for parentheses
+     * around TypeTree in places like a type cast where a J.ControlParenthesis is
      * used. But other languages, like Kotlin, do.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * (List<String>) obj;
+     * }</pre>
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2516,6 +2638,14 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents an identifier in Java code.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * MyClass variableName;
+     * }</pre>
+     */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
@@ -2562,6 +2692,18 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java if statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * if (condition) {
+     *     // then
+     * } else {
+     *     // else
+     * }
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2711,6 +2853,14 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java import declaration.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * import java.util.List;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -2945,6 +3095,14 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java instanceof expression.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * obj instanceof String
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
@@ -3069,6 +3227,15 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a deconstruction pattern in Java.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * case Point(int x, int y):
+     *     // use x and y
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3150,6 +3317,14 @@ public interface J extends Tree, RpcCodec<J> {
 
     }
 
+    /**
+     * Represents an intersection type.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * Serializable & Closeable
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3236,6 +3411,15 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a labeled statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * label:
+     *     statement;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3320,6 +3504,14 @@ public interface J extends Tree, RpcCodec<J> {
         }
     }
 
+    /**
+     * Represents a Java lambda expression.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * x -> x.toString()
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data

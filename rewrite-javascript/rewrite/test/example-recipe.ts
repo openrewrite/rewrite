@@ -66,7 +66,7 @@ export class ReplacedText {
 }
 
 export class CreateText extends ScanningRecipe<{ exists: boolean }> {
-    name = "org.openrewrite.text.create-text";
+    name = "org.openrewrite.example.text.create-text";
     displayName = "Create text file";
     description = "Create a new text file.";
 
@@ -99,7 +99,7 @@ export class CreateText extends ScanningRecipe<{ exists: boolean }> {
 }
 
 export class ChangeText extends Recipe {
-    name = "org.openrewrite.text.change-text"
+    name = "org.openrewrite.example.text.change-text"
     displayName = "Change text";
     description = "Change the text of a file.";
 
@@ -137,7 +137,7 @@ export class ChangeText extends Recipe {
 }
 
 export class ChangeVersion extends Recipe {
-    name = "org.openrewrite.npm.change-version";
+    name = "org.openrewrite.example.npm.change-version";
     displayName = "Change version in `package.json`";
     description = "Change the version in both `package.json` and `package-lock.json`.";
 
@@ -178,7 +178,7 @@ export class ChangeVersion extends Recipe {
 }
 
 export class RecipeWithRecipeList extends Recipe {
-    name = "org.openrewrite.text.with-recipe-list"
+    name = "org.openrewrite.example.text.with-recipe-list"
     displayName = "A recipe that has a recipe list";
     description = "To verify that it is possible for a recipe list to be called over RPC.";
 
@@ -188,7 +188,7 @@ export class RecipeWithRecipeList extends Recipe {
 }
 
 export class ReplaceId extends Recipe {
-    name = "org.openrewrite.javascript.replace-id"
+    name = "org.openrewrite.example.javascript.replace-id"
     displayName = "Replace IDs";
     description = "Replaces the ID of every `Tree` and `Marker` object in a JavaScript source.";
 

@@ -82,7 +82,7 @@ class PropertiesParserTest implements RewriteTest {
               key=value
               """.formatted(commentStyle),
             spec -> spec.beforeRecipe(p -> {
-                assertThat(p.getContent().get(0))
+                assertThat(p.getContent().getFirst())
                   .isInstanceOf(Properties.Comment.class)
                   .matches(comment -> ((Properties.Comment) comment).getMessage().equals(" this is a comment"));
                 assertThat(p.getContent().get(1))
@@ -103,7 +103,7 @@ class PropertiesParserTest implements RewriteTest {
               key=value %s this is a comment
               """.formatted(commentStyle),
             spec -> spec.beforeRecipe(p -> {
-                assertThat(p.getContent().get(0))
+                assertThat(p.getContent().getFirst())
                   .isInstanceOf(Properties.Entry.class)
                   .extracting(e -> ((Properties.Entry) e).getValue().getText())
                   .isEqualTo("value");

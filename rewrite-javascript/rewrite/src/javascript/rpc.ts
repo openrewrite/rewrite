@@ -51,7 +51,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(cu, c => c.charsetBomMarked);
         await q.getAndSend(cu, c => c.checksum);
         await q.getAndSend(cu, c => c.fileAttributes);
-        await q.getAndSendList(cu, c => c.imports, imp => imp.element.id, imp => this.visitRightPadded(imp, q));
         await q.getAndSendList(cu, c => c.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
         await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
         return cu;
@@ -67,10 +66,8 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSendList(arrowFunction, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
         await q.getAndSendList(arrowFunction, el => el.modifiers, el => el.id, el => this.visit(el, q));
         await q.getAndSend(arrowFunction, el => el.typeParameters, el => this.visit(el, q));
-        await q.getAndSend(arrowFunction, el => el.parameters, el => this.visit(el, q));
+        await q.getAndSend(arrowFunction, el => el.lambda, el => this.visit(el, q));
         await q.getAndSend(arrowFunction, el => el.returnTypeExpression, el => this.visit(el, q));
-        await q.getAndSend(arrowFunction, el => el.body, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(arrowFunction, el => asRef(el.type), el => this.visitType(el, q));
         return arrowFunction;
     }
 
@@ -535,7 +532,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.charsetBomMarked = await q.receive(cu.charsetBomMarked);
         draft.checksum = await q.receive(cu.checksum);
         draft.fileAttributes = await q.receive(cu.fileAttributes);
-        draft.imports = await q.receiveListDefined(cu.imports, imp => this.visitRightPadded(imp, q));
         draft.statements = await q.receiveListDefined(cu.statements, stmt => this.visitRightPadded(stmt, q));
         draft.eof = await q.receive(cu.eof, space => this.visitSpace(space, q));
 
@@ -554,10 +550,8 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.leadingAnnotations = await q.receiveListDefined(draft.leadingAnnotations, el => this.visitDefined<J.Annotation>(el, q));
         draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
         draft.typeParameters = await q.receive(draft.typeParameters, el => this.visitDefined<J.TypeParameters>(el, q));
-        draft.parameters = await q.receive(draft.parameters, el => this.visitDefined<J.Lambda.Parameters>(el, q));
+        draft.lambda = await q.receive(draft.lambda, el => this.visitDefined<J.Lambda>(el, q));
         draft.returnTypeExpression = await q.receive(draft.returnTypeExpression, el => this.visitDefined<TypeTree>(el, q));
-        draft.body = await q.receive(draft.body, el => this.visitLeftPadded(el, q));
-        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
 

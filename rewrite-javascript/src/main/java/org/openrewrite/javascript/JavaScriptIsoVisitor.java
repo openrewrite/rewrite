@@ -33,8 +33,18 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.ArrayBindingPattern visitArrayBindingPattern(JS.ArrayBindingPattern arrayBindingPattern, P p) {
+        return (JS.ArrayBindingPattern) super.visitArrayBindingPattern(arrayBindingPattern, p);
+    }
+
+    @Override
     public JS.ArrowFunction visitArrowFunction(JS.ArrowFunction arrowFunction, P p) {
         return (JS.ArrowFunction) super.visitArrowFunction(arrowFunction, p);
+    }
+
+    @Override
+    public JS.AssignmentOperation visitAssignmentOperation(JS.AssignmentOperation assignOp, P p) {
+        return (JS.AssignmentOperation) super.visitAssignmentOperation(assignOp, p);
     }
 
     @Override
@@ -48,13 +58,48 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.ComputedPropertyMethodDeclaration visitComputedPropertyMethodDeclaration(JS.ComputedPropertyMethodDeclaration method, P p) {
+        return (JS.ComputedPropertyMethodDeclaration) super.visitComputedPropertyMethodDeclaration(method, p);
+    }
+
+    @Override
+    public JS.ConditionalType visitConditionalType(JS.ConditionalType conditionalType, P p) {
+        return (JS.ConditionalType) super.visitConditionalType(conditionalType, p);
+    }
+
+    @Override
     public JS.Delete visitDelete(JS.Delete delete, P p) {
         return (JS.Delete) super.visitDelete(delete, p);
     }
 
     @Override
+    public JS.ExportAssignment visitExportAssignment(JS.ExportAssignment exportAssignment, P p) {
+        return (JS.ExportAssignment) super.visitExportAssignment(exportAssignment, p);
+    }
+
+    @Override
+    public JS.ExportSpecifier visitExportSpecifier(JS.ExportSpecifier exportSpecifier, P p) {
+        return (JS.ExportSpecifier) super.visitExportSpecifier(exportSpecifier, p);
+    }
+
+    @Override
     public JS.ExpressionStatement visitExpressionStatement(JS.ExpressionStatement statement, P p) {
         return (JS.ExpressionStatement) super.visitExpressionStatement(statement, p);
+    }
+
+    @Override
+    public JS.ExpressionWithTypeArguments visitExpressionWithTypeArguments(JS.ExpressionWithTypeArguments expressionWithTypeArguments, P p) {
+        return (JS.ExpressionWithTypeArguments) super.visitExpressionWithTypeArguments(expressionWithTypeArguments, p);
+    }
+
+    @Override
+    public JS.ForInLoop visitForInLoop(JS.ForInLoop forInLoop, P p) {
+        return (JS.ForInLoop) super.visitForInLoop(forInLoop, p);
+    }
+
+    @Override
+    public JS.ForOfLoop visitForOfLoop(JS.ForOfLoop forOfLoop, P p) {
+        return (JS.ForOfLoop) super.visitForOfLoop(forOfLoop, p);
     }
 
     @Override
@@ -73,6 +118,106 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.ImportAttributes visitImportAttributes(JS.ImportAttributes importAttributes, P p) {
+        return (JS.ImportAttributes) super.visitImportAttributes(importAttributes, p);
+    }
+
+    @Override
+    public JS.ImportAttribute visitImportAttribute(JS.ImportAttribute importAttribute, P p) {
+        return (JS.ImportAttribute) super.visitImportAttribute(importAttribute, p);
+    }
+
+    @Override
+    public JS.ExportDeclaration visitExportDeclaration(JS.ExportDeclaration exportDeclaration, P p) {
+        return (JS.ExportDeclaration) super.visitExportDeclaration(exportDeclaration, p);
+    }
+
+    @Override
+    public JS.ImportClause visitImportClause(JS.ImportClause importClause, P p) {
+        return (JS.ImportClause) super.visitImportClause(importClause, p);
+    }
+
+    @Override
+    public JS.ImportSpecifier visitImportSpecifier(JS.ImportSpecifier importSpecifier, P p) {
+        return (JS.ImportSpecifier) super.visitImportSpecifier(importSpecifier, p);
+    }
+
+    @Override
+    public JS.ImportType visitImportType(JS.ImportType importType, P p) {
+        return (JS.ImportType) super.visitImportType(importType, p);
+    }
+
+    @Override
+    public JS.ImportTypeAttributes visitImportTypeAttributes(JS.ImportTypeAttributes importTypeAttributes, P p) {
+        return (JS.ImportTypeAttributes) super.visitImportTypeAttributes(importTypeAttributes, p);
+    }
+
+    @Override
+    public JS.IndexedAccessType visitIndexedAccessType(JS.IndexedAccessType indexedAccessType, P p) {
+        return (JS.IndexedAccessType) super.visitIndexedAccessType(indexedAccessType, p);
+    }
+
+    @Override
+    public JS.IndexSignatureDeclaration visitIndexSignatureDeclaration(JS.IndexSignatureDeclaration indexSignatureDeclaration, P p) {
+        return (JS.IndexSignatureDeclaration) super.visitIndexSignatureDeclaration(indexSignatureDeclaration, p);
+    }
+
+    @Override
+    public JS.IndexedAccessType.IndexType visitIndexedAccessTypeIndexType(JS.IndexedAccessType.IndexType indexedAccessTypeIndexType, P p) {
+        return (JS.IndexedAccessType.IndexType) super.visitIndexedAccessTypeIndexType(indexedAccessTypeIndexType, p);
+    }
+
+    @Override
+    public JS.InferType visitInferType(JS.InferType inferType, P p) {
+        return (JS.InferType) super.visitInferType(inferType, p);
+    }
+
+    @Override
+    public JS.LiteralType visitLiteralType(JS.LiteralType literalType, P p) {
+        return (JS.LiteralType) super.visitLiteralType(literalType, p);
+    }
+
+    @Override
+    public JS.MappedType visitMappedType(JS.MappedType mappedType, P p) {
+        return (JS.MappedType) super.visitMappedType(mappedType, p);
+    }
+
+    @Override
+    public JS.MappedType.KeysRemapping visitMappedTypeKeysRemapping(JS.MappedType.KeysRemapping mappedTypeKeys, P p) {
+        return (JS.MappedType.KeysRemapping) super.visitMappedTypeKeysRemapping(mappedTypeKeys, p);
+    }
+
+    @Override
+    public JS.MappedType.Parameter visitMappedTypeParameter(JS.MappedType.Parameter parameter, P p) {
+        return (JS.MappedType.Parameter) super.visitMappedTypeParameter(parameter, p);
+    }
+
+    @Override
+    public JS.NamedExports visitNamedExports(JS.NamedExports namedExports, P p) {
+        return (JS.NamedExports) super.visitNamedExports(namedExports, p);
+    }
+
+    @Override
+    public JS.NamedImports visitNamedImports(JS.NamedImports namedImports, P p) {
+        return (JS.NamedImports) super.visitNamedImports(namedImports, p);
+    }
+
+    @Override
+    public JS.NamespaceDeclaration visitNamespaceDeclaration(JS.NamespaceDeclaration namespaceDeclaration, P p) {
+        return (JS.NamespaceDeclaration) super.visitNamespaceDeclaration(namespaceDeclaration, p);
+    }
+
+    @Override
+    public JS.Intersection visitIntersection(JS.Intersection intersection, P p) {
+        return (JS.Intersection) super.visitIntersection(intersection, p);
+    }
+
+    @Override
+    public J.IntersectionType visitIntersectionType(J.IntersectionType intersectionType, P p) {
+        return (J.IntersectionType) super.visitIntersectionType(intersectionType, p);
+    }
+
+    @Override
     public JS.ObjectBindingDeclarations visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, P p) {
         return (JS.ObjectBindingDeclarations) super.visitObjectBindingDeclarations(objectBindingDeclarations, p);
     }
@@ -80,6 +225,11 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     @Override
     public JS.PropertyAssignment visitPropertyAssignment(JS.PropertyAssignment propertyAssignment, P p) {
         return (JS.PropertyAssignment) super.visitPropertyAssignment(propertyAssignment, p);
+    }
+
+    @Override
+    public JS.SatisfiesExpression visitSatisfiesExpression(JS.SatisfiesExpression satisfiesExpression, P p) {
+        return (JS.SatisfiesExpression) super.visitSatisfiesExpression(satisfiesExpression, p);
     }
 
     @Override
@@ -93,6 +243,11 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.TaggedTemplateExpression visitTaggedTemplateExpression(JS.TaggedTemplateExpression taggedTemplateExpression, P p) {
+        return (JS.TaggedTemplateExpression) super.visitTaggedTemplateExpression(taggedTemplateExpression, p);
+    }
+
+    @Override
     public JS.TemplateExpression visitTemplateExpression(JS.TemplateExpression templateExpression, P p) {
         return (JS.TemplateExpression) super.visitTemplateExpression(templateExpression, p);
     }
@@ -100,6 +255,11 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     @Override
     public JS.TemplateExpression.Span visitTemplateExpressionSpan(JS.TemplateExpression.Span value, P p) {
         return (JS.TemplateExpression.Span) super.visitTemplateExpressionSpan(value, p);
+    }
+
+    @Override
+    public JS.TrailingTokenStatement visitTrailingTokenStatement(JS.TrailingTokenStatement statement, P p) {
+        return (JS.TrailingTokenStatement) super.visitTrailingTokenStatement(statement, p);
     }
 
     @Override
@@ -113,8 +273,38 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.TypeInfo visitTypeInfo(JS.TypeInfo typeInfo, P p) {
+        return (JS.TypeInfo) super.visitTypeInfo(typeInfo, p);
+    }
+
+    @Override
+    public JS.TypeLiteral visitTypeLiteral(JS.TypeLiteral typeLiteral, P p) {
+        return (JS.TypeLiteral) super.visitTypeLiteral(typeLiteral, p);
+    }
+
+    @Override
     public JS.TypeOf visitTypeOf(JS.TypeOf typeOf, P p) {
         return (JS.TypeOf) super.visitTypeOf(typeOf, p);
+    }
+
+    @Override
+    public JS.TypePredicate visitTypePredicate(JS.TypePredicate typePredicate, P p) {
+        return (JS.TypePredicate) super.visitTypePredicate(typePredicate, p);
+    }
+
+    @Override
+    public JS.TypeQuery visitTypeQuery(JS.TypeQuery typeQuery, P p) {
+        return (JS.TypeQuery) super.visitTypeQuery(typeQuery, p);
+    }
+
+    @Override
+    public JS.TypeTreeExpression visitTypeTreeExpression(JS.TypeTreeExpression typeTreeExpression, P p) {
+        return (JS.TypeTreeExpression) super.visitTypeTreeExpression(typeTreeExpression, p);
+    }
+
+    @Override
+    public JS.WithStatement visitWithStatement(JS.WithStatement withStatement, P p) {
+        return (JS.WithStatement) super.visitWithStatement(withStatement, p);
     }
 
     @Override
@@ -448,5 +638,50 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     @Override
     public J.Wildcard visitWildcard(J.Wildcard wildcard, P p) {
         return (J.Wildcard) super.visitWildcard(wildcard, p);
+    }
+
+    @Override
+    public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, P p) {
+        return (J.DeconstructionPattern) super.visitDeconstructionPattern(deconstructionPattern, p);
+    }
+
+    @Override
+    public J.Erroneous visitErroneous(J.Erroneous erroneous, P p) {
+        return (J.Erroneous) super.visitErroneous(erroneous, p);
+    }
+
+    @Override
+    public J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, P p) {
+        return (J.Lambda.Parameters) super.visitLambdaParameters(parameters, p);
+    }
+
+    @Override
+    public J.Modifier visitModifier(J.Modifier modifer, P p) {
+        return (J.Modifier) super.visitModifier(modifer, p);
+    }
+
+    @Override
+    public J.NullableType visitNullableType(J.NullableType nullableType, P p) {
+        return (J.NullableType) super.visitNullableType(nullableType, p);
+    }
+
+    @Override
+    public J.ParenthesizedTypeTree visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, P p) {
+        return (J.ParenthesizedTypeTree) super.visitParenthesizedTypeTree(parTree, p);
+    }
+
+    @Override
+    public J.TypeParameters visitTypeParameters(J.TypeParameters typeParameters, P p) {
+        return (J.TypeParameters) super.visitTypeParameters(typeParameters, p);
+    }
+
+    @Override
+    public J.Unknown visitUnknown(J.Unknown unknown, P p) {
+        return (J.Unknown) super.visitUnknown(unknown, p);
+    }
+
+    @Override
+    public J.Unknown.Source visitUnknownSource(J.Unknown.Source source, P p) {
+        return (J.Unknown.Source) super.visitUnknownSource(source, p);
     }
 }

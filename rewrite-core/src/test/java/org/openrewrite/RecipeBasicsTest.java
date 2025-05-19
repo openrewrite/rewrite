@@ -80,7 +80,7 @@ class RecipeBasicsTest {
     @Test
     void subclassExposesOptionsViaMethod() {
         RecipeDescriptor d = new ExtendingRecipe("option").createRecipeDescriptor();
-        assertThat(d.getOptions().get(0).getDisplayName()).isEqualTo("Option");
+        assertThat(d.getOptions().getFirst().getDisplayName()).isEqualTo("Option");
     }
 
     static class RecipeWithConstructorParameter extends Recipe {
@@ -104,6 +104,6 @@ class RecipeBasicsTest {
     @Test
     void optionExposedViaConstructorParameter() {
         RecipeDescriptor d = new RecipeWithConstructorParameter("option").createRecipeDescriptor();
-        assertThat(d.getOptions().get(0).getDisplayName()).isEqualTo("Option");
+        assertThat(d.getOptions().getFirst().getDisplayName()).isEqualTo("Option");
     }
 }

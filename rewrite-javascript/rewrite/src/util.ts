@@ -14,5 +14,23 @@
  * limitations under the License.
  */
 export async function mapAsync<T, U>(arr: T[], fn: (t: T, i: number) => Promise<U | undefined>): Promise<U[]> {
-    return (await Promise.all(arr.map(fn))).filter(v => v !== undefined);
+    let results: U[] | undefined = undefined;
+    
+    for (let i = 0; i < arr.length; i++) {
+        const result = await fn(arr[i], i);
+        
+        if (result !== arr[i]) {
+            if (results === undefined) {
+                results = arr.slice(0, i) as unknown[] as U[];
+            }
+            
+            if (result !== undefined) {
+                results.push(result);
+            }
+        } else if (results !== undefined && result !== undefined) {
+            results.push(result);
+        }
+    }
+    
+    return results === undefined ? arr as unknown[] as U[] : results;
 }
