@@ -443,6 +443,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     ).visitNonNull(cu, ctx);
 
                     for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : projectRequiredUpdates.entrySet()) {
+                        if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
+                            continue;
+                        }
                         Map<GradleDependencyConfiguration, String> configs = update.getValue();
                         for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
                             cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
