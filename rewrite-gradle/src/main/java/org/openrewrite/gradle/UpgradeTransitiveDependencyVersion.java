@@ -56,6 +56,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Preconditions.not;
@@ -337,6 +338,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
+        final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc.getUpdatesPerProject());
             private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock();
@@ -376,6 +378,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .collect(Collectors.toSet());
                 Set<GroupArtifactVersion> gavs = new LinkedHashSet<>();
                 for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
+                    if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
+                        continue;
+                    }
                     Map<GradleDependencyConfiguration, String> configs = update.getValue();
                     String groupId = update.getKey().getGroupId();
                     String artifactId = update.getKey().getArtifactId();
@@ -397,6 +402,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     private class UpdateGradle extends JavaVisitor<ExecutionContext> {
 
         final Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject;
+        final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
 
         @SuppressWarnings("NotNullFieldNotInitialized")
         GradleProject gradleProject;
@@ -407,7 +413,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
 
-                if (!updatesPerProject.get(getGradleProjectKey(gradleProject)).isEmpty()) {
+                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap());
+                if (!projectRequiredUpdates.isEmpty()) {
+                    if (projectRequiredUpdates.keySet().stream().noneMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
+                        return cu;
+                    }
                     cu = (JavaSourceFile) Preconditions.check(
                             not(new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
@@ -432,7 +442,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             new AddConstraintsBlock(cu instanceof K.CompilationUnit)
                     ).visitNonNull(cu, ctx);
 
-                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : updatesPerProject.get(getGradleProjectKey(gradleProject)).entrySet()) {
+                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : projectRequiredUpdates.entrySet()) {
+                        if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
+                            continue;
+                        }
                         Map<GradleDependencyConfiguration, String> configs = update.getValue();
                         for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
                             cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),

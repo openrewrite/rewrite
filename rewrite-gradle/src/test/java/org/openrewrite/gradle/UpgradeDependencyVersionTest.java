@@ -1440,7 +1440,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void lockFileGetsUpdated() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "latest.patch", null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "10.0.27", null)),
           //language=groovy
           buildGradle(
             """
@@ -1483,7 +1483,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void multimoduleProjectLockFile() {
         rewriteRun(spec ->
-            spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "latest.patch", null)),
+            spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "10.0.27", null)),
           settingsGradle(
             """
             rootProject.name = 'my-project'
@@ -1716,7 +1716,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void multiProject() {
         rewriteRun(
-            spec -> spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "latest.patch", null)),
+            spec -> spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "10.0.27", null)),
           buildGradle(
             """
               plugins { id 'java' }
