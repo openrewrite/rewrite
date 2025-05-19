@@ -985,7 +985,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         p.append("{");
 
         if (mappedType.prefixToken) {
-            await this.visitLeftPadded(mappedType.prefixToken, p);
+            await this.visitLeftPadded(mappedType.prefixToken, "MAPPED_TYPE_PREFIX_TOKEN", p);
         }
 
         if (mappedType.hasReadonly.element) {
@@ -995,7 +995,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visitKeysRemapping(mappedType.keysRemapping, p);
 
         if (mappedType.suffixToken) {
-            await this.visitLeftPadded(mappedType.suffixToken, p);
+            await this.visitLeftPadded(mappedType.suffixToken, "MAPPED_TYPE_SUFFIX_TOKEN", p);
         }
 
         if (mappedType.hasQuestionToken.element) {
@@ -1118,7 +1118,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         p.append(keyword);
 
-        await this.visitLeftPadded(typeOperator.expression, p);
+        await this.visitLeftPadded(typeOperator.expression, "TYPE_OPERATOR_EXPRESSION", p);
 
         await this.afterSyntax(typeOperator, p);
         return typeOperator;
