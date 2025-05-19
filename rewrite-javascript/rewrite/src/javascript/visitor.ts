@@ -76,7 +76,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
            alias = expression as JS.Alias;
 
         return this.produceJavaScript<JS.Alias>(alias, p, async draft => {
-            draft.propertyName = await this.visitRightPadded(alias.propertyName, p);
+            draft.propertyName = await this.visitRightPadded(alias.propertyName, "ALIAS_PROPERTY_NAME", p);
             draft.alias = await this.visitDefined<Expression>(alias.alias, p);
         });
     }
@@ -118,7 +118,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
-            draft.statements = await mapAsync(compilationUnit.statements, stmt => this.visitRightPadded(stmt, p));
+            draft.statements = await mapAsync(compilationUnit.statements, stmt => this.visitRightPadded(stmt, "JS_COMPILATION_UNIT_STATEMENTS", p));
             draft.eof = await this.visitSpace(compilationUnit.eof, p);
         });
     }
@@ -223,7 +223,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
            importType = expression as JS.ImportType;
 
         return this.produceJavaScript<JS.ImportType>(importType, p, async draft => {
-            draft.hasTypeof = await this.visitRightPadded(importType.hasTypeof, p);
+            draft.hasTypeof = await this.visitRightPadded(importType.hasTypeof, "IMPORT_TYPE_HAS_TYPEOF", p);
             draft.argumentAndAttributes = await this.visitContainer(importType.argumentAndAttributes, "IMPORT_TYPE_ARGUMENT_AND_ATTRIBUTES", p);
             draft.qualifier = importType.qualifier && await this.visitLeftPadded(importType.qualifier, p);
             draft.typeArguments = importType.typeArguments && await this.visitContainer(importType.typeArguments, "IMPORT_TYPE_TYPE_ARGUMENTS", p);
@@ -241,7 +241,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitImportClause(importClause: JS.ImportClause, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ImportClause>(importClause, p, async draft => {
-            draft.name = importClause.name && await this.visitRightPadded(importClause.name, p);
+            draft.name = importClause.name && await this.visitRightPadded(importClause.name, "IMPORT_CLAUSE_NAME", p);
             draft.namedBindings = importClause.namedBindings && await this.visitDefined<Expression>(importClause.namedBindings, p);
         });
     }
@@ -281,7 +281,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ImportTypeAttributes>(importTypeAttributes, p, async draft => {
-            draft.token = await this.visitRightPadded(importTypeAttributes.token, p);
+            draft.token = await this.visitRightPadded(importTypeAttributes.token, "IMPORT_TYPE_ATTRIBUTES_TOKEN", p);
             draft.elements = await this.visitContainer(importTypeAttributes.elements, "IMPORT_TYPE_ATTRIBUTES_ELEMENTS", p);
             draft.end = await this.visitSpace(importTypeAttributes.end, p);
         });
@@ -342,8 +342,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.MappedType.KeysRemapping>(keysRemapping, p, async draft => {
-            draft.typeParameter = await this.visitRightPadded(keysRemapping.typeParameter, p);
-            draft.nameType = keysRemapping.nameType && await this.visitRightPadded(keysRemapping.nameType, p);
+            draft.typeParameter = await this.visitRightPadded(keysRemapping.typeParameter, "KEYS_REMAPPING_TYPE_PARAMETER", p);
+            draft.nameType = keysRemapping.nameType && await this.visitRightPadded(keysRemapping.nameType, "KEYS_REMAPPING_NAME_TYPE", p);
         });
     }
 
@@ -378,7 +378,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         propertyAssignment = statement as JS.PropertyAssignment;
 
         return this.produceJavaScript<JS.PropertyAssignment>(propertyAssignment, p, async draft => {
-            draft.name = await this.visitRightPadded(propertyAssignment.name, p);
+            draft.name = await this.visitRightPadded(propertyAssignment.name, "PROPERTY_ASSIGNMENT_NAME", p);
             draft.initializer = propertyAssignment.initializer && await this.visitDefined<Expression>(propertyAssignment.initializer, p);
         });
     }
@@ -407,7 +407,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return this.produceJavaScript<JS.ScopedVariableDeclarations>(scopedVariableDeclarations, p, async draft => {
             draft.modifiers = await mapAsync(scopedVariableDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.scope = scopedVariableDeclarations.scope && await this.visitLeftPadded(scopedVariableDeclarations.scope, p);
-            draft.variables = await mapAsync(scopedVariableDeclarations.variables, item => this.visitRightPadded(item, p));
+            draft.variables = await mapAsync(scopedVariableDeclarations.variables, item => this.visitRightPadded(item, "SCOPED_VARIABLE_DECLARATIONS_VARIABLES", p));
         });
     }
 
@@ -443,7 +443,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         taggedTemplateExpression = statement as JS.TaggedTemplateExpression;
 
         return this.produceJavaScript<JS.TaggedTemplateExpression>(taggedTemplateExpression, p, async draft => {
-            draft.tag = taggedTemplateExpression.tag && await this.visitRightPadded(taggedTemplateExpression.tag, p);
+            draft.tag = taggedTemplateExpression.tag && await this.visitRightPadded(taggedTemplateExpression.tag, "TAGGED_TEMPLATE_EXPRESSION_TAG", p);
             draft.typeArguments = taggedTemplateExpression.typeArguments && await this.visitContainer(taggedTemplateExpression.typeArguments, "TAGGED_TEMPLATE_EXPRESSION_TYPE_ARGUMENTS", p);
             draft.templateExpression = await this.visitDefined<Expression>(taggedTemplateExpression.templateExpression, p);
             draft.type = taggedTemplateExpression.type && await this.visitType(taggedTemplateExpression.type, p);
@@ -465,7 +465,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.TemplateExpression>(templateExpression, p, async draft => {
             draft.head = await this.visitDefined<J.Literal>(templateExpression.head, p);
-            draft.spans = await mapAsync(templateExpression.spans, item => this.visitRightPadded(item, p));
+            draft.spans = await mapAsync(templateExpression.spans, item => this.visitRightPadded(item, "TEMPLATE_EXPRESSION_SPANS", p));
             draft.type = templateExpression.type && await this.visitType(templateExpression.type, p);
         });
     }
@@ -491,7 +491,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         trailingTokenStatement = statement as JS.TrailingTokenStatement;
 
         return this.produceJavaScript<JS.TrailingTokenStatement>(trailingTokenStatement, p, async draft => {
-            draft.expression = await this.visitRightPadded(trailingTokenStatement.expression, p);
+            draft.expression = await this.visitRightPadded(trailingTokenStatement.expression, "TRAILING_TOKEN_STATEMENT_EXPRESSION", p);
             draft.type = trailingTokenStatement.type && await this.visitType(trailingTokenStatement.type, p);
         });
     }
@@ -575,7 +575,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitIndexType(indexType: JS.IndexedAccessType.IndexType, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.IndexedAccessType.IndexType>(indexType, p, async draft => {
-            draft.element = await this.visitRightPadded(indexType.element, p);
+            draft.element = await this.visitRightPadded(indexType.element, "INDEX_TYPE_ELEMENT", p);
             draft.type = indexType.type && await this.visitType(indexType.type, p);
         });
     }
@@ -614,7 +614,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
            computedPropertyName = expression as JS.ComputedPropertyName;
 
         return this.produceJavaScript<JS.ComputedPropertyName>(computedPropertyName, p, async draft => {
-            draft.expression = await this.visitRightPadded(computedPropertyName.expression, p);
+            draft.expression = await this.visitRightPadded(computedPropertyName.expression, "COMPUTED_PROPERTY_NAME_EXPRESSION", p);
         });
     }
 
@@ -653,7 +653,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
            union = expression as JS.Union;
 
         return this.produceJavaScript<JS.Union>(union, p, async draft => {
-            draft.types = await mapAsync(union.types, item => this.visitRightPadded(item, p));
+            draft.types = await mapAsync(union.types, item => this.visitRightPadded(item, "UNION_TYPES", p));
             draft.type = union.type && await this.visitType(union.type, p);
         });
     }
@@ -666,7 +666,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
            intersection = expression as JS.Intersection;
 
         return this.produceJavaScript<JS.Intersection>(intersection, p, async draft => {
-            draft.types = await mapAsync(intersection.types, item => this.visitRightPadded(item, p));
+            draft.types = await mapAsync(intersection.types, item => this.visitRightPadded(item, "INTERSECTION_TYPES", p));
             draft.type = intersection.type && await this.visitType(intersection.type, p);
         });
     }
@@ -692,7 +692,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.WithStatement>(withStatement, p, async draft => {
             draft.expression = await this.visitDefined<J.ControlParentheses<Expression>>(withStatement.expression, p);
-            draft.body = await this.visitRightPadded(withStatement.body, p);
+            draft.body = await this.visitRightPadded(withStatement.body, "WITH_STATEMENT_BODY", p);
         });
     }
 
@@ -739,7 +739,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     protected async visitForInLoop(forInLoop: JS.ForInLoop, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ForInLoop>(forInLoop, p, async draft => {
             draft.control = await this.visitDefined<JS.ForInLoop.Control>(forInLoop.control, p);
-            draft.body = await this.visitRightPadded(forInLoop.body, p);
+            draft.body = await this.visitRightPadded(forInLoop.body, "FOR_IN_LOOP_BODY", p);
         });
     }
 
@@ -753,7 +753,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return this.produceJavaScript<JS.NamespaceDeclaration>(namespaceDeclaration, p, async draft => {
             draft.modifiers = await mapAsync(namespaceDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.keywordType = await this.visitLeftPadded(namespaceDeclaration.keywordType, p);
-            draft.name = await this.visitRightPadded(namespaceDeclaration.name, p);
+            draft.name = await this.visitRightPadded(namespaceDeclaration.name, "NAMESPACE_DECLARATION_NAME", p);
             draft.body = namespaceDeclaration.body && await this.visitDefined<J.Block>(namespaceDeclaration.body, p);
         });
     }
@@ -780,7 +780,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         bindingElement = statement as JS.BindingElement;
 
         return this.produceJavaScript<JS.BindingElement>(bindingElement, p, async draft => {
-            draft.propertyName = bindingElement.propertyName && await this.visitRightPadded(bindingElement.propertyName, p);
+            draft.propertyName = bindingElement.propertyName && await this.visitRightPadded(bindingElement.propertyName, "BINDING_ELEMENT_PROPERTY_NAME", p);
             draft.name = await this.visitDefined<TypedTree>(bindingElement.name, p);
             draft.initializer = bindingElement.initializer && await this.visitLeftPadded(bindingElement.initializer, p);
             draft.variableType = bindingElement.variableType && (await this.visitType(bindingElement.variableType, p) as JavaType.Variable);

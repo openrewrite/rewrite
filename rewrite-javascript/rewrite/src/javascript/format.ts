@@ -16,7 +16,7 @@
 import {JS} from "./tree";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, J, JavaType, Statement} from "../java";
+import {Comment, J, JavaType, RightPaddedLocation, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isTree, Tree} from "../tree";
 import {SpacesStyle, styleFromSourceFile, StyleKind, WrappingAndBracesStyle, BlankLinesStyle} from "./style";
@@ -204,8 +204,8 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: ExecutionContext): Promise<J.RightPadded<T>> {
-        const ret = await super.visitRightPadded(right, p);
+    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, loc: RightPaddedLocation, p: ExecutionContext): Promise<J.RightPadded<T>> {
+        const ret = await super.visitRightPadded(right, loc, p);
         if (isTree(ret.element)) {
             switch (ret.element.kind) {
                 case J.Kind.NamedVariable:
