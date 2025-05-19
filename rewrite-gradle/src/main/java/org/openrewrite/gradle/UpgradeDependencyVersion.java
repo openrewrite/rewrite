@@ -902,6 +902,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private static org.openrewrite.maven.tree.Dependency maybeUpdateDependency(
             org.openrewrite.maven.tree.Dependency dep,
             org.openrewrite.maven.tree.Dependency newDep) {
+        if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId()) && Objects.equals(dep.getVersion(), newDep.getVersion())) {
+            return dep;
+        }
         if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
             return newDep;
         }
@@ -924,6 +927,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             ResolvedDependency newDep,
             Set<ResolvedDependency> traversalHistory) {
         if (traversalHistory.contains(dep)) {
+            return dep;
+        }
+        if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId()) && Objects.equals(dep.getVersion(), newDep.getVersion())) {
             return dep;
         }
         if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
