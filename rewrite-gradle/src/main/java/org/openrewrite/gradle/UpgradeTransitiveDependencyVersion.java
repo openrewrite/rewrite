@@ -413,7 +413,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
 
-                if (!updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()).isEmpty()) {
+                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap());
+                if (!projectRequiredUpdates.isEmpty()) {
+                    if (projectRequiredUpdates.keySet().stream().noneMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
+                        return cu;
+                    }
                     cu = (JavaSourceFile) Preconditions.check(
                             not(new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
@@ -438,10 +442,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             new AddConstraintsBlock(cu instanceof K.CompilationUnit)
                     ).visitNonNull(cu, ctx);
 
-                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : updatesPerProject.get(getGradleProjectKey(gradleProject)).entrySet()) {
-                        if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
-                            continue;
-                        }
+                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : projectRequiredUpdates.entrySet()) {
                         Map<GradleDependencyConfiguration, String> configs = update.getValue();
                         for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
                             cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
