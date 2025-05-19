@@ -1031,7 +1031,7 @@ class AddImportTest implements RewriteTest {
                   Map<String, String> map = new HashMap<>();
                   Set<String> set = new HashSet<>();
                   List<String> test = Collections.singletonList("test");
-                  List<String> test2 = new java.util.ArrayList<>();
+                  List<String> test2 = new ArrayList<>();
               }
               """
           )
@@ -1546,7 +1546,7 @@ class AddImportTest implements RewriteTest {
               import static com.example.CustomColor.RED;
 
               class Ambiguous {
-                  Color color = java.awt.Color.RED;
+                  Color color = Color.RED;
                   void method() {
                       // RED is from com.example.CustomColor
                       System.out.println(RED);

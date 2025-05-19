@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -172,6 +173,12 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
 
+            if (member != null && typeReference.isPresent()) {
+                cu = (JavaSourceFile) new ShortenFullyQualifiedMemberReferences(typeReference.get()).visit(cu, p);
+            } else if (member == null && typeReference.isPresent()) {
+                cu = (JavaSourceFile) new ShortenFullyQualifiedTypeReferences((JavaType.FullyQualified) typeReference.get()).visit(cu, p);
+            }
+
             // ImportLayoutStyle::addImport adds always `\n` as newlines. Checking if we need to fix them
             newImports = checkCRLF(cu, newImports);
 
@@ -202,7 +209,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                         return ImportStatus.IMPLICITLY_IMPORTED;
                     }
                 }
-                if (ending.equals(member)) {
+                if (!"*".equals(ending) && ending.equals(member)) {
                     return ImportStatus.IMPORT_AMBIGUITY;
                 }
             } else {
@@ -213,7 +220,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                         return ImportStatus.IMPLICITLY_IMPORTED;
                     }
                 }
-                if (ending.equals(typeName)) {
+                if (!"*".equals(ending) && ending.equals(typeName)) {
                     return ImportStatus.IMPORT_AMBIGUITY;
                 }
             }
@@ -317,6 +324,93 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 fieldAccess.set(identifier.getFieldType());
             }
             return identifier;
+        }
+    }
+
+    @AllArgsConstructor
+    private class ShortenFullyQualifiedTypeReferences extends ShortenFullyQualifiedReference {
+        private final JavaType.FullyQualified typeToShorten;
+
+        @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            if (fieldAccess.isFullyQualifiedClassReference(typeToShorten.getFullyQualifiedName())) {
+                return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+            }
+            return super.visitFieldAccess(fieldAccess, p);
+        }
+
+        @Override
+        public J visitIdentifier(J.Identifier identifier, P p) {
+            if (isFullyQualifiedClassReference(identifier, typeToShorten.getFullyQualifiedName())) {
+                return identifier.withSimpleName(typeToShorten.getClassName());
+            }
+            return super.visitIdentifier(identifier, p);
+        }
+    }
+
+    @AllArgsConstructor
+    private class ShortenFullyQualifiedMemberReferences extends ShortenFullyQualifiedReference {
+        private final JavaType memberToShorten;
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation methodInvocation, P p) {
+            J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(methodInvocation, p);
+            if (!(memberToShorten instanceof JavaType.Method)) {
+                return mi;
+            }
+            JavaType.Method m = (JavaType.Method) memberToShorten;
+            JavaType.FullyQualified targetType = m.getDeclaringType();
+
+            if (isFullyQualifiedClassReference(mi.getSelect(), targetType.getFullyQualifiedName()) && mi.getSimpleName().equals(m.getName())) {
+                return methodInvocation.withSelect(null);
+            }
+            return mi;
+        }
+
+        @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            if (!(memberToShorten instanceof JavaType.Variable)) {
+                return super.visitFieldAccess(fieldAccess, p);
+            }
+            JavaType.Variable var = (JavaType.Variable) memberToShorten;
+            JavaType.FullyQualified targetType = (JavaType.FullyQualified) var.getOwner();
+            if (targetType != null) {
+                if (fieldAccess.getTarget() instanceof J.FieldAccess) {
+                    J.FieldAccess target = (J.FieldAccess) fieldAccess.getTarget();
+                    if (target.isFullyQualifiedClassReference(targetType.getFullyQualifiedName())) {
+                        return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+                    }
+                }
+            }
+            return super.visitFieldAccess(fieldAccess, p);
+        }
+    }
+
+    private abstract class ShortenFullyQualifiedReference extends JavaVisitor<P> {
+        @Override
+        public J visitImport(J.Import _import, P p) {
+            return _import;
+        }
+
+        @Override
+        protected JavadocVisitor<P> getJavadocVisitor() {
+            return new JavadocVisitor<P>(new JavaVisitor<>()) {
+                @Override
+                public Javadoc visitReference(Javadoc.Reference reference, P p) {
+                    return reference;
+                }
+            };
+        }
+
+        protected boolean isFullyQualifiedClassReference(@Nullable Expression expr, String className) {
+            if (expr instanceof J.FieldAccess) {
+                return ((J.FieldAccess) expr).isFullyQualifiedClassReference(className);
+            }
+            if (expr instanceof J.Identifier) {
+                J.Identifier id = (J.Identifier) expr;
+                return id.getFieldType() == null && id.getSimpleName().equals(className);
+            }
+            return false;
         }
     }
 }
