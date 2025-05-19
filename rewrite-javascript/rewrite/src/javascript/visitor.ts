@@ -182,7 +182,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.ExpressionWithTypeArguments>(expressionWithTypeArguments, p, async draft => {
             draft.clazz = await this.visitDefined<J>(expressionWithTypeArguments.clazz, p);
-            draft.typeArguments = expressionWithTypeArguments.typeArguments && await this.visitContainer(expressionWithTypeArguments.typeArguments, p);
+            draft.typeArguments = expressionWithTypeArguments.typeArguments && await this.visitContainer(expressionWithTypeArguments.typeArguments, "EXPRESSION_WITH_TYPE_ARGUMENTS_TYPE_ARGUMENTS", p);
             draft.type = expressionWithTypeArguments.type && await this.visitType(expressionWithTypeArguments.type, p);
         });
     }
@@ -197,7 +197,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return this.produceJavaScript<JS.FunctionType>(functionType, p, async draft => {
             draft.constructorType = await this.visitLeftPadded(functionType.constructorType, p);
             draft.typeParameters = functionType.typeParameters && await this.visitDefined<J.TypeParameters>(functionType.typeParameters, p);
-            draft.parameters = await this.visitContainer(functionType.parameters, p);
+            draft.parameters = await this.visitContainer(functionType.parameters, "FUNCTION_TYPE_PARAMETERS", p);
             draft.returnType = await this.visitLeftPadded(functionType.returnType, p);
         });
     }
@@ -224,9 +224,9 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.ImportType>(importType, p, async draft => {
             draft.hasTypeof = await this.visitRightPadded(importType.hasTypeof, p);
-            draft.argumentAndAttributes = await this.visitContainer(importType.argumentAndAttributes, p);
+            draft.argumentAndAttributes = await this.visitContainer(importType.argumentAndAttributes, "IMPORT_TYPE_ARGUMENT_AND_ATTRIBUTES", p);
             draft.qualifier = importType.qualifier && await this.visitLeftPadded(importType.qualifier, p);
-            draft.typeArguments = importType.typeArguments && await this.visitContainer(importType.typeArguments, p);
+            draft.typeArguments = importType.typeArguments && await this.visitContainer(importType.typeArguments, "IMPORT_TYPE_TYPE_ARGUMENTS", p);
             draft.type = importType.type && await this.visitType(importType.type, p);
         });
     }
@@ -254,7 +254,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
            namedImports = expression as JS.NamedImports;
 
         return this.produceJavaScript<JS.NamedImports>(namedImports, p, async draft => {
-            draft.elements = await this.visitContainer(namedImports.elements, p);
+            draft.elements = await this.visitContainer(namedImports.elements, "NAMED_IMPORTS_ELEMENTS", p);
             draft.type = namedImports.type && await this.visitType(namedImports.type, p);
         });
     }
@@ -275,14 +275,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitImportAttributes(importAttributes: JS.ImportAttributes, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ImportAttributes>(importAttributes, p, async draft => {
-            draft.elements = await this.visitContainer(importAttributes.elements, p);
+            draft.elements = await this.visitContainer(importAttributes.elements, "IMPORT_ATTRIBUTES_ELEMENTS", p);
         });
     }
 
     protected async visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ImportTypeAttributes>(importTypeAttributes, p, async draft => {
             draft.token = await this.visitRightPadded(importTypeAttributes.token, p);
-            draft.elements = await this.visitContainer(importTypeAttributes.elements, p);
+            draft.elements = await this.visitContainer(importTypeAttributes.elements, "IMPORT_TYPE_ATTRIBUTES_ELEMENTS", p);
             draft.end = await this.visitSpace(importTypeAttributes.end, p);
         });
     }
@@ -335,7 +335,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.keysRemapping = await this.visitDefined<JS.MappedType.KeysRemapping>(mappedType.keysRemapping, p);
             draft.suffixToken = mappedType.suffixToken && await this.visitLeftPadded(mappedType.suffixToken, p);
             draft.hasQuestionToken = await this.visitLeftPadded(mappedType.hasQuestionToken, p);
-            draft.valueType = await this.visitContainer(mappedType.valueType, p);
+            draft.valueType = await this.visitContainer(mappedType.valueType, "MAPPED_TYPE_VALUE_TYPE", p);
             draft.type = mappedType.type && await this.visitType(mappedType.type, p);
         });
     }
@@ -365,7 +365,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.leadingAnnotations = await mapAsync(objectBindingDeclarations.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
             draft.modifiers = await mapAsync(objectBindingDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.typeExpression = objectBindingDeclarations.typeExpression && await this.visitDefined<TypedTree>(objectBindingDeclarations.typeExpression, p);
-            draft.bindings = await this.visitContainer(objectBindingDeclarations.bindings, p);
+            draft.bindings = await this.visitContainer(objectBindingDeclarations.bindings, "OBJECT_BINDING_DECLARATIONS_BINDINGS", p);
             draft.initializer = objectBindingDeclarations.initializer && await this.visitLeftPadded(objectBindingDeclarations.initializer, p);
         });
     }
@@ -444,7 +444,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.TaggedTemplateExpression>(taggedTemplateExpression, p, async draft => {
             draft.tag = taggedTemplateExpression.tag && await this.visitRightPadded(taggedTemplateExpression.tag, p);
-            draft.typeArguments = taggedTemplateExpression.typeArguments && await this.visitContainer(taggedTemplateExpression.typeArguments, p);
+            draft.typeArguments = taggedTemplateExpression.typeArguments && await this.visitContainer(taggedTemplateExpression.typeArguments, "TAGGED_TEMPLATE_EXPRESSION_TYPE_ARGUMENTS", p);
             draft.templateExpression = await this.visitDefined<Expression>(taggedTemplateExpression.templateExpression, p);
             draft.type = taggedTemplateExpression.type && await this.visitType(taggedTemplateExpression.type, p);
         });
@@ -504,7 +504,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
            tuple = expression as JS.Tuple;
 
         return this.produceJavaScript<JS.Tuple>(tuple, p, async draft => {
-            draft.elements = await this.visitContainer(tuple.elements, p);
+            draft.elements = await this.visitContainer(tuple.elements, "TUPLE_ELEMENTS", p);
             draft.type = tuple.type && await this.visitType(tuple.type, p);
         });
     }
@@ -589,7 +589,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.TypeQuery>(typeQuery, p, async draft => {
             draft.typeExpression = await this.visitDefined<TypedTree>(typeQuery.typeExpression, p);
-            draft.typeArguments = typeQuery.typeArguments && await this.visitContainer(typeQuery.typeArguments, p);
+            draft.typeArguments = typeQuery.typeArguments && await this.visitContainer(typeQuery.typeArguments, "TYPE_QUERY_TYPE_ARGUMENTS", p);
             draft.type = typeQuery.type && await this.visitType(typeQuery.type, p);
         });
     }
@@ -705,7 +705,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.IndexSignatureDeclaration>(indexSignatureDeclaration, p, async draft => {
             draft.modifiers = await mapAsync(indexSignatureDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.parameters = await this.visitContainer(indexSignatureDeclaration.parameters, p);
+            draft.parameters = await this.visitContainer(indexSignatureDeclaration.parameters, "INDEX_SIGNATURE_DECLARATION_PARAMETERS", p);
             draft.typeExpression = await this.visitLeftPadded(indexSignatureDeclaration.typeExpression, p);
             draft.type = indexSignatureDeclaration.type && await this.visitType(indexSignatureDeclaration.type, p);
         });
@@ -724,7 +724,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.typeParameters = computedPropMethod.typeParameters && await this.visitDefined<J.TypeParameters>(computedPropMethod.typeParameters, p);
             draft.returnTypeExpression = computedPropMethod.returnTypeExpression && await this.visitDefined<TypedTree>(computedPropMethod.returnTypeExpression, p);
             draft.name = await this.visitDefined<ComputedPropertyName>(computedPropMethod.name, p);
-            draft.parameters = await this.visitContainer(computedPropMethod.parameters, p);
+            draft.parameters = await this.visitContainer(computedPropMethod.parameters, "COMPUTED_PROPERTY_METHOD_DECLARATION_PARAMETERS", p);
             draft.body = computedPropMethod.body && await this.visitDefined<J.Block>(computedPropMethod.body, p);
             draft.methodType = computedPropMethod.methodType && (await this.visitType(computedPropMethod.methodType, p) as JavaType.Method);
         });
@@ -767,7 +767,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitArrayBindingPattern(arrayBindingPattern: JS.ArrayBindingPattern, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.ArrayBindingPattern>(arrayBindingPattern, p, async draft => {
-            draft.elements = await this.visitContainer(arrayBindingPattern.elements, p);
+            draft.elements = await this.visitContainer(arrayBindingPattern.elements, "ARRAY_BINDING_PATTERN_ELEMENTS", p);
             draft.type = arrayBindingPattern.type && await this.visitType(arrayBindingPattern.type, p);
         });
     }
@@ -817,7 +817,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitNamedExports(namedExports: JS.NamedExports, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.NamedExports>(namedExports, p, async draft => {
-            draft.elements = await this.visitContainer(namedExports.elements, p);
+            draft.elements = await this.visitContainer(namedExports.elements, "NAMED_EXPORTS_ELEMENTS", p);
             draft.type = namedExports.type && await this.visitType(namedExports.type, p);
         });
     }

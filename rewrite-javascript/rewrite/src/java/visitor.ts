@@ -21,6 +21,7 @@ import {isTree,
     ValidImmerRecipeReturnType
 } from "../";
 import {
+    ContainerLocation,
     Expression,
     isJava,
     isSpace,
@@ -85,7 +86,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         return this.produceJava<J.Annotation>(annotation, p, async draft => {
             draft.annotationType = await this.visitTypeName(annotation.annotationType, p);
-            draft.arguments = await this.visitOptionalContainer(annotation.arguments, p);
+            draft.arguments = await this.visitOptionalContainer(annotation.arguments, "ANNOTATION_ARGUMENTS", p);
         });
     }
 
@@ -218,8 +219,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         aCase = statement as J.Case;
 
         return this.produceJava<J.Case>(aCase, p, async draft => {
-            draft.caseLabels = await this.visitContainer(aCase.caseLabels, p);
-            draft.statements = await this.visitContainer(aCase.statements, p);
+            draft.caseLabels = await this.visitContainer(aCase.caseLabels, "CASE_LABELS", p);
+            draft.statements = await this.visitContainer(aCase.statements, "CASE_STATEMENTS", p);
             draft.body = await this.visitOptionalRightPadded(aCase.body, p);
             if (aCase.guard) {
                 draft.guard = await this.visitDefined(aCase.guard, p) as Expression;
@@ -239,11 +240,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.modifiers = await mapAsync(classDecl.modifiers, m => this.visitDefined<J.Modifier>(m, p));
             draft.classKind = await this.visitDefined(classDecl.classKind, p) as J.ClassDeclaration.Kind;
             draft.name = await this.visitDefined(classDecl.name, p) as J.Identifier;
-            draft.typeParameters = await this.visitOptionalContainer(classDecl.typeParameters, p);
-            draft.primaryConstructor = await this.visitOptionalContainer(classDecl.primaryConstructor, p);
+            draft.typeParameters = await this.visitOptionalContainer(classDecl.typeParameters, "CLASS_DECLARATION_TYPE_PARAMETERS", p);
+            draft.primaryConstructor = await this.visitOptionalContainer(classDecl.primaryConstructor, "CLASS_DECLARATION_PRIMARY_CONSTRUCTOR", p);
             draft.extends = await this.visitOptionalLeftPadded(classDecl.extends, p);
-            draft.implements = await this.visitOptionalContainer(classDecl.implements, p);
-            draft.permitting = await this.visitOptionalContainer(classDecl.permitting, p);
+            draft.implements = await this.visitOptionalContainer(classDecl.implements, "CLASS_DECLARATION_IMPLEMENTS", p);
+            draft.permitting = await this.visitOptionalContainer(classDecl.permitting, "CLASS_DECLARATION_PERMITTING", p);
             draft.body = await this.visitDefined(classDecl.body, p) as J.Block;
             draft.type = await this.visitType(classDecl.type, p) as JavaType.Class | undefined;
         });
@@ -287,7 +288,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitDeconstructionPattern(pattern: J.DeconstructionPattern, p: P): Promise<J | undefined> {
         return this.produceJava<J.DeconstructionPattern>(pattern, p, async draft => {
             draft.deconstructor = await this.visitDefined(pattern.deconstructor, p) as Expression;
-            draft.nested = await this.visitContainer(pattern.nested, p);
+            draft.nested = await this.visitContainer(pattern.nested, "DECONSTRUCTION_PATTERN", p);
             draft.type = await this.visitType(pattern.type, p);
         });
     }
@@ -492,7 +493,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         intersectionType = expression as J.IntersectionType;
 
         return this.produceJava<J.IntersectionType>(intersectionType, p, async draft => {
-            draft.bounds = await this.visitContainer(intersectionType.bounds, p);
+            draft.bounds = await this.visitContainer(intersectionType.bounds, "INTERSECTION_TYPE", p);
         });
     }
 
@@ -557,7 +558,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         return this.produceJava<J.MemberReference>(memberRef, p, async draft => {
             draft.containing = await this.visitRightPadded(memberRef.containing, p);
-            draft.typeParameters = await this.visitOptionalContainer(memberRef.typeParameters, p);
+            draft.typeParameters = await this.visitOptionalContainer(memberRef.typeParameters, "MEMBER_REFERENCE_TYPE_PARAMETERS", p);
             draft.reference = await this.visitLeftPadded(memberRef.reference, p);
             draft.type = await this.visitType(memberRef.type, p);
             draft.methodType = await this.visitType(memberRef.methodType, p) as JavaType.Method | undefined;
@@ -580,8 +581,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
             draft.nameAnnotations = await mapAsync(methodDecl.nameAnnotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.name = await this.visitDefined(methodDecl.name, p);
-            draft.parameters = await this.visitContainer(methodDecl.parameters, p);
-            draft.throws = methodDecl.throws && await this.visitContainer(methodDecl.throws, p);
+            draft.parameters = await this.visitContainer(methodDecl.parameters, "METHOD_DECLARATION_PARAMETERS", p);
+            draft.throws = methodDecl.throws && await this.visitContainer(methodDecl.throws, "METHOD_DECLARATION_THROWS", p);
             draft.body = methodDecl.body && await this.visitDefined(methodDecl.body, p) as J.Block;
             draft.defaultValue = await this.visitOptionalLeftPadded(methodDecl.defaultValue, p);
             draft.methodType = await this.visitType(methodDecl.methodType, p) as JavaType.Method | undefined;
@@ -597,9 +598,9 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         return this.produceJava<J.MethodInvocation>(methodInv, p, async draft => {
             draft.select = await this.visitOptionalRightPadded(methodInv.select, p);
-            draft.typeParameters = await this.visitOptionalContainer(methodInv.typeParameters, p);
+            draft.typeParameters = await this.visitOptionalContainer(methodInv.typeParameters, "METHOD_INVOCATION_TYPE_PARAMETERS", p);
             draft.name = await this.visitDefined(methodInv.name, p) as J.Identifier;
-            draft.arguments = await this.visitContainer(methodInv.arguments, p);
+            draft.arguments = await this.visitContainer(methodInv.arguments, "METHOD_INVOCATION_ARGUMENTS", p);
             draft.methodType = await this.visitType(methodInv.methodType, p) as JavaType.Method | undefined;
         });
     }
@@ -631,7 +632,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.dimensions = await mapAsync(newArray.dimensions, dim =>
                 this.visitDefined<J.ArrayDimension>(dim, p));
 
-            draft.initializer = await this.visitOptionalContainer(newArray.initializer, p);
+            draft.initializer = await this.visitOptionalContainer(newArray.initializer, "NEW_ARRAY_INITIALIZER", p);
             draft.type = await this.visitType(newArray.type, p);
         });
     }
@@ -654,7 +655,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
                 draft.class = await this.visitDefined(newClass.class, p) as TypedTree;
             }
 
-            draft.arguments = await this.visitContainer(newClass.arguments, p);
+            draft.arguments = await this.visitContainer(newClass.arguments, "NEW_CLASS_ARGUMENTS", p);
 
             if (newClass.body) {
                 draft.body = await this.visitDefined(newClass.body, p) as J.Block;
@@ -689,7 +690,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitParameterizedType(parameterizedType: J.ParameterizedType, p: P): Promise<J | undefined> {
         return this.produceJava<J.ParameterizedType>(parameterizedType, p, async draft => {
             draft.class = await this.visitTypeName(parameterizedType.class, p);
-            draft.typeParameters = await this.visitOptionalContainer(parameterizedType.typeParameters, p);
+            draft.typeParameters = await this.visitOptionalContainer(parameterizedType.typeParameters, "PARAMETRIZED_TYPE_TYPE_PARAMETERS", p);
             draft.type = await this.visitType(parameterizedType.type, p);
         });
     }
@@ -820,7 +821,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         tryable = statement as J.Try;
 
         return this.produceJava<J.Try>(tryable, p, async draft => {
-            draft.resources = await this.visitOptionalContainer(tryable.resources, p);
+            draft.resources = await this.visitOptionalContainer(tryable.resources, "TRY_RESOURCES", p);
             draft.body = await this.visitDefined(tryable.body, p) as J.Block;
             draft.catches = await mapAsync(tryable.catches, c => this.visitDefined<J.Try.Catch>(c, p));
             draft.finally = await this.visitOptionalLeftPadded(tryable.finally, p);
@@ -858,7 +859,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.annotations = await mapAsync(typeParam.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.modifiers = await mapAsync(typeParam.modifiers, m => this.visitDefined<J.Modifier>(m, p));
             draft.name = await this.visitDefined(typeParam.name, p) as J.Identifier;
-            draft.bounds = await this.visitOptionalContainer(typeParam.bounds, p);
+            draft.bounds = await this.visitOptionalContainer(typeParam.bounds, "TYPE_PARAMETER_BOUNDS", p);
         });
     }
 
@@ -1013,11 +1014,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitOptionalContainer<T extends J>(container: J.Container<T> | undefined, p: P): Promise<J.Container<T> | undefined> {
-        return container ? this.visitContainer(container, p) : undefined;
+    protected async visitOptionalContainer<T extends J>(container: J.Container<T> | undefined, loc: ContainerLocation, p: P): Promise<J.Container<T> | undefined> {
+        return container ? this.visitContainer(container, loc, p) : undefined;
     }
 
-    protected async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
+    protected async visitContainer<T extends J>(container: J.Container<T>, loc: ContainerLocation, p: P): Promise<J.Container<T>> {
         return produceAsync<J.Container<T>>(container, async draft => {
             draft.before = await this.visitSpace(container.before, p);
             (draft.elements as J.RightPadded<J>[]) = await mapAsync(container.elements, e => this.visitRightPadded(e, p));
