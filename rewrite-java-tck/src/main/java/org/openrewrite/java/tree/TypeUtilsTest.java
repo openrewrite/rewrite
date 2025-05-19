@@ -34,8 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.tree.TypeUtils.TypeMode.BOUND;
-import static org.openrewrite.java.tree.TypeUtils.TypeMode.INFER;
+import static org.openrewrite.java.tree.TypeUtils.ResolutionContext.BOUND;
+import static org.openrewrite.java.tree.TypeUtils.ResolutionContext.INFER;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")

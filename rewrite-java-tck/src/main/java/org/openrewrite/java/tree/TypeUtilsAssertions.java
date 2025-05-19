@@ -23,8 +23,8 @@ import org.openrewrite.java.JavaIsoVisitor;
 
 import java.util.*;
 
-import static org.openrewrite.java.tree.TypeUtils.TypeMode.BOUND;
-import static org.openrewrite.java.tree.TypeUtils.TypeMode.INFER;
+import static org.openrewrite.java.tree.TypeUtils.ResolutionContext.BOUND;
+import static org.openrewrite.java.tree.TypeUtils.ResolutionContext.INFER;
 
 class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
     Map<String, List<JavaType>> types = new HashMap<>();
@@ -66,7 +66,7 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
         return isAssignableTo(to, from, BOUND);
     }
 
-    public BooleanAssert isAssignableTo(String to, String from, TypeUtils.TypeMode mode) {
+    public BooleanAssert isAssignableTo(String to, String from, TypeUtils.ResolutionContext mode) {
         JavaType toType = getFirst(to);
         JavaType fromType = getLast(from);
         return assertThat(TypeUtils.isAssignableTo(toType, fromType, mode))
@@ -77,14 +77,14 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
         return isOfType(to, from, BOUND);
     }
 
-    public BooleanAssert isOfType(String to, String from, TypeUtils.TypeMode mode) {
+    public BooleanAssert isOfType(String to, String from, TypeUtils.ResolutionContext mode) {
         JavaType toType = getFirst(to);
         JavaType fromType = getLast(from);
         return assertThat(TypeUtils.isOfType(toType, fromType, mode))
           .describedAs("isOfType(%s, %s, %s)", to, from, describe(mode));
     }
 
-    private String describe(TypeUtils.TypeMode mode) {
+    private String describe(TypeUtils.ResolutionContext mode) {
         if (mode == BOUND) {
             return "BOUND";
         } else if (mode == INFER) {

@@ -25,8 +25,8 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.java.tree.TypeUtils.TypeMode.Mode.FROM;
-import static org.openrewrite.java.tree.TypeUtils.TypeMode.Mode.TO;
+import static org.openrewrite.java.tree.TypeUtils.ResolutionContext.Direction.FROM;
+import static org.openrewrite.java.tree.TypeUtils.ResolutionContext.Direction.TO;
 
 public class TypeUtils {
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
@@ -121,10 +121,10 @@ public class TypeUtils {
      * {@link JavaType.GenericTypeVariable} will be checked for {@link JavaType.GenericTypeVariable.Variance} and each of the bounds.
      */
     public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2) {
-        return isOfType(type1, type2, TypeMode.BOUND);
+        return isOfType(type1, type2, ResolutionContext.BOUND);
     }
 
-    public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2, TypeMode mode) {
+    public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2, ResolutionContext mode) {
         if (type1 == type2 && !(type1 instanceof JavaType.Unknown)) {
             return true;
         }
@@ -144,7 +144,7 @@ public class TypeUtils {
         return isOfTypeCore(type1, type2, mode);
     }
 
-    private static boolean isOfTypeMethod(JavaType.Method type1, JavaType.Method type2, TypeMode mode) {
+    private static boolean isOfTypeMethod(JavaType.Method type1, JavaType.Method type2, ResolutionContext mode) {
         if (!type1.getName().equals(type2.getName()) ||
             type1.getFlagsBitMap() != type2.getFlagsBitMap() ||
             !TypeUtils.isOfType(type1.getDeclaringType(), type2.getDeclaringType(), mode) ||
@@ -167,7 +167,7 @@ public class TypeUtils {
         return true;
     }
 
-    private static boolean isOfTypeVariable(JavaType.Variable var1, JavaType.Variable var2, TypeMode mode) {
+    private static boolean isOfTypeVariable(JavaType.Variable var1, JavaType.Variable var2, ResolutionContext mode) {
         return isOfType(var1.getType(), var2.getType(), mode) && isOfType(var1.getOwner(), var2.getOwner(), mode) &&
                 var1.getName().equals(var2.getName());
     }
@@ -237,7 +237,7 @@ public class TypeUtils {
         return false;
     }
 
-    private static boolean isOfTypeCore(@Nullable JavaType to, @Nullable JavaType from, TypeMode mode) {
+    private static boolean isOfTypeCore(@Nullable JavaType to, @Nullable JavaType from, ResolutionContext mode) {
         if (isPseudoType(to) || isPseudoType(from)) {
             return false;
         }
@@ -246,7 +246,7 @@ public class TypeUtils {
         }
 
         // Try to match captures
-        if (mode.get() == TO && isTypeVariable(to) || mode.get() == FROM && isTypeVariable(from)) {
+        if (mode.direction() == TO && isTypeVariable(to) || mode.direction() == FROM && isTypeVariable(from)) {
             return isAssignableToCore(to, from, mode);
         }
 
@@ -269,7 +269,7 @@ public class TypeUtils {
         return false;
     }
 
-    private static boolean isOfTypeGeneric(JavaType.GenericTypeVariable to, JavaType.GenericTypeVariable from, TypeMode mode) {
+    private static boolean isOfTypeGeneric(JavaType.GenericTypeVariable to, JavaType.GenericTypeVariable from, ResolutionContext mode) {
         if (!to.getName().equals(from.getName()) ||
                 to.getVariance() != from.getVariance() ||
                 to.getBounds().size() != from.getBounds().size()) {
@@ -283,14 +283,14 @@ public class TypeUtils {
         return true;
     }
 
-    private static boolean isOfTypeFullyQualified(JavaType.FullyQualified to, JavaType.FullyQualified from, TypeMode mode) {
+    private static boolean isOfTypeFullyQualified(JavaType.FullyQualified to, JavaType.FullyQualified from, ResolutionContext mode) {
         if (!TypeUtils.fullyQualifiedNamesAreEqual(to.getFullyQualifiedName(), from.getFullyQualifiedName())) {
             return false;
         }
         if (to instanceof JavaType.Class && from instanceof JavaType.Class) {
             return true;
         } else if (to instanceof JavaType.Parameterized && from instanceof JavaType.Parameterized) {
-            if (mode.contains(to, from)) {
+            if (mode.isResolving(to, from)) {
                 return true;
             }
             if (to.getTypeParameters().size() != from.getTypeParameters().size()) {
@@ -299,7 +299,7 @@ public class TypeUtils {
             List<JavaType> toTypeParams = to.getTypeParameters();
             List<JavaType> fromTypeParams = from.getTypeParameters();
             for (int i = 0; i < toTypeParams.size(); i++) {
-                if (!isOfTypeCore(toTypeParams.get(i), fromTypeParams.get(i), mode.push(to, from))) {
+                if (!isOfTypeCore(toTypeParams.get(i), fromTypeParams.get(i), mode.pushResolving(to, from))) {
                     return false;
                 }
             }
@@ -308,11 +308,11 @@ public class TypeUtils {
         return false;
     }
 
-    private static boolean isOfTypePrimitive(JavaType.Primitive to, JavaType.Primitive from, TypeMode mode) {
+    private static boolean isOfTypePrimitive(JavaType.Primitive to, JavaType.Primitive from, ResolutionContext mode) {
         return to == from;
     }
 
-    private static boolean isOfTypeArray(JavaType.Array to, JavaType.Array from, TypeMode mode) {
+    private static boolean isOfTypeArray(JavaType.Array to, JavaType.Array from, ResolutionContext mode) {
         if (to.getElemType() instanceof JavaType.Primitive || from.getElemType() instanceof JavaType.Primitive) {
             // Avoid incorrect inference of array types
             return to.getElemType() == from.getElemType();
@@ -320,7 +320,7 @@ public class TypeUtils {
         return isOfTypeCore(to.getElemType(), from.getElemType(), mode);
     }
 
-    private static boolean isOfTypeList(List<JavaType> to, List<JavaType> from, TypeMode mode) {
+    private static boolean isOfTypeList(List<JavaType> to, List<JavaType> from, ResolutionContext mode) {
         if (to.size() != from.size() ||
                 to.stream().anyMatch(e -> !(e instanceof JavaType.FullyQualified)) ||
                 from.stream().anyMatch(e -> !(e instanceof JavaType.FullyQualified))) {
@@ -398,10 +398,10 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
-        return isAssignableTo(to, from, TypeMode.BOUND);
+        return isAssignableTo(to, from, ResolutionContext.BOUND);
     }
 
-    public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, TypeMode mode) {
+    public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, ResolutionContext mode) {
         try {
             if (to == from && !(to instanceof JavaType.Unknown)) {
                 return true;
@@ -429,7 +429,7 @@ public class TypeUtils {
         }
     }
 
-    private static boolean isAssignableToMethod(JavaType.Method type1, JavaType.Method type2, TypeMode mode) {
+    private static boolean isAssignableToMethod(JavaType.Method type1, JavaType.Method type2, ResolutionContext mode) {
         if (!type1.getName().equals(type2.getName()) ||
                 Flag.hasFlags(type1.getFlagsBitMap(), Flag.Static) != Flag.hasFlags(type2.getFlagsBitMap(), Flag.Static) ||
                 !TypeUtils.isAssignableTo(type1.getDeclaringType(), type2.getDeclaringType(), mode) ||
@@ -445,12 +445,12 @@ public class TypeUtils {
         return true;
     }
 
-    private static boolean isAssignableToVariable(JavaType.Variable var1, JavaType.Variable var2, TypeMode mode) {
+    private static boolean isAssignableToVariable(JavaType.Variable var1, JavaType.Variable var2, ResolutionContext mode) {
         return isAssignableTo(var1.getType(), var2.getType(), mode) && isAssignableTo(var1.getOwner(), var2.getOwner(), mode) &&
                 var1.getName().equals(var2.getName());
     }
 
-    private static boolean isAssignableToCore(@Nullable JavaType to, @Nullable JavaType from, TypeMode mode) {
+    private static boolean isAssignableToCore(@Nullable JavaType to, @Nullable JavaType from, ResolutionContext mode) {
         if (isPseudoType(to) || isPseudoType(from)) {
             return false;
         }
@@ -462,7 +462,7 @@ public class TypeUtils {
         }
 
         // Handle generic type variables (e.g., T extends Collection<String>)
-        if (mode.get() == FROM && isTypeVariable(from)) {
+        if (mode.direction() == FROM && isTypeVariable(from)) {
             // Is there anything we can validate?
             return true;
         } else if (to instanceof JavaType.GenericTypeVariable) {
@@ -503,8 +503,8 @@ public class TypeUtils {
         return false;
     }
 
-    private static boolean isAssignableToGeneric(JavaType.GenericTypeVariable to, JavaType from, TypeMode mode) {
-        if (isWildcard(to) || mode.get() == TO) {
+    private static boolean isAssignableToGeneric(JavaType.GenericTypeVariable to, JavaType from, ResolutionContext mode) {
+        if (isWildcard(to) || mode.direction() == TO) {
             // If target "to" wildcard is unbounded, it accepts anything
             if (to.getBounds().isEmpty()) {
                 return true;
@@ -539,11 +539,11 @@ public class TypeUtils {
                     return isAssignableToCore(target, source, mode);
                 case CONTRAVARIANT:
                     // ? super TARGET. Source must be assignable from target.
-                    return isAssignableToCore(source, target, mode.reverse());
+                    return isAssignableToCore(source, target, mode.flipDirection());
                 default:
                     // In Java, an invariant wildcard with bounds (e.g., ? T) is not valid syntax
                     // Could a capture come this way?
-                    assert mode.get() == TO;
+                    assert mode.direction() == TO;
                     return isAssignableToCore(target, source, mode);
             }
         }
@@ -568,16 +568,16 @@ public class TypeUtils {
     }
 
     // Handle cases
-    private static boolean isAssignableFromGeneric(JavaType to, JavaType.GenericTypeVariable from, TypeMode mode) {
+    private static boolean isAssignableFromGeneric(JavaType to, JavaType.GenericTypeVariable from, ResolutionContext mode) {
         if (from.getVariance() == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) {
-            return isAssignableToCore(getBounds(from), to, mode.reverse());
+            return isAssignableToCore(getBounds(from), to, mode.flipDirection());
         } else {
             return isAssignableToCore(to, getBounds(from), mode);
         }
     }
 
     // Contract, from is FullyQualified, Array or Primitive
-    private static boolean isAssignableToFullyQualified(JavaType.FullyQualified to, @Nullable JavaType from, TypeMode mode) {
+    private static boolean isAssignableToFullyQualified(JavaType.FullyQualified to, @Nullable JavaType from, ResolutionContext mode) {
         if (from instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
             if (!TypeUtils.fullyQualifiedNamesAreEqual(to.getFullyQualifiedName(), classFrom.getFullyQualifiedName())) {
@@ -597,7 +597,7 @@ public class TypeUtils {
                 return true;
             }
 
-            if (mode.contains(to, from)) {
+            if (mode.isResolving(to, from)) {
                 return true;
             }
 
@@ -625,8 +625,8 @@ public class TypeUtils {
                 JavaType toParam = toParameters.get(i);
                 JavaType fromParam = fromParameters.get(i);
 
-                if (isWildcard(toParam) && isAssignableToCore(toParam, fromParam, mode.push(to, from)) ||
-                        !isWildcard(toParam) && isOfTypeCore(toParam, fromParam, mode.push(to, from))) {
+                if (isWildcard(toParam) && isAssignableToCore(toParam, fromParam, mode.pushResolving(to, from)) ||
+                        !isWildcard(toParam) && isOfTypeCore(toParam, fromParam, mode.pushResolving(to, from))) {
                     continue;
                 }
                 return false;
@@ -687,7 +687,7 @@ public class TypeUtils {
     }
 
     // Contract: from is FullyQualified, Array or Primitive
-    private static boolean isAssignableToArray(JavaType.Array to, JavaType from, TypeMode mode) {
+    private static boolean isAssignableToArray(JavaType.Array to, JavaType from, ResolutionContext mode) {
         if (from instanceof JavaType.Array) {
             JavaType.Array fromArray = (JavaType.Array) from;
             if (to.getElemType() instanceof JavaType.Primitive || fromArray.getElemType() instanceof JavaType.Primitive) {
@@ -700,7 +700,7 @@ public class TypeUtils {
     }
 
     // Contract: from is FullyQualified, Array or Primitive
-    private static boolean isAssignableToPrimitive(JavaType.Primitive to, @Nullable JavaType from, TypeMode mode) {
+    private static boolean isAssignableToPrimitive(JavaType.Primitive to, @Nullable JavaType from, ResolutionContext mode) {
         if (from instanceof JavaType.FullyQualified) {
             // Account for auto-unboxing
             JavaType.FullyQualified fromFq = (JavaType.FullyQualified) from;
@@ -1172,18 +1172,18 @@ public class TypeUtils {
         }
     }
 
-    public static class TypeMode {
-        public static final TypeMode INFER = new TypeMode(null, null, TO, null);
-        public static final TypeMode BOUND = new TypeMode(null, null, Mode.NONE, null);
+    public static class ResolutionContext {
+        public static final ResolutionContext INFER = new ResolutionContext(null, null, TO, null);
+        public static final ResolutionContext BOUND = new ResolutionContext(null, null, Direction.NONE, null);
         private final @Nullable JavaType target;
         private final @Nullable JavaType source;
-        private final Mode mode;
-        private final @Nullable TypeMode parent;
+        private final Direction direction;
+        private final @Nullable ResolutionContext parent;
 
-        enum Mode {
+        enum Direction {
             TO, FROM, NONE;
 
-            public Mode reverse() {
+            public Direction reverse() {
                 switch (this) {
                     case TO:
                         return FROM;
@@ -1195,30 +1195,30 @@ public class TypeUtils {
             }
         }
 
-        private TypeMode(@Nullable JavaType target, @Nullable JavaType source, Mode mode, @Nullable TypeMode parent) {
+        private ResolutionContext(@Nullable JavaType target, @Nullable JavaType source, Direction direction, @Nullable ResolutionContext parent) {
             this.target = target;
             this.source = source;
-            this.mode = mode;
+            this.direction = direction;
             this.parent = parent;
         }
 
-        public boolean contains(JavaType target, JavaType source) {
+        public boolean isResolving(JavaType target, JavaType source) {
             if (parent == null) {
                 return false;
             }
-            return Objects.equals(this.target, target) && Objects.equals(this.source, source) || parent.contains(target, source);
+            return Objects.equals(this.target, target) && Objects.equals(this.source, source) || parent.isResolving(target, source);
         }
 
-        public TypeMode push(JavaType target, JavaType source) {
-            return new TypeMode(target, source, mode, this);
+        public ResolutionContext pushResolving(JavaType target, JavaType source) {
+            return new ResolutionContext(target, source, direction, this);
         }
 
-        public TypeMode reverse() {
-            return new TypeMode(target, source, mode.reverse(), this);
+        public ResolutionContext flipDirection() {
+            return new ResolutionContext(target, source, direction.reverse(), this);
         }
 
-        Mode get() {
-            return mode;
+        Direction direction() {
+            return direction;
         }
     }
 }
