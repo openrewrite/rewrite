@@ -56,6 +56,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Preconditions.not;
@@ -412,7 +413,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
 
-                if (!updatesPerProject.get(getGradleProjectKey(gradleProject)).isEmpty()) {
+                if (!updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()).isEmpty()) {
                     cu = (JavaSourceFile) Preconditions.check(
                             not(new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
