@@ -22,7 +22,7 @@ import {
     J,
     JavaType,
     LeftPaddedLocation,
-    RightPaddedLocation,
+    RightPaddedLocation, SpaceLocation,
     Statement,
     TypedTree,
     TypeTree
@@ -50,7 +50,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
+        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, "TODO_UNKNOWN", q));
         await q.sendMarkers(j, j2 => j2.markers);
         return j;
     }
@@ -62,7 +62,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(cu, c => c.checksum);
         await q.getAndSend(cu, c => c.fileAttributes);
         await q.getAndSendList(cu, c => c.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, "JS_COMPILATION_UNIT_STATEMENTS", q));
-        await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
+        await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, "JS_COMPILATION_UNIT_EOF", q));
         return cu;
     }
 
@@ -171,7 +171,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     override async visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(importTypeAttributes, el => el.token, el => this.visitRightPadded(el, "IMPORT_TYPE_ATTRIBUTES_TOKEN", q));
         await q.getAndSend(importTypeAttributes, el => el.elements, el => this.visitContainer(el, "IMPORT_TYPE_ATTRIBUTES_ELEMENTS", q));
-        await q.getAndSend(importTypeAttributes, el => el.end, el => this.visitSpace(el, q));
+        await q.getAndSend(importTypeAttributes, el => el.end, el => this.visitSpace(el, "IMPORT_TYPE_ATTRIBUTES_END", q));
         return importTypeAttributes;
     }
 
@@ -481,8 +481,8 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return this.javaSender.visitContainer(container, loc, q);
     }
 
-    override async visitSpace(space: J.Space, q: RpcSendQueue): Promise<J.Space> {
-        return this.javaSender.visitSpace(space, q);
+    override async visitSpace(space: J.Space, loc: SpaceLocation, q: RpcSendQueue): Promise<J.Space> {
+        return this.javaSender.visitSpace(space, loc, q);
     }
 
     override async visitType(javaType: JavaType | undefined, q: RpcSendQueue): Promise<JavaType | undefined> {
@@ -528,7 +528,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         const draft = createDraft(j);
 
         draft.id = await q.receive(j.id);
-        draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
+        draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, "TYPE_PREFIX", q));
         draft.markers = await q.receiveMarkers(j.markers);
 
         return finishDraft(draft);
@@ -543,7 +543,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.checksum = await q.receive(cu.checksum);
         draft.fileAttributes = await q.receive(cu.fileAttributes);
         draft.statements = await q.receiveListDefined(cu.statements, stmt => this.visitRightPadded(stmt, "JS_COMPILATION_UNIT_STATEMENTS", q));
-        draft.eof = await q.receive(cu.eof, space => this.visitSpace(space, q));
+        draft.eof = await q.receive(cu.eof, space => this.visitSpace(space, "JS_COMPILATION_UNIT_EOF", q));
 
         return finishDraft(draft);
     }
@@ -669,7 +669,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         const draft = createDraft(importTypeAttributes);
         draft.token = await q.receive(draft.token, el => this.visitRightPadded(el, "IMPORT_TYPE_ATTRIBUTES_TOKEN", q));
         draft.elements = await q.receive(draft.elements, el => this.visitContainer(el, "IMPORT_TYPE_ATTRIBUTES_ELEMENTS", q));
-        draft.end = await q.receive(draft.end, el => this.visitSpace(el, q));
+        draft.end = await q.receive(draft.end, el => this.visitSpace(el, "IMPORT_TYPE_ATTRIBUTES_END", q));
         return finishDraft(draft);
     }
 
@@ -1022,8 +1022,8 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return this.javaReceiverDelegate.visitContainer(container,  loc, q);
     }
 
-    override async visitSpace(space: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
-        return this.javaReceiverDelegate.visitSpace(space, q);
+    override async visitSpace(space: J.Space, loc: SpaceLocation, q: RpcReceiveQueue): Promise<J.Space> {
+        return this.javaReceiverDelegate.visitSpace(space, loc, q);
     }
 
     override async visitType(javaType: JavaType | undefined, q: RpcReceiveQueue): Promise<JavaType | undefined> {

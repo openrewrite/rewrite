@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {mapAsync, SourceFile, ValidImmerRecipeReturnType} from "../";
-import {Expression, J, JavaType, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
+import {Expression, J, JavaType, JavaVisitor, NameTree, SpaceLocation, Statement, TypedTree} from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
 import {isJavaScript, JS} from "./tree";
 import ComputedPropertyName = JS.ComputedPropertyName;
@@ -38,7 +38,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+    protected override async visitSpace(space: J.Space, loc: SpaceLocation, p: P): Promise<J.Space> {
         return space;
     }
 
@@ -60,7 +60,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             PromiseLike<ValidImmerRecipeReturnType<Draft<J2>>>
     ): Promise<J2> {
         const draft: Draft<J2> = createDraft(before as J2);
-        (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, p);
+        (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, "TODO_UNKNOWN", p);
         (draft as Draft<J>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {
             await recipe(draft);
@@ -119,7 +119,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     protected async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.CompilationUnit>(compilationUnit, p, async draft => {
             draft.statements = await mapAsync(compilationUnit.statements, stmt => this.visitRightPadded(stmt, "JS_COMPILATION_UNIT_STATEMENTS", p));
-            draft.eof = await this.visitSpace(compilationUnit.eof, p);
+            draft.eof = await this.visitSpace(compilationUnit.eof, "JS_COMPILATION_UNIT_EOF", p);
         });
     }
 
@@ -283,7 +283,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return this.produceJavaScript<JS.ImportTypeAttributes>(importTypeAttributes, p, async draft => {
             draft.token = await this.visitRightPadded(importTypeAttributes.token, "IMPORT_TYPE_ATTRIBUTES_TOKEN", p);
             draft.elements = await this.visitContainer(importTypeAttributes.elements, "IMPORT_TYPE_ATTRIBUTES_ELEMENTS", p);
-            draft.end = await this.visitSpace(importTypeAttributes.end, p);
+            draft.end = await this.visitSpace(importTypeAttributes.end, "IMPORT_TYPE_ATTRIBUTES_END", p);
         });
     }
 

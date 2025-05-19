@@ -26,7 +26,7 @@ import {
     isJava,
     isSpace,
     J, LeftPaddedLocation,
-    NameTree, RightPaddedLocation,
+    NameTree, RightPaddedLocation, SpaceLocation,
     Statement, TypedTree, TypeTree
 } from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
@@ -50,7 +50,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+    protected async visitSpace(space: J.Space, loc: SpaceLocation, p: P): Promise<J.Space> {
         return space;
     }
 
@@ -193,7 +193,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return this.produceJava<J.Block>(block, p, async draft => {
             draft.static = await this.visitRightPadded(block.static, "BLOCK_STATIC", p);
             draft.statements = await mapAsync(block.statements, stmt => this.visitRightPadded(stmt, "BLOCK_STATEMENTS", p));
-            draft.end = await this.visitSpace(block.end, p);
+            draft.end = await this.visitSpace(block.end, "BLOCK_END", p);
         });
     }
 
@@ -261,7 +261,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.packageDeclaration = await this.visitRightPadded(cu.packageDeclaration, "COMPILATION_UNIT_PACKAGE_DECLARATION", p) as J.RightPadded<J.Package>;
             draft.imports = await mapAsync(cu.imports, imp => this.visitRightPadded(imp, "COMPILATION_UNIT_IMPORTS", p));
             draft.classes = await mapAsync(cu.classes, cls => this.visitDefined(cls, p) as Promise<J.ClassDeclaration>);
-            draft.eof = await this.visitSpace(cu.eof, p);
+            draft.eof = await this.visitSpace(cu.eof, "COMPILATION_UNIT_EOF", p);
         });
     }
 
@@ -525,7 +525,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         return this.produceJava<J.Lambda>(lambda, p, async draft => {
             draft.parameters = await this.visitDefined(lambda.parameters, p) as J.Lambda.Parameters;
-            draft.arrow = await this.visitSpace(lambda.arrow, p);
+            draft.arrow = await this.visitSpace(lambda.arrow, "LAMBDA_ARROW", p);
             draft.body = await this.visitDefined(lambda.body, p) as Statement | Expression;
             draft.type = await this.visitType(lambda.type, p);
         });
@@ -649,7 +649,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
                 draft.enclosing = await this.visitRightPadded(newClass.enclosing, "NEW_CLASS_ENCLOSING", p);
             }
 
-            draft.new = await this.visitSpace(newClass.new, p);
+            draft.new = await this.visitSpace(newClass.new, "NEW_CLASS_NEW", p);
 
             if (newClass.class) {
                 draft.class = await this.visitDefined(newClass.class, p) as TypedTree;
@@ -928,7 +928,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             }
 
             if (varDecls.varargs) {
-                draft.varargs = await this.visitSpace(varDecls.varargs, p);
+                draft.varargs = await this.visitSpace(varDecls.varargs, "VARIABLE_DECLARATIONS_VARARGS", p);
             }
 
             draft.variables = await mapAsync(varDecls.variables, v => this.visitRightPadded(v, "VARIABLE_DECLARATIONS_VARIABLES", p));
@@ -993,7 +993,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             if (isTree(right.element)) {
                 (draft.element as J) = await this.visitDefined(right.element, p);
             }
-            draft.after = await this.visitSpace(right.after, p);
+            draft.after = await this.visitSpace(right.after, "YIELD_AFTER", p);
             draft.markers = await this.visitMarkers(right.markers, p);
         });
     }
@@ -1004,11 +1004,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, loc: LeftPaddedLocation, p: P): Promise<J.LeftPadded<T>> {
         return produceAsync<J.LeftPadded<T>>(left, async draft => {
-            draft.before = await this.visitSpace(left.before, p);
+            draft.before = await this.visitSpace(left.before, "YIELD_BEFORE", p);
             if (isTree(left.element)) {
                 draft.element = await this.visitDefined(left.element, p) as Draft<T>;
             } else if (isSpace(left.element)) {
-                draft.element = await this.visitSpace(left.element, p) as Draft<T>;
+                draft.element = await this.visitSpace(left.element, "YIELD_ELEMENT", p) as Draft<T>;
             }
             draft.markers = await this.visitMarkers(left.markers, p);
         });
@@ -1020,7 +1020,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     protected async visitContainer<T extends J>(container: J.Container<T>, loc: ContainerLocation, p: P): Promise<J.Container<T>> {
         return produceAsync<J.Container<T>>(container, async draft => {
-            draft.before = await this.visitSpace(container.before, p);
+            draft.before = await this.visitSpace(container.before, "YIELD_BEFORE", p);
             (draft.elements as J.RightPadded<J>[]) = await mapAsync(container.elements, e => this.visitRightPadded(e, "CONTAINER_ELEMENTS", p));
             draft.markers = await this.visitMarkers(container.markers, p);
         });
@@ -1034,7 +1034,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             PromiseLike<ValidImmerRecipeReturnType<Draft<J2>>>
     ): Promise<J2> {
         const draft: Draft<J2> = createDraft(before as J2);
-        (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, p);
+        (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, "TODO_UNKNOWN", p);
         (draft as Draft<J>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {
             await recipe(draft);

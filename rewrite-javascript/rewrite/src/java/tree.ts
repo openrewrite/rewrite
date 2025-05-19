@@ -923,6 +923,63 @@ export type RightPaddedLocation =
     "WHILE_LOOP_BODY" |
     "WITH_STATEMENT_BODY";
 
+export type SpaceLocation =
+    "ANY" |
+
+    "ARRAY_TYPE_DIMENSION" |
+    "ARROW_FUNCTION_ARROW" |
+    "ARROW_FUNCTION_PARAMETERS" |
+    "ARROW_FUNCTION_PREFIX" |
+    "ASSIGNMENT_OPERATION_EXTENSIONS_OPERATOR" |
+    "ASSIGNMENT_OPERATION_OPERATOR" |
+    "BINARY_EXTENSIONS_OPERATOR" |
+    "BINARY_OPERATOR" |
+    "BLOCK_END" |
+    "CASE_STATEMENTS" |
+    "CLASS_DECLARATION" |
+    "CLASS_DECLARATION_CLASS_KIND" |
+    "COMPILATION_UNIT_EOF" |
+    "COMPUTED_PROPERTY_METHOD_DECLARATION" |
+    "COMPUTED_PROPERTY_METHOD_DECLARATION_PREFIX" |
+    "ENUM_VALUE_PREFIX" |
+    "FOR_IN_LOOP_PREFIX" |
+    "FOR_LOOP_PREFIX" |
+    "FOR_OF_LOOP_AWAIT" |
+    "FOR_OF_LOOP_PREFIX" |
+    "FUNCTION_TYPE_PREFIX" |
+    "IDENTIFIER" |
+    "IMPORT_TYPE_ATTRIBUTES_END" |
+    "JRIGHT_PADDED_LOCAL_AFTER" |
+    "JRIGHT_PADDED_LOCAL_SINGLE_AFTER" |
+    "JS_COMPILATION_UNIT_EOF" |
+    "LAMBDA_ARROW" |
+    "MARKER_NON_NULL_ASSERTION" |
+    "MARKER_OPTIONAL" |
+    "MARKER_SPREAD" |
+    "MARKER_TRAILING_COMMA" |
+    "METHOD_DECLARATION" |
+    "METHOD_DECLARATION_PREFIX" |
+    "NAMESPACE_DECLARATION_KEYWORD_TYPE" |
+    "NEW_CLASS_NEW" |
+    "RIGHT_PADDED_LOCAL_AFTER" |
+    "SCOPED_VARIABLE_DECLARATIONS_BEFORE" |
+    "SPACE_AFTER" |
+    "SPACE_BEFORE" |
+    "SPACE_ELEMENT" |
+    "STATEMENT_LOCAL_AFTER" |
+    "TODO_UNKNOWN" |
+    "TYPE_DECLARATION_PREFIX" |
+    "TYPE_PARAMETER_BEFORE" |
+    "TYPE_PREFIX" |
+    "UNARY_OPERATOR" |
+    "UNKNOWN_PREFIX" |
+    "VARIABLE_DECLARATIONS_AFTER" |
+    "VARIABLE_DECLARATIONS_VARARGS" |
+    "YIELD_AFTER" |
+    "YIELD_BEFORE" |
+    "YIELD_ELEMENT" |
+    "YIELD_PREFIX";
+
 export function isSpace(tree: any): tree is J.Space {
     return tree &&
         typeof tree === 'object' &&
@@ -1033,11 +1090,11 @@ Object.values(J.Kind).forEach(kind => {
     if (kind === J.Kind.Space) {
         RpcCodecs.registerCodec(kind, {
                 async rpcReceive(before: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
-                    return (await javaReceiver.visitSpace(before, q))!;
+                    return (await javaReceiver.visitSpace(before, "ANY", q))!;
                 },
 
                 async rpcSend(after: J.Space, q: RpcSendQueue): Promise<void> {
-                    await javaSender.visitSpace(after, q);
+                    await javaSender.visitSpace(after, "ANY", q);
                 }
             }
         );

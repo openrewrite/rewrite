@@ -16,7 +16,7 @@
 import {JS} from "./tree";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, J, JavaType, RightPaddedLocation, Statement} from "../java";
+import {Comment, J, JavaType, RightPaddedLocation, SpaceLocation, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isTree, Tree} from "../tree";
 import {SpacesStyle, styleFromSourceFile, StyleKind, WrappingAndBracesStyle, BlankLinesStyle} from "./style";
@@ -558,10 +558,10 @@ export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionCont
         super();
     }
 
-    override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
+    override async visitSpace(space: J.Space, loc: SpaceLocation, p: ExecutionContext): Promise<J.Space> {
         // Note - for some reason the original MinimumViableSpacingVisitor.java doesn't have it
         // and only has the logic in MinimumViableSpacingTest.defaults
-        const ret = await super.visitSpace(space, p) as J.Space;
+        const ret = await super.visitSpace(space, loc, p) as J.Space;
         return ret && produce(ret, draft => {
             draft.whitespace = "";
         });
