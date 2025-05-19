@@ -418,10 +418,26 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if ((tree != t || updateLockFile.isAcceptable(sf, ctx)) && projectMarker.isPresent()) {
                         GradleProject gradleProject = projectMarker.get();
                         Map<GroupArtifact, Set<String>> configurationsPerGa = acc.getConfigurationPerGAPerModule().getOrDefault(getGradleProjectKey(gradleProject), emptyMap());
-                        for (Map.Entry<GroupArtifact, Object> newVersion : acc.getGaToNewVersion().entrySet()) {
-                            if (newVersion.getValue() instanceof String) {
-                                GroupArtifactVersion gav = new GroupArtifactVersion(newVersion.getKey().getGroupId(), newVersion.getKey().getArtifactId(), (String) newVersion.getValue());
-                                gradleProject = replaceVersion(gradleProject, ctx, gav, configurationsPerGa.getOrDefault(gav.asGroupArtifact(), emptySet()));
+                        if (acc.getGaToNewVersion().isEmpty()) {
+                            DependencyMatcher matcher = new DependencyMatcher(groupId, artifactId, null);
+                            DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
+                            for (GroupArtifact groupArtifact : configurationsPerGa.keySet()) {
+                                if (!matcher.matches(groupArtifact.getGroupId(), groupArtifact.getArtifactId())) {
+                                    continue;
+                                }
+                                try {
+                                    String selectedVersion = versionSelector.select(groupArtifact, null, newVersion, versionPattern, ctx);
+                                    GroupArtifactVersion gav = new GroupArtifactVersion(groupArtifact.getGroupId(), groupArtifact.getArtifactId(), selectedVersion);
+                                    gradleProject = replaceVersion(gradleProject, ctx, gav, configurationsPerGa.getOrDefault(gav.asGroupArtifact(), emptySet()));
+                                } catch (MavenDownloadingException ignore) {}
+                            }
+
+                        } else {
+                            for (Map.Entry<GroupArtifact, Object> newVersion : acc.getGaToNewVersion().entrySet()) {
+                                if (newVersion.getValue() instanceof String) {
+                                    GroupArtifactVersion gav = new GroupArtifactVersion(newVersion.getKey().getGroupId(), newVersion.getKey().getArtifactId(), (String) newVersion.getValue());
+                                    gradleProject = replaceVersion(gradleProject, ctx, gav, configurationsPerGa.getOrDefault(gav.asGroupArtifact(), emptySet()));
+                                }
                             }
                         }
                         if (projectMarker.get() != gradleProject) {
