@@ -1046,4 +1046,62 @@ class JavaTemplateMatchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void matchMemberReferenceAndLambda() {
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final JavaTemplate refTemplate = JavaTemplate.builder("String::valueOf")
+                  .expressionType("java.util.function.Function<Object, String>")
+                  .build();
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("(e)->e.toString()")
+                  .expressionType("java.util.function.Function<Object, String>")
+                  .build();
+
+                @Override
+                public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
+                    return refTemplate.matches(getCursor()) ? SearchResult.found(memberRef, "ref") : super.visitMemberReference(memberRef, executionContext);
+                }
+
+                @Override
+                public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
+                    return lambdaTemplate.matches(getCursor()) ? SearchResult.found(lambda, "lambda") : super.visitLambda(lambda, executionContext);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(String::valueOf);
+                      test(e -> e.toString());
+                      test(x -> x.toString());
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(/*~~(ref)~~>*/String::valueOf);
+                      test(/*~~(lambda)~~>*/e -> e.toString());
+                      test(/*~~(lambda)~~>*/x -> x.toString());
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """
+          )
+        );
+    }
 }

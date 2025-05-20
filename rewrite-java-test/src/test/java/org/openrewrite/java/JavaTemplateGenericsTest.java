@@ -164,6 +164,88 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void setsDifferenceMultimapRecipe() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava"))
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final JavaTemplate template = JavaTemplate.builder("#{set:any(java.util.Set<T>)}.stream().filter(java.util.function.Predicate.not(#{multimap:any(com.google.common.collect.Multimap<K, V>)}::containsKey)).collect(com.google.common.collect.ImmutableSet.toImmutableSet())")
+                  .expressionType("com.google.common.collect.ImmutableSet<T>")
+                  .genericTypes("T", "K", "V")
+                  .javaParser(JavaParser.fromJavaVersion().classpath("guava"))
+                  .build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                    return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+                }
+            })),
+          java(
+            """
+              import com.google.common.collect.ImmutableSet;
+              import com.google.common.collect.ImmutableSetMultimap;
+              
+              import java.util.function.Predicate;
+              
+              class Test {
+                  void test() {
+                      ImmutableSet.of(1).stream().filter(Predicate.not(ImmutableSetMultimap.of(2, 3)::containsKey)).collect(ImmutableSet.toImmutableSet());
+                  }
+              }
+              """,
+            """
+              import com.google.common.collect.ImmutableSet;
+              import com.google.common.collect.ImmutableSetMultimap;
+              
+              import java.util.function.Predicate;
+              
+              class Test {
+                  void test() {
+                      /*~~>*/ImmutableSet.of(1).stream().filter(Predicate.not(ImmutableSetMultimap.of(2, 3)::containsKey)).collect(ImmutableSet.toImmutableSet());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyStreamRecipe() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate template = JavaTemplate.builder("java.util.stream.Stream.of()")
+                .expressionType("java.util.stream.Stream<T>")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+              }
+          })),
+          java(
+            """
+              import java.util.stream.Stream;
+              
+              class Test {
+                  Stream<String> test() {
+                      return Stream.of();
+                  }
+              }
+              """,
+            """
+              import java.util.stream.Stream;
+              
+              class Test {
+                  Stream<String> test() {
+                      return /*~~>*/Stream.of();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodModifiersMismatch() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
