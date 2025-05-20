@@ -62,6 +62,7 @@ npmTest.configure {
         include("jest.config.js")
     })
     inputs.files(fileTree("rewrite/src"))
+    inputs.files(fileTree("rewrite/test"))
     outputs.files("rewrite/README.md") // A fake output entry; without it Gradle build caching doesn't work
 }
 tasks.check {
