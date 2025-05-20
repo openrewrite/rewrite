@@ -25,8 +25,8 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.java.tree.TypeUtils.ResolutionContext.Inference.FROM;
-import static org.openrewrite.java.tree.TypeUtils.ResolutionContext.Inference.TO;
+import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceMode.FROM;
+import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceMode.TO;
 
 public class TypeUtils {
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
@@ -121,10 +121,10 @@ public class TypeUtils {
      * {@link JavaType.GenericTypeVariable} will be checked for {@link JavaType.GenericTypeVariable.Variance} and each of the bounds.
      */
     public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2) {
-        return isOfType(type1, type2, ResolutionContext.BOUND);
+        return isOfType(type1, type2, ComparisonContext.BOUND);
     }
 
-    public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2, ResolutionContext context) {
+    public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2, ComparisonContext context) {
         if (type1 == type2 && !(type1 instanceof JavaType.Unknown)) {
             return true;
         }
@@ -144,7 +144,7 @@ public class TypeUtils {
         return isOfTypeCore(type1, type2, context);
     }
 
-    private static boolean isOfTypeMethod(JavaType.Method type1, JavaType.Method type2, ResolutionContext context) {
+    private static boolean isOfTypeMethod(JavaType.Method type1, JavaType.Method type2, ComparisonContext context) {
         if (!type1.getName().equals(type2.getName()) ||
             type1.getFlagsBitMap() != type2.getFlagsBitMap() ||
             !TypeUtils.isOfType(type1.getDeclaringType(), type2.getDeclaringType(), context) ||
@@ -167,7 +167,7 @@ public class TypeUtils {
         return true;
     }
 
-    private static boolean isOfTypeVariable(JavaType.Variable var1, JavaType.Variable var2, ResolutionContext context) {
+    private static boolean isOfTypeVariable(JavaType.Variable var1, JavaType.Variable var2, ComparisonContext context) {
         return isOfType(var1.getType(), var2.getType(), context) && isOfType(var1.getOwner(), var2.getOwner(), context) &&
                 var1.getName().equals(var2.getName());
     }
@@ -237,7 +237,7 @@ public class TypeUtils {
         return false;
     }
 
-    private static boolean isOfTypeCore(@Nullable JavaType to, @Nullable JavaType from, ResolutionContext context) {
+    private static boolean isOfTypeCore(@Nullable JavaType to, @Nullable JavaType from, ComparisonContext context) {
         if (isPseudoType(to) || isPseudoType(from)) {
             return false;
         }
@@ -246,7 +246,7 @@ public class TypeUtils {
         }
 
         // Try to match captures
-        if (context.inferenceSide() == TO && isTypeVariable(to) || context.inferenceSide() == FROM && isTypeVariable(from)) {
+        if (context.getInference() == TO && isTypeVariable(to) || context.getInference() == FROM && isTypeVariable(from)) {
             return isAssignableToCore(to, from, context);
         }
 
@@ -269,7 +269,7 @@ public class TypeUtils {
         return false;
     }
 
-    private static boolean isOfTypeGeneric(JavaType.GenericTypeVariable to, JavaType.GenericTypeVariable from, ResolutionContext context) {
+    private static boolean isOfTypeGeneric(JavaType.GenericTypeVariable to, JavaType.GenericTypeVariable from, ComparisonContext context) {
         if (!to.getName().equals(from.getName()) ||
                 to.getVariance() != from.getVariance() ||
                 to.getBounds().size() != from.getBounds().size()) {
@@ -283,14 +283,14 @@ public class TypeUtils {
         return true;
     }
 
-    private static boolean isOfTypeFullyQualified(JavaType.FullyQualified to, JavaType.FullyQualified from, ResolutionContext context) {
+    private static boolean isOfTypeFullyQualified(JavaType.FullyQualified to, JavaType.FullyQualified from, ComparisonContext context) {
         if (!TypeUtils.fullyQualifiedNamesAreEqual(to.getFullyQualifiedName(), from.getFullyQualifiedName())) {
             return false;
         }
         if (to instanceof JavaType.Class && from instanceof JavaType.Class) {
             return true;
         } else if (to instanceof JavaType.Parameterized && from instanceof JavaType.Parameterized) {
-            if (context.isResolving(to, from)) {
+            if (context.isComparing(to, from)) {
                 return true;
             }
             if (to.getTypeParameters().size() != from.getTypeParameters().size()) {
@@ -299,7 +299,7 @@ public class TypeUtils {
             List<JavaType> toTypeParams = to.getTypeParameters();
             List<JavaType> fromTypeParams = from.getTypeParameters();
             for (int i = 0; i < toTypeParams.size(); i++) {
-                if (!isOfTypeCore(toTypeParams.get(i), fromTypeParams.get(i), context.pushResolving(to, from))) {
+                if (!isOfTypeCore(toTypeParams.get(i), fromTypeParams.get(i), context.enterComparison(to, from))) {
                     return false;
                 }
             }
@@ -308,11 +308,11 @@ public class TypeUtils {
         return false;
     }
 
-    private static boolean isOfTypePrimitive(JavaType.Primitive to, JavaType.Primitive from, ResolutionContext context) {
+    private static boolean isOfTypePrimitive(JavaType.Primitive to, JavaType.Primitive from, ComparisonContext context) {
         return to == from;
     }
 
-    private static boolean isOfTypeArray(JavaType.Array to, JavaType.Array from, ResolutionContext context) {
+    private static boolean isOfTypeArray(JavaType.Array to, JavaType.Array from, ComparisonContext context) {
         if (to.getElemType() instanceof JavaType.Primitive || from.getElemType() instanceof JavaType.Primitive) {
             // Avoid incorrect inference of array types
             return to.getElemType() == from.getElemType();
@@ -320,7 +320,7 @@ public class TypeUtils {
         return isOfTypeCore(to.getElemType(), from.getElemType(), context);
     }
 
-    private static boolean isOfTypeList(List<JavaType> to, List<JavaType> from, ResolutionContext context) {
+    private static boolean isOfTypeList(List<JavaType> to, List<JavaType> from, ComparisonContext context) {
         if (to.size() != from.size() ||
                 to.stream().anyMatch(e -> !(e instanceof JavaType.FullyQualified)) ||
                 from.stream().anyMatch(e -> !(e instanceof JavaType.FullyQualified))) {
@@ -398,10 +398,10 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
-        return isAssignableTo(to, from, ResolutionContext.BOUND);
+        return isAssignableTo(to, from, ComparisonContext.BOUND);
     }
 
-    public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, ResolutionContext context) {
+    public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from, ComparisonContext context) {
         try {
             if (to == from && !(to instanceof JavaType.Unknown)) {
                 return true;
@@ -429,7 +429,7 @@ public class TypeUtils {
         }
     }
 
-    private static boolean isAssignableToMethod(JavaType.Method type1, JavaType.Method type2, ResolutionContext context) {
+    private static boolean isAssignableToMethod(JavaType.Method type1, JavaType.Method type2, ComparisonContext context) {
         if (!type1.getName().equals(type2.getName()) ||
                 Flag.hasFlags(type1.getFlagsBitMap(), Flag.Static) != Flag.hasFlags(type2.getFlagsBitMap(), Flag.Static) ||
                 !TypeUtils.isAssignableTo(type1.getDeclaringType(), type2.getDeclaringType(), context) ||
@@ -445,12 +445,12 @@ public class TypeUtils {
         return true;
     }
 
-    private static boolean isAssignableToVariable(JavaType.Variable var1, JavaType.Variable var2, ResolutionContext mode) {
+    private static boolean isAssignableToVariable(JavaType.Variable var1, JavaType.Variable var2, ComparisonContext mode) {
         return isAssignableTo(var1.getType(), var2.getType(), mode) && isAssignableTo(var1.getOwner(), var2.getOwner(), mode) &&
                 var1.getName().equals(var2.getName());
     }
 
-    private static boolean isAssignableToCore(@Nullable JavaType to, @Nullable JavaType from, ResolutionContext context) {
+    private static boolean isAssignableToCore(@Nullable JavaType to, @Nullable JavaType from, ComparisonContext context) {
         if (isPseudoType(to) || isPseudoType(from)) {
             return false;
         }
@@ -462,7 +462,7 @@ public class TypeUtils {
         }
 
         // Handle generic type variables (e.g., T extends Collection<String>)
-        if (context.inferenceSide() == FROM && isTypeVariable(from)) {
+        if (context.getInference() == FROM && isTypeVariable(from)) {
             // Is there anything we can validate?
             return true;
         } else if (to instanceof JavaType.GenericTypeVariable) {
@@ -503,8 +503,8 @@ public class TypeUtils {
         return false;
     }
 
-    private static boolean isAssignableToGeneric(JavaType.GenericTypeVariable to, JavaType from, ResolutionContext context) {
-        if (isWildcard(to) || context.inferenceSide() == TO) {
+    private static boolean isAssignableToGeneric(JavaType.GenericTypeVariable to, JavaType from, ComparisonContext context) {
+        if (isWildcard(to) || context.getInference() == TO) {
             // If target "to" wildcard is unbounded, it accepts anything
             if (to.getBounds().isEmpty()) {
                 return true;
@@ -539,11 +539,11 @@ public class TypeUtils {
                     return isAssignableToCore(target, source, context);
                 case CONTRAVARIANT:
                     // ? super TARGET. Source must be assignable from target.
-                    return isAssignableToCore(source, target, context.flipInferenceSide());
+                    return isAssignableToCore(source, target, context.flipInference());
                 default:
                     // In Java, an invariant wildcard with bounds (e.g., ? T) is not valid syntax
                     // Could a capture come this way?
-                    assert context.inferenceSide() == TO;
+                    assert context.getInference() == TO;
                     return isAssignableToCore(target, source, context);
             }
         }
@@ -568,16 +568,16 @@ public class TypeUtils {
     }
 
     // Handle cases
-    private static boolean isAssignableFromGeneric(JavaType to, JavaType.GenericTypeVariable from, ResolutionContext context) {
+    private static boolean isAssignableFromGeneric(JavaType to, JavaType.GenericTypeVariable from, ComparisonContext context) {
         if (from.getVariance() == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) {
-            return isAssignableToCore(getBounds(from), to, context.flipInferenceSide());
+            return isAssignableToCore(getBounds(from), to, context.flipInference());
         } else {
             return isAssignableToCore(to, getBounds(from), context);
         }
     }
 
     // Contract, from is FullyQualified, Array or Primitive
-    private static boolean isAssignableToFullyQualified(JavaType.FullyQualified to, @Nullable JavaType from, ResolutionContext context) {
+    private static boolean isAssignableToFullyQualified(JavaType.FullyQualified to, @Nullable JavaType from, ComparisonContext context) {
         if (from instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
             if (!TypeUtils.fullyQualifiedNamesAreEqual(to.getFullyQualifiedName(), classFrom.getFullyQualifiedName())) {
@@ -597,7 +597,7 @@ public class TypeUtils {
                 return true;
             }
 
-            if (context.isResolving(to, from)) {
+            if (context.isComparing(to, from)) {
                 return true;
             }
 
@@ -625,8 +625,8 @@ public class TypeUtils {
                 JavaType toParam = toParameters.get(i);
                 JavaType fromParam = fromParameters.get(i);
 
-                if (isWildcard(toParam) && isAssignableToCore(toParam, fromParam, context.pushResolving(to, from)) ||
-                        !isWildcard(toParam) && isOfTypeCore(toParam, fromParam, context.pushResolving(to, from))) {
+                if (isWildcard(toParam) && isAssignableToCore(toParam, fromParam, context.enterComparison(to, from)) ||
+                        !isWildcard(toParam) && isOfTypeCore(toParam, fromParam, context.enterComparison(to, from))) {
                     continue;
                 }
                 return false;
@@ -687,7 +687,7 @@ public class TypeUtils {
     }
 
     // Contract: from is FullyQualified, Array or Primitive
-    private static boolean isAssignableToArray(JavaType.Array to, JavaType from, ResolutionContext context) {
+    private static boolean isAssignableToArray(JavaType.Array to, JavaType from, ComparisonContext context) {
         if (from instanceof JavaType.Array) {
             JavaType.Array fromArray = (JavaType.Array) from;
             if (to.getElemType() instanceof JavaType.Primitive || fromArray.getElemType() instanceof JavaType.Primitive) {
@@ -700,7 +700,7 @@ public class TypeUtils {
     }
 
     // Contract: from is FullyQualified, Array or Primitive
-    private static boolean isAssignableToPrimitive(JavaType.Primitive to, @Nullable JavaType from, ResolutionContext context) {
+    private static boolean isAssignableToPrimitive(JavaType.Primitive to, @Nullable JavaType from, ComparisonContext context) {
         if (from instanceof JavaType.FullyQualified) {
             // Account for auto-unboxing
             JavaType.FullyQualified fromFq = (JavaType.FullyQualified) from;
@@ -1172,18 +1172,18 @@ public class TypeUtils {
         }
     }
 
-    public static class ResolutionContext {
-        public static final ResolutionContext INFER = new ResolutionContext(null, null, Inference.TO, null);
-        public static final ResolutionContext BOUND = new ResolutionContext(null, null, Inference.NONE, null);
+    public static class ComparisonContext {
+        public static final ComparisonContext INFER = new ComparisonContext(null, null, InferenceMode.TO, null);
+        public static final ComparisonContext BOUND = new ComparisonContext(null, null, InferenceMode.NONE, null);
         private final @Nullable JavaType target;
         private final @Nullable JavaType source;
-        private final Inference inference;
-        private final @Nullable ResolutionContext parent;
+        private final InferenceMode inference;
+        private final @Nullable ComparisonContext parent;
 
-        enum Inference {
+        enum InferenceMode {
             TO, FROM, NONE;
 
-            public Inference flip() {
+            public InferenceMode flip() {
                 switch (this) {
                     case TO:
                         return FROM;
@@ -1195,29 +1195,27 @@ public class TypeUtils {
             }
         }
 
-        private ResolutionContext(@Nullable JavaType target, @Nullable JavaType source, Inference inference, @Nullable ResolutionContext parent) {
+        private ComparisonContext(@Nullable JavaType target, @Nullable JavaType source, InferenceMode inference, @Nullable ComparisonContext parent) {
             this.target = target;
             this.source = source;
             this.inference = inference;
             this.parent = parent;
         }
 
-        public boolean isResolving(JavaType target, JavaType source) {
-            if (parent == null) {
-                return false;
-            }
-            return Objects.equals(this.target, target) && Objects.equals(this.source, source) || parent.isResolving(target, source);
+        public boolean isComparing(JavaType target, JavaType source) {
+            return Objects.equals(this.target, target) && Objects.equals(this.source, source) ||
+                    parent != null && parent.isComparing(target, source);
         }
 
-        public ResolutionContext pushResolving(JavaType target, JavaType source) {
-            return new ResolutionContext(target, source, inference, this);
+        public ComparisonContext enterComparison(JavaType target, JavaType source) {
+            return new ComparisonContext(target, source, inference, this);
         }
 
-        public ResolutionContext flipInferenceSide() {
-            return new ResolutionContext(target, source, inference.flip(), this);
+        public ComparisonContext flipInference() {
+            return new ComparisonContext(null, null, inference.flip(), this);
         }
 
-        Inference inferenceSide() {
+        InferenceMode getInference() {
             return inference;
         }
     }

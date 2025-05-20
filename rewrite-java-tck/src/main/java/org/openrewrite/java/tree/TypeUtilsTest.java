@@ -34,8 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.tree.TypeUtils.ResolutionContext.BOUND;
-import static org.openrewrite.java.tree.TypeUtils.ResolutionContext.INFER;
+import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.BOUND;
+import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.INFER;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
@@ -1426,20 +1426,9 @@ class TypeUtilsTest implements RewriteTest {
           )
         );
     }
-    abstract class CompT<T extends CompT<T>> implements Comparable<T> {}
-    abstract class ExtT<T> extends CompT<ExtT<T>> {}
+
     @Test
     void recursiveTypes() {
-        CompT<?> compT;
-        CompT<ExtT<Integer>> compExtT;
-        ExtT<Integer> extT = new ExtT<Integer>() {
-            @Override
-            public int compareTo(@NotNull TypeUtilsTest.ExtT<Integer> o) {
-                return 0;
-            }
-        };
-        compExtT = extT;
-
         rewriteRun(
           java(
             """
@@ -1448,6 +1437,10 @@ class TypeUtilsTest implements RewriteTest {
               enum EnumType { A, B, C }
               abstract class CompT<T extends CompT<T>> implements Comparable<T> {}
               abstract class ExtT<T> extends CompT<ExtT<T>> {}
+              abstract class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              abstract class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              class OneType extends One<TwoType, OneType> {}
+              class TwoType extends Two<TwoType, OneType> {}
               
               class Test<E extends Enum<E>, C extends Comparable<? super C>, T> {
                   E e;
@@ -1460,6 +1453,10 @@ class TypeUtilsTest implements RewriteTest {
                   CompT<?> compT;
                   CompT<ExtT<Integer>> compExtT;
                   ExtT<Integer> extT;
+                  One<?, ?> oneWildcard;
+                  Two<?, ?> twoWildcard;
+                  OneType oneType;
+                  TwoType twoType;
               }
               """,
             spec -> spec.afterRecipe(cu -> {
@@ -1472,6 +1469,9 @@ class TypeUtilsTest implements RewriteTest {
                       assertions.isOfType("CompT<ExtT<Integer>>", "CompT<ExtT<Integer>>").isTrue();
                       assertions.isOfType("ExtT<Integer>", "ExtT<Integer>").isTrue();
                       assertions.isOfType("CompT<ExtT<Integer>>", "ExtT<Integer>").isFalse();
+
+                      assertions.isOfType("OneType", "OneType").isTrue();
+                      assertions.isOfType("TwoType", "TwoType").isTrue();
 
                       assertions.isAssignableTo("E", "EnumType", BOUND).isFalse();
                       assertions.isAssignableTo("E", "EnumType", INFER).isTrue();
@@ -1494,6 +1494,11 @@ class TypeUtilsTest implements RewriteTest {
                       assertions.isAssignableTo("CompT<?>", "ExtT<Integer>").isTrue();
                       assertions.isAssignableTo("CompT<ExtT<Integer>>", "ExtT<Integer>").isTrue();
                       assertions.isAssignableTo("ExtT<Integer>", "ExtT<Integer>").isTrue();
+
+                      assertions.isAssignableTo("One<?, ?>", "OneType").isTrue();
+                      assertions.isAssignableTo("Two<?, ?>", "TwoType").isTrue();
+                      assertions.isAssignableTo("OneType", "OneType").isTrue();
+                      assertions.isAssignableTo("TwoType", "TwoType").isTrue();
                   }
               }
             )
