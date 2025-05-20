@@ -25,8 +25,8 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceMode.FROM;
-import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceMode.TO;
+import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceDirection.FROM;
+import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceDirection.TO;
 
 public class TypeUtils {
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
@@ -1173,17 +1173,17 @@ public class TypeUtils {
     }
 
     public static class ComparisonContext {
-        public static final ComparisonContext INFER = new ComparisonContext(null, null, InferenceMode.TO, null);
-        public static final ComparisonContext BOUND = new ComparisonContext(null, null, InferenceMode.NONE, null);
-        private final @Nullable JavaType target;
-        private final @Nullable JavaType source;
-        private final InferenceMode inference;
+        public static final ComparisonContext INFER = new ComparisonContext(null, null, InferenceDirection.TO, null);
+        public static final ComparisonContext BOUND = new ComparisonContext(null, null, InferenceDirection.NONE, null);
+        private final @Nullable JavaType to;
+        private final @Nullable JavaType from;
+        private final InferenceDirection inference;
         private final @Nullable ComparisonContext parent;
 
-        enum InferenceMode {
+        enum InferenceDirection {
             TO, FROM, NONE;
 
-            public InferenceMode flip() {
+            public InferenceDirection flip() {
                 switch (this) {
                     case TO:
                         return FROM;
@@ -1195,27 +1195,27 @@ public class TypeUtils {
             }
         }
 
-        private ComparisonContext(@Nullable JavaType target, @Nullable JavaType source, InferenceMode inference, @Nullable ComparisonContext parent) {
-            this.target = target;
-            this.source = source;
+        private ComparisonContext(@Nullable JavaType to, @Nullable JavaType from, InferenceDirection inference, @Nullable ComparisonContext parent) {
+            this.to = to;
+            this.from = from;
             this.inference = inference;
             this.parent = parent;
         }
 
-        public boolean isComparing(JavaType target, JavaType source) {
-            return Objects.equals(this.target, target) && Objects.equals(this.source, source) ||
-                    parent != null && parent.isComparing(target, source);
+        public boolean isComparing(JavaType to, JavaType from) {
+            return Objects.equals(this.to, to) && Objects.equals(this.from, from) ||
+                    parent != null && parent.isComparing(to, from);
         }
 
-        public ComparisonContext enterComparison(JavaType target, JavaType source) {
-            return new ComparisonContext(target, source, inference, this);
+        public ComparisonContext enterComparison(JavaType to, JavaType from) {
+            return new ComparisonContext(to, from, inference, this);
         }
 
         public ComparisonContext flipInference() {
             return new ComparisonContext(null, null, inference.flip(), this);
         }
 
-        InferenceMode getInference() {
+        InferenceDirection getInference() {
             return inference;
         }
     }
