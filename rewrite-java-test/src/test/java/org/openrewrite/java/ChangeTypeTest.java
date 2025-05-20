@@ -1674,6 +1674,49 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void doNotRenameRandomVariablesMatchingClassName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
+          java(
+            """
+              package a;
+              public class A1 {
+              }
+              """,
+            """
+              package a;
+              public class A2 {
+              }
+              """
+          ),
+          java(
+            """
+              package org.foo;
+              
+              import a.A1;
+              
+              public class Example {
+                  public String method(A1 a, String a1) {
+                      return a1;
+                  }
+              }
+              """,
+            """
+              package org.foo;
+              
+              import a.A2;
+              
+              public class Example {
+                  public String method(A2 a, String a1) {
+                      return a1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void updateVariableType() {
         rewriteRun(
           java(a1),
