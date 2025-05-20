@@ -16,11 +16,9 @@
 package org.openrewrite.java;
 
 import lombok.Value;
-import org.antlr.v4.runtime.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypedPatternContext;
 import org.openrewrite.java.internal.template.TemplateParameter;
@@ -157,8 +155,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                     }
                 }
 
-                if (TypeUtils.isObject(marker.getType()) ||
-                    TypeUtils.isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
+                if (isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
                     registerMatch(j, marker.getName());
                     return true;
                 }
@@ -194,6 +191,16 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         private static boolean isTemplateParameterPlaceholder(J.Empty empty) {
             Markers markers = empty.getMarkers();
             return markers.getMarkers().size() == 1 && markers.getMarkers().get(0) instanceof TemplateParameter;
+        }
+
+        @Override
+        protected boolean isOfType(JavaType target, JavaType source) {
+            return TypeUtils.isAssignableTo(target, source, TypeUtils.ComparisonContext.INFER);
+        }
+
+        @Override
+        protected boolean isAssignableTo(JavaType to, JavaType from) {
+            return TypeUtils.isAssignableTo(to, from, TypeUtils.ComparisonContext.INFER);
         }
     }
 }

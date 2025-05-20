@@ -5,11 +5,6 @@ plugins {
     id("jvm-test-suite")
 }
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
-    }
-}
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
@@ -28,6 +23,12 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation("org.antlr:antlr4-runtime:4.13.2")
     "javaTck"(project(":rewrite-java-tck"))
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
 }
 
 tasks.withType<JavaCompile> {

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import java.util.Collections;
 import lombok.Getter;
 import lombok.Value;
 import lombok.experimental.NonFinal;
@@ -35,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;

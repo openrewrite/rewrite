@@ -137,7 +137,7 @@ class JavaParserTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
+              assertThat(cu.getClasses().getFirst().getLeadingAnnotations()).hasSize(2))
           )
         );
     }
@@ -154,7 +154,7 @@ class JavaParserTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
+              assertThat(cu.getClasses().getFirst().getLeadingAnnotations()).hasSize(2))
           )
         );
     }
@@ -330,7 +330,7 @@ class JavaParserTest implements RewriteTest {
                    */
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getBody().getEnd().getComments())
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().getFirst().getBody().getEnd().getComments())
               .extracting("text")
               .containsExactly(
                 """
