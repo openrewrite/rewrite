@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -88,7 +87,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("PR #5374 was reverted, due to regressions")
     void expressionTest() {
         var template = JavaTemplate.builder("!#{iterable:any(java.lang.Iterable<T>)}.iterator().hasNext()")
           .genericTypes("T")
@@ -117,6 +115,91 @@ class JavaTemplateGenericsTest implements RewriteTest {
               class Test {
                   boolean test() {
                       return /*~~>*/!List.of("1").iterator().hasNext();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void recursiveType() {
+        var template = JavaTemplate.builder("#{enumAssert:any(org.assertj.core.api.AbstractIterableAssert<?, ?, E, ?>)}.size().isLessThan(#{size:any(int)}).returnToIterable()")
+          .genericTypes("E")
+          .javaParser(JavaParser.fromJavaVersion().classpath("assertj-core"))
+          .build();
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+              }
+          })),
+          java(
+            """
+              import com.google.common.collect.ImmutableSet;
+              import org.assertj.core.api.AbstractAssert;
+              import org.assertj.core.api.Assertions;
+              
+              class Test {
+                  void test() {
+                      Assertions.assertThat(ImmutableSet.of(1)).size().isLessThan(2).returnToIterable();
+                  }
+              }
+              """,
+            """
+              import com.google.common.collect.ImmutableSet;
+              import org.assertj.core.api.AbstractAssert;
+              import org.assertj.core.api.Assertions;
+              
+              class Test {
+                  void test() {
+                      /*~~>*/Assertions.assertThat(ImmutableSet.of(1)).size().isLessThan(2).returnToIterable();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodModifiersMismatch() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate template = JavaTemplate.builder("#{stream:any(java.util.stream.Stream<T>)}.filter(#{map:any(java.util.Map<K, V>)}::containsKey).map(#{map}::get)")
+                .genericTypes("T", "K", "V")
+                .build();
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+              }
+          })),
+          java(
+            """
+              import com.google.common.collect.ImmutableMap;
+              
+              import java.util.function.Function;
+              import java.util.function.Predicate;
+              import java.util.stream.Stream;
+              
+              class Test {
+                  Stream<Integer> test() {
+                      return Stream.of("foo").filter(ImmutableMap.of(1, 2)::containsKey).map(ImmutableMap.of(1, 2)::get);
+                  }
+              }
+              """,
+            """
+              import com.google.common.collect.ImmutableMap;
+              
+              import java.util.function.Function;
+              import java.util.function.Predicate;
+              import java.util.stream.Stream;
+              
+              class Test {
+                  Stream<Integer> test() {
+                      return /*~~>*/Stream.of("foo").filter(ImmutableMap.of(1, 2)::containsKey).map(ImmutableMap.of(1, 2)::get);
                   }
               }
               """
