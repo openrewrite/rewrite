@@ -15,9 +15,11 @@
  */
 package org.openrewrite.gradle;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.Issue;
+import org.openrewrite.*;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -916,5 +918,83 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void canHandleNullScannedAccumulator() {
+        UpgradeTransitiveDependencyVersion updateClassgraph = new UpgradeTransitiveDependencyVersion("io.github.classgraph", "classgraph", "4.8.112", null, null, null);
+        UpgradeTransitiveDependencyVersion updateJackson = new UpgradeTransitiveDependencyVersion("com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null);
+        rewriteRun(
+          spec -> spec.recipe(new ScanningAccumulatedUpgradeRecipe(updateClassgraph, updateJackson)),
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins {
+                id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    public static class ScanningAccumulatedUpgradeRecipe extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
+        @Override
+        public String getDisplayName() {
+            return "Accumulation-scanned recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Some recipes hava loop to determine all updates and add them to the scanner. This cycle/recipe only can update for the provided dependency.";
+        }
+
+        private final UpgradeTransitiveDependencyVersion scanAlsoFor;
+        private final UpgradeTransitiveDependencyVersion upgradeDependency;
+
+        @Override
+        public UpgradeTransitiveDependencyVersion.DependencyVersionState getInitialValue(ExecutionContext ctx) {
+            return new UpgradeTransitiveDependencyVersion.DependencyVersionState();
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(UpgradeTransitiveDependencyVersion.DependencyVersionState acc) {
+            return new TreeVisitor<>() {
+                @Override
+                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    if (tree instanceof SourceFile) {
+                        tree = scanAlsoFor.getScanner(acc).visit(tree, ctx);
+                        tree = upgradeDependency.getScanner(acc).visit(tree, ctx);
+                    }
+                    return tree;
+                }
+            };
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor(UpgradeTransitiveDependencyVersion.DependencyVersionState acc) {
+            return upgradeDependency.getVisitor(acc);
+        }
     }
 }
