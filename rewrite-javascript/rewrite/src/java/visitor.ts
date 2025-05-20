@@ -121,7 +121,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             if (arrayType.annotations) {
                 draft.annotations = await mapAsync(arrayType.annotations, a => this.visitDefined<J.Annotation>(a, p));
             }
-            draft.dimension = await this.visitLeftPadded(arrayType.dimension, "ARRAY_TYPE_DIMENSION", p);
+            draft.dimension = await this.visitLeftPaddedSpace(arrayType.dimension, "ARRAY_TYPE_DIMENSION", p);
             draft.type = await this.visitType(arrayType.type, p);
         });
     }
@@ -938,7 +938,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: P): Promise<J | undefined> {
         return this.produceJava<J.VariableDeclarations.NamedVariable>(variable, p, async draft => {
             draft.name = await this.visitDefined(variable.name, p) as J.Identifier;
-            draft.dimensionsAfterName = await mapAsync(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, "VARIABLE_DIMENSIONS_AFTER_NAME", p));
+            draft.dimensionsAfterName = await mapAsync(variable.dimensionsAfterName, dim => this.visitLeftPaddedSpace(dim, "VARIABLE_DIMENSIONS_AFTER_NAME", p));
             draft.initializer = await this.visitOptionalLeftPadded(variable.initializer, "VARIABLE_INITIALIZER", p);
             draft.variableType = await this.visitType(variable.variableType, p) as JavaType.Variable | undefined;
         });
@@ -998,17 +998,25 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         });
     }
 
-    protected async visitOptionalLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T> | undefined, loc: LeftPaddedLocation, p: P): Promise<J.LeftPadded<T> | undefined> {
+    protected async visitOptionalLeftPadded<T extends J |number | string | boolean>(left: J.LeftPadded<T> | undefined, loc: LeftPaddedLocation, p: P): Promise<J.LeftPadded<T> | undefined> {
         return left ? this.visitLeftPadded(left, loc, p) : undefined;
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, loc: LeftPaddedLocation, p: P): Promise<J.LeftPadded<T>> {
+    protected async visitLeftPadded<T extends J | number | string | boolean>(left: J.LeftPadded<T>, loc: LeftPaddedLocation, p: P): Promise<J.LeftPadded<T>> {
         return produceAsync<J.LeftPadded<T>>(left, async draft => {
-            draft.before = await this.visitSpace(left.before, "YIELD_BEFORE", p);
+            draft.before = await this.visitSpace(left.before, loc, p);
             if (isTree(left.element)) {
                 draft.element = await this.visitDefined(left.element, p) as Draft<T>;
-            } else if (isSpace(left.element)) {
-                draft.element = await this.visitSpace(left.element, "YIELD_ELEMENT", p) as Draft<T>;
+            }
+            draft.markers = await this.visitMarkers(left.markers, p);
+        });
+    }
+
+    protected async visitLeftPaddedSpace(left: J.LeftPadded<J.Space>, loc: LeftPaddedLocation, p: P): Promise<J.LeftPadded<J.Space>> {
+        return produceAsync<J.LeftPadded<J.Space>>(left, async draft => {
+            draft.before = await this.visitSpace(left.before, loc, p);
+            if (isSpace(left.element)) {
+                draft.element = await this.visitSpace(left.element, "YIELD_ELEMENT", p) as Draft<J.Space>; // TODO asdf
             }
             draft.markers = await this.visitMarkers(left.markers, p);
         });

@@ -925,7 +925,7 @@ export type RightPaddedLocation =
 
 export type SpaceLocation =
     "ANY" |
-
+    LeftPaddedLocation | // notice in Java JLeftPadded.beforeLocation has the same name for all values
     "ARRAY_TYPE_DIMENSION" |
     "ARROW_FUNCTION_ARROW" |
     "ARROW_FUNCTION_PARAMETERS" |
