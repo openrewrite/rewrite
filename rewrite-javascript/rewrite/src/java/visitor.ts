@@ -21,7 +21,7 @@ import {isTree,
     ValidImmerRecipeReturnType
 } from "../";
 import {
-    ContainerLocation, ElementPrefixLocation,
+    ContainerLocation, ElementPrefixLocation, ElementSuffixLocation,
     Expression,
     isJava,
     isSpace,
@@ -993,7 +993,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             if (isTree(right.element)) {
                 (draft.element as J) = await this.visitDefined(right.element, p);
             }
-            draft.after = await this.visitSpace(right.after, "YIELD_AFTER", p);
+            draft.after = await this.visitSpace(right.after, `${loc}_SUFFIX` as ElementSuffixLocation, p);
             draft.markers = await this.visitMarkers(right.markers, p);
         });
     }

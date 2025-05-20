@@ -16,7 +16,7 @@
 import {JavaVisitor} from "./visitor";
 import {asRef, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {
-    ContainerLocation,
+    ContainerLocation, ElementSuffixLocation,
     Expression,
     isSpace,
     J,
@@ -1355,14 +1355,14 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.element = await q.receive(right.element, elem => {
             if (isSpace(elem)) {
-                return this.visitSpace(elem as J.Space, "TODO_UNKNOWN", q) as any as T;
+                return this.visitSpace(elem as J.Space, "ANY", q) as any as T;
             } else if (typeof elem === 'object' && elem.kind) {
                 // FIXME find a better way to check if it is a `Tree`
                 return this.visit(elem as J, q) as any as T;
             }
             return elem as any as T;
         }) as Draft<T>;
-        draft.after = await q.receive(right.after, space => this.visitSpace(space, "TODO_UNKNOWN", q));
+        draft.after = await q.receive(right.after, space => this.visitSpace(space, `${loc}_SUFFIX` as ElementSuffixLocation, q));
         draft.markers = await q.receiveMarkers(right.markers);
 
         return finishDraft(draft) as J.RightPadded<T>;

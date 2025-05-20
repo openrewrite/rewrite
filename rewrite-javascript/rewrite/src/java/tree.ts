@@ -923,6 +923,8 @@ export type RightPaddedLocation =
     "WHILE_LOOP_BODY" |
     "WITH_STATEMENT_BODY";
 
+export type ElementSuffixLocation = `${RightPaddedLocation}_SUFFIX`;
+
 export type ElementPrefixLocation =
     "ALIAS_PREFIX" |
     "ANNOTATED_TYPE_PREFIX" |
@@ -1059,6 +1061,7 @@ export type ElementPrefixLocation =
 export type SpaceLocation =
     "ANY" |
     ElementPrefixLocation |
+    ElementSuffixLocation |
     LeftPaddedLocation | // notice in Java JLeftPadded.beforeLocation has the same name for all values
     "ARRAY_TYPE_DIMENSION" |
     "ARROW_FUNCTION_ARROW" |
@@ -1101,7 +1104,6 @@ export type SpaceLocation =
     "SPACE_BEFORE" |
     "SPACE_ELEMENT" |
     "STATEMENT_LOCAL_AFTER" |
-    "TODO_UNKNOWN" |
     "TYPE_DECLARATION_PREFIX" |
     "TYPE_PARAMETER_BEFORE" |
     "TYPE_PREFIX" |
