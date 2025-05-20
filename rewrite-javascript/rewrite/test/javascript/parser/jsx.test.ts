@@ -10,8 +10,15 @@ describe("jsx mapping", () => {
     test("jsx with comments", () =>
         spec.rewriteRun(
             //language=jsx
-            tsx("/*a*/<div /*b*/>/*c*/</div>/*d*/"),
+            tsx("/*a*/<div /*b*/></div>/*d*/"),
         ));
+
+    test("jsx text", () => {
+        spec.rewriteRun(
+            //language=jsx
+            tsx("<div>hello world</div>"),
+        )
+    });
 
     test("jsx with attributes", () =>
         spec.rewriteRun(
@@ -36,6 +43,16 @@ describe("jsx mapping", () => {
         spec.rewriteRun(
             //language=jsx
             tsx("<img src=\"foo.png\" alt=\"Foo\" />")
+        ));
+
+    test("fragment shorthand", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(`
+                <>
+                    <Item/>
+                </>
+            `)
         ));
 
     test("jsx with nested elements", () =>

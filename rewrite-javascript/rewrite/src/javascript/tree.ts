@@ -30,9 +30,12 @@ export namespace JS {
         Alias: "org.openrewrite.javascript.tree.JS$Alias",
         ArrayBindingPattern: "org.openrewrite.javascript.tree.JS$ArrayBindingPattern",
         ArrowFunction: "org.openrewrite.javascript.tree.JS$ArrowFunction",
+        AssignmentOperation: "org.openrewrite.javascript.tree.JS$AssignmentOperation",
         Await: "org.openrewrite.javascript.tree.JS$Await",
+        Binary: "org.openrewrite.javascript.tree.JS$Binary",
         BindingElement: "org.openrewrite.javascript.tree.JS$BindingElement",
         CompilationUnit: "org.openrewrite.javascript.tree.JS$CompilationUnit",
+        ComputedPropertyMethodDeclaration: "org.openrewrite.javascript.tree.JS$ComputedPropertyMethodDeclaration",
         ComputedPropertyName: "org.openrewrite.javascript.tree.JS$ComputedPropertyName",
         ConditionalType: "org.openrewrite.javascript.tree.JS$ConditionalType",
         Delete: "org.openrewrite.javascript.tree.JS$Delete",
@@ -55,9 +58,11 @@ export namespace JS {
         Intersection: "org.openrewrite.javascript.tree.JS$Intersection",
         ForInLoop: "org.openrewrite.javascript.tree.JS$ForInLoop",
         ForOfLoop: "org.openrewrite.javascript.tree.JS$ForOfLoop",
-        ComputedPropertyMethodDeclaration: "org.openrewrite.javascript.tree.JS$ComputedPropertyMethodDeclaration",
-        AssignmentOperation: "org.openrewrite.javascript.tree.JS$AssignmentOperation",
-        Binary: "org.openrewrite.javascript.tree.JS$Binary",
+        JsxEmbeddedExpression: "org.openrewrite.javascript.tree.JSX$EmbeddedExpression",
+        JsxSpreadAttribute: "org.openrewrite.javascript.tree.JSX$SpreadAttribute",
+        JsxNamespacedName: "org.openrewrite.javascript.tree.JSX$NamespacedName",
+        JsxTag: "org.openrewrite.javascript.tree.JSX$Tag",
+        JsxAttribute: "org.openrewrite.javascript.tree.JSX$Attribute",
         Import: "org.openrewrite.javascript.tree.JS$Import",
         ImportClause: "org.openrewrite.javascript.tree.JS$ImportClause",
         ImportSpecifier: "org.openrewrite.javascript.tree.JS$ImportSpecifier",
@@ -820,6 +825,62 @@ export namespace JS {
         readonly typeOnly: J.LeftPadded<boolean>;
         readonly specifier: Expression;
         readonly type?: JavaType;
+    }
+}
+
+export namespace JSX {
+    /**
+     * Represents a JSX tag. Note that `selfClosing` and `children` are mutually exclusive.
+     * @example <div>{child}</div>
+     */
+    export type Tag =
+        | (BaseTag & { selfClosing: J.Space; children?: undefined; closingName?: undefined })
+        | (BaseTag & { selfClosing?: undefined; children: J.RightPadded<EmbeddedExpression | Tag | J.Identifier | J.Empty>[]; closingName: J.LeftPadded<string> });
+
+    interface BaseTag extends JS, Statement, Expression {
+        readonly kind: typeof JS.Kind.JsxTag;
+        readonly openName: J.LeftPadded<string>;
+        readonly afterName: J.Space;
+        readonly attributes: J.RightPadded<Attribute | SpreadAttribute>[];
+    }
+
+    /**
+     * Represents a single JSX attribute.
+     * @example prop="value"
+     */
+    export interface Attribute extends JS, Statement {
+        readonly kind: typeof JS.Kind.JsxAttribute;
+        readonly key: J.Identifier;
+        readonly value?: J.LeftPadded<Expression>;
+    }
+
+    /**
+     * Represents a spread attribute in JSX.
+     * @example {...props}
+     */
+    export interface SpreadAttribute extends JS, Statement {
+        readonly kind: typeof JS.Kind.JsxSpreadAttribute;
+        readonly dots: J.Space
+        readonly expression: J.RightPadded<Expression>;
+    }
+
+    /**
+     * Represents a JSX expression container.
+     * @example {expression}
+     */
+    export interface EmbeddedExpression extends JS, Statement {
+        readonly kind: typeof JS.Kind.JsxEmbeddedExpression;
+        readonly expression: J.RightPadded<Expression>;
+    }
+
+    /**
+     * Represents a namespaced JSX name.
+     * @example namespace:Name
+     */
+    export interface NamespacedName extends JS, Expression {
+        readonly kind: typeof JS.Kind.JsxNamespacedName;
+        readonly namespace: J.Identifier;
+        readonly name: J.LeftPadded<J.Identifier>;
     }
 }
 
