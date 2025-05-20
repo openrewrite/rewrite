@@ -732,14 +732,4 @@ public class StringUtils {
 
         return false;
     }
-
-    /**
-     * @return string with first character changed to lowercase (or empty string)
-     */
-    public static String decapitalize(@Nullable String string) {
-        if (string != null && !string.isEmpty()) {
-            return Character.toLowerCase(string.charAt(0)) + string.substring(1);
-        }
-        return "";
-    }
 }

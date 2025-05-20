@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.VariableNameUtils.GenerationStrategy;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -32,7 +33,6 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.internal.StringUtils.decapitalize;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -372,7 +372,11 @@ public class ChangeType extends Recipe {
                 // Rename variable if it matches class name (starting with a lowercase character)
                 if (ident.getSimpleName().equals(decapitalize(className))) {
                     if (targetType instanceof JavaType.FullyQualified) {
-                        String newName = decapitalize(((JavaType.FullyQualified) targetType).getClassName());
+                        String newName = VariableNameUtils.generateVariableName(
+                                decapitalize(((JavaType.FullyQualified) targetType).getClassName()),
+                                getCursor(),
+                                GenerationStrategy.INCREMENT_NUMBER
+                        );
 
                         ident = ident.withSimpleName(newName);
 
@@ -800,5 +804,20 @@ public class ChangeType extends Recipe {
         String curFqn = curType != null ? curType.getFullyQualifiedName() : null;
 
         return fqn != null && fqn.equals(curFqn);
+    }
+
+    private static String decapitalize(String string) {
+        if (!string.isEmpty()) {
+            int firstCodePoint = string.codePointAt(0);
+            int firstCodePointLowercase = Character.toLowerCase(firstCodePoint);
+
+            if (firstCodePoint != firstCodePointLowercase) {
+                return new StringBuilder()
+                        .appendCodePoint(firstCodePointLowercase)
+                        .append(string.substring(Character.charCount(firstCodePoint)))
+                        .toString();
+            }
+        }
+        return string;
     }
 }

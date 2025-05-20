@@ -1631,6 +1631,49 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void updateMethodTypeWithUnicodeCharacter() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Ą1", "a.Ą2", false)),
+          java(
+            """
+              package a;
+              public class Ą1 {
+              }
+              """,
+            """
+              package a;
+              public class Ą2 {
+              }
+              """
+          ),
+          java(
+            """
+              package org.foo;
+              
+              import a.Ą1;
+              
+              public class Example {
+                  public Ą1 method(Ą1 ą1) {
+                      return ą1;
+                  }
+              }
+              """,
+            """
+              package org.foo;
+              
+              import a.Ą2;
+              
+              public class Example {
+                  public Ą2 method(Ą2 ą2) {
+                      return ą2;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void updateVariableType() {
         rewriteRun(
           java(a1),
