@@ -34,7 +34,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async preVisit(j: J, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, "UNKNOWN_PREFIX", q));
+        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, "ANY", q));
         await q.sendMarkers(j, j2 => j2.markers);
         return j;
     }
@@ -1362,7 +1362,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             }
             return elem as any as T;
         }) as Draft<T>;
-        draft.after = await q.receive(right.after, space => this.visitSpace(space, "SPACE_AFTER", q));
+        draft.after = await q.receive(right.after, space => this.visitSpace(space, "TODO_UNKNOWN", q));
         draft.markers = await q.receiveMarkers(right.markers);
 
         return finishDraft(draft) as J.RightPadded<T>;

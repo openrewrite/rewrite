@@ -50,7 +50,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, "TODO_UNKNOWN", q));
+        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, "ANY", q));
         await q.sendMarkers(j, j2 => j2.markers);
         return j;
     }

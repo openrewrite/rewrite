@@ -1696,7 +1696,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             );
         }
 
-        await this.visitSpace(prefix, "TODO_UNKNOWN", p);
+        await this.visitSpace(prefix, "ANY", p);
         await this.visitMarkers(markers, p);
 
         for (const marker of markers.markers) {
