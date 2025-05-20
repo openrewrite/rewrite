@@ -64,6 +64,8 @@ npmTest.configure {
     inputs.files(fileTree("rewrite/src"))
     inputs.files(fileTree("rewrite/test"))
     outputs.files("rewrite/README.md") // A fake output entry; without it Gradle build caching doesn't work
+
+    dependsOn(tasks.named("npmInstall"))
 }
 tasks.check {
     dependsOn(
