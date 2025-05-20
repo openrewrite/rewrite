@@ -56,6 +56,14 @@ extensions.configure<NodeExtension> {
 }
 
 val npmTest = tasks.named("npm_test")
+npmTest.configure {
+    inputs.files(fileTree("rewrite") {
+        include("*.json")
+        include("jest.config.js")
+    })
+    inputs.files(fileTree("rewrite/src"))
+    outputs.files("rewrite/README.md") // A fake output entry; without it Gradle build caching doesn't work
+}
 tasks.check {
     dependsOn(
         tasks.named("npmInstall"),
