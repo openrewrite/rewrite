@@ -301,7 +301,7 @@ public class ReloadableJava11Parser implements JavaParser {
 
     private void compileDependencies() {
         if (dependsOn != null) {
-            InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+            InMemoryExecutionContext ctx = InMemoryExecutionContext.unsafeExecutionContext();
             ctx.putMessage("org.openrewrite.java.skipSourceSetMarker", true);
             parseInputs(dependsOn, null, ctx);
         }

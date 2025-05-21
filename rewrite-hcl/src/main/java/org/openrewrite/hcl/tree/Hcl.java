@@ -21,7 +21,6 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.ListUtils;
@@ -31,10 +30,13 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 import static java.util.Collections.singletonList;
+import static org.openrewrite.Tree.randomId;
 
 @SuppressWarnings("unused")
 public interface Hcl extends Tree {
@@ -463,7 +465,7 @@ public interface Hcl extends Tree {
                         return attr.withValue(l.withValue(value.toString()).withValueSource("\"" + value + "\""));
                     } else if (attr.getValue() instanceof QuotedTemplate) {
                         QuotedTemplate q = (QuotedTemplate) attr.getValue();
-                        return attr.withValue(q.withExpressions(singletonList(new Literal(Tree.randomId(),
+                        return attr.withValue(q.withExpressions(singletonList(new Literal(randomId(),
                                 Space.EMPTY, Markers.EMPTY, value, value.toString()))));
                     }
                 }
@@ -485,9 +487,8 @@ public interface Hcl extends Tree {
             Object value = attr.getValue() instanceof Literal ?
                     ((Literal) attr.getValue()).getValueSource() : null;
             if (attr.getValue() instanceof QuotedTemplate) {
-                Cursor root = new Cursor(null, HclParser.builder().build().parse("")
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL")));
+                Cursor root = new Cursor(null, new ConfigFile(
+                        randomId(), Paths.get(""), null, Space.EMPTY, Markers.EMPTY, null, false, null, Collections.emptyList(), Space.EMPTY));
                 StringBuilder valueBuilder = new StringBuilder();
                 for (Expression expr : ((QuotedTemplate) attr.getValue()).getExpressions()) {
                     valueBuilder.append(expr.print(root));

@@ -20,7 +20,6 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -58,7 +57,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
             return m.withArguments(newArgs);
         }
 
-        J j = removeMethods(m, 0, isLambdaBody(), new Stack<>());
+        J j = removeMethods(m, 0, isLambdaBody(), new Stack<>(), ctx);
         if (j != null) {
             j = j.withPrefix(m.getPrefix());
             // There should always be
@@ -71,7 +70,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         return j;
     }
 
-    private @Nullable J removeMethods(@Nullable Expression expression, int depth, boolean isLambdaBody, Stack<Space> selectAfter) {
+    private @Nullable J removeMethods(@Nullable Expression expression, int depth, boolean isLambdaBody, Stack<Space> selectAfter, ExecutionContext ctx) {
         if (!(expression instanceof J.MethodInvocation) || ((J.MethodInvocation) expression).getMethodType() == null) {
             return expression;
         }
@@ -111,15 +110,15 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
                     }
                 }
             } else if (m.getSelect() instanceof J.MethodInvocation) {
-                return removeMethods(m.getSelect(), depth, isLambdaBody, selectAfter);
+                return removeMethods(m.getSelect(), depth, isLambdaBody, selectAfter, ctx);
             }
         }
 
-        J.MethodInvocation method = m.withSelect((Expression) removeMethods(m.getSelect(), depth + 1, isLambdaBody, selectAfter));
+        J.MethodInvocation method = m.withSelect((Expression) removeMethods(m.getSelect(), depth + 1, isLambdaBody, selectAfter, ctx));
 
         // inherit prefix
         if (!selectAfter.isEmpty()) {
-            method = inheritSelectAfter(method, selectAfter);
+            method = inheritSelectAfter(method, selectAfter, ctx);
         }
 
         return method;
@@ -156,7 +155,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         return getCursor().dropParentUntil(p -> !(p instanceof JRightPadded)).getValue() instanceof J.MethodInvocation;
     }
 
-    private J.MethodInvocation inheritSelectAfter(J.MethodInvocation method, Stack<Space> prefix) {
+    private J.MethodInvocation inheritSelectAfter(J.MethodInvocation method, Stack<Space> prefix, ExecutionContext ctx) {
         return (J.MethodInvocation) new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
@@ -165,7 +164,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
                 if (right == null) return null;
                 return prefix.isEmpty() ? right : right.withAfter(prefix.pop());
             }
-        }.visitNonNull(method, new InMemoryExecutionContext());
+        }.visitNonNull(method, ctx);
     }
 
     private Space getSelectAfter(J.MethodInvocation method) {

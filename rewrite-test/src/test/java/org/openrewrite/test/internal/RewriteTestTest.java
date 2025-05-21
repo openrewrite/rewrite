@@ -97,6 +97,14 @@ class RewriteTestTest implements RewriteTest {
         );
     }
 
+    @Test
+    void noExecutionContextInstantiation() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new InstantiateExecutionContext()),
+            text("irrelevant")
+          ));
+    }
 
     @Test
     void rejectRecipeValidationFailure() {
@@ -196,6 +204,30 @@ class MutateExecutionContext extends Recipe {
                 ctx.putMessage("mutated", true);
                 return tree;
             }
+        };
+    }
+}
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+class InstantiateExecutionContext extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Instantiate execution context";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Instantiates an InMemoryExecutionContext to trigger a validation failure.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        //noinspection unused
+        return new TreeVisitor<>() {
+            final ExecutionContext ctx = new InMemoryExecutionContext();
         };
     }
 }

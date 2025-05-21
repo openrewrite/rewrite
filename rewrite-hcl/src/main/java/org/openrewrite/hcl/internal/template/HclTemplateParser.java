@@ -16,6 +16,7 @@
 package org.openrewrite.hcl.internal.template;
 
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.RandomizeIdVisitor;
 import org.openrewrite.hcl.tree.BodyContent;
@@ -70,7 +71,7 @@ public class HclTemplateParser {
     }
 
     private Hcl.ConfigFile compileTemplate(String stub) {
-        return parser.parse(stub)
+        return parser.parse(InMemoryExecutionContext.unsafeExecutionContext(), stub)
                 .findFirst()
                 .map(Hcl.ConfigFile.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL"));

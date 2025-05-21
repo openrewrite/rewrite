@@ -309,7 +309,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             }
 
             //noinspection UnusedProperty
-            Properties.File gradleWrapperProperties = new PropertiesParser().parse(
+            Properties.File gradleWrapperProperties = new PropertiesParser().parse(ctx,
                             "distributionBase=GRADLE_USER_HOME\n" +
                             "distributionPath=wrapper/dists\n" +
                             "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +

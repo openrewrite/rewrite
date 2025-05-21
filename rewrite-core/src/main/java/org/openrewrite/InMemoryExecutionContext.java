@@ -29,6 +29,7 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
 
     private final Consumer<Throwable> onError;
     private final BiConsumer<Throwable, ExecutionContext> onTimeout;
+    private static final ThreadLocal<Boolean> inTest = ThreadLocal.withInitial(() -> false);
 
     public InMemoryExecutionContext() {
         this(t -> {
@@ -45,9 +46,35 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     }
 
     public InMemoryExecutionContext(Consumer<Throwable> onError, Duration runTimeout, BiConsumer<Throwable, ExecutionContext> onTimeout) {
+        this(onError, runTimeout, onTimeout, inTest.get());
+    }
+
+    private InMemoryExecutionContext(Consumer<Throwable> onError, Duration runTimeout, BiConsumer<Throwable, ExecutionContext> onTimeout, boolean inTestOverride) {
         this.onError = onError;
         this.onTimeout = onTimeout;
         putMessage(ExecutionContext.RUN_TIMEOUT, runTimeout);
+        assert !inTestOverride : "Recipes must never instantiate their own execution context. " +
+                               "Always use the execution context passed in to the visitor. " +
+                               "Failure to follow this rule can lead to settings, caches, and http configuration being ignored, duplicated, or lost. " +
+                               "If you are sure you have a good reason to ignore this advice, use the static method unsafeExecutionContext().";
+    }
+
+    /**
+     * Sets the thread-local flag indicating whether the current thread is in a test.
+     * If you're writing a recipe, you should never need to touch this.
+     * Always use the execution context provided to the visitor at execution time.
+     */
+    public static void unsafeSetInTest(boolean isInTest) {
+        inTest.set(isInTest);
+    }
+
+    /**
+     * Use only when you are sure you have a good reason to create an execution context that doesn't actually have any context.
+     * If you're writing a recipe, you should never need to touch this.
+     * Always use the execution context provided to the visitor at execution time.
+     */
+    public static InMemoryExecutionContext unsafeExecutionContext() {
+        return new InMemoryExecutionContext(t -> {}, Duration.ofHours(2), (throwable, ctx) -> {}, false);
     }
 
     @Override

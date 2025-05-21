@@ -266,7 +266,7 @@ public class JavaTemplateParser {
     }
 
     private JavaSourceFile compileTemplate(@Language("java") String stub) {
-        ExecutionContext ctx = new InMemoryExecutionContext();
+        ExecutionContext ctx = InMemoryExecutionContext.unsafeExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
         Parser jp = parser.build();

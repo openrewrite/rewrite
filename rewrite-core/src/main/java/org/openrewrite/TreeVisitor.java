@@ -26,9 +26,7 @@ import org.openrewrite.marker.Markers;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -186,7 +184,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     public static <U extends Tree, R, C extends Collection<R>> C collect(TreeVisitor<?, ExecutionContext> visitor,
                                                                          Tree tree, C initial, Class<U> matchOn,
                                                                          Function<U, R> map) {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        ExecutionContext ctx = InMemoryExecutionContext.unsafeExecutionContext();
         ctx.addObserver(new TreeObserver.Subscription(new TreeObserver() {
             @Override
             public Tree treeChanged(Cursor cursor, Tree newTree) {
@@ -224,10 +222,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
             return defaultValue(null, p);
         }
 
-        boolean topLevel = false;
-        if (visitCount == 0) {
-            topLevel = true;
-        }
+        boolean topLevel = visitCount == 0;
 
         visitCount++;
         setCursor(new Cursor(cursor, tree));

@@ -83,7 +83,7 @@ public class AddKeyValue extends Recipe {
                     boolean jsonIsEmpty = originalMembers.isEmpty() || originalMembers.get(0) instanceof Json.Empty;
                     Space space = jsonIsEmpty || prepend ? originalMembers.get(0).getPrefix() : Space.build("\n", emptyList());
 
-                    Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, rightPaddedKey(), parsedValue());
+                    Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, rightPaddedKey(), parsedValue(ctx));
 
                     if (jsonIsEmpty) {
                         return autoFormat(obj.withMembers(Collections.singletonList(newMember)), ctx, getCursor().getParent());
@@ -97,9 +97,9 @@ public class AddKeyValue extends Recipe {
                 return obj;
             }
 
-            private JsonValue parsedValue() {
+            private JsonValue parsedValue(ExecutionContext ctx) {
                 Json.Document parsedDoc = (Json.Document) JsonParser.builder().build()
-                        .parse(value.trim()).findFirst().get();
+                        .parse(ctx, value.trim()).findFirst().get();
                 JsonValue value = parsedDoc.getValue();
                 return value.withPrefix(value.getPrefix().withWhitespace(" "));
             }

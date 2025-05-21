@@ -61,7 +61,11 @@ public class FindMissingTypes extends Recipe {
     }
 
     public static List<MissingTypeResult> findMissingTypes(J j, boolean checkDocumentation) {
-        J j1 = new FindMissingTypesVisitor(checkDocumentation).visit(j, new InMemoryExecutionContext());
+        return findMissingTypes(j, checkDocumentation, InMemoryExecutionContext.unsafeExecutionContext());
+    }
+
+    public static List<MissingTypeResult> findMissingTypes(J j, boolean checkDocumentation, ExecutionContext ctx) {
+        J j1 = new FindMissingTypesVisitor(checkDocumentation).visit(j, ctx);
         List<MissingTypeResult> results = new ArrayList<>();
         if (j1 != j) {
             new JavaIsoVisitor<List<MissingTypeResult>>() {
@@ -77,7 +81,7 @@ public class FindMissingTypes extends Recipe {
                         if (j != null) {
                             String printedTree;
                             if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
-                                printedTree = j.printTrimmed(new InMemoryExecutionContext(), getCursor().getParentOrThrow());
+                                printedTree = j.printTrimmed(ctx, getCursor().getParentOrThrow());
                             } else {
                                 printedTree = String.valueOf(j);
                             }
