@@ -87,9 +87,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, String expressionType, Set<String> imports,
+    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, String bindType, Set<String> imports,
                          Set<String> genericTypes, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
-        this(code, genericTypes, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports, expressionType));
+        this(code, genericTypes, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports, bindType));
     }
 
     private static JavaParser.Builder<?, ?> augmentClasspath(JavaParser.Builder<?, ?> parserBuilder) {
@@ -181,7 +181,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private final Set<String> genericTypes = new HashSet<>();
 
         private boolean contextSensitive;
-        private String expressionType = "Object";
+        private String bindType = "Object";
 
         private JavaParser.Builder<?, ?> parser = org.openrewrite.java.JavaParser.fromJavaVersion();
 
@@ -224,11 +224,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
          * </ul>
          * In such cases, the type must be specified manually.
          */
-        public Builder expressionType(String expressionType) {
-            if (StringUtils.isBlank(expressionType)) {
+        public Builder bindType(String bindType) {
+            if (StringUtils.isBlank(bindType)) {
                 throw new IllegalArgumentException("Type must not be blank");
             }
-            this.expressionType = expressionType;
+            this.bindType = bindType;
             return this;
         }
 
@@ -279,7 +279,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(contextSensitive, parser.clone(), code, expressionType, imports, genericTypes,
+            return new JavaTemplate(contextSensitive, parser.clone(), code, bindType, imports, genericTypes,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }

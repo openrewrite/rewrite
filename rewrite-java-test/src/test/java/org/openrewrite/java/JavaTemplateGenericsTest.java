@@ -169,7 +169,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava"))
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                 final JavaTemplate template = JavaTemplate.builder("#{set:any(java.util.Set<T>)}.stream().filter(java.util.function.Predicate.not(#{multimap:any(com.google.common.collect.Multimap<K, V>)}::containsKey)).collect(com.google.common.collect.ImmutableSet.toImmutableSet())")
-                  .expressionType("com.google.common.collect.ImmutableSet<T>")
+                  .bindType("com.google.common.collect.ImmutableSet<T>")
                   .genericTypes("T", "K", "V")
                   .javaParser(JavaParser.fromJavaVersion().classpath("guava"))
                   .build();
@@ -213,7 +213,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               final JavaTemplate template = JavaTemplate.builder("java.util.stream.Stream.of()")
-                .expressionType("java.util.stream.Stream<T>")
+                .bindType("java.util.stream.Stream<T>")
                 .genericTypes("T")
                 .build();
 

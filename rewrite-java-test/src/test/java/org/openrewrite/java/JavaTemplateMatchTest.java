@@ -1055,10 +1055,10 @@ class JavaTemplateMatchTest implements RewriteTest {
             .expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("String::valueOf")
-                  .expressionType("java.util.function.Function<Object, String>")
+                  .bindType("java.util.function.Function<Object, String>")
                   .build();
                 final JavaTemplate lambdaTemplate = JavaTemplate.builder("(e)->e.toString()")
-                  .expressionType("java.util.function.Function<Object, String>")
+                  .bindType("java.util.function.Function<Object, String>")
                   .build();
 
                 @Override

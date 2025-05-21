@@ -51,7 +51,7 @@ public class BlockStatementTemplateGenerator {
 
     protected final Set<String> imports;
     private final boolean contextSensitive;
-    private final String expressionType;
+    private final String bindType;
 
     public BlockStatementTemplateGenerator(Set<String> imports, boolean contextSensitive) {
         this(imports, contextSensitive, "Object");
@@ -210,26 +210,26 @@ public class BlockStatementTemplateGenerator {
     protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
                 "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(Collectors.joining(", ")) + ">";
-        if (j instanceof J.Lambda && "Object".equals(expressionType)) {
+        if (j instanceof J.Lambda && "Object".equals(bindType)) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
-                    "specify the type by calling JavaTemplate.Builder#expressionType()");
-        } else if (j instanceof J.MemberReference && "Object".equals(expressionType)) {
+                    "specify the type by calling JavaTemplate.Builder#bindType()");
+        } else if (j instanceof J.MemberReference && "Object".equals(bindType)) {
             throw new IllegalArgumentException(
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
-                    "specify the type by calling JavaTemplate.Builder#expressionType()");
+                    "specify the type by calling JavaTemplate.Builder#bindType()");
         } else if (j instanceof J.MethodInvocation) {
             before.insert(0, String.format("class %s {{\n", classDeclaration));
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
             if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
-                before.append(expressionType).append(" o = ");
+                before.append(bindType).append(" o = ");
             }
             after.append(";\n}}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, String.format("class %s {\n", classDeclaration));
-            before.append(expressionType).append(" o = ");
+            before.append(bindType).append(" o = ");
             after.append(";\n}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
                    cursor.getValue() instanceof J.Block &&
