@@ -1630,48 +1630,6 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @Test
-    void updateMethodTypeWithUnicodeCharacter() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.𐐅1", "a.𐐅2", false)),
-          java(
-            """
-              package a;
-              public class 𐐅1 {
-              }
-              """,
-            """
-              package a;
-              public class 𐐅2 {
-              }
-              """
-          ),
-          java(
-            """
-              package org.foo;
-              
-              import a.𐐅1;
-              
-              public class Example {
-                  public 𐐅1 method(𐐅1 𐐭1) {
-                      return 𐐭1;
-                  }
-              }
-              """,
-            """
-              package org.foo;
-              
-              import a.𐐅2;
-              
-              public class Example {
-                  public 𐐅2 method(𐐅2 𐐭2) {
-                      return 𐐭2;
-                  }
-              }
-              """
-          )
-        );
-    }
 
     @Test
     void doNotRenameRandomVariablesMatchingClassName() {

@@ -806,18 +806,10 @@ public class ChangeType extends Recipe {
         return fqn != null && fqn.equals(curFqn);
     }
 
-    private static String decapitalize(String string) {
-        if (!string.isEmpty()) {
-            int firstCodePoint = string.codePointAt(0);
-            int firstCodePointLowercase = Character.toLowerCase(firstCodePoint);
-
-            if (firstCodePoint != firstCodePointLowercase) {
-                return new StringBuilder()
-                        .appendCodePoint(firstCodePointLowercase)
-                        .append(string.substring(Character.charCount(firstCodePoint)))
-                        .toString();
-            }
+    private static String decapitalize(@Nullable String string) {
+        if (string != null && !string.isEmpty()) {
+            return Character.toLowerCase(string.charAt(0)) + string.substring(1);
         }
-        return string;
+        return "";
     }
 }
