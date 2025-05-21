@@ -21,6 +21,7 @@ import org.openrewrite.java.internal.rpc.JavaReceiver;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.javascript.tree.JSX;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
@@ -57,7 +58,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
         return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
-                .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
+                .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<JS.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
@@ -427,6 +428,59 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return withStatement
                 .withExpression(q.receive(withStatement.getExpression(), expr -> (J.ControlParentheses<Expression>) visitNonNull(expr, q)))
                 .getPadding().withBody(q.receive(withStatement.getPadding().getBody(), el -> visitRightPadded(el, q)));
+    }
+
+    @Override
+    public J visitJsxTag(JSX.Tag tag, RpcReceiveQueue q) {
+        JSX.Tag t = tag;
+        t = t.getPadding().withOpenName(q.receive(tag.getPadding().getOpenName(), name -> visitLeftPadded(name, q)));
+        t = t.withAfterName(q.receive(tag.getAfterName(), space -> visitSpace(space, q)));
+        t = t.getPadding().withAttributes(q.receiveList(tag.getPadding().getAttributes(), attr -> visitRightPadded(attr, q)));
+
+        if (tag.isSelfClosing()) {
+            t = t.withSelfClosing(q.receive(tag.getSelfClosing(), space -> visitSpace(space, q)));
+        } else if (tag.hasChildren()) {
+            t = t.getPadding().withChildren(q.receiveList(tag.getPadding().getChildren(), child -> visitRightPadded(child, q)));
+            t = t.getPadding().withClosingName(q.receive(tag.getPadding().getClosingName(), name -> visitLeftPadded(name, q)));
+        }
+
+        t = t.withType(q.receive(tag.getType(), type -> visitType(type, q)));
+
+        return t;
+    }
+
+    @Override
+    public J visitJsxAttribute(JSX.Attribute attribute, RpcReceiveQueue q) {
+        JSX.Attribute a = attribute;
+        a = a.withKey(q.receive(attribute.getKey(), key -> (J.Identifier) visitNonNull(key, q)));
+        if (attribute.getPadding().getValue() != null) {
+            a = a.getPadding().withValue(q.receive(attribute.getPadding().getValue(), value -> visitLeftPadded(value, q)));
+        }
+        return a;
+    }
+
+    @Override
+    public J visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, RpcReceiveQueue q) {
+        JSX.SpreadAttribute s = spreadAttribute;
+        s = s.withDots(q.receive(spreadAttribute.getDots(), dots -> visitSpace(dots, q)));
+        s = s.getPadding().withExpression(q.receive(spreadAttribute.getPadding().getExpression(), expr -> visitRightPadded(expr, q)));
+        return s;
+    }
+
+    @Override
+    public J visitJsxEmbeddedExpression(JSX.EmbeddedExpression embeddedExpression, RpcReceiveQueue q) {
+        JSX.EmbeddedExpression e = embeddedExpression;
+        e = e.getPadding().withExpression(q.receive(embeddedExpression.getPadding().getExpression(), expr -> visitRightPadded(expr, q)));
+        return e;
+    }
+
+    @Override
+    public J visitJsxNamespacedName(JSX.NamespacedName namespacedName, RpcReceiveQueue q) {
+        JSX.NamespacedName n = namespacedName;
+        n = n.withNamespace(q.receive(namespacedName.getNamespace(), ns -> (J.Identifier) visitNonNull(ns, q)));
+        n = n.getPadding().withName(q.receive(namespacedName.getPadding().getName(), name -> visitLeftPadded(name, q)));
+        n = n.withType(q.receive(namespacedName.getType(), type -> visitType(type, q)));
+        return n;
     }
 
     @Override

@@ -103,13 +103,16 @@ public interface JSX extends JS {
             return closingName == null ? null : closingName.getElement();
         }
 
-        @With
-        @Nullable
-        JavaType type;
+        @Override
+        public JavaType getType() {
+            // TODO
+            return JavaType.Unknown.getInstance();
+        }
 
         @Override
-        public @Nullable JavaType getType() {
-            return type;
+        public <T extends J> T withType(@Nullable JavaType type) {
+            // TODO
+            return (T) this;
         }
 
         @Override
@@ -155,7 +158,7 @@ public interface JSX extends JS {
             }
 
             public Tag withOpenName(JLeftPadded<String> openName) {
-                return t.openName == openName ? t : new Tag(t.id, t.prefix, t.markers, openName, t.afterName, t.attributes, t.selfClosing, t.children, t.closingName, t.type);
+                return t.openName == openName ? t : new Tag(t.id, t.prefix, t.markers, openName, t.afterName, t.attributes, t.selfClosing, t.children, t.closingName);
             }
 
             public List<JRightPadded<JSX>> getAttributes() {
@@ -163,7 +166,7 @@ public interface JSX extends JS {
             }
 
             public Tag withAttributes(List<JRightPadded<JSX>> attributes) {
-                return t.attributes == attributes ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, attributes, t.selfClosing, t.children, t.closingName, t.type);
+                return t.attributes == attributes ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, attributes, t.selfClosing, t.children, t.closingName);
             }
 
             @Nullable
@@ -172,7 +175,7 @@ public interface JSX extends JS {
             }
 
             public Tag withChildren(@Nullable List<JRightPadded<J>> children) {
-                return t.children == children ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, children, t.closingName, t.type);
+                return t.children == children ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, children, t.closingName);
             }
 
             @Nullable
@@ -181,7 +184,7 @@ public interface JSX extends JS {
             }
 
             public Tag withClosingName(@Nullable JLeftPadded<String> closingName) {
-                return t.closingName == closingName ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, t.children, closingName, t.type);
+                return t.closingName == closingName ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, t.children, closingName);
             }
         }
     }
@@ -212,14 +215,16 @@ public interface JSX extends JS {
         @With
         J.Identifier key;
 
+        @Nullable
         JLeftPadded<Expression> value;
 
+        @Nullable
         public Expression getValue() {
-            return value.getElement();
+            return value == null ? null : value.getElement();
         }
 
-        public Attribute withValue(Expression value) {
-            return getPadding().withValue(this.value.withElement(value));
+        public Attribute withValue(@Nullable Expression value) {
+            return getPadding().withValue(value == null ? null : JLeftPadded.withElement(this.value, value));
         }
 
         @Override
@@ -252,11 +257,12 @@ public interface JSX extends JS {
         public static class Padding {
             private final JSX.Attribute t;
 
+            @Nullable
             public JLeftPadded<Expression> getValue() {
                 return t.value;
             }
 
-            public Attribute withValue(JLeftPadded<Expression> value) {
+            public Attribute withValue(@Nullable JLeftPadded<Expression> value) {
                 return t.value == value ? t : new Attribute(t.id, t.prefix, t.markers, t.key, value);
             }
         }
@@ -446,13 +452,16 @@ public interface JSX extends JS {
             return getPadding().withName(this.name.withElement(name));
         }
 
-        @With
-        @Nullable
-        JavaType type;
+        @Override
+        public JavaType getType() {
+            // TODO
+            return JavaType.Unknown.getInstance();
+        }
 
         @Override
-        public @Nullable JavaType getType() {
-            return type;
+        public <T extends J> T withType(@Nullable JavaType type) {
+            // TODO
+            return (T) this;
         }
 
         @Override
@@ -490,7 +499,7 @@ public interface JSX extends JS {
             }
 
             public NamespacedName withName(JLeftPadded<J.Identifier> name) {
-                return t.name == name ? t : new NamespacedName(t.id, t.prefix, t.markers, t.namespace, name, t.type);
+                return t.name == name ? t : new NamespacedName(t.id, t.prefix, t.markers, t.namespace, name);
             }
         }
     }

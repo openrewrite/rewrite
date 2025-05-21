@@ -22,6 +22,7 @@ import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.javascript.tree.JSX;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import static org.openrewrite.rpc.Reference.asRef;
@@ -516,6 +517,58 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(withStatement, JS.WithStatement::getExpression, el -> visit(el, q));
         q.getAndSend(withStatement, el -> el.getPadding().getBody(), el -> visitRightPadded(el, q));
         return withStatement;
+    }
+
+    @Override
+    public J visitJsxTag(JSX.Tag tag, RpcSendQueue q) {
+        q.getAndSend(tag, el -> el.getPadding().getOpenName(), el -> visitLeftPadded(el, q));
+        q.getAndSend(tag, JSX.Tag::getAfterName, space -> visitSpace(space, q));
+        q.getAndSendList(tag, el -> el.getPadding().getAttributes(), attr -> attr.getElement().getId(), attr -> visitRightPadded(attr, q));
+
+        if (tag.isSelfClosing()) {
+            q.getAndSend(tag, JSX.Tag::getSelfClosing, space -> visitSpace(space, q));
+        } else if (tag.hasChildren()) {
+            q.getAndSendList(tag, el -> el.getPadding().getChildren(), child -> child.getElement().getId(), child -> visitRightPadded(child, q));
+            q.getAndSend(tag, el -> el.getPadding().getClosingName(), el -> visitLeftPadded(el, q));
+        }
+
+        if (tag.getType() != null) {
+            q.getAndSend(tag, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+        }
+
+        return tag;
+    }
+
+    @Override
+    public J visitJsxAttribute(JSX.Attribute attribute, RpcSendQueue q) {
+        q.getAndSend(attribute, JSX.Attribute::getKey, el -> visit(el, q));
+        if (attribute.getPadding().getValue() != null) {
+            q.getAndSend(attribute, el -> el.getPadding().getValue(), el -> visitLeftPadded(el, q));
+        }
+        return attribute;
+    }
+
+    @Override
+    public J visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, RpcSendQueue q) {
+        q.getAndSend(spreadAttribute, JSX.SpreadAttribute::getDots, space -> visitSpace(space, q));
+        q.getAndSend(spreadAttribute, el -> el.getPadding().getExpression(), el -> visitRightPadded(el, q));
+        return spreadAttribute;
+    }
+
+    @Override
+    public J visitJsxEmbeddedExpression(JSX.EmbeddedExpression embeddedExpression, RpcSendQueue q) {
+        q.getAndSend(embeddedExpression, el -> el.getPadding().getExpression(), el -> visitRightPadded(el, q));
+        return embeddedExpression;
+    }
+
+    @Override
+    public J visitJsxNamespacedName(JSX.NamespacedName namespacedName, RpcSendQueue q) {
+        q.getAndSend(namespacedName, JSX.NamespacedName::getNamespace, el -> visit(el, q));
+        q.getAndSend(namespacedName, el -> el.getPadding().getName(), el -> visitLeftPadded(el, q));
+        if (namespacedName.getType() != null) {
+            q.getAndSend(namespacedName, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+        }
+        return namespacedName;
     }
 
     @Override
