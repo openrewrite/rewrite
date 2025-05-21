@@ -837,7 +837,7 @@ export namespace JSX {
         | (BaseTag & { selfClosing: J.Space; children?: undefined; closingName?: undefined })
         | (BaseTag & { selfClosing?: undefined; children: J.RightPadded<EmbeddedExpression | Tag | J.Identifier | J.Literal | J.Empty>[]; closingName: J.LeftPadded<string> });
 
-    interface BaseTag extends JS, Statement, Expression {
+    interface BaseTag extends JS, Expression {
         readonly kind: typeof JS.Kind.JsxTag;
         readonly openName: J.LeftPadded<string>;
         readonly afterName: J.Space;
@@ -848,7 +848,7 @@ export namespace JSX {
      * Represents a single JSX attribute.
      * @example prop="value"
      */
-    export interface Attribute extends JS, Statement {
+    export interface Attribute extends JS {
         readonly kind: typeof JS.Kind.JsxAttribute;
         readonly key: J.Identifier;
         readonly value?: J.LeftPadded<Expression>;
@@ -858,7 +858,7 @@ export namespace JSX {
      * Represents a spread attribute in JSX.
      * @example {...props}
      */
-    export interface SpreadAttribute extends JS, Statement {
+    export interface SpreadAttribute extends JS {
         readonly kind: typeof JS.Kind.JsxSpreadAttribute;
         readonly dots: J.Space
         readonly expression: J.RightPadded<Expression>;
@@ -868,7 +868,7 @@ export namespace JSX {
      * Represents a JSX expression container.
      * @example {expression}
      */
-    export interface EmbeddedExpression extends JS, Statement {
+    export interface EmbeddedExpression extends JS, Expression {
         readonly kind: typeof JS.Kind.JsxEmbeddedExpression;
         readonly expression: J.RightPadded<Expression>;
     }
@@ -877,7 +877,7 @@ export namespace JSX {
      * Represents a namespaced JSX name.
      * @example namespace:Name
      */
-    export interface NamespacedName extends JS, Expression {
+    export interface NamespacedName extends JS {
         readonly kind: typeof JS.Kind.JsxNamespacedName;
         readonly namespace: J.Identifier;
         readonly name: J.LeftPadded<J.Identifier>;

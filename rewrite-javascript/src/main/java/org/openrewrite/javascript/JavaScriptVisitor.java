@@ -1077,14 +1077,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         JSX.Attribute a = attribute;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-
-        Statement temp = (Statement) visitStatement(a, p);
-        if (!(temp instanceof JSX.Attribute)) {
-            return temp;
-        } else {
-            a = (JSX.Attribute) temp;
-        }
-
         a = a.withKey(requireNonNull(visitAndCast(a.getKey(), p)));
         if (a.getPadding().getValue() != null) {
             a = a.getPadding().withValue(visitLeftPadded(a.getPadding().getValue(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
@@ -1097,14 +1089,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         JSX.SpreadAttribute s = spreadAttribute;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-
-        Statement temp = (Statement) visitStatement(s, p);
-        if (!(temp instanceof JSX.SpreadAttribute)) {
-            return temp;
-        } else {
-            s = (JSX.SpreadAttribute) temp;
-        }
-
         s = s.withDots(visitSpace(s.getDots(), Space.Location.LANGUAGE_EXTENSION, p));
         s = s.getPadding().withExpression(requireNonNull(visitRightPadded(s.getPadding().getExpression(), JRightPadded.Location.LANGUAGE_EXTENSION, p)));
 
@@ -1116,7 +1100,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
 
-        Statement temp = (Statement) visitStatement(e, p);
+        Expression temp = (Expression) visitExpression(e, p);
         if (!(temp instanceof JSX.EmbeddedExpression)) {
             return temp;
         } else {
@@ -1132,17 +1116,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         JSX.NamespacedName n = namespacedName;
         n = n.withPrefix(visitSpace(n.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         n = n.withMarkers(visitMarkers(n.getMarkers(), p));
-
-        Expression temp = (Expression) visitExpression(n, p);
-        if (!(temp instanceof JSX.NamespacedName)) {
-            return temp;
-        } else {
-            n = (JSX.NamespacedName) temp;
-        }
-
         n = n.withNamespace(requireNonNull(visitAndCast(n.getNamespace(), p)));
         n = n.getPadding().withName(requireNonNull(visitLeftPadded(n.getPadding().getName(), JLeftPadded.Location.LANGUAGE_EXTENSION, p)));
-        n = n.withType(visitType(n.getType(), p));
 
         return n;
     }
