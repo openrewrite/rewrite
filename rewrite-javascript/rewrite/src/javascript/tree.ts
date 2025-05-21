@@ -835,7 +835,7 @@ export namespace JSX {
      */
     export type Tag =
         | (BaseTag & { selfClosing: J.Space; children?: undefined; closingName?: undefined })
-        | (BaseTag & { selfClosing?: undefined; children: J.RightPadded<EmbeddedExpression | Tag | J.Identifier | J.Empty>[]; closingName: J.LeftPadded<string> });
+        | (BaseTag & { selfClosing?: undefined; children: J.RightPadded<EmbeddedExpression | Tag | J.Identifier | J.Literal | J.Empty>[]; closingName: J.LeftPadded<string> });
 
     interface BaseTag extends JS, Statement, Expression {
         readonly kind: typeof JS.Kind.JsxTag;

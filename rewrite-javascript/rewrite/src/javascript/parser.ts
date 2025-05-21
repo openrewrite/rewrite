@@ -639,7 +639,7 @@ export class JavaScriptParserVisitor {
     }
 
     private mapLiteral(node: ts.LiteralExpression | ts.TrueLiteral | ts.FalseLiteral | ts.NullLiteral | ts.Identifier
-        | ts.TemplateHead | ts.TemplateMiddle | ts.TemplateTail, value: any): J.Literal {
+        | ts.TemplateHead | ts.TemplateMiddle | ts.TemplateTail | ts.JsxText, value: any): J.Literal {
 
         let valueSource = node.getText();
         if (!isValidSurrogateRange(valueSource)) {
@@ -664,10 +664,6 @@ export class JavaScriptParserVisitor {
 
     visitStringLiteral(node: ts.StringLiteral): J.Literal {
         return this.mapLiteral(node, node.text); // FIXME value not in AST
-    }
-
-    visitJsxText(node: ts.JsxText): J.Unknown {
-        return this.visitUnknown(node);
     }
 
     visitRegularExpressionLiteral(node: ts.RegularExpressionLiteral): J.Literal {
@@ -3418,6 +3414,10 @@ export class JavaScriptParserVisitor {
         }
     }
 
+    visitJsxText(node: ts.JsxText): J.Literal {
+        return this.mapLiteral(node, node.text);
+    }
+
     visitJsxElement(node: ts.JsxElement): JSX.Tag {
         const attrs = node.openingElement.attributes.properties;
         return {
@@ -3431,16 +3431,16 @@ export class JavaScriptParserVisitor {
                 emptySpace,
             attributes: attrs.length === 0 ?
                 [] :
-                this.mapToRightPaddedList<Attribute | SpreadAttribute>(
+                this.mapJsxChildren<Attribute | SpreadAttribute>(
                     attrs,
                     this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!),
                     () => emptyMarkers
                 ),
             children: node.children.length > 0 ?
-                this.mapToRightPaddedList<JSX.EmbeddedExpression | JSX.Tag | J.Identifier>(
+                this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(
                     node.children,
                     this.prefix(this.findChildNode(node.closingElement, ts.SyntaxKind.LessThanToken)!),
-                    () => emptyMarkers,
+                    () => emptyMarkers
                 ) :
                 [
                     this.rightPadded(
@@ -3465,7 +3465,7 @@ export class JavaScriptParserVisitor {
                 emptySpace,
             attributes: attrs.length === 0 ?
                 [] :
-                this.mapToRightPaddedList<Attribute | SpreadAttribute>(
+                this.mapJsxChildren<Attribute | SpreadAttribute>(
                     attrs,
                     this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!),
                     () => emptyMarkers
@@ -3483,8 +3483,18 @@ export class JavaScriptParserVisitor {
             openName: this.leftPadded(this.prefix(node.openingFragment), ""),
             afterName: this.prefix(this.findChildNode(node.openingFragment, ts.SyntaxKind.GreaterThanToken)!),
             attributes: [],
-            // TODO last element right padded is the one before the < of the closing tag
-            children: this.mapToContainer<JSX.EmbeddedExpression | JSX.Tag | J.Identifier>(node.children as any).elements,
+            children: node.children.length > 0 ?
+                this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(
+                    node.children,
+                    this.prefix(this.findChildNode(node.closingFragment, ts.SyntaxKind.LessThanToken)!),
+                    () => emptyMarkers
+                ) :
+                [
+                    this.rightPadded(
+                        this.newEmpty(),
+                        this.prefix(this.findChildNode(node.closingFragment, ts.SyntaxKind.LessThanToken)!)
+                    )
+                ],
             closingName: this.leftPadded(emptySpace, "")
         };
     }
@@ -3527,7 +3537,7 @@ export class JavaScriptParserVisitor {
                 node.expression ?
                     this.convert<Expression>(node.expression) :
                     this.newEmpty(),
-                this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!)
+                this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseBraceToken)!)
             )
         };
     }
@@ -4044,6 +4054,30 @@ export class JavaScriptParserVisitor {
             }
             if ((childCount & 1) === 1) {
                 args.push(this.rightPadded(this.visit(elementList[childCount - 1]), lastAfter));
+            }
+        }
+        return args;
+    }
+
+    private mapJsxChildren<T extends J>(elementList: readonly ts.Node[], lastAfter: J.Space, markers?: (ns: readonly ts.Node[], i: number) => Markers): J.RightPadded<T>[] {
+        let childCount = elementList.length;
+
+        const args: J.RightPadded<T>[] = [];
+        if (childCount === 0) {
+            args.push(this.rightPadded(
+                this.newEmpty() as T,
+                lastAfter,
+                emptyMarkers
+            ));
+        } else {
+            for (let i = 0; i < childCount; i++) {
+                const node = elementList[i];
+                const isLast = i === childCount - 1;
+                args.push(this.rightPadded(
+                    this.visit(node),
+                    isLast ? lastAfter : emptySpace,
+                    markers ? markers(elementList, i) : emptyMarkers
+                ));
             }
         }
         return args;

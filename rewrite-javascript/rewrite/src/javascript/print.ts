@@ -91,20 +91,21 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitJsxTag(element: JSX.Tag, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(element, p);
         await this.visitLeftPaddedLocal("<", element.openName, p);
-        if (element.selfClosing) {
-            await this.visitSpace(element.selfClosing, p);
-        }
         await this.visitSpace(element.afterName, p);
         await this.visitRightPaddedLocal(element.attributes, "", p);
-        p.append(">");
 
-        if (element.children) {
-            await this.visitRightPaddedLocal(element.children, "", p);
-            await this.visitLeftPaddedLocal("</", element.closingName, p);
+        if (element.selfClosing) {
+            await this.visitSpace(element.selfClosing, p);
+            p.append("/>");
         } else {
-            p.append("</");
+            p.append(">");
+            if (element.children) {
+                await this.visitRightPaddedLocal(element.children, "", p);
+                await this.visitLeftPaddedLocal("</", element.closingName, p);
+                p.append(">");
+            }
         }
-        p.append(">");
+
         await this.afterSyntax(element, p);
         return element;
     }
@@ -133,6 +134,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitJsxExpression(expr: JSX.EmbeddedExpression, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(expr, p);
+        p.append("{");
         if (expr.expression) {
             await this.visitRightPaddedLocal([expr.expression], "}", p);
         }
