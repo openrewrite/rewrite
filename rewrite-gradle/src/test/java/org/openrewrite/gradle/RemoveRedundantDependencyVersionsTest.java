@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class RemoveRedundantDependencyVersionsTest implements RewriteTest {
@@ -529,6 +530,88 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3:3.14.0")
               
                   testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlin() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  constraints {
+                      implementation("org.springframework:spring-core:6.2.1") {
+                          because("Gradle is resolving 6.2.2 already, this constraint has no effect and can be removed")
+                      }
+                  }
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.4.2"))
+                  implementation("org.springframework.boot:spring-boot:3.4.2")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.4.2"))
+                  implementation("org.springframework.boot:spring-boot")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void testScope() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  constraints {
+                      testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.0") {
+                          because("Some reason")
+                      }
+                  }
+                  testImplementation(platform("org.junit:junit-bom:5.10.1"))
+                  testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation(platform("org.junit:junit-bom:5.10.1"))
+                  testImplementation("org.junit.jupiter:junit-jupiter")
               }
               """
           )
