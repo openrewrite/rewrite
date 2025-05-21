@@ -756,7 +756,11 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
             });
             return super.visit(cu, p, cursor);
         }
-
+        if (tree.kind === J.Kind.MethodDeclaration) {
+            tree = produce(tree as J.MethodDeclaration, draft => {
+                this.ensurePrefixHasNewLine(draft);
+            });
+        }
         return super.visit(tree, p, cursor);
     }
 
@@ -799,27 +803,6 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J.MethodDeclaration> {
-        let j = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
-        if (!j.body) return j;
-
-        // TODO check if it's relevant to TS/JS
-        // j = produce(j, draft => {
-        //     if (draft.body!.statements.length === 0) {
-        //
-        //         let end = this.minimumLines(draft.body!.end.whitespace, this.style.minimum.beforeMethodBody);
-        //         if (!end.whitespace.includes("\n") && this.style.minimum.beforeMethodBody > 0) {
-        //             end = { ...end, whitespace: "\n".repeat(this.style.minimum.beforeMethodBody) };
-        //         }
-        //         draft.body!.end = end;
-        //     } else {
-        //         draft.body!.statements[0] = this.minimumLines(draft.body!.statements[0], this.style.minimum.beforeMethodBody);
-        //     }
-        // });
-
-        return j;
-    }
-
     override async visitStatement(statement: Statement, p: ExecutionContext): Promise<Statement> {
         const ret = await super.visitStatement(statement, p) as Statement;
         const parent = this.cursor.parent?.value;
@@ -849,6 +832,9 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
                     }
                     this.keepMaximumBlankLines(draft, this.style.keepMaximum.inCode);
                 }
+            } else if (parent?.kind === J.Kind.Block ||
+                      (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id)) {
+                this.ensurePrefixHasNewLine(draft);
             }
         });
     }
@@ -856,6 +842,9 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
     protected async visitBlock(block: J.Block, p: ExecutionContext): Promise<J.Block> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
+            if (!draft.end.whitespace.includes("\n")) {
+                draft.end.whitespace = draft.end.whitespace + "\n";
+            }
             // TODO check if it's relevant to TS/JS
             // draft.end = this.keepMaximumLines(draft.end, this.style.keepMaximum.beforeEndOfBlock);
         });
@@ -899,6 +888,12 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
         const needed = min - currentNewlines + 1;
         if (needed > 0) {
             node.prefix.whitespace = "\n".repeat(needed) + node.prefix.whitespace;
+        }
+    }
+
+    private ensurePrefixHasNewLine<T extends J>(node: Draft<J>) {
+        if (node.prefix && !node.prefix.whitespace.includes("\n")) {
+            node.prefix.whitespace = "\n" + node.prefix.whitespace;
         }
     }
 
