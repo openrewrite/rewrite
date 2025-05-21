@@ -444,7 +444,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             t = t.getPadding().withClosingName(q.receive(tag.getPadding().getClosingName(), name -> visitLeftPadded(name, q)));
         }
 
-        t = t.withType(q.receive(tag.getType(), type -> visitType(type, q)));
+//        t = t.withType(q.receive(tag.getType(), type -> visitType(type, q)));
 
         return t;
     }
@@ -479,7 +479,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         JSX.NamespacedName n = namespacedName;
         n = n.withNamespace(q.receive(namespacedName.getNamespace(), ns -> (J.Identifier) visitNonNull(ns, q)));
         n = n.getPadding().withName(q.receive(namespacedName.getPadding().getName(), name -> visitLeftPadded(name, q)));
-        n = n.withType(q.receive(namespacedName.getType(), type -> visitType(type, q)));
+//        n = n.withType(q.receive(namespacedName.getType(), type -> visitType(type, q)));
         return n;
     }
 
