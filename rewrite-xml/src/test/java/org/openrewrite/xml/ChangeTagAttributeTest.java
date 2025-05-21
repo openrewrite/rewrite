@@ -124,4 +124,22 @@ class ChangeTagAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeTagAttributeAndXSDProblem() {
+        rewriteRun(
+            spec -> spec.recipe(new ChangeTagAttribute("//*[namespace-uri() = 'http://java.sun.com/xml/ns/jaxb' and local-name() = 'bindings']",
+                    "version", "3.0", "1.0", false)).expectedCyclesThatMakeChanges(0),
+
+            xml(
+                    """
+                            <schema xmlns="http://www.w3.org/2001/XMLSchema"
+                            xmlns:xenc="http://www.w3.org/2001/04/xmlenc#"
+                            xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                            targetNamespace="http://www.w3.org/2001/04/xmlenc#"
+                            elementFormDefault="qualified" version="1.0"/>
+                            """
+            )
+        );
+    }
 }
