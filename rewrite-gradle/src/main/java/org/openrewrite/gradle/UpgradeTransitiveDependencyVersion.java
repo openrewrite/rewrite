@@ -41,10 +41,11 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenDownloadingExceptions;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
@@ -55,11 +56,12 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Preconditions.not;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKey;
-import static org.openrewrite.gradle.UpgradeDependencyVersion.hasBomWithoutDependencies;
+import static org.openrewrite.gradle.UpgradeDependencyVersion.replaceVersion;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
 @Incubating(since = "8.18.0")
@@ -390,7 +392,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     }
                 }
                 for (GroupArtifactVersion gav : gavs) {
-                    gp = constraintVersion(gp, ctx, gav, configNames);
+                    gp = replaceVersion(gp, ctx, gav, configNames);
                 }
                 return gp;
             }
@@ -936,91 +938,5 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         }
 
         return false;
-    }
-
-
-    private static GradleProject constraintVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav, Set<String> configurations) {
-        try {
-            //noinspection ConstantValue
-            if (gav.getGroupId() == null || gav.getArtifactId() == null) {
-                return gp;
-            }
-
-            Set<String> remainingConfigurations = new HashSet<>(configurations);
-            remainingConfigurations.remove("classpath");
-
-            if (remainingConfigurations.isEmpty()) {
-                return gp;
-            }
-
-            MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-            Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
-            ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
-            List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
-            org.openrewrite.maven.tree.Dependency newRequested = org.openrewrite.maven.tree.Dependency.builder()
-                    .gav(gav)
-                    .build();
-            ResolvedDependency newDep = ResolvedDependency.builder()
-                    .gav(resolvedPom.getGav())
-                    .requested(newRequested)
-                    .dependencies(transitiveDependencies)
-                    .build();
-
-            Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-            Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
-            boolean anyChanged = false;
-            for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                GradleDependencyConfiguration newGdc = gdc
-                        .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeConstraintResolvedDependency(resolved, newDep.getGav(), new HashSet<>())));
-                if (hasBomWithoutDependencies(newDep)) {
-                    for (ResolvedManagedDependency resolvedDependency : resolvedPom.getDependencyManagement()) {
-                        ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(null, resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion(), null);
-                        newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), resolved -> maybeConstraintResolvedDependency(resolved, resolvedGav, new HashSet<>())));
-                    }
-                    for (ResolvedDependency resolvedDependency : boms(newDep, new HashSet<>())) {
-                        ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(null, resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion(), null);
-                        newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), resolved -> maybeConstraintResolvedDependency(resolved, resolvedGav, new HashSet<>())));
-                    }
-                }
-                anyChanged |= newGdc != gdc;
-                newNameToConfiguration.put(newGdc.getName(), newGdc);
-            }
-            if (anyChanged) {
-                gp = gp.withNameToConfiguration(newNameToConfiguration);
-            }
-        } catch (MavenDownloadingException | MavenDownloadingExceptions e) {
-            return gp;
-        }
-        return gp;
-    }
-
-    private static ResolvedDependency maybeConstraintResolvedDependency(ResolvedDependency dep, ResolvedGroupArtifactVersion constraint, Set<ResolvedDependency> traversalHistory) {
-        if (traversalHistory.contains(dep)) {
-            return dep;
-        }
-        if (Objects.equals(dep.getGroupId(), constraint.getGroupId()) && Objects.equals(dep.getArtifactId(), constraint.getArtifactId()) && Objects.equals(dep.getVersion(), constraint.getVersion())) {
-            return dep;
-        }
-        if (Objects.equals(dep.getGroupId(), constraint.getGroupId()) && Objects.equals(dep.getArtifactId(), constraint.getArtifactId())) {
-            return dep.withGav(constraint);
-        }
-        traversalHistory.add(dep);
-        return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeConstraintResolvedDependency(d, constraint, new HashSet<>(traversalHistory))));
-    }
-
-    private static Set<ResolvedDependency> boms(ResolvedDependency dep, Set<ResolvedDependency> traversalHistory) {
-        if (traversalHistory.contains(dep)) {
-            return emptySet();
-        }
-        traversalHistory.add(dep);
-        Set<ResolvedDependency> dependencies = new HashSet<>();
-        for (ResolvedDependency d : dep.getDependencies()) {
-            if ("bom".equals(d.getType())) {
-                dependencies.add(d);
-            } else {
-                dependencies.addAll(boms(d, traversalHistory));
-            }
-        }
-        return dependencies;
     }
 }

@@ -100,11 +100,16 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
                     if (transitivelyResolvedDependencies.isEmpty()) {
                         empty.add(configuration);
                     } else {
+                        boolean anyChanged = false;
                         for (ResolvedDependency resolved : transitivelyResolvedDependencies) {
                             if (isDependencyOnAnotherModule(resolved, project)) {
                                 continue;
                             }
                             lockedVersions.computeIfAbsent(resolved.getGav().asGroupArtifactVersion(), k -> new TreeSet<>()).add(configuration);
+                            anyChanged = true;
+                        }
+                        if (!anyChanged) {
+                            empty.add(configuration);
                         }
                     }
                 });
@@ -154,7 +159,7 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
     }
 
     private boolean isDependencyOnAnotherModule(ResolvedDependency resolved, GradleProject project) {
-        if (Objects.equals(project.getGroup(),resolved.getGroupId())) {
+        if (Objects.equals(project.getGroup(), resolved.getGroupId())) {
             return modules.stream().anyMatch(module -> resolved.getArtifactId().equals(module.getName()));
         }
         return false;

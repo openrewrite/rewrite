@@ -51,7 +51,6 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
-import java.util.function.Function;
 
 import static java.util.Collections.*;
 
@@ -851,7 +850,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
     }
 
-    private static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav, Set<String> configurations) {
+    public static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav, Set<String> configurations) {
         try {
             //noinspection ConstantValue
             if (gav.getGroupId() == null || gav.getArtifactId() == null) {
@@ -887,7 +886,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeUpdateResolvedDependency(resolved, newDep, new HashSet<>())));
                 if (hasBomWithoutDependencies(newDep)) {
                     for (ResolvedManagedDependency resolvedDependency : resolvedPom.getDependencyManagement()) {
-                        newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), maybeUpdateManagedResolvedDependency(resolvedDependency.getGav())));
+                        ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(null, resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion(), null);
+                        newGdc = newGdc.withDirectResolved(ListUtils.map(newGdc.getDirectResolved(), resolved -> maybeUpdateManagedResolvedDependency(resolved, resolvedGav, new HashSet<>())));
                     }
                 }
                 anyChanged |= newGdc != gdc;
@@ -914,15 +914,24 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return dep;
     }
 
-    private static Function<ResolvedDependency, ResolvedDependency> maybeUpdateManagedResolvedDependency(GroupArtifactVersion gav) {
-        return resolved -> {
-            ResolvedDependency newResolvedDependency = ResolvedDependency.builder()
-                    .gav(resolved.getGav().withGroupArtifact(gav.asGroupArtifact()).withVersion(gav.getVersion()))
-                    .requested(resolved.getRequested())
-                    .dependencies(resolved.getDependencies())
-                    .build();
-            return maybeUpdateResolvedDependency(resolved, newResolvedDependency, new HashSet<>());
-        };
+    private static ResolvedDependency maybeUpdateManagedResolvedDependency(
+            ResolvedDependency dep,
+            ResolvedGroupArtifactVersion gav,
+            Set<ResolvedDependency> traversalHistory) {
+        if (traversalHistory.contains(dep)) {
+            return dep;
+        }
+        if (Objects.equals(dep.getGroupId(), gav.getGroupId()) && Objects.equals(dep.getArtifactId(), gav.getArtifactId()) && Objects.equals(dep.getVersion(), gav.getVersion())
+                || wouldDowngrade(dep.getGav().asGroupArtifactVersion(), gav.asGroupArtifactVersion())) {
+            return dep;
+        }
+        if (Objects.equals(dep.getGroupId(), gav.getGroupId()) && Objects.equals(dep.getArtifactId(), gav.getArtifactId())) {
+            if (!isSpringPluginManaged(dep)) {
+                return dep.withGav(gav);
+            }
+        }
+        traversalHistory.add(dep);
+        return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateManagedResolvedDependency(d, gav, new HashSet<>(traversalHistory))));
     }
 
     private static ResolvedDependency maybeUpdateResolvedDependency(
@@ -932,14 +941,32 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         if (traversalHistory.contains(dep)) {
             return dep;
         }
-        if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId()) && Objects.equals(dep.getVersion(), newDep.getVersion())) {
+        if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId()) && Objects.equals(dep.getVersion(), newDep.getVersion())
+                || wouldDowngrade(dep.getGav().asGroupArtifactVersion(), newDep.getGav().asGroupArtifactVersion())) {
             return dep;
         }
         if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
+            if (isSpringPluginManaged(newDep)) {
+                //Spring plugin overwrites versions that are not set in constraints or similar blocks so the transitive dependencies would remain the same except for the current lib.
+                return dep.withGav(newDep.getGav());
+            }
             return newDep;
         }
         traversalHistory.add(dep);
         return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(d, newDep, new HashSet<>(traversalHistory))));
+    }
+
+    private static boolean wouldDowngrade(GroupArtifactVersion from, GroupArtifactVersion to) {
+        if (from.getGroupId().equals(to.getGroupId()) && from.getArtifactId().equals(to.getArtifactId())) {
+            Version fromVersion = new Version(from.getVersion());
+            Version toVersion = new Version(to.getVersion());
+            return fromVersion.compareTo(toVersion) > 0;
+        }
+        return false;
+    }
+
+    private static boolean isSpringPluginManaged(ResolvedDependency newDep) {
+        return newDep.getGroupId().startsWith("org.springframework");
     }
 
     // Some dependencies like jackson-bom do not publish a .module file and only contain dependencyManagement section.
