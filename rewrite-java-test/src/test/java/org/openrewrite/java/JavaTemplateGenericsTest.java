@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -282,6 +283,120 @@ class JavaTemplateGenericsTest implements RewriteTest {
               class Test {
                   Stream<Integer> test() {
                       return /*~~>*/Stream.of("foo").filter(ImmutableMap.of(1, 2)::containsKey).map(ImmutableMap.of(1, 2)::get);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @ExpectedToFail
+    void replaceMemberReferenceToLambda() {
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate refTemplate = JavaTemplate.builder("T::toString")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
+                    JavaTemplate.Matcher matcher = refTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitMemberReference(memberRef, executionContext);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(Object::toString);
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(e -> e.toString());
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @ExpectedToFail
+    void replaceLambdaToMemberReference() {
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+                final JavaTemplate refTemplate = JavaTemplate.builder("T::toString")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
+                    JavaTemplate.Matcher matcher = lambdaTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitLambda(lambda, executionContext);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(e -> e.toString());
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(Object::toString);
+                  }
+
+                  void test(Function<Object, String> fn) {
                   }
               }
               """

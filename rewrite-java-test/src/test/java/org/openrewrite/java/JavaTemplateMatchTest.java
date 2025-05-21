@@ -1053,7 +1053,7 @@ class JavaTemplateMatchTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .expectedCyclesThatMakeChanges(1).cycles(1)
-            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("String::valueOf")
                   .bindType("java.util.function.Function<Object, String>")
                   .build();
@@ -1062,13 +1062,23 @@ class JavaTemplateMatchTest implements RewriteTest {
                   .build();
 
                 @Override
-                public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
-                    return refTemplate.matches(getCursor()) ? SearchResult.found(memberRef, "ref") : super.visitMemberReference(memberRef, executionContext);
+                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
+                    var matcher = refTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitMemberReference(memberRef, executionContext);
+                    }
                 }
 
                 @Override
-                public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
-                    return lambdaTemplate.matches(getCursor()) ? SearchResult.found(lambda, "lambda") : super.visitLambda(lambda, executionContext);
+                public J visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
+                    var matcher = lambdaTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return lambdaTemplate.matches(getCursor()) ? SearchResult.found(lambda, "lambda") : super.visitLambda(lambda, executionContext);
+                    }
                 }
             })),
           //language=java
@@ -1092,9 +1102,9 @@ class JavaTemplateMatchTest implements RewriteTest {
               
               class Foo {
                   void test() {
-                      test(/*~~(ref)~~>*/String::valueOf);
-                      test(/*~~(lambda)~~>*/e -> e.toString());
-                      test(/*~~(lambda)~~>*/x -> x.toString());
+                      test((e) -> e.toString());
+                      test(String::valueOf);
+                      test(String::valueOf);
                   }
 
                   void test(Function<Object, String> fn) {
