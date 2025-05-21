@@ -23,9 +23,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -462,13 +460,5 @@ class JavaTemplateGenericsTest implements RewriteTest {
               """
           )
         );
-    }
-}
-class Foo {
-    List<Integer> test(List<Integer> list) {
-        Set<Integer> set = Set.of(1, 2, 3);
-        return list.stream()
-          .filter(set::contains)
-          .toList();
     }
 }
