@@ -578,7 +578,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
-    void testScope() {
+    void differentScope() {
         rewriteRun(
           buildGradleKts(
             """
