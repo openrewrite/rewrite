@@ -405,7 +405,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
-    public void memberReferenceToLambda() {
+    void memberReferenceToLambda() {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
