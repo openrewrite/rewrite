@@ -23,7 +23,9 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -402,5 +404,71 @@ class JavaTemplateGenericsTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    public void memberReferenceToLambda() {
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate refTemplate = JavaTemplate.builder("#{any(java.util.Set<T>)}::contains")
+                  .bindType("java.util.function.Predicate<T>")
+                  .genericTypes("T")
+                  .build();
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> #{any(java.util.Set<T>)}.contains(e)")
+                  .bindType("java.util.function.Predicate<T>")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
+                    JavaTemplate.Matcher matcher = refTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitMemberReference(memberRef, executionContext);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.*;
+              import java.util.function.*;
+              
+              class Foo {
+                  List<Integer> test(List<Integer> list) {
+                      Set<Integer> set = Set.of(1, 2, 3);
+                      return list.stream()
+                          .filter(set::contains)
+                          .toList();
+                  }
+              }
+              """,
+            """
+              import java.util.*;
+              import java.util.function.*;
+              
+              class Foo {
+                  List<Integer> test(List<Integer> list) {
+                      Set<Integer> set = Set.of(1, 2, 3);
+                      return list.stream()
+                          .filter(e -> set.contains(e))
+                          .toList();
+                  }
+              }
+              """
+          )
+        );
+    }
+}
+class Foo {
+    List<Integer> test(List<Integer> list) {
+        Set<Integer> set = Set.of(1, 2, 3);
+        return list.stream()
+          .filter(set::contains)
+          .toList();
     }
 }
