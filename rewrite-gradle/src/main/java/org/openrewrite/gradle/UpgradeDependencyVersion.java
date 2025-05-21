@@ -135,6 +135,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         Map<GroupArtifact, Object> gaToNewVersion = new HashMap<>();
 
         Map<String, Map<GroupArtifact, Set<String>>> configurationPerGAPerModule = new HashMap<>();
+        Set<GradleProject> modules = new HashSet<>();
     }
 
     @Override
@@ -159,8 +160,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    gradleProject = tree.getMarkers().findFirst(GradleProject.class)
-                            .orElse(null);
+                    gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    if (gradleProject != null) {
+                        acc.modules.add(gradleProject);
+                    }
                 }
                 return super.visit(tree, ctx);
             }
@@ -397,7 +400,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
-            private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock();
+            private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock(acc.modules);
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
@@ -848,7 +851,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
     }
 
-    public static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav, Set<String> configurations) {
+    private static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav, Set<String> configurations) {
         try {
             //noinspection ConstantValue
             if (gav.getGroupId() == null || gav.getArtifactId() == null) {
@@ -942,7 +945,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     // Some dependencies like jackson-bom do not publish a .module file and only contain dependencyManagement section.
     // In that case we want to update the versions of the managed dependencies.
     // If a module file is pushed, and it contains dependencies, we do not need to resolve using dependencyManagement as the bom will have dependencies on the overridden versions.
-    private static boolean hasBomWithoutDependencies(ResolvedDependency dep) {
+    static boolean hasBomWithoutDependencies(ResolvedDependency dep) {
         if ("bom".equals(dep.getType()) && dep.getDependencies().isEmpty()) {
             return true;
         }

@@ -39,6 +39,12 @@ import static java.util.Collections.emptySet;
 @EqualsAndHashCode(callSuper = false)
 public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
 
+    /**
+     * There is a shortcoming in  GradleProject model where we don't maintain the intra-project relationships.
+     * Ultimately an improvement should be made to GradleProject model, but in the meantime work around it in the recipe
+     */
+    Set<GradleProject> modules;
+
     @Override
     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
         return sourceFile instanceof PlainText && sourceFile.getSourcePath().endsWith("gradle.lockfile");
@@ -65,15 +71,26 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
             return plainText;
         }
 
+        GradleProject project = gradleProject.get();
+
         Arrays.stream(text.split("\n")).forEach(lock -> {
             if (isComment(lock)) {
                 comments.add(lock);
             } else {
                 lockedConfigurations.addAll(parseLockedConfigurations(lock));
+                parseLockedConfigurations(lock)
+                        .forEach(lockedConf -> {
+                            GradleDependencyConfiguration conf = project.getNameToConfiguration().get(lockedConf);
+                            // we do not want to remove locks present in the lockfile which where previously locked but now not present anymore (e.g. by removing a plugin) as that would be a different recipe's task (e.g. CleanupDependencyLock)
+                            if (conf == null || !conf.isCanBeResolved()) {
+                                GroupArtifactVersion gav = parseLockedArtifact(lock);
+                                if (gav != null) {
+                                    lockedVersions.computeIfAbsent(gav, k -> new TreeSet<>()).add(lockedConf);
+                                }
+                            }
+                        });
             }
         });
-
-        GradleProject project = gradleProject.get();
         project.getConfigurations().stream()
                 .filter(GradleDependencyConfiguration::isCanBeResolved)
                 .filter(configuration -> lockedConfigurations.contains(configuration.getName()))
@@ -84,6 +101,9 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
                         empty.add(configuration);
                     } else {
                         for (ResolvedDependency resolved : transitivelyResolvedDependencies) {
+                            if (isDependencyOnAnotherModule(resolved, project)) {
+                                continue;
+                            }
                             lockedVersions.computeIfAbsent(resolved.getGav().asGroupArtifactVersion(), k -> new TreeSet<>()).add(configuration);
                         }
                     }
@@ -131,6 +151,25 @@ public class UpdateDependencyLock extends PlainTextVisitor<ExecutionContext> {
 
     private static boolean isComment(String entry) {
         return entry.startsWith("# ");
+    }
+
+    private boolean isDependencyOnAnotherModule(ResolvedDependency resolved, GradleProject project) {
+        if (Objects.equals(project.getGroup(),resolved.getGroupId())) {
+            return modules.stream().anyMatch(module -> resolved.getArtifactId().equals(module.getName()));
+        }
+        return false;
+    }
+
+    private @Nullable GroupArtifactVersion parseLockedArtifact(String lock) {
+        String[] parts = lock.split("=");
+        if (parts.length != 2) {
+            return null;
+        }
+        String[] gavParts = parts[0].split(":");
+        if (gavParts.length != 3) {
+            return null;
+        }
+        return new GroupArtifactVersion(gavParts[0], gavParts[1], gavParts[2]);
     }
 
     private Set<String> parseLockedConfigurations(String lock) {
