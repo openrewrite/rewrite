@@ -68,7 +68,7 @@ class FindTest implements RewriteTest {
           spec -> spec.recipe(new Find("text", null, null, null, null, null, null, 50))
             .dataTable(TextMatches.Row.class, rows -> {
                 assertThat(rows).hasSize(1);
-                assertThat(rows.get(0).getMatch()).isEqualTo("This is ~~>text.");
+                assertThat(rows.getFirst().getMatch()).isEqualTo("This is ~~>text.");
             }),
           text(
             """

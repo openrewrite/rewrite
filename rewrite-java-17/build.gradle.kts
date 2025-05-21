@@ -8,6 +8,7 @@ plugins {
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
@@ -21,6 +22,12 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     "javaTck"(project(":rewrite-java-tck"))
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
 }
 
 tasks.withType<JavaCompile> {

@@ -25,6 +25,7 @@ import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -294,7 +295,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                        Optional<GradleDependency> maybeGradleDependency = new GradleDependency.Matcher()
+                        Optional<GradleDependency> maybeGradleDependency = Traits.gradleDependency()
                                 .groupId(groupPattern)
                                 .artifactId(artifactPattern)
                                 .get(getCursor());

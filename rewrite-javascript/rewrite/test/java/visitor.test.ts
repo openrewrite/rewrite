@@ -15,7 +15,7 @@
  */
 
 import {ExecutionContext} from "../../src";
-import {J, JavaVisitor, Statement} from "../../src/java";
+import {Expression, J, Statement} from "../../src/java";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {JavaScriptVisitor, typescript} from "../../src/javascript";
 
@@ -34,12 +34,36 @@ describe('visitor', () => {
 
         // when
         await spec.rewriteRun(
-            // TODO something is off with the rewriteRun logic, it doesn't work without the after, even if before==after
             //language=typescript
-            typescript('class A {}', 'class A {}')
+            typescript('class A {}')
         );
 
         // test
         expect(global).toEqual("visited org.openrewrite.java.tree.J$ClassDeclaration");
+    });
+
+    test('call visitExpression for subclasses', async () => {
+        // given
+        let visitCounter = 0;
+        let visits = "";
+        const CustomVisitor = class extends JavaScriptVisitor<ExecutionContext> {
+            protected async visitExpression(expression: Expression, p: ExecutionContext): Promise<J | undefined> {
+                visitCounter++;
+                visits = visits + "/" + expression.kind;
+                return await super.visitExpression(expression, p);
+            }
+        }
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new CustomVisitor());
+
+        // when
+        await spec.rewriteRun(
+            //language=typescript
+            typescript('const x = 3 + 3;')
+        );
+
+        // test
+        expect(visitCounter).toEqual(4);
+        expect(visits).toEqual("/org.openrewrite.java.tree.J$Identifier/org.openrewrite.java.tree.J$Binary/org.openrewrite.java.tree.J$Literal/org.openrewrite.java.tree.J$Literal");
     });
 });

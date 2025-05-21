@@ -134,7 +134,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         String source = "const two = 1 + 1";
 
         SourceFile cu = client.parse("javascript", List.of(Parser.Input.fromString(
-          Paths.get("test.js"), source)), null).iterator().next();
+          Paths.get("test.js"), source)), null).getFirst();
 
         new JavaIsoVisitor<Integer>() {
             @Override

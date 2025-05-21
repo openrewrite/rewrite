@@ -26,6 +26,7 @@ export const JavaScriptStyles = {
 export const StyleKind = {
     SpacesStyle: "org.openrewrite.javascript.style.SpacesStyle",
     WrappingAndBracesStyle: "org.openrewrite.java.style.WrappingAndBracesStyle",
+    BlankLinesStyle: "org.openrewrite.javascript.style.BlankLinesStyle"
 } as const;
 
 export const SpacesStyleDetailKind = {
@@ -145,7 +146,6 @@ export namespace SpacesStyle {
     }
 }
 
-
 export const WrappingAndBracesStyleDetailKind = {
     WrappingAndBracesStyleIfStatement: "org.openrewrite.java.style.WrappingAndBracesStyle$IfStatement",
 } as const;
@@ -154,6 +154,28 @@ export interface WrappingAndBracesStyle extends Style {
     // TODO add more flags; this is what we have in Java, but IntelliJ has way more settings
     readonly kind: typeof StyleKind.WrappingAndBracesStyle;
     readonly ifStatement: WrappingAndBracesStyle.IfStatement;
+}
+
+export interface BlankLinesStyle extends Style {
+    readonly kind: "org.openrewrite.javascript.style.BlankLinesStyle";
+    readonly keepMaximum: BlankLinesStyle.KeepMaximum;
+    readonly minimum: BlankLinesStyle.Minimum;
+}
+
+export namespace BlankLinesStyle {
+    export interface KeepMaximum {
+        readonly inCode: number;
+    }
+
+    export interface Minimum {
+        readonly afterImports: number;
+        readonly aroundClass: number;
+        readonly aroundFieldInInterface?: number;
+        readonly aroundField: number;
+        readonly aroundMethodInInterface?: number;
+        readonly aroundMethod: number;
+        readonly aroundFunction: number;
+    }
 }
 
 export namespace WrappingAndBracesStyle {
@@ -172,7 +194,7 @@ export namespace IntelliJ {
             displayName: "IntelliJ IDEA",
             description: "Default IntelliJ IDEA code style.",
             tags: [],
-            styles: [spaces(), wrappingAndBraces()],
+            styles: [spaces(), wrappingAndBraces(), blankLines()],
         }
 
         export function spaces(): SpacesStyle {
@@ -277,6 +299,22 @@ export namespace IntelliJ {
                 }
             };
         }
+
+        export function blankLines(): BlankLinesStyle {
+            return {
+                kind: StyleKind.BlankLinesStyle,
+                keepMaximum: {
+                    inCode: 2
+                },
+                minimum: {
+                    afterImports: 1,
+                    aroundClass: 1,
+                    aroundField: 0,
+                    aroundMethod: 1,
+                    aroundFunction: 1
+                }
+            };
+        }
     }
 
     export namespace TypeScript {
@@ -287,7 +325,7 @@ export namespace IntelliJ {
             displayName: "IntelliJ IDEA",
             description: "Default IntelliJ IDEA code style.",
             tags: [],
-            styles: [spaces(), wrappingAndBraces()],
+            styles: [spaces(), wrappingAndBraces(), blankLines()],
         }
 
         export function spaces(): SpacesStyle {
@@ -389,6 +427,24 @@ export namespace IntelliJ {
                 ifStatement: {
                     kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement,
                     elseOnNewLine: false
+                }
+            };
+        }
+
+        export function blankLines(): BlankLinesStyle {
+            return {
+                kind: StyleKind.BlankLinesStyle,
+                keepMaximum: {
+                    inCode: 2
+                },
+                minimum: {
+                    afterImports: 1,
+                    aroundClass: 1,
+                    aroundFieldInInterface: 0,
+                    aroundField: 0,
+                    aroundMethodInInterface: 1,
+                    aroundMethod: 1,
+                    aroundFunction: 1
                 }
             };
         }

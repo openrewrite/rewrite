@@ -69,8 +69,8 @@ class GradleParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(4);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Import.class);
-                J.Import i = (J.Import) cu.getStatements().get(0);
+                assertThat(cu.getStatements().getFirst()).isInstanceOf(J.Import.class);
+                J.Import i = (J.Import) cu.getStatements().getFirst();
                 assertThat(i.getTypeName()).isEqualTo("org.gradle.api.Project");
                 assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodInvocation.class);
                 J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(3);

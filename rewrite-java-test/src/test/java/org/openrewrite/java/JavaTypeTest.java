@@ -81,7 +81,7 @@ class JavaTypeTest implements RewriteTest {
                 @Override
                 public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
                     JavaType returnType = ((J.MethodInvocation) variable.getInitializer()).getMethodType().getReturnType();
-                    assertThat(TypeUtils.asFullyQualified(TypeUtils.asParameterized(returnType).getTypeParameters().get(0))
+                    assertThat(TypeUtils.asFullyQualified(TypeUtils.asParameterized(returnType).getTypeParameters().getFirst())
                       .getFullyQualifiedName()).isEqualTo("java.lang.Integer");
                     return variable;
                 }
@@ -106,7 +106,7 @@ class JavaTypeTest implements RewriteTest {
                 public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
                     List<JavaType.FullyQualified> annotations = multiVariable.getTypeAsFullyQualified().getAnnotations();
                     assertThat(annotations).hasSize(1);
-                    assertThat(annotations.get(0).getFullyQualifiedName()).isEqualTo("java.lang.FunctionalInterface");
+                    assertThat(annotations.getFirst().getFullyQualifiedName()).isEqualTo("java.lang.FunctionalInterface");
                     return multiVariable;
                 }
             })
@@ -196,8 +196,8 @@ class JavaTypeTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> assertThat(
               ((J.MethodDeclaration)
-                cu.getClasses().get(0)
-                  .getBody().getStatements().get(0))
+                cu.getClasses().getFirst()
+                  .getBody().getStatements().getFirst())
                 .getMethodType().isOverride())
               .isTrue())
           )

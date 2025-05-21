@@ -34,6 +34,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -158,7 +159,7 @@ public class RecipeSpec {
         return String.join("-", s);
     }
 
-    private static final Map<String, Recipe> RECIPE_CACHE = new HashMap<>();
+    private static final Map<String, Recipe> RECIPE_CACHE = new ConcurrentHashMap<>();
 
     /**
      * @param parser The parser supplier to use when a matching source file is found.

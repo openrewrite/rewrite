@@ -508,7 +508,7 @@ class BlankLinesTest implements RewriteTest {
             "\nclass Test {}",
             "class Test {}",
             spec -> spec
-              .afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPrefix().getWhitespace()).isEmpty())
+              .afterRecipe(cu -> assertThat(cu.getClasses().getFirst().getPrefix().getWhitespace()).isEmpty())
               .noTrim()
           )
         );

@@ -83,8 +83,8 @@ class JavaTemplateTest3Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              var methodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var methodType = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
               assertThat(methodType.getReturnType()).isEqualTo(JavaType.Primitive.Int);
               assertThat(methodType.getParameterTypes()).containsExactly(JavaType.Primitive.Int);
           }),
@@ -337,7 +337,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (enumEquals.matches(method)) {
-                      return t.apply(getCursor(), method.getCoordinates().replace(), method.getSelect(), method.getArguments().get(0));
+                      return t.apply(getCursor(), method.getCoordinates().replace(), method.getSelect(), method.getArguments().getFirst());
                   }
                   return super.visitMethodInvocation(method, p);
               }
@@ -378,7 +378,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                       mi = JavaTemplate.builder("acceptString(#{any()}.toString())")
                         .javaParser(JavaParser.fromJavaVersion())
                         .build()
-                        .apply(updateCursor(mi), mi.getCoordinates().replaceMethod(), mi.getArguments().get(0));
+                        .apply(updateCursor(mi), mi.getCoordinates().replaceMethod(), mi.getArguments().getFirst());
                       mi = mi.withName(mi.getName().withType(mi.getMethodType()));
                   }
                   return mi;
@@ -430,7 +430,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   J.MethodInvocation m = super.visitMethodInvocation(method, p);
                   if (m.getSimpleName().equals("method") && m.getArguments().size() == 2) {
-                      m = JavaTemplate.apply("#{anyArray(int)}", getCursor(), m.getCoordinates().replaceArguments(), m.getArguments().get(0));
+                      m = JavaTemplate.apply("#{anyArray(int)}", getCursor(), m.getCoordinates().replaceArguments(), m.getArguments().getFirst());
                   }
                   return m;
               }
@@ -482,7 +482,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                       m = JavaTemplate.builder("#{any(java.lang.Integer)}")
                         .contextSensitive()
                         .build()
-                        .apply(getCursor(), coordinates, m.getArguments().get(0));
+                        .apply(getCursor(), coordinates, m.getArguments().getFirst());
                   }
                   return m;
               }

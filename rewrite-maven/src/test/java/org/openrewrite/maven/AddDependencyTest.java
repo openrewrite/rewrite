@@ -1469,6 +1469,45 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/5433")
+    @Test
+    void doNotAddDependencyTransitivelyProvidedByBom() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("org.springframework", "spring-webmvc", "5.3.31",
+            null, null, null, null, null, null, null, null, true)),
+          mavenProject(
+            "project",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-dependencies</artifactId>
+                                <version>2.7.18</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-web</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
     @Test
     void addDependencyToParentPomWhenAggregatingPomIsNotParent() {
         rewriteRun(
