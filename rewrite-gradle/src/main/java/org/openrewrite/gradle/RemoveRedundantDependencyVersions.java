@@ -294,7 +294,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
                                         return false;
                                     }
-                                    List<ResolvedDependency> resolvedDependencies = Stream.concat(
+
+                                    return Stream.concat(
                                                     Stream.of(c),
                                                     gp.configurationsExtendingFrom(c, true).stream()
                                             )
@@ -302,12 +303,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             .distinct()
                                             .map(conf -> conf.findResolvedDependency(requireNonNull(constraint.getGroupId()), constraint.getArtifactId()))
                                             .filter(Objects::nonNull)
-                                            .collect(Collectors.toList());
-
-                                    return resolvedDependencies.stream()
-                                            .anyMatch(resolvedDependency -> {
-                                                return VERSION_COMPARATOR.compare(null, resolvedDependency.getVersion(), constraint.getVersion()) > 0;
-                                            });
+                                            .anyMatch(resolvedDependency -> VERSION_COMPARATOR.compare(null, resolvedDependency.getVersion(), constraint.getVersion()) > 0);
                                 }
                             }.visitNonNull(tree, ctx);
                         }
