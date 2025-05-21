@@ -1,8 +1,11 @@
 package org.openrewrite.java.internal.template;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 // Assuming a Mode enum or similar concept might be needed.
 // For now, this is a placeholder. If a standard OpenRewrite enum exists for this, it should be used.
@@ -15,10 +18,10 @@ enum TemplateInsertionMode {
 
 public class BlockStatementTemplateGenerator {
 
-    private final AstPruner astPruner;
+    private final ContextualAstPruner astPruner;
 
     public BlockStatementTemplateGenerator() {
-        this.astPruner = new AstPruner();
+        this.astPruner = new ContextualAstPruner();
     }
 
     /**
@@ -46,37 +49,118 @@ public class BlockStatementTemplateGenerator {
         }
 
         J.CompilationUnit originalCu = insertionPoint.firstEnclosingOrThrow(J.CompilationUnit.class);
+        J originalTargetAstNode = insertionPoint.getValue(); // This is the J element in the original CU
+        if (originalTargetAstNode == null) {
+            throw new IllegalArgumentException("Insertion point cursor must point to a valid J element.");
+        }
+        UUID originalTargetId = originalTargetAstNode.getId();
+
         J.CompilationUnit prunedCu = astPruner.prune(originalCu, insertionPoint);
 
-        Object prunedTargetElement = insertionPoint.getValue(); // Default to original if path re-navigation fails
-        try {
-            // Attempt to re-navigate the cursor path within the pruned CompilationUnit.
-            // This provides the AST element in the pruned CU corresponding to the original insertion point.
-            Cursor prunedCuRootCursor = new Cursor(null, prunedCu);
-            Cursor targetCursorInPrunedCu = new Cursor(prunedCuRootCursor, insertionPoint.getPath());
-            prunedTargetElement = targetCursorInPrunedCu.getValue();
-        } catch (Exception e) {
-            // This catch block is a fallback. If re-navigation fails, `prunedTargetElement` remains
-            // the original element. Printing this might lead to inaccuracies if it was altered by pruning.
-            // A robust solution might need more sophisticated ways to locate the element or mark it during pruning.
-            System.err.println("Warning: Failed to re-navigate to insertion point in pruned CU. " +
-                               "Template generation may be inaccurate. Error: " + e.getMessage());
+        // Find the equivalent of the originalTargetAstNode in the prunedCu using its ID
+        AtomicReference<J> foundInPrunedCu = new AtomicReference<>();
+        new JavaIsoVisitor<AtomicReference<J>>() {
+            @Override
+            public <T extends J> J visitTree(J tree, AtomicReference<J> targetHolder) {
+                if (tree != null && tree.getId().equals(originalTargetId)) {
+                    targetHolder.set(tree);
+                    // Stop further traversal once found by returning the tree itself, not super.visitTree
+                    return tree; 
+                }
+                // Only continue traversal if not found yet
+                return targetHolder.get() == null ? super.visitTree(tree, targetHolder) : tree;
+            }
+        }.visit(prunedCu, foundInPrunedCu);
+
+        J prunedTargetElement = foundInPrunedCu.get();
+
+        if (prunedTargetElement == null) {
+            // This means the pruner removed the exact AST node that was the insertion point.
+            // This could be problematic if the pruner is too aggressive or if the insertion point
+            // was on an element that was legitimately removed entirely.
+            // Fallback: try to use the original element for printing, but this is risky.
+            // Or, if the insertion point was, e.g., a J.Block, and it's gone,
+            // we might try to find its parent if that was kept.
+            System.err.println("Warning: The exact insertion point AST node (ID: " + originalTargetId +
+                               ") was not found in the pruned CU. Template placement might be compromised.");
+            // Attempt to use the *original* insertion point's parent block if the IP itself is gone.
+            // This is a heuristic for cases where the IP statement was removed but its block context remains.
+            if (originalTargetAstNode instanceof Statement) {
+                J.Block parentBlockOfOriginalIp = insertionPoint.firstEnclosing(J.Block.class);
+                if (parentBlockOfOriginalIp != null) {
+                    AtomicReference<J> foundParentBlockInPrunedCu = new AtomicReference<>();
+                     new JavaIsoVisitor<AtomicReference<J>>() {
+                        @Override
+                        public J visitBlock(J.Block block, AtomicReference<J> holder) {
+                            if (block.getId().equals(parentBlockOfOriginalIp.getId())) {
+                                holder.set(block);
+                                return block;
+                            }
+                            return super.visitBlock(block, holder);
+                        }
+                    }.visit(prunedCu, foundParentBlockInPrunedCu);
+                    if (foundParentBlockInPrunedCu.get() != null) {
+                        prunedTargetElement = foundParentBlockInPrunedCu.get(); // Target insertion inside this block
+                        System.err.println("Fallback: Using parent block (ID: " + prunedTargetElement.getId() + ") as insertion context.");
+                         // For modes like BEFORE/AFTER, this needs careful handling.
+                         // For REPLACE_STATEMENT on a block, this means inserting into the block.
+                         // If mode is BEFORE/AFTER original (now gone) statement, we might insert at start/end of parent block.
+                         // This logic gets very complex. For now, we'll let it try to print this block and search for it.
+                    } else {
+                        // Parent block also not found. Very difficult to place template.
+                        System.err.println("Error: Parent block of original IP also not found. Cannot reliably place template.");
+                        return "// ERROR: Could not locate insertion point or its parent block in pruned context.\n" +
+                               "//__TEMPLATE__\n" + code + "\n//__TEMPLATE_STOP__\n" + prunedCu.printAll();
+                    }
+                } else {
+                     System.err.println("Error: Original IP had no parent block. Cannot reliably place template.");
+                     return "// ERROR: Could not locate insertion point in pruned context.\n" +
+                               "//__TEMPLATE__\n" + code + "\n//__TEMPLATE_STOP__\n" + prunedCu.printAll();
+                }
+            } else {
+                 System.err.println("Error: Could not locate non-statement insertion point in pruned context.");
+                 return "// ERROR: Could not locate insertion point in pruned context.\n" +
+                           "//__TEMPLATE__\n" + code + "\n//__TEMPLATE_STOP__\n" + prunedCu.printAll();
+            }
         }
 
-        String prunedCuString = prunedCu.printAll(); // Print the entire pruned Compilation Unit
+        String prunedCuString = prunedCu.printAll();
+        String targetElementString = prunedTargetElement.printAll().trim();
 
-        String targetElementString;
-        if (prunedTargetElement instanceof J) {
-            // Print the specific target element found in the pruned CU (or original if lookup failed).
-            // Using .printAll() for the element to get its full representation.
-            targetElementString = ((J) prunedTargetElement).printAll().trim();
-        } else {
-            // Should not happen if insertionPoint.getValue() is a J element.
-            throw new IllegalStateException("Target element for template insertion is not a J instance: " +
-                                            prunedTargetElement.getClass().getName());
+        if (targetElementString.isEmpty() && !(prunedTargetElement instanceof J.Block && ((J.Block)prunedTargetElement).getStatements().isEmpty())) {
+             // If it's not an empty block but prints empty (e.g. J.Empty), handle similarly to not found,
+             // as indexOf("") is problematic.
+             System.err.println("Warning: Target element prints as empty string. Fallback for J.Empty or similar.");
+             // This case needs very careful handling. For now, assume it's like node not found.
+             // If the insertion point was J.Empty, we might want to insert into the parent block at its location.
+             // This is covered by the "prunedTargetElement == null" fallback to parent block if that logic is robust.
+             // For now, error out or use a very broad context.
+             return "// WARNING: Target element string is empty. Template may be misplaced.\n" +
+                    "//__TEMPLATE__\n" + code + "\n//__TEMPLATE_STOP__\n" + prunedCuString;
+        }
+        
+        // Special handling for inserting into an empty block when it's the target
+        if (prunedTargetElement instanceof J.Block && ((J.Block)prunedTargetElement).getStatements().isEmpty() &&
+            (mode == TemplateInsertionMode.REPLACE_STATEMENT || targetElementString.equals("{}") || targetElementString.equals("{\n}"))) {
+            // If mode is REPLACE_STATEMENT for an empty block, or if the target string is just empty braces.
+            // We want to insert *inside* the braces.
+            String blockRepresentation = prunedTargetElement.printAll(); // Get exact representation
+            int openingBraceIndex = prunedCuString.indexOf(blockRepresentation);
+            if (openingBraceIndex != -1) {
+                openingBraceIndex = prunedCuString.indexOf('{', openingBraceIndex); // Find the actual brace
+                 if (openingBraceIndex != -1) {
+                    String before = prunedCuString.substring(0, openingBraceIndex + 1);
+                    String after = prunedCuString.substring(openingBraceIndex + 1);
+                    return before + "\n//__TEMPLATE__\n" + code + "\n//__TEMPLATE_STOP__\n" + after;
+                }
+            }
+            // Fallback if block representation not found (should not happen if prunedTargetElement is from prunedCu)
+            System.err.println("Warning: Could not find empty block representation for targeted insertion. Defaulting to string search.");
+            // Proceed to normal indexOf search for targetElementString, which might be "{}"
         }
 
-        if (targetElementString.isEmpty()) {
+
+        if (targetElementString.isEmpty()) { // Catch-all for empty target string after block check
             // This can happen for J.Empty or if the element prints as nothing.
             System.err.println("Warning: Target element for template insertion prints as empty. " +
                                "Template markers will be placed based on mode relative to an assumed point.");

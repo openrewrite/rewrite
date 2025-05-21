@@ -9,9 +9,9 @@ import org.openrewrite.java.tree.Statement;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class AstPrunerTest {
+class ContextualAstPrunerTest {
 
-    private final AstPruner astPruner = new AstPruner();
+    private final ContextualAstPruner astPruner = new ContextualAstPruner();
     private final JavaParser parser = JavaParser.fromJavaVersion()
             .logCompilationWarningsAndErrors(true)
             .build();
@@ -404,5 +404,418 @@ class AstPrunerTest {
         // This means `System.out.println(greeter.greet());` should indeed be pruned. The assertion `.contains("System.out.println(greeter.greet());")` is likely wrong.
 
         assertThat(prunedSource).doesNotContain("System.out.println(greeter.greet());");
+    }
+
+    @Test
+    void pruneIfStatement_IpInThen() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "class A {\n" +
+            "    void method(int k) {\n" +
+            "        if (k > 0) { // Condition will be simplified to true\n" +
+            "            System.out.println(\"Positive\");\n" +
+            "            //__INSERTION_POINT__\n" +
+            "            System.out.println(\"Still positive\");\n" +
+            "        } else {\n" + // Else will be removed
+            "            System.out.println(\"Not positive\");\n" +
+            "        }\n" +
+            "        int after = 10;\n" + // Will be pruned
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "//__INSERTION_POINT__");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+
+        assertThat(prunedSource)
+            .contains("package com.example;")
+            .contains("class A {")
+            .contains("void method(int k)")
+            .contains("if (true)") // Condition simplified
+            .contains("System.out.println(\"Positive\");")
+            .contains("//__INSERTION_POINT__")
+            .doesNotContain("System.out.println(\"Still positive\");") // Pruned from then block
+            .doesNotContain("else {") // Else block removed
+            .doesNotContain("System.out.println(\"Not positive\");")
+            .doesNotContain("int after = 10;"); // Pruned
+    }
+
+    @Test
+    void pruneIfStatement_IpInElse() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "class A {\n" +
+            "    void method(int k) {\n" +
+            "        if (k > 0) { // Then will be emptied\n" +
+            "            System.out.println(\"Positive\");\n" +
+            "        } else { // Condition will be simplified to false (or if kept, then emptied)\n" +
+            "            System.out.println(\"Not positive\");\n" +
+            "            //__INSERTION_POINT__\n" +
+            "            System.out.println(\"Still not positive\");\n" +
+            "        }\n" +
+            "        int after = 10;\n" +
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "//__INSERTION_POINT__");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+
+        assertThat(prunedSource)
+            .contains("package com.example;")
+            .contains("class A {")
+            .contains("void method(int k)")
+            // Condition simplification to 'false' is ideal but 'true' is also acceptable if 'then' is empty.
+            // Current simplifyExpression defaults to 'true'.
+            // If the 'if' itself is not an ancestor, and IP is in 'else', then 'then' is emptied, 'else' is kept.
+            // The condition is simplified.
+            .contains("if (true)") // Or "if (false)" if smart enough, current default is true
+            .contains("then {") // Then block structure kept but emptied
+            .doesNotContain("System.out.println(\"Positive\");")
+            .contains("else {")
+            .contains("System.out.println(\"Not positive\");")
+            .contains("//__INSERTION_POINT__")
+            .doesNotContain("System.out.println(\"Still not positive\");")
+            .doesNotContain("int after = 10;");
+    }
+
+    @Test
+    void pruneIfStatement_IpInCondition() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "class A {\n" +
+            "    void method(int k) {\n" +
+            "        int before = 0;\n" +
+            "        if (k > 0 && /*__INSERTION_POINT__*/ k < 100) { // IP in condition\n" +
+            "            System.out.println(\"In range\");\n" + // Then will be emptied
+            "        } else {\n" +
+            "            System.out.println(\"Out of range\");\n" + // Else will be emptied
+            "        }\n" +
+            "        int after = 10;\n" +
+            "    }\n" +
+            "}"
+        );
+        // For IP in condition, it's harder to get cursor to a part of J.Binary
+        // Let's place a comment and get cursor to that comment.
+        // The pruner should keep the J.Binary (condition) as it's an ancestor.
+        Cursor insertionPoint = getCursorToStatement(cu, "/*__INSERTION_POINT__*/");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+        
+        assertThat(prunedSource)
+            .contains("package com.example;")
+            .contains("class A {")
+            .contains("void method(int k)")
+            .contains("int before = 0;")
+            .contains("if (k > 0 && /*__INSERTION_POINT__*/ k < 100)") // Condition kept
+            .contains("then {") // Then block structure kept but emptied
+            .doesNotContain("System.out.println(\"In range\");")
+            .contains("else {") // Else block structure kept but emptied
+            .doesNotContain("System.out.println(\"Out of range\");")
+            .doesNotContain("int after = 10;");
+    }
+
+
+    // Tests for Loop Constructs
+
+    @Test
+    void pruneForLoop_IpInBody() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "class A {\n" +
+            "    void method() {\n" +
+            "        for (int i = 0; i < 10; i++) { // Control simplified\n" +
+            "            System.out.println(\"Looping: \" + i);\n" +
+            "            //__INSERTION_POINT__\n" +
+            "            System.out.println(\"After IP in loop\");\n" + // Pruned
+            "        }\n" +
+            "        int afterLoop = 1;\n" + // Pruned
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "//__INSERTION_POINT__");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+
+        assertThat(prunedSource)
+            .contains("package com.example;")
+            .contains("class A {")
+            .contains("void method()")
+            .contains("for ( ; true; )") // Control simplified (init and update removed, condition true)
+            .contains("System.out.println(\"Looping: \" + i);")
+            .contains("//__INSERTION_POINT__")
+            .doesNotContain("System.out.println(\"After IP in loop\");")
+            .doesNotContain("int afterLoop = 1;");
+    }
+
+    @Test
+    void pruneForLoop_IpInControl_Condition() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "class A {\n" +
+            "    void method() {\n" +
+            "        int limit = 10; \n" + // Kept as it's before the loop
+            "        for (int i = 0; i < /*__INSERTION_POINT__*/ limit; i++) { // IP in condition\n" +
+            "            System.out.println(i);\n" + // Body emptied
+            "        }\n" +
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "/*__INSERTION_POINT__*/");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+        
+        assertThat(prunedSource)
+            .contains("int limit = 10;")
+            .contains("for (int i = 0; i < /*__INSERTION_POINT__*/ limit; i++)") // Control kept
+            .contains("body {") // Body block structure kept
+            .doesNotContain("System.out.println(i);"); // Body content pruned
+    }
+    
+    @Test
+    void pruneForEachLoop_IpInBody() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "import java.util.List;\n" +
+            "class A {\n" +
+            "    void method(List<String> items) {\n" +
+            "        for (String item : items) { // Control simplified (var/iterable might be simplified)\n" +
+            "            System.out.println(item);\n" +
+            "            //__INSERTION_POINT__\n" +
+            "            System.out.println(\"After IP in for-each\");\n" + // Pruned
+            "        }\n" +
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "//__INSERTION_POINT__");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+
+        assertThat(prunedSource)
+            .contains("for (Object templateVar : /* Simplified */true)") // Control simplified
+            .contains("System.out.println(item);")
+            .contains("//__INSERTION_POINT__")
+            .doesNotContain("System.out.println(\"After IP in for-each\");");
+    }
+    
+    @Test
+    void pruneWhileLoop_IpInBody() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "class A {\n" +
+            "    void method(int k) {\n" +
+            "        while (k > 0) { // Condition simplified to true\n" +
+            "            System.out.println(k);\n" +
+            "            //__INSERTION_POINT__\n" +
+            "            k--;\n" + // Pruned
+            "        }\n" +
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "//__INSERTION_POINT__");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+
+        assertThat(prunedSource)
+            .contains("while (true)") // Condition simplified
+            .contains("System.out.println(k);")
+            .contains("//__INSERTION_POINT__")
+            .doesNotContain("k--;");
+    }
+
+    @Test
+    void pruneDoWhileLoop_IpInBody() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "class A {\n" +
+            "    void method(int k) {\n" +
+            "        do { // Body kept up to IP\n" +
+            "            System.out.println(k);\n" +
+            "            //__INSERTION_POINT__\n" +
+            "            k--;\n" + // Pruned
+            "        } while (k > 0); // Condition simplified\n" +
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "//__INSERTION_POINT__");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+
+        assertThat(prunedSource)
+            .contains("do {")
+            .contains("System.out.println(k);")
+            .contains("//__INSERTION_POINT__")
+            .doesNotContain("k--;")
+            .contains("} while (true);"); // Condition simplified
+    }
+
+    // Tests for Try-Catch-Finally
+
+    @Test
+    void pruneTryCatch_IpInTry() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "import java.io.*;\n" +
+            "class A {\n" +
+            "    void method() {\n" +
+            "        try (InputStream is = new FileInputStream(\"file.txt\")) { // Resource simplified if not IP path\n" +
+            "            System.out.println(\"In try\");\n" +
+            "            //__INSERTION_POINT__\n" +
+            "            System.out.println(\"More in try\");\n" + // Pruned
+            "        } catch (IOException e) { // Catch simplified\n" +
+            "            System.out.println(\"Caught IOE\");\n" +
+            "        } catch (Exception e) { // Catch simplified\n" +
+            "            System.out.println(\"Caught general Exception\");\n" +
+            "        } finally { // Finally simplified\n" +
+            "            System.out.println(\"In finally\");\n" +
+            "        }\n" +
+            "        int afterTry = 1;\n" + // Pruned
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "//__INSERTION_POINT__");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+        
+        assertThat(prunedSource)
+            .contains("package com.example;")
+            .contains("import java.io.*;") // Kept due to FileInputStream
+            .contains("class A {")
+            .contains("void method()")
+            // Try-with-resources: resource var simplified if not on IP path.
+            // Current simplifyVariable might make it "Object templateVar".
+            // If 'is' is an ancestor, it is kept. Here, 'is' is an ancestor of IP.
+            .contains("try (InputStream is = new FileInputStream(\"file.txt\"))")
+            .contains("System.out.println(\"In try\");")
+            .contains("//__INSERTION_POINT__")
+            .doesNotContain("System.out.println(\"More in try\");")
+            // Catches are kept as structures but bodies emptied
+            .contains("catch (IOException e) {")
+            .doesNotContain("System.out.println(\"Caught IOE\");")
+            .contains("catch (Exception e) {")
+            .doesNotContain("System.out.println(\"Caught general Exception\");")
+            // Finally is kept as structure but body emptied
+            .contains("finally {")
+            .doesNotContain("System.out.println(\"In finally\");")
+            .doesNotContain("int afterTry = 1;");
+    }
+
+    @Test
+    void pruneTryCatch_IpInCatch() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "import java.io.*;\n" +
+            "class A {\n" +
+            "    void method() {\n" +
+            "        try { // Try body emptied\n" +
+            "            System.out.println(\"In try\");\n" +
+            "        } catch (IOException e) { // This catch kept\n" +
+            "            System.out.println(\"Caught IOE\");\n" +
+            "            //__INSERTION_POINT__\n" +
+            "            System.out.println(\"More in IOE catch\");\n" + // Pruned
+            "        } catch (Exception e) { // Other catch simplified\n" +
+            "            System.out.println(\"Caught general Exception\");\n" +
+            "        } finally { // Finally simplified\n" +
+            "            System.out.println(\"In finally\");\n" +
+            "        }\n" +
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "//__INSERTION_POINT__");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+
+        assertThat(prunedSource)
+            .contains("try {") // Try body emptied
+            .doesNotContain("System.out.println(\"In try\");")
+            .contains("catch (IOException e) {")
+            .contains("System.out.println(\"Caught IOE\");")
+            .contains("//__INSERTION_POINT__")
+            .doesNotContain("System.out.println(\"More in IOE catch\");")
+            .contains("catch (Exception e) {") // Other catch emptied
+            .doesNotContain("System.out.println(\"Caught general Exception\");")
+            .contains("finally {") // Finally emptied
+            .doesNotContain("System.out.println(\"In finally\");");
+    }
+    
+    @Test
+    void pruneTryCatch_IpInFinally() {
+         J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "import java.io.*;\n" +
+            "class A {\n" +
+            "    void method() {\n" +
+            "        try { /* Try body emptied */ System.out.println(\"In try\"); } " +
+            "        catch (IOException e) { /* Catch emptied */ System.out.println(\"Caught IOE\"); } " +
+            "        finally { \n"+
+            "             System.out.println(\"In finally\");\n" +
+            "             //__INSERTION_POINT__\n" +
+            "             System.out.println(\"More in finally\");\n" + // Pruned
+            "        }\n" +
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "//__INSERTION_POINT__");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+
+        assertThat(prunedSource)
+            .contains("try {")
+            .doesNotContain("System.out.println(\"In try\");")
+            .contains("catch (IOException e) {")
+            .doesNotContain("System.out.println(\"Caught IOE\");")
+            .contains("finally {")
+            .contains("System.out.println(\"In finally\");")
+            .contains("//__INSERTION_POINT__")
+            .doesNotContain("System.out.println(\"More in finally\");");
+    }
+
+    // Tests for Switch Statements
+    @Test
+    void pruneSwitch_IpInCaseBody() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "class A {\n" +
+            "    void method(int k) {\n" +
+            "        switch (k) { // Selector simplified if not IP path\n" +
+            "            case 1:\n" +
+            "                System.out.println(\"One\");\n" +
+            "                //__INSERTION_POINT__\n" +
+            "                System.out.println(\"More one\");\n" + // Pruned
+            "                break;\n" + // Pruned if after IP in same case body, or kept if part of IP path
+            "            case 2:\n" + // This case pruned or body emptied
+            "                System.out.println(\"Two\");\n" +
+            "                break;\n" +
+            "            default:\n" + // This case pruned or body emptied
+            "                System.out.println(\"Default\");\n" +
+            "        }\n" +
+            "        int afterSwitch = 1;\n" + // Pruned
+            "    }\n" +
+            "}"
+        );
+        Cursor insertionPoint = getCursorToStatement(cu, "//__INSERTION_POINT__");
+        J.CompilationUnit prunedCu = astPruner.prune(cu, insertionPoint);
+        String prunedSource = prunedCu.printAll().trim();
+
+        assertThat(prunedSource)
+            .contains("switch (true)") // Selector simplified
+            .contains("case 1:")
+            .contains("System.out.println(\"One\");")
+            .contains("//__INSERTION_POINT__")
+            .doesNotContain("System.out.println(\"More one\");")
+            // The 'break;' for case 1 might be kept if it's considered part of the IP statement's block scope.
+            // Current visitBlock logic stops after the IP containing statement in a direct parent block.
+            // If the comment is the IP, its statement is the J.Block of the case.
+            // This means break might be pruned. Let's assume it's pruned.
+            .doesNotContain("break;") 
+            .satisfiesAnyOf( // Other cases might be removed entirely or have bodies emptied
+                s -> !s.contains("case 2:"),
+                s -> s.contains("case 2:\n            }") // Empty body for case 2
+            )
+            .satisfiesAnyOf(
+                s -> !s.contains("default:"),
+                s -> s.contains("default:\n            }") // Empty body for default
+            )
+            .doesNotContain("int afterSwitch = 1;");
     }
 }

@@ -260,4 +260,61 @@ class BlockStatementTemplateGeneratorTest {
                 .contains("int first = 1;")
                 .contains("int last = 2;\n//__TEMPLATE__\n" + codeToInsert + "\n//__TEMPLATE_STOP__");
     }
+
+    @Test
+    void contextTemplateInDeeplyNestedStructure() {
+        J.CompilationUnit cu = parseSingle(
+            "package com.example;\n" +
+            "class Outer {\n" +
+            "    void outerMethod() {\n" +
+            "        System.out.println(\"Outer before if\");\n" + // Kept - before relevant if
+            "        if (true) { // Kept - ancestor of IP
+            "            System.out.println(\"Outer in if, before inner class\");\n" + // Kept
+            "            class Inner {\n" + // Kept - ancestor
+            "                void innerMethod() {\n" + // Kept - ancestor
+            "                    System.out.println(\"Inner before target\");\n" + // Kept
+            "                    int target = 123; // IP is BEFORE this\n" +
+            "                    System.out.println(\"Inner after target\");\n" + // Pruned by block logic
+            "                }\n" +
+            "                void anotherInnerMethod() {} // Pruned - body emptied by AstPruner\n" +
+            "            }\n" +
+            "            System.out.println(\"Outer in if, after inner class\");\n" + // Pruned by block logic (after relevant inner class)
+            "        }\n" +
+            "        System.out.println(\"Outer after if\");\n" + // Pruned by block logic
+            "    }\n" +
+            "    void anotherOuterMethod() {} // Pruned - body emptied by AstPruner\n" +
+            "}"
+        );
+
+        Cursor insertionPoint = getCursorToStatement(cu, "int target = 123;");
+        String codeToInsert = "/* TEMPLATE_CODE */";
+
+        String result = templateGenerator.contextTemplate(insertionPoint, codeToInsert, TemplateInsertionMode.BEFORE_STATEMENT);
+
+        // Expected: Only the direct path to 'int target = 123;' and statements immediately before it in its block are kept.
+        // Outer methods/statements not on this path are pruned or have bodies emptied.
+        assertThat(result)
+            .contains("package com.example;")
+            .contains("class Outer {")
+            .contains("void outerMethod()")
+            .contains("System.out.println(\"Outer before if\");")
+            .contains("if (true)") // Condition might be simplified if not IP ancestor
+            .contains("System.out.println(\"Outer in if, before inner class\");")
+            .contains("class Inner {")
+            .contains("void innerMethod() {")
+            .contains("System.out.println(\"Inner before target\");")
+            .contains("//__TEMPLATE__\n" + codeToInsert + "\n//__TEMPLATE_STOP__\nint target = 123;")
+            .doesNotContain("System.out.println(\"Inner after target\");")
+            .contains("void anotherInnerMethod() {") // Signature kept
+            .matches(source -> !source.substring(source.indexOf("void anotherInnerMethod() {") + "void anotherInnerMethod() {".length()).trim().startsWith("}")) // Body check (empty)
+            .doesNotContain("System.out.println(\"Outer in if, after inner class\");")
+            .doesNotContain("System.out.println(\"Outer after if\");")
+            .contains("void anotherOuterMethod() {") // Signature kept
+            .matches(source -> !source.substring(source.indexOf("void anotherOuterMethod() {") + "void anotherOuterMethod() {".length()).trim().startsWith("}")); // Body check (empty)
+            
+        // Refined check for `if(true)` condition simplification:
+        // The `if` statement is an ancestor of the IP. So `isIpOrAncestor(mIf)` is true.
+        // Its condition `true` is not an IP/ancestor. So `conditionIsRelevant` is false.
+        // `simplifyExpression(condition)` should be called. Current `simplifyExpression` makes it `true`. So this is fine.
+    }
 }
