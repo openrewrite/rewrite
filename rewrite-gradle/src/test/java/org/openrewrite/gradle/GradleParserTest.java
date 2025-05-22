@@ -293,7 +293,7 @@ class GradleParserTest implements RewriteTest {
                   exec {
                       commandLine 'bash', '-c', \"""
                           RESPONSE=\\$(curl --location -s --request POST "https://localhost")
-                          echo "TEST" > "$someVar"
+                          echo "TEST" > "\\$(echo $someVar)"
                       \"""
                   }
               }

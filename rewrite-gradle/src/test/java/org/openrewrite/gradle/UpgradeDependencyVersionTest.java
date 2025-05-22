@@ -1861,12 +1861,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               task executeShellCommands {
                   doLast {
                       exec {
-                          commandLine 'bash', '-c', '''
-                              set +x
-                              RESPONSE=\\$(curl --location -s --request POST "https://managed-vault-be.apps.csts-k8cpr-1.r-caas.allstate.com/api/v1/generate-test-credentials/0418000011J5" --header "Authorization: Basic \\$AUTH")
-                              roleID=\\$(echo \\$RESPONSE | egrep -o '\\"roleID\\"*:*\\"[^\\\\\\\\\\"]+\\"' | awk -F':' '{print \\$2}' | sed -e 's/\\"//g')set -x
-                              echo "Extracted variable: $someVar"
-                          '''
+                          commandLine 'bash', '-c', \"""
+                              RESPONSE=\\$(curl --location -s --request POST "https://localhost")
+                              echo "TEST" > "$someVar"
+                          \"""
                       }
                   }
               }
