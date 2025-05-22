@@ -20,6 +20,8 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Collections;
+
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
@@ -44,7 +46,7 @@ class LockDependencyVersionsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(RewriteTest.toRecipe(UpdateDependencyLock::new));
+        spec.recipe(RewriteTest.toRecipe(() -> new UpdateDependencyLock(Collections.emptySet())));
     }
 
     @Test
@@ -144,6 +146,8 @@ class LockDependencyVersionsTest implements RewriteTest {
               # This file is expected to be part of source control.
               org.apache.tomcat.embed:tomcat-embed-core:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               org.apache.tomcat:tomcat-annotations-api:10.0.0-M1=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.jacoco:org.jacoco.agent:0.8.12=jacocoAgent,jacocoAnt
+              org.jacoco:org.jacoco.ant:0.8.12=jacocoAnt
               empty=annotationProcessor,testAnnotationProcessor
               """,
             """
@@ -152,6 +156,8 @@ class LockDependencyVersionsTest implements RewriteTest {
               # This file is expected to be part of source control.
               org.apache.tomcat.embed:tomcat-embed-core:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
               org.apache.tomcat:tomcat-annotations-api:10.0.27=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+              org.jacoco:org.jacoco.agent:0.8.12=jacocoAgent,jacocoAnt
+              org.jacoco:org.jacoco.ant:0.8.12=jacocoAnt
               empty=annotationProcessor,testAnnotationProcessor
               """
           )

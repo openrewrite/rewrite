@@ -88,7 +88,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     public static final String DEFAULT_RESOURCE_PATH = "META-INF/rewrite/classpath.tsv.zip";
 
-    private static final Map<GroupArtifactVersion, Path> classesDirByArtifact = new LinkedHashMap<>();
+    private static final Map<GroupArtifactVersion, Path> classesDirByArtifact = Collections.synchronizedMap(new LinkedHashMap<>());
 
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
         try {
@@ -135,13 +135,15 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     private static Collection<String> artifactsNotYetWritten(Collection<String> artifactNames) {
         Collection<String> notWritten = new ArrayList<>(artifactNames);
-        for (String artifactName : artifactNames) {
-            Pattern artifactPattern = Pattern.compile(artifactName + ".*");
-            for (GroupArtifactVersion groupArtifactVersion : classesDirByArtifact.keySet()) {
-                if (artifactPattern
-                        .matcher(groupArtifactVersion.getArtifactId() + "-" + groupArtifactVersion.getVersion())
-                        .matches()) {
-                    notWritten.remove(artifactName);
+        synchronized (classesDirByArtifact) {
+            for (String artifactName : artifactNames) {
+                Pattern artifactPattern = Pattern.compile(artifactName + ".*");
+                for (GroupArtifactVersion groupArtifactVersion : classesDirByArtifact.keySet()) {
+                    if (artifactPattern
+                            .matcher(groupArtifactVersion.getArtifactId() + "-" + groupArtifactVersion.getVersion())
+                            .matches()) {
+                        notWritten.remove(artifactName);
+                    }
                 }
             }
         }
@@ -393,12 +395,14 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     @Override
     public @Nullable Path load(String artifactName) {
-        for (Map.Entry<GroupArtifactVersion, Path> gavAndClassesDir : classesDirByArtifact.entrySet()) {
-            GroupArtifactVersion gav = gavAndClassesDir.getKey();
-            if (Pattern.compile(artifactName + ".*")
-                    .matcher(gav.getArtifactId() + "-" + gav.getVersion())
-                    .matches()) {
-                return gavAndClassesDir.getValue();
+        synchronized (classesDirByArtifact) {
+            for (Map.Entry<GroupArtifactVersion, Path> gavAndClassesDir : classesDirByArtifact.entrySet()) {
+                GroupArtifactVersion gav = gavAndClassesDir.getKey();
+                if (Pattern.compile(artifactName + ".*")
+                        .matcher(gav.getArtifactId() + "-" + gav.getVersion())
+                        .matches()) {
+                    return gavAndClassesDir.getValue();
+                }
             }
         }
         return null;

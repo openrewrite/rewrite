@@ -52,7 +52,8 @@ describe('BlankLinesVisitor', () => {
                 class B {
                 }
 
-                 class C {}
+                 class C {
+                }
                 `),
             // TODO the space before `class C` seems excessive, not sure if it's the BlankLinkesVisitor's responsibility though
             // @formatter:on
@@ -105,6 +106,52 @@ describe('BlankLinesVisitor', () => {
             typescript(`
                  class A {
                  }
+                `)
+            // @formatter:on
+        );
+    });
+
+    test('simple un-minify', () => {
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`const x=["1",2,3];let y = 2;const z = 3;`,
+                `
+                    const x=["1",2,3];
+                    let y = 2;
+                    const z = 3;
+                `)
+            // @formatter:on
+        );
+    });
+
+    test('un-minify', () => {
+        spec.recipe = fromVisitor(new BlankLinesVisitor(blankLines(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`class TodoItem{constructor(public title:string,public done:boolean=false){}toggle():void{this.done=!this.done;}toString():string{return (this.done?"[x]":"[ ]")+this.title}}const list:TodoItem[]=[new TodoItem("Buy milk"),new TodoItem("Walk the dog")];list[1].toggle();list.forEach(item=>console.log(item.toString()));`,
+                `
+                    class TodoItem{
+                    constructor(public title:string,public done:boolean=false){
+                    }
+
+
+                    toggle():void{
+                    this.done=!this.done;
+                    }
+
+
+                    toString():string{
+                    return (this.done?"[x]":"[ ]")+this.title
+                    }
+                    }
+                    const list:TodoItem[]=[new TodoItem("Buy milk"),new TodoItem("Walk the dog")];
+                    list[1].toggle();
+                    list.forEach(item=>console.log(item.toString()));
                 `)
             // @formatter:on
         );

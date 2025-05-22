@@ -791,7 +791,9 @@ public class TypeUtils {
         try {
             if (from instanceof JavaType.FullyQualified) {
                 if (from instanceof JavaType.Parameterized) {
-                    if (to.equals(from.toString())) {
+                    int lessThanIndex = to.indexOf('<');
+                    String fromRawType = ((JavaType.Parameterized) from).getType().getFullyQualifiedName();
+                    if (lessThanIndex == fromRawType.length() && to.startsWith(fromRawType) && to.equals(from.toString())) {
                         return true;
                     }
                 }
