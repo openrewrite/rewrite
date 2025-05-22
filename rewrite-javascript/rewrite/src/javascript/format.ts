@@ -959,6 +959,9 @@ export class TabsAndIndentsVisitor extends JavaScriptVisitor<ExecutionContext> {
         const relativeIndent = this.currentIndent;
 
         return produce(ret, draft => {
+            if (draft.prefix == undefined) {
+                draft.prefix = {kind: J.Kind.Space, comments: [], whitespace: ""};
+            }
             if (draft.prefix.whitespace.includes("\n")) {
                 draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
             }
