@@ -30,7 +30,6 @@ describe('TabsAndIndentsVisitor', () => {
     test('simple', () => {
         const spec = new RecipeSpec()
         spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-            // TODO
         })));
         return spec.rewriteRun(
             // @formatter:off
@@ -58,7 +57,6 @@ describe('TabsAndIndentsVisitor', () => {
     test('indent', () => {
         const spec = new RecipeSpec()
         spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-            // TODO
         })));
         return spec.rewriteRun(
             // @formatter:off
@@ -106,7 +104,6 @@ describe('TabsAndIndentsVisitor', () => {
     test("not so simple", () => {
         const spec = new RecipeSpec()
         spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
-            // TODO
         })));
         return spec.rewriteRun(
             // @formatter:off
