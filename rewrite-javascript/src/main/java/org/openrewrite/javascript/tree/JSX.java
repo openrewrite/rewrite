@@ -197,9 +197,7 @@ public interface JSX extends JS {
                 return t.children == children ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, children, t.closingName, t.afterClosingName);
             }
 
-            @Nullable
-            public JLeftPadded<String> getClosingName() {
-                return t.closingName;
+            public @Nullable JLeftPadded<String> getClosingName() {
             }
 
             public Tag withClosingName(@Nullable JLeftPadded<String> closingName) {
