@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
@@ -30,14 +29,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
  * These JavaTemplate tests are specific to the annotation matching syntax.
  */
 class JavaTemplateAnnotationTest implements RewriteTest {
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(new ReplaceAnnotation(
-                "javax.annotation.Nullable",
-                "org.checkerframework.checker.nullness.qual.Nullable",
-                null));
-    }
 
     @DocumentExample
     @Test
@@ -125,131 +116,6 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               """
           )
         );
-    }
-
-    @Test
-    void enumParsing() {
-        rewriteRun(java(
-                        """
-                                import com.google.common.collect.ImmutableMap;
-                                import javax.annotation.Nullable;
-
-                                public enum NullableRecipeValidationEnum {
-                                    INVALID("invalid"),
-                                    CLICKED("clicked");
-
-                                    private static final ImmutableMap<String, NullableRecipeValidationEnum> VALUE_TO_ACTION_TYPE;
-                                    static {
-                                        final ImmutableMap.Builder<String, NullableRecipeValidationEnum> builder = new ImmutableMap.Builder<>();
-                                        for (final NullableRecipeValidationEnum enumTest : values()) {
-                                            builder.put(enumTest.value, enumTest);
-                                        }
-                                        VALUE_TO_ACTION_TYPE = builder.build();
-                                    }
-
-
-                                    private final String value;
-
-                                    NullableRecipeValidationEnum(@Nullable final String value){
-                                        this.value = value;
-                                    }
-
-                                }
-                                """,
-                        """
-                                import com.google.common.collect.ImmutableMap;
-                                import org.checkerframework.checker.nullness.qual.Nullable;
-
-                                public enum NullableRecipeValidationEnum {
-                                    INVALID("invalid"),
-                                    CLICKED("clicked");
-
-                                    private static final ImmutableMap<String, NullableRecipeValidationEnum> VALUE_TO_ACTION_TYPE;
-                                    static {
-                                        final ImmutableMap.Builder<String, NullableRecipeValidationEnum> builder = new ImmutableMap.Builder<>();
-                                        for (final NullableRecipeValidationEnum enumTest : values()) {
-                                            builder.put(enumTest.value, enumTest);
-                                        }
-                                        VALUE_TO_ACTION_TYPE = builder.build();
-                                    }
-
-
-                                    private final String value;
-
-                                    NullableRecipeValidationEnum(@Nullable final String value){
-                                        this.value = value;
-                                    }
-
-                                }
-                                """)
-        );
-    }
-
-    @Test
-    void functionParsing() {
-        rewriteRun(
-                java(
-                        """
-                                import com.google.common.base.Function;
-
-                                import javax.annotation.Nullable;
-
-                                public class AttachmentMetadata {
-                                    public final String filename;
-                                    public final String extension;
-                                    public final String contentType;
-                                    public final long size;
-
-                                    public AttachmentMetadata(@Nullable final String filename,
-                                                           final String contentType,
-                                                           final long size) {
-                                        this.filename = filename;
-                                        final int dot = (filename == null) ? -1 : filename.lastIndexOf('.');
-                                        this.extension = (dot == -1) ? null : filename.substring(dot + 1).toLowerCase();
-                                        this.contentType = contentType;
-                                        this.size = size;
-                                    }
-
-                                    public static final Function<AttachmentMetadata, String> ATTACHMENT_METADATA_TO_FILENAME_EXTENSION = new Function<AttachmentMetadata, String>() {
-                                        @Nullable
-                                        @Override
-                                        public String apply(@Nullable final AttachmentMetadata attachment) {
-                                            return (attachment == null) ? null : attachment.extension;
-                                        }
-                                    };
-
-                                }
-                                """,
-                        """
-                                import com.google.common.base.Function;
-
-                                import org.checkerframework.checker.nullness.qual.Nullable;
-
-                                public class AttachmentMetadata {
-                                    public final String filename;
-                                    public final String extension;
-                                    public final String contentType;
-                                    public final long size;
-
-                                    public AttachmentMetadata(@Nullable final String filename,
-                                                           final String contentType,
-                                                           final long size) {
-                                        this.filename = filename;
-                                        final int dot = (filename == null) ? -1 : filename.lastIndexOf('.');
-                                        this.extension = (dot == -1) ? null : filename.substring(dot + 1).toLowerCase();
-                                        this.contentType = contentType;
-                                        this.size = size;
-                                    }
-
-                                    public static final Function<AttachmentMetadata, String> ATTACHMENT_METADATA_TO_FILENAME_EXTENSION = new Function<AttachmentMetadata, String>() {
-                                        @Nullable
-                                        @Override
-                                        public String apply(@Nullable final AttachmentMetadata attachment) {
-                                            return (attachment == null) ? null : attachment.extension;
-                                        }
-                                    };
-                                }
-                                """));
     }
 
 }

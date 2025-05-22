@@ -135,6 +135,91 @@ class ReplaceAnnotationTest implements RewriteTest {
               )
             );
         }
+
+        @Test
+        void enumWithParameter() {
+
+            rewriteRun(
+                    spec -> spec.recipe(new ReplaceAnnotation("@lombok.NonNull", "@org.jetbrains.annotations.NotNull", null)),
+                    java(
+                            """
+                                    import lombok.NonNull;
+    
+                                    public enum NullableRecipeValidationEnum {
+                                        INVALID("invalid"),
+                                        CLICKED("clicked");
+    
+                                        private final String value;
+    
+                                        NullableRecipeValidationEnum(@NonNull final String value){
+                                            this.value = value;
+                                        }
+    
+                                    }
+                                    """,
+                            """
+                                    import org.jetbrains.annotations.NotNull;
+    
+                                    public enum NullableRecipeValidationEnum {
+                                        INVALID("invalid"),
+                                        CLICKED("clicked");
+    
+                                        private final String value;
+    
+                                        NullableRecipeValidationEnum(@NotNull final String value){
+                                            this.value = value;
+                                        }
+    
+                                    }
+                                    """)
+            );
+        }
+
+        @Test
+        void recordWithAttibutesAnnotated() {
+            rewriteRun(
+                    spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+                    java(
+                            """
+                    import org.jetbrains.annotations.NotNull;
+        
+                    public record Person(
+                        @NotNull String firstName,
+                        @NotNull String lastName
+                    ) {}
+                    """,
+                            """
+                    import lombok.NonNull;
+        
+                    public record Person(
+                        @NonNull String firstName,
+                        @NonNull String lastName
+                    ) {}
+                    """));
+        }
+
+        @Test
+        void attributesInClass() {
+            rewriteRun(
+                    spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+                    java(
+                            """
+                    import org.jetbrains.annotations.NotNull;
+        
+                    public class Person {
+                        @NotNull String firstName="";
+                        @NotNull String lastName="";
+                    }
+                    """,
+                            """
+                    import lombok.NonNull;
+        
+                    public class Person {
+                        @NonNull String firstName="";
+                        @NonNull String lastName="";
+                    }
+                    """));
+        }
     }
 
     @Nested

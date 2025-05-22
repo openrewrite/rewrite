@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
@@ -42,34 +41,6 @@ class JavaTemplateAnnotationRecordTest implements RewriteTest {
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
                       return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
                         getCursor(), annotation.getCoordinates().replace(), "2.0");
-                  }
-              }
-            )),
-          java(
-            """
-              @Deprecated(since = "1.0", forRemoval = true)
-              class A {
-              }
-                """,
-            """
-              @Deprecated(since = "2.0", forRemoval = true)
-              class A {
-              }
-              """
-          )
-        );
-    }
-
-    @ExpectedToFail
-    @Test
-    void replaceAnnotation2() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-                  @Override
-                  public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
-                      annotation = JavaTemplate.apply("@Deprecated(since = \"#{any(java.lang.String)}\", forRemoval = true)",
-                        getCursor(), annotation.getCoordinates().replace(), "2.0");
-                      return annotation;
                   }
               }
             )),
@@ -119,26 +90,4 @@ class JavaTemplateAnnotationRecordTest implements RewriteTest {
                 """));
     }
 
-    @Test
-    void replacesInRecord() {
-        rewriteRun(
-                spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
-                java(
-                        """
-                import org.jetbrains.annotations.NotNull;
-    
-                public record Person(
-                    @NotNull String firstName,
-                    @NotNull String lastName
-                ) {}
-                """,
-                        """
-                import lombok.NonNull;
-    
-                public record Person(
-                    @NonNull String firstName,
-                    @NonNull String lastName
-                ) {}
-                """));
-    }
 }
