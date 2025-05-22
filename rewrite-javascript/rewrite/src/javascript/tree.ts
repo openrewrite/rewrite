@@ -828,6 +828,9 @@ export function isJavaScript(tree: any): tree is JS {
     return KindValues.has(tree["kind"]);
 }
 
+export function isExpressionStatement(tree: any): tree is JS.ExpressionStatement {
+    return tree["kind"] === JS.Kind.ExpressionStatement;
+}
 
 TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => getType(tree.initializer));
 TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: FunctionType) => getType(tree.returnType.element))
