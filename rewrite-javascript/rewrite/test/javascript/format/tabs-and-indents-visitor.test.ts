@@ -182,4 +182,16 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('lambda', () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`console.log(() => "a");`)
+            // @formatter:on
+        )
+    });
 });
