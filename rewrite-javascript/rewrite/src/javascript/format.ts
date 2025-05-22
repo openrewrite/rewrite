@@ -704,6 +704,13 @@ export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionCont
         });
     }
 
+    protected async visitThrow(thrown: J.Throw, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitThrow(thrown, p) as J.Throw;
+        return ret && produce(ret, draft => {
+           draft.exception.prefix.whitespace = " ";
+        });
+    }
+
     protected async visitVariableDeclarations(v: J.VariableDeclarations, p: ExecutionContext): Promise<J | undefined> {
         let ret = await super.visitVariableDeclarations(v, p) as J.VariableDeclarations;
         let first = ret.leadingAnnotations.length === 0;
