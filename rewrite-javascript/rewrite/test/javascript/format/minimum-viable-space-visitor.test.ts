@@ -51,5 +51,15 @@ describe('MinimumViableSpacingVisitor', () => {
                 // @formatter:on
         ))
     });
+
+    test('throw new', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`throw new Error("things went south");`,
+                `throw new Error("things went south");`
+                // @formatter:on
+            ))
+    });
 });
 
