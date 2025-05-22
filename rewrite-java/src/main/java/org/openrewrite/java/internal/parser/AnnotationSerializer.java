@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.internal.parser;
 
-import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.Type;
 
 /**
@@ -29,7 +28,7 @@ import org.objectweb.asm.Type;
  * - Arrays and nested arrays
  * - Nested annotations
  */
-public class AnnotationSerializer {
+class AnnotationSerializer {
 
     /**
      * Serializes a simple annotation without attributes.

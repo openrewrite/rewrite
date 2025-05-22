@@ -25,7 +25,7 @@ import java.util.List;
 /**
  * Helper class for applying annotations to classes, methods, and fields using ASM.
  */
-public class AnnotationApplier {
+class AnnotationApplier {
 
     /**
      * Applies an annotation to a class, method, or field.

@@ -31,7 +31,7 @@ import java.util.List;
  * - Arrays and nested arrays
  * - Nested annotations
  */
-public class AnnotationDeserializer {
+class AnnotationDeserializer {
 
     /**
      * Parses a serialized annotation string.
