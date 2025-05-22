@@ -1871,5 +1871,5 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """
           )
         );
-    }2
+    }
 }
