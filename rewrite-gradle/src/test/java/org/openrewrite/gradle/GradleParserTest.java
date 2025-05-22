@@ -16,8 +16,16 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
@@ -261,5 +269,39 @@ class GradleParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void error() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
+          }
+          
+          repositories {
+            mavenCentral()
+          }
+          
+          dependencies {
+            compileOnly 'com.google.guava:guava:29.0-jre'
+            runtimeOnly ('com.google.guava:guava:29.0-jre')
+          }
+          
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', \"""
+                          RESPONSE=\\$(curl --location -s --request POST "https://localhost")
+                          echo "TEST" > "$someVar"
+                      \"""
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
     }
 }
