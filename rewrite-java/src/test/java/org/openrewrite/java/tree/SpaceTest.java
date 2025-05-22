@@ -60,7 +60,7 @@ class SpaceTest {
 
         assertThat(cf.getComments()).hasSize(3);
 
-        TextComment c1 = (TextComment) cf.getComments().get(0);
+        TextComment c1 = (TextComment) cf.getComments().getFirst();
         TextComment c2 = (TextComment) cf.getComments().get(1);
         TextComment c3 = (TextComment) cf.getComments().get(2);
 
@@ -89,7 +89,7 @@ class SpaceTest {
 
         assertThat(cf.getComments()).hasSize(3);
 
-        TextComment c1 = (TextComment) cf.getComments().get(0);
+        TextComment c1 = (TextComment) cf.getComments().getFirst();
         TextComment c2 = (TextComment) cf.getComments().get(1);
         TextComment c3 = (TextComment) cf.getComments().get(2);
 
@@ -117,7 +117,7 @@ class SpaceTest {
         );
 
         assertThat(cf.getComments()).hasSize(1);
-        assertThat(cf.getComments().get(0).getSuffix()).isEqualTo("\n  ");
+        assertThat(cf.getComments().getFirst().getSuffix()).isEqualTo("\n  ");
         assertThat(cf.getWhitespace()).isEqualTo("  \n");
     }
 
@@ -131,7 +131,7 @@ class SpaceTest {
         );
         assertThat(cf.getComments()).hasSize(1);
 
-        TextComment c1 = (TextComment) cf.getComments().get(0);
+        TextComment c1 = (TextComment) cf.getComments().getFirst();
         assertThat(c1.getText()).isEqualTo("// debugging\n* bla\n");
     }
 
@@ -158,14 +158,14 @@ class SpaceTest {
         var s1 = Space.format("""
 
                 //comment""");
-        TextComment c1 = (TextComment) s1.getComments().get(0);
+        TextComment c1 = (TextComment) s1.getComments().getFirst();
         assertThat(c1.getSuffix()).isEqualTo("");
 
         var s2 = Space.format("""
 
                 //comment
                 """);
-        TextComment c2 = (TextComment) s2.getComments().get(0);
+        TextComment c2 = (TextComment) s2.getComments().getFirst();
         assertThat(c2.getSuffix()).isEqualTo("\n");
     }
 
@@ -176,7 +176,7 @@ class SpaceTest {
                 //c1
                    //c2""";
         var space = Space.format(input);
-        TextComment c1 = (TextComment) space.getComments().get(0);
+        TextComment c1 = (TextComment) space.getComments().getFirst();
         assertThat(c1.getText()).isEqualTo("c1");
         assertThat(c1.getSuffix()).isEqualTo("\n   ");
 

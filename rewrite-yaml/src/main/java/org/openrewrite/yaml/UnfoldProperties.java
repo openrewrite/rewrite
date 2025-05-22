@@ -21,10 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -77,21 +74,34 @@ public class UnfoldProperties extends Recipe {
                 Yaml.Mapping.Entry entry = super.visitMappingEntry(e, ctx);
 
                 String key = entry.getKey().getValue();
-                if (key.contains(".") && matchers.stream().noneMatch(it -> it.matches(getCursor()))) {
-                    List<String> parts = getParts(key);
-                    if (parts.size() > 1) {
-                        Yaml.Mapping.Entry nestedEntry = createNestedEntry(parts, 0, entry.getValue()).withPrefix(entry.getPrefix());
-                        Yaml.Mapping.Entry newEntry = maybeAutoFormat(entry, nestedEntry, entry.getValue(), ctx, getCursor());
-
-                        if (shouldShift()) {
-                            int identLevel = Math.abs(getIndentLevel(entry) - getIndentLevel(newEntry));
-                            if (!hasLineBreak(entry.getPrefix()) && hasLineBreak(newEntry.getPrefix())) {
-                                newEntry = newEntry.withPrefix(substringOfAfterFirstLineBreak(entry.getPrefix()));
-                            }
-                            doAfterVisit(new ShiftFormatLeftVisitor<>(newEntry, identLevel));
+                if (key.contains(".")) {
+                    boolean foundMatch = false;
+                    Cursor c = getCursor();
+                    while (!foundMatch && c.getValue() != Cursor.ROOT_VALUE) {
+                        Cursor current = c;
+                        foundMatch = matchers.stream().anyMatch(matcher -> matcher.matches(current));
+                        if(foundMatch) {
+                            break;
+                        } else {
+                            c = c.getParent();
                         }
+                    }
+                    if (!foundMatch) {
+                        List<String> parts = getParts(key);
+                        if (parts.size() > 1) {
+                            Yaml.Mapping.Entry nestedEntry = createNestedEntry(parts, 0, entry.getValue()).withPrefix(entry.getPrefix());
+                            Yaml.Mapping.Entry newEntry = maybeAutoFormat(entry, nestedEntry, entry.getValue(), ctx, getCursor());
 
-                        return newEntry;
+                            if (shouldShift()) {
+                                int identLevel = Math.abs(getIndentLevel(entry) - getIndentLevel(newEntry));
+                                if (!hasLineBreak(entry.getPrefix()) && hasLineBreak(newEntry.getPrefix())) {
+                                    newEntry = newEntry.withPrefix(substringOfAfterFirstLineBreak(entry.getPrefix()));
+                                }
+                                doAfterVisit(new ShiftFormatLeftVisitor<>(newEntry, identLevel));
+                            }
+
+                            return newEntry;
+                        }
                     }
                 }
 
@@ -109,7 +119,7 @@ public class UnfoldProperties extends Recipe {
                 String parentKey = getParentKey();
                 List<String> keepTogether = new ArrayList<>();
                 for (String ex : exclusions) {
-                    matches(key, ex, parentKey).ifPresent(keepTogether::add);
+                    keepTogether.addAll(matches(key, ex, parentKey));
                 }
 
                 List<String> result = new ArrayList<>();
@@ -152,18 +162,11 @@ public class UnfoldProperties extends Recipe {
              *
              * @return found group or empty if no match was found
              */
-            private Optional<String> matches(String key, String pattern, String parentKey) {
+            private List<String> matches(String key, String pattern, String parentKey) {
                 // Recursive descent
+                List<String> result = new ArrayList<>();
                 if (pattern.startsWith("$..")) {
                     pattern = pattern.substring(3);
-                    // Handle parent-child conditions like: `$..[logging.level][?(<condition>)]` and `$..logging.level[?(<condition>)]`
-                    if (pattern.startsWith("[") && pattern.contains("][")) {
-                        int secondBracket = pattern.indexOf( '[', 1);
-                        pattern = pattern.substring(1, secondBracket - 1) + pattern.substring(secondBracket);
-                    }
-                    if (!pattern.startsWith("[") && pattern.contains("[") && parentKey.contains(pattern.split("\\[")[0])) {
-                        pattern = "[" + pattern.split("\\[")[1];
-                    }
                 }
 
                 // Starts from root
@@ -172,6 +175,23 @@ public class UnfoldProperties extends Recipe {
                     if (pattern.startsWith(".")) {
                         pattern = pattern.substring(1);
                     }
+                }
+
+                // Handle parent-child conditions like: `$..[logging.level][?(<condition>)]` and `$..logging.level[?(<condition>)]`
+                if (pattern.startsWith("[") && pattern.contains("][")) {
+                    int secondBracketStart = pattern.indexOf('[', 1);
+                    String secondBracket = pattern.substring(secondBracketStart);
+                    String valueOfFirstBracket = pattern.substring(1, secondBracketStart - 1);
+                    List<String> firstBracketMatches = matches(key, valueOfFirstBracket, parentKey);
+                    for (String firstBracketMatch : firstBracketMatches) {
+                        if (key.startsWith(firstBracketMatch) && key.length() > firstBracketMatch.length()) {
+                            result.addAll(matches(key.substring(firstBracketMatch.length() + 1), secondBracket, (!parentKey.isEmpty() ? parentKey + "." : parentKey) + valueOfFirstBracket));
+                        }
+                    }
+                    pattern = pattern.substring(1, secondBracketStart - 1) + secondBracket;
+                }
+                if (!pattern.startsWith("[") && pattern.contains("[") && parentKey.contains(pattern.split("\\[")[0])) {
+                    pattern = "[" + pattern.split("\\[")[1];
                 }
 
                 // property in brackets
@@ -187,15 +207,19 @@ public class UnfoldProperties extends Recipe {
                 }
 
                 if (key.contains(pattern)) {
-                    return Optional.of(pattern);
+                    result.add(pattern);
                 } else if (pattern.startsWith("?(@property.match(/") && pattern.endsWith("/))")) {
                     pattern = pattern.substring(19, pattern.length() - 3);
                     Matcher m = Pattern.compile(".*(" + pattern + ").*").matcher(key);
                     if (m.matches()) {
-                        return Optional.of(m.group(1).isEmpty() ? m.group(0) : m.group(1));
+                        String match = m.group(1).isEmpty() ? m.group(0) : m.group(1);
+                        if (match.endsWith(".")) {
+                            match = match.substring(0, match.length() - 1);
+                        }
+                        result.add(match);
                     }
                 }
-                return Optional.empty();
+                return result;
             }
 
             private Yaml.Mapping.Entry createNestedEntry(List<String> keys, int index, Yaml.Block value) {

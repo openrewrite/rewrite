@@ -341,7 +341,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 .get()
                 .extracting(mrr -> mrr.getDependencies().get(Scope.Compile))
                 .matches(deps -> deps.size() == 1)
-                .extracting(deps -> deps.get(0))
+                .extracting(deps -> deps.getFirst())
                 .matches(dep -> dep.getGroupId().equals("org.jvnet.staxex") &&
                   dep.getArtifactId().equals("stax-ex") &&
                   dep.getVersion().equals("1.0"))))

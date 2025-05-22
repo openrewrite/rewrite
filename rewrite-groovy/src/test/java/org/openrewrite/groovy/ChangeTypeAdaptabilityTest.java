@@ -54,7 +54,7 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
               """,
             spec -> spec.path("file.groovy").afterRecipe(cu -> {
                 assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "newFile")).isTrue();
             })
           )
         );
@@ -134,8 +134,8 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
-                J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().get(0).getInitializer();
+                J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().getFirst().getInitializer();
                 assertThat(TypeUtils.isOfClassType(sizeMi.getMethodType().getDeclaringType(),
                   "java.util.ArrayList")).isTrue();
                 J.MethodInvocation emptyListMi = (J.MethodInvocation) sizeMi.getSelect();

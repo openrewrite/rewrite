@@ -643,7 +643,7 @@ class RemoveImportTest implements RewriteTest {
                   Collection<Integer> l;
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().get(0).getId()).isNotEqualTo(cu.getImports().get(1).getId())))
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().getFirst().getId()).isNotEqualTo(cu.getImports().get(1).getId())))
         );
     }
 

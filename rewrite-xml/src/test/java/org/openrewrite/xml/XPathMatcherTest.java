@@ -43,7 +43,7 @@ class XPathMatcherTest {
             </dependency>
         </dependencies>
         """
-    ).toList().get(0);
+    ).toList().getFirst();
 
     private final SourceFile pomXml1 = new XmlParser().parse(
       """
@@ -66,7 +66,7 @@ class XPathMatcherTest {
           </build>
         </project>
         """
-    ).toList().get(0);
+    ).toList().getFirst();
 
     private final SourceFile pomXml2 = new XmlParser().parse(
       """
@@ -91,7 +91,7 @@ class XPathMatcherTest {
           </build>
         </project>
         """
-    ).toList().get(0);
+    ).toList().getFirst();
 
     private final SourceFile namespacedXml = new XmlParser().parse(
       """
@@ -111,7 +111,7 @@ class XPathMatcherTest {
           </parent>
         </root>
         """
-    ).toList().get(0);
+    ).toList().getFirst();
 
     @Test
     void matchAbsolute() {
@@ -176,7 +176,7 @@ class XPathMatcherTest {
                 </element>
             </root>
             """
-        ).toList().get(0);
+        ).toList().getFirst();
 
         // no / at start
         assertThat(match("element/test", xml)).isTrue();
@@ -236,7 +236,7 @@ class XPathMatcherTest {
           <element1 foo="bar"><foo>baz</foo></element1>
         </root>
         """
-    ).toList().get(0);
+    ).toList().getFirst();
 
     @Test
     void attributePredicate() {
@@ -281,7 +281,7 @@ class XPathMatcherTest {
               </element1>
             </root>
             """
-        ).toList().get(0);
+        ).toList().getFirst();
         assertThat(match("//element1[foo='bar']", xml)).isFalse();
         assertThat(match("//element1[foo='baz']", xml)).isTrue();
         assertThat(match("//element1[@foo='bar']", xml)).isTrue();

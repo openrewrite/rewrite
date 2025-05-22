@@ -32,7 +32,7 @@ class SequenceTest implements RewriteTest {
               - oranges
               """,
             spec -> spec.afterRecipe(y -> {
-                assertThat(((Yaml.Sequence) (y.getDocuments().get(0).getBlock())).getEntries().stream()
+                assertThat(((Yaml.Sequence) (y.getDocuments().getFirst().getBlock())).getEntries().stream()
                   .map(Yaml.Sequence.Entry::getBlock)
                   .map(block -> ((Yaml.Scalar) block).getValue()))
                   .containsExactly("apples", "oranges");
@@ -125,8 +125,8 @@ class SequenceTest implements RewriteTest {
           yaml(
             "[1 ,2  ,0]",
             spec -> spec.afterRecipe(y -> {
-                Yaml.Sequence seq = (Yaml.Sequence) y.getDocuments().get(0).getBlock();
-                assertThat(seq.getEntries().get(0).getTrailingCommaPrefix()).isEqualTo(" ");
+                Yaml.Sequence seq = (Yaml.Sequence) y.getDocuments().getFirst().getBlock();
+                assertThat(seq.getEntries().getFirst().getTrailingCommaPrefix()).isEqualTo(" ");
                 assertThat(seq.getEntries().get(1).getTrailingCommaPrefix()).isEqualTo("  ");
                 assertThat(seq.getEntries().get(2).getTrailingCommaPrefix()).isNull();
             })

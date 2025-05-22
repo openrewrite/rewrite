@@ -283,7 +283,6 @@ export class JavaScriptParserVisitor {
             sourcePath: this.sourcePath,
             charsetName: bomAndTextEncoding.encoding,
             charsetBomMarked: bomAndTextEncoding.hasBom,
-            imports: [],
             statements: this.semicolonPaddedStatementList(node.statements),
             eof: this.prefix(node.endOfFileToken)
         };

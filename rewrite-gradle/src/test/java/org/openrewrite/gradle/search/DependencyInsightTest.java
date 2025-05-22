@@ -185,7 +185,7 @@ class DependencyInsightTest implements RewriteTest {
           spec -> spec.recipe(new DependencyInsight("*", "jackson-core", null, null))
             .dataTable(DependenciesInUse.Row.class, rows -> {
                 assertThat(rows).isNotEmpty();
-                DependenciesInUse.Row row = rows.get(0);
+                DependenciesInUse.Row row = rows.getFirst();
                 assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.core");
                 assertThat(row.getArtifactId()).isEqualTo("jackson-core");
                 assertThat(row.getVersion()).isEqualTo("2.13.4");

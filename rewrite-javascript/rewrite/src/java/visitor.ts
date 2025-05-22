@@ -64,6 +64,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitAnnotatedType(annotatedType: J.AnnotatedType, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(annotatedType, p);
+        if (!expression?.kind || expression.kind !== J.Kind.AnnotatedType) {
+            return expression;
+        }
+        annotatedType = expression as J.AnnotatedType;
+
         return this.produceJava<J.AnnotatedType>(annotatedType, p, async draft => {
             draft.annotations = await mapAsync(annotatedType.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.typeExpression = await this.visitDefined(annotatedType.typeExpression, p) as TypedTree;
@@ -71,6 +77,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitAnnotation(annotation: J.Annotation, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(annotation, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Annotation) {
+            return expression;
+        }
+        annotation = expression as J.Annotation;
+
         return this.produceJava<J.Annotation>(annotation, p, async draft => {
             draft.annotationType = await this.visitTypeName(annotation.annotationType, p);
             draft.arguments = await this.visitOptionalContainer(annotation.arguments, p);
@@ -78,6 +90,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitArrayAccess(arrayAccess: J.ArrayAccess, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(arrayAccess, p);
+        if (!expression?.kind || expression.kind !== J.Kind.ArrayAccess) {
+            return expression;
+        }
+        arrayAccess = expression as J.ArrayAccess;
+
         return this.produceJava<J.ArrayAccess>(arrayAccess, p, async draft => {
             draft.indexed = await this.visitDefined(arrayAccess.indexed, p) as Expression;
             draft.dimension = await this.visitDefined(arrayAccess.dimension, p) as J.ArrayDimension;
@@ -91,6 +109,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitArrayType(arrayType: J.ArrayType, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(arrayType, p);
+        if (!expression?.kind || expression.kind !== J.Kind.ArrayType) {
+            return expression;
+        }
+        arrayType = expression as J.ArrayType;
+
         return this.produceJava<J.ArrayType>(arrayType, p, async draft => {
             draft.elementType = await this.visitDefined(arrayType.elementType, p) as TypedTree;
             if (arrayType.annotations) {
@@ -102,6 +126,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitAssert(anAssert: J.Assert, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(anAssert, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Assert) {
+            return statement;
+        }
+        anAssert = statement as J.Assert;
+
         return this.produceJava<J.Assert>(anAssert, p, async draft => {
             draft.condition = await this.visitDefined(anAssert.condition, p) as Expression;
             draft.detail = await this.visitOptionalLeftPadded(anAssert.detail, p);
@@ -109,6 +139,18 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitAssignment(assignment: J.Assignment, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(assignment, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Assignment) {
+            return expression;
+        }
+        assignment = expression as J.Assignment;
+
+        const statement = await this.visitStatement(assignment, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Assignment) {
+            return statement;
+        }
+        assignment = statement as J.Assignment;
+
         return this.produceJava<J.Assignment>(assignment, p, async draft => {
             draft.variable = await this.visitDefined(assignment.variable, p) as Expression;
             draft.assignment = await this.visitLeftPadded(assignment.assignment, p);
@@ -117,6 +159,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitAssignmentOperation(assignOp: J.AssignmentOperation, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(assignOp, p);
+        if (!expression?.kind || expression.kind !== J.Kind.AssignmentOperation) {
+            return expression;
+        }
+        assignOp = expression as J.AssignmentOperation;
+
         return this.produceJava<J.AssignmentOperation>(assignOp, p, async draft => {
             draft.variable = await this.visitDefined(assignOp.variable, p) as Expression;
             draft.operator = await this.visitLeftPadded(assignOp.operator, p);
@@ -126,6 +174,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitBinary(binary: J.Binary, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(binary, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Binary) {
+            return expression;
+        }
+        binary = expression as J.Binary;
+
         return this.produceJava<J.Binary>(binary, p, async draft => {
             draft.left = await this.visitDefined(binary.left, p) as Expression;
             draft.operator = await this.visitLeftPadded(binary.operator, p);
@@ -143,6 +197,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitBreak(breakStatement: J.Break, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(breakStatement, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Break) {
+            return statement;
+        }
+        breakStatement = statement as J.Break;
+
         return this.produceJava<J.Break>(breakStatement, p, async draft => {
             if (breakStatement.label) {
                 draft.label = await this.visitDefined(breakStatement.label, p) as J.Identifier;
@@ -151,6 +211,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitCase(aCase: J.Case, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(aCase, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Case) {
+            return statement;
+        }
+        aCase = statement as J.Case;
+
         return this.produceJava<J.Case>(aCase, p, async draft => {
             draft.caseLabels = await this.visitContainer(aCase.caseLabels, p);
             draft.statements = await this.visitContainer(aCase.statements, p);
@@ -162,6 +228,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(classDecl, p);
+        if (!statement?.kind || statement.kind !== J.Kind.ClassDeclaration) {
+            return statement;
+        }
+        classDecl = statement as J.ClassDeclaration;
+
         return this.produceJava<J.ClassDeclaration>(classDecl, p, async draft => {
             draft.leadingAnnotations = await mapAsync(classDecl.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.modifiers = await mapAsync(classDecl.modifiers, m => this.visitDefined<J.Modifier>(m, p));
@@ -193,6 +265,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitContinue(continueStatement: J.Continue, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(continueStatement, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Continue) {
+            return statement;
+        }
+        continueStatement = statement as J.Continue;
+
         return this.produceJava<J.Continue>(continueStatement, p, async draft => {
             if (continueStatement.label) {
                 draft.label = await this.visitDefined(continueStatement.label, p) as J.Identifier;
@@ -215,6 +293,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitDoWhileLoop(doWhileLoop: J.DoWhileLoop, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(doWhileLoop, p);
+        if (!statement?.kind || statement.kind !== J.Kind.DoWhileLoop) {
+            return statement;
+        }
+        doWhileLoop = statement as J.DoWhileLoop;
+
         return this.produceJava<J.DoWhileLoop>(doWhileLoop, p, async draft => {
             draft.body = await this.visitRightPadded(doWhileLoop.body, p);
             draft.whileCondition = await this.visitLeftPadded(doWhileLoop.whileCondition, p);
@@ -222,6 +306,18 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitEmpty(empty: J.Empty, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(empty, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Empty) {
+            return expression;
+        }
+        empty = expression as J.Empty;
+
+        const statement = await this.visitStatement(empty, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Empty) {
+            return statement;
+        }
+        empty = statement as J.Empty;
+
         return this.produceJava<J.Empty>(empty, p);
     }
 
@@ -236,16 +332,46 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitEnumValueSet(enumValueSet: J.EnumValueSet, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(enumValueSet, p);
+        if (!statement?.kind || statement.kind !== J.Kind.EnumValueSet) {
+            return statement;
+        }
+        enumValueSet = statement as J.EnumValueSet;
+
         return this.produceJava<J.EnumValueSet>(enumValueSet, p, async draft => {
             draft.enums = await mapAsync(enumValueSet.enums, e => this.visitRightPadded(e, p));
         });
     }
 
     protected async visitErroneous(erroneous: J.Erroneous, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(erroneous, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Erroneous) {
+            return expression;
+        }
+        erroneous = expression as J.Erroneous;
+
+        const statement = await this.visitStatement(erroneous, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Erroneous) {
+            return statement;
+        }
+        erroneous = statement as J.Erroneous;
+
         return this.produceJava<J.Erroneous>(erroneous, p);
     }
 
     protected async visitFieldAccess(fieldAccess: J.FieldAccess, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(fieldAccess, p);
+        if (!expression?.kind || expression.kind !== J.Kind.FieldAccess) {
+            return expression;
+        }
+        fieldAccess = expression as J.FieldAccess;
+
+        const statement = await this.visitStatement(fieldAccess, p);
+        if (!statement?.kind || statement.kind !== J.Kind.FieldAccess) {
+            return statement;
+        }
+        fieldAccess = statement as J.FieldAccess;
+
         return this.produceJava<J.FieldAccess>(fieldAccess, p, async draft => {
             draft.target = await this.visitDefined(fieldAccess.target, p) as Expression;
             draft.name = await this.visitLeftPadded(fieldAccess.name, p);
@@ -254,6 +380,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitForEachLoop(forLoop: J.ForEachLoop, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(forLoop, p);
+        if (!statement?.kind || statement.kind !== J.Kind.ForEachLoop) {
+            return statement;
+        }
+        forLoop = statement as J.ForEachLoop;
+
         return this.produceJava<J.ForEachLoop>(forLoop, p, async draft => {
             draft.control = await this.visitDefined(forLoop.control, p) as J.ForEachLoop.Control;
             draft.body = await this.visitRightPadded(forLoop.body, p);
@@ -268,6 +400,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitForLoop(forLoop: J.ForLoop, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(forLoop, p);
+        if (!statement?.kind || statement.kind !== J.Kind.ForLoop) {
+            return statement;
+        }
+        forLoop = statement as J.ForLoop;
+
         return this.produceJava<J.ForLoop>(forLoop, p, async draft => {
             draft.control = await this.visitDefined(forLoop.control, p) as J.ForLoop.Control;
             draft.body = await this.visitRightPadded(forLoop.body, p);
@@ -283,6 +421,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitIdentifier(ident: J.Identifier, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(ident, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Identifier) {
+            return expression;
+        }
+        ident = expression as J.Identifier;
+
         return this.produceJava<J.Identifier>(ident, p, async draft => {
             draft.annotations = await mapAsync(ident.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.type = await this.visitType(ident.type, p);
@@ -291,6 +435,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitIf(iff: J.If, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(iff, p);
+        if (!statement?.kind || statement.kind !== J.Kind.If) {
+            return statement;
+        }
+        iff = statement as J.If;
+
         return this.produceJava<J.If>(iff, p, async draft => {
             draft.ifCondition = await this.visitDefined(iff.ifCondition, p) as J.ControlParentheses<Expression>;
             draft.thenPart = await this.visitRightPadded(iff.thenPart, p);
@@ -315,6 +465,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitInstanceOf(instanceOf: J.InstanceOf, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(instanceOf, p);
+        if (!expression?.kind || expression.kind !== J.Kind.InstanceOf) {
+            return expression;
+        }
+        instanceOf = expression as J.InstanceOf;
+
         return this.produceJava<J.InstanceOf>(instanceOf, p, async draft => {
             draft.expression = await this.visitRightPadded(instanceOf.expression, p);
             draft.class = await this.visitDefined(instanceOf.class, p) as J;
@@ -329,12 +485,24 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitIntersectionType(intersectionType: J.IntersectionType, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(intersectionType, p);
+        if (!expression?.kind || expression.kind !== J.Kind.IntersectionType) {
+            return expression;
+        }
+        intersectionType = expression as J.IntersectionType;
+
         return this.produceJava<J.IntersectionType>(intersectionType, p, async draft => {
             draft.bounds = await this.visitContainer(intersectionType.bounds, p);
         });
     }
 
     protected async visitLabel(label: J.Label, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(label, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Label) {
+            return statement;
+        }
+        label = statement as J.Label;
+
         return this.produceJava<J.Label>(label, p, async draft => {
             draft.label = await this.visitRightPadded(label.label, p);
             draft.statement = await this.visitDefined(label.statement, p) as Statement;
@@ -342,6 +510,18 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitLambda(lambda: J.Lambda, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(lambda, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Lambda) {
+            return expression;
+        }
+        lambda = expression as J.Lambda;
+
+        const statement = await this.visitStatement(lambda, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Lambda) {
+            return statement;
+        }
+        lambda = statement as J.Lambda;
+
         return this.produceJava<J.Lambda>(lambda, p, async draft => {
             draft.parameters = await this.visitDefined(lambda.parameters, p) as J.Lambda.Parameters;
             draft.arrow = await this.visitSpace(lambda.arrow, p);
@@ -357,12 +537,24 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitLiteral(literal: J.Literal, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(literal, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Literal) {
+            return expression;
+        }
+        literal = expression as J.Literal;
+
         return this.produceJava<J.Literal>(literal, p, async draft => {
             draft.type = await this.visitType(literal.type, p) as JavaType.Primitive | undefined;
         });
     }
 
     protected async visitMemberReference(memberRef: J.MemberReference, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(memberRef, p);
+        if (!expression?.kind || expression.kind !== J.Kind.MemberReference) {
+            return expression;
+        }
+        memberRef = expression as J.MemberReference;
+
         return this.produceJava<J.MemberReference>(memberRef, p, async draft => {
             draft.containing = await this.visitRightPadded(memberRef.containing, p);
             draft.typeParameters = await this.visitOptionalContainer(memberRef.typeParameters, p);
@@ -374,6 +566,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitMethodDeclaration(methodDecl: J.MethodDeclaration, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(methodDecl, p);
+        if (!statement?.kind || statement.kind !== J.Kind.MethodDeclaration) {
+            return statement;
+        }
+        methodDecl = statement as J.MethodDeclaration;
+
         return this.produceJava<J.MethodDeclaration>(methodDecl, p, async draft => {
             draft.leadingAnnotations = await mapAsync(methodDecl.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.modifiers = await mapAsync(methodDecl.modifiers, m => this.visitDefined<J.Modifier>(m, p));
@@ -397,6 +595,18 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitMethodInvocation(methodInv: J.MethodInvocation, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(methodInv, p);
+        if (!expression?.kind || expression.kind !== J.Kind.MethodInvocation) {
+            return expression;
+        }
+        methodInv = expression as J.MethodInvocation;
+
+        const statement = await this.visitStatement(methodInv, p);
+        if (!statement?.kind || statement.kind !== J.Kind.MethodInvocation) {
+            return statement;
+        }
+        methodInv = statement as J.MethodInvocation;
+
         return this.produceJava<J.MethodInvocation>(methodInv, p, async draft => {
             draft.select = await this.visitOptionalRightPadded(methodInv.select, p);
             draft.typeParameters = await this.visitOptionalContainer(methodInv.typeParameters, p);
@@ -419,6 +629,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitNewArray(newArray: J.NewArray, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(newArray, p);
+        if (!expression?.kind || expression.kind !== J.Kind.NewArray) {
+            return expression;
+        }
+        newArray = expression as J.NewArray;
+
         return this.produceJava<J.NewArray>(newArray, p, async draft => {
             if (newArray.typeExpression) {
                 draft.typeExpression = await this.visitDefined(newArray.typeExpression, p) as TypedTree;
@@ -433,6 +649,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(newClass, p);
+        if (!expression?.kind || expression.kind !== J.Kind.NewClass) {
+            return expression;
+        }
+        newClass = expression as J.NewClass;
+
         return this.produceJava<J.NewClass>(newClass, p, async draft => {
             if (newClass.enclosing) {
                 draft.enclosing = await this.visitRightPadded(newClass.enclosing, p);
@@ -455,6 +677,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitNullableType(nullableType: J.NullableType, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(nullableType, p);
+        if (!expression?.kind || expression.kind !== J.Kind.NullableType) {
+            return expression;
+        }
+        nullableType = expression as J.NullableType;
+
         return this.produceJava<J.NullableType>(nullableType, p, async draft => {
             draft.annotations = await mapAsync(nullableType.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.typeTree = await this.visitRightPadded(nullableType.typeTree, p);
@@ -485,6 +713,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitParenthesizedTypeTree(parTypeTree: J.ParenthesizedTypeTree, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(parTypeTree, p);
+        if (!expression?.kind || expression.kind !== J.Kind.ParenthesizedTypeTree) {
+            return expression;
+        }
+        parTypeTree = expression as J.ParenthesizedTypeTree;
+
         return this.produceJava<J.ParenthesizedTypeTree>(parTypeTree, p, async draft => {
             draft.annotations = await mapAsync(parTypeTree.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.parenthesizedType = await this.visitDefined(parTypeTree.parenthesizedType, p) as J.Parentheses<TypeTree>;
@@ -492,12 +726,24 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitPrimitive(primitive: J.Primitive, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(primitive, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Primitive) {
+            return expression;
+        }
+        primitive = expression as J.Primitive;
+
         return this.produceJava<J.Primitive>(primitive, p, async draft => {
             draft.type = await this.visitType(primitive.type, p) as JavaType.Primitive;
         });
     }
 
     protected async visitReturn(ret: J.Return, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(ret, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Return) {
+            return statement;
+        }
+        ret = statement as J.Return;
+
         return this.produceJava<J.Return>(ret, p, async draft => {
             if (ret.expression) {
                 draft.expression = await this.visitDefined(ret.expression, p) as Expression;
@@ -506,6 +752,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitSwitch(aSwitch: J.Switch, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(aSwitch, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Switch) {
+            return statement;
+        }
+        aSwitch = statement as J.Switch;
+
         return this.produceJava<J.Switch>(aSwitch, p, async draft => {
             draft.selector = await this.visitDefined(aSwitch.selector, p) as J.ControlParentheses<Expression>;
             draft.cases = await this.visitDefined(aSwitch.cases, p) as J.Block;
@@ -513,6 +765,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitSwitchExpression(switchExpr: J.SwitchExpression, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(switchExpr, p);
+        if (!expression?.kind || expression.kind !== J.Kind.SwitchExpression) {
+            return expression;
+        }
+        switchExpr = expression as J.SwitchExpression;
+
         return this.produceJava<J.SwitchExpression>(switchExpr, p, async draft => {
             draft.selector = await this.visitDefined(switchExpr.selector, p) as J.ControlParentheses<Expression>;
             draft.cases = await this.visitDefined(switchExpr.cases, p) as J.Block;
@@ -521,6 +779,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitSynchronized(sync: J.Synchronized, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(sync, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Synchronized) {
+            return statement;
+        }
+        sync = statement as J.Synchronized;
+
         return this.produceJava<J.Synchronized>(sync, p, async draft => {
             draft.lock = await this.visitDefined(sync.lock, p) as J.ControlParentheses<Expression>;
             draft.body = await this.visitDefined(sync.body, p) as J.Block;
@@ -528,6 +792,18 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitTernary(ternary: J.Ternary, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(ternary, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Ternary) {
+            return expression;
+        }
+        ternary = expression as J.Ternary;
+
+        const statement = await this.visitStatement(ternary, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Ternary) {
+            return statement;
+        }
+        ternary = statement as J.Ternary;
+
         return this.produceJava<J.Ternary>(ternary, p, async draft => {
             draft.condition = await this.visitDefined(ternary.condition, p) as Expression;
             draft.truePart = await this.visitLeftPadded(ternary.truePart, p);
@@ -537,12 +813,24 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitThrow(thrown: J.Throw, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(thrown, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Throw) {
+            return statement;
+        }
+        thrown = statement as J.Throw;
+
         return this.produceJava<J.Throw>(thrown, p, async draft => {
             draft.exception = await this.visitDefined(thrown.exception, p) as Expression;
         });
     }
 
     protected async visitTry(tryable: J.Try, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(tryable, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Try) {
+            return statement;
+        }
+        tryable = statement as J.Try;
+
         return this.produceJava<J.Try>(tryable, p, async draft => {
             draft.resources = await this.visitOptionalContainer(tryable.resources, p);
             draft.body = await this.visitDefined(tryable.body, p) as J.Block;
@@ -565,6 +853,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitTypeCast(typeCast: J.TypeCast, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(typeCast, p);
+        if (!expression?.kind || expression.kind !== J.Kind.TypeCast) {
+            return expression;
+        }
+        typeCast = expression as J.TypeCast;
+
         return this.produceJava<J.TypeCast>(typeCast, p, async draft => {
             draft.class = await this.visitDefined(typeCast.class, p) as J.ControlParentheses<TypedTree>;
             draft.expression = await this.visitDefined(typeCast.expression, p) as Expression;
@@ -588,6 +882,18 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitUnary(unary: J.Unary, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(unary, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Unary) {
+            return expression;
+        }
+        unary = expression as J.Unary;
+
+        const statement = await this.visitStatement(unary, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Unary) {
+            return statement;
+        }
+        unary = statement as J.Unary;
+
         return this.produceJava<J.Unary>(unary, p, async draft => {
             draft.operator = await this.visitLeftPadded(unary.operator, p);
             draft.expression = await this.visitDefined(unary.expression, p) as Expression;
@@ -596,6 +902,18 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitUnknown(unknown: J.Unknown, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(unknown, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Unknown) {
+            return expression;
+        }
+        unknown = expression as J.Unknown;
+
+        const statement = await this.visitStatement(unknown, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Unknown) {
+            return statement;
+        }
+        unknown = statement as J.Unknown;
+
         return this.produceJava<J.Unknown>(unknown, p, async draft => {
             draft.source = await this.visitDefined(unknown.source, p) as J.UnknownSource;
         });
@@ -606,6 +924,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitVariableDeclarations(varDecls: J.VariableDeclarations, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(varDecls, p);
+        if (!statement?.kind || statement.kind !== J.Kind.VariableDeclarations) {
+            return statement;
+        }
+        varDecls = statement as J.VariableDeclarations;
+
         return this.produceJava<J.VariableDeclarations>(varDecls, p, async draft => {
             draft.leadingAnnotations = await mapAsync(varDecls.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.modifiers = await mapAsync(varDecls.modifiers, m => this.visitDefined<J.Modifier>(m, p));
@@ -632,6 +956,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitWhileLoop(whileLoop: J.WhileLoop, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(whileLoop, p);
+        if (!statement?.kind || statement.kind !== J.Kind.WhileLoop) {
+            return statement;
+        }
+        whileLoop = statement as J.WhileLoop;
+
         return this.produceJava<J.WhileLoop>(whileLoop, p, async draft => {
             draft.condition = await this.visitDefined(whileLoop.condition, p) as J.ControlParentheses<Expression>;
             draft.body = await this.visitRightPadded(whileLoop.body, p);
@@ -639,6 +969,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitWildcard(wildcard: J.Wildcard, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(wildcard, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Wildcard) {
+            return expression;
+        }
+        wildcard = expression as J.Wildcard;
+
         return this.produceJava<J.Wildcard>(wildcard, p, async draft => {
             draft.bound = await this.visitOptionalLeftPadded(wildcard.bound, p);
             if (wildcard.boundedType) {
@@ -648,6 +984,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitYield(aYield: J.Yield, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(aYield, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Yield) {
+            return statement;
+        }
+        aYield = statement as J.Yield;
+
         return this.produceJava<J.Yield>(aYield, p, async draft => {
             draft.value = await this.visitDefined(aYield.value, p) as Expression;
         });

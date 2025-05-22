@@ -48,8 +48,8 @@ class LiteralTest implements RewriteTest {
     void literalCharacter() {
         rewriteRun(
           kotlin("val c : Char = '\\n'", spec -> spec.afterRecipe(cu -> {
-              J.VariableDeclarations vd = (J.VariableDeclarations) cu.getStatements().get(0);
-              J.VariableDeclarations.NamedVariable c = vd.getVariables().get(0);
+              J.VariableDeclarations vd = (J.VariableDeclarations) cu.getStatements().getFirst();
+              J.VariableDeclarations.NamedVariable c = vd.getVariables().getFirst();
               J.Literal lit = (J.Literal) c.getInitializer();
               assertThat(lit).isNotNull();
               assertThat(lit.getValueSource()).isEqualTo("'\\n'");
@@ -62,8 +62,8 @@ class LiteralTest implements RewriteTest {
     void literalUnicodeCharacter() {
         rewriteRun(
           kotlin("val c : Char = '\\u2605'", spec -> spec.afterRecipe(cu -> {
-              J.VariableDeclarations vd = (J.VariableDeclarations) cu.getStatements().get(0);
-              J.VariableDeclarations.NamedVariable c = vd.getVariables().get(0);
+              J.VariableDeclarations vd = (J.VariableDeclarations) cu.getStatements().getFirst();
+              J.VariableDeclarations.NamedVariable c = vd.getVariables().getFirst();
               J.Literal lit = (J.Literal) c.getInitializer();
               assertThat(lit).isNotNull();
               assertThat(lit.getValueSource()).isEqualTo("'\\u2605'");

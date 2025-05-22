@@ -68,6 +68,9 @@ public class MavenPomDownloader {
     private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
 
     private static final String SNAPSHOT = "SNAPSHOT";
+    private static final String LATEST = "LATEST";
+    private static final String RELEASE = "RELEASE";
+    private static final List<String> NAMED_VERSIONS = Arrays.asList(LATEST, RELEASE);
 
 
     private final MavenPomCache mavenCache;
@@ -259,7 +262,7 @@ public class MavenPomDownloader {
                     String baseUri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
                                      requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
                                      gav.getArtifactId() + '/' +
-                                     (gav.getVersion() == null ? "" : gav.getVersion() + '/');
+                                     (gav.getVersion() == null || NAMED_VERSIONS.contains(gav.getVersion().toUpperCase()) ? "" : gav.getVersion() + '/');
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
@@ -534,8 +537,9 @@ public class MavenPomDownloader {
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "pom");
 
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
-        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         GroupArtifactVersion originalGav = gav;
+        gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
+        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         gav = handleSnapshotTimestampVersion(gav);
         List<String> uris = new ArrayList<>();
 
@@ -618,13 +622,33 @@ public class MavenPomDownloader {
                 } else {
                     try {
                         try {
-                            byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
+                            byte[] pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
 
                             Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
                             RawPom rawPom = RawPom.parse(
-                                    new ByteArrayInputStream(responseBody),
+                                    new ByteArrayInputStream(pomResponseBody),
                                     Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
                             );
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(pomResponseBody)))) {
+                                String line;
+                                while ((line = reader.readLine()) != null) {
+                                    if (line.contains("published-with-gradle-metadata")) {
+                                        // as some artifacts do not have the bom as dependency listed, we need to add it by fetching the gradle metadata module.
+                                        pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString().replaceFirst(".pom$", ".module"));
+                                        RawGradleModule module = RawGradleModule.parse(new ByteArrayInputStream(pomResponseBody));
+                                        for (Dependency dependency : module.getDependencies("apiElements", "platform")) {
+                                            rawPom.getDependencies().getDependencies().add(
+                                                    new RawPom.Dependency(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), null, "bom", null, null, null)
+                                            );
+                                        }
+                                        break;
+                                    }
+                                }
+                            } catch (HttpSenderResponseException e) {
+                                if (e.getResponseCode() != 404) {
+                                    throw e;
+                                }
+                            }
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
@@ -753,6 +777,29 @@ public class MavenPomDownloader {
         }
 
         return gav.getVersion();
+    }
+
+    private GroupArtifactVersion resolveNamedVersion(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories, ExecutionContext ctx) {
+        if (gav.getVersion() == null) {
+            return gav;
+        }
+        String version = gav.getVersion().toUpperCase();
+        if (NAMED_VERSIONS.contains(version)) {
+            MavenMetadata mavenMetadata;
+            try {
+                mavenMetadata = downloadMetadata(gav, containingPom, repositories);
+            } catch (MavenDownloadingException e) {
+                //This can happen if the artifact only exists in the local maven cache. In this case, just return the original
+                return gav;
+            }
+
+            if (RELEASE.equals(version)) {
+                return gav.withVersion(mavenMetadata.getVersioning().getRelease());
+            } else if (LATEST.equals(version)) {
+                return gav.withVersion(mavenMetadata.getVersioning().getLatest());
+            }
+        }
+        return gav;
     }
 
     Iterable<MavenRepository> distinctNormalizedRepositories(
@@ -1165,5 +1212,4 @@ public class MavenPomDownloader {
         }
         return null;
     }
-
 }
