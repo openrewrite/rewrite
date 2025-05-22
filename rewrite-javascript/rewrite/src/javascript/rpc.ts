@@ -377,21 +377,16 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(tag, el => el.afterName, space => this.visitSpace(space, q));
         await q.getAndSendList(tag, el => el.attributes, attr => attr.element.id, attr => this.visitRightPadded(attr, q));
 
-        if (tag.selfClosing) {
-            await q.getAndSend(tag, el => el.selfClosing, space => this.visitSpace(space, q));
-        } else if (tag.children) {
-            await q.getAndSendList(tag, el => el.children!, child => child.element.id, child => this.visitRightPadded(child, q));
-            await q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
-        }
+        await q.getAndSend(tag, el => el.selfClosing, space => this.visitSpace(space, q));
+        await q.getAndSendList(tag, el => el.children!, child => child.element.id, child => this.visitRightPadded(child, q));
+        await q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
 
         return tag;
     }
 
     override async visitJsxAttribute(attribute: JSX.Attribute, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(attribute, el => el.key, el => this.visit(el, q));
-        if (attribute.value) {
-            await q.getAndSend(attribute, el => el.value, el => this.visitLeftPadded(el, q));
-        }
+        await q.getAndSend(attribute, el => el.value, el => this.visitLeftPadded(el, q));
         return attribute;
     }
 
@@ -948,12 +943,9 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.afterName = await q.receive(draft.afterName, space => this.visitSpace(space, q));
         draft.attributes = await q.receiveListDefined(draft.attributes, attr => this.visitRightPadded(attr, q));
 
-        if (tag.selfClosing) {
-            draft.selfClosing = await q.receive(draft.selfClosing, space => this.visitSpace(space, q));
-        } else if (tag.children) {
-            draft.children = await q.receiveListDefined(draft.children, child => this.visitRightPadded(child, q));
-            draft.closingName = await q.receive(draft.closingName, el => this.visitLeftPadded(el, q));
-        }
+        draft.selfClosing = await q.receive(draft.selfClosing, space => this.visitSpace(space, q));
+        draft.children = await q.receiveListDefined(draft.children, child => this.visitRightPadded(child, q));
+        draft.closingName = await q.receive(draft.closingName, el => this.visitLeftPadded(el, q));
 
         return finishDraft(draft);
     }

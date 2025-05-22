@@ -525,12 +525,9 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(tag, JSX.Tag::getAfterName, space -> visitSpace(space, q));
         q.getAndSendList(tag, el -> el.getPadding().getAttributes(), attr -> attr.getElement().getId(), attr -> visitRightPadded(attr, q));
 
-        if (tag.isSelfClosing()) {
-            q.getAndSend(tag, JSX.Tag::getSelfClosing, space -> visitSpace(space, q));
-        } else if (tag.hasChildren()) {
-            q.getAndSendList(tag, el -> el.getPadding().getChildren(), child -> child.getElement().getId(), child -> visitRightPadded(child, q));
-            q.getAndSend(tag, el -> el.getPadding().getClosingName(), el -> visitLeftPadded(el, q));
-        }
+        q.getAndSend(tag, JSX.Tag::getSelfClosing, space -> visitSpace(space, q));
+        q.getAndSendList(tag, el -> el.getPadding().getChildren(), child -> child.getElement().getId(), child -> visitRightPadded(child, q));
+        q.getAndSend(tag, el -> el.getPadding().getClosingName(), el -> visitLeftPadded(el, q));
 
 //        if (tag.getType() != null) {
 //            q.getAndSend(tag, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));

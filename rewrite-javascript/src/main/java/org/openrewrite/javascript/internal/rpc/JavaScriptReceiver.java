@@ -437,12 +437,9 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         t = t.withAfterName(q.receive(tag.getAfterName(), space -> visitSpace(space, q)));
         t = t.getPadding().withAttributes(q.receiveList(tag.getPadding().getAttributes(), attr -> visitRightPadded(attr, q)));
 
-        if (tag.isSelfClosing()) {
-            t = t.withSelfClosing(q.receive(tag.getSelfClosing(), space -> visitSpace(space, q)));
-        } else if (tag.hasChildren()) {
-            t = t.getPadding().withChildren(q.receiveList(tag.getPadding().getChildren(), child -> visitRightPadded(child, q)));
-            t = t.getPadding().withClosingName(q.receive(tag.getPadding().getClosingName(), name -> visitLeftPadded(name, q)));
-        }
+        t = t.withSelfClosing(q.receive(tag.getSelfClosing(), space -> visitSpace(space, q)));
+        t = t.getPadding().withChildren(q.receiveList(tag.getPadding().getChildren(), child -> visitRightPadded(child, q)));
+        t = t.getPadding().withClosingName(q.receive(tag.getPadding().getClosingName(), name -> visitLeftPadded(name, q)));
 
 //        t = t.withType(q.receive(tag.getType(), type -> visitType(type, q)));
 
@@ -453,9 +450,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitJsxAttribute(JSX.Attribute attribute, RpcReceiveQueue q) {
         JSX.Attribute a = attribute;
         a = a.withKey(q.receive(attribute.getKey(), key -> (J.Identifier) visitNonNull(key, q)));
-        if (attribute.getPadding().getValue() != null) {
-            a = a.getPadding().withValue(q.receive(attribute.getPadding().getValue(), value -> visitLeftPadded(value, q)));
-        }
+        a = a.getPadding().withValue(q.receive(attribute.getPadding().getValue(), value -> visitLeftPadded(value, q)));
         return a;
     }
 
