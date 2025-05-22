@@ -693,10 +693,13 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitMethodInvocation(method: J.MethodInvocation, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(method, p);
 
-        if (method.name.toString().length === 0) {
+        if (method.name.simpleName.length === 0) {
             method.select && await this.visitRightPadded(method.select, p);
         } else {
             method.select && await this.visitJRightPaddedLocalSingle(method.select, "", p);
+            if (method.select) {
+                p.append(".");
+            }
             await this.visit(method.name, p);
         }
 

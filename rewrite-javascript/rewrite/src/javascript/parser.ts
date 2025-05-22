@@ -1823,6 +1823,9 @@ export class JavaScriptParserVisitor {
                 }),
                 emptySpace
             )
+        } else if (ts.isPropertyAccessExpression(node.expression)) {
+            select = this.rightPadded(this.visit(node.expression.expression), this.suffix(node.expression.expression));
+            name = this.visit(node.expression.name);
         } else {
             select = this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
         }
