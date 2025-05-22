@@ -101,7 +101,7 @@ public interface JavaParser extends Parser {
         for (Path cpEntry : runtimeClasspath) {
             String cpEntryString = cpEntry.toString();
             if (jarPattern.matcher(cpEntryString).find() ||
-                explodedPattern.matcher(cpEntryString).find() && cpEntry.toFile().isDirectory()) {
+                    explodedPattern.matcher(cpEntryString).find() && cpEntry.toFile().isDirectory()) {
                 artifacts.add(cpEntry);
                 // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
             }
@@ -205,7 +205,7 @@ public interface JavaParser extends Parser {
         }
 
         throw new IllegalStateException("Unable to create a Java parser instance. " +
-                                        "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.");
+                "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.");
     }
 
     @Override
@@ -387,7 +387,7 @@ public interface JavaParser extends Parser {
         String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
         String className = Optional.ofNullable(simpleName.apply(sourceCode))
-                                   .orElse(Long.toString(System.nanoTime())) + ".java";
+                .orElse(Long.toString(System.nanoTime())) + ".java";
 
         return prefix.resolve(Paths.get(pkg + className));
     }
