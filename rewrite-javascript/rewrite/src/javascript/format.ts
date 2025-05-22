@@ -135,7 +135,11 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
 
         return produce(ret, draft => {
             draft.body.prefix.whitespace = this.style.beforeLeftBrace.catchLeftBrace ? " " : "";
-            // TODO if (classDecl.body.statements.length === 0) {
+
+            if (draft.extends) {
+                draft.extends.before.whitespace = " ";
+                draft.extends.element.prefix.whitespace = " ";
+            }
         }) as J.ClassDeclaration;
     }
 
