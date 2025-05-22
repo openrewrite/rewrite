@@ -20,7 +20,6 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.internal.parser.JavaParserClasspathLoader;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -117,26 +116,34 @@ public interface JavaParser extends Parser {
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
         Set<String> missingArtifactNames = new LinkedHashSet<>(Arrays.asList(artifactNamesWithVersions));
 
-        try (RewriteClasspathJarClasspathLoader rewriteClasspathJarClasspathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
-            List<JavaParserClasspathLoader> loaders = new ArrayList<>(2);
-            loaders.add(rewriteClasspathJarClasspathLoader);
-            Optional.ofNullable(TypeTable.fromClasspath(ctx, missingArtifactNames)).ifPresent(loaders::add);
+        TypeTable typeTable = TypeTable.fromClasspath(ctx, missingArtifactNames);
+        if (typeTable != null) {
+            for (String missingArtifactName : new ArrayList<>(missingArtifactNames)) {
+                Path located = typeTable.load(missingArtifactName);
+                if (located != null) {
+                    artifacts.add(located);
+                    missingArtifactNames.remove(missingArtifactName);
+                }
+            }
+        }
 
-            for (JavaParserClasspathLoader loader : loaders) {
+        if (!missingArtifactNames.isEmpty()) {
+            try (RewriteClasspathJarClasspathLoader classpathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
                 for (String missingArtifactName : new ArrayList<>(missingArtifactNames)) {
-                    Path located = loader.load(missingArtifactName);
+                    Path located = classpathLoader.load(missingArtifactName);
                     if (located != null) {
                         artifacts.add(located);
                         missingArtifactNames.remove(missingArtifactName);
                     }
                 }
             }
-
-            if (!missingArtifactNames.isEmpty()) {
-                String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
-                throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
-            }
         }
+
+        if (!missingArtifactNames.isEmpty()) {
+            String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
+            throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
+        }
+
         return artifacts;
     }
 
