@@ -242,6 +242,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             CompletableFuture<@Nullable Path> future = new CompletableFuture<>();
             if (classesDirByArtifact.putIfAbsent(gav, future) != null) {
+                // is already being written (by concurrent thread)
                 return;
             }
 
@@ -315,6 +316,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                 future.complete(classesDir);
             } catch (Exception e) {
                 future.completeExceptionally(e);
+                classesDirByArtifact.remove(gav);
             }
         }
 
