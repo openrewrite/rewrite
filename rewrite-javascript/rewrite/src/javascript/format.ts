@@ -52,6 +52,13 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         super();
     }
 
+    protected async visitAlias(alias: JS.Alias, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitAlias(alias, p) as JS.Alias;
+        return produce(ret, draft => {
+            draft.propertyName.after.whitespace = " ";
+        });
+    }
+
     protected async visitArrayAccess(arrayAccess: J.ArrayAccess, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitArrayAccess(arrayAccess, p) as J.ArrayAccess;
         return produce(ret, draft => {
@@ -132,6 +139,31 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         }) as J.ClassDeclaration;
     }
 
+    protected async visitContainer<T extends J>(container: J.Container<T>, p: ExecutionContext): Promise<J.Container<T>> {
+        const ret = await super.visitContainer(container, p) as J.Container<T>;
+        return produce(ret, draft => {
+            if (draft.elements.length > 1) {
+                for (let i = 1; i < draft.elements.length; i++) {
+                    draft.elements[i].element.prefix.whitespace = this.style.other.afterComma ? " " : "";
+                }
+            }
+        });
+    }
+
+    protected async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitExportDeclaration(exportDeclaration, p) as JS.ExportDeclaration;
+        return produce(ret, draft => {
+            if (draft.exportClause) {
+                draft.exportClause.prefix.whitespace = " ";
+            }
+            draft.typeOnly.before.whitespace = draft.typeOnly.element ? " " : "";
+            if (draft.moduleSpecifier) {
+                draft.moduleSpecifier.before.whitespace = " ";
+                draft.moduleSpecifier.element.prefix.whitespace = " ";
+            }
+        })
+    }
+
     protected async visitForLoop(forLoop: J.ForLoop, p: ExecutionContext): Promise<J | undefined> {
         const ret = await super.visitForLoop(forLoop, p) as J.ForLoop;
         return produceAsync(ret, async draft => {
@@ -168,6 +200,25 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
             draft.ifCondition.tree = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(draft.ifCondition.tree, this.style.within.ifParentheses), this.style.within.ifParentheses);
             draft.thenPart = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(ret.thenPart, this.style.beforeLeftBrace.ifLeftBrace), false);
         });
+    }
+
+    protected async visitImportDeclaration(jsImport: JS.Import, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitImportDeclaration(jsImport, p) as JS.Import;
+        return produce(ret, draft => {
+            if (draft.importClause) {
+                draft.importClause.prefix.whitespace = draft.importClause.namedBindings && !draft.importClause.typeOnly ? "" : " ";
+                if (draft.importClause.name) {
+                    draft.importClause.name.after.whitespace = "";
+                }
+                if (draft.importClause.namedBindings) {
+                    draft.importClause.namedBindings.prefix.whitespace = " ";
+                }
+            }
+            if (draft.moduleSpecifier) {
+                draft.moduleSpecifier.before.whitespace = " ";
+                draft.moduleSpecifier.element.prefix.whitespace = draft.importClause ? " " : "";
+            }
+        })
     }
 
     protected async visitMethodDeclaration(methodDecl: J.MethodDeclaration, p: ExecutionContext): Promise<J | undefined> {

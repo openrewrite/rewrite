@@ -48,4 +48,34 @@ describe('SpacesVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('spaces after export or import', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                export{MyPreciousClass} from'./my-precious-class';
+                export type{MyOtherClass} from'./my-other-class';
+                import{delta,gamma,zeta}from'delta.js';
+                import{b}from'qux.js';
+                import*as foo from'foo.js';
+                import a from'baz.js';
+                import'module-without-export.js';
+                import type{Models} from'../models';
+                `,
+                `
+                export {MyPreciousClass} from './my-precious-class';
+                export type {MyOtherClass} from './my-other-class';
+                import {delta, gamma, zeta} from 'delta.js';
+                import {b} from 'qux.js';
+                import * as foo from 'foo.js';
+                import a from 'baz.js';
+                import 'module-without-export.js';
+                import type {Models} from '../models';
+                `
+                // @formatter:on
+        ));
+    });
 });
