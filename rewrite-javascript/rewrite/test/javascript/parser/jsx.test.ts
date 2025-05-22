@@ -10,8 +10,22 @@ describe("jsx mapping", () => {
     test("jsx with comments", () =>
         spec.rewriteRun(
             //language=jsx
-            tsx("/*a*/<div /*b*/></div>/*d*/"),
+            tsx("/*a*/<div /*b*/></div >/*d*/"),
         ));
+
+    test("jsx namespace element", () => {
+        spec.rewriteRun(
+            //language=jsx
+            tsx("<foo:bar />"),
+        )
+    });
+
+    test("jsx member expression", () => {
+        spec.rewriteRun(
+            //language=jsx
+            tsx("<Foo.Bar />"),
+        )
+    });
 
     test("jsx text", () => {
         spec.rewriteRun(
@@ -36,6 +50,12 @@ describe("jsx mapping", () => {
         spec.rewriteRun(
             //language=jsx
             tsx("<div className=\"foo\"><span>Hello</span></div>")
+        ));
+
+    test("jsx with namespaced attribute", () =>
+        spec.rewriteRun(
+            //language=jsx
+            tsx("<div aria:foo=\"bar\"><span>Hello</span></div>")
         ));
 
     // noinspection HtmlUnknownTarget

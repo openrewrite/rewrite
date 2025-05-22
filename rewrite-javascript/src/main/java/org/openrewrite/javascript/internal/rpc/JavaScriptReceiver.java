@@ -62,7 +62,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<JS.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
-                .getPadding().withImports(q.receiveList(cu.getPadding().getImports(), imp -> visitRightPadded(imp, q)))
                 .getPadding().withStatements(q.receiveList(cu.getPadding().getStatements(), stmt -> visitRightPadded(stmt, q)))
                 .withEof(q.receive(cu.getEof(), space -> visitSpace(space, q)));
     }
@@ -440,6 +439,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         t = t.withSelfClosing(q.receive(tag.getSelfClosing(), space -> visitSpace(space, q)));
         t = t.getPadding().withChildren(q.receiveList(tag.getPadding().getChildren(), child -> visitRightPadded(child, q)));
         t = t.getPadding().withClosingName(q.receive(tag.getPadding().getClosingName(), name -> visitLeftPadded(name, q)));
+        t = t.withAfterClosingName(q.receive(tag.getAfterClosingName(), space -> visitSpace(space, q)));
 
 //        t = t.withType(q.receive(tag.getType(), type -> visitType(type, q)));
 
@@ -449,7 +449,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitJsxAttribute(JSX.Attribute attribute, RpcReceiveQueue q) {
         JSX.Attribute a = attribute;
-        a = a.withKey(q.receive(attribute.getKey(), key -> (J.Identifier) visitNonNull(key, q)));
+        a = a.withKey(q.receive(attribute.getKey(), key -> (NameTree) visitNonNull(key, q)));
         a = a.getPadding().withValue(q.receive(attribute.getPadding().getValue(), value -> visitLeftPadded(value, q)));
         return a;
     }

@@ -3424,7 +3424,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            openName: this.leftPadded(this.prefix(node.openingElement), node.openingElement.tagName.getFullText(this.sourceFile)),
+            openName: this.leftPadded(this.prefix(node.openingElement), this.visit(node.openingElement.tagName)),
             afterName: attrs.length === 0 ?
                 this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
@@ -3447,7 +3447,8 @@ export class JavaScriptParserVisitor {
                         this.prefix(this.findChildNode(node.closingElement, ts.SyntaxKind.LessThanToken)!)
                     )
                 ],
-            closingName: this.leftPadded(this.prefix(node.closingElement.tagName), node.closingElement.tagName.getFullText(this.sourceFile))
+            closingName: this.leftPadded(this.prefix(node.closingElement.tagName), this.visit(node.closingElement.tagName)),
+            afterClosingName: this.suffix(node.closingElement.tagName)
         };
     }
 
@@ -3458,7 +3459,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            openName: this.leftPadded(this.prefix(node.tagName), node.tagName.getFullText(this.sourceFile)),
+            openName: this.leftPadded(this.prefix(node.tagName), this.visit(node.tagName)),
             afterName: attrs.length === 0 ?
                 this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
@@ -3479,7 +3480,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            openName: this.leftPadded(this.prefix(node.openingFragment), ""),
+            openName: this.leftPadded(this.prefix(node.openingFragment), this.newEmpty()),
             afterName: this.prefix(this.findChildNode(node.openingFragment, ts.SyntaxKind.GreaterThanToken)!),
             attributes: [],
             children: node.children.length > 0 ?
@@ -3494,7 +3495,8 @@ export class JavaScriptParserVisitor {
                         this.prefix(this.findChildNode(node.closingFragment, ts.SyntaxKind.LessThanToken)!)
                     )
                 ],
-            closingName: this.leftPadded(emptySpace, "")
+            closingName: this.leftPadded(emptySpace, this.newEmpty()),
+            afterClosingName: emptySpace
         };
     }
 

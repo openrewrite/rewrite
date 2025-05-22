@@ -63,10 +63,14 @@ public interface JSX extends JS {
         @With
         Markers markers;
 
-        JLeftPadded<String> openName;
+        JLeftPadded<NameTree> openName;
 
-        public String getOpenName() {
+        public NameTree getOpenName() {
             return openName.getElement();
+        }
+
+        public Tag withOpenName(NameTree openName) {
+            return getPadding().withOpenName(JLeftPadded.withElement(this.openName, openName));
         }
 
         @Getter
@@ -113,6 +117,11 @@ public interface JSX extends JS {
         public String getClosingName() {
             return closingName == null ? null : closingName.getElement();
         }
+
+        @Getter
+        @With
+        @Nullable
+        Space afterClosingName;
 
         @Override
         public JavaType getType() {
@@ -164,12 +173,12 @@ public interface JSX extends JS {
         public static class Padding {
             private final JSX.Tag t;
 
-            public JLeftPadded<String> getOpenName() {
+            public JLeftPadded<NameTree> getOpenName() {
                 return t.openName;
             }
 
-            public Tag withOpenName(JLeftPadded<String> openName) {
-                return t.openName == openName ? t : new Tag(t.id, t.prefix, t.markers, openName, t.afterName, t.attributes, t.selfClosing, t.children, t.closingName);
+            public Tag withOpenName(JLeftPadded<NameTree> openName) {
+                return t.openName == openName ? t : new Tag(t.id, t.prefix, t.markers, openName, t.afterName, t.attributes, t.selfClosing, t.children, t.closingName, t.afterClosingName);
             }
 
             public List<JRightPadded<JSX>> getAttributes() {
@@ -177,7 +186,7 @@ public interface JSX extends JS {
             }
 
             public Tag withAttributes(List<JRightPadded<JSX>> attributes) {
-                return t.attributes == attributes ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, attributes, t.selfClosing, t.children, t.closingName);
+                return t.attributes == attributes ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, attributes, t.selfClosing, t.children, t.closingName, t.afterClosingName);
             }
 
             @Nullable
@@ -186,7 +195,7 @@ public interface JSX extends JS {
             }
 
             public Tag withChildren(@Nullable List<JRightPadded<Expression>> children) {
-                return t.children == children ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, children, t.closingName);
+                return t.children == children ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, children, t.closingName, t.afterClosingName);
             }
 
             @Nullable
@@ -195,7 +204,7 @@ public interface JSX extends JS {
             }
 
             public Tag withClosingName(@Nullable JLeftPadded<String> closingName) {
-                return t.closingName == closingName ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, t.children, closingName);
+                return t.closingName == closingName ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, t.children, closingName, t.afterClosingName);
             }
         }
     }
@@ -224,7 +233,7 @@ public interface JSX extends JS {
 
         @Getter
         @With
-        J.Identifier key;
+        NameTree key;
 
         @Nullable
         JLeftPadded<Expression> value;
@@ -430,7 +439,7 @@ public interface JSX extends JS {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class NamespacedName implements JSX {
+    final class NamespacedName implements JSX, NameTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -465,6 +474,19 @@ public interface JSX extends JS {
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
             return v.visitJsxNamespacedName(this, p);
+        }
+
+        @Override
+        public JavaType getType() {
+            // TODO
+            return JavaType.Unknown.getInstance();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            // TODO
+            //noinspection unchecked
+            return (T) this;
         }
 
         public Padding getPadding() {

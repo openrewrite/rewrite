@@ -102,6 +102,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             if (element.children) {
                 await this.visitRightPaddedLocal(element.children, "", p);
                 await this.visitLeftPaddedLocal("</", element.closingName, p);
+                await this.visitSpace(element.afterClosingName, p);
                 p.append(">");
             }
         }

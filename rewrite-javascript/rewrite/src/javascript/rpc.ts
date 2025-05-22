@@ -379,6 +379,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(tag, el => el.selfClosing, space => this.visitSpace(space, q));
         await q.getAndSendList(tag, el => el.children!, child => child.element.id, child => this.visitRightPadded(child, q));
         await q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
+        await q.getAndSend(tag, el => el.afterClosingName, el => this.visitSpace(el, q));
 
         return tag;
     }
@@ -944,13 +945,14 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.selfClosing = await q.receive(draft.selfClosing, space => this.visitSpace(space, q));
         draft.children = await q.receiveListDefined(draft.children, child => this.visitRightPadded(child, q));
         draft.closingName = await q.receive(draft.closingName, el => this.visitLeftPadded(el, q));
+        draft.afterClosingName = await q.receive(draft.afterClosingName, el => this.visitSpace(el, q));
 
         return finishDraft(draft);
     }
 
     override async visitJsxAttribute(attribute: JSX.Attribute, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(attribute);
-        draft.key = await q.receive(draft.key, el => this.visitDefined<J.Identifier>(el, q));
+        draft.key = await q.receive(draft.key, el => this.visitDefined<J.Identifier | JSX.NamespacedName>(el, q));
         draft.value = await q.receive(draft.value, el => this.visitLeftPadded(el, q));
         return finishDraft(draft);
     }

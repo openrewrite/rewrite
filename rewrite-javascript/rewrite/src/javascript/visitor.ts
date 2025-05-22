@@ -119,16 +119,18 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     protected async visitJsxTag(element: JSX.Tag, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JSX.Tag>(element, p, async draft => {
             draft.openName = await this.visitLeftPadded(element.openName, p);
+            draft.afterName = await this.visitSpace(element.afterName, p);
             draft.attributes = await mapAsync(element.attributes, attr => this.visitRightPadded(attr, p));
             draft.selfClosing = element.selfClosing && await this.visitSpace(element.selfClosing, p);
             draft.children = element.children && await mapAsync(element.children, child => this.visitRightPadded(child, p));
             draft.closingName = element.closingName && await this.visitLeftPadded(element.closingName, p);
+            draft.afterClosingName = element.afterClosingName && await this.visitSpace(element.afterClosingName, p);
         });
     }
 
     protected async visitJsxAttribute(attribute: JSX.Attribute, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JSX.Attribute>(attribute, p, async draft => {
-            draft.key = await this.visitDefined<J.Identifier>(attribute.key, p);
+            draft.key = await this.visitDefined<J.Identifier | JSX.NamespacedName>(attribute.key, p);
             draft.value = attribute.value && await this.visitLeftPadded(attribute.value, p);
         });
     }

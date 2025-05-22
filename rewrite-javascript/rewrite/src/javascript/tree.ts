@@ -17,7 +17,7 @@
  */
 
 import {SourceFile, TreeKind} from "../";
-import {Expression, J, JavaType, Statement, TypedTree, TypeTree, VariableDeclarator,} from "../java";
+import {Expression, J, JavaType, NameTree, Statement, TypedTree, TypeTree, VariableDeclarator,} from "../java";
 import getType = TypedTree.getType;
 import FunctionType = JS.FunctionType;
 
@@ -833,12 +833,22 @@ export namespace JSX {
      * @example <div>{child}</div>
      */
     export type Tag =
-        | (BaseTag & { selfClosing: J.Space; children?: undefined; closingName?: undefined })
-        | (BaseTag & { selfClosing?: undefined; children: J.RightPadded<EmbeddedExpression | Tag | J.Identifier | J.Literal | J.Empty>[]; closingName: J.LeftPadded<string> });
+        (BaseTag & {
+            readonly selfClosing: J.Space;
+            readonly children?: undefined;
+            readonly closingName?: undefined;
+            readonly afterClosingName?: undefined;
+        }) |
+        (BaseTag & {
+            readonly selfClosing?: undefined;
+            readonly children: J.RightPadded<EmbeddedExpression | Tag | J.Identifier | J.Literal | J.Empty>[];
+            readonly closingName: J.LeftPadded<J.Identifier | J.FieldAccess | NamespacedName | J.Empty>;
+            readonly afterClosingName: J.Space;
+        });
 
     interface BaseTag extends JS, Expression {
         readonly kind: typeof JS.Kind.JsxTag;
-        readonly openName: J.LeftPadded<string>;
+        readonly openName: J.LeftPadded<J.Identifier | J.FieldAccess | NamespacedName | J.Empty>;
         readonly afterName: J.Space;
         readonly attributes: J.RightPadded<Attribute | SpreadAttribute>[];
     }
@@ -849,7 +859,7 @@ export namespace JSX {
      */
     export interface Attribute extends JS {
         readonly kind: typeof JS.Kind.JsxAttribute;
-        readonly key: J.Identifier;
+        readonly key: J.Identifier | NamespacedName;
         readonly value?: J.LeftPadded<Expression>;
     }
 
@@ -876,7 +886,7 @@ export namespace JSX {
      * Represents a namespaced JSX name.
      * @example namespace:Name
      */
-    export interface NamespacedName extends JS {
+    export interface NamespacedName extends JS, NameTree {
         readonly kind: typeof JS.Kind.JsxNamespacedName;
         readonly namespace: J.Identifier;
         readonly name: J.LeftPadded<J.Identifier>;

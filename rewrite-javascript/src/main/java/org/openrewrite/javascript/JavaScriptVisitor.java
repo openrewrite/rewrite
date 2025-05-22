@@ -1063,10 +1063,11 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         t = t.getPadding().withAttributes(requireNonNull(ListUtils.map(t.getPadding().getAttributes(), attr -> visitRightPadded(attr, JRightPadded.Location.LANGUAGE_EXTENSION, p))));
 
         if (t.isSelfClosing()) {
-            t = t.withSelfClosing(visitSpace(t.getSelfClosing(), Space.Location.LANGUAGE_EXTENSION, p));
+            t = t.withSelfClosing(visitSpace(requireNonNull(t.getSelfClosing()), Space.Location.LANGUAGE_EXTENSION, p));
         } else if (t.hasChildren()) {
             t = t.getPadding().withChildren(requireNonNull(ListUtils.map(t.getPadding().getChildren(), child -> visitRightPadded(child, JRightPadded.Location.LANGUAGE_EXTENSION, p))));
             t = t.getPadding().withClosingName(requireNonNull(visitLeftPadded(t.getPadding().getClosingName(), JLeftPadded.Location.LANGUAGE_EXTENSION, p)));
+            t = t.withAfterClosingName(visitSpace(requireNonNull(t.getAfterClosingName()), Space.Location.LANGUAGE_EXTENSION, p));
         }
 
         t = t.withType(visitType(t.getType(), p));
