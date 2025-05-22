@@ -155,6 +155,13 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         return produce(ret, draft => {
             if (draft.exportClause) {
                 draft.exportClause.prefix.whitespace = " ";
+                if (draft.exportClause.kind == JS.Kind.NamedExports) {
+                    const ne = (draft.exportClause as Draft<JS.NamedExports>);
+                    if (ne.elements.elements.length > 0) {
+                        ne.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                        ne.elements.elements[ne.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                    }
+                }
             }
             draft.typeOnly.before.whitespace = draft.typeOnly.element ? " " : "";
             if (draft.moduleSpecifier) {
@@ -212,6 +219,11 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
                 }
                 if (draft.importClause.namedBindings) {
                     draft.importClause.namedBindings.prefix.whitespace = " ";
+                    if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
+                        const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
+                        ni.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                        ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                    }
                 }
             }
             if (draft.moduleSpecifier) {
