@@ -272,20 +272,55 @@ class GradleParserTest implements RewriteTest {
     }
 
     @Test
-    void error() {
+    void escapedAndNonEscapedDollarSignsInSingleDoubleQuotes() {
         GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
           }
           
-          repositories {
-            mavenCentral()
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', "RESPONSE=\\$(curl --location -s --request POST \\"https://localhost/$path\\")"
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInSingleSingleQuotes() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
           }
           
-          dependencies {
-            compileOnly 'com.google.guava:guava:29.0-jre'
-            runtimeOnly ('com.google.guava:guava:29.0-jre')
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', 'RESPONSE=\\$(curl --location -s --request POST "https://localhost/$path")'
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInTripleDoubleQuotes() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
           }
           
           task executeShellCommands {
@@ -295,6 +330,31 @@ class GradleParserTest implements RewriteTest {
                           RESPONSE=\\$(curl --location -s --request POST "https://localhost")
                           echo "TEST" > "\\$(echo $someVar)"
                       \"""
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInTripleSingleQuotes() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
+          }
+          
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', '''
+                          RESPONSE=\\$(curl --location -s --request POST "https://localhost")
+                          echo "TEST" > "\\$(echo $someVar)"
+                      '''
                   }
               }
           }

@@ -1602,7 +1602,7 @@ public class GroovyParserVisitor {
                     String value = sourceSubstring(cursor, delimiter.close);
                     // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
                     int indexNextSign = source.indexOf("$", cursor);
-                    if(indexNextSign != -1 && delimiter == TRIPLE_DOUBLE_QUOTE_STRING) {
+                    if(indexNextSign != -1 && (delimiter == TRIPLE_DOUBLE_QUOTE_STRING || delimiter == DOUBLE_QUOTE_STRING)) {
                         while (source.charAt(indexNextSign - 1) == '\\') {
                             indexNextSign = source.indexOf("$", indexNextSign + 1);
                         }
