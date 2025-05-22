@@ -96,8 +96,7 @@ public interface JSX extends JS {
         @Nullable
         List<JRightPadded<Expression>> children;
 
-        @Nullable
-        public List<Expression> getChildren() {
+        public @Nullable List<Expression> getChildren() {
             return children == null ? null : JRightPadded.getElements(children);
         }
 
