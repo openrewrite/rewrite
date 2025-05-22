@@ -21,7 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 
@@ -89,4 +89,32 @@ class JavaTemplateAnnotationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceAnnotation2() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                  @Override
+                  public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                      annotation = JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
+                        getCursor(), annotation.getCoordinates().replace(), "2.0");
+                      return annotation;
+                  }
+              }
+            ))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              @Deprecated(since = "1.0", forRemoval = true)
+              class A {
+              }
+              """,
+            """
+              @Deprecated(since = "2.0", forRemoval = true)
+              class A {
+              }
+              """
+          )
+        );
+    }
 }
