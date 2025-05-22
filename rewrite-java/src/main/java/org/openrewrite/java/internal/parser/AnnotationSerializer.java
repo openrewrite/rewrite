@@ -259,4 +259,28 @@ public class AnnotationSerializer {
     public static String escapeSpecialCharacters(String value) {
         return value.replace("|", "\\|").replace("\t", "\\t");
     }
+
+    static String serializeValue(Object value) {
+        if (value instanceof String) {
+            return serializeString((String) value);
+        } else if (value instanceof Type) {
+            return serializeClassConstant(((Type) value).getClassName());
+        } else if (value instanceof Boolean) {
+            return serializeBoolean((Boolean) value);
+        } else if (value instanceof Character) {
+            return serializeChar((Character) value);
+        } else if (value instanceof Number) {
+            if (value instanceof Long) {
+                return serializeLong((Long) value);
+            } else if (value instanceof Float) {
+                return serializeFloat((Float) value);
+            } else if (value instanceof Double) {
+                return serializeDouble((Double) value);
+            } else {
+                return serializeNumber((Number) value);
+            }
+        } else {
+            return String.valueOf(value);
+        }
+    }
 }

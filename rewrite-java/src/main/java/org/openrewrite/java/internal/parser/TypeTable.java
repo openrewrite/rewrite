@@ -516,13 +516,13 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         if (classDefinition == null && name != null) {
                                             // Create the ClassDefinition now that all annotations have been collected
                                             classDefinition = new ClassDefinition(
-                                                Jar.this, 
-                                                access, 
-                                                name, 
-                                                signature, 
-                                                superName, 
-                                                interfaces,
-                                                collectedClassAnnotations.isEmpty() ? null : collectedClassAnnotations.toArray(new String[0])
+                                                    Jar.this,
+                                                    access,
+                                                    name,
+                                                    signature,
+                                                    superName,
+                                                    interfaces,
+                                                    collectedClassAnnotations.isEmpty() ? null : collectedClassAnnotations.toArray(new String[0])
                                             );
                                             wroteFieldOrMethod = false;
                                             if (!wroteFieldOrMethod && !"module-info".equals(name)) {
@@ -535,140 +535,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     @Override
                                     public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
                                         if (visible) {
-                                            String annotationName = Type.getType(descriptor).getClassName();
-                                            String baseAnnotation = AnnotationSerializer.serializeSimpleAnnotation(annotationName);
-
-                                            return new AnnotationVisitor(Opcodes.ASM9) {
-                                                private final List<String> attributes = new ArrayList<>();
-
-                                                @Override
-                                                public void visit(String name, Object value) {
-                                                    String attributeName = name == null ? "value" : name;
-                                                    String attributeValue;
-
-                                                    if (value instanceof String) {
-                                                        attributeValue = AnnotationSerializer.serializeString((String) value);
-                                                    } else if (value instanceof Type) {
-                                                        attributeValue = AnnotationSerializer.serializeClassConstant(((Type) value).getClassName());
-                                                    } else if (value instanceof Boolean) {
-                                                        attributeValue = AnnotationSerializer.serializeBoolean((Boolean) value);
-                                                    } else if (value instanceof Character) {
-                                                        attributeValue = AnnotationSerializer.serializeChar((Character) value);
-                                                    } else if (value instanceof Number) {
-                                                        if (value instanceof Long) {
-                                                            attributeValue = AnnotationSerializer.serializeLong((Long) value);
-                                                        } else if (value instanceof Float) {
-                                                            attributeValue = AnnotationSerializer.serializeFloat((Float) value);
-                                                        } else if (value instanceof Double) {
-                                                            attributeValue = AnnotationSerializer.serializeDouble((Double) value);
-                                                        } else {
-                                                            attributeValue = AnnotationSerializer.serializeNumber((Number) value);
-                                                        }
-                                                    } else {
-                                                        attributeValue = String.valueOf(value);
-                                                    }
-
-                                                    attributes.add(AnnotationSerializer.serializeAttribute(attributeName, attributeValue));
-                                                }
-
-                                                @Override
-                                                public void visitEnum(String name, String descriptor, String value) {
-                                                    String attributeName = name == null ? "value" : name;
-                                                    String enumType = Type.getType(descriptor).getClassName();
-                                                    String attributeValue = AnnotationSerializer.serializeEnumConstant(enumType, value);
-                                                    attributes.add(AnnotationSerializer.serializeAttribute(attributeName, attributeValue));
-                                                }
-
-                                                @Override
-                                                public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-                                                    // For nested annotations, we'll just collect the name for now
-                                                    // In a more complete implementation, we would recursively collect details
-                                                    String attributeName = name == null ? "value" : name;
-                                                    String nestedAnnotationName = Type.getType(descriptor).getClassName();
-                                                    String attributeValue = AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationName);
-                                                    attributes.add(AnnotationSerializer.serializeAttribute(attributeName, attributeValue));
-                                                    return null;
-                                                }
-
-                                                @Override
-                                                public AnnotationVisitor visitArray(String name) {
-                                                    String attributeName = name == null ? "value" : name;
-                                                    List<String> arrayElements = new ArrayList<>();
-
-                                                    return new AnnotationVisitor(Opcodes.ASM9) {
-                                                        @Override
-                                                        public void visit(String name, Object value) {
-                                                            String elementValue;
-
-                                                            if (value instanceof String) {
-                                                                elementValue = AnnotationSerializer.serializeString((String) value);
-                                                            } else if (value instanceof Type) {
-                                                                elementValue = AnnotationSerializer.serializeClassConstant(((Type) value).getClassName());
-                                                            } else if (value instanceof Boolean) {
-                                                                elementValue = AnnotationSerializer.serializeBoolean((Boolean) value);
-                                                            } else if (value instanceof Character) {
-                                                                elementValue = AnnotationSerializer.serializeChar((Character) value);
-                                                            } else if (value instanceof Number) {
-                                                                if (value instanceof Long) {
-                                                                    elementValue = AnnotationSerializer.serializeLong((Long) value);
-                                                                } else if (value instanceof Float) {
-                                                                    elementValue = AnnotationSerializer.serializeFloat((Float) value);
-                                                                } else if (value instanceof Double) {
-                                                                    elementValue = AnnotationSerializer.serializeDouble((Double) value);
-                                                                } else {
-                                                                    elementValue = AnnotationSerializer.serializeNumber((Number) value);
-                                                                }
-                                                            } else {
-                                                                elementValue = String.valueOf(value);
-                                                            }
-
-                                                            arrayElements.add(elementValue);
-                                                        }
-
-                                                        @Override
-                                                        public void visitEnum(String name, String descriptor, String value) {
-                                                            String enumType = Type.getType(descriptor).getClassName();
-                                                            String elementValue = AnnotationSerializer.serializeEnumConstant(enumType, value);
-                                                            arrayElements.add(elementValue);
-                                                        }
-
-                                                        @Override
-                                                        public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-                                                            // For nested annotations in arrays, we'll just collect the name for now
-                                                            String nestedAnnotationName = Type.getType(descriptor).getClassName();
-                                                            String elementValue = AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationName);
-                                                            arrayElements.add(elementValue);
-                                                            return null;
-                                                        }
-
-                                                        @Override
-                                                        public AnnotationVisitor visitArray(String name) {
-                                                            // For nested arrays, we'll just add an empty array for now
-                                                            arrayElements.add("{}");
-                                                            return null;
-                                                        }
-
-                                                        @Override
-                                                        public void visitEnd() {
-                                                            String arrayValue = AnnotationSerializer.serializeArray(arrayElements.toArray(new String[0]));
-                                                            attributes.add(AnnotationSerializer.serializeAttribute(attributeName, arrayValue));
-                                                        }
-                                                    };
-                                                }
-
-                                                @Override
-                                                public void visitEnd() {
-                                                    if (attributes.isEmpty()) {
-                                                        collectedClassAnnotations.add(baseAnnotation);
-                                                    } else {
-                                                        String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
-                                                                annotationName, 
-                                                                attributes.toArray(new String[0])
-                                                        );
-                                                        collectedClassAnnotations.add(annotationWithAttributes);
-                                                    }
-                                                }
-                                            };
+                                            return AnnotationCollectorHelper.createCollector(descriptor, collectedClassAnnotations);
                                         }
                                         return null;
                                     }
@@ -681,139 +548,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                 @Override
                                                 public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
                                                     if (visible) {
-                                                        String annotationName = Type.getType(descriptor).getClassName();
-                                                        String baseAnnotation = AnnotationSerializer.serializeSimpleAnnotation(annotationName);
-
-                                                        return new AnnotationVisitor(Opcodes.ASM9) {
-                                                            private final List<String> attributes = new ArrayList<>();
-
-                                                            @Override
-                                                            public void visit(String name, Object value) {
-                                                                String attributeName = name == null ? "value" : name;
-                                                                String attributeValue;
-
-                                                                if (value instanceof String) {
-                                                                    attributeValue = AnnotationSerializer.serializeString((String) value);
-                                                                } else if (value instanceof Type) {
-                                                                    attributeValue = AnnotationSerializer.serializeClassConstant(((Type) value).getClassName());
-                                                                } else if (value instanceof Boolean) {
-                                                                    attributeValue = AnnotationSerializer.serializeBoolean((Boolean) value);
-                                                                } else if (value instanceof Character) {
-                                                                    attributeValue = AnnotationSerializer.serializeChar((Character) value);
-                                                                } else if (value instanceof Number) {
-                                                                    if (value instanceof Long) {
-                                                                        attributeValue = AnnotationSerializer.serializeLong((Long) value);
-                                                                    } else if (value instanceof Float) {
-                                                                        attributeValue = AnnotationSerializer.serializeFloat((Float) value);
-                                                                    } else if (value instanceof Double) {
-                                                                        attributeValue = AnnotationSerializer.serializeDouble((Double) value);
-                                                                    } else {
-                                                                        attributeValue = AnnotationSerializer.serializeNumber((Number) value);
-                                                                    }
-                                                                } else {
-                                                                    attributeValue = String.valueOf(value);
-                                                                }
-
-                                                                attributes.add(AnnotationSerializer.serializeAttribute(attributeName, attributeValue));
-                                                            }
-
-                                                            @Override
-                                                            public void visitEnum(String name, String descriptor, String value) {
-                                                                String attributeName = name == null ? "value" : name;
-                                                                String enumType = Type.getType(descriptor).getClassName();
-                                                                String attributeValue = AnnotationSerializer.serializeEnumConstant(enumType, value);
-                                                                attributes.add(AnnotationSerializer.serializeAttribute(attributeName, attributeValue));
-                                                            }
-
-                                                            @Override
-                                                            public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-                                                                // For nested annotations, we'll just collect the name for now
-                                                                String attributeName = name == null ? "value" : name;
-                                                                String nestedAnnotationName = Type.getType(descriptor).getClassName();
-                                                                String attributeValue = AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationName);
-                                                                attributes.add(AnnotationSerializer.serializeAttribute(attributeName, attributeValue));
-                                                                return null;
-                                                            }
-
-                                                            @Override
-                                                            public AnnotationVisitor visitArray(String name) {
-                                                                String attributeName = name == null ? "value" : name;
-                                                                List<String> arrayElements = new ArrayList<>();
-
-                                                                return new AnnotationVisitor(Opcodes.ASM9) {
-                                                                    @Override
-                                                                    public void visit(String name, Object value) {
-                                                                        String elementValue;
-
-                                                                        if (value instanceof String) {
-                                                                            elementValue = AnnotationSerializer.serializeString((String) value);
-                                                                        } else if (value instanceof Type) {
-                                                                            elementValue = AnnotationSerializer.serializeClassConstant(((Type) value).getClassName());
-                                                                        } else if (value instanceof Boolean) {
-                                                                            elementValue = AnnotationSerializer.serializeBoolean((Boolean) value);
-                                                                        } else if (value instanceof Character) {
-                                                                            elementValue = AnnotationSerializer.serializeChar((Character) value);
-                                                                        } else if (value instanceof Number) {
-                                                                            if (value instanceof Long) {
-                                                                                elementValue = AnnotationSerializer.serializeLong((Long) value);
-                                                                            } else if (value instanceof Float) {
-                                                                                elementValue = AnnotationSerializer.serializeFloat((Float) value);
-                                                                            } else if (value instanceof Double) {
-                                                                                elementValue = AnnotationSerializer.serializeDouble((Double) value);
-                                                                            } else {
-                                                                                elementValue = AnnotationSerializer.serializeNumber((Number) value);
-                                                                            }
-                                                                        } else {
-                                                                            elementValue = String.valueOf(value);
-                                                                        }
-
-                                                                        arrayElements.add(elementValue);
-                                                                    }
-
-                                                                    @Override
-                                                                    public void visitEnum(String name, String descriptor, String value) {
-                                                                        String enumType = Type.getType(descriptor).getClassName();
-                                                                        String elementValue = AnnotationSerializer.serializeEnumConstant(enumType, value);
-                                                                        arrayElements.add(elementValue);
-                                                                    }
-
-                                                                    @Override
-                                                                    public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-                                                                        // For nested annotations in arrays, we'll just collect the name for now
-                                                                        String nestedAnnotationName = Type.getType(descriptor).getClassName();
-                                                                        String elementValue = AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationName);
-                                                                        arrayElements.add(elementValue);
-                                                                        return null;
-                                                                    }
-
-                                                                    @Override
-                                                                    public AnnotationVisitor visitArray(String name) {
-                                                                        // For nested arrays, we'll just add an empty array for now
-                                                                        arrayElements.add("{}");
-                                                                        return null;
-                                                                    }
-
-                                                                    @Override
-                                                                    public void visitEnd() {
-                                                                        String arrayValue = AnnotationSerializer.serializeArray(arrayElements.toArray(new String[0]));
-                                                                        attributes.add(AnnotationSerializer.serializeAttribute(attributeName, arrayValue));
-                                                                    }
-                                                                };
-                                                            }
-
-                                                            @Override
-                                                            public void visitEnd() {
-                                                                if (attributes.isEmpty()) {
-                                                                    collectedFieldAnnotations.add(baseAnnotation);
-                                                                } else {
-                                                                    String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
-                                                                            annotationName, 
-                                                                            attributes.toArray(new String[0])
-                                                                    );
-                                                                    collectedFieldAnnotations.add(annotationWithAttributes);
-                                                                }
-                                                            }
-                                                        };
+                                                        return AnnotationCollectorHelper.createCollector(descriptor, collectedFieldAnnotations);
                                                     }
                                                     return null;
                                                 }
@@ -821,7 +556,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                 @Override
                                                 public void visitEnd() {
                                                     wroteFieldOrMethod |= classDefinition
-                                                            .writeField(access, name, descriptor, signature, 
+                                                            .writeField(access, name, descriptor, signature,
                                                                     collectedFieldAnnotations.isEmpty() ? null : collectedFieldAnnotations.toArray(new String[0]));
                                                 }
                                             };
@@ -849,139 +584,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                 @Override
                                                 public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
                                                     if (visible) {
-                                                        String annotationName = Type.getType(descriptor).getClassName();
-                                                        String baseAnnotation = AnnotationSerializer.serializeSimpleAnnotation(annotationName);
-
-                                                        return new AnnotationVisitor(Opcodes.ASM9) {
-                                                            private final List<String> attributes = new ArrayList<>();
-
-                                                            @Override
-                                                            public void visit(String name, Object value) {
-                                                                String attributeName = name == null ? "value" : name;
-                                                                String attributeValue;
-
-                                                                if (value instanceof String) {
-                                                                    attributeValue = AnnotationSerializer.serializeString((String) value);
-                                                                } else if (value instanceof Type) {
-                                                                    attributeValue = AnnotationSerializer.serializeClassConstant(((Type) value).getClassName());
-                                                                } else if (value instanceof Boolean) {
-                                                                    attributeValue = AnnotationSerializer.serializeBoolean((Boolean) value);
-                                                                } else if (value instanceof Character) {
-                                                                    attributeValue = AnnotationSerializer.serializeChar((Character) value);
-                                                                } else if (value instanceof Number) {
-                                                                    if (value instanceof Long) {
-                                                                        attributeValue = AnnotationSerializer.serializeLong((Long) value);
-                                                                    } else if (value instanceof Float) {
-                                                                        attributeValue = AnnotationSerializer.serializeFloat((Float) value);
-                                                                    } else if (value instanceof Double) {
-                                                                        attributeValue = AnnotationSerializer.serializeDouble((Double) value);
-                                                                    } else {
-                                                                        attributeValue = AnnotationSerializer.serializeNumber((Number) value);
-                                                                    }
-                                                                } else {
-                                                                    attributeValue = String.valueOf(value);
-                                                                }
-
-                                                                attributes.add(AnnotationSerializer.serializeAttribute(attributeName, attributeValue));
-                                                            }
-
-                                                            @Override
-                                                            public void visitEnum(String name, String descriptor, String value) {
-                                                                String attributeName = name == null ? "value" : name;
-                                                                String enumType = Type.getType(descriptor).getClassName();
-                                                                String attributeValue = AnnotationSerializer.serializeEnumConstant(enumType, value);
-                                                                attributes.add(AnnotationSerializer.serializeAttribute(attributeName, attributeValue));
-                                                            }
-
-                                                            @Override
-                                                            public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-                                                                // For nested annotations, we'll just collect the name for now
-                                                                String attributeName = name == null ? "value" : name;
-                                                                String nestedAnnotationName = Type.getType(descriptor).getClassName();
-                                                                String attributeValue = AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationName);
-                                                                attributes.add(AnnotationSerializer.serializeAttribute(attributeName, attributeValue));
-                                                                return null;
-                                                            }
-
-                                                            @Override
-                                                            public AnnotationVisitor visitArray(String name) {
-                                                                String attributeName = name == null ? "value" : name;
-                                                                List<String> arrayElements = new ArrayList<>();
-
-                                                                return new AnnotationVisitor(Opcodes.ASM9) {
-                                                                    @Override
-                                                                    public void visit(String name, Object value) {
-                                                                        String elementValue;
-
-                                                                        if (value instanceof String) {
-                                                                            elementValue = AnnotationSerializer.serializeString((String) value);
-                                                                        } else if (value instanceof Type) {
-                                                                            elementValue = AnnotationSerializer.serializeClassConstant(((Type) value).getClassName());
-                                                                        } else if (value instanceof Boolean) {
-                                                                            elementValue = AnnotationSerializer.serializeBoolean((Boolean) value);
-                                                                        } else if (value instanceof Character) {
-                                                                            elementValue = AnnotationSerializer.serializeChar((Character) value);
-                                                                        } else if (value instanceof Number) {
-                                                                            if (value instanceof Long) {
-                                                                                elementValue = AnnotationSerializer.serializeLong((Long) value);
-                                                                            } else if (value instanceof Float) {
-                                                                                elementValue = AnnotationSerializer.serializeFloat((Float) value);
-                                                                            } else if (value instanceof Double) {
-                                                                                elementValue = AnnotationSerializer.serializeDouble((Double) value);
-                                                                            } else {
-                                                                                elementValue = AnnotationSerializer.serializeNumber((Number) value);
-                                                                            }
-                                                                        } else {
-                                                                            elementValue = String.valueOf(value);
-                                                                        }
-
-                                                                        arrayElements.add(elementValue);
-                                                                    }
-
-                                                                    @Override
-                                                                    public void visitEnum(String name, String descriptor, String value) {
-                                                                        String enumType = Type.getType(descriptor).getClassName();
-                                                                        String elementValue = AnnotationSerializer.serializeEnumConstant(enumType, value);
-                                                                        arrayElements.add(elementValue);
-                                                                    }
-
-                                                                    @Override
-                                                                    public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-                                                                        // For nested annotations in arrays, we'll just collect the name for now
-                                                                        String nestedAnnotationName = Type.getType(descriptor).getClassName();
-                                                                        String elementValue = AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationName);
-                                                                        arrayElements.add(elementValue);
-                                                                        return null;
-                                                                    }
-
-                                                                    @Override
-                                                                    public AnnotationVisitor visitArray(String name) {
-                                                                        // For nested arrays, we'll just add an empty array for now
-                                                                        arrayElements.add("{}");
-                                                                        return null;
-                                                                    }
-
-                                                                    @Override
-                                                                    public void visitEnd() {
-                                                                        String arrayValue = AnnotationSerializer.serializeArray(arrayElements.toArray(new String[0]));
-                                                                        attributes.add(AnnotationSerializer.serializeAttribute(attributeName, arrayValue));
-                                                                    }
-                                                                };
-                                                            }
-
-                                                            @Override
-                                                            public void visitEnd() {
-                                                                if (attributes.isEmpty()) {
-                                                                    collectedMethodAnnotations.add(baseAnnotation);
-                                                                } else {
-                                                                    String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
-                                                                            annotationName, 
-                                                                            attributes.toArray(new String[0])
-                                                                    );
-                                                                    collectedMethodAnnotations.add(annotationWithAttributes);
-                                                                }
-                                                            }
-                                                        };
+                                                        return AnnotationCollectorHelper.createCollector(descriptor, collectedMethodAnnotations);
                                                     }
                                                     return null;
                                                 }
@@ -989,8 +592,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                 @Override
                                                 public void visitEnd() {
                                                     wroteFieldOrMethod |= classDefinition
-                                                            .writeMethod(access, name, descriptor, signature, 
-                                                                    collectedParameterNames.isEmpty() ? null : collectedParameterNames, 
+                                                            .writeMethod(access, name, descriptor, signature,
+                                                                    collectedParameterNames.isEmpty() ? null : collectedParameterNames,
                                                                     exceptions,
                                                                     collectedMethodAnnotations.isEmpty() ? null : collectedMethodAnnotations.toArray(new String[0]));
                                                 }
