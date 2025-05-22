@@ -56,6 +56,11 @@ export class Cursor {
         return this._messages;
     }
 
+    getNearestMessage<T>(key: string): any {
+        const t = this._messages == undefined ? undefined : this._messages.get(key);
+        return t == null && this.parent != null ? this.parent.getNearestMessage<T>(key) : t;
+    }
+
     asArray(): any[] {
         const path: any[] = [];
         let current: Cursor | undefined = this;

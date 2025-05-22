@@ -16,10 +16,17 @@
 import {JS} from "./tree";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, J, JavaType, Statement} from "../java";
+import {Comment, J, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isTree, Tree} from "../tree";
-import {SpacesStyle, styleFromSourceFile, StyleKind, WrappingAndBracesStyle, BlankLinesStyle} from "./style";
+import {
+    BlankLinesStyle,
+    SpacesStyle,
+    styleFromSourceFile,
+    StyleKind,
+    TabsAndIndentsStyle,
+    WrappingAndBracesStyle
+} from "./style";
 import {produceAsync} from "../visitor";
 
 export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
@@ -27,14 +34,15 @@ export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
         const spacesStyle = styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle;
         const wrappingAndBracesStyle = styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle;
         const blankLinesStyle = styleFromSourceFile(StyleKind.BlankLinesStyle, tree) as BlankLinesStyle;
+        const tabsAndIndentsStyle = styleFromSourceFile(StyleKind.TabsAndIndentsStyle, tree) as TabsAndIndentsStyle;
         let t: R | undefined = tree as R;
         // TODO possibly cursor.fork
 
-        // TODO enable them once we have the indenting visitor
-        // t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
-        // t = t && await new BlankLinesVisitor(blankLinesStyle).visit(t, p, cursor);
+        t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
+        t = t && await new BlankLinesVisitor(blankLinesStyle).visit(t, p, cursor);
         t = t && await new WrappingAndBracesVisitor(wrappingAndBracesStyle).visit(t, p, cursor);
         t = t && await new SpacesVisitor(spacesStyle).visit(t, p, cursor);
+        t = t && await new TabsAndIndentsVisitor(tabsAndIndentsStyle).visit(t, p, cursor);
         return t;
     }
 }
@@ -97,6 +105,15 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
             draft.operator.before.whitespace = property ? " " : "";
             draft.right.prefix.whitespace = property ? " " : "";
         }) as J.Binary;
+    }
+
+    protected async visitCase(aCase: J.Case, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.visitCase(aCase, p) as J.Case;
+        return ret && produce(ret, draft => {
+            if (draft.caseLabels.elements[0].element.kind != J.Kind.Identifier || (draft.caseLabels.elements[0].element as J.Identifier).simpleName != "default") {
+                draft.caseLabels.before.whitespace = " ";
+            }
+        });
     }
 
     protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J | undefined> {
@@ -840,7 +857,8 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
                     this.keepMaximumBlankLines(draft, this.style.keepMaximum.inCode);
                 }
             } else if (parent?.kind === J.Kind.Block ||
-                      (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id)) {
+                      (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
+                      (parent?.kind === J.Kind.Case)) {
                 this.ensurePrefixHasNewLine(draft);
             }
         });
@@ -906,5 +924,77 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
 
     private static countNewlines(s: string): number {
         return [...s].filter(c => c === "\n").length;
+    }
+}
+
+export class TabsAndIndentsVisitor extends JavaScriptVisitor<ExecutionContext> {
+    private readonly newline: string;
+    private readonly singleIndent: string;
+
+    constructor(private readonly tabsAndIndentsStyle: TabsAndIndentsStyle) {
+        super();
+        this.newline = "\n"; // TODO this should be configurable and come from some style too
+
+        if (this.tabsAndIndentsStyle.useTabCharacter) {
+            this.singleIndent = "\t";
+        } else {
+            this.singleIndent = " ".repeat(this.tabsAndIndentsStyle.indentSize);
+        }
+    }
+
+    protected async preVisit(tree: J, p: ExecutionContext): Promise<J | undefined> {
+        const ret = await super.preVisit(tree, p);
+        const indentShouldIncrease = tree.kind === J.Kind.Block || tree.kind === J.Kind.Case;
+        if (indentShouldIncrease) {
+            this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
+        }
+        return ret;
+    }
+
+    async visit<R extends J>(tree: Tree, p: ExecutionContext, parent?: Cursor): Promise<R | undefined> {
+        let ret = await super.visit(tree, p, parent) as R;
+        if (ret == undefined) {
+            return ret;
+        }
+        const relativeIndent = this.currentIndent;
+
+        return produce(ret, draft => {
+            if (draft.prefix.whitespace.includes("\n")) {
+                draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
+            }
+            if (draft.kind === J.Kind.Block) {
+                const block = draft as Draft<J> as Draft<J.Block>;
+                block.end.whitespace = this.newline + relativeIndent;
+            }
+        });
+    }
+
+    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: ExecutionContext): Promise<J.LeftPadded<T>> {
+        const ret = await super.visitLeftPadded(left, p);
+        if (ret == undefined) {
+            return ret;
+        }
+        return produce(ret, draft => {
+            if (draft.before.whitespace.includes("\n")) {
+                draft.before.whitespace = this.combineIndent(draft.before.whitespace, this.currentIndent);
+            }
+        });
+    }
+
+    private get currentIndent(): string {
+        const indent = this.cursor.getNearestMessage("indentToUse");
+        if (indent == undefined) {
+            const enclosingWhitespace = this.cursor.firstEnclosing((x: any): x is J => x.prefix && x.prefix.whitespace.includes("\n"))?.prefix.whitespace;
+            if (enclosingWhitespace) {
+                return enclosingWhitespace.substring(enclosingWhitespace.lastIndexOf("\n") + 1);
+            } else {
+                return "";
+            }
+        }
+        return indent;
+    }
+
+    private combineIndent(oldWs: string, relativeIndent: string): string {
+        return oldWs.substring(0, oldWs.lastIndexOf("\n") + 1) + relativeIndent;
     }
 }
