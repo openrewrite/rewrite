@@ -15,11 +15,12 @@
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
-import {J} from "../../../src/java";
+import {Expression, J} from "../../../src/java";
 import {template, $} from "../../../src/javascript/templating2";
 import {JavaCoordinates} from "../../../src/javascript/templating";
 import {produce} from "immer";
 import Mode = JavaCoordinates.Mode;
+import {produceAsync} from "../../../src";
 
 describe('template2 replace', () => {
     const spec = new RecipeSpec();
@@ -81,13 +82,15 @@ describe('template2 replace', () => {
     test('binary expression replacement', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                // Check if this is an equality comparison (==)
                 if (binary.operator.element === J.Binary.Type.Equal) {
-                    // Use the right side of the binary expression to replace the left side
-                    return template`${$(binary.right)} == ${$(binary.right)}`.apply(
-                        this.cursor, 
-                        {tree: binary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}
-                    );
+                    return await produceAsync(binary, async draft => {
+
+                        draft.left = (await template`${$(binary.right)}`.apply(
+                            this.cursor,
+                            {tree: binary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}
+                        )) as Expression;
+
+                    });
                 }
                 return binary;
             }

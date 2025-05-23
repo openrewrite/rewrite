@@ -983,7 +983,14 @@ export class TemplateProcessor {
      */
     private extractPatternFromAst(cu: JS.CompilationUnit): J {
         // Extract the relevant part of the AST based on the template content
-        // This is a simplified implementation that just returns the first statement
-        return cu.statements[0].element;
+        const firstStatement = cu.statements[0].element;
+
+        // If the first statement is an expression statement, extract the expression
+        if (firstStatement.kind === JS.Kind.ExpressionStatement) {
+            return (firstStatement as JS.ExpressionStatement).expression;
+        }
+
+        // Otherwise, return the statement itself
+        return firstStatement;
     }
 }
