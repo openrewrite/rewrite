@@ -142,11 +142,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
         return produce(ret, draft => {
             draft.body.prefix.whitespace = this.style.beforeLeftBrace.catchLeftBrace ? " " : "";
-
-            if (draft.extends) {
-                draft.extends.before.whitespace = " ";
-                draft.extends.element.prefix.whitespace = " ";
-            }
         }) as J.ClassDeclaration;
     }
 
@@ -656,15 +651,6 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         super();
     }
 
-    override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
-        // Note - for some reason the original MinimumViableSpacingVisitor.java doesn't have it
-        // and only has the logic in MinimumViableSpacingTest.defaults
-        const ret = await super.visitSpace(space, p) as J.Space;
-        return ret && produce(ret, draft => {
-            draft.whitespace = "";
-        });
-    }
-
     protected async visitAwait(await_: JS.Await, p: P): Promise<J | undefined> {
         const ret = await super.visitAwait(await_, p) as JS.Await;
         return produce(ret, draft => {
@@ -780,7 +766,7 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitNewClass(newClass, p) as J.NewClass;
         return produce(ret, draft => {
             if (draft.class != undefined) {
-                draft.class.prefix.whitespace = " ";
+                //draft.class.prefix.whitespace = " ";
             }
         });
     }
@@ -971,7 +957,9 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             } else if (parent?.kind === J.Kind.Block ||
                       (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
                       (parent?.kind === J.Kind.Case)) {
-                this.ensurePrefixHasNewLine(draft);
+                if (draft.kind != J.Kind.Case) {
+                    this.ensurePrefixHasNewLine(draft);
+                }
             }
         });
     }
