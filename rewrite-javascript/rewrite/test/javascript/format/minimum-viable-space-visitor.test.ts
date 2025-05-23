@@ -13,20 +13,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {fromVisitor, RecipeSpec} from "../../../src/test";
+import {fromVisitor, RecipeSpec, SourceSpec} from "../../../src/test";
 import {MinimumViableSpacingVisitor} from "../../../src/javascript/format";
-import {typescript} from "../../../src/javascript";
+import {JavaScriptParser, JavaScriptVisitor, JS, typescript} from "../../../src/javascript";
+import {produce} from "immer";
+import {mapAsync, ParserInput, SourceFile} from "../../../src";
+import {J} from "../../../src/java";
 
-// TODO remodel the tests after we no longer remove all whitespace in MinimumViableSpacingVisitor
 describe('MinimumViableSpacingVisitor', () => {
     const spec = new RecipeSpec()
+    spec.checkParsePrintIdempotence = false;
     spec.recipe = fromVisitor(new MinimumViableSpacingVisitor());
 
-    test.skip('basic', () => {
+    function typescriptWithSpacesRemoved(before: string | null, after?: string): SourceSpec<JS.CompilationUnit> {
+        const ret = typescript(before, after);
+        class JavaScriptParserWithSpacesRemoved extends JavaScriptParser {
+            constructor() {
+                super(undefined, undefined);
+            }
+
+            static RemoveSpaces = class <P> extends JavaScriptVisitor<P> {
+                override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+                    const ret = await super.visitSpace(space, p) as J.Space;
+                    return ret && produce(ret, draft => {
+                        draft.whitespace = "";
+                    });
+                }
+            }
+
+            override async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
+                const files = await super.parse(...inputs);
+                const removeSpaces = new JavaScriptParserWithSpacesRemoved.RemoveSpaces();
+                return await mapAsync(files, async (file) => {
+                    return await removeSpaces.visit(file, undefined) as unknown as SourceFile;
+                });
+            }
+        }
+        return produce(ret, draft => {
+            draft.parser = () => new JavaScriptParserWithSpacesRemoved()
+        });
+    }
+
+    test('basic', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript(`
+            typescriptWithSpacesRemoved(`
                 class TodoItem {
                     constructor(public title: string, public done: boolean = false) {
                     }
@@ -53,65 +85,65 @@ describe('MinimumViableSpacingVisitor', () => {
         ))
     });
 
-    test.skip('throw new', () => {
+    test('throw new', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript(`throw new Error("things went south");`,
+            typescriptWithSpacesRemoved(`throw new Error("things went south");`,
                 `throw new Error("things went south");`
                 // @formatter:on
             ))
     });
 
-    test.skip('type', () => {
+    test('type', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript(
+            typescriptWithSpacesRemoved(
                 `type T1 = string;`,
                 `type T1=string;`
                 // @formatter:on
             ))
     });
 
-    test.skip('await', () => {
+    test('await', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript(
+            typescriptWithSpacesRemoved(
                 `const response = await fetch("https://api.example.com/users/2");`,
                 `const response=await fetch("https://api.example.com/users/2");`
                 // @formatter:on
             ))
     });
 
-    test.skip('type parameters', () => {
+    test('type parameters', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript(
+            typescriptWithSpacesRemoved(
                 `function m<T extends MyType>(a:T): T {return a}`,
                 `function m<T extends MyType>(a:T):T{return a}`
                 // @formatter:on
             ))
     });
 
-    test.skip('typeof', () => {
+    test('typeof', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript(
+            typescriptWithSpacesRemoved(
                 `const a = "A";console.log(typeof a)`,
                 `const a="A";console.log(typeof a)`,
                 // @formatter:on
             ))
     });
 
-    test.skip('namespace', () => {
+    test('namespace', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript(
+            typescriptWithSpacesRemoved(
                 `export namespace MathUtils { export const PI = 3.14}`,
                 `export namespace MathUtils{export const PI=3.14}`,
                 // @formatter:on

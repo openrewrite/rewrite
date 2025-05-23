@@ -38,6 +38,8 @@ export interface SourceSpec<T extends SourceFile> {
 }
 
 export class RecipeSpec {
+    checkParsePrintIdempotence: boolean = true
+
     recipe: Recipe = new NoopRecipe()
 
     /**
@@ -71,7 +73,7 @@ export class RecipeSpec {
             const specs = specsByKind[kind];
             const parsed = await this.parse(specs);
             await this.expectNoParseFailures(parsed);
-            await this.expectParsePrintIdempotence(parsed);
+            this.checkParsePrintIdempotence && await this.expectParsePrintIdempotence(parsed);
             const changeset = (await scheduleRun(this.recipe,
                 parsed.map(([_, sourceFile]) => sourceFile),
                 this.recipeExecutionContext)).changeset;
