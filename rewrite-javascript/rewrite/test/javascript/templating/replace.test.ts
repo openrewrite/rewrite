@@ -17,6 +17,7 @@ import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {JavaCoordinates, JavaScriptTemplate} from "../../../src/javascript/templating";
+import {produce} from "immer";
 import Mode = JavaCoordinates.Mode;
 
 describe('template replace', () => {
@@ -26,29 +27,51 @@ describe('template replace', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                 if (literal.valueSource === '1') {
-                    return new JavaScriptTemplate('2').apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
+                    return new JavaScriptTemplate('2')
+                        .apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
                 }
                 return literal;
             }
         });
-        return spec.rewriteRun({
+        return spec.rewriteRun(
             //language=typescript
-            ...typescript('const a = 1', 'const a = 2'),
-        });
+            typescript('const a = 1', 'const a = 2'),
+        );
     });
 
     test('string replacement', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                 if (literal.valueSource === '1') {
-                    return new JavaScriptTemplate('#{}').apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}, '2');
+                    return new JavaScriptTemplate('#{}')
+                        .apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}, '2');
                 }
                 return literal;
             }
         });
-        return spec.rewriteRun({
+        return spec.rewriteRun(
             //language=typescript
-            ...typescript('const a = 1', 'const a = 2'),
+            typescript('const a = 1', 'const a = 2'),
+        );
+    });
+
+    test('tree replacement', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+                if (literal.valueSource === '1') {
+                    const two = produce(literal, draft => {
+                        draft.value = 2;
+                        draft.valueSource = '2';
+                    });
+                    return new JavaScriptTemplate('#{any()}')
+                        .apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}, two);
+                }
+                return literal;
+            }
         });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('const a = 1', 'const a = 2'),
+        );
     });
 });
