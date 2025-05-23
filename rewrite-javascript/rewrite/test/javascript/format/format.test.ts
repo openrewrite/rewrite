@@ -27,8 +27,10 @@ describe('AutoformatVisitor', () => {
             // @formatter:off
             //language=typescript
             typescript(`
-                    class K{
+                    class L {}
+                    class K extends L{
                         constructor  ( ){
+                            super();
                         }
                         m ( x :number  ,  y  :  number[] ) :number{
                             this.m( x, [1] );
@@ -63,13 +65,21 @@ describe('AutoformatVisitor', () => {
                     }
                 `,
                 `
-                    class K {
+                    class L {
+                    }
+
+                    class K extends L {
                         constructor() {
+                            super();
                         }
+
+
                         m(x: number, y: number[]): number {
                             this.m(x, [1]);
                             return y[0];
                         }
+
+
                         s(s: string): number {
                             switch (s) {
                                 case "apple":

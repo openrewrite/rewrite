@@ -21,13 +21,14 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new RemoveRedundantDependencyVersions(null, null, null, null));
+          .recipe(new RemoveRedundantDependencyVersions(null, null, null));
     }
 
     @DocumentExample
@@ -309,6 +310,174 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void removeDirectDependencyWithLowerVersionNumberIfDependencyIsLoadedTransitivelyWithHigherVersionNumber() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services:3.3.3")
+                  implementation("org.springframework:spring-webmvc:6.1.11")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDirectDependencyIfDependencyIsLoadedTransitivelyWithSameVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services:3.3.3")
+                  implementation("org.springframework:spring-webmvc:6.1.12")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDirectDependencyWithHigherVersionNumberIfDependencyIsLoadedTransitivelyWithLowerVersionNumber() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services:3.3.3")
+                  implementation("org.springframework:spring-webmvc:6.1.13")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web-services")
+                  implementation("org.springframework:spring-webmvc:6.1.13")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handleSeveralPlatformDependencies() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                   implementation(platform("org.springframework.cloud:spring-cloud-dependencies:2024.0.0"))
+                   implementation("org.springframework.boot:spring-boot-starter-web-services")
+                   implementation("org.springframework.cloud:spring-cloud-starter-config")
+                   implementation("org.springframework:spring-webmvc:6.1.10")
+                   implementation("org.springframework.boot:spring-boot-starter-actuator:3.3.3")
+                   implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
+                   implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.1.0")
+                   implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.1.1")
+                   implementation("org.springframework.cloud:spring-cloud-starter-gateway:4.1.2")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                   implementation(platform("org.springframework.cloud:spring-cloud-dependencies:2024.0.0"))
+                   implementation("org.springframework.boot:spring-boot-starter-web-services")
+                   implementation("org.springframework.cloud:spring-cloud-starter-config")
+                   implementation("org.springframework.boot:spring-boot-starter-actuator")
+                   implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
+                   implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+                   implementation("org.springframework.cloud:spring-cloud-starter-gateway")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void transitiveConfiguration() {
         rewriteRun(
           buildGradle(
@@ -361,6 +530,88 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3:3.14.0")
               
                   testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlin() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  constraints {
+                      implementation("org.springframework:spring-core:6.2.1") {
+                          because("Gradle is resolving 6.2.2 already, this constraint has no effect and can be removed")
+                      }
+                  }
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.4.2"))
+                  implementation("org.springframework.boot:spring-boot:3.4.2")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.4.2"))
+                  implementation("org.springframework.boot:spring-boot")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void differentScope() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  constraints {
+                      testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.0") {
+                          because("Some reason")
+                      }
+                  }
+                  testImplementation(platform("org.junit:junit-bom:5.10.1"))
+                  testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation(platform("org.junit:junit-bom:5.10.1"))
+                  testImplementation("org.junit.jupiter:junit-jupiter")
               }
               """
           )

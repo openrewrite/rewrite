@@ -14,37 +14,51 @@
  * limitations under the License.
  */
 import {JS} from "./tree";
-import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, J, JavaType, Statement} from "../java";
+import {Comment, J, Statement} from "../java";
 import {Draft, produce} from "immer";
 import {Cursor, isTree, Tree} from "../tree";
-import {SpacesStyle, styleFromSourceFile, StyleKind, WrappingAndBracesStyle, BlankLinesStyle} from "./style";
+import {
+    BlankLinesStyle,
+    SpacesStyle,
+    styleFromSourceFile,
+    StyleKind,
+    TabsAndIndentsStyle,
+    WrappingAndBracesStyle
+} from "./style";
 import {produceAsync} from "../visitor";
 
-export class AutoformatVisitor extends JavaScriptVisitor<ExecutionContext> {
-    async visit<R extends J>(tree: Tree, p: ExecutionContext, cursor?: Cursor): Promise<R | undefined> {
+export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
+    async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
         const spacesStyle = styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle;
         const wrappingAndBracesStyle = styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle;
         const blankLinesStyle = styleFromSourceFile(StyleKind.BlankLinesStyle, tree) as BlankLinesStyle;
+        const tabsAndIndentsStyle = styleFromSourceFile(StyleKind.TabsAndIndentsStyle, tree) as TabsAndIndentsStyle;
         let t: R | undefined = tree as R;
         // TODO possibly cursor.fork
 
-        // TODO enable them once we have the indenting visitor
-        // t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
-        // t = t && await new BlankLinesVisitor(blankLinesStyle).visit(t, p, cursor);
+        t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
+        t = t && await new BlankLinesVisitor(blankLinesStyle).visit(t, p, cursor);
         t = t && await new WrappingAndBracesVisitor(wrappingAndBracesStyle).visit(t, p, cursor);
         t = t && await new SpacesVisitor(spacesStyle).visit(t, p, cursor);
+        t = t && await new TabsAndIndentsVisitor(tabsAndIndentsStyle).visit(t, p, cursor);
         return t;
     }
 }
 
-export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
+export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     constructor(private style: SpacesStyle) {
         super();
     }
 
-    protected async visitArrayAccess(arrayAccess: J.ArrayAccess, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitAlias(alias: JS.Alias, p: P): Promise<J | undefined> {
+        const ret = await super.visitAlias(alias, p) as JS.Alias;
+        return produce(ret, draft => {
+            draft.propertyName.after.whitespace = " ";
+        });
+    }
+
+    protected async visitArrayAccess(arrayAccess: J.ArrayAccess, p: P): Promise<J | undefined> {
         const ret = await super.visitArrayAccess(arrayAccess, p) as J.ArrayAccess;
         return produce(ret, draft => {
             draft.dimension.index.element.prefix.whitespace = this.style.within.arrayBrackets ? " " : "";
@@ -52,7 +66,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitBinary(binary: J.Binary, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitBinary(binary: J.Binary, p: P): Promise<J | undefined> {
         const ret = await super.visitBinary(binary, p) as J.Binary;
         let property = false;
         switch (ret.operator.element.valueOf()) {
@@ -99,7 +113,16 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         }) as J.Binary;
     }
 
-    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitCase(aCase: J.Case, p: P): Promise<J | undefined> {
+        const ret = await super.visitCase(aCase, p) as J.Case;
+        return ret && produce(ret, draft => {
+            if (draft.caseLabels.elements[0].element.kind != J.Kind.Identifier || (draft.caseLabels.elements[0].element as J.Identifier).simpleName != "default") {
+                draft.caseLabels.before.whitespace = " ";
+            }
+        });
+    }
+
+    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
         const ret = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
         // TODO
         // if (c.leadingAnnotations.length > 1) {
@@ -111,11 +134,47 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
 
         return produce(ret, draft => {
             draft.body.prefix.whitespace = this.style.beforeLeftBrace.catchLeftBrace ? " " : "";
-            // TODO if (classDecl.body.statements.length === 0) {
+
+            if (draft.extends) {
+                draft.extends.before.whitespace = " ";
+                draft.extends.element.prefix.whitespace = " ";
+            }
         }) as J.ClassDeclaration;
     }
 
-    protected async visitForLoop(forLoop: J.ForLoop, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
+        const ret = await super.visitContainer(container, p) as J.Container<T>;
+        return produce(ret, draft => {
+            if (draft.elements.length > 1) {
+                for (let i = 1; i < draft.elements.length; i++) {
+                    draft.elements[i].element.prefix.whitespace = this.style.other.afterComma ? " " : "";
+                }
+            }
+        });
+    }
+
+    protected async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, p: P): Promise<J | undefined> {
+        const ret = await super.visitExportDeclaration(exportDeclaration, p) as JS.ExportDeclaration;
+        return produce(ret, draft => {
+            if (draft.exportClause) {
+                draft.exportClause.prefix.whitespace = " ";
+                if (draft.exportClause.kind == JS.Kind.NamedExports) {
+                    const ne = (draft.exportClause as Draft<JS.NamedExports>);
+                    if (ne.elements.elements.length > 0) {
+                        ne.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                        ne.elements.elements[ne.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                    }
+                }
+            }
+            draft.typeOnly.before.whitespace = draft.typeOnly.element ? " " : "";
+            if (draft.moduleSpecifier) {
+                draft.moduleSpecifier.before.whitespace = " ";
+                draft.moduleSpecifier.element.prefix.whitespace = " ";
+            }
+        })
+    }
+
+    protected async visitForLoop(forLoop: J.ForLoop, p: P): Promise<J | undefined> {
         const ret = await super.visitForLoop(forLoop, p) as J.ForLoop;
         return produceAsync(ret, async draft => {
             draft.control.prefix.whitespace = this.style.beforeParentheses.forParentheses ? " " : "";
@@ -144,7 +203,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitIf(iff: J.If, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitIf(iff: J.If, p: P): Promise<J | undefined> {
         const ret = await super.visitIf(iff, p) as J.If;
         return produceAsync(ret, async draft => {
             draft.ifCondition = await this.spaceBefore(draft.ifCondition, this.style.beforeParentheses.ifParentheses);
@@ -153,7 +212,31 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitMethodDeclaration(methodDecl: J.MethodDeclaration, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
+        const ret = await super.visitImportDeclaration(jsImport, p) as JS.Import;
+        return produce(ret, draft => {
+            if (draft.importClause) {
+                draft.importClause.prefix.whitespace = draft.importClause.namedBindings && !draft.importClause.typeOnly ? "" : " ";
+                if (draft.importClause.name) {
+                    draft.importClause.name.after.whitespace = "";
+                }
+                if (draft.importClause.namedBindings) {
+                    draft.importClause.namedBindings.prefix.whitespace = " ";
+                    if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
+                        const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
+                        ni.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                        ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                    }
+                }
+            }
+            if (draft.moduleSpecifier) {
+                draft.moduleSpecifier.before.whitespace = " ";
+                draft.moduleSpecifier.element.prefix.whitespace = draft.importClause ? " " : "";
+            }
+        })
+    }
+
+    protected async visitMethodDeclaration(methodDecl: J.MethodDeclaration, p: P): Promise<J | undefined> {
         const ret = await super.visitMethodDeclaration(methodDecl, p) as J.MethodDeclaration;
         return produceAsync(ret, async draft => {
             draft.body = ret.body && await this.spaceBefore(ret.body, this.style.beforeLeftBrace.functionLeftBrace);
@@ -179,7 +262,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitMethodInvocation(methodInv: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitMethodInvocation(methodInv: J.MethodInvocation, p: P): Promise<J | undefined> {
         const ret = await super.visitMethodInvocation(methodInv, p) as J.MethodInvocation;
         return produceAsync(ret, async draft => {
             if (draft.select) {
@@ -204,7 +287,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: ExecutionContext): Promise<J.RightPadded<T>> {
+    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T>> {
         const ret = await super.visitRightPadded(right, p);
         if (isTree(ret.element)) {
             switch (ret.element.kind) {
@@ -217,7 +300,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         return ret;
     }
 
-    protected async visitSwitch(switchNode: J.Switch, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitSwitch(switchNode: J.Switch, p: P): Promise<J | undefined> {
         const ret = await super.visitSwitch(switchNode, p) as J.Switch;
         return produceAsync(ret, async draft => {
             draft.selector = await this.spaceBefore(draft.selector, this.style.beforeParentheses.switchParentheses);
@@ -235,7 +318,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitTernary(ternary: J.Ternary, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitTernary(ternary: J.Ternary, p: P): Promise<J | undefined> {
         const ret = await super.visitTernary(ternary, p) as J.Ternary;
         return produceAsync(ret, async draft => {
             draft.truePart = await this.spaceBeforeLeftPaddedElement(draft.truePart, this.style.ternaryOperator.beforeQuestionMark, this.style.ternaryOperator.afterQuestionMark);
@@ -243,7 +326,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitTry(try_: J.Try, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitTry(try_: J.Try, p: P): Promise<J | undefined> {
         const ret = await super.visitTry(try_, p) as J.Try;
         return produceAsync(ret, async draft => {
             draft.body.prefix.whitespace = this.style.beforeLeftBrace.tryLeftBrace ? " " : "";
@@ -259,7 +342,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitTypeInfo(typeInfo: JS.TypeInfo, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitTypeInfo(typeInfo: JS.TypeInfo, p: P): Promise<J | undefined> {
         const ret = await super.visitTypeInfo(typeInfo, p) as JS.TypeInfo;
         return produceAsync(ret, async draft => {
             draft.prefix.whitespace = this.style.other.beforeTypeReferenceColon ? " " : "";
@@ -267,7 +350,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitUnary(unary: J.Unary, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitUnary(unary: J.Unary, p: P): Promise<J | undefined> {
         const ret = await super.visitUnary(unary, p) as J.Unary;
         return produce(ret, draft => {
             const spacing = this.style.aroundOperators.unary;
@@ -289,7 +372,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
             }
         });
     }
-    protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: P): Promise<J | undefined> {
         const ret = await super.visitVariable(variable, p) as J.VariableDeclarations.NamedVariable;
         return produceAsync(ret, async draft => {
             if (draft.initializer) {
@@ -298,7 +381,7 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitWhileLoop(whileLoop: J.WhileLoop, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitWhileLoop(whileLoop: J.WhileLoop, p: P): Promise<J | undefined> {
         const ret = await super.visitWhileLoop(whileLoop, p) as J.WhileLoop;
         return produceAsync(ret, async draft => {
             draft.body = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(ret.body, this.style.beforeLeftBrace.whileLeftBrace), false);
@@ -408,12 +491,12 @@ export class SpacesVisitor extends JavaScriptVisitor<ExecutionContext> {
     }
 }
 
-export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext> {
+export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
     constructor(private readonly style: WrappingAndBracesStyle) {
         super();
     }
 
-    public async visitStatement(statement: Statement, p: ExecutionContext): Promise<Statement> {
+    public async visitStatement(statement: Statement, p: P): Promise<Statement> {
         const j = await super.visitStatement(statement, p) as Statement;
         // TODO is it needed?
         // const parent = this.cursor.parent?.value;
@@ -427,7 +510,7 @@ export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext
         return j;
     }
 
-    protected async visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): Promise<J.VariableDeclarations> {
+    protected async visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: P): Promise<J.VariableDeclarations> {
         const v = await super.visitVariableDeclarations(multiVariable, p) as J.VariableDeclarations;
         const parent = this.cursor.parent?.value;
         if (parent?.kind === J.Kind.Block) {
@@ -445,7 +528,7 @@ export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext
         return v;
     }
 
-    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J.MethodDeclaration> {
+    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: P): Promise<J.MethodDeclaration> {
         const m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
         return produce(m, draft => {
             draft.leadingAnnotations = this.withNewlines(draft.leadingAnnotations);
@@ -463,7 +546,7 @@ export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext
         });
     }
 
-    protected async visitElse(elsePart: J.If.Else, p: ExecutionContext): Promise<J.If.Else> {
+    protected async visitElse(elsePart: J.If.Else, p: P): Promise<J.If.Else> {
         const e = await super.visitElse(elsePart, p) as J.If.Else;
         const hasBody = e.body.element.kind === J.Kind.Block || e.body.element.kind === J.Kind.If;
 
@@ -480,7 +563,7 @@ export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext
         });
     }
 
-    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J.ClassDeclaration> {
+    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J.ClassDeclaration> {
         const j = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
         return produce(j, draft => {
             draft.leadingAnnotations = this.withNewlines(draft.leadingAnnotations);
@@ -497,7 +580,7 @@ export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext
         });
     }
 
-    protected async visitBlock(block: J.Block, p: ExecutionContext): Promise<J.Block> {
+    protected async visitBlock(block: J.Block, p: P): Promise<J.Block> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
             if (!draft.end.whitespace.includes("\n") && (draft.statements.length == 0 || !draft.statements[draft.statements.length - 1].after.whitespace.includes("\n"))) {
@@ -506,7 +589,7 @@ export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext
         });
     }
 
-    protected async visitSwitch(aSwitch: J.Switch, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitSwitch(aSwitch: J.Switch, p: P): Promise<J | undefined> {
         return super.visitSwitch(aSwitch, p);
     }
 
@@ -553,12 +636,12 @@ export class WrappingAndBracesVisitor extends JavaScriptVisitor<ExecutionContext
 }
 
 
-export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionContext> {
+export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
     constructor() {
         super();
     }
 
-    override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
+    override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
         // Note - for some reason the original MinimumViableSpacingVisitor.java doesn't have it
         // and only has the logic in MinimumViableSpacingTest.defaults
         const ret = await super.visitSpace(space, p) as J.Space;
@@ -567,7 +650,7 @@ export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionCont
         });
     }
 
-    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
         let c = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
         let first = c.leadingAnnotations.length === 0;
 
@@ -623,7 +706,7 @@ export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionCont
         return c;
     }
 
-    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: P): Promise<J | undefined> {
         let m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
         let first = m.leadingAnnotations.length === 0;
 
@@ -677,7 +760,7 @@ export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionCont
         return m;
     }
 
-    protected async visitNewClass(newClass: J.NewClass, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
         const ret = await super.visitNewClass(newClass, p) as J.NewClass;
         return produce(ret, draft => {
             if (draft.class != undefined) {
@@ -686,7 +769,7 @@ export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionCont
         });
     }
 
-    protected async visitReturn(returnNode: J.Return, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitReturn(returnNode: J.Return, p: P): Promise<J | undefined> {
         const r = await super.visitReturn(returnNode, p) as J.Return;
         if (r.expression && r.expression.prefix.whitespace === "" &&
             !r.markers.markers.find(m => m.id === "org.openrewrite.java.marker.ImplicitReturn")) {
@@ -697,21 +780,21 @@ export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionCont
         return r;
     }
 
-    protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: P): Promise<J | undefined> {
         const ret = await super.visitScopedVariableDeclarations(scopedVariableDeclarations, p) as JS.ScopedVariableDeclarations;
         return ret.scope && produce(ret, draft => {
             draft.variables[0].element.prefix.whitespace = " ";
         });
     }
 
-    protected async visitThrow(thrown: J.Throw, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitThrow(thrown: J.Throw, p: P): Promise<J | undefined> {
         const ret = await super.visitThrow(thrown, p) as J.Throw;
         return ret && produce(ret, draft => {
            draft.exception.prefix.whitespace = " ";
         });
     }
 
-    protected async visitVariableDeclarations(v: J.VariableDeclarations, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitVariableDeclarations(v: J.VariableDeclarations, p: P): Promise<J | undefined> {
         let ret = await super.visitVariableDeclarations(v, p) as J.VariableDeclarations;
         let first = ret.leadingAnnotations.length === 0;
 
@@ -735,7 +818,7 @@ export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionCont
     }
 
 
-    protected async visitCase(caseNode: J.Case, p: ExecutionContext): Promise<J | undefined> {
+    protected async visitCase(caseNode: J.Case, p: P): Promise<J | undefined> {
         const c = await super.visitCase(caseNode, p) as J.Case;
 
         if (c.guard && c.caseLabels.elements.length > 0 && c.caseLabels.elements[c.caseLabels.elements.length - 1].after.whitespace === "") {
@@ -749,12 +832,12 @@ export class MinimumViableSpacingVisitor extends JavaScriptVisitor<ExecutionCont
     }
 }
 
-export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
+export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
     constructor(private readonly style: BlankLinesStyle) {
         super();
     }
 
-    override async visit<R extends J>(tree: Tree, p: ExecutionContext, cursor?: Cursor): Promise<R | undefined> {
+    override async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
         if (tree.kind === JS.Kind.CompilationUnit) {
             const cu = produce(tree as JS.CompilationUnit, draft => {
                 if (draft.prefix.comments.length == 0) {
@@ -771,7 +854,7 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
         return super.visit(tree, p, cursor);
     }
 
-    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J.ClassDeclaration> {
+    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J.ClassDeclaration> {
         let ret = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
         if (!ret.body) return ret;
         return produce(ret, draft => {
@@ -810,7 +893,7 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    override async visitStatement(statement: Statement, p: ExecutionContext): Promise<Statement> {
+    override async visitStatement(statement: Statement, p: P): Promise<Statement> {
         const ret = await super.visitStatement(statement, p) as Statement;
         const parent = this.cursor.parent?.value;
         const grandparent = this.cursor.parent?.parent?.value;
@@ -840,13 +923,14 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
                     this.keepMaximumBlankLines(draft, this.style.keepMaximum.inCode);
                 }
             } else if (parent?.kind === J.Kind.Block ||
-                      (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id)) {
+                      (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
+                      (parent?.kind === J.Kind.Case)) {
                 this.ensurePrefixHasNewLine(draft);
             }
         });
     }
 
-    protected async visitBlock(block: J.Block, p: ExecutionContext): Promise<J.Block> {
+    protected async visitBlock(block: J.Block, p: P): Promise<J.Block> {
         const b = await super.visitBlock(block, p) as J.Block;
         return produce(b, draft => {
             if (!draft.end.whitespace.includes("\n")) {
@@ -857,13 +941,13 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
         });
     }
 
-    protected async visitEnumValue(enumValue: J.EnumValue, p: ExecutionContext): Promise<J.EnumValue> {
+    protected async visitEnumValue(enumValue: J.EnumValue, p: P): Promise<J.EnumValue> {
         const e = await super.visitEnumValue(enumValue, p) as J.EnumValue;
         this.keepMaximumBlankLines(e, this.style.keepMaximum.inCode);
         return e;
     }
     // TODO check if it's relevant to TS/JS
-    // protected async visitNewClass(newClass: J.NewClass, p: ExecutionContext): Promise<J.NewClass> {
+    // protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J.NewClass> {
     //     const j = await super.visitNewClass(newClass, p) as J.NewClass;
     //     if (!j.body) return j;
     //
@@ -906,5 +990,80 @@ export class BlankLinesVisitor extends JavaScriptVisitor<ExecutionContext> {
 
     private static countNewlines(s: string): number {
         return [...s].filter(c => c === "\n").length;
+    }
+}
+
+export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
+    private readonly newline: string;
+    private readonly singleIndent: string;
+
+    constructor(private readonly tabsAndIndentsStyle: TabsAndIndentsStyle) {
+        super();
+        this.newline = "\n"; // TODO this should be configurable and come from some style too
+
+        if (this.tabsAndIndentsStyle.useTabCharacter) {
+            this.singleIndent = "\t";
+        } else {
+            this.singleIndent = " ".repeat(this.tabsAndIndentsStyle.indentSize);
+        }
+    }
+
+    protected async preVisit(tree: J, p: P): Promise<J | undefined> {
+        const ret = await super.preVisit(tree, p);
+        const indentShouldIncrease = tree.kind === J.Kind.Block || tree.kind === J.Kind.Case;
+        if (indentShouldIncrease) {
+            this.cursor.messages.set("indentToUse", this.currentIndent + this.singleIndent);
+        }
+        return ret;
+    }
+
+    async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+        let ret = await super.visit(tree, p, parent) as R;
+        if (ret == undefined) {
+            return ret;
+        }
+        const relativeIndent = this.currentIndent;
+
+        return produce(ret, draft => {
+            if (draft.prefix == undefined) {
+                draft.prefix = {kind: J.Kind.Space, comments: [], whitespace: ""};
+            }
+            if (draft.prefix.whitespace.includes("\n")) {
+                draft.prefix.whitespace = this.combineIndent(draft.prefix.whitespace, relativeIndent);
+            }
+            if (draft.kind === J.Kind.Block) {
+                const block = draft as Draft<J> as Draft<J.Block>;
+                block.end.whitespace = this.newline + relativeIndent;
+            }
+        });
+    }
+
+    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
+        const ret = await super.visitLeftPadded(left, p);
+        if (ret == undefined) {
+            return ret;
+        }
+        return produce(ret, draft => {
+            if (draft.before.whitespace.includes("\n")) {
+                draft.before.whitespace = this.combineIndent(draft.before.whitespace, this.currentIndent);
+            }
+        });
+    }
+
+    private get currentIndent(): string {
+        const indent = this.cursor.getNearestMessage("indentToUse");
+        if (indent == undefined) {
+            const enclosingWhitespace = this.cursor.firstEnclosing((x: any): x is J => x.prefix && x.prefix.whitespace.includes("\n"))?.prefix.whitespace;
+            if (enclosingWhitespace) {
+                return enclosingWhitespace.substring(enclosingWhitespace.lastIndexOf("\n") + 1);
+            } else {
+                return "";
+            }
+        }
+        return indent;
+    }
+
+    private combineIndent(oldWs: string, relativeIndent: string): string {
+        return oldWs.substring(0, oldWs.lastIndexOf("\n") + 1) + relativeIndent;
     }
 }

@@ -316,7 +316,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         break;
                 }
 
-                if (onlyForConfigurations != null) {
+                if (onlyForConfigurations != null && !onlyForConfigurations.isEmpty()) {
                     if (!onlyForConfigurations.contains(constraintConfigName)) {
                         return null;
                     }

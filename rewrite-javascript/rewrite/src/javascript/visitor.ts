@@ -271,6 +271,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(jsImport, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.Import) {
+            return statement;
+        }
+        jsImport = statement as JS.Import;
+
         return this.produceJavaScript<JS.Import>(jsImport, p, async draft => {
             draft.importClause = jsImport.importClause && await this.visitDefined<JS.ImportClause>(jsImport.importClause, p);
             draft.moduleSpecifier = await this.visitLeftPadded(jsImport.moduleSpecifier, p);

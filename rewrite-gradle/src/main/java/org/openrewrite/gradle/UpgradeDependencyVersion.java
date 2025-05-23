@@ -931,8 +931,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return dep.withGav(gav);
             }
         }
-        traversalHistory.add(dep);
-        return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateManagedResolvedDependency(gp, d, gav, new HashSet<>(traversalHistory))));
+        boolean added = traversalHistory.add(dep);
+        try {
+            return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateManagedResolvedDependency(gp, d, gav, traversalHistory)));
+        } finally {
+            if (added) {
+                traversalHistory.remove(dep);
+            }
+        }
     }
 
     private static ResolvedDependency maybeUpdateResolvedDependency(
@@ -954,8 +960,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
             return newDep;
         }
-        traversalHistory.add(dep);
-        return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(gp, d, newDep, new HashSet<>(traversalHistory))));
+        boolean added = traversalHistory.add(dep);
+        try {
+            return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(gp, d, newDep, traversalHistory)));
+        } finally {
+            if (added) {
+                traversalHistory.remove(dep);
+            }
+        }
     }
 
     private static boolean wouldDowngrade(GroupArtifactVersion from, GroupArtifactVersion to) {

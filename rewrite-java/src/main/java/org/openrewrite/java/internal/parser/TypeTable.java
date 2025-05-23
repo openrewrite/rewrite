@@ -31,6 +31,8 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -88,7 +90,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     public static final String DEFAULT_RESOURCE_PATH = "META-INF/rewrite/classpath.tsv.zip";
 
-    private static final Map<GroupArtifactVersion, Path> classesDirByArtifact = Collections.synchronizedMap(new LinkedHashMap<>());
+    private static final Map<GroupArtifactVersion, CompletableFuture<Path>> classesDirByArtifact = new ConcurrentHashMap<>();
 
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
         try {
@@ -135,15 +137,13 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     private static Collection<String> artifactsNotYetWritten(Collection<String> artifactNames) {
         Collection<String> notWritten = new ArrayList<>(artifactNames);
-        synchronized (classesDirByArtifact) {
-            for (String artifactName : artifactNames) {
-                Pattern artifactPattern = Pattern.compile(artifactName + ".*");
-                for (GroupArtifactVersion groupArtifactVersion : classesDirByArtifact.keySet()) {
-                    if (artifactPattern
-                            .matcher(groupArtifactVersion.getArtifactId() + "-" + groupArtifactVersion.getVersion())
-                            .matches()) {
-                        notWritten.remove(artifactName);
-                    }
+        for (String artifactName : artifactNames) {
+            Pattern artifactPattern = Pattern.compile(artifactName + ".*");
+            for (GroupArtifactVersion groupArtifactVersion : classesDirByArtifact.keySet()) {
+                if (artifactPattern
+                        .matcher(groupArtifactVersion.getArtifactId() + "-" + groupArtifactVersion.getVersion())
+                        .matches()) {
+                    notWritten.remove(artifactName);
                 }
             }
         }
@@ -156,9 +156,9 @@ public class TypeTable implements JavaParserClasspathLoader {
     @RequiredArgsConstructor
     static class Reader {
         private static final int NESTED_TYPE_ACCESS_MASK = Opcodes.ACC_PUBLIC | Opcodes.ACC_PRIVATE | Opcodes.ACC_PROTECTED |
-                                                           Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_INTERFACE |
-                                                           Opcodes.ACC_ABSTRACT | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_ANNOTATION |
-                                                           Opcodes.ACC_ENUM;
+                Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_INTERFACE |
+                Opcodes.ACC_ABSTRACT | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_ANNOTATION |
+                Opcodes.ACC_ENUM;
 
         private final ExecutionContext ctx;
 
@@ -240,74 +240,84 @@ public class TypeTable implements JavaParserClasspathLoader {
                 return;
             }
 
+            CompletableFuture<@Nullable Path> future = new CompletableFuture<>();
+            if (classesDirByArtifact.putIfAbsent(gav, future) != null) {
+                // is already being written (by concurrent thread)
+                return;
+            }
+
             Path classesDir = getClassesDir(ctx, gav);
-            classesDirByArtifact.put(gav, classesDir);
-
-            classes.values().forEach(classDef -> {
-                Path classFile = classesDir.resolve(classDef.getName() + ".class");
-                if (!classFile.getParent().toFile().mkdirs() && !Files.exists(classFile.getParent())) {
-                    throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir.getParent()));
-                }
-
-                ClassWriter cw = new ClassWriter(COMPUTE_MAXS);
-                ClassVisitor classWriter = ctx.getMessage(VERIFY_CLASS_WRITING, false) ?
-                        new CheckClassAdapter(cw) : cw;
-
-                classWriter.visit(
-                        V1_8,
-                        classDef.getAccess(),
-                        classDef.getName(),
-                        classDef.getSignature(),
-                        classDef.getSuperclassSignature(),
-                        classDef.getSuperinterfaceSignatures()
-                );
-
-                for (ClassDefinition innerClassDef : nestedTypesByOwner.getOrDefault(classDef.getName(), emptyList())) {
-                    classWriter.visitInnerClass(
-                            innerClassDef.getName(),
-                            classDef.getName(),
-                            innerClassDef.getName().substring(classDef.getName().length() + 1),
-                            innerClassDef.getAccess() & NESTED_TYPE_ACCESS_MASK
-                    );
-                }
-
-                for (Member member : classDef.getMembers()) {
-                    if (member.getDescriptor().contains("(")) {
-                        MethodVisitor mv = classWriter
-                                .visitMethod(
-                                        member.getAccess(),
-                                        member.getName(),
-                                        member.getDescriptor(),
-                                        member.getSignature(),
-                                        member.getExceptions()
-                                );
-                        String[] parameterNames = member.getParameterNames();
-                        if (parameterNames != null) {
-                            for (String parameterName : parameterNames) {
-                                mv.visitParameter(parameterName, 0);
-                            }
-                        }
-                        writeMethodBody(member, mv);
-                        mv.visitEnd();
-                    } else {
-                        classWriter
-                                .visitField(
-                                        member.getAccess(),
-                                        member.getName(),
-                                        member.getDescriptor(),
-                                        member.getSignature(),
-                                        null
-                                )
-                                .visitEnd();
+            try {
+                classes.values().forEach(classDef -> {
+                    Path classFile = classesDir.resolve(classDef.getName() + ".class");
+                    if (!classFile.getParent().toFile().mkdirs() && !Files.exists(classFile.getParent())) {
+                        throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir.getParent()));
                     }
-                }
 
-                try {
-                    Files.write(classFile, cw.toByteArray());
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
+                    ClassWriter cw = new ClassWriter(COMPUTE_MAXS);
+                    ClassVisitor classWriter = ctx.getMessage(VERIFY_CLASS_WRITING, false) ?
+                            new CheckClassAdapter(cw) : cw;
+
+                    classWriter.visit(
+                            V1_8,
+                            classDef.getAccess(),
+                            classDef.getName(),
+                            classDef.getSignature(),
+                            classDef.getSuperclassSignature(),
+                            classDef.getSuperinterfaceSignatures()
+                    );
+
+                    for (ClassDefinition innerClassDef : nestedTypesByOwner.getOrDefault(classDef.getName(), emptyList())) {
+                        classWriter.visitInnerClass(
+                                innerClassDef.getName(),
+                                classDef.getName(),
+                                innerClassDef.getName().substring(classDef.getName().length() + 1),
+                                innerClassDef.getAccess() & NESTED_TYPE_ACCESS_MASK
+                        );
+                    }
+
+                    for (Member member : classDef.getMembers()) {
+                        if (member.getDescriptor().contains("(")) {
+                            MethodVisitor mv = classWriter
+                                    .visitMethod(
+                                            member.getAccess(),
+                                            member.getName(),
+                                            member.getDescriptor(),
+                                            member.getSignature(),
+                                            member.getExceptions()
+                                    );
+                            String[] parameterNames = member.getParameterNames();
+                            if (parameterNames != null) {
+                                for (String parameterName : parameterNames) {
+                                    mv.visitParameter(parameterName, 0);
+                                }
+                            }
+                            writeMethodBody(member, mv);
+                            mv.visitEnd();
+                        } else {
+                            classWriter
+                                    .visitField(
+                                            member.getAccess(),
+                                            member.getName(),
+                                            member.getDescriptor(),
+                                            member.getSignature(),
+                                            null
+                                    )
+                                    .visitEnd();
+                        }
+                    }
+
+                    try {
+                        Files.write(classFile, cw.toByteArray());
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
+                future.complete(classesDir);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+                classesDirByArtifact.remove(gav);
+            }
         }
 
         private void writeMethodBody(Member member, MethodVisitor mv) {
@@ -395,14 +405,12 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     @Override
     public @Nullable Path load(String artifactName) {
-        synchronized (classesDirByArtifact) {
-            for (Map.Entry<GroupArtifactVersion, Path> gavAndClassesDir : classesDirByArtifact.entrySet()) {
-                GroupArtifactVersion gav = gavAndClassesDir.getKey();
-                if (Pattern.compile(artifactName + ".*")
-                        .matcher(gav.getArtifactId() + "-" + gav.getVersion())
-                        .matches()) {
-                    return gavAndClassesDir.getValue();
-                }
+        for (Map.Entry<GroupArtifactVersion, CompletableFuture<Path>> gavAndClassesDir : classesDirByArtifact.entrySet()) {
+            GroupArtifactVersion gav = gavAndClassesDir.getKey();
+            if (Pattern.compile(artifactName + ".*")
+                    .matcher(gav.getArtifactId() + "-" + gav.getVersion())
+                    .matches()) {
+                return gavAndClassesDir.getValue().join();
             }
         }
         return null;
@@ -480,7 +488,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                                                String signature, String[] exceptions) {
                                         // Repeating check from `writeMethod()` for performance reasons
                                         if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
-                                            name != null && !"<clinit>".equals(name)) {
+                                                name != null && !"<clinit>".equals(name)) {
                                             return new MethodVisitor(Opcodes.ASM9) {
                                                 @Override
                                                 public void visitParameter(@Nullable String name, int access) {
