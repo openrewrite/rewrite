@@ -27,7 +27,6 @@ import {
     WrappingAndBracesStyle
 } from "./style";
 import {produceAsync} from "../visitor";
-import {MarkersKind} from "../markers";
 
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
@@ -65,6 +64,14 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         return produce(ret, draft => {
             draft.dimension.index.element.prefix.whitespace = this.style.within.arrayBrackets ? " " : "";
             draft.dimension.index.after.whitespace = this.style.within.arrayBrackets ? " " : "";
+        });
+    }
+
+    protected async visitAssignment(assignment: J.Assignment, p: P): Promise<J | undefined> {
+        const ret = await super.visitAssignment(assignment, p) as J.Assignment;
+        return produce(ret, draft => {
+            draft.assignment.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            draft.assignment.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
         });
     }
 
@@ -238,6 +245,14 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         })
     }
 
+    protected async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, p: P): Promise<J | undefined> {
+        const ret = await super.visitIndexSignatureDeclaration(indexSignatureDeclaration, p) as JS.IndexSignatureDeclaration;
+        return produce(ret, draft => {
+            draft.typeExpression.before.whitespace = this.style.other.beforeTypeReferenceColon ? " " : "";
+            draft.typeExpression.element.prefix.whitespace = this.style.other.afterTypeReferenceColon ? " " : "";
+        });
+    }
+
     protected async visitMethodDeclaration(methodDecl: J.MethodDeclaration, p: P): Promise<J | undefined> {
         const ret = await super.visitMethodDeclaration(methodDecl, p) as J.MethodDeclaration;
         return produceAsync(ret, async draft => {
@@ -279,7 +294,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
             } else if (ret.arguments.elements.length == 1) {
                 draft.arguments.elements[0] = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(draft.arguments.elements[0], this.style.within.functionCallParentheses), false);
             }
-
             // TODO typeParameters handling - see visitClassDeclaration
 
             // TODO
@@ -287,19 +301,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
             // if (m.getArguments().isEmpty() || m.getArguments()[0] instanceof J.Empty) {
             //   ...
         });
-    }
-
-    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T>> {
-        const ret = await super.visitRightPadded(right, p);
-        if (isTree(ret.element)) {
-            switch (ret.element.kind) {
-                case J.Kind.NamedVariable:
-                    return produce(ret, draft => {
-                        draft.after.whitespace = this.style.aroundOperators.assignment ? " " : "";
-                    });
-            }
-        }
-        return ret;
     }
 
     protected async visitSwitch(switchNode: J.Switch, p: P): Promise<J | undefined> {
@@ -390,7 +391,8 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitVariable(variable, p) as J.VariableDeclarations.NamedVariable;
         return produceAsync(ret, async draft => {
             if (draft.initializer) {
-                draft.initializer = await this.spaceBeforeLeftPaddedElement(draft.initializer, false, this.style.aroundOperators.assignment);
+                draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                draft.initializer.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
             }
         });
     }
