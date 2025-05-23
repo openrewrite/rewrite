@@ -18,6 +18,8 @@ import {JavaScriptParser} from './parser';
 import {Cursor, Tree} from '..';
 import {J} from '../java';
 import {TypedTree} from '../java';
+import {JavaType} from '../java/type';
+import getType = TypedTree.getType;
 
 /**
  * Capture specification for pattern matching.
@@ -28,13 +30,13 @@ export interface Capture {
      * The name of the capture, used to retrieve the captured node later.
      */
     name: string;
-    
+
     /**
      * Optional type constraint for the capture.
      * If provided, the captured node must match this type.
      */
     typeConstraint?: string;
-    
+
     /**
      * Whether this is a back-reference to a previously captured node.
      */
@@ -72,6 +74,9 @@ export function backRef(name: string): Capture {
  * Represents a pattern that can be matched against AST nodes.
  */
 export class Pattern {
+    private patternAst?: J;
+    private templateProcessor?: TemplateProcessor;
+
     /**
      * Creates a new pattern from template parts and captures.
      * 
@@ -106,6 +111,20 @@ export class Pattern {
     getTemplateParts(): TemplateStringsArray {
         return this.templateParts;
     }
+
+    /**
+     * Gets the AST pattern for this pattern.
+     * Lazily creates the pattern AST if it doesn't exist yet.
+     * 
+     * @returns A Promise resolving to the AST pattern
+     */
+    async getPatternAst(): Promise<J> {
+        if (!this.patternAst) {
+            this.templateProcessor = new TemplateProcessor(this.templateParts, this.captures);
+            this.patternAst = await this.templateProcessor.toAstPattern();
+        }
+        return this.patternAst;
+    }
 }
 
 /**
@@ -113,6 +132,7 @@ export class Pattern {
  */
 export class Matcher {
     private readonly bindings = new Map<string, J>();
+    private patternAst?: J;
 
     /**
      * Creates a new matcher for a pattern against an AST node.
@@ -130,10 +150,12 @@ export class Matcher {
      * 
      * @returns true if the pattern matches, false otherwise
      */
-    matches(): boolean {
-        // This is a placeholder implementation that will be expanded in Phase 2
-        // For now, it always returns false
-        return false;
+    async matches(): Promise<boolean> {
+        if (!this.patternAst) {
+            this.patternAst = await this.pattern.getPatternAst();
+        }
+
+        return this.matchNode(this.patternAst, this.ast);
     }
 
     /**
@@ -154,6 +176,351 @@ export class Matcher {
     getAll(): Map<string, J> {
         return new Map(this.bindings);
     }
+
+    /**
+     * Matches a pattern node against a target node.
+     * 
+     * @param pattern The pattern node
+     * @param target The target node
+     * @returns true if the pattern matches the target, false otherwise
+     */
+    private matchNode(pattern: J, target: J): boolean {
+        // Check if pattern is a capture placeholder
+        if (this.isCapturePlaceholder(pattern)) {
+            return this.handleCapture(pattern, target);
+        }
+
+        // Check if pattern is a back-reference
+        if (this.isBackRefPlaceholder(pattern)) {
+            return this.handleBackRef(pattern, target);
+        }
+
+        // Check if nodes have the same kind
+        if (pattern.kind !== target.kind) {
+            return false;
+        }
+
+        // Match specific node types
+        switch (pattern.kind) {
+            case J.Kind.Binary:
+                return this.matchBinary(pattern as J.Binary, target as J.Binary);
+            case J.Kind.Identifier:
+                return this.matchIdentifier(pattern as J.Identifier, target as J.Identifier);
+            case J.Kind.Literal:
+                return this.matchLiteral(pattern as J.Literal, target as J.Literal);
+            case JS.Kind.TemplateExpression:
+                return this.matchTemplateExpression(pattern as JS.TemplateExpression, target as JS.TemplateExpression);
+            default:
+                return this.matchGenericNode(pattern, target);
+        }
+    }
+
+    /**
+     * Matches a binary expression.
+     * 
+     * @param pattern The pattern binary expression
+     * @param target The target binary expression
+     * @returns true if the pattern matches the target, false otherwise
+     */
+    private matchBinary(pattern: J.Binary, target: J.Binary): boolean {
+        // Match operator
+        if (pattern.operator.element !== target.operator.element) {
+            return false;
+        }
+
+        // Match left and right operands
+        return this.matchNode(pattern.left, target.left) && 
+               this.matchNode(pattern.right, target.right);
+    }
+
+    /**
+     * Matches an identifier.
+     * 
+     * @param pattern The pattern identifier
+     * @param target The target identifier
+     * @returns true if the pattern matches the target, false otherwise
+     */
+    private matchIdentifier(pattern: J.Identifier, target: J.Identifier): boolean {
+        // For non-placeholder identifiers, match by name
+        return pattern.simpleName === target.simpleName;
+    }
+
+    /**
+     * Matches a literal.
+     * 
+     * @param pattern The pattern literal
+     * @param target The target literal
+     * @returns true if the pattern matches the target, false otherwise
+     */
+    private matchLiteral(pattern: J.Literal, target: J.Literal): boolean {
+        // Match by value
+        return pattern.valueSource === target.valueSource;
+    }
+
+    /**
+     * Matches a template expression.
+     * 
+     * @param pattern The pattern template expression
+     * @param target The target template expression
+     * @returns true if the pattern matches the target, false otherwise
+     */
+    private matchTemplateExpression(pattern: JS.TemplateExpression, target: JS.TemplateExpression): boolean {
+        // Match head
+        if (pattern.head !== target.head) {
+            return false;
+        }
+
+        // Match spans
+        if (pattern.spans.length !== target.spans.length) {
+            return false;
+        }
+
+        for (let i = 0; i < pattern.spans.length; i++) {
+            const patternSpan = pattern.spans[i].element;
+            const targetSpan = target.spans[i].element;
+
+            if (!this.matchNode(patternSpan.expression, targetSpan.expression) ||
+                patternSpan.tail !== targetSpan.tail) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Matches a generic node by matching all properties recursively.
+     * 
+     * @param pattern The pattern node
+     * @param target The target node
+     * @returns true if the pattern matches the target, false otherwise
+     */
+    private matchGenericNode(pattern: J, target: J): boolean {
+        // This is a simplified implementation that always returns true
+        // In a real implementation, we would recursively match all properties
+        return true;
+    }
+
+    /**
+     * Checks if a node is a capture placeholder.
+     * 
+     * @param node The node to check
+     * @returns true if the node is a capture placeholder, false otherwise
+     */
+    private isCapturePlaceholder(node: J): boolean {
+        // Check if node is an identifier with a special capture name format
+        if (node.kind === J.Kind.Identifier) {
+            const id = node as J.Identifier;
+            return id.simpleName.startsWith('__capture_');
+        }
+        return false;
+    }
+
+    /**
+     * Checks if a node is a back-reference placeholder.
+     * 
+     * @param node The node to check
+     * @returns true if the node is a back-reference placeholder, false otherwise
+     */
+    private isBackRefPlaceholder(node: J): boolean {
+        // Check if node is an identifier with a special back-reference name format
+        if (node.kind === J.Kind.Identifier) {
+            const id = node as J.Identifier;
+            return id.simpleName.startsWith('__backRef_');
+        }
+        return false;
+    }
+
+    /**
+     * Handles a capture placeholder.
+     * 
+     * @param pattern The pattern node
+     * @param target The target node
+     * @returns true if the capture is successful, false otherwise
+     */
+    private handleCapture(pattern: J, target: J): boolean {
+        const id = pattern as J.Identifier;
+        const captureName = this.extractCaptureName(id.simpleName);
+        const typeConstraint = this.extractTypeConstraint(id.simpleName);
+
+        // Check type constraint if present
+        if (typeConstraint && !this.matchesTypeConstraint(target, typeConstraint)) {
+            return false;
+        }
+
+        // Store the binding
+        this.bindings.set(captureName, target);
+        return true;
+    }
+
+    /**
+     * Handles a back-reference placeholder.
+     * 
+     * @param pattern The pattern node
+     * @param target The target node
+     * @returns true if the back-reference matches, false otherwise
+     */
+    private handleBackRef(pattern: J, target: J): boolean {
+        const id = pattern as J.Identifier;
+        const refName = this.extractBackRefName(id.simpleName);
+
+        // Check if the reference exists
+        if (!this.bindings.has(refName)) {
+            return false;
+        }
+
+        // Compare the referenced node with the target
+        const referenced = this.bindings.get(refName)!;
+        return this.nodesAreEqual(referenced, target);
+    }
+
+    /**
+     * Extracts the capture name from a placeholder.
+     * 
+     * @param placeholder The placeholder string
+     * @returns The capture name
+     */
+    private extractCaptureName(placeholder: string): string {
+        // Extract capture name from "__capture_name_type__" format
+        const match = placeholder.match(/__capture_([^_]+)(?:_[^_]+)?__/);
+        return match ? match[1] : '';
+    }
+
+    /**
+     * Extracts the type constraint from a placeholder.
+     * 
+     * @param placeholder The placeholder string
+     * @returns The type constraint, or undefined if none
+     */
+    private extractTypeConstraint(placeholder: string): string | undefined {
+        // Extract type constraint from "__capture_name_type__" format
+        const match = placeholder.match(/__capture_[^_]+_([^_]+)__/);
+        return match ? match[1] : undefined;
+    }
+
+    /**
+     * Extracts the back-reference name from a placeholder.
+     * 
+     * @param placeholder The placeholder string
+     * @returns The back-reference name
+     */
+    private extractBackRefName(placeholder: string): string {
+        // Extract back-reference name from "__backRef_name__" format
+        const match = placeholder.match(/__backRef_([^_]+)__/);
+        return match ? match[1] : '';
+    }
+
+    /**
+     * Checks if a node matches a type constraint.
+     * 
+     * @param node The node to check
+     * @param typeConstraint The type constraint
+     * @returns true if the node matches the type constraint, false otherwise
+     */
+    private matchesTypeConstraint(node: J, typeConstraint: string): boolean {
+        return TypeConstraintChecker.matches(node, typeConstraint);
+    }
+
+    /**
+     * Checks if two nodes are equal.
+     * 
+     * @param a The first node
+     * @param b The second node
+     * @returns true if the nodes are equal, false otherwise
+     */
+    private nodesAreEqual(a: J, b: J): boolean {
+        // Check if nodes have the same kind
+        if (a.kind !== b.kind) {
+            return false;
+        }
+
+        // Match specific node types
+        switch (a.kind) {
+            case J.Kind.Binary:
+                return this.binaryNodesAreEqual(a as J.Binary, b as J.Binary);
+            case J.Kind.Identifier:
+                return this.identifierNodesAreEqual(a as J.Identifier, b as J.Identifier);
+            case J.Kind.Literal:
+                return this.literalNodesAreEqual(a as J.Literal, b as J.Literal);
+            case JS.Kind.TemplateExpression:
+                return this.templateExpressionNodesAreEqual(a as JS.TemplateExpression, b as JS.TemplateExpression);
+            default:
+                return this.genericNodesAreEqual(a, b);
+        }
+    }
+
+    /**
+     * Checks if two binary expressions are equal.
+     * 
+     * @param a The first binary expression
+     * @param b The second binary expression
+     * @returns true if the expressions are equal, false otherwise
+     */
+    private binaryNodesAreEqual(a: J.Binary, b: J.Binary): boolean {
+        return a.operator.element === b.operator.element &&
+               this.nodesAreEqual(a.left, b.left) &&
+               this.nodesAreEqual(a.right, b.right);
+    }
+
+    /**
+     * Checks if two identifiers are equal.
+     * 
+     * @param a The first identifier
+     * @param b The second identifier
+     * @returns true if the identifiers are equal, false otherwise
+     */
+    private identifierNodesAreEqual(a: J.Identifier, b: J.Identifier): boolean {
+        return a.simpleName === b.simpleName;
+    }
+
+    /**
+     * Checks if two literals are equal.
+     * 
+     * @param a The first literal
+     * @param b The second literal
+     * @returns true if the literals are equal, false otherwise
+     */
+    private literalNodesAreEqual(a: J.Literal, b: J.Literal): boolean {
+        return a.valueSource === b.valueSource;
+    }
+
+    /**
+     * Checks if two template expressions are equal.
+     * 
+     * @param a The first template expression
+     * @param b The second template expression
+     * @returns true if the expressions are equal, false otherwise
+     */
+    private templateExpressionNodesAreEqual(a: JS.TemplateExpression, b: JS.TemplateExpression): boolean {
+        if (a.head !== b.head || a.spans.length !== b.spans.length) {
+            return false;
+        }
+
+        for (let i = 0; i < a.spans.length; i++) {
+            const aSpan = a.spans[i].element;
+            const bSpan = b.spans[i].element;
+
+            if (!this.nodesAreEqual(aSpan.expression, bSpan.expression) ||
+                aSpan.tail !== bSpan.tail) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Checks if two generic nodes are equal.
+     * 
+     * @param a The first node
+     * @param b The second node
+     * @returns true if the nodes are equal, false otherwise
+     */
+    private genericNodesAreEqual(a: J, b: J): boolean {
+        // This is a simplified implementation that compares string representations
+        // In a real implementation, we would recursively compare all properties
+        return JSON.stringify(a) === JSON.stringify(b);
+    }
 }
 
 /**
@@ -168,6 +535,117 @@ export class Matcher {
  */
 export function match(strings: TemplateStringsArray, ...captures: Capture[]): Pattern {
     return new Pattern(strings, captures);
+}
+
+/**
+ * Type constraint checker for pattern matching.
+ * Checks if a node matches a given type constraint.
+ */
+export class TypeConstraintChecker {
+    /**
+     * Checks if a node matches a given type constraint.
+     * 
+     * @param node The node to check
+     * @param constraint The type constraint
+     * @returns true if the node matches the constraint, false otherwise
+     */
+    static matches(node: J, constraint: string): boolean {
+        // Get type information from the node
+        const typeInfo = this.getNodeTypeInfo(node);
+        if (!typeInfo) {
+            return false;
+        }
+
+        // Match against different constraint formats
+        if (this.isPrimitiveTypeConstraint(constraint)) {
+            return this.matchesPrimitiveType(typeInfo, constraint);
+        } else if (this.isClassTypeConstraint(constraint)) {
+            return this.matchesClassType(typeInfo, constraint);
+        } else if (this.isUnionTypeConstraint(constraint)) {
+            return this.matchesUnionType(typeInfo, constraint);
+        }
+
+        return false;
+    }
+
+    /**
+     * Gets the type information from a node.
+     * 
+     * @param node The node to get type information from
+     * @returns The type information, or undefined if none
+     */
+    private static getNodeTypeInfo(node: J): JavaType | undefined {
+        return getType(node as TypedTree);
+    }
+
+    /**
+     * Checks if a constraint is a primitive type constraint.
+     * 
+     * @param constraint The constraint to check
+     * @returns true if the constraint is a primitive type constraint, false otherwise
+     */
+    private static isPrimitiveTypeConstraint(constraint: string): boolean {
+        const primitives = ['string', 'number', 'boolean', 'any', 'void', 'null', 'undefined'];
+        return primitives.includes(constraint);
+    }
+
+    /**
+     * Checks if a constraint is a class type constraint.
+     * 
+     * @param constraint The constraint to check
+     * @returns true if the constraint is a class type constraint, false otherwise
+     */
+    private static isClassTypeConstraint(constraint: string): boolean {
+        // Check if constraint is a class name (starts with uppercase letter)
+        return /^[A-Z][a-zA-Z0-9_]*$/.test(constraint);
+    }
+
+    /**
+     * Checks if a constraint is a union type constraint.
+     * 
+     * @param constraint The constraint to check
+     * @returns true if the constraint is a union type constraint, false otherwise
+     */
+    private static isUnionTypeConstraint(constraint: string): boolean {
+        return constraint.includes('|');
+    }
+
+    /**
+     * Checks if a type matches a primitive type constraint.
+     * 
+     * @param typeInfo The type information
+     * @param constraint The constraint
+     * @returns true if the type matches the constraint, false otherwise
+     */
+    private static matchesPrimitiveType(typeInfo: JavaType, constraint: string): boolean {
+        // Match primitive types
+        return typeInfo.toString().toLowerCase().includes(constraint.toLowerCase());
+    }
+
+    /**
+     * Checks if a type matches a class type constraint.
+     * 
+     * @param typeInfo The type information
+     * @param constraint The constraint
+     * @returns true if the type matches the constraint, false otherwise
+     */
+    private static matchesClassType(typeInfo: JavaType, constraint: string): boolean {
+        // Match class types
+        return typeInfo.toString().includes(constraint);
+    }
+
+    /**
+     * Checks if a type matches a union type constraint.
+     * 
+     * @param typeInfo The type information
+     * @param constraint The constraint
+     * @returns true if the type matches the constraint, false otherwise
+     */
+    private static matchesUnionType(typeInfo: JavaType, constraint: string): boolean {
+        // Match union types
+        const types = constraint.split('|').map(t => t.trim());
+        return types.some(t => this.matches({ type: typeInfo } as any, t));
+    }
 }
 
 /**

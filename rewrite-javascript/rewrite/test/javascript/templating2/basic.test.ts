@@ -44,12 +44,12 @@ describe('templating2 basics', () => {
         test('creates a pattern with template parts and captures', () => {
             const pattern = match`${capture('left')} + ${capture('right')}`;
             expect(pattern).toBeInstanceOf(Pattern);
-            
+
             const captures = pattern.getCaptures();
             expect(captures.length).toBe(2);
             expect(captures[0].name).toBe('left');
             expect(captures[1].name).toBe('right');
-            
+
             const parts = pattern.getTemplateParts();
             expect(parts.length).toBe(3);
             expect(parts[0]).toBe('');
@@ -59,7 +59,7 @@ describe('templating2 basics', () => {
 
         test('creates a pattern with type constraints', () => {
             const pattern = match`${capture('x', 'number')} + ${capture('y', 'number')}`;
-            
+
             const captures = pattern.getCaptures();
             expect(captures.length).toBe(2);
             expect(captures[0].name).toBe('x');
@@ -70,7 +70,7 @@ describe('templating2 basics', () => {
 
         test('creates a pattern with back-references', () => {
             const pattern = match`${capture('expr')} || ${backRef('expr')}`;
-            
+
             const captures = pattern.getCaptures();
             expect(captures.length).toBe(2);
             expect(captures[0].name).toBe('expr');
@@ -89,10 +89,10 @@ describe('templating2 basics', () => {
     });
 
     describe('Matcher', () => {
-        test('matches returns false in initial implementation', () => {
+        test('matches returns false in initial implementation', async () => {
             const pattern = match`${capture('left')} + ${capture('right')}`;
             const matcher = pattern.against({} as any);
-            expect(matcher.matches()).toBe(false);
+            expect(await matcher.matches()).toBe(false);
         });
 
         test('get returns undefined for non-existent captures', () => {
