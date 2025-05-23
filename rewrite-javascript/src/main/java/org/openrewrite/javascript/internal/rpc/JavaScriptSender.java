@@ -439,8 +439,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(tag, el -> el.getPadding().getClosingName(), el -> visitLeftPadded(el, q));
         q.getAndSend(tag, JSX.Tag::getAfterClosingName, space -> visitSpace(space, q));
 
-//        q.getAndSend(tag, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-
         return tag;
     }
 
@@ -468,7 +466,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitJsxNamespacedName(JSX.NamespacedName namespacedName, RpcSendQueue q) {
         q.getAndSend(namespacedName, JSX.NamespacedName::getNamespace, el -> visit(el, q));
         q.getAndSend(namespacedName, el -> el.getPadding().getName(), el -> visitLeftPadded(el, q));
-//        q.getAndSend(namespacedName, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return namespacedName;
     }
 

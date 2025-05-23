@@ -431,51 +431,41 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitJsxTag(JSX.Tag tag, RpcReceiveQueue q) {
-        JSX.Tag t = tag;
-        t = t.getPadding().withOpenName(q.receive(tag.getPadding().getOpenName(), name -> visitLeftPadded(name, q)));
-        t = t.withAfterName(q.receive(tag.getAfterName(), space -> visitSpace(space, q)));
-        t = t.getPadding().withAttributes(q.receiveList(tag.getPadding().getAttributes(), attr -> visitRightPadded(attr, q)));
-
-        t = t.withSelfClosing(q.receive(tag.getSelfClosing(), space -> visitSpace(space, q)));
-        t = t.getPadding().withChildren(q.receiveList(tag.getPadding().getChildren(), child -> visitRightPadded(child, q)));
-        t = t.getPadding().withClosingName(q.receive(tag.getPadding().getClosingName(), name -> visitLeftPadded(name, q)));
-        t = t.withAfterClosingName(q.receive(tag.getAfterClosingName(), space -> visitSpace(space, q)));
-
-//        t = t.withType(q.receive(tag.getType(), type -> visitType(type, q)));
-
-        return t;
+        return tag
+                .getPadding().withOpenName(q.receive(tag.getPadding().getOpenName(), name1 -> visitLeftPadded(name1, q)))
+                .withAfterName(q.receive(tag.getAfterName(), space2 -> visitSpace(space2, q)))
+                .getPadding().withAttributes(q.receiveList(tag.getPadding().getAttributes(), attr -> visitRightPadded(attr, q)))
+                .withSelfClosing(q.receive(tag.getSelfClosing(), space1 -> visitSpace(space1, q)))
+                .getPadding().withChildren(q.receiveList(tag.getPadding().getChildren(), child -> visitRightPadded(child, q)))
+                .getPadding().withClosingName(q.receive(tag.getPadding().getClosingName(), name -> visitLeftPadded(name, q)))
+                .withAfterClosingName(q.receive(tag.getAfterClosingName(), space -> visitSpace(space, q)));
     }
 
     @Override
     public J visitJsxAttribute(JSX.Attribute attribute, RpcReceiveQueue q) {
-        JSX.Attribute a = attribute;
-        a = a.withKey(q.receive(attribute.getKey(), key -> (NameTree) visitNonNull(key, q)));
-        a = a.getPadding().withValue(q.receive(attribute.getPadding().getValue(), value -> visitLeftPadded(value, q)));
-        return a;
+        return attribute
+                .withKey(q.receive(attribute.getKey(), key -> (NameTree) visitNonNull(key, q)))
+                .getPadding().withValue(q.receive(attribute.getPadding().getValue(), value -> visitLeftPadded(value, q)));
     }
 
     @Override
     public J visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, RpcReceiveQueue q) {
-        JSX.SpreadAttribute s = spreadAttribute;
-        s = s.withDots(q.receive(spreadAttribute.getDots(), dots -> visitSpace(dots, q)));
-        s = s.getPadding().withExpression(q.receive(spreadAttribute.getPadding().getExpression(), expr -> visitRightPadded(expr, q)));
-        return s;
+        return spreadAttribute
+                .withDots(q.receive(spreadAttribute.getDots(), dots -> visitSpace(dots, q)))
+                .getPadding().withExpression(q.receive(spreadAttribute.getPadding().getExpression(), expr -> visitRightPadded(expr, q)));
     }
 
     @Override
     public J visitJsxEmbeddedExpression(JSX.EmbeddedExpression embeddedExpression, RpcReceiveQueue q) {
-        JSX.EmbeddedExpression e = embeddedExpression;
-        e = e.getPadding().withExpression(q.receive(embeddedExpression.getPadding().getExpression(), expr -> visitRightPadded(expr, q)));
-        return e;
+        return embeddedExpression
+                .getPadding().withExpression(q.receive(embeddedExpression.getPadding().getExpression(), expr -> visitRightPadded(expr, q)));
     }
 
     @Override
     public J visitJsxNamespacedName(JSX.NamespacedName namespacedName, RpcReceiveQueue q) {
-        JSX.NamespacedName n = namespacedName;
-        n = n.withNamespace(q.receive(namespacedName.getNamespace(), ns -> (J.Identifier) visitNonNull(ns, q)));
-        n = n.getPadding().withName(q.receive(namespacedName.getPadding().getName(), name -> visitLeftPadded(name, q)));
-//        n = n.withType(q.receive(namespacedName.getType(), type -> visitType(type, q)));
-        return n;
+        return namespacedName
+                .withNamespace(q.receive(namespacedName.getNamespace(), ns -> (J.Identifier) visitNonNull(ns, q)))
+                .getPadding().withName(q.receive(namespacedName.getPadding().getName(), name -> visitLeftPadded(name, q)));
     }
 
     @Override

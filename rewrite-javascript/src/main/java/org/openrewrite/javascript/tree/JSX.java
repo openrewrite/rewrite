@@ -112,8 +112,7 @@ public interface JSX extends JS {
         @Nullable
         JLeftPadded<String> closingName;
 
-        @Nullable
-        public String getClosingName() {
+        public @Nullable String getClosingName() {
             return closingName == null ? null : closingName.getElement();
         }
 
@@ -188,8 +187,7 @@ public interface JSX extends JS {
                 return t.attributes == attributes ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, attributes, t.selfClosing, t.children, t.closingName, t.afterClosingName);
             }
 
-            @Nullable
-            public List<JRightPadded<Expression>> getChildren() {
+            public @Nullable List<JRightPadded<Expression>> getChildren() {
                 return t.children;
             }
 
@@ -198,6 +196,7 @@ public interface JSX extends JS {
             }
 
             public @Nullable JLeftPadded<String> getClosingName() {
+                return t.closingName;
             }
 
             public Tag withClosingName(@Nullable JLeftPadded<String> closingName) {
@@ -235,8 +234,7 @@ public interface JSX extends JS {
         @Nullable
         JLeftPadded<Expression> value;
 
-        @Nullable
-        public Expression getValue() {
+        public @Nullable Expression getValue() {
             return value == null ? null : value.getElement();
         }
 
@@ -268,8 +266,7 @@ public interface JSX extends JS {
         public static class Padding {
             private final JSX.Attribute t;
 
-            @Nullable
-            public JLeftPadded<Expression> getValue() {
+            public @Nullable JLeftPadded<Expression> getValue() {
                 return t.value;
             }
 
