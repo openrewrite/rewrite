@@ -65,15 +65,6 @@ public class MavenMetadata {
         @Nullable
         String latest;
 
-        @Deprecated
-        public Versioning(
-                List<String> versions,
-                @Nullable List<SnapshotVersion> snapshotVersions,
-                @Nullable Snapshot snapshot,
-                @Nullable ZonedDateTime lastUpdated) {
-            this(versions, snapshotVersions, snapshot, lastUpdated, null, null);
-        }
-
         @JsonCreator
         public Versioning(
                 @JacksonXmlElementWrapper(localName = "versions") List<String> versions,

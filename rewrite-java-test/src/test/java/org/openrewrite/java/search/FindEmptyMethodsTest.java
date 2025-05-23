@@ -29,6 +29,34 @@ class FindEmptyMethodsTest implements RewriteTest {
         spec.recipe(new FindEmptyMethods(false));
     }
 
+    @DocumentExample
+    @Test
+    void matchOverride() {
+        rewriteRun(
+          spec -> spec.recipe(new FindEmptyMethods(true)),
+          java(
+            """
+              import java.util.Collection;
+              
+              class Test implements Collection<String> {
+                  @Override
+                  public boolean isEmpty() {
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              
+              class Test implements Collection<String> {
+                  /*~~>*/@Override
+                  public boolean isEmpty() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void methodNotEmpty() {
         rewriteRun(
@@ -82,34 +110,6 @@ class FindEmptyMethodsTest implements RewriteTest {
               
               class Test implements Collection<String> {
                   @Override
-                  public boolean isEmpty() {
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void matchOverride() {
-        rewriteRun(
-          spec -> spec.recipe(new FindEmptyMethods(true)),
-          java(
-            """
-              import java.util.Collection;
-              
-              class Test implements Collection<String> {
-                  @Override
-                  public boolean isEmpty() {
-                  }
-              }
-              """,
-            """
-              import java.util.Collection;
-              
-              class Test implements Collection<String> {
-                  /*~~>*/@Override
                   public boolean isEmpty() {
                   }
               }

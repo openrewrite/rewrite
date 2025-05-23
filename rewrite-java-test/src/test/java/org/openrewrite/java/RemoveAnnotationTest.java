@@ -25,23 +25,6 @@ import static org.openrewrite.java.Assertions.java;
 
 class RemoveAnnotationTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/861")
-    @Test
-    void removeLastAnnotationFromClassDeclaration() {
-        rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
-          java(
-            """
-              @Deprecated
-              interface Test {}
-              """,
-            """
-              interface Test {}
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void removeAnnotation() {
@@ -67,6 +50,23 @@ class RemoveAnnotationTest implements RewriteTest {
                       int n;
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/861")
+    @Test
+    void removeLastAnnotationFromClassDeclaration() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+          java(
+            """
+              @Deprecated
+              interface Test {}
+              """,
+            """
+              interface Test {}
               """
           )
         );

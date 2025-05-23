@@ -42,10 +42,6 @@ class TypecastParenPadTest implements RewriteTest {
         spec.recipe(new TypecastParenPad());
     }
 
-    private static Iterable<NamedStyles> namedStyles(Collection<Style> styles) {
-        return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
-    }
-
     @DocumentExample
     @Test
     void addTypecastPadding() {
@@ -77,6 +73,10 @@ class TypecastParenPadTest implements RewriteTest {
             autoFormatIsIdempotent()
           )
         );
+    }
+
+    private static Iterable<NamedStyles> namedStyles(Collection<Style> styles) {
+        return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
     }
 
     @Test

@@ -49,6 +49,33 @@ class ChangeMethodNameTest implements RewriteTest {
       }
       """;
 
+    @DocumentExample
+    @Test
+    void changeMethodNameForMethodWithSingleArg() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null)),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              package com.abc;
+              class A {
+                 public void test() {
+                     new B().singleArg("boo");
+                 }
+              }
+              """,
+            """
+              package com.abc;
+              class A {
+                 public void test() {
+                     new B().bar("boo");
+                 }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings({"ConstantConditions", "RedundantOperationOnEmptyContainer"})
     @Issue("https://github.com/openrewrite/rewrite/issues/605")
     @Test
@@ -86,12 +113,12 @@ class ChangeMethodNameTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
                 List<Statement> statements = testMethodDecl.getBody().getStatements();
-                J.MethodInvocation barInvocation = (J.MethodInvocation) statements.get(0);
+                J.MethodInvocation barInvocation = (J.MethodInvocation) statements.getFirst();
                 assertThat(barInvocation.getName().getSimpleName()).isEqualTo("bar");
                 assertThat(barInvocation.getMethodType().getName()).isEqualTo("bar");
-                J.MemberReference barReference = (J.MemberReference) ((J.MethodInvocation) statements.get(1)).getArguments().get(0);
+                J.MemberReference barReference = (J.MemberReference) ((J.MethodInvocation) statements.get(1)).getArguments().getFirst();
                 JavaType.Method barRefType = barReference.getMethodType();
                 assertThat(barRefType.getName()).isEqualTo("bar");
             })
@@ -189,33 +216,6 @@ class ChangeMethodNameTest implements RewriteTest {
                       new B().bar("boo");
                       new java.util.ArrayList<String>().forEach(new B()::bar);
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void changeMethodNameForMethodWithSingleArg() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
-              package com.abc;
-              class A {
-                 public void test() {
-                     new B().singleArg("boo");
-                 }
-              }
-              """,
-            """
-              package com.abc;
-              class A {
-                 public void test() {
-                     new B().bar("boo");
-                 }
               }
               """
           )

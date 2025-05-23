@@ -383,8 +383,8 @@ class EnvironmentTest implements RewriteTest {
           .findAny().orElse(null);
         assertThat(changeTextDescriptor).isNotNull();
         assertThat(changeTextDescriptor.getOptions()).hasSize(1);
-        assertThat(changeTextDescriptor.getOptions().get(0).getName()).isEqualTo("toText");
-        assertThat(changeTextDescriptor.getOptions().get(0).getType()).isEqualTo("String");
+        assertThat(changeTextDescriptor.getOptions().getFirst().getName()).isEqualTo("toText");
+        assertThat(changeTextDescriptor.getOptions().getFirst().getType()).isEqualTo("String");
     }
 
     @Test
@@ -424,7 +424,7 @@ class EnvironmentTest implements RewriteTest {
         var helloJon2 = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.HelloJon2"))
           .findAny().orElseThrow();
         assertThat(helloJon2.getRecipeList()).hasSize(1);
-        assertThat(helloJon2.getRecipeList().get(0).getName()).isEqualTo("org.openrewrite.HelloJon");
+        assertThat(helloJon2.getRecipeList().getFirst().getName()).isEqualTo("org.openrewrite.HelloJon");
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1789")
@@ -488,7 +488,7 @@ class EnvironmentTest implements RewriteTest {
           ))
           .build();
         var recipeList = env.activateRecipes("test.OrderPreserved").getRecipeList();
-        assertThat(recipeList.get(0).getName()).isEqualTo("org.openrewrite.config.RecipeNoParameters");
+        assertThat(recipeList.getFirst().getName()).isEqualTo("org.openrewrite.config.RecipeNoParameters");
         assertThat(recipeList.get(1).getName()).isEqualTo("test.FooOne");
         assertThat(recipeList.get(2).getName()).isEqualTo("org.openrewrite.config.RecipeAcceptingParameters");
         assertThat(recipeList.get(3).getName()).isEqualTo("org.openrewrite.config.RecipeNoParameters");

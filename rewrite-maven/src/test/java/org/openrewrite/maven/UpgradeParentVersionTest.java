@@ -30,35 +30,6 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradeParentVersionTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1317")
-    @Test
-    void doesNotDowngradeVersion() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeParentVersion(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "~1.5",
-            null,
-            null
-          )),
-          pomXml(
-            """
-              <project>
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.4.12</version>
-                  <relativePath/>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void nonMavenCentralRepository() {
@@ -93,6 +64,35 @@ class UpgradeParentVersionTest implements RewriteTest {
                   </parent>
                   <artifactId>example</artifactId>
                   <version>1.0.0</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1317")
+    @Test
+    void doesNotDowngradeVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeParentVersion(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "~1.5",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.4.12</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
               </project>
               """
           )

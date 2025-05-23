@@ -82,10 +82,10 @@ class VariableDeclarationsTest implements RewriteTest {
               List<? extends String> l
               """,
             spec -> spec.beforeRecipe(cu -> {
-                var varDecl = (J.VariableDeclarations) cu.getStatements().get(0);
+                var varDecl = (J.VariableDeclarations) cu.getStatements().getFirst();
                 assertThat(varDecl.getTypeExpression()).isInstanceOf(J.ParameterizedType.class);
                 var typeExpression = requireNonNull(requireNonNull((J.ParameterizedType) varDecl.getTypeExpression())
-                  .getTypeParameters()).get(0);
+                  .getTypeParameters()).getFirst();
                 assertThat(typeExpression).isInstanceOf(J.Wildcard.class);
                 assertThat(((J.Wildcard) typeExpression).getBound()).isEqualTo(J.Wildcard.Bound.Extends);
             })
@@ -181,7 +181,7 @@ class VariableDeclarationsTest implements RewriteTest {
                         return SearchResult.found(multiVariable);
                     }
                 }, cu, new ArrayList<>(), J.VariableDeclarations.class, v -> v);
-                assertThat(variables.get(0).getLeadingAnnotations()).hasSize(1);
+                assertThat(variables.getFirst().getLeadingAnnotations()).hasSize(1);
             })
           )
         );

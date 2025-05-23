@@ -129,7 +129,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         Validated<Object> validation = dr.validate();
         assertThat(validation.isValid()).isFalse();
         assertThat(validation.failures().size()).isEqualTo(2);
-        assertThat(validation.failures().get(0).getProperty()).isEqualTo("initialization");
+        assertThat(validation.failures().getFirst().getProperty()).isEqualTo("initialization");
     }
 
     @Test
@@ -253,16 +253,82 @@ class DeclarativeRecipeTest implements RewriteTest {
                    relativeFileName: test.txt
                    fileContents: "test"
               """, "org.openrewrite.PreconditionTest")
-            .afterRecipe(run -> {
-                assertThat(run.getChangeset().getAllResults()).anySatisfy(
-                  s -> {
-                      assertThat(s.getAfter()).isNotNull();
-                      assertThat(s.getAfter().getSourcePath()).isEqualTo(Paths.get("test.txt"));
-                  }
-                );
-            })
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).anySatisfy(
+              s -> {
+                  //noinspection DataFlowIssue
+                  assertThat(s.getAfter()).isNotNull();
+                  assertThat(s.getAfter().getSourcePath()).isEqualTo(Paths.get("test.txt"));
+              }
+            ))
             .expectedCyclesThatMakeChanges(1),
           text("1")
+        );
+    }
+
+    @Test
+    void scanningPreconditionMet() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.ScanningPreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: sam.txt
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: foo
+                    replace: bar
+              """, "org.openrewrite.ScanningPreconditionTest"),
+          text("sam", spec -> spec.path("sam.txt")),
+          text("foo", "bar")
+        );
+    }
+
+    @Test
+    void scanningPreconditionNotMet() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.ScanningPreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: sam.txt
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: foo
+                    replace: bar
+              """, "org.openrewrite.ScanningPreconditionTest"),
+          text("foo")
+        );
+    }
+
+    @Test
+    void preconditionOnNestedDeclarative() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionOnDeclarative
+              description: Test.
+              preconditions:
+                - org.openrewrite.text.Find:
+                    find: foo
+              recipeList:
+                - org.openrewrite.DeclarativeExample
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.DeclarativeExample
+              description: Test.
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: foo
+                    replace: bar
+              """, "org.openrewrite.PreconditionOnDeclarative"),
+          text("foo", "bar")
         );
     }
 
@@ -270,7 +336,7 @@ class DeclarativeRecipeTest implements RewriteTest {
     void exposesUnderlyingDataTables() {
         DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
           "test", emptySet(), null, URI.create("dummy"), true, Collections.emptyList());
-        dr.addUninitialized(new Find("sam", null, null, null, null, null, null));
+        dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
         dr.initialize(List.of(), Map.of());
         assertThat(dr.getDataTableDescriptors()).anyMatch(it -> "org.openrewrite.table.TextMatches".equals(it.getName()));
     }
@@ -306,7 +372,7 @@ class DeclarativeRecipeTest implements RewriteTest {
           )
         );
         rewriteRun(
-          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(3),
+          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(2),
           text("1", "1+1+1")
         );
         assertThat(cycleCount).hasValue(3);

@@ -33,6 +33,26 @@ class ChangeTypeTest implements RewriteTest {
         spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
     }
 
+    @DocumentExample
+    @Test
+    void changeDefinition() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
+          kotlin(
+            """
+              class file {
+              }
+              """,
+            """
+              class newFile {
+              }
+              """,
+            spec -> spec.path("file.kt").afterRecipe(cu ->
+              assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "newFile")).isTrue())
+          )
+        );
+    }
+
     @Test
     void changeImport() {
         rewriteRun(
@@ -271,26 +291,6 @@ class ChangeTypeTest implements RewriteTest {
                   val type : Target = Target()
               }
               """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void changeDefinition() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
-          kotlin(
-            """
-              class file {
-              }
-              """,
-            """
-              class newFile {
-              }
-              """,
-            spec -> spec.path("file.kt").afterRecipe(cu ->
-              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue())
           )
         );
     }

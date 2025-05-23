@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 
+@SuppressWarnings("GroovyAssignabilityCheck")
 class DependencyConstraintToRuleTest implements RewriteTest {
 
     @Override
@@ -64,6 +65,27 @@ class DependencyConstraintToRuleTest implements RewriteTest {
               }
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void buildscript() {
+        rewriteRun(
+          buildGradle(
+            """
+              buildscript {
+                  repositories { mavenCentral() }
+                  dependencies {
+                      constraints {
+                          implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                              because 'CVE-2024-BAD'
+                          }
+                      }
+                      classpath 'org.openrewrite:rewrite-java:7.0.0'
+                  }
               }
               """
           )
@@ -165,6 +187,55 @@ class DependencyConstraintToRuleTest implements RewriteTest {
                       }
                   }
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void buildscriptWithExistingResolutionStrategy() {
+        rewriteRun(
+          buildGradle(
+            """
+              buildscript {
+                  repositories { mavenCentral() }
+                  configurations.all {
+                      resolutionStrategy.eachDependency { details ->
+                          if (details.requested.group == 'some' && details.requested.name == 'other') {
+                              details.useVersion('1.2.3')
+                              details.because('CVE-2025-EXISTING')
+                          }
+                      }
+                  }
+              }
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories { mavenCentral() }
+                  configurations.all {
+                      resolutionStrategy.eachDependency { details ->
+                          if (details.requested.group == 'some' && details.requested.name == 'other') {
+                              details.useVersion('1.2.3')
+                              details.because('CVE-2025-EXISTING')
+                          }
+                      }
+                  }
+              }
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
+                          details.useVersion('2.12.5')
+                          details.because('CVE-2024-BAD')
+                      }
+                  }
               }
               """
           )

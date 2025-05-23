@@ -12,6 +12,7 @@ val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
+
 dependencies {
     compileOnly(files(tools))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
@@ -79,9 +80,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        useJUnitPlatform {
-                            excludeTags("java11", "java17", "java21")
-                        }
+                        useJUnitPlatform()
                         testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
