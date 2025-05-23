@@ -22,7 +22,7 @@ import {produce} from "immer";
 describe('match extraction', () => {
     const spec = new RecipeSpec();
 
-    test('extract parts of a binary expression', () => {
+    test('extract parts of a binary expression using string names', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                 if (binary.operator.element === J.Binary.Type.Addition) {
@@ -44,6 +44,54 @@ describe('match extraction', () => {
 
                         const newRight = produce({} as J, draft => {
                             Object.assign(draft, a);
+                            // Use the prefix from the original right operand
+                            draft.prefix = binary.right.prefix;
+                        });
+
+                        // Create a new binary expression with the swapped operands
+                        return produce(binary, draft => {
+                            draft.left = newLeft;
+                            draft.right = newRight;
+                        });
+                    }
+                }
+                return binary;
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('const result = 1 + 2;', 'const result = 2 + 1;'),
+        );
+    });
+
+    test('extract parts of a binary expression using capture objects', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                if (binary.operator.element === J.Binary.Type.Addition) {
+
+                    // Create capture objects
+                    const a = capture('a');
+                    const b = capture('b');
+
+                    // Create a pattern that matches "a + b" using the capture objects
+                    const pattern = match`${a} + ${b}`;
+                    const matcher = pattern.against(binary);
+
+                    if (await matcher.matches()) {
+                        // Extract the captured parts using the capture objects
+                        const left = matcher.get(a);
+                        const right = matcher.get(b);
+
+                        // First, create deep copies of the operands to avoid modifying the originals
+                        const newLeft = produce({} as J, draft => {
+                            Object.assign(draft, right);
+                            // Use the prefix from the original left operand
+                            draft.prefix = binary.left.prefix;
+                        });
+
+                        const newRight = produce({} as J, draft => {
+                            Object.assign(draft, left);
                             // Use the prefix from the original right operand
                             draft.prefix = binary.right.prefix;
                         });

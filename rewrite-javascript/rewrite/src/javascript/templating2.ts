@@ -162,12 +162,13 @@ export class Matcher {
     }
 
     /**
-     * Gets a captured node by name.
+     * Gets a captured node by name or capture object.
      * 
-     * @param name The name of the capture
+     * @param nameOrCapture The name of the capture or the capture object
      * @returns The captured node, or undefined if not found
      */
-    get(name: string): J | undefined {
+    get(nameOrCapture: string | Capture): J | undefined {
+        const name = typeof nameOrCapture === 'string' ? nameOrCapture : nameOrCapture.name;
         return this.bindings.get(name);
     }
 
