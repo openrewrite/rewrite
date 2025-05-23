@@ -27,6 +27,7 @@ import {
     WrappingAndBracesStyle
 } from "./style";
 import {produceAsync} from "../visitor";
+import {MarkersKind} from "../markers";
 
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
@@ -662,6 +663,13 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
+    protected async visitAwait(await_: JS.Await, p: P): Promise<J | undefined> {
+        const ret = await super.visitAwait(await_, p) as JS.Await;
+        return produce(ret, draft => {
+            draft.expression.prefix.whitespace = " ";
+        });
+    }
+
     protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
         let c = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
         let first = c.leadingAnnotations.length === 0;
@@ -722,6 +730,10 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         let m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
         let first = m.leadingAnnotations.length === 0;
 
+        if (method.markers.markers.find(x => x.kind == JS.Markers.FunctionDeclaration)) {
+            first = false;
+        }
+
         if (m.modifiers.length > 0) {
             if (!first && m.modifiers[0].prefix.whitespace === "") {
                 m = produce(m, draft => {
@@ -737,26 +749,6 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
             first = false;
         }
 
-        if (m.typeParameters && m.typeParameters.typeParameters.length > 0 && m.typeParameters.prefix.whitespace === "" && !first) {
-            m = produce(m, draft => {
-                draft.typeParameters!.prefix.whitespace = " ";
-            });
-            first = false;
-        }
-
-        if (m.returnTypeExpression && m.returnTypeExpression.prefix.whitespace === "" && !first) {
-            m = produce(m, draft => {
-                if (m.returnTypeExpression!.kind === J.Kind.AnnotatedType) {
-                    const ann = (m.returnTypeExpression as J.AnnotatedType).annotations;
-                    (m.returnTypeExpression as Draft<J.AnnotatedType>).annotations = ann.map((a, i) =>
-                        i === 0 ? {...a, prefix: {...a.prefix, whitespace: " "}} : a
-                    );
-                } else {
-                    draft.returnTypeExpression!.prefix.whitespace = " ";
-                }
-            });
-        }
-
         if (!first && m.name.prefix.whitespace === "") {
             m = produce(m, draft => {
                 draft.name.prefix.whitespace = " ";
@@ -770,6 +762,16 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         }
 
         return m;
+    }
+
+    protected async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, p: P): Promise<J | undefined> {
+        const ret = await super.visitNamespaceDeclaration(namespaceDeclaration, p) as JS.NamespaceDeclaration;
+        return produce(ret, draft => {
+            if (draft.modifiers.length > 0) {
+                draft.keywordType.before.whitespace=" ";
+            }
+            draft.name.element.prefix.whitespace = " ";
+        });
     }
 
     protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
@@ -795,6 +797,9 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: P): Promise<J | undefined> {
         const ret = await super.visitScopedVariableDeclarations(scopedVariableDeclarations, p) as JS.ScopedVariableDeclarations;
         return ret.scope && produce(ret, draft => {
+            if (draft.scope && draft.modifiers.length > 0) {
+                draft.scope.before.whitespace = " ";
+            }
             draft.variables[0].element.prefix.whitespace = " ";
         });
     }
@@ -813,6 +818,23 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
                 draft.name.before.whitespace = " ";
             }
             draft.name.element.prefix.whitespace = " ";
+        });
+    }
+
+    protected async visitTypeOf(typeOf: JS.TypeOf, p: P): Promise<J | undefined> {
+        const ret = await super.visitTypeOf(typeOf, p) as JS.TypeOf;
+        return produce(ret, draft => {
+            draft.expression.prefix.whitespace = " ";
+        });
+    }
+
+    protected async visitTypeParameter(typeParam: J.TypeParameter, p: P): Promise<J | undefined> {
+        const ret = await super.visitTypeParameter(typeParam, p) as J.TypeParameter;
+        return produce(ret, draft => {
+            if (draft.bounds && draft.bounds.elements.length > 0) {
+                draft.bounds.before.whitespace = " ";
+                draft.bounds.elements[0].element.prefix.whitespace = " ";
+            }
         });
     }
 

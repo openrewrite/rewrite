@@ -99,4 +99,20 @@ describe('SpacesVisitor', () => {
                 // @formatter:on
             ));
     });
+
+    test('await', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                async function fetchData(): Promise<string> {
+                    const response = await fetch('https://api.example.com/data');
+                    return response.json().name;
+                }
+                `
+                // @formatter:on
+            ));
+    });
 });
