@@ -61,5 +61,16 @@ describe('MinimumViableSpacingVisitor', () => {
                 // @formatter:on
             ))
     });
+
+    test('type', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `type T1 = string;`,
+                `type T1=string;`
+                // @formatter:on
+            ))
+    });
 });
 

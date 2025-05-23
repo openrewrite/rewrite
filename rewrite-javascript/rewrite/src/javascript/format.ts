@@ -806,6 +806,16 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
+    protected async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, p: P): Promise<J | undefined> {
+        const ret = await super.visitTypeDeclaration(typeDeclaration, p) as JS.TypeDeclaration;
+        return produce(ret, draft => {
+            if (draft.modifiers.length > 0) {
+                draft.name.before.whitespace = " ";
+            }
+            draft.name.element.prefix.whitespace = " ";
+        });
+    }
+
     protected async visitVariableDeclarations(v: J.VariableDeclarations, p: P): Promise<J | undefined> {
         let ret = await super.visitVariableDeclarations(v, p) as J.VariableDeclarations;
         let first = ret.leadingAnnotations.length === 0;
