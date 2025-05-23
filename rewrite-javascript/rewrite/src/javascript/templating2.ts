@@ -15,10 +15,13 @@
  */
 import {JavaScriptVisitor, JS} from '.';
 import {JavaScriptParser} from './parser';
-import {Cursor, Tree} from '..';
-import {J} from '../java';
+import {JavaScriptPrinter} from './print';
+import {Cursor, Tree, PrintOutputCapture} from '..';
+import {J, emptySpace} from '../java';
 import {TypedTree} from '../java';
 import {JavaType} from '../java/type';
+import {JavaCoordinates} from './templating';
+import {produce} from "immer";
 import getType = TypedTree.getType;
 
 /**
@@ -535,6 +538,277 @@ export class Matcher {
  */
 export function match(strings: TemplateStringsArray, ...captures: Capture[]): Pattern {
     return new Pattern(strings, captures);
+}
+
+/**
+ * Parameter specification for template generation.
+ * Represents a placeholder in a template that will be replaced with a parameter value.
+ */
+export interface Parameter {
+    /**
+     * The value to substitute into the template.
+     */
+    value: any;
+}
+
+/**
+ * Creates a parameter specification for use in templates.
+ * 
+ * This function is used to create parameters for the `template` tagged template function.
+ * It's similar to how `capture` is used with the `match` function, but for template generation
+ * rather than pattern matching.
+ * 
+ * @param value The value to substitute into the template
+ * @returns A Parameter object
+ * 
+ * @example
+ * // Simple value parameter
+ * template`const x = ${$(2)};`
+ * 
+ * @example
+ * // AST node parameter
+ * const literal = ...; // Some AST node
+ * template`const x = ${$(literal)};`
+ * 
+ * @example
+ * // Multiple parameters
+ * template`const x = ${$(a)} + ${$(b)};`
+ */
+export function $(value: any): Parameter {
+    return { value };
+}
+
+/**
+ * Template generator for creating AST nodes.
+ * 
+ * This class is used to generate AST nodes from templates. It's similar to the `Pattern` class,
+ * but used for generating AST nodes rather than matching them.
+ * 
+ * The `TemplateGenerator` is created by the `template` tagged template function and provides
+ * an `apply` method that generates an AST node and applies it to an existing AST.
+ * 
+ * @example
+ * // Generate a literal AST node
+ * const result = template`2`.apply(cursor, coordinates);
+ * 
+ * @example
+ * // Generate an AST node with a parameter
+ * const result = template`${$(2)}`.apply(cursor, coordinates);
+ * 
+ * @example
+ * // Generate an AST node with an AST node parameter
+ * const literal = ...; // Some AST node
+ * const result = template`${$(literal)}`.apply(cursor, coordinates);
+ */
+export class TemplateGenerator {
+    /**
+     * Creates a new template generator.
+     * 
+     * @param templateParts The string parts of the template
+     * @param parameters The parameters between the string parts
+     */
+    constructor(
+        private readonly templateParts: TemplateStringsArray,
+        private readonly parameters: Parameter[]
+    ) {}
+
+    /**
+     * Applies the template to generate an AST node.
+     * 
+     * @param cursor The cursor pointing to the current location in the AST
+     * @param coordinates The coordinates specifying where and how to insert the generated AST
+     * @returns A Promise resolving to the generated AST node
+     */
+    async apply(cursor: Cursor, coordinates: JavaCoordinates): Promise<J | undefined> {
+        // Build the template string with parameter placeholders
+        const templateString = this.buildTemplateString();
+
+        // Parse the template string into an AST
+        const parser = new JavaScriptParser();
+        const parseResults = await parser.parse({text: templateString, sourcePath: 'template.ts'});
+        const cu: JS.CompilationUnit = parseResults[0] as JS.CompilationUnit;
+
+        // Extract the relevant part of the AST
+        const firstStatement = cu.statements[0].element;
+        const ast = firstStatement.kind === JS.Kind.ExpressionStatement
+            ? (firstStatement as JS.ExpressionStatement).expression
+            : firstStatement;
+
+        // Apply the template to the current AST
+        return new TemplateApplier(
+            cursor,
+            coordinates,
+            ast,
+            this.parameters
+        ).apply();
+    }
+
+    /**
+     * Builds a template string with parameter placeholders.
+     * 
+     * @returns The template string
+     */
+    private buildTemplateString(): string {
+        let result = '';
+        for (let i = 0; i < this.templateParts.length; i++) {
+            result += this.templateParts[i];
+            if (i < this.parameters.length) {
+                const param = this.parameters[i];
+                if (typeof param.value === 'string') {
+                    result += param.value;
+                } else if (param.value && typeof param.value === 'object' && param.value.kind) {
+                    // If the parameter is an AST node, use a simple value that will be replaced later
+                    // Use the valueSource if it's a literal, otherwise use a placeholder
+                    if (param.value.kind === J.Kind.Literal && (param.value as J.Literal).valueSource) {
+                        result += (param.value as J.Literal).valueSource;
+                    } else {
+                        result += '0'; // Use a simple value that will be replaced later
+                    }
+                } else {
+                    // For other types, convert to string
+                    result += String(param.value);
+                }
+            }
+        }
+        return result;
+    }
+}
+
+/**
+ * Helper class for applying a template to an AST.
+ */
+class TemplateApplier {
+    constructor(
+        private readonly cursor: Cursor,
+        private readonly coordinates: JavaCoordinates,
+        private readonly ast: J,
+        private readonly parameters: Parameter[] = []
+    ) {}
+
+    /**
+     * Applies the template to the current AST.
+     * 
+     * @returns A Promise resolving to the modified AST
+     */
+    async apply(): Promise<J | undefined> {
+        const { tree, loc, mode } = this.coordinates;
+
+        // Special case: If there's only one parameter and it's an AST node, use it directly
+        if (this.parameters.length === 1 && 
+            this.parameters[0].value && 
+            typeof this.parameters[0].value === 'object' && 
+            this.parameters[0].value.kind) {
+
+            // Create a copy of the parameter with the prefix from the target
+            return produce(this.parameters[0].value as J, draft => {
+                draft.prefix = (tree as J).prefix;
+            });
+        }
+
+        // Apply the template based on the location and mode
+        switch (loc) {
+            case 'EXPRESSION_PREFIX':
+                return this.applyToExpression();
+            case 'STATEMENT_PREFIX':
+                return this.applyToStatement();
+            case 'BLOCK_END':
+                return this.applyToBlock();
+            default:
+                throw new Error(`Unsupported location: ${loc}`);
+        }
+    }
+
+    /**
+     * Applies the template to an expression.
+     * 
+     * @returns A Promise resolving to the modified AST
+     */
+    private async applyToExpression(): Promise<J | undefined> {
+        const { tree, mode } = this.coordinates;
+
+        // Create a copy of the AST with the prefix from the target
+        let result = produce(this.ast, draft => {
+            draft.prefix = (tree as J).prefix;
+        });
+
+        // If the result is a literal with a placeholder, replace it with the actual parameter
+        if (result.kind === J.Kind.Literal) {
+            const literal = result as J.Literal;
+
+            if (literal.valueSource && literal.valueSource.startsWith('__param')) {
+                const paramIndex = parseInt(literal.valueSource.replace('__param', '').replace('__', ''));
+
+                if (paramIndex >= 0 && paramIndex < this.parameters.length) {
+                    const param = this.parameters[paramIndex];
+
+                    if (param.value && typeof param.value === 'object' && param.value.kind) {
+                        // If the parameter is an AST node, use it directly
+                        result = produce(param.value as J, draft => {
+                            draft.prefix = literal.prefix;
+                        });
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Applies the template to a statement.
+     * 
+     * @returns A Promise resolving to the modified AST
+     */
+    private async applyToStatement(): Promise<J | undefined> {
+        // Not implemented yet
+        return this.ast;
+    }
+
+    /**
+     * Applies the template to a block.
+     * 
+     * @returns A Promise resolving to the modified AST
+     */
+    private async applyToBlock(): Promise<J | undefined> {
+        // Not implemented yet
+        return this.ast;
+    }
+}
+
+/**
+ * Tagged template function for creating AST nodes.
+ * 
+ * This function provides a more intuitive and TypeScript-friendly way to create templates
+ * compared to the old string-based API. Instead of using string templates with `#{}` syntax,
+ * you can use tagged template literals with `$()` syntax.
+ * 
+ * @param strings The string parts of the template
+ * @param parameters The parameters between the string parts
+ * @returns A TemplateGenerator object
+ * 
+ * @example
+ * // Old API:
+ * new JavaScriptTemplate('2').apply(cursor, coordinates);
+ * 
+ * // New API:
+ * template`2`.apply(cursor, coordinates);
+ * 
+ * @example
+ * // Old API:
+ * new JavaScriptTemplate('#{}').apply(cursor, coordinates, '2');
+ * 
+ * // New API:
+ * template`${$(2)}`.apply(cursor, coordinates);
+ * 
+ * @example
+ * // Old API:
+ * new JavaScriptTemplate('#{any()}').apply(cursor, coordinates, astNode);
+ * 
+ * // New API:
+ * template`${$(astNode)}`.apply(cursor, coordinates);
+ */
+export function template(strings: TemplateStringsArray, ...parameters: Parameter[]): TemplateGenerator {
+    return new TemplateGenerator(strings, parameters);
 }
 
 /**
