@@ -342,6 +342,18 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
+    protected async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, p: P): Promise<J | undefined> {
+        const ret = await super.visitTypeDeclaration(typeDeclaration, p) as JS.TypeDeclaration;
+        return produce(ret, draft => {
+            if (draft.modifiers.length > 0) {
+                draft.name.before.whitespace = " ";
+            }
+            draft.name.element.prefix.whitespace = " ";
+            draft.initializer.before.whitespace = this.style.aroundOperators.assignment ? " " : "";
+            draft.initializer.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+        });
+    }
+
     protected async visitTypeInfo(typeInfo: JS.TypeInfo, p: P): Promise<J | undefined> {
         const ret = await super.visitTypeInfo(typeInfo, p) as JS.TypeInfo;
         return produceAsync(ret, async draft => {

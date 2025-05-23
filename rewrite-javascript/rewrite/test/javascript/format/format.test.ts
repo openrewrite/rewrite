@@ -27,6 +27,8 @@ describe('AutoformatVisitor', () => {
             // @formatter:off
             //language=typescript
             typescript(`
+                     type T1=string;
+                     export   type   T2   =   string;
                     class L {}
                     class K extends L{
                         constructor  ( ){
@@ -65,6 +67,9 @@ describe('AutoformatVisitor', () => {
                     }
                 `,
                 `
+                    type T1 = string;
+                    export type T2 = string;
+
                     class L {
                     }
 
