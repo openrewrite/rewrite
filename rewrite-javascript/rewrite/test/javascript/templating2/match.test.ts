@@ -17,7 +17,7 @@ import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {capture, match} from "../../../src/javascript/templating2";
-import {produce} from "immer";
+import {createDraft, produce} from "immer";
 
 describe('match extraction', () => {
     const spec = new RecipeSpec();
@@ -32,26 +32,15 @@ describe('match extraction', () => {
                     const matcher = pattern.against(binary);
                     if (await matcher.matches()) {
                         // Extract the captured parts
-                        const a = matcher.get('a');
-                        const b = matcher.get('b');
-
-                        // First, create deep copies of the operands to avoid modifying the originals
-                        const newLeft = produce({} as J, draft => {
-                            Object.assign(draft, b);
-                            // Use the prefix from the original left operand
-                            draft.prefix = binary.left.prefix;
-                        });
-
-                        const newRight = produce({} as J, draft => {
-                            Object.assign(draft, a);
-                            // Use the prefix from the original right operand
-                            draft.prefix = binary.right.prefix;
-                        });
+                        const left = matcher.get('a');
+                        const right = matcher.get('b');
 
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
-                            draft.left = newLeft;
-                            draft.right = newRight;
+                            draft.left = createDraft(right!);
+                            draft.prefix = binary.left.prefix;
+                            draft.right = createDraft(left!);
+                            draft.right.prefix = binary.right.prefix;
                         });
                     }
                 }
@@ -83,23 +72,12 @@ describe('match extraction', () => {
                         const left = matcher.get(a);
                         const right = matcher.get(b);
 
-                        // First, create deep copies of the operands to avoid modifying the originals
-                        const newLeft = produce({} as J, draft => {
-                            Object.assign(draft, right);
-                            // Use the prefix from the original left operand
-                            draft.prefix = binary.left.prefix;
-                        });
-
-                        const newRight = produce({} as J, draft => {
-                            Object.assign(draft, left);
-                            // Use the prefix from the original right operand
-                            draft.prefix = binary.right.prefix;
-                        });
-
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
-                            draft.left = newLeft;
-                            draft.right = newRight;
+                            draft.left = createDraft(right!);
+                            draft.prefix = binary.left.prefix;
+                            draft.right = createDraft(left!);
+                            draft.right.prefix = binary.right.prefix;
                         });
                     }
                 }
