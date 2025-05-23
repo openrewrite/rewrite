@@ -72,5 +72,49 @@ describe('MinimumViableSpacingVisitor', () => {
                 // @formatter:on
             ))
     });
+
+    test('await', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const response = await fetch("https://api.example.com/users/2");`,
+                `const response=await fetch("https://api.example.com/users/2");`
+                // @formatter:on
+            ))
+    });
+
+    test('type parameters', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function m<T extends MyType>(a:T): T {return a}`,
+                `function m<T extends MyType>(a:T):T{return a}`
+                // @formatter:on
+            ))
+    });
+
+    test('typeof', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = "A";console.log(typeof a)`,
+                `const a="A";console.log(typeof a)`,
+                // @formatter:on
+            ))
+    });
+
+    test('namespace', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `export namespace MathUtils { export const PI = 3.14}`,
+                `export namespace MathUtils{export const PI=3.14}`,
+                // @formatter:on
+            ))
+    });
 });
 
