@@ -116,4 +116,19 @@ describe('AutoformatVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('types', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            type Values={[key:string]:string;}
+            `,
+            `
+            type Values = {
+                [key: string]: string;
+            }
+            `)
+            // @formatter:on
+        )});
 });
