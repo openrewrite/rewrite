@@ -38,7 +38,8 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
         let t: R | undefined = tree as R;
         // TODO possibly cursor.fork
 
-        t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
+        // FIXME fix bug in `MinimumViableSpacingVisitor`: it removes whitespace whereas it should only every add whitespace
+        // t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
         t = t && await new BlankLinesVisitor(blankLinesStyle).visit(t, p, cursor);
         t = t && await new WrappingAndBracesVisitor(wrappingAndBracesStyle).visit(t, p, cursor);
         t = t && await new SpacesVisitor(spacesStyle).visit(t, p, cursor);

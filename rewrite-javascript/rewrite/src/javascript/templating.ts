@@ -82,7 +82,7 @@ export class JavaScriptTemplateParser {
     ) {}
 
     async parseExpression(scope: Cursor, template: string, loc: JavaCoordinates.Location): Promise<J> {
-        const parseResults = await this.parser.parse(template);
+        const parseResults = await this.parser.parse({text: template, sourcePath: 'template.ts'});
         const cu: JS.CompilationUnit = parseResults[0] as JS.CompilationUnit;
 
         const firstStatement = cu.statements[0].element;
@@ -101,7 +101,7 @@ export class JavaScriptTemplateParser {
         loc: JavaCoordinates.Location,
         mode: JavaCoordinates.Mode
     ): Promise<J[]> {
-        const parseResults = await this.parser.parse(template);
+        const parseResults = await this.parser.parse({text: template, sourcePath: 'template.ts'});
         const cu: JS.CompilationUnit = parseResults[0] as JS.CompilationUnit;
         return cu.statements.map(stmt => stmt.element);
     }
