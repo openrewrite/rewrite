@@ -55,7 +55,7 @@ export class JavaScriptTemplate {
 
     async apply(scope: Cursor, coordinates: JavaCoordinates, ...parameters: any[]): Promise<J | undefined> {
         const substitutions = this.substitutions(parameters);
-        const substituted = substitutions.substitute();
+        const substituted = await substitutions.substitute();
 
         if (this.onAfterVariableSubstitution) {
             this.onAfterVariableSubstitution(substituted);
@@ -115,7 +115,7 @@ export class Substitutions {
         public readonly parameters: (J | string)[]
     ) {}
 
-    substitute(): string {
+    async substitute(): Promise<string> {
         let result = "";
         let pos = 0;
         let paramCount = 0;
@@ -162,7 +162,7 @@ export class Substitutions {
             // Replace the #{...} with parameter placeholder
             result += pattern
                 ? `__p${paramIndex}__`
-                : this.substituteUntyped(paramIndex);
+                : await this.substituteUntyped(paramIndex);
 
             if (!pattern || pattern.includes('any()')) {
                 paramCount++;

@@ -36,4 +36,19 @@ describe('template replace', () => {
             ...typescript('const a = 1', 'const a = 2'),
         });
     });
+
+    test('string replacement', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+                if (literal.valueSource === '1') {
+                    return new JavaScriptTemplate('#{}').apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}, '2');
+                }
+                return literal;
+            }
+        });
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript('const a = 1', 'const a = 2'),
+        });
+    });
 });
