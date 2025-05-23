@@ -60,23 +60,21 @@ describe('match extraction', () => {
                 if (binary.operator.element === J.Binary.Type.Addition) {
 
                     // Create capture objects
-                    const a = capture('a');
-                    const b = capture('b');
+                    const left = capture('left');
+                    const right = capture('right');
 
                     // Create a pattern that matches "a + b" using the capture objects
-                    const pattern = match`${a} + ${b}`;
+                    const pattern = match`${left} + ${right}`;
                     const matcher = pattern.against(binary);
 
                     if (await matcher.matches()) {
                         // Extract the captured parts using the capture objects
-                        const left = matcher.get(a);
-                        const right = matcher.get(b);
-
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
-                            draft.left = createDraft(right!);
+                            draft.left = createDraft((matcher.get(right))!);
                             draft.prefix = binary.left.prefix;
-                            draft.right = createDraft(left!);
+
+                            draft.right = createDraft((matcher.get(left))!);
                             draft.right.prefix = binary.right.prefix;
                         });
                     }
