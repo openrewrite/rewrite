@@ -44,6 +44,7 @@ import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static org.objectweb.asm.ClassReader.SKIP_CODE;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
@@ -287,7 +288,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                     }
 
                     for (Member member : classDef.getMembers()) {
-                        if (member.getDescriptor().contains("(")) {
+                        if (member.getDescriptor().startsWith("(")) {
                             MethodVisitor mv = classWriter
                                     .visitMethod(
                                             member.getAccess(),
@@ -342,7 +343,6 @@ public class TypeTable implements JavaParserClasspathLoader {
                 future.complete(classesDir);
             } catch (Exception e) {
                 future.completeExceptionally(e);
-                classesDirByArtifact.remove(gav);
             }
         }
 
@@ -479,19 +479,6 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     @Nullable
                                     ClassDefinition classDefinition;
 
-                                    boolean wroteFieldOrMethod;
-                                    final List<String> collectedParameterNames = new ArrayList<>();
-                                    final List<String> collectedClassAnnotations = new ArrayList<>();
-                                    final List<String> collectedMethodAnnotations = new ArrayList<>();
-                                    final List<String> collectedFieldAnnotations = new ArrayList<>();
-
-                                    private int version;
-                                    private int access;
-                                    private String name;
-                                    private String signature;
-                                    private String superName;
-                                    private String[] interfaces;
-
                                     @Override
                                     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
                                         int lastIndexOf$ = name.lastIndexOf('$');
@@ -499,43 +486,22 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             // skip anonymous subclasses
                                             classDefinition = null;
                                         } else {
-                                            // Store the parameters for later use in visitEnd
-                                            this.version = version;
-                                            this.access = access;
-                                            this.name = name;
-                                            this.signature = signature;
-                                            this.superName = superName;
-                                            this.interfaces = interfaces;
-                                            collectedClassAnnotations.clear();
-                                            super.visit(version, access, name, signature, superName, interfaces);
-                                        }
-                                    }
-
-                                    @Override
-                                    public void visitEnd() {
-                                        if (classDefinition == null && name != null) {
-                                            // Create the ClassDefinition now that all annotations have been collected
                                             classDefinition = new ClassDefinition(
                                                     Jar.this,
                                                     access,
                                                     name,
                                                     signature,
                                                     superName,
-                                                    interfaces,
-                                                    collectedClassAnnotations.isEmpty() ? null : collectedClassAnnotations.toArray(new String[0])
+                                                    interfaces
                                             );
-                                            wroteFieldOrMethod = false;
-                                            if (!wroteFieldOrMethod && !"module-info".equals(name)) {
-                                                // No fields or methods, which can happen for marker annotations for example
-                                                classDefinition.writeClass();
-                                            }
+                                            super.visit(version, access, name, signature, superName, interfaces);
                                         }
                                     }
 
                                     @Override
-                                    public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                                        if (visible) {
-                                            return AnnotationCollectorHelper.createCollector(descriptor, collectedClassAnnotations);
+                                    public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                        if (visible && classDefinition != null) {
+                                            return AnnotationCollectorHelper.createCollector(descriptor, requireNonNull(classDefinition).classAnnotations);
                                         }
                                         return null;
                                     }
@@ -543,21 +509,19 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     @Override
                                     public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
                                         if (classDefinition != null) {
-                                            collectedFieldAnnotations.clear();
+                                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, null);
                                             return new FieldVisitor(Opcodes.ASM9) {
                                                 @Override
-                                                public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                                public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
                                                     if (visible) {
-                                                        return AnnotationCollectorHelper.createCollector(descriptor, collectedFieldAnnotations);
+                                                        return AnnotationCollectorHelper.createCollector(descriptor, member.annotations);
                                                     }
                                                     return null;
                                                 }
 
                                                 @Override
                                                 public void visitEnd() {
-                                                    wroteFieldOrMethod |= classDefinition
-                                                            .writeField(access, name, descriptor, signature,
-                                                                    collectedFieldAnnotations.isEmpty() ? null : collectedFieldAnnotations.toArray(new String[0]));
+                                                    classDefinition.addField(member);
                                                 }
                                             };
                                         }
@@ -567,39 +531,42 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                     @Override
                                     public @Nullable MethodVisitor visitMethod(int access, @Nullable String name, String descriptor,
-                                                                               String signature, String[] exceptions) {
+                                                                               @Nullable String signature, String @Nullable [] exceptions) {
                                         // Repeating check from `writeMethod()` for performance reasons
                                         if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
                                                 name != null && !"<clinit>".equals(name)) {
-                                            collectedMethodAnnotations.clear();
-                                            collectedParameterNames.clear();
+                                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, exceptions);
                                             return new MethodVisitor(Opcodes.ASM9) {
                                                 @Override
                                                 public void visitParameter(@Nullable String name, int access) {
                                                     if (name != null) {
-                                                        collectedParameterNames.add(name);
+                                                        member.parameterNames.add(name);
                                                     }
                                                 }
 
                                                 @Override
-                                                public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                                public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
                                                     if (visible) {
-                                                        return AnnotationCollectorHelper.createCollector(descriptor, collectedMethodAnnotations);
+                                                        return AnnotationCollectorHelper.createCollector(descriptor, member.annotations);
                                                     }
                                                     return null;
                                                 }
 
                                                 @Override
                                                 public void visitEnd() {
-                                                    wroteFieldOrMethod |= classDefinition
-                                                            .writeMethod(access, name, descriptor, signature,
-                                                                    collectedParameterNames.isEmpty() ? null : collectedParameterNames,
-                                                                    exceptions,
-                                                                    collectedMethodAnnotations.isEmpty() ? null : collectedMethodAnnotations.toArray(new String[0]));
+                                                    classDefinition.addMethod(member);
                                                 }
                                             };
                                         }
                                         return null;
+                                    }
+
+                                    @Override
+                                    public void visitEnd() {
+                                        if (classDefinition != null && !"module-info".equals(classDefinition.className)) {
+                                            // No fields or methods, which can happen for marker annotations for example
+                                            classDefinition.writeClass();
+                                        }
                                     }
                                 }, SKIP_CODE);
                             }
@@ -612,7 +579,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
 
         @Value
-        public class ClassDefinition {
+        class ClassDefinition {
             Jar jar;
             int classAccess;
             String className;
@@ -620,11 +587,13 @@ public class TypeTable implements JavaParserClasspathLoader {
             @Nullable
             String classSignature;
 
+            @Nullable
             String classSuperclassName;
+
             String @Nullable [] classSuperinterfaceSignatures;
 
-            @Nullable
-            String @Nullable [] classAnnotations;
+            List<String> classAnnotations = new ArrayList<>(4);
+            List<Writer.Member> members = new ArrayList<>();
 
             public void writeClass() {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & classAccess) == 0) {
@@ -636,49 +605,52 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classSuperclassName,
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
                             -1, "", "", "", "", "",
-                            classAnnotations == null ? "" : String.join("|", classAnnotations));
+                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations));
+
+                    for (Writer.Member member : members) {
+                        member.writeMember(jar, this);
+                    }
                 }
             }
 
-            public boolean writeMethod(int access, @Nullable String name, String descriptor,
-                                       @Nullable String signature,
-                                       @Nullable List<String> parameterNames,
-                                       String @Nullable [] exceptions) {
-                return writeMethod(access, name, descriptor, signature, parameterNames, exceptions, null);
+            void addMethod(Writer.Member member) {
+                members.add(member);
             }
 
-            public boolean writeMethod(int access, @Nullable String name, String descriptor,
-                                       @Nullable String signature,
-                                       @Nullable List<String> parameterNames,
-                                       String @Nullable [] exceptions,
-                                       String @Nullable [] annotations) {
-                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 && name != null && !name.equals("<clinit>")) {
+            void addField(Writer.Member member) {
+                members.add(member);
+            }
+        }
+
+        @Value
+        private class Member {
+            int access;
+            String name;
+            String descriptor;
+
+            @Nullable
+            String signature;
+
+            String @Nullable [] exceptions;
+            List<String> parameterNames = new ArrayList<>(4);
+            List<String> annotations = new ArrayList<>(4);
+
+            private void writeMember(Jar jar, ClassDefinition classDefinition) {
+                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
                     out.printf(
                             "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
-                            classAccess, className,
-                            classSignature == null ? "" : classSignature,
-                            classSuperclassName,
-                            classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
+                            classDefinition.classAccess, classDefinition.className,
+                            classDefinition.classSignature == null ? "" : classDefinition.classSignature,
+                            classDefinition.classSuperclassName,
+                            classDefinition.classSuperinterfaceSignatures == null ? "" : String.join("|", classDefinition.classSuperinterfaceSignatures),
                             access, name, descriptor,
                             signature == null ? "" : signature,
-                            parameterNames == null ? "" : String.join("|", parameterNames),
+                            parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
-                            annotations == null ? "" : String.join("|", annotations)
+                            annotations.isEmpty() ? "" : String.join("|", annotations)
                     );
-                    return true;
                 }
-                return false;
-            }
-
-            public boolean writeField(int access, String name, String descriptor, @Nullable String signature) {
-                // Fits into the same table structure
-                return writeMethod(access, name, descriptor, signature, null, null, null);
-            }
-
-            public boolean writeField(int access, String name, String descriptor, @Nullable String signature, String @Nullable [] annotations) {
-                // Fits into the same table structure
-                return writeMethod(access, name, descriptor, signature, null, null, annotations);
             }
         }
     }
@@ -704,7 +676,6 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         String @Nullable [] superinterfaceSignatures;
 
-        @Nullable
         String @Nullable [] annotations;
 
         @NonFinal
