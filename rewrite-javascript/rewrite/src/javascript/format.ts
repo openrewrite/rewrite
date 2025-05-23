@@ -766,8 +766,10 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
         const ret = await super.visitNewClass(newClass, p) as J.NewClass;
         return produce(ret, draft => {
-            if (draft.class != undefined) {
-                //this.ensureSpace(draft.class.prefix);
+            if (draft.class) {
+                if (draft.class.kind == JS.Kind.TypeTreeExpression) {
+                    this.ensureSpace((draft.class as Draft<JS.TypeTreeExpression>).expression.prefix);
+                }
             }
         });
     }
