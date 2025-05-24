@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JavaScriptVisitor, JS} from '.';
+import {JS} from '.';
 import {JavaScriptParser} from './parser';
-import {JavaScriptPrinter} from './print';
-import {Cursor, Tree, PrintOutputCapture} from '..';
-import {J, emptySpace} from '../java';
-import {TypedTree} from '../java';
-import {JavaType} from '../java/type';
+import {Cursor} from '..';
+import {J} from '../java';
+import {JavaType, TypedTree} from '../java';
 import {JavaCoordinates} from './templating';
 import {produce} from "immer";
 import getType = TypedTree.getType;
@@ -50,6 +48,27 @@ export interface Capture {
      * This is set when the pattern matches and can be used directly in templates.
      */
     tree?: J;
+
+    /**
+     * Adds a type constraint to the capture.
+     */
+    ofType(type: string): Capture;
+}
+
+/**
+ * Implementation of the Capture interface.
+ */
+class CaptureImpl implements Capture {
+    constructor(
+        public name: string,
+        public typeConstraint?: string,
+        public isBackRef: boolean = false,
+        public tree?: J
+    ) {}
+
+    ofType(type: string): Capture {
+        return new CaptureImpl(this.name, type, this.isBackRef, this.tree);
+    }
 }
 
 /**
@@ -71,7 +90,7 @@ export function capture(name?: string, typeConstraint?: string): Capture {
     if (name === undefined) {
         name = `unnamed_${capture.nextUnnamedId++}`;
     }
-    return { name, typeConstraint, isBackRef: false };
+    return new CaptureImpl(name, typeConstraint);
 }
 
 // Static counter for generating unique IDs for unnamed captures
@@ -87,7 +106,7 @@ capture.nextUnnamedId = 1;
  * const pattern = match`${capture('expr')} || ${backRef('expr')}`;
  */
 export function backRef(name: string): Capture {
-    return { name, isBackRef: true };
+    return new CaptureImpl(name, undefined, true);
 }
 
 /**
@@ -576,6 +595,23 @@ export class Matcher {
  * const pattern = match`${capture('x')} + ${capture('y')}`;
  */
 export function match(strings: TemplateStringsArray, ...captures: Capture[]): Pattern {
+    // Check for undefined captures (indicates missing default parameters)
+    for (let i = 0; i < captures.length; i++) {
+        if (captures[i] === undefined || captures[i] === null) {
+            throw new Error(
+                `Capture parameter ${i} is undefined. ` +
+                `Make sure to provide default values for all parameters in your replace() function. ` +
+                `Example: (left = capture(), right = capture()) => ({...})`
+            );
+        }
+        if (typeof captures[i] !== 'object' || !('name' in captures[i])) {
+            throw new Error(
+                `Capture parameter ${i} is not a valid Capture object. ` +
+                `Expected a Capture created with capture(), got: ${typeof captures[i]}`
+            );
+        }
+    }
+    
     return new Pattern(strings, captures);
 }
 
@@ -635,10 +671,30 @@ export class TemplateGenerator {
         // Build the template string with parameter placeholders
         const templateString = this.buildTemplateString();
 
+        // Debug log
+        console.log("[DEBUG] Template string:", templateString);
+
+        // If the template string is empty, return undefined
+        if (!templateString.trim()) {
+            console.log("[DEBUG] Empty template string");
+            return undefined;
+        }
+
         // Parse the template string into an AST
         const parser = new JavaScriptParser();
         const parseResults = await parser.parse({text: templateString, sourcePath: 'template.ts'});
         const cu: JS.CompilationUnit = parseResults[0] as JS.CompilationUnit;
+
+        // Debug log
+        console.log("[DEBUG] Parse results:", JSON.stringify(parseResults, null, 2));
+        console.log("[DEBUG] Compilation unit:", JSON.stringify(cu, null, 2));
+        console.log("[DEBUG] Statements:", cu.statements ? cu.statements.length : 0);
+
+        // Check if there are any statements
+        if (!cu.statements || cu.statements.length === 0) {
+            console.log("[DEBUG] No statements in compilation unit");
+            return undefined;
+        }
 
         // Extract the relevant part of the AST
         const firstStatement = cu.statements[0].element;
@@ -668,7 +724,11 @@ export class TemplateGenerator {
                 const param = this.parameters[i];
                 if (typeof param.value === 'string') {
                     result += param.value;
+                } else if (param.value instanceof CaptureImpl) {
+                    // FIXME implement substitution
+                    result += '0';
                 } else if (param.value && typeof param.value === 'object' && param.value.kind) {
+                    // FIXME implement substitution
                     // If the parameter is an AST node, use a simple value that will be replaced later
                     // Use the valueSource if it's a literal, otherwise use a placeholder
                     if (param.value.kind === J.Kind.Literal && (param.value as J.Literal).valueSource) {
@@ -1050,4 +1110,84 @@ export class TemplateProcessor {
         // Otherwise, return the statement itself
         return firstStatement;
     }
+}
+
+/**
+ * Represents a replacement rule that can match a pattern and apply a template.
+ */
+export interface ReplaceRule {
+    tryApply(node: J, cursor: Cursor, coordinates: JavaCoordinates): Promise<J>;
+}
+
+/**
+ * Configuration for a replacement rule.
+ */
+export interface ReplaceConfig {
+    match: Pattern;
+    template: TemplateGenerator;
+}
+
+/**
+ * Implementation of a replacement rule.
+ */
+class ReplaceRuleImpl implements ReplaceRule {
+    constructor(
+        private readonly matchPattern: Pattern,
+        private readonly templateGenerator: TemplateGenerator
+    ) {}
+
+    async tryApply(node: J, cursor: Cursor, coordinates: JavaCoordinates): Promise<J> {
+        const matcher = this.matchPattern.against(node);
+
+        if (await matcher.matches()) {
+            const result = await this.templateGenerator.apply(cursor, coordinates);
+            return result || node; // Fallback to original if template fails
+        }
+
+        // Return the original node if no match
+        return node;
+    }
+}
+
+/**
+ * Creates a replacement rule using a builder function with default parameters.
+ *
+ * @param builderFn Function that takes capture objects (with defaults) and returns match/template config
+ * @returns A replacement rule that can be applied to AST nodes
+ *
+ * @example
+ * const swapOperands = replace((left = capture(), right = capture()) => ({
+ *     match: match`${left} + ${right}`,
+ *     template: template`${right} + ${left}`
+ * }));
+ *
+ * @example
+ * const swapLiterals = replace(
+ *     (left = capture().ofType('Literal'), right = capture().ofType('Literal')) => ({
+ *         match: match`${left} + ${right}`,
+ *         template: template`${right} + ${left}`
+ *     })
+ * );
+ */
+export function replace(
+    builderFn: () => ReplaceConfig
+): ReplaceRule {
+    // Call with no arguments to trigger default parameters
+    const config = builderFn();
+
+    // Ensure we have valid match and template properties
+    if (!config.match || !config.template) {
+        throw new Error('Builder function must return an object with match and template properties');
+    }
+
+    return new ReplaceRuleImpl(config.match, config.template);
+}
+
+// Alternative version that handles default parameters more explicitly
+export function replaceWithDefaults<T extends Capture[]>(
+    builderFn: (...captures: T) => ReplaceConfig,
+    ...defaultCaptures: T
+): ReplaceRule {
+    const { match: matchPattern, template: templateGenerator } = builderFn(...defaultCaptures);
+    return new ReplaceRuleImpl(matchPattern, templateGenerator);
 }

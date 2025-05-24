@@ -16,7 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {capture, match, template} from "../../../src/javascript/templating2";
+import {capture, match, replace, template} from "../../../src/javascript/templating2";
 import {createDraft, produce} from "immer";
 import {JavaCoordinates} from "../../../src/javascript/templating";
 import Mode = JavaCoordinates.Mode;
@@ -72,6 +72,30 @@ describe('match extraction', () => {
                         .apply(this.cursor, {tree: binary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
                 }
                 return binary;
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('const result = 1 + 2;', 'const result = 2 + 1;'),
+        );
+    });
+
+    test('extract parts of a binary expression using replace function', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+
+                const swapOperands = replace(
+                    (left = capture(), right = capture()) => ({
+                        match: match`${left} + ${right}`,
+                        template: template`${right} + ${left}`
+                    })
+                );
+                return await swapOperands.tryApply(binary, this.cursor, {
+                    tree: binary,
+                    loc: "EXPRESSION_PREFIX",
+                    mode: Mode.Replace
+                });
             }
         });
 
