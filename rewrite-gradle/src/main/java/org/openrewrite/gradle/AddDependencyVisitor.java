@@ -82,6 +82,9 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
     @Nullable
     private final Predicate<Cursor> insertPredicate;
 
+    @Nullable
+    private final DependencyModifier dependencyModifier;
+
     @Override
     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
         if (tree instanceof JavaSourceFile) {
@@ -254,6 +257,8 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
 
     @RequiredArgsConstructor
     private class InsertDependencyInOrder extends JavaIsoVisitor<ExecutionContext> {
+        public static final String KOTLIN_MAP_SEPARATOR = " = ";
+        public static final String GROOVY_MAP_SEPARATOR = ": ";
         private final String configuration;
 
         private final GradleProject gp;
@@ -290,29 +295,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
 
             J.Block body = (J.Block) dependenciesBlock.getBody();
 
-            String codeTemplate;
-            DependencyStyle style = autodetectDependencyStyle(body.getStatements());
-            if (style == DependencyStyle.String) {
-                if (!isKotlinDsl) {
-                    codeTemplate = "dependencies {\n" +
-                                   escapeIfNecessary(configuration) + " \"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
-                                   "\n}";
-                } else {
-                    codeTemplate = "dependencies {\n" +
-                                   configuration + "(\"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\")" +
-                                   "\n}";
-                }
-            } else {
-                if (!isKotlinDsl) {
-                    codeTemplate = "dependencies {\n" +
-                                   escapeIfNecessary(configuration) + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version: \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
-                                   "\n}";
-                } else {
-                    codeTemplate = "dependencies {\n" +
-                                   configuration + "(group = \"" + groupId + "\", name = \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version = \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier = \"" + classifier + "\"") + (extension == null ? "" : ", ext = \"" + extension + "\"") + ")" +
-                                   "\n}";
-                }
-            }
+            String codeTemplate = buildCodeTemplate(body, isKotlinDsl);
 
             Boolean requirePrintEqualsInput = ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT);
             ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
@@ -393,12 +376,29 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
 
             return m;
         }
-    }
 
-    private String escapeIfNecessary(String configurationName) {
-        // default is a gradle configuration created by the base plugin and a groovy keyword if
-        // it is used it needs to be escaped
-        return configurationName.equals("default") ? "'" + configurationName + "'" : configurationName;
+        private String buildCodeTemplate(J.Block body, boolean isKotlinDsl) {
+            DependencyStyle style = autodetectDependencyStyle(body.getStatements());
+            if (isKotlinDsl) {
+                return "dependencies {\n" + escapeIfNecessary(configuration) + "(" + (dependencyModifier == null ? "" : dependencyModifier.modifier + "(") + buildDependencyCodeTemplate(KOTLIN_MAP_SEPARATOR, style) + (dependencyModifier == null ? "" : ")") + ")" + "\n}";
+            } else {
+                return "dependencies {\n" + escapeIfNecessary(configuration) + " " + (dependencyModifier == null ? "" : dependencyModifier.modifier + "(") + buildDependencyCodeTemplate(GROOVY_MAP_SEPARATOR, style) + (dependencyModifier == null ? "" : ")") + "\n}";
+            }
+        }
+
+        private String buildDependencyCodeTemplate(String mapSeparator, DependencyStyle style) {
+            if (style == DependencyStyle.String) {
+                return "\"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"";
+            } else {
+                return "group" + mapSeparator + "\"" + groupId + "\", name" + mapSeparator + "\"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version" + mapSeparator + "\"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier" + mapSeparator + "\"" + classifier + "\"") + (extension == null ? "" : ", ext" + mapSeparator + "\"" + extension + "\"");
+            }
+        }
+
+        private String escapeIfNecessary(String configurationName) {
+            // default is a gradle configuration created by the base plugin and a groovy keyword if
+            // it is used it needs to be escaped
+            return configurationName.equals("default") ? "'" + configurationName + "'" : configurationName;
+        }
     }
 
     enum DependencyStyle {
@@ -431,5 +431,13 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
         }
 
         return string >= map ? DependencyStyle.String : DependencyStyle.Map;
+    }
+
+    @RequiredArgsConstructor
+    public enum DependencyModifier {
+        PLATFORM("platform"),
+        ENFORCED_PLATFORM("enforcedPlatform");
+
+        private final String modifier;
     }
 }
