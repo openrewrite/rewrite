@@ -1046,4 +1046,72 @@ class JavaTemplateMatchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void matchMemberReferenceAndLambda() {
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate refTemplate = JavaTemplate.builder("String::valueOf")
+                  .bindType("java.util.function.Function<Object, String>")
+                  .build();
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("(e)->e.toString()")
+                  .bindType("java.util.function.Function<Object, String>")
+                  .build();
+
+                @Override
+                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
+                    var matcher = refTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitMemberReference(memberRef, executionContext);
+                    }
+                }
+
+                @Override
+                public J visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
+                    var matcher = lambdaTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return lambdaTemplate.matches(getCursor()) ? SearchResult.found(lambda, "lambda") : super.visitLambda(lambda, executionContext);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(String::valueOf);
+                      test(e -> e.toString());
+                      test(x -> x.toString());
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test((e) -> e.toString());
+                      test(String::valueOf);
+                      test(String::valueOf);
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """
+          )
+        );
+    }
 }
