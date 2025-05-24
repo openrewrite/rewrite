@@ -68,7 +68,7 @@ describe('match extraction', () => {
                 const matcher = pattern.against(binary);
 
                 if (await matcher.matches()) {
-                    return template`${matcher.get(right)} + ${matcher.get(left)}`
+                    return template`${right} + ${left}`
                         .apply(this.cursor, {tree: binary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
                 }
                 return binary;
@@ -87,9 +87,6 @@ describe('match extraction', () => {
                 if (binary.operator.element === J.Binary.Type.Addition) {
                     // Create capture objects without explicit names
                     const {left, right} = {left: capture(), right: capture()};
-
-                    console.log("[DEBUG_LOG] Match test - Left capture name:", left.name);
-                    console.log("[DEBUG_LOG] Match test - Right capture name:", right.name);
 
                     // Create a pattern that matches "a + b" using the capture objects
                     const pattern = match`${left} + ${right}`;

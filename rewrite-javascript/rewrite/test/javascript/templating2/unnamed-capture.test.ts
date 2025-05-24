@@ -35,22 +35,12 @@ describe('unnamed capture', () => {
                     const pattern = match`${left} + ${right}`;
                     const matcher = pattern.against(binary);
 
-                    console.log("[DEBUG_LOG] Left capture name:", left.name);
-                    console.log("[DEBUG_LOG] Right capture name:", right.name);
-                    console.log("[DEBUG_LOG] Binary operator:", binary.operator.element);
-
                     const matches = await matcher.matches();
-                    console.log("[DEBUG_LOG] Pattern matches:", matches);
 
                     if (matches) {
                         // Extract the captured parts
                         const leftValue = matcher.get(left);
                         const rightValue = matcher.get(right);
-
-                        console.log("[DEBUG_LOG] Left capture name:", left.name);
-                        console.log("[DEBUG_LOG] Right capture name:", right.name);
-                        console.log("[DEBUG_LOG] Left value:", leftValue ? "defined" : "undefined");
-                        console.log("[DEBUG_LOG] Right value:", rightValue ? "defined" : "undefined");
 
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
@@ -70,4 +60,34 @@ describe('unnamed capture', () => {
             typescript('const result = 1 + 2;', 'const result = 2 + 1;'),
         );
     });
+
+    // test('more complex example', () => {
+    //     spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+    //         override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
+    //             const obj = capture();
+    //             const defaultValue = capture();
+    //             const property = capture();
+    //             const pattern = match`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`;
+    //             let matcher = pattern.against(ternary);
+    //             if (await matcher.matches()) {
+    //                 return template`${matcher.get(obj)}?.${matcher.get(property)} ?? ${matcher.get(defaultValue)}`
+    //                     .apply(this.cursor, {tree: ternary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
+    //             }
+    //             return super.visitTernary(ternary, p);
+    //         }
+    //     });
+    //
+    //     return spec.rewriteRun(
+    //         //language=typescript
+    //         typescript(`
+    //             function getName(user) {
+    //                 return user === null || user === undefined ? "default" : user.name;
+    //             }
+    //         `, `
+    //             function getName(user) {
+    //                 return user?.name ?? "default";
+    //             }
+    //         `),
+    //     );
+    // });
 });

@@ -44,6 +44,12 @@ export interface Capture {
      * Whether this is a back-reference to a previously captured node.
      */
     isBackRef?: boolean;
+
+    /**
+     * The captured tree node.
+     * This is set when the pattern matches and can be used directly in templates.
+     */
+    tree?: J;
 }
 
 /**
@@ -365,6 +371,16 @@ export class Matcher {
 
         // Store the binding
         this.bindings.set(captureName, target);
+
+        // Find the corresponding capture object and update its tree property
+        // Only if the pattern has a getCaptures method
+        if (typeof this.pattern.getCaptures === 'function') {
+            const capture = this.pattern.getCaptures().find(c => c.name === captureName);
+            if (capture) {
+                capture.tree = target;
+            }
+        }
+
         return true;
     }
 
@@ -815,13 +831,41 @@ class TemplateApplier {
  * @example
  * const literal = ...; // Some AST node
  * const result = template`${$(literal)}`.apply(cursor, coordinates);
+ * 
+ * @example
+ * // Using capture objects directly
+ * const left = capture('left');
+ * const right = capture('right');
+ * const pattern = match`${left} + ${right}`;
+ * const matcher = pattern.against(binary);
+ * if (await matcher.matches()) {
+ *     return template`${right} + ${left}`.apply(cursor, coordinates);
+ * }
  */
 export function $(value: any): Parameter {
+    // If value is a Capture object with a tree, use the tree
+    if (value && typeof value === 'object' && 'name' in value && 'tree' in value && value.tree) {
+        return { value: value.tree };
+    }
     return { value };
 }
 
 export function template(strings: TemplateStringsArray, ...parameters: any[]): TemplateGenerator {
-    return new TemplateGenerator(strings, parameters);
+    // Convert Capture objects to Parameter objects
+    const processedParameters = parameters.map(param => {
+        // If param is a Capture object with a tree, convert it to a Parameter
+        if (param && typeof param === 'object' && 'name' in param && 'tree' in param && param.tree) {
+            return { value: param.tree };
+        }
+        // If param is already a Parameter, return it as is
+        if (param && typeof param === 'object' && 'value' in param) {
+            return param;
+        }
+        // Otherwise, wrap it in a Parameter
+        return { value: param };
+    });
+
+    return new TemplateGenerator(strings, processedParameters);
 }
 
 /**
