@@ -31,7 +31,6 @@ import getType = TypedTree.getType;
 export interface Capture {
     /**
      * The name of the capture, used to retrieve the captured node later.
-     * For unnamed captures, this will be set to the property name in the object passed to against().
      */
     name: string;
 
@@ -45,42 +44,39 @@ export interface Capture {
      * Whether this is a back-reference to a previously captured node.
      */
     isBackRef?: boolean;
-
-    /**
-     * Whether this is an unnamed capture.
-     * If true, the name will be set to the property name in the object passed to against().
-     */
-    isUnnamedCapture?: boolean;
 }
 
 /**
  * Creates a capture specification for use in template patterns.
- * 
- * @param name The name of the capture, or undefined to use the property name from the against() method
+ *
+ * @param name The name of the capture, or undefined to generate a unique name
  * @param typeConstraint Optional type constraint
  * @returns A Capture object
- * 
+ *
  * @example
  * const pattern = match`${capture('x')} + ${capture('y', 'number')}`;
  * 
- * @example
- * // Using unnamed captures with property names
+ * // Using unnamed captures
+ * const {left, right} = {left: capture(), right: capture()};
  * const pattern = match`${left} + ${right}`;
- * const matcher = pattern.against(binary, {
- *     left: capture(),
- *     right: capture()
- * });
  */
 export function capture(name?: string, typeConstraint?: string): Capture {
-    return { name: name || '', typeConstraint, isBackRef: false, isUnnamedCapture: !name };
+    // Generate a unique name if none is provided
+    if (name === undefined) {
+        name = `unnamed_${capture.nextUnnamedId++}`;
+    }
+    return { name, typeConstraint, isBackRef: false };
 }
+
+// Static counter for generating unique IDs for unnamed captures
+capture.nextUnnamedId = 1;
 
 /**
  * Creates a back-reference to a previously captured node.
- * 
+ *
  * @param name The name of the previously captured node
  * @returns A Capture object configured as a back-reference
- * 
+ *
  * @example
  * const pattern = match`${capture('expr')} || ${backRef('expr')}`;
  */
@@ -97,7 +93,7 @@ export class Pattern {
 
     /**
      * Creates a new pattern from template parts and captures.
-     * 
+     *
      * @param templateParts The string parts of the template
      * @param captures The captures between the string parts
      */
@@ -108,45 +104,11 @@ export class Pattern {
 
     /**
      * Creates a matcher for this pattern against a specific AST node.
-     * 
+     *
      * @param ast The AST node to match against
-     * @param namedCaptures Optional object mapping property names to captures
      * @returns A Matcher object
-     * 
-     * @example
-     * // Using named captures
-     * const pattern = match`${left} + ${right}`;
-     * const matcher = pattern.against(binary, {
-     *     left: capture(),
-     *     right: capture()
-     * });
      */
-    against(ast: J, namedCaptures?: Record<string, Capture>): Matcher {
-        // If namedCaptures is provided, update the names of unnamed captures
-        if (namedCaptures) {
-            // Create a copy of the captures array to avoid modifying the original
-            const updatedCaptures = [...this.captures];
-
-            // Find unnamed captures in the pattern and update their names based on the property names
-            const unnamedCaptureIndices = updatedCaptures
-                .map((c, i) => c.isUnnamedCapture ? i : -1)
-                .filter(i => i !== -1);
-
-            let unnamedCaptureIndex = 0;
-            for (const [propName, capture] of Object.entries(namedCaptures)) {
-                if (capture.isUnnamedCapture) {
-                    // Get the next unnamed capture index
-                    if (unnamedCaptureIndex < unnamedCaptureIndices.length) {
-                        const index = unnamedCaptureIndices[unnamedCaptureIndex++];
-                        // Update the name of the capture
-                        updatedCaptures[index] = { ...updatedCaptures[index], name: propName };
-                    }
-                }
-            }
-
-            return new Matcher(new Pattern(this.templateParts, updatedCaptures), ast);
-        }
-
+    against(ast: J): Matcher {
         return new Matcher(this, ast);
     }
 
@@ -167,7 +129,7 @@ export class Pattern {
     /**
      * Gets the AST pattern for this pattern.
      * Lazily creates the pattern AST if it doesn't exist yet.
-     * 
+     *
      * @returns A Promise resolving to the AST pattern
      */
     async getPatternAst(): Promise<J> {
@@ -188,7 +150,7 @@ export class Matcher {
 
     /**
      * Creates a new matcher for a pattern against an AST node.
-     * 
+     *
      * @param pattern The pattern to match
      * @param ast The AST node to match against
      */
@@ -199,7 +161,7 @@ export class Matcher {
 
     /**
      * Checks if the pattern matches the AST node.
-     * 
+     *
      * @returns true if the pattern matches, false otherwise
      */
     async matches(): Promise<boolean> {
@@ -212,7 +174,7 @@ export class Matcher {
 
     /**
      * Gets a captured node by name or capture object.
-     * 
+     *
      * @param nameOrCapture The name of the capture or the capture object
      * @returns The captured node, or undefined if not found
      */
@@ -223,7 +185,7 @@ export class Matcher {
 
     /**
      * Gets all captured nodes.
-     * 
+     *
      * @returns A map of capture names to captured nodes
      */
     getAll(): Map<string, J> {
@@ -232,7 +194,7 @@ export class Matcher {
 
     /**
      * Matches a pattern node against a target node.
-     * 
+     *
      * @param pattern The pattern node
      * @param target The target node
      * @returns true if the pattern matches the target, false otherwise
@@ -270,7 +232,7 @@ export class Matcher {
 
     /**
      * Matches a binary expression.
-     * 
+     *
      * @param pattern The pattern binary expression
      * @param target The target binary expression
      * @returns true if the pattern matches the target, false otherwise
@@ -282,13 +244,13 @@ export class Matcher {
         }
 
         // Match left and right operands
-        return this.matchNode(pattern.left, target.left) && 
-               this.matchNode(pattern.right, target.right);
+        return this.matchNode(pattern.left, target.left) &&
+            this.matchNode(pattern.right, target.right);
     }
 
     /**
      * Matches an identifier.
-     * 
+     *
      * @param pattern The pattern identifier
      * @param target The target identifier
      * @returns true if the pattern matches the target, false otherwise
@@ -300,7 +262,7 @@ export class Matcher {
 
     /**
      * Matches a literal.
-     * 
+     *
      * @param pattern The pattern literal
      * @param target The target literal
      * @returns true if the pattern matches the target, false otherwise
@@ -312,7 +274,7 @@ export class Matcher {
 
     /**
      * Matches a template expression.
-     * 
+     *
      * @param pattern The pattern template expression
      * @param target The target template expression
      * @returns true if the pattern matches the target, false otherwise
@@ -343,7 +305,7 @@ export class Matcher {
 
     /**
      * Matches a generic node by matching all properties recursively.
-     * 
+     *
      * @param pattern The pattern node
      * @param target The target node
      * @returns true if the pattern matches the target, false otherwise
@@ -356,7 +318,7 @@ export class Matcher {
 
     /**
      * Checks if a node is a capture placeholder.
-     * 
+     *
      * @param node The node to check
      * @returns true if the node is a capture placeholder, false otherwise
      */
@@ -371,7 +333,7 @@ export class Matcher {
 
     /**
      * Checks if a node is a back-reference placeholder.
-     * 
+     *
      * @param node The node to check
      * @returns true if the node is a back-reference placeholder, false otherwise
      */
@@ -386,7 +348,7 @@ export class Matcher {
 
     /**
      * Handles a capture placeholder.
-     * 
+     *
      * @param pattern The pattern node
      * @param target The target node
      * @returns true if the capture is successful, false otherwise
@@ -408,7 +370,7 @@ export class Matcher {
 
     /**
      * Handles a back-reference placeholder.
-     * 
+     *
      * @param pattern The pattern node
      * @param target The target node
      * @returns true if the back-reference matches, false otherwise
@@ -429,31 +391,42 @@ export class Matcher {
 
     /**
      * Extracts the capture name from a placeholder.
-     * 
+     *
      * @param placeholder The placeholder string
      * @returns The capture name
      */
     private extractCaptureName(placeholder: string): string {
         // Extract capture name from "__capture_name_type__" format
-        const match = placeholder.match(/__capture_([^_]+)(?:_[^_]+)?__/);
-        return match ? match[1] : '';
+        // For unnamed captures, the format is "__capture_unnamed_N__" where N is a number
+        if (placeholder.startsWith('__capture_unnamed_')) {
+            const match = placeholder.match(/__capture_(unnamed_\d+)__/);
+            return match ? match[1] : '';
+        } else {
+            const match = placeholder.match(/__capture_([^_]+)(?:_[^_]+)?__/);
+            return match ? match[1] : '';
+        }
     }
 
     /**
      * Extracts the type constraint from a placeholder.
-     * 
+     *
      * @param placeholder The placeholder string
      * @returns The type constraint, or undefined if none
      */
     private extractTypeConstraint(placeholder: string): string | undefined {
         // Extract type constraint from "__capture_name_type__" format
-        const match = placeholder.match(/__capture_[^_]+_([^_]+)__/);
-        return match ? match[1] : undefined;
+        // Skip type constraint extraction for unnamed captures
+        if (placeholder.startsWith('__capture_unnamed_')) {
+            return undefined;
+        } else {
+            const match = placeholder.match(/__capture_[^_]+_([^_]+)__/);
+            return match ? match[1] : undefined;
+        }
     }
 
     /**
      * Extracts the back-reference name from a placeholder.
-     * 
+     *
      * @param placeholder The placeholder string
      * @returns The back-reference name
      */
@@ -465,7 +438,7 @@ export class Matcher {
 
     /**
      * Checks if a node matches a type constraint.
-     * 
+     *
      * @param node The node to check
      * @param typeConstraint The type constraint
      * @returns true if the node matches the type constraint, false otherwise
@@ -476,7 +449,7 @@ export class Matcher {
 
     /**
      * Checks if two nodes are equal.
-     * 
+     *
      * @param a The first node
      * @param b The second node
      * @returns true if the nodes are equal, false otherwise
@@ -504,20 +477,20 @@ export class Matcher {
 
     /**
      * Checks if two binary expressions are equal.
-     * 
+     *
      * @param a The first binary expression
      * @param b The second binary expression
      * @returns true if the expressions are equal, false otherwise
      */
     private binaryNodesAreEqual(a: J.Binary, b: J.Binary): boolean {
         return a.operator.element === b.operator.element &&
-               this.nodesAreEqual(a.left, b.left) &&
-               this.nodesAreEqual(a.right, b.right);
+            this.nodesAreEqual(a.left, b.left) &&
+            this.nodesAreEqual(a.right, b.right);
     }
 
     /**
      * Checks if two identifiers are equal.
-     * 
+     *
      * @param a The first identifier
      * @param b The second identifier
      * @returns true if the identifiers are equal, false otherwise
@@ -528,7 +501,7 @@ export class Matcher {
 
     /**
      * Checks if two literals are equal.
-     * 
+     *
      * @param a The first literal
      * @param b The second literal
      * @returns true if the literals are equal, false otherwise
@@ -539,7 +512,7 @@ export class Matcher {
 
     /**
      * Checks if two template expressions are equal.
-     * 
+     *
      * @param a The first template expression
      * @param b The second template expression
      * @returns true if the expressions are equal, false otherwise
@@ -564,7 +537,7 @@ export class Matcher {
 
     /**
      * Checks if two generic nodes are equal.
-     * 
+     *
      * @param a The first node
      * @param b The second node
      * @returns true if the nodes are equal, false otherwise
@@ -578,11 +551,11 @@ export class Matcher {
 
 /**
  * Tagged template function for creating patterns.
- * 
+ *
  * @param strings The string parts of the template
  * @param captures The captures between the string parts
  * @returns A Pattern object
- * 
+ *
  * @example
  * const pattern = match`${capture('x')} + ${capture('y')}`;
  */
@@ -603,21 +576,21 @@ export interface Parameter {
 
 /**
  * Template generator for creating AST nodes.
- * 
+ *
  * This class is used to generate AST nodes from templates. It's similar to the `Pattern` class,
  * but used for generating AST nodes rather than matching them.
- * 
+ *
  * The `TemplateGenerator` is created by the `template` tagged template function and provides
  * an `apply` method that generates an AST node and applies it to an existing AST.
- * 
+ *
  * @example
  * // Generate a literal AST node
  * const result = template`2`.apply(cursor, coordinates);
- * 
+ *
  * @example
  * // Generate an AST node with a parameter
  * const result = template`${$(2)}`.apply(cursor, coordinates);
- * 
+ *
  * @example
  * // Generate an AST node with an AST node parameter
  * const literal = ...; // Some AST node
@@ -626,7 +599,7 @@ export interface Parameter {
 export class TemplateGenerator {
     /**
      * Creates a new template generator.
-     * 
+     *
      * @param templateParts The string parts of the template
      * @param parameters The parameters between the string parts
      */
@@ -637,7 +610,7 @@ export class TemplateGenerator {
 
     /**
      * Applies the template to generate an AST node.
-     * 
+     *
      * @param cursor The cursor pointing to the current location in the AST
      * @param coordinates The coordinates specifying where and how to insert the generated AST
      * @returns A Promise resolving to the generated AST node
@@ -668,7 +641,7 @@ export class TemplateGenerator {
 
     /**
      * Builds a template string with parameter placeholders.
-     * 
+     *
      * @returns The template string
      */
     private buildTemplateString(): string {
@@ -710,16 +683,16 @@ class TemplateApplier {
 
     /**
      * Applies the template to the current AST.
-     * 
+     *
      * @returns A Promise resolving to the modified AST
      */
     async apply(): Promise<J | undefined> {
         const { tree, loc, mode } = this.coordinates;
 
         // Special case: If there's only one parameter and it's an AST node, use it directly
-        if (this.parameters.length === 1 && 
-            this.parameters[0].value && 
-            typeof this.parameters[0].value === 'object' && 
+        if (this.parameters.length === 1 &&
+            this.parameters[0].value &&
+            typeof this.parameters[0].value === 'object' &&
             this.parameters[0].value.kind) {
 
             // Create a copy of the parameter with the prefix from the target
@@ -743,7 +716,7 @@ class TemplateApplier {
 
     /**
      * Applies the template to an expression.
-     * 
+     *
      * @returns A Promise resolving to the modified AST
      */
     private async applyToExpression(): Promise<J | undefined> {
@@ -779,7 +752,7 @@ class TemplateApplier {
 
     /**
      * Applies the template to a statement.
-     * 
+     *
      * @returns A Promise resolving to the modified AST
      */
     private async applyToStatement(): Promise<J | undefined> {
@@ -789,7 +762,7 @@ class TemplateApplier {
 
     /**
      * Applies the template to a block.
-     * 
+     *
      * @returns A Promise resolving to the modified AST
      */
     private async applyToBlock(): Promise<J | undefined> {
@@ -800,36 +773,53 @@ class TemplateApplier {
 
 /**
  * Tagged template function for creating AST nodes.
- * 
+ *
  * This function provides a more intuitive and TypeScript-friendly way to create templates
  * compared to the old string-based API. Instead of using string templates with `#{}` syntax,
  * you can use tagged template literals with `$()` syntax.
- * 
+ *
  * @param strings The string parts of the template
  * @param parameters The parameters between the string parts
  * @returns A TemplateGenerator object
- * 
+ *
  * @example
  * // Old API:
  * new JavaScriptTemplate('2').apply(cursor, coordinates);
- * 
+ *
  * // New API:
  * template`2`.apply(cursor, coordinates);
- * 
+ *
  * @example
  * // Old API:
  * new JavaScriptTemplate('#{}').apply(cursor, coordinates, '2');
- * 
+ *
  * // New API:
  * template`${$(2)}`.apply(cursor, coordinates);
- * 
+ *
  * @example
  * // Old API:
  * new JavaScriptTemplate('#{any()}').apply(cursor, coordinates, astNode);
- * 
+ *
  * // New API:
  * template`${$(astNode)}`.apply(cursor, coordinates);
  */
+/**
+ * Creates a parameter for use in template literals.
+ *
+ * @param value The value to use as a parameter
+ * @returns A Parameter object
+ *
+ * @example
+ * const result = template`${$(2)}`.apply(cursor, coordinates);
+ * 
+ * @example
+ * const literal = ...; // Some AST node
+ * const result = template`${$(literal)}`.apply(cursor, coordinates);
+ */
+export function $(value: any): Parameter {
+    return { value };
+}
+
 export function template(strings: TemplateStringsArray, ...parameters: any[]): TemplateGenerator {
     return new TemplateGenerator(strings, parameters);
 }
@@ -841,7 +831,7 @@ export function template(strings: TemplateStringsArray, ...parameters: any[]): T
 export class TypeConstraintChecker {
     /**
      * Checks if a node matches a given type constraint.
-     * 
+     *
      * @param node The node to check
      * @param constraint The type constraint
      * @returns true if the node matches the constraint, false otherwise
@@ -867,7 +857,7 @@ export class TypeConstraintChecker {
 
     /**
      * Gets the type information from a node.
-     * 
+     *
      * @param node The node to get type information from
      * @returns The type information, or undefined if none
      */
@@ -877,7 +867,7 @@ export class TypeConstraintChecker {
 
     /**
      * Checks if a constraint is a primitive type constraint.
-     * 
+     *
      * @param constraint The constraint to check
      * @returns true if the constraint is a primitive type constraint, false otherwise
      */
@@ -888,7 +878,7 @@ export class TypeConstraintChecker {
 
     /**
      * Checks if a constraint is a class type constraint.
-     * 
+     *
      * @param constraint The constraint to check
      * @returns true if the constraint is a class type constraint, false otherwise
      */
@@ -899,7 +889,7 @@ export class TypeConstraintChecker {
 
     /**
      * Checks if a constraint is a union type constraint.
-     * 
+     *
      * @param constraint The constraint to check
      * @returns true if the constraint is a union type constraint, false otherwise
      */
@@ -909,7 +899,7 @@ export class TypeConstraintChecker {
 
     /**
      * Checks if a type matches a primitive type constraint.
-     * 
+     *
      * @param typeInfo The type information
      * @param constraint The constraint
      * @returns true if the type matches the constraint, false otherwise
@@ -921,7 +911,7 @@ export class TypeConstraintChecker {
 
     /**
      * Checks if a type matches a class type constraint.
-     * 
+     *
      * @param typeInfo The type information
      * @param constraint The constraint
      * @returns true if the type matches the constraint, false otherwise
@@ -933,7 +923,7 @@ export class TypeConstraintChecker {
 
     /**
      * Checks if a type matches a union type constraint.
-     * 
+     *
      * @param typeInfo The type information
      * @param constraint The constraint
      * @returns true if the type matches the constraint, false otherwise
@@ -952,7 +942,7 @@ export class TypeConstraintChecker {
 export class TemplateProcessor {
     /**
      * Creates a new template processor.
-     * 
+     *
      * @param templateParts The string parts of the template
      * @param captures The captures between the string parts
      */
@@ -963,7 +953,7 @@ export class TemplateProcessor {
 
     /**
      * Converts the template to an AST pattern.
-     * 
+     *
      * @returns A Promise resolving to the AST pattern
      */
     async toAstPattern(): Promise<J> {
@@ -981,7 +971,7 @@ export class TemplateProcessor {
 
     /**
      * Builds a template string with placeholders for captures.
-     * 
+     *
      * @returns The template string
      */
     private buildTemplateString(): string {
@@ -990,8 +980,8 @@ export class TemplateProcessor {
             result += this.templateParts[i];
             if (i < this.captures.length) {
                 const capture = this.captures[i];
-                result += capture.isBackRef 
-                    ? `__backRef_${capture.name}__` 
+                result += capture.isBackRef
+                    ? `__backRef_${capture.name}__`
                     : `__capture_${capture.name}${capture.typeConstraint ? `_${capture.typeConstraint}` : ''}__`;
             }
         }
@@ -1000,7 +990,7 @@ export class TemplateProcessor {
 
     /**
      * Extracts the pattern from the parsed AST.
-     * 
+     *
      * @param cu The compilation unit
      * @returns The extracted pattern
      */

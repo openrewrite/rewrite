@@ -16,11 +16,11 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
-import {template, $} from "../../../src/javascript/templating2";
+import {$, template} from "../../../src/javascript/templating2";
 import {JavaCoordinates} from "../../../src/javascript/templating";
 import {produce} from "immer";
-import Mode = JavaCoordinates.Mode;
 import {produceAsync} from "../../../src";
+import Mode = JavaCoordinates.Mode;
 
 describe('template2 replace', () => {
     const spec = new RecipeSpec();
@@ -85,7 +85,7 @@ describe('template2 replace', () => {
                 if (binary.operator.element === J.Binary.Type.Equal) {
                     return await produceAsync(binary, async draft => {
 
-                        draft.left = (await template`${binary.right}`.apply(
+                        draft.left = (await template`${$(binary.right)}`.apply(
                             this.cursor,
                             {tree: binary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}
                         )) as Expression;

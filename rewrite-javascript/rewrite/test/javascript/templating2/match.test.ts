@@ -80,4 +80,42 @@ describe('match extraction', () => {
             typescript('const result = 1 + 2;', 'const result = 2 + 1;'),
         );
     });
+
+    test('extract parts of a binary expression using unnamed captures', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                if (binary.operator.element === J.Binary.Type.Addition) {
+                    // Create capture objects without explicit names
+                    const {left, right} = {left: capture(), right: capture()};
+
+                    console.log("[DEBUG_LOG] Match test - Left capture name:", left.name);
+                    console.log("[DEBUG_LOG] Match test - Right capture name:", right.name);
+
+                    // Create a pattern that matches "a + b" using the capture objects
+                    const pattern = match`${left} + ${right}`;
+                    const matcher = pattern.against(binary);
+
+                    if (await matcher.matches()) {
+                        // Extract the captured parts
+                        const leftValue = matcher.get(left);
+                        const rightValue = matcher.get(right);
+
+                        // Create a new binary expression with the swapped operands
+                        return produce(binary, draft => {
+                            draft.left = createDraft(rightValue!);
+                            draft.prefix = binary.left.prefix;
+                            draft.right = createDraft(leftValue!);
+                            draft.right.prefix = binary.right.prefix;
+                        });
+                    }
+                }
+                return binary;
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('const result = 1 + 2;', 'const result = 2 + 1;'),
+        );
+    });
 });
