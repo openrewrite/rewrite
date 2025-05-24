@@ -553,33 +553,6 @@ export interface Parameter {
 }
 
 /**
- * Creates a parameter specification for use in templates.
- * 
- * This function is used to create parameters for the `template` tagged template function.
- * It's similar to how `capture` is used with the `match` function, but for template generation
- * rather than pattern matching.
- * 
- * @param value The value to substitute into the template
- * @returns A Parameter object
- * 
- * @example
- * // Simple value parameter
- * template`const x = ${$(2)};`
- * 
- * @example
- * // AST node parameter
- * const literal = ...; // Some AST node
- * template`const x = ${$(literal)};`
- * 
- * @example
- * // Multiple parameters
- * template`const x = ${$(a)} + ${$(b)};`
- */
-export function $(value: any): Parameter {
-    return { value };
-}
-
-/**
  * Template generator for creating AST nodes.
  * 
  * This class is used to generate AST nodes from templates. It's similar to the `Pattern` class,
@@ -808,7 +781,7 @@ class TemplateApplier {
  * // New API:
  * template`${$(astNode)}`.apply(cursor, coordinates);
  */
-export function template(strings: TemplateStringsArray, ...parameters: Parameter[]): TemplateGenerator {
+export function template(strings: TemplateStringsArray, ...parameters: any[]): TemplateGenerator {
     return new TemplateGenerator(strings, parameters);
 }
 

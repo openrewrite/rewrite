@@ -85,7 +85,7 @@ describe('template2 replace', () => {
                 if (binary.operator.element === J.Binary.Type.Equal) {
                     return await produceAsync(binary, async draft => {
 
-                        draft.left = (await template`${$(binary.right)}`.apply(
+                        draft.left = (await template`${binary.right}`.apply(
                             this.cursor,
                             {tree: binary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}
                         )) as Expression;

@@ -16,8 +16,10 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {capture, match} from "../../../src/javascript/templating2";
+import {capture, match, template} from "../../../src/javascript/templating2";
 import {createDraft, produce} from "immer";
+import {JavaCoordinates} from "../../../src/javascript/templating";
+import Mode = JavaCoordinates.Mode;
 
 describe('match extraction', () => {
     const spec = new RecipeSpec();
@@ -66,15 +68,8 @@ describe('match extraction', () => {
                 const matcher = pattern.against(binary);
 
                 if (await matcher.matches()) {
-                    // Extract the captured parts using the capture objects
-                    // Create a new binary expression with the swapped operands
-                    return produce(binary, draft => {
-                        draft.left = createDraft((matcher.get(right))!);
-                        draft.prefix = binary.left.prefix;
-
-                        draft.right = createDraft((matcher.get(left))!);
-                        draft.right.prefix = binary.right.prefix;
-                    });
+                    return template`${matcher.get(right)} + ${matcher.get(left)}`
+                        .apply(this.cursor, {tree: binary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
                 }
                 return binary;
             }
