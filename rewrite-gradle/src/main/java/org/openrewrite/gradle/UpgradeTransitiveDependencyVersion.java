@@ -175,6 +175,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     @Value
     public static class DependencyVersionState {
         Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject = new LinkedHashMap<>();
+        Set<GradleProject> modules = new HashSet<>();
     }
 
     @Override
@@ -200,6 +201,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
+                    acc.modules.add(gradleProject);
                     acc.updatesPerProject.putIfAbsent(getGradleProjectKey(gradleProject), new HashMap<>());
 
                     DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
@@ -314,7 +316,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         break;
                 }
 
-                if (onlyForConfigurations != null) {
+                if (onlyForConfigurations != null && !onlyForConfigurations.isEmpty()) {
                     if (!onlyForConfigurations.contains(constraintConfigName)) {
                         return null;
                     }
@@ -341,7 +343,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc.getUpdatesPerProject());
-            private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock();
+            private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock(acc.modules);
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
