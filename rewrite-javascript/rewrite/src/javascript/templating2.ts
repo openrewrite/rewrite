@@ -31,6 +31,7 @@ import getType = TypedTree.getType;
 export interface Capture {
     /**
      * The name of the capture, used to retrieve the captured node later.
+     * For unnamed captures, this will be set to the property name in the object passed to against().
      */
     name: string;
 
@@ -44,20 +45,34 @@ export interface Capture {
      * Whether this is a back-reference to a previously captured node.
      */
     isBackRef?: boolean;
+
+    /**
+     * Whether this is an unnamed capture.
+     * If true, the name will be set to the property name in the object passed to against().
+     */
+    isUnnamedCapture?: boolean;
 }
 
 /**
  * Creates a capture specification for use in template patterns.
  * 
- * @param name The name of the capture
+ * @param name The name of the capture, or undefined to use the property name from the against() method
  * @param typeConstraint Optional type constraint
  * @returns A Capture object
  * 
  * @example
  * const pattern = match`${capture('x')} + ${capture('y', 'number')}`;
+ * 
+ * @example
+ * // Using unnamed captures with property names
+ * const pattern = match`${left} + ${right}`;
+ * const matcher = pattern.against(binary, {
+ *     left: capture(),
+ *     right: capture()
+ * });
  */
-export function capture(name: string, typeConstraint?: string): Capture {
-    return { name, typeConstraint, isBackRef: false };
+export function capture(name?: string, typeConstraint?: string): Capture {
+    return { name: name || '', typeConstraint, isBackRef: false, isUnnamedCapture: !name };
 }
 
 /**
@@ -95,9 +110,43 @@ export class Pattern {
      * Creates a matcher for this pattern against a specific AST node.
      * 
      * @param ast The AST node to match against
+     * @param namedCaptures Optional object mapping property names to captures
      * @returns A Matcher object
+     * 
+     * @example
+     * // Using named captures
+     * const pattern = match`${left} + ${right}`;
+     * const matcher = pattern.against(binary, {
+     *     left: capture(),
+     *     right: capture()
+     * });
      */
-    against(ast: J): Matcher {
+    against(ast: J, namedCaptures?: Record<string, Capture>): Matcher {
+        // If namedCaptures is provided, update the names of unnamed captures
+        if (namedCaptures) {
+            // Create a copy of the captures array to avoid modifying the original
+            const updatedCaptures = [...this.captures];
+
+            // Find unnamed captures in the pattern and update their names based on the property names
+            const unnamedCaptureIndices = updatedCaptures
+                .map((c, i) => c.isUnnamedCapture ? i : -1)
+                .filter(i => i !== -1);
+
+            let unnamedCaptureIndex = 0;
+            for (const [propName, capture] of Object.entries(namedCaptures)) {
+                if (capture.isUnnamedCapture) {
+                    // Get the next unnamed capture index
+                    if (unnamedCaptureIndex < unnamedCaptureIndices.length) {
+                        const index = unnamedCaptureIndices[unnamedCaptureIndex++];
+                        // Update the name of the capture
+                        updatedCaptures[index] = { ...updatedCaptures[index], name: propName };
+                    }
+                }
+            }
+
+            return new Matcher(new Pattern(this.templateParts, updatedCaptures), ast);
+        }
+
         return new Matcher(this, ast);
     }
 
