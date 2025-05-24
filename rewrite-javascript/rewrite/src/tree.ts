@@ -43,6 +43,10 @@ export function isTree(tree: any): tree is Tree {
     );
 }
 
+export function isScope(a: Tree, b: Tree): boolean {
+    return a !== undefined && b !== undefined && (a === b || a.id === b.id);
+}
+
 export class Cursor {
     private _messages?: Map<string | symbol, any>;
 
