@@ -16,8 +16,16 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
@@ -69,8 +77,8 @@ class GradleParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(4);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Import.class);
-                J.Import i = (J.Import) cu.getStatements().get(0);
+                assertThat(cu.getStatements().getFirst()).isInstanceOf(J.Import.class);
+                J.Import i = (J.Import) cu.getStatements().getFirst();
                 assertThat(i.getTypeName()).isEqualTo("org.gradle.api.Project");
                 assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodInvocation.class);
                 J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(3);
@@ -261,5 +269,99 @@ class GradleParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInSingleDoubleQuotes() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
+          }
+          
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', "RESPONSE=\\$(curl --location -s --request POST \\"https://localhost/$path\\")"
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInSingleSingleQuotes() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
+          }
+          
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', 'RESPONSE=\\$(curl --location -s --request POST "https://localhost/$path")'
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInTripleDoubleQuotes() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
+          }
+          
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', \"""
+                          RESPONSE=\\$(curl --location -s --request POST "https://localhost")
+                          echo "TEST" > "\\$(echo $someVar)"
+                      \"""
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInTripleSingleQuotes() {
+        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
+          }
+          
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', '''
+                          RESPONSE=\\$(curl --location -s --request POST "https://localhost")
+                          echo "TEST" > "\\$(echo $someVar)"
+                      '''
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
     }
 }

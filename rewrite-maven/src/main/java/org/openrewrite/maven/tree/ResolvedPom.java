@@ -554,7 +554,7 @@ public class ResolvedPom {
                         boolean found = false;
                         for (Dependency reqDep : requestedDependencies) {
                             if (reqDep.getGav().getGroupId().equals(incReqDep.getGav().getGroupId()) &&
-                                reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
+                                    reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
                                 found = true;
                                 break;
                             }
@@ -695,7 +695,7 @@ public class ResolvedPom {
                     // PHASE
                     String mergedPhase = currentExecution.getPhase();
                     if (incomingExecution.getPhase() != null &&
-                        !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
+                            !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
                         mergedPhase = incomingExecution.getPhase();
                     }
                     // CONFIGURATION
@@ -875,8 +875,8 @@ public class ResolvedPom {
                             // Add one to the depth to account for the BOM which brings it in
                             int depthPlusBom = depth + 1;
                             if (existing == null || existing.depth > depthPlusBom ||
-                                // If they have the same depth prefer the explicitly defined one
-                                (existing.depth == depthPlusBom && existing.getDependency().getBomGav() != null && managed.getBomGav() == null)) {
+                                    // If they have the same depth prefer the explicitly defined one
+                                    (existing.depth == depthPlusBom && existing.getDependency().getBomGav() != null && managed.getBomGav() == null)) {
 
                                 return new ResolvedManagedDependencyDepth(managed, depthPlusBom);
                             }
@@ -912,8 +912,8 @@ public class ResolvedPom {
                 Pom pom = pomAncestry.get(i);
                 ResolvedGroupArtifactVersion alreadyResolvedGav = pom.getGav();
                 if (alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId()) &&
-                    alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId()) &&
-                    alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
+                        alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId()) &&
+                        alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
                     return true;
                 }
             }
@@ -951,9 +951,13 @@ public class ResolvedPom {
                 d = getValues(d, depth);
                 try {
                     if (depth == 0 && d.getVersion() == null) {
-                        throw new MavenDownloadingException("No version provided for direct dependency", null, dd.getDependency().getGav());
+                        String coordinates = d.getGav() +
+                                (d.getClassifier() == null ? "" : ":" + d.getClassifier()) +
+                                (d.getType() == null ? "" : ":" + d.getType()) +
+                                (d.getScope() == null ? "" : ":" + d.getScope());
+                        throw new MavenDownloadingException("No version provided for direct dependency " + coordinates, null, dd.getDependency().getGav());
                     }
-                    if (d.getVersion() == null || (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType())))) {
+                    if (d.getVersion() == null || (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType()) && !"bom".equals(d.getType())))) {
                         continue;
                     }
 
@@ -994,8 +998,8 @@ public class ResolvedPom {
                     }
 
                     if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
-                        (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
-                        (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
+                            (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
+                            (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
                         throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
                     }
 
@@ -1005,7 +1009,8 @@ public class ResolvedPom {
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
                         resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
+                                emptyList(), initialRepositories, emptyList(), emptyList(),
+                                emptyList(), emptyList(), emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
@@ -1049,7 +1054,7 @@ public class ResolvedPom {
                             d2 = d2.withExclusions(ListUtils.concatAll(d2.getExclusions(), d.getExclusions()));
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
-                                    matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
                                     if (resolved.getEffectiveExclusions().isEmpty()) {
                                         resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                     }
@@ -1088,7 +1093,7 @@ public class ResolvedPom {
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
         for (ResolvedDependency it : dependencies) {
             if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId()) &&
-                (Objects.equals(classifier, it.getClassifier()))) {
+                    (Objects.equals(classifier, it.getClassifier()))) {
                 return true;
             }
         }

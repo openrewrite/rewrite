@@ -25,7 +25,9 @@ export const JavaScriptStyles = {
 
 export const StyleKind = {
     SpacesStyle: "org.openrewrite.javascript.style.SpacesStyle",
-    WrappingAndBracesStyle: "org.openrewrite.java.style.WrappingAndBracesStyle",
+    WrappingAndBracesStyle: "org.openrewrite.javascript.style.WrappingAndBracesStyle",
+    BlankLinesStyle: "org.openrewrite.javascript.style.BlankLinesStyle",
+    TabsAndIndentsStyle: "org.openrewrite.javascript.style.TabsAndIndentsStyle"
 } as const;
 
 export const SpacesStyleDetailKind = {
@@ -145,7 +147,6 @@ export namespace SpacesStyle {
     }
 }
 
-
 export const WrappingAndBracesStyleDetailKind = {
     WrappingAndBracesStyleIfStatement: "org.openrewrite.java.style.WrappingAndBracesStyle$IfStatement",
 } as const;
@@ -163,6 +164,39 @@ export namespace WrappingAndBracesStyle {
     }
 }
 
+export interface BlankLinesStyle extends Style {
+    readonly kind: "org.openrewrite.javascript.style.BlankLinesStyle";
+    readonly keepMaximum: BlankLinesStyle.KeepMaximum;
+    readonly minimum: BlankLinesStyle.Minimum;
+}
+
+export namespace BlankLinesStyle {
+    export interface KeepMaximum {
+        readonly inCode: number;
+    }
+
+    export interface Minimum {
+        readonly afterImports: number;
+        readonly aroundClass: number;
+        readonly aroundFieldInInterface?: number;
+        readonly aroundField: number;
+        readonly aroundMethodInInterface?: number;
+        readonly aroundMethod: number;
+        readonly aroundFunction: number;
+    }
+}
+
+export interface TabsAndIndentsStyle extends Style {
+    readonly kind: typeof StyleKind.TabsAndIndentsStyle;
+    readonly useTabCharacter: boolean;
+    readonly tabSize: number;
+    readonly indentSize: number;
+    readonly continuationIndent: number;
+    readonly keepIndentsOnEmptyLines: boolean;
+    readonly indentChainedMethods: boolean;
+    readonly indentAllChainedCallsInAGroup: boolean;
+}
+
 export namespace IntelliJ {
     export namespace JavaScript {
         export const defaults: NamedStyles<typeof JavaScriptStyles.IntelliJ> = {
@@ -172,7 +206,7 @@ export namespace IntelliJ {
             displayName: "IntelliJ IDEA",
             description: "Default IntelliJ IDEA code style.",
             tags: [],
-            styles: [spaces(), wrappingAndBraces()],
+            styles: [spaces(), wrappingAndBraces(), blankLines(), tabsAndIndents()],
         }
 
         export function spaces(): SpacesStyle {
@@ -277,6 +311,35 @@ export namespace IntelliJ {
                 }
             };
         }
+
+        export function blankLines(): BlankLinesStyle {
+            return {
+                kind: StyleKind.BlankLinesStyle,
+                keepMaximum: {
+                    inCode: 2
+                },
+                minimum: {
+                    afterImports: 1,
+                    aroundClass: 1,
+                    aroundField: 0,
+                    aroundMethod: 1,
+                    aroundFunction: 1
+                }
+            };
+        }
+
+        export function tabsAndIndents(): TabsAndIndentsStyle {
+            return {
+                kind: StyleKind.TabsAndIndentsStyle,
+                useTabCharacter: false,
+                tabSize: 4,
+                indentSize: 4,
+                continuationIndent: 4,
+                keepIndentsOnEmptyLines: false,
+                indentChainedMethods: true,
+                indentAllChainedCallsInAGroup: false
+            };
+        }
     }
 
     export namespace TypeScript {
@@ -287,7 +350,7 @@ export namespace IntelliJ {
             displayName: "IntelliJ IDEA",
             description: "Default IntelliJ IDEA code style.",
             tags: [],
-            styles: [spaces(), wrappingAndBraces()],
+            styles: [spaces(), wrappingAndBraces(), blankLines(), tabsAndIndents()],
         }
 
         export function spaces(): SpacesStyle {
@@ -390,6 +453,37 @@ export namespace IntelliJ {
                     kind: WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement,
                     elseOnNewLine: false
                 }
+            };
+        }
+
+        export function blankLines(): BlankLinesStyle {
+            return {
+                kind: StyleKind.BlankLinesStyle,
+                keepMaximum: {
+                    inCode: 2
+                },
+                minimum: {
+                    afterImports: 1,
+                    aroundClass: 1,
+                    aroundFieldInInterface: 0,
+                    aroundField: 0,
+                    aroundMethodInInterface: 1,
+                    aroundMethod: 1,
+                    aroundFunction: 1
+                }
+            };
+        }
+
+        export function tabsAndIndents(): TabsAndIndentsStyle {
+            return {
+                kind: StyleKind.TabsAndIndentsStyle,
+                useTabCharacter: false,
+                tabSize: 4,
+                indentSize: 4,
+                continuationIndent: 4,
+                keepIndentsOnEmptyLines: false,
+                indentChainedMethods: true,
+                indentAllChainedCallsInAGroup: false
             };
         }
     }

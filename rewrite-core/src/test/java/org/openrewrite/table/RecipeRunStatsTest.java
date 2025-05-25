@@ -75,7 +75,7 @@ class RecipeRunStatsTest implements RewriteTest {
               assertThat(rows)
                 .as("Running a single recipe on a single source should produce a single row in the RecipeRunStats table")
                 .hasSize(1);
-              RecipeRunStats.Row row = rows.get(0);
+              RecipeRunStats.Row row = rows.getFirst();
               assertThat(row.getRecipe()).endsWith("RecipeWithApplicabilityTest");
               assertThat(row.getSourceFiles())
                 .as("Test framework will invoke the recipe once when it is expected to make a change, " +

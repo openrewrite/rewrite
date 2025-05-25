@@ -38,6 +38,8 @@ export interface SourceSpec<T extends SourceFile> {
 }
 
 export class RecipeSpec {
+    checkParsePrintIdempotence: boolean = true
+
     recipe: Recipe = new NoopRecipe()
 
     /**
@@ -71,7 +73,7 @@ export class RecipeSpec {
             const specs = specsByKind[kind];
             const parsed = await this.parse(specs);
             await this.expectNoParseFailures(parsed);
-            await this.expectParsePrintIdempotence(parsed);
+            this.checkParsePrintIdempotence && await this.expectParsePrintIdempotence(parsed);
             const changeset = (await scheduleRun(this.recipe,
                 parsed.map(([_, sourceFile]) => sourceFile),
                 this.recipeExecutionContext)).changeset;
@@ -113,7 +115,11 @@ export class RecipeSpec {
             })?.after;
 
             if (!spec.after) {
-                expect(after).not.toBeDefined();
+                if (after) {
+                    expect(await TreePrinters.print(after)).toEqual(dedent(spec.before!));
+                    // TODO: Consider throwing an error, as there should typically have been no change to the LST
+                    // fail("Expected after to be undefined.");
+                }
                 if (spec.afterRecipe) {
                     spec.afterRecipe(matchingSpec![1]);
                 }

@@ -26,7 +26,7 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-yaml"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
 
     integTestImplementation(project(":rewrite-json"))
     integTestImplementation(project(":rewrite-java-tck"))

@@ -44,7 +44,7 @@ class MethodDeclarationTest implements RewriteTest {
               }
               """,
             spec -> spec.beforeRecipe(cu -> {
-                var method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                var method = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
                 JavaType.Method methodType = method.getMethodType();
                 assertThat(methodType).isNotNull();
                 assertThat(methodType.getName()).isEqualTo("method");
@@ -260,7 +260,7 @@ class MethodDeclarationTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(1);
-                J.VariableDeclarations m = (J.VariableDeclarations) accept.getParameters().get(0);
+                J.VariableDeclarations m = (J.VariableDeclarations) accept.getParameters().getFirst();
                 assertThat(m.getModifiers()).satisfiesExactly(
                   mod -> assertThat(mod.getType()).isEqualTo(J.Modifier.Type.Final),
                   mod -> assertThat(mod.getKeyword()).isEqualTo("def")
@@ -279,7 +279,7 @@ class MethodDeclarationTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(0);
+                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().getFirst();
                 assertThat(accept.getReturnTypeExpression()).isNull();
             })
           )

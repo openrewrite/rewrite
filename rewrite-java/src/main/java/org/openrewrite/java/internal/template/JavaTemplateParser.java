@@ -276,7 +276,7 @@ public class JavaTemplateParser {
                 .findFirst()
                 .filter(JavaSourceFile.class::isInstance) // Filters out ParseErrors
                 .map(JavaSourceFile.class::cast)
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java:\n" + stub));
     }
 
     /**

@@ -430,8 +430,8 @@ class SemanticallyEqualTest {
               ).findFirst()
               .map(J.CompilationUnit.class::cast)
               .get();
-            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
-            J.Assignment a = (J.Assignment) m.getBody().getStatements().get(0);
+            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(1);
+            J.Assignment a = (J.Assignment) m.getBody().getStatements().getFirst();
             assertFalse(SemanticallyEqual.areEqual(a.getVariable(), a.getAssignment()));
             assertFalse(SemanticallyEqual.areEqual(((J.FieldAccess) a.getVariable()).getName(), a.getAssignment()));
         }
@@ -450,8 +450,8 @@ class SemanticallyEqualTest {
               ).findFirst()
               .map(J.CompilationUnit.class::cast)
               .get();
-            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
-            J.Binary b = (J.Binary) ((J.Return) m.getBody().getStatements().get(0)).getExpression();
+            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(1);
+            J.Binary b = (J.Binary) ((J.Return) m.getBody().getStatements().getFirst()).getExpression();
             assertFalse(SemanticallyEqual.areEqual(b.getLeft(), b.getRight()));
         }
     }

@@ -129,7 +129,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         Validated<Object> validation = dr.validate();
         assertThat(validation.isValid()).isFalse();
         assertThat(validation.failures().size()).isEqualTo(2);
-        assertThat(validation.failures().get(0).getProperty()).isEqualTo("initialization");
+        assertThat(validation.failures().getFirst().getProperty()).isEqualTo("initialization");
     }
 
     @Test

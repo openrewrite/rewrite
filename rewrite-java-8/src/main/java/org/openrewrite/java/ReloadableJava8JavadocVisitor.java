@@ -700,7 +700,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     private static boolean paramTypeMatches(JavaType parameterType, JavaType mappedJavadocType) {
         if (parameterType instanceof JavaType.Array && mappedJavadocType instanceof JavaType.Array) {
             if (((JavaType.Array) parameterType).getElemType() instanceof JavaType.Primitive) {
-                return TypeUtils.isAssignableTo(parameterType, mappedJavadocType, TypeUtils.TypePosition.In);
+                return TypeUtils.isAssignableTo(parameterType, mappedJavadocType);
             }
             return paramTypeMatches(((JavaType.Array) parameterType).getElemType(), ((JavaType.Array) mappedJavadocType).getElemType());
         } else if (parameterType instanceof JavaType.GenericTypeVariable && !((JavaType.GenericTypeVariable) parameterType).getBounds().isEmpty()) {
@@ -710,7 +710,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         } else if (parameterType instanceof JavaType.Parameterized && !(mappedJavadocType instanceof JavaType.Parameterized)) {
             return paramTypeMatches(((JavaType.Parameterized) parameterType).getType(), mappedJavadocType);
         }
-        return TypeUtils.isAssignableTo(parameterType, mappedJavadocType, TypeUtils.TypePosition.In);
+        return TypeUtils.isAssignableTo(parameterType, mappedJavadocType);
     }
 
     private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
@@ -1150,6 +1150,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
             NameTree id = (NameTree) javaVisitor.scan(node.getType(), Space.EMPTY);
             List<JRightPadded<Expression>> expressions = new ArrayList<>(node.getTypeArguments().size());
+            String spaceBeforeTypeParams = whitespaceBeforeAsString();
             cursor += 1; // skip '<', JavaDocVisitor does not interpret List <Integer> as Parameterized.
             int argsSize = node.getTypeArguments().size();
             for (int i = 0; i < argsSize; i++) {
@@ -1164,7 +1165,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 expression = expression.withAfter(after);
                 expressions.add(expression);
             }
-            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions), typeMapping.type(node));
+            JContainer<Expression> typeArgs = JContainer.build(expressions)
+                    .withBefore(Space.build(spaceBeforeTypeParams, emptyList()));
+            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, typeArgs, typeMapping.type(node));
         }
     }
 }
