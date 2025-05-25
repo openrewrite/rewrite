@@ -16,7 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {capture, match, template} from "../../../src/javascript/templating2";
+import {capture, match, replace, template} from "../../../src/javascript/templating2";
 import {createDraft, produce} from "immer";
 import {JavaCoordinates} from "../../../src/javascript/templating";
 import Mode = JavaCoordinates.Mode;
@@ -61,33 +61,63 @@ describe('unnamed capture', () => {
         );
     });
 
-    // test('more complex example', () => {
-    //     spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-    //         override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
-    //             const obj = capture();
-    //             const defaultValue = capture();
-    //             const property = capture();
-    //             const pattern = match`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`;
-    //             let matcher = pattern.against(ternary);
-    //             if (await matcher.matches()) {
-    //                 return template`${matcher.get(obj)}?.${matcher.get(property)} ?? ${matcher.get(defaultValue)}`
-    //                     .apply(this.cursor, {tree: ternary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
-    //             }
-    //             return super.visitTernary(ternary, p);
-    //         }
-    //     });
-    //
-    //     return spec.rewriteRun(
-    //         //language=typescript
-    //         typescript(`
-    //             function getName(user) {
-    //                 return user === null || user === undefined ? "default" : user.name;
-    //             }
-    //         `, `
-    //             function getName(user) {
-    //                 return user?.name ?? "default";
-    //             }
-    //         `),
-    //     );
-    // });
+    test('more complex example', () => {
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
+
+                const {obj, defaultValue, property} = {obj: capture(), defaultValue: capture(), property: capture()};
+                if (await match`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`
+                    .against(ternary).matches()) {
+
+                    return template`${obj}?.${property} ?? ${defaultValue}`
+                        .apply(this.cursor, {tree: ternary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
+                }
+
+                return await super.visitTernary(ternary, p);
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                function getName(user) {
+                    return user === null || user === undefined ? "default" : user.name;
+                }
+            `, `
+                function getName(user) {
+                    return user?.name ?? "default";
+                }
+            `),
+        );
+    });
+
+    test('more complex example using replace', () => {
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
+
+                return await replace((obj = capture(), defaultValue = capture(), property = capture()) => ({
+                        pattern: match`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`,
+                        template: template`${obj}?.${property} ?? ${defaultValue}`
+                    }))
+                        .tryApply(ternary, this.cursor, {tree: ternary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}) ||
+                    super.visitTernary(ternary, p);
+
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                function getName(user) {
+                    return user === null || user === undefined ? "default" : user.name;
+                }
+            `, `
+                function getName(user) {
+                    return user?.name ?? "default";
+                }
+            `),
+        );
+    });
 });

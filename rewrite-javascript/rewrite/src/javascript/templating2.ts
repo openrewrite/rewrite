@@ -15,12 +15,14 @@
  */
 import {JS} from '.';
 import {JavaScriptParser} from './parser';
+import {JavaScriptVisitor} from './visitor';
 import {Cursor} from '..';
 import {J} from '../java';
 import {JavaType, TypedTree} from '../java';
 import {JavaCoordinates} from './templating';
 import {produce} from "immer";
 import getType = TypedTree.getType;
+import {JavaScriptComparatorVisitor} from "./comparator";
 
 /**
  * Capture specification for pattern matching.
@@ -113,6 +115,9 @@ export function backRef(name: string): Capture {
  * Represents a pattern that can be matched against AST nodes.
  */
 export class Pattern {
+    configure(configuration: {}) {
+        return this;
+    }
     private patternAst?: J;
     private templateProcessor?: TemplateProcessor;
 
@@ -224,7 +229,7 @@ export class Matcher {
      * @param target The target node
      * @returns true if the pattern matches the target, false otherwise
      */
-    private matchNode(pattern: J, target: J): boolean {
+    private async matchNode(pattern: J, target: J): Promise<boolean> {
         // Check if pattern is a capture placeholder
         if (this.isCapturePlaceholder(pattern)) {
             return this.handleCapture(pattern, target);
@@ -240,6 +245,7 @@ export class Matcher {
             return false;
         }
 
+        // FIXME use `JavaScriptComparatorVisitor`
         // Match specific node types
         switch (pattern.kind) {
             case J.Kind.Binary:
@@ -251,7 +257,20 @@ export class Matcher {
             case JS.Kind.TemplateExpression:
                 return this.matchTemplateExpression(pattern as JS.TemplateExpression, target as JS.TemplateExpression);
             default:
-                return this.matchGenericNode(pattern, target);
+                const matcher = this;
+                return await ((new class extends JavaScriptComparatorVisitor {
+                    protected hasSameKind(j: J, other: J): boolean {
+                        return super.hasSameKind(j, other) || j.kind == J.Kind.Identifier && this.matchesParameter(j as J.Identifier, other);
+                    }
+
+                    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+                        return this.matchesParameter(identifier, other) ? identifier : await super.visitIdentifier(identifier, other);
+                    }
+
+                    private matchesParameter(identifier: J.Identifier, other: J): boolean {
+                        return identifier.simpleName.startsWith('__capture') && matcher.handleCapture(identifier, other);
+                    }
+                }).compare(pattern, target));
         }
     }
 
@@ -262,15 +281,15 @@ export class Matcher {
      * @param target The target binary expression
      * @returns true if the pattern matches the target, false otherwise
      */
-    private matchBinary(pattern: J.Binary, target: J.Binary): boolean {
+    private async matchBinary(pattern: J.Binary, target: J.Binary): Promise<boolean> {
         // Match operator
         if (pattern.operator.element !== target.operator.element) {
             return false;
         }
 
         // Match left and right operands
-        return this.matchNode(pattern.left, target.left) &&
-            this.matchNode(pattern.right, target.right);
+        return await this.matchNode(pattern.left, target.left) &&
+            await this.matchNode(pattern.right, target.right);
     }
 
     /**
@@ -611,7 +630,7 @@ export function match(strings: TemplateStringsArray, ...captures: Capture[]): Pa
             );
         }
     }
-    
+
     return new Pattern(strings, captures);
 }
 
@@ -649,6 +668,8 @@ export interface Parameter {
  * const result = template`${$(literal)}`.apply(cursor, coordinates);
  */
 export class TemplateGenerator {
+    private readonly substitutions = new Map<string, Parameter>();
+
     /**
      * Creates a new template generator.
      *
@@ -671,12 +692,8 @@ export class TemplateGenerator {
         // Build the template string with parameter placeholders
         const templateString = this.buildTemplateString();
 
-        // Debug log
-        console.log("[DEBUG] Template string:", templateString);
-
         // If the template string is empty, return undefined
         if (!templateString.trim()) {
-            console.log("[DEBUG] Empty template string");
             return undefined;
         }
 
@@ -685,14 +702,8 @@ export class TemplateGenerator {
         const parseResults = await parser.parse({text: templateString, sourcePath: 'template.ts'});
         const cu: JS.CompilationUnit = parseResults[0] as JS.CompilationUnit;
 
-        // Debug log
-        console.log("[DEBUG] Parse results:", JSON.stringify(parseResults, null, 2));
-        console.log("[DEBUG] Compilation unit:", JSON.stringify(cu, null, 2));
-        console.log("[DEBUG] Statements:", cu.statements ? cu.statements.length : 0);
-
         // Check if there are any statements
         if (!cu.statements || cu.statements.length === 0) {
-            console.log("[DEBUG] No statements in compilation unit");
             return undefined;
         }
 
@@ -702,11 +713,14 @@ export class TemplateGenerator {
             ? (firstStatement as JS.ExpressionStatement).expression
             : firstStatement;
 
+        // Unsubstitute placeholders with actual parameter values
+        const unsubstitutedAst = await this.unsubstitute(ast);
+
         // Apply the template to the current AST
         return new TemplateApplier(
             cursor,
             coordinates,
-            ast,
+            unsubstitutedAst,
             this.parameters
         ).apply();
     }
@@ -721,28 +735,134 @@ export class TemplateGenerator {
         for (let i = 0; i < this.templateParts.length; i++) {
             result += this.templateParts[i];
             if (i < this.parameters.length) {
-                const param = this.parameters[i];
-                if (typeof param.value === 'string') {
-                    result += param.value;
-                } else if (param.value instanceof CaptureImpl) {
-                    // FIXME implement substitution
-                    result += '0';
-                } else if (param.value && typeof param.value === 'object' && param.value.kind) {
-                    // FIXME implement substitution
-                    // If the parameter is an AST node, use a simple value that will be replaced later
-                    // Use the valueSource if it's a literal, otherwise use a placeholder
-                    if (param.value.kind === J.Kind.Literal && (param.value as J.Literal).valueSource) {
-                        result += (param.value as J.Literal).valueSource;
-                    } else {
-                        result += '0'; // Use a simple value that will be replaced later
-                    }
-                } else {
-                    // For other types, convert to string
-                    result += String(param.value);
-                }
+                const placeholder = `__PLACEHOLDER_${i}__`;
+                this.substitutions.set(placeholder, this.parameters[i]);
+                result += placeholder;
             }
         }
         return result;
+    }
+
+    /**
+     * Replaces placeholders in the AST with actual parameter values.
+     *
+     * @param ast The AST to unsubstitute
+     * @returns The AST with placeholders replaced
+     */
+    private async unsubstitute(ast: J): Promise<J> {
+        const visitor = new PlaceholderReplacementVisitor(this.substitutions);
+        return (await visitor.visit(ast, null))!;
+    }
+}
+
+/**
+ * Visitor that replaces placeholder nodes with actual parameter values.
+ */
+class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
+    constructor(private readonly substitutions: Map<string, Parameter>) {
+        super();
+    }
+
+    async visit<R extends J>(tree: J, p: any, parent?: Cursor): Promise<R | undefined> {
+        // Check if this node is a placeholder
+        if (this.isPlaceholder(tree)) {
+            const replacement = this.replacePlaceholder(tree);
+            if (replacement !== tree) {
+                return replacement as R;
+            }
+        }
+
+        // Continue with normal traversal
+        return super.visit(tree, p, parent);
+    }
+
+    /**
+     * Checks if a node is a placeholder.
+     *
+     * @param node The node to check
+     * @returns True if the node is a placeholder
+     */
+    private isPlaceholder(node: J): boolean {
+        if (node.kind === J.Kind.Identifier) {
+            const identifier = node as J.Identifier;
+            return identifier.simpleName.startsWith('__PLACEHOLDER_');
+        } else if (node.kind === J.Kind.Literal) {
+            const literal = node as J.Literal;
+            return literal.valueSource?.startsWith('__PLACEHOLDER_') || false;
+        }
+        return false;
+    }
+
+    /**
+     * Replaces a placeholder node with the actual parameter value.
+     *
+     * @param placeholder The placeholder node
+     * @returns The replacement node or the original if not a placeholder
+     */
+    private replacePlaceholder(placeholder: J): J {
+        const placeholderText = this.getPlaceholderText(placeholder);
+
+        if (!placeholderText || !placeholderText.startsWith('__PLACEHOLDER_')) {
+            return placeholder;
+        }
+
+        // Find the corresponding parameter
+        const param = this.substitutions.get(placeholderText);
+        if (!param || param.value === undefined) {
+            return placeholder;
+        }
+
+        // If the parameter value is an AST node, use it directly
+        if (typeof param.value === 'object' && param.value !== null && 'kind' in param.value) {
+            // Return the AST node, preserving the original prefix
+            return produce(param.value as J, draft => {
+                draft.markers = placeholder.markers;
+                draft.prefix = placeholder.prefix;
+            });
+        } else if (param.value instanceof CaptureImpl) {
+            return produce(param.value.tree as J, draft => {
+                draft.prefix = placeholder.prefix;
+            });
+        }
+
+        // For primitive values, create a new literal node
+        if (placeholder.kind === J.Kind.Literal) {
+            // Create a new literal with the primitive value
+            const literal = placeholder as J.Literal;
+            return produce({} as J.Literal, draft => {
+                // Copy all properties from the original literal
+                Object.assign(draft, literal);
+                // Override the value and valueSource
+                draft.value = param.value;
+                draft.valueSource = String(param.value);
+            }) as J;
+        } else if (placeholder.kind === J.Kind.Identifier) {
+            // Create a new identifier with the primitive value
+            const identifier = placeholder as J.Identifier;
+            return produce({} as J.Identifier, draft => {
+                // Copy all properties from the original identifier
+                Object.assign(draft, identifier);
+                // Override the simpleName
+                draft.simpleName = String(param.value);
+            }) as J;
+        }
+
+        return placeholder;
+    }
+
+    /**
+     * Gets the placeholder text from a node.
+     *
+     * @param node The node to get placeholder text from
+     * @returns The placeholder text or null
+     */
+    private getPlaceholderText(node: J): string | null {
+        if (node.kind === J.Kind.Identifier) {
+            return (node as J.Identifier).simpleName;
+        } else if (node.kind === J.Kind.Literal) {
+            return (node as J.Literal).valueSource || null;
+        }
+        return null;
     }
 }
 
@@ -765,18 +885,6 @@ class TemplateApplier {
     async apply(): Promise<J | undefined> {
         const { tree, loc, mode } = this.coordinates;
 
-        // Special case: If there's only one parameter and it's an AST node, use it directly
-        if (this.parameters.length === 1 &&
-            this.parameters[0].value &&
-            typeof this.parameters[0].value === 'object' &&
-            this.parameters[0].value.kind) {
-
-            // Create a copy of the parameter with the prefix from the target
-            return produce(this.parameters[0].value as J, draft => {
-                draft.prefix = (tree as J).prefix;
-            });
-        }
-
         // Apply the template based on the location and mode
         switch (loc) {
             case 'EXPRESSION_PREFIX':
@@ -796,34 +904,12 @@ class TemplateApplier {
      * @returns A Promise resolving to the modified AST
      */
     private async applyToExpression(): Promise<J | undefined> {
-        const { tree, mode } = this.coordinates;
+        const { tree } = this.coordinates;
 
         // Create a copy of the AST with the prefix from the target
-        let result = produce(this.ast, draft => {
+        return produce(this.ast, draft => {
             draft.prefix = (tree as J).prefix;
         });
-
-        // If the result is a literal with a placeholder, replace it with the actual parameter
-        if (result.kind === J.Kind.Literal) {
-            const literal = result as J.Literal;
-
-            if (literal.valueSource && literal.valueSource.startsWith('__param')) {
-                const paramIndex = parseInt(literal.valueSource.replace('__param', '').replace('__', ''));
-
-                if (paramIndex >= 0 && paramIndex < this.parameters.length) {
-                    const param = this.parameters[paramIndex];
-
-                    if (param.value && typeof param.value === 'object' && param.value.kind) {
-                        // If the parameter is an AST node, use it directly
-                        result = produce(param.value as J, draft => {
-                            draft.prefix = literal.prefix;
-                        });
-                    }
-                }
-            }
-        }
-
-        return result;
     }
 
     /**
@@ -918,9 +1004,9 @@ export function template(strings: TemplateStringsArray, ...parameters: any[]): T
             return { value: param.tree };
         }
         // If param is already a Parameter, return it as is
-        if (param && typeof param === 'object' && 'value' in param) {
-            return param;
-        }
+        // if (param && typeof param === 'object' && 'value' in param) {
+        //     return param;
+        // }
         // Otherwise, wrap it in a Parameter
         return { value: param };
     });
@@ -1116,14 +1202,14 @@ export class TemplateProcessor {
  * Represents a replacement rule that can match a pattern and apply a template.
  */
 export interface ReplaceRule {
-    tryApply(node: J, cursor: Cursor, coordinates: JavaCoordinates): Promise<J>;
+    tryApply(node: J, cursor: Cursor, coordinates: JavaCoordinates): Promise<J | undefined>;
 }
 
 /**
  * Configuration for a replacement rule.
  */
 export interface ReplaceConfig {
-    match: Pattern;
+    pattern: Pattern;
     template: TemplateGenerator;
 }
 
@@ -1136,7 +1222,7 @@ class ReplaceRuleImpl implements ReplaceRule {
         private readonly templateGenerator: TemplateGenerator
     ) {}
 
-    async tryApply(node: J, cursor: Cursor, coordinates: JavaCoordinates): Promise<J> {
+    async tryApply(node: J, cursor: Cursor, coordinates: JavaCoordinates): Promise<J | undefined> {
         const matcher = this.matchPattern.against(node);
 
         if (await matcher.matches()) {
@@ -1145,7 +1231,7 @@ class ReplaceRuleImpl implements ReplaceRule {
         }
 
         // Return the original node if no match
-        return node;
+        return undefined;
     }
 }
 
@@ -1176,11 +1262,11 @@ export function replace(
     const config = builderFn();
 
     // Ensure we have valid match and template properties
-    if (!config.match || !config.template) {
+    if (!config.pattern || !config.template) {
         throw new Error('Builder function must return an object with match and template properties');
     }
 
-    return new ReplaceRuleImpl(config.match, config.template);
+    return new ReplaceRuleImpl(config.pattern, config.template);
 }
 
 // Alternative version that handles default parameters more explicitly
@@ -1188,6 +1274,6 @@ export function replaceWithDefaults<T extends Capture[]>(
     builderFn: (...captures: T) => ReplaceConfig,
     ...defaultCaptures: T
 ): ReplaceRule {
-    const { match: matchPattern, template: templateGenerator } = builderFn(...defaultCaptures);
+    const { pattern: matchPattern, template: templateGenerator } = builderFn(...defaultCaptures);
     return new ReplaceRuleImpl(matchPattern, templateGenerator);
 }

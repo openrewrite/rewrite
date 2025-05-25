@@ -56,7 +56,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other node to compare with
      * @returns true if the nodes have the same kind, false otherwise
      */
-    private hasSameKind(j: J, other: J): boolean {
+    protected hasSameKind(j: J, other: J): boolean {
         return j.kind === other.kind;
     }
 
