@@ -30,19 +30,22 @@ import {produceAsync} from "../visitor";
 
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
-        const spacesStyle = styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle;
-        const wrappingAndBracesStyle = styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle;
-        const blankLinesStyle = styleFromSourceFile(StyleKind.BlankLinesStyle, tree) as BlankLinesStyle;
-        const tabsAndIndentsStyle = styleFromSourceFile(StyleKind.TabsAndIndentsStyle, tree) as TabsAndIndentsStyle;
-        let t: R | undefined = tree as R;
-        // TODO possibly cursor.fork
+        const visitors = [
+            new NormalizeWhitespaceVisitor(),
+            new MinimumViableSpacingVisitor(),
+            new BlankLinesVisitor(styleFromSourceFile(StyleKind.BlankLinesStyle, tree) as BlankLinesStyle),
+            new WrappingAndBracesVisitor(styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle),
+            new SpacesVisitor(styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle),
+            new TabsAndIndentsVisitor(styleFromSourceFile(StyleKind.TabsAndIndentsStyle, tree) as TabsAndIndentsStyle),
+        ]
 
-        t = t && await new NormalizeWhitespaceVisitor().visit(t, p, cursor);
-        t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
-        t = t && await new BlankLinesVisitor(blankLinesStyle).visit(t, p, cursor);
-        t = t && await new WrappingAndBracesVisitor(wrappingAndBracesStyle).visit(t, p, cursor);
-        t = t && await new SpacesVisitor(spacesStyle).visit(t, p, cursor);
-        t = t && await new TabsAndIndentsVisitor(tabsAndIndentsStyle).visit(t, p, cursor);
+        let t: R | undefined = tree as R;
+        for (const visitor of visitors) {
+            t = await visitor.visit(t, p, cursor);
+            if (t === undefined) {
+                return undefined;
+            }
+        }
         return t;
     }
 }
