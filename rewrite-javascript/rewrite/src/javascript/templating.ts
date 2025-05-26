@@ -49,26 +49,19 @@ class CaptureImpl implements Capture {
 /**
  * Creates a capture specification for use in template patterns.
  *
- * @param name The name of the capture, or undefined to generate a unique name
  * @returns A Capture object
  *
  * @example
- * const pattern = pattern`${capture('x')} + ${capture('y')}`;
- * 
- * // Using unnamed captures
+ * // Multiple captures
  * const {left, right} = {left: capture(), right: capture()};
  * const pattern = pattern`${left} + ${right}`;
  * 
  * // Repeated patterns using the same capture
- * const expr = capture('expr');
+ * const expr = capture();
  * const redundantOr = pattern`${expr} || ${expr}`;
  */
-export function capture(name?: string): Capture {
-    // Generate a unique name if none is provided
-    if (name === undefined) {
-        name = `unnamed_${capture.nextUnnamedId++}`;
-    }
-    return new CaptureImpl(name);
+export function capture(): Capture {
+    return new CaptureImpl(`unnamed_${capture.nextUnnamedId++}`);
 }
 
 // Static counter for generating unique IDs for unnamed captures
@@ -207,11 +200,11 @@ export class Matcher {
     /**
      * Gets a captured node by name or capture object.
      *
-     * @param nameOrCapture The name of the capture or the capture object
+     * @param capture The name of the capture or the capture object
      * @returns The captured node, or undefined if not found
      */
-    get(nameOrCapture: string | Capture): J | undefined {
-        const name = typeof nameOrCapture === 'string' ? nameOrCapture : nameOrCapture.name;
+    get(capture: Capture): J | undefined {
+        const name = capture.name;
         return this.bindings.get(name);
     }
 

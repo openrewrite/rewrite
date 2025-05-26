@@ -16,7 +16,6 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
     capture,
-    JavaCoordinates,
     JavaScriptVisitor,
     pattern,
     rewrite,
@@ -25,7 +24,6 @@ import {
 } from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {createDraft, produce} from "immer";
-import Mode = JavaCoordinates.Mode;
 
 describe('unnamed capture', () => {
     const spec = new RecipeSpec();

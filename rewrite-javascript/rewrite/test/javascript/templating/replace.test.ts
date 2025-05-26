@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {JavaCoordinates, JavaScriptVisitor, template, typescript} from "../../../src/javascript";
+import {JavaScriptVisitor, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 import {produce} from "immer";
 import {produceAsync} from "../../../src";
-import Mode = JavaCoordinates.Mode;
 
 describe('template2 replace', () => {
     const spec = new RecipeSpec();

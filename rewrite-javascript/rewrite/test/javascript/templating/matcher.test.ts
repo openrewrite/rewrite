@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, Matcher, Pattern, pattern} from "../../../src/javascript";
+import {capture, Matcher, pattern} from "../../../src/javascript";
 import {emptySpace, J} from "../../../src/java";
 import {emptyMarkers, randomId} from "../../../src";
 
@@ -64,25 +64,10 @@ function createBinary(left: J, operator: J.Binary.Type, right: J): J.Binary {
 }
 
 describe('Matcher', () => {
-    describe('handleCapture', () => {
-        test('captures a node and returns true', () => {
-            const matcher = new Matcher({} as Pattern, {} as J);
-
-            const capturePlaceholder = createIdentifier('__capture_test__');
-            const targetNode = createLiteral(42, '42');
-
-            // Access the private methods using type assertion
-            const handleCapture = (matcher as any).handleCapture.bind(matcher);
-
-            expect(handleCapture(capturePlaceholder, targetNode)).toBe(true);
-            expect(matcher.get('test')).toBe(targetNode);
-        });
-    });
-
     describe('matches', () => {
         test('matches a simple pattern with captures', async () => {
             // Create a pattern
-            const p = pattern`${capture('left')} + ${capture('right')}`;
+            const p = pattern`${capture()} + ${capture()}`;
 
             const ast = createBinary(
                 createLiteral(1, '1'),
@@ -111,7 +96,7 @@ describe('Matcher', () => {
 
         test('does not match if pattern and AST are different', async () => {
             // Create a pattern
-            const p = pattern`${capture('left')} + ${capture('right')}`;
+            const p = pattern`${capture()} + ${capture()}`;
 
             const ast = createIdentifier('notABinaryExpression');
 
@@ -138,7 +123,9 @@ describe('Matcher', () => {
     describe('integration tests', () => {
         test('captures variables in a binary expression', async () => {
             // Create a real pattern using the match function
-            const p = pattern`${capture('left')} + ${capture('right')}`;
+            let left = capture();
+            let right = capture();
+            const p = pattern`${left} + ${right}`;
 
             // Create a matching AST
             const ast = createBinary(
@@ -151,14 +138,14 @@ describe('Matcher', () => {
             const matcher = new Matcher(p, ast);
             (matcher as any).matchNode = jest.fn((_pattern: J, target: J) => {
                 // Simulate capturing the left and right operands
-                (matcher as any).bindings.set('left', ast.left);
-                (matcher as any).bindings.set('right', ast.right);
+                (matcher as any).bindings.set(left.name, ast.left);
+                (matcher as any).bindings.set(right.name, ast.right);
                 return true;
             });
 
             expect(await matcher.matches()).toBe(true);
-            expect(matcher.get('left')).toBe(ast.left);
-            expect(matcher.get('right')).toBe(ast.right);
+            expect(matcher.get(left)).toBe(ast.left);
+            expect(matcher.get(right)).toBe(ast.right);
         });
     });
 });

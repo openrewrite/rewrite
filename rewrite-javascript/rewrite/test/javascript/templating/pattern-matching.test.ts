@@ -20,8 +20,8 @@ describe('Pattern Matching', () => {
         test('buildTemplateString creates correct string with captures', () => {
             const templateParts = ['', ' + ', ''];
             const captures = [
-                capture('left'),
-                capture('right')
+                capture(),
+                capture()
             ];
 
             const processor = new TemplateProcessor(templateParts as unknown as TemplateStringsArray, captures);
@@ -30,19 +30,17 @@ describe('Pattern Matching', () => {
             const buildTemplateString = (processor as any).buildTemplateString.bind(processor);
 
             const result = buildTemplateString();
-            expect(result).toBe('__capture_left__ + __capture_right__');
+            expect(result).toBe('__capture_unnamed_1__ + __capture_unnamed_2__');
         });
     });
 
     describe('Pattern', () => {
         test('creates a pattern with correct template parts and captures', () => {
-            const p = pattern`${capture('left')} + ${capture('right')}`;
+            const p = pattern`${capture()} + ${capture()}`;
             
             expect(p.templateParts).toBeDefined();
             expect(p.captures).toBeDefined();
             expect(p.captures.length).toBe(2);
-            expect(p.captures[0].name).toBe('left');
-            expect(p.captures[1].name).toBe('right');
         });
     });
 });

@@ -36,12 +36,14 @@ describe('match extraction', () => {
                 if (binary.operator.element === J.Binary.Type.Addition) {
 
                     // Create a pattern that matches "a + b"
-                    const p = pattern`${capture('a')} + ${capture('b')}`;
+                    let a = capture();
+                    let b = capture();
+                    const p = pattern`${a} + ${b}`;
                     const matcher = p.against(binary);
                     if (await matcher.matches()) {
                         // Extract the captured parts
-                        const left = matcher.get('a');
-                        const right = matcher.get('b');
+                        const left = matcher.get(a);
+                        const right = matcher.get(b);
 
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
@@ -66,8 +68,8 @@ describe('match extraction', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, _p: any): Promise<J | undefined> {
                 // Create capture objects
-                const left = capture('left');
-                const right = capture('right');
+                const left = capture();
+                const right = capture();
 
                 // Create a pattern that matches "a + b" using the capture objects
                 const p = pattern`${left} + ${right}`;
