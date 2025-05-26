@@ -30,7 +30,7 @@ describe('AutoformatVisitor', () => {
             typescript(`
                      type T1=string;
                      export   type   T2   =   string;
-                    class L {}
+                    abstract class L {}
                     class K extends L{
                         constructor  ( ){
                             super();
@@ -71,7 +71,7 @@ describe('AutoformatVisitor', () => {
                     type T1 = string;
                     export type T2 = string;
 
-                    class L {
+                    abstract class L {
                     }
 
                     class K extends L {

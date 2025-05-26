@@ -691,9 +691,9 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
                 });
             }
             c = produce(c, draft => {
-                // TODO convert it to a usual draft syntax and use this.ensuresSpace()
-                draft.modifiers = draft.modifiers.map((m, i) => i > 0 && m.prefix.whitespace === "" ?
-                    {...m, prefix: {...m.prefix, whitespace: " "}} : m);
+                for (let i = 1; i < draft.modifiers.length; i++) {
+                    this.ensureSpace(draft.modifiers[i].prefix);
+                }
             });
             first = false;
         }
