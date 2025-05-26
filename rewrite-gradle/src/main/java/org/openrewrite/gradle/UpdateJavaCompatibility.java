@@ -134,8 +134,8 @@ public class UpdateJavaCompatibility extends Recipe {
                     if (compatibilityType == null) {
                         if (!("sourceCompatibility".equals(fieldAccess.getSimpleName()) || "targetCompatibility".equals(fieldAccess.getSimpleName()) ||
                                 ("release".equals(fieldAccess.getSimpleName()) &&
-                                        ((fieldAccess.getTarget() instanceof J.Identifier && "options".equals(((J.Identifier) fieldAccess.getTarget()).getSimpleName()))
-                                                || (fieldAccess.getTarget() instanceof J.FieldAccess && "options".equals(((J.FieldAccess) fieldAccess.getTarget()).getSimpleName())))))) {
+                                        ((fieldAccess.getTarget() instanceof J.Identifier && "options".equals(((J.Identifier) fieldAccess.getTarget()).getSimpleName())) ||
+                                                (fieldAccess.getTarget() instanceof J.FieldAccess && "options".equals(((J.FieldAccess) fieldAccess.getTarget()).getSimpleName())))))) {
                             return a;
                         }
                     } else if (!(compatibilityType.toString().toLowerCase() + "Compatibility").equals(fieldAccess.getSimpleName())) {

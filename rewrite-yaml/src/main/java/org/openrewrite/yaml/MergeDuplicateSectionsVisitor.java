@@ -19,7 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.openrewrite.internal.StringUtils.isNotEmpty;
 
