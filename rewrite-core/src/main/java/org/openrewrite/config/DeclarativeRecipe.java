@@ -184,7 +184,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         @Override
         public String getDescription() {
             return "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
-                   "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends. ";
+                   "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
         }
 
         Supplier<TreeVisitor<?, ExecutionContext>> precondition;

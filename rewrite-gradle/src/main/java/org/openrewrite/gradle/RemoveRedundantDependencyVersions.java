@@ -30,7 +30,10 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
@@ -43,7 +46,6 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -138,9 +140,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             .groupId(groupPattern)
                                             .artifactId(artifactPattern)
                                             .get(getCursor())
-                                            .ifPresent(it -> {
-                                                directDependencies.add(it.getResolvedDependency());
-                                            });
+                                            .ifPresent(it ->
+                                                directDependencies.add(it.getResolvedDependency()));
 
                                     if (!m.getSimpleName().equals("platform") && !m.getSimpleName().equals("enforcedPlatform")) {
                                         return m;
