@@ -45,12 +45,6 @@ public class HasNotNamespaceUri extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(not(new HasNamespaceUri(namespaceUri, null).getVisitor()),
-                new XmlIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                        return document.withRoot(SearchResult.found(document.getRoot()));
-                    }
-                });
+            return not(new HasNamespaceUri(namespaceUri, null).getVisitor());
     }
 }
