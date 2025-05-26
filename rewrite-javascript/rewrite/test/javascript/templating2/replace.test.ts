@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
-import {$, template} from "../../../src/javascript/templating2";
+import {template} from "../../../src/javascript/templating2";
 import {JavaCoordinates} from "../../../src/javascript/templating";
 import {produce} from "immer";
 import {produceAsync} from "../../../src";
@@ -46,7 +46,7 @@ describe('template2 replace', () => {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                 if (literal.valueSource === '1') {
                     // Use the new template API with tagged template literals and parameter substitution
-                    return template`${$(2)}`.apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
+                    return template`${2}`.apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
                 }
                 return literal;
             }
@@ -68,7 +68,7 @@ describe('template2 replace', () => {
                     });
 
                     // Use the new template API with tagged template literals and AST node substitution
-                    return template`${$(two)}`.apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
+                    return template`${two}`.apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
                 }
                 return literal;
             }
@@ -85,7 +85,7 @@ describe('template2 replace', () => {
                 if (binary.operator.element === J.Binary.Type.Equal) {
                     return await produceAsync(binary, async draft => {
 
-                        draft.left = (await template`${$(binary.right)}`.apply(
+                        draft.left = (await template`${binary.right}`.apply(
                             this.cursor,
                             {tree: binary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}
                         )) as Expression;

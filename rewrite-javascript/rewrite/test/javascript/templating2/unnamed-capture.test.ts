@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {capture, match, replace, template} from "../../../src/javascript/templating2";
+import {capture, pattern, rewrite, template} from "../../../src/javascript/templating2";
 import {createDraft, produce} from "immer";
 import {JavaCoordinates} from "../../../src/javascript/templating";
 import Mode = JavaCoordinates.Mode;
@@ -32,8 +32,8 @@ describe('unnamed capture', () => {
                     const {left, right} = {left: capture(), right: capture()};
 
                     // Create a pattern that matches "a + b" using the capture objects
-                    const pattern = match`${left} + ${right}`;
-                    const matcher = pattern.against(binary);
+                    const p = pattern`${left} + ${right}`;
+                    const matcher = p.against(binary);
 
                     const matches = await matcher.matches();
 
@@ -67,7 +67,7 @@ describe('unnamed capture', () => {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
                 const {obj, defaultValue, property} = {obj: capture(), defaultValue: capture(), property: capture()};
-                if (await match`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`
+                if (await pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`
                     .against(ternary).matches()) {
 
                     return template`${obj}?.${property} ?? ${defaultValue}`
@@ -97,13 +97,11 @@ describe('unnamed capture', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
-                return await replace((obj = capture(), defaultValue = capture(), property = capture()) => ({
-                        pattern: match`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`,
-                        template: template`${obj}?.${property} ?? ${defaultValue}`
+                return await rewrite((obj = capture(), defaultValue = capture(), property = capture()) => ({
+                        matching: pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`,
+                        as: template`${obj}?.${property} ?? ${defaultValue}`
                     }))
-                        .tryApply(ternary, this.cursor, {tree: ternary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}) ||
-                    super.visitTernary(ternary, p);
-
+                        .tryOn(ternary, this.cursor) || super.visitTernary(ternary, p);
             }
         });
 

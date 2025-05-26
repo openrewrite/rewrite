@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {capture, match, replace, template} from "../../../src/javascript/templating2";
+import {capture, pattern, rewrite, template} from "../../../src/javascript/templating2";
 import {createDraft, produce} from "immer";
 import {JavaCoordinates} from "../../../src/javascript/templating";
 import Mode = JavaCoordinates.Mode;
@@ -30,8 +30,8 @@ describe('match extraction', () => {
                 if (binary.operator.element === J.Binary.Type.Addition) {
 
                     // Create a pattern that matches "a + b"
-                    const pattern = match`${capture('a')} + ${capture('b')}`;
-                    const matcher = pattern.against(binary);
+                    const p = pattern`${capture('a')} + ${capture('b')}`;
+                    const matcher = p.against(binary);
                     if (await matcher.matches()) {
                         // Extract the captured parts
                         const left = matcher.get('a');
@@ -58,14 +58,14 @@ describe('match extraction', () => {
 
     test('extract parts of a binary expression using capture objects', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override async visitBinary(binary: J.Binary, _p: any): Promise<J | undefined> {
                 // Create capture objects
                 const left = capture('left');
                 const right = capture('right');
 
                 // Create a pattern that matches "a + b" using the capture objects
-                const pattern = match`${left} + ${right}`;
-                const matcher = pattern.against(binary);
+                const p = pattern`${left} + ${right}`;
+                const matcher = p.against(binary);
 
                 if (await matcher.matches()) {
                     return template`${right} + ${left}`
@@ -85,13 +85,13 @@ describe('match extraction', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
 
-                const swapOperands = replace(
+                const swapOperands = rewrite(
                     (left = capture(), right = capture()) => ({
-                        match: match`${left} + ${right}`,
-                        template: template`${right} + ${left}`
+                        matching: pattern`${left} + ${right}`,
+                        as: template`${right} + ${left}`
                     })
                 );
-                return await swapOperands.tryApply(binary, this.cursor, {
+                return await swapOperands.tryOn(binary, this.cursor, {
                     tree: binary,
                     loc: "EXPRESSION_PREFIX",
                     mode: Mode.Replace
@@ -113,8 +113,8 @@ describe('match extraction', () => {
                     const {left, right} = {left: capture(), right: capture()};
 
                     // Create a pattern that matches "a + b" using the capture objects
-                    const pattern = match`${left} + ${right}`;
-                    const matcher = pattern.against(binary);
+                    const p = pattern`${left} + ${right}`;
+                    const matcher = p.against(binary);
 
                     if (await matcher.matches()) {
                         // Extract the captured parts
