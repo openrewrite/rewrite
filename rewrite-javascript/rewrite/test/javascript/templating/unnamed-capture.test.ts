@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, replace, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {createDraft, produce} from "immer";
 
@@ -64,14 +64,13 @@ describe('unnamed capture', () => {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
                 const {obj, defaultValue, property} = {obj: capture(), defaultValue: capture(), property: capture()};
-                if (await pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`
-                    .against(ternary).matches()) {
-
-                    return template`${obj}?.${property} ?? ${defaultValue}`
-                        .apply(this.cursor, {tree: ternary});
-                }
-
-                return await super.visitTernary(ternary, p);
+                
+                // Use the new cleaner API - matcher.applyTemplate()
+                const result = await pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`
+                    .against(ternary)
+                    .replaceWith(template`${obj}?.${property} ?? ${defaultValue}`, this.cursor);
+                
+                return result || await super.visitTernary(ternary, p);
             }
         });
 
@@ -94,7 +93,7 @@ describe('unnamed capture', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
-                return await replace(() => {
+                return await rewrite(() => {
                     const obj = capture(), defaultValue = capture(), property = capture();
                     return {
                         before: pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`,

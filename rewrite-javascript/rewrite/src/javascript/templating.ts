@@ -30,18 +30,11 @@ export interface Capture {
      * The name of the capture, used to retrieve the captured node later.
      */
     name: string;
-
-    /**
-     * The captured tree node.
-     * This is set when the pattern matches and can be used directly in templates.
-     */
-    tree?: J;
 }
 
 class CaptureImpl implements Capture {
     constructor(
-        public readonly name: string,
-        public tree?: J  // This needs to be mutable for binding updates
+        public readonly name: string
     ) {
     }
 }
@@ -218,6 +211,33 @@ export class Matcher {
     }
 
     /**
+     * Applies a template using the results from this matcher.
+     *
+     * This is a convenience method that combines matching and template application.
+     * If the pattern doesn't match, returns undefined.
+     *
+     * @param template The template to apply
+     * @param cursor The cursor pointing to the current location in the AST
+     * @param coordinates The coordinates specifying where and how to insert the generated AST
+     * @returns A Promise resolving to the generated AST node, or undefined if no match
+     *
+     * @example
+     * const result = await pattern`${obj} === null`.against(ternary)
+     *     .applyTemplate(template`${obj}?.prop`, cursor, coordinates);
+     */
+    async replaceWith(template: Template, cursor: Cursor, coordinates?: JavaCoordinates): Promise<J | undefined> {
+        if (!await this.matches()) {
+            return undefined;
+        }
+        const coords = coordinates || {
+            tree: this.ast,
+            loc: "EXPRESSION_PREFIX" as const,
+            mode: JavaCoordinates.Mode.Replace
+        };
+        return template.applyWithResults(cursor, coords, this.getAll());
+    }
+
+    /**
      * Matches a pattern node against a target node.
      *
      * @param pattern The pattern node
@@ -269,15 +289,6 @@ export class Matcher {
 
         // Store the binding
         this.bindings.set(captureInfo.name, target);
-
-        // Find the corresponding capture object and update its tree property
-        if (this.pattern.captures) {
-            const capture = this.pattern.captures.find(c => c.name === captureInfo.name);
-            if (capture) {
-                capture.tree = target;
-            }
-        }
-
         return true;
     }
 }
@@ -344,52 +355,29 @@ export namespace JavaCoordinates {
 }
 
 /**
- * Template generator for creating AST nodes.
- *
- * This class is used to generate AST nodes from templates. It's similar to the `Pattern` class,
- * but used for generating AST nodes rather than matching them.
- *
- * The `TemplateGenerator` is created by the `template` tagged template function and provides
- * an `apply` method that generates an AST node and applies it to an existing AST.
- *
- * @example
- * // Generate a literal AST node
- * const result = template`2`.apply(cursor, coordinates);
- *
- * @example
- * // Generate an AST node with a parameter
- * const result = template`${$(2)}`.apply(cursor, coordinates);
- *
- * @example
- * // Generate an AST node with an AST node parameter
- * const literal = ...; // Some AST node
- * const result = template`${$(literal)}`.apply(cursor, coordinates);
+ * Internal template engine - handles the core templating logic.
+ * Not exported, so only visible within this module.
  */
-export class Template {
-    private readonly substitutions = new Map<string, Parameter>();
-
+class TemplateEngine {
     /**
-     * Creates a new template generator.
+     * Applies a template with optional match results from pattern matching.
      *
      * @param templateParts The string parts of the template
      * @param parameters The parameters between the string parts
-     */
-    constructor(
-        private readonly templateParts: TemplateStringsArray,
-        private readonly parameters: Parameter[]
-    ) {
-    }
-
-    /**
-     * Applies the template to generate an AST node.
-     *
      * @param cursor The cursor pointing to the current location in the AST
      * @param coordinates The coordinates specifying where and how to insert the generated AST
+     * @param matchResults Map of capture names to matched AST nodes
      * @returns A Promise resolving to the generated AST node
      */
-    async apply(cursor: Cursor, coordinates: JavaCoordinates): Promise<J | undefined> {
+    static async applyTemplate(
+        templateParts: TemplateStringsArray,
+        parameters: Parameter[],
+        cursor: Cursor,
+        coordinates: JavaCoordinates,
+        matchResults: Map<string, J> = new Map()
+    ): Promise<J | undefined> {
         // Build the template string with parameter placeholders
-        const templateString = this.buildTemplateString();
+        const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
 
         // If the template string is empty, return undefined
         if (!templateString.trim()) {
@@ -412,45 +400,89 @@ export class Template {
             ? (firstStatement as JS.ExpressionStatement).expression
             : firstStatement;
 
-        // Unsubstitute placeholders with actual parameter values
-        const unsubstitutedAst = await this.unsubstitute(ast);
+        // Create substitutions map for placeholders
+        const substitutions = new Map<string, Parameter>();
+        for (let i = 0; i < parameters.length; i++) {
+            const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
+            substitutions.set(placeholder, parameters[i]);
+        }
+
+        // Unsubstitute placeholders with actual parameter values and match results
+        const visitor = new PlaceholderReplacementVisitor(substitutions, matchResults);
+        const unsubstitutedAst = (await visitor.visit(ast, null))!;
 
         // Apply the template to the current AST
-        return new TemplateApplier(
-            cursor,
-            coordinates,
-            unsubstitutedAst,
-            this.parameters
-        ).apply();
+        return new TemplateApplier(cursor, coordinates, unsubstitutedAst, parameters).apply();
     }
 
     /**
      * Builds a template string with parameter placeholders.
      *
+     * @param templateParts The string parts of the template
+     * @param parameters The parameters between the string parts
      * @returns The template string
      */
-    private buildTemplateString(): string {
+    private static buildTemplateString(templateParts: TemplateStringsArray, parameters: Parameter[]): string {
         let result = '';
-        for (let i = 0; i < this.templateParts.length; i++) {
-            result += this.templateParts[i];
-            if (i < this.parameters.length) {
+        for (let i = 0; i < templateParts.length; i++) {
+            result += templateParts[i];
+            if (i < parameters.length) {
                 const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
-                this.substitutions.set(placeholder, this.parameters[i]);
                 result += placeholder;
             }
         }
         return result;
     }
+}
+
+/**
+ * Template for creating AST nodes.
+ *
+ * This class provides the public API for template generation.
+ * The actual templating logic is handled by the internal TemplateEngine.
+ *
+ * @example
+ * // Generate a literal AST node
+ * const result = template`2`.apply(cursor, coordinates);
+ *
+ * @example
+ * // Generate an AST node with a parameter
+ * const result = template`${capture()}`.apply(cursor, coordinates);
+ */
+export class Template {
+    /**
+     * Creates a new template.
+     *
+     * @param templateParts The string parts of the template
+     * @param parameters The parameters between the string parts
+     */
+    constructor(
+        private readonly templateParts: TemplateStringsArray,
+        private readonly parameters: Parameter[]
+    ) {
+    }
 
     /**
-     * Replaces placeholders in the AST with actual parameter values.
+     * Applies the template to generate an AST node.
      *
-     * @param ast The AST to unsubstitute
-     * @returns The AST with placeholders replaced
+     * @param cursor The cursor pointing to the current location in the AST
+     * @param coordinates The coordinates specifying where and how to insert the generated AST
+     * @returns A Promise resolving to the generated AST node
      */
-    private async unsubstitute(ast: J): Promise<J> {
-        const visitor = new PlaceholderReplacementVisitor(this.substitutions);
-        return (await visitor.visit(ast, null))!;
+    async apply(cursor: Cursor, coordinates: JavaCoordinates): Promise<J | undefined> {
+        return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, coordinates);
+    }
+
+    /**
+     * Applies the template with match results from pattern matching.
+     *
+     * @param cursor The cursor pointing to the current location in the AST
+     * @param coordinates The coordinates specifying where and how to insert the generated AST
+     * @param matchResults Map of capture names to matched AST nodes
+     * @returns A Promise resolving to the generated AST node
+     */
+    async applyWithResults(cursor: Cursor, coordinates: JavaCoordinates, matchResults: Map<string, J>): Promise<J | undefined> {
+        return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, coordinates, matchResults);
     }
 }
 
@@ -458,7 +490,10 @@ export class Template {
  * Visitor that replaces placeholder nodes with actual parameter values.
  */
 class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
-    constructor(private readonly substitutions: Map<string, Parameter>) {
+    constructor(
+        private readonly substitutions: Map<string, Parameter>,
+        private readonly matchResults: Map<string, J> = new Map()
+    ) {
         super();
     }
 
@@ -511,15 +546,23 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             return placeholder;
         }
 
+        // If the parameter value is a Capture, look up the matched result
+        if (param.value instanceof CaptureImpl) {
+            const matchedNode = this.matchResults.get(param.value.name);
+            if (matchedNode) {
+                return produce(matchedNode, draft => {
+                    draft.markers = placeholder.markers;
+                    draft.prefix = placeholder.prefix;
+                });
+            }
+            // If no match found, return placeholder unchanged
+            return placeholder;
+        }
+
         // If the parameter value is an AST node, use it directly
         if (isTree(param.value)) {
             // Return the AST node, preserving the original prefix
             return produce(param.value as J, draft => {
-                draft.markers = placeholder.markers;
-                draft.prefix = placeholder.prefix;
-            });
-        } else if (param.value instanceof CaptureImpl) {
-            return produce(param.value.tree as J, draft => {
                 draft.markers = placeholder.markers;
                 draft.prefix = placeholder.prefix;
             });
@@ -643,13 +686,9 @@ class TemplateApplier {
 export type TemplateParameter = Capture | Tree | string | number | boolean;
 
 export function template(strings: TemplateStringsArray, ...parameters: TemplateParameter[]): Template {
-    // Convert Capture objects to Parameter objects
+    // Convert parameters to Parameter objects (no longer need to check for mutable tree property)
     const processedParameters = parameters.map(param => {
-        // If param is a Capture object with a tree, convert it to a Parameter
-        if (param instanceof CaptureImpl && param.tree) {
-            return {value: param.tree};
-        }
-        // Otherwise, wrap it in a Parameter
+        // Just wrap each parameter value in a Parameter object
         return {value: param};
     });
 
@@ -758,15 +797,15 @@ class RewriteRuleImpl implements RewriteRule {
             const matcher = pattern.against(node);
 
             if (await matcher.matches()) {
-                const result = await this.after.apply(cursor,
-                    coordinates || {tree: node, loc: "EXPRESSION_PREFIX", mode: JavaCoordinates.Mode.Replace});
+                // Use the matcher's applyTemplate method for cleaner API
+                const result = await matcher.replaceWith(this.after, cursor, coordinates);
                 if (result) {
                     return result;
                 }
             }
         }
 
-        // Return the original node if no match
+        // Return undefined if no patterns match
         return undefined;
     }
 }
@@ -800,7 +839,7 @@ class RewriteRuleImpl implements RewriteRule {
  *     };
  * });
  */
-export function replace<T extends J>(
+export function rewrite<T extends J>(
     builderFn: () => RewriteConfig
 ): RewriteRule {
     const config = builderFn();

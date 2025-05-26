@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, JS, pattern, replace, template} from '../../../src/javascript';
+import {capture, JavaScriptParser, JS, pattern, rewrite, template} from '../../../src/javascript';
 import {J} from '../../../src/java';
 
 describe('replace with context', () => {
@@ -32,7 +32,7 @@ describe('replace with context', () => {
 
     describe('new replace API', () => {
         test('single pattern replacement with object destructuring', async () => {
-            const swapOperands = replace<J.Binary>(() => {
+            const swapOperands = rewrite<J.Binary>(() => {
                 const {left, right} = {left: capture(), right: capture()};
                 return {
                     before: pattern`${left} + ${right}`,
@@ -50,7 +50,7 @@ describe('replace with context', () => {
         });
 
         test('single pattern replacement with individual captures', async () => {
-            const swapOperands = replace<J.Binary>(() => {
+            const swapOperands = rewrite<J.Binary>(() => {
                 const left = capture();
                 const right = capture();
                 return {
@@ -69,7 +69,7 @@ describe('replace with context', () => {
         });
 
         test('multiple patterns replacement', async () => {
-            const normalizeComparisons = replace<J.Binary>(() => {
+            const normalizeComparisons = rewrite<J.Binary>(() => {
                 const {left, right} = {left: capture(), right: capture()};
                 return {
                     before: [
@@ -104,7 +104,7 @@ describe('replace with context', () => {
         });
 
         test('captures work across patterns and template', async () => {
-            const rule = replace<J.Binary>(() => {
+            const rule = rewrite<J.Binary>(() => {
                 const {expr} = {expr: capture()};
                 return {
                     before: [
@@ -132,7 +132,7 @@ describe('replace with context', () => {
 
         test('error handling for missing properties', () => {
             expect(() => {
-                replace<J.Binary>(() => {
+                rewrite<J.Binary>(() => {
                     return {} as any;
                 });
             }).toThrow('Builder function must return an object with before and after properties');
@@ -141,7 +141,7 @@ describe('replace with context', () => {
 
     describe('compatibility with existing rewrite API', () => {
         test('old rewrite API still works', async () => {
-            const swapOperandsOld = replace(() => {
+            const swapOperandsOld = rewrite(() => {
                 const left = capture();
                 const right = capture();
                 return {
@@ -161,7 +161,7 @@ describe('replace with context', () => {
 
         test('both APIs can be used in the same codebase', () => {
             // New API
-            const newRule = replace<J.Binary>(() => {
+            const newRule = rewrite<J.Binary>(() => {
                 const {left, right} = {left: capture(), right: capture()};
                 return {
                     before: pattern`${left} + ${right}`,
@@ -170,7 +170,7 @@ describe('replace with context', () => {
             });
 
             // Old API
-            const oldRule = replace(() => {
+            const oldRule = rewrite(() => {
                 const left = capture();
                 const right = capture();
                 return {

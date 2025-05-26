@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, Matcher, Pattern, pattern, replace, template} from "../../../src/javascript";
+import {capture, Matcher, Pattern, pattern, rewrite, template} from "../../../src/javascript";
 
 describe('templating basics', () => {
     describe('match', () => {
@@ -54,7 +54,7 @@ describe('templating basics', () => {
     describe('API comparison', () => {
         test('both rewrite and replace APIs are available', () => {
             // Old API
-            const oldRule = replace(() => {
+            const oldRule = rewrite(() => {
                 const left = capture();
                 const right = capture();
                 return {
@@ -64,7 +64,7 @@ describe('templating basics', () => {
             });
 
             // New API  
-            const newRule = replace(() => {
+            const newRule = rewrite(() => {
                 const left = capture(), right = capture();
                 return {
                     before: pattern`${left} + ${right}`,
