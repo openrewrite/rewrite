@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
@@ -235,7 +236,7 @@ public class GitRemoteTest {
     }
 
     @Test
-    void shouldNotReplaceExistingWellKnownServer(){
+    void shouldNotReplaceExistingWellKnownServer() {
         GitRemote.Parser parser = new GitRemote.Parser()
           .registerRemote(GitRemote.Service.GitHub, URI.create("https://github.com"), List.of(URI.create("ssh://notgithub.com")));
 
@@ -302,5 +303,84 @@ public class GitRemoteTest {
     void hashCodeIgnoresCase() {
         assertThat(new GitRemote(GitRemote.Service.GitHub, "https://github.com/org/repo", "github.com", "org/repo", "org", "repo"))
           .hasSameHashCodeAs(new GitRemote(GitRemote.Service.GitHub, "https://GITHUB.COM/ORG/REPO", "GITHUB.COM", "ORG/REPO", "ORG", "REPO"));
+    }
+
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      https://github.com/org/repo, github.com, org/repo, org, repo
+      https://github.com/1org/repo, github.com, 1org/repo, 1org, repo
+      https://github.com/1234/repo, github.com, 1234/repo, 1234, repo
+      git@github.com:org/repo.git, github.com, org/repo, org, repo
+      git@github.com:1org/1repo.git, github.com, 1org/1repo, 1org, 1repo
+      git@github.com:1234/1repo.git, github.com, 1234/1repo, 1234, 1repo
+      ssh://github.com/org/repo.git, github.com, org/repo, org, repo
+      
+      https://gitlab.com/group/repo.git, gitlab.com, group/repo, group, repo
+      https://gitlab.com/group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      git@gitlab.com:group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      ssh://git@gitlab.com:22/group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
+      
+      https://bitbucket.org/PRJ/repo, bitbucket.org, PRJ/repo, PRJ, repo
+      git@bitbucket.org:PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
+      git@bitbucket.org:1PRJ/repo.git, bitbucket.org, 1PRJ/repo, 1PRJ, repo
+      ssh://bitbucket.org/PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
+      
+      https://org@dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
+      https://dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
+      git@ssh.dev.azure.com:v3/org/project/repo, dev.azure.com, org/project/repo, org/project, repo
+      
+      https://github.com/group/repo with spaces, github.com, group/repo with spaces, group, repo with spaces
+      """)
+    void findCached(String cloneUrl, String expectedOrigin, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
+        GitRemote.Parser parser = new GitRemote.Parser();
+        assertThat(parser.findCached(cloneUrl)).isNull();
+        GitRemote original = parser.parse(cloneUrl);
+        GitRemote cached = parser.findCached(cloneUrl);
+        assertThat(cached).isEqualTo(original);
+        assertThat(cached.getOrigin()).isEqualTo(expectedOrigin);
+        assertThat(cached.getPath()).isEqualTo(expectedPath);
+        assertThat(cached.getOrganization()).isEqualTo(expectedOrganization);
+        assertThat(cached.getRepositoryName()).isEqualTo(expectedRepositoryName);
+    }
+
+
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      https://github.com/org/repo,https://github.com
+      https://github.com/1org/repo,https://github.com
+      https://github.com/1234/repo,https://github.com
+      git@github.com:org/repo.git,git@github.com
+      git@github.com:1org/1repo.git,git@github.com
+      git@github.com:1234/1repo.git,git@github.com
+      ssh://github.com/org/repo.git,ssh://github.com
+      
+      https://gitlab.com/group/repo.git,https://gitlab.com
+      https://gitlab.com/group/subgroup/subergroup/subestgroup/repo.git,https://gitlab.com
+      git@gitlab.com:group/subgroup/subergroup/subestgroup/repo.git,git@gitlab.com
+      ssh://git@gitlab.com:22/group/subgroup/subergroup/subestgroup/repo.git,ssh://git@gitlab.com:22
+      
+      https://bitbucket.org/PRJ/repo,https://bitbucket.org
+      git@bitbucket.org:PRJ/repo.git,git@bitbucket.org
+      git@bitbucket.org:1PRJ/repo.git,git@bitbucket.org
+      ssh://bitbucket.org/PRJ/repo.git,ssh://bitbucket.org
+      
+      https://org@dev.azure.com/org/project/_git/repo,https://org@dev.azure.com
+      https://dev.azure.com/org/project/_git/repo,https://dev.azure.com
+      git@ssh.dev.azure.com:v3/org/project/repo,git@ssh.dev.azure.com
+      
+      https://github.com/group/repo with spaces,https://github.com
+      """)
+    void maybeCache(String originalUrl, String expectedBaseUrl) {
+        GitRemote.Parser parser = new GitRemote.Parser();
+        URI normalized = GitRemote.Parser.normalize(originalUrl);
+        GitRemote.Parser.RemoteServerMatch match = new GitRemote.Parser.RemoteServerMatch(GitRemote.Service.GitHub, "doesnotmatter", URI.create("https://github.com"));
+
+        assertThat(parser.maybeCache(originalUrl, normalized, match)).isTrue();
+
+        assertThat(parser.baseUrlRemoteServerCache)
+          .containsKey(expectedBaseUrl);
+
+        assertThat(parser.baseUrlRemoteServerCache.get(expectedBaseUrl.toLowerCase(Locale.ENGLISH)))
+          .isEqualTo(match);
     }
 }

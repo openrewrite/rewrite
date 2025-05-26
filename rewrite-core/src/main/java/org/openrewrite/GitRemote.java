@@ -24,6 +24,7 @@ import org.openrewrite.jgit.transport.URIish;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -94,6 +95,15 @@ public class GitRemote {
 
     public static class Parser {
         private final List<RemoteServer> servers;
+        final Map<String, RemoteServerMatch> baseUrlRemoteServerCache =
+                Collections.synchronizedMap(new LinkedHashMap<String, RemoteServerMatch>(16, 0.75f, true) {
+                    private static final int MAX_ENTRIES = 100;
+
+                    @Override
+                    protected boolean removeEldestEntry(Map.Entry<String, RemoteServerMatch> eldest) {
+                        return size() > MAX_ENTRIES;
+                    }
+                });
 
         public Parser() {
             servers = new ArrayList<>();
@@ -239,15 +249,88 @@ public class GitRemote {
             }
         }
 
+        @Nullable GitRemote findCached(String url) {
+            String baseUrl = null;
+
+            if (url.startsWith("https://") || url.startsWith("ssh://") || url.startsWith("http://")) {
+                int slashIndex = url.indexOf('/', url.indexOf("://") + 3);
+                baseUrl = slashIndex == -1 ? url : url.substring(0, slashIndex);
+            } else if (url.startsWith("git@") && url.contains(":")) {
+                int colonIndex = url.indexOf(':');
+                baseUrl = url.substring(0, colonIndex);
+            }
+
+            RemoteServerMatch match = null;
+            if (baseUrl == null) {
+                // No protocol or SCP style URL, try to match against the base URLs of registered servers.
+                Map.Entry<String, RemoteServerMatch> matchEntry = baseUrlRemoteServerCache.entrySet().stream()
+                        .filter(entry -> url.startsWith(entry.getKey())).findFirst()
+                        .orElse(null);
+                if (matchEntry != null) {
+                    baseUrl = matchEntry.getKey();
+                    match = matchEntry.getValue();
+                }
+            } else {
+                match = baseUrlRemoteServerCache.get(baseUrl.toLowerCase(Locale.ENGLISH));
+            }
+            if (match == null) {
+                return null;
+            }
+
+            String path = cleanUpPath(url.substring(baseUrl.length()));
+            return buildGitRemote(url, match, path);
+        }
+
         public GitRemote parse(String url) {
+            GitRemote cached = findCached(url);
+            if (cached != null) {
+                return cached;
+            }
             URI normalizedUri = normalize(url);
 
             RemoteServerMatch match = matchRemoteServer(normalizedUri);
             String repositoryPath = repositoryPath(match, normalizedUri);
+            maybeCache(url, normalizedUri, match);
 
-            switch (match.service) {
+            return buildGitRemote(url, match, repositoryPath);
+        }
+
+        boolean maybeCache(String url, URI normalizedUrl, RemoteServerMatch match) {
+            String normalizedPath = normalizedUrl.getPath();
+            if (normalizedPath == null || normalizedPath.isEmpty()) {
+                return false;
+            }
+
+            String lowerUrl = cleanUpPath(url.toLowerCase(Locale.ENGLISH));
+            String lowerPath = normalizedPath.toLowerCase(Locale.ENGLISH);
+
+            // Try with "/" prefix
+            int pathIndex = lowerUrl.lastIndexOf(lowerPath);
+            if (pathIndex == -1 && lowerPath.startsWith("/")) {
+                // Try with ":" instead of "/" for SCP-style
+                String altPath = ":" + lowerPath.substring(1);
+                pathIndex = lowerUrl.lastIndexOf(altPath);
+            }
+
+            if (pathIndex == -1) {
+                return false; // Can't confidently strip
+            }
+
+            // Ensure the path is a suffix
+            if (pathIndex + lowerPath.length() != lowerUrl.length() &&
+                pathIndex + lowerPath.length() + 1 != lowerUrl.length()) {
+                return false;
+            }
+
+            String baseUrl = url.substring(0, pathIndex);
+            baseUrlRemoteServerCache.put(baseUrl, match);
+            return true;
+        }
+
+        private GitRemote buildGitRemote(String url, RemoteServerMatch remoteServerMatch, String repositoryPath) {
+            switch (remoteServerMatch.service) {
                 case AzureDevOps:
-                    if (match.matchedUri.getHost().equalsIgnoreCase("ssh.dev.azure.com")) {
+                    if (remoteServerMatch.matchedUri.getHost().equalsIgnoreCase("ssh.dev.azure.com")) {
                         repositoryPath = repositoryPath.replaceFirst("(?i)v3/", "");
                     } else {
                         repositoryPath = repositoryPath.replaceFirst("(?i)/_git/", "/");
@@ -267,7 +350,7 @@ public class GitRemote {
             } else {
                 repositoryName = repositoryPath;
             }
-            return new GitRemote(match.service, url, match.origin, repositoryPath, organization, repositoryName);
+            return new GitRemote(remoteServerMatch.service, url, remoteServerMatch.origin, repositoryPath, organization, repositoryName);
         }
 
         private @NonNull RemoteServerMatch matchRemoteServer(URI normalizedUri) {
@@ -337,17 +420,29 @@ public class GitRemote {
                 }
                 String maybePort = maybePort(uri.getPort(), scheme);
 
-                String path = uri.getPath().replaceFirst("/$", "")
-                        .replaceFirst("(?i)\\.git$", "")
-                        .replaceFirst("^/", "");
+                String path = cleanUpPath(uri.getPath());
                 return URI.create((scheme + "://" + host + maybePort + "/" + path.replace(" ", "%20")).replaceFirst("/$", ""));
             } catch (URISyntaxException e) {
                 throw new IllegalStateException("Unable to parse origin from: " + url, e);
             }
         }
 
+        private static final Pattern LEADING_SLASH_PATTERN = Pattern.compile("^/");
+        private static final Pattern LEADING_COLON_PATTERN = Pattern.compile("^:");
+        private static final Pattern TRAILING_SLASH_PATTERN = Pattern.compile("/$");
+        private static final Pattern DOT_GIT_PATTERN = Pattern.compile("(?i)\\.git$");
+
+        private static String cleanUpPath(String path) {
+            String cleaned = path;
+            cleaned = LEADING_SLASH_PATTERN.matcher(cleaned).replaceFirst("");
+            cleaned = LEADING_COLON_PATTERN.matcher(cleaned).replaceFirst("");
+            cleaned = TRAILING_SLASH_PATTERN.matcher(cleaned).replaceFirst("");
+            cleaned = DOT_GIT_PATTERN.matcher(cleaned).replaceFirst("");
+            return cleaned;
+        }
+
         @Value
-        private static class RemoteServerMatch {
+        static class RemoteServerMatch {
             Service service;
             String origin;
             URI matchedUri;
