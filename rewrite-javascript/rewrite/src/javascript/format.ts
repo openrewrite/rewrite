@@ -143,11 +143,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
         return produce(ret, draft => {
             draft.body.prefix.whitespace = this.style.beforeLeftBrace.catchLeftBrace ? " " : "";
-
-            if (draft.extends) {
-                draft.extends.before.whitespace = " ";
-                draft.extends.element.prefix.whitespace = " ";
-            }
         }) as J.ClassDeclaration;
     }
 
@@ -657,19 +652,10 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         super();
     }
 
-    override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
-        // Note - for some reason the original MinimumViableSpacingVisitor.java doesn't have it
-        // and only has the logic in MinimumViableSpacingTest.defaults
-        const ret = await super.visitSpace(space, p) as J.Space;
-        return ret && produce(ret, draft => {
-            draft.whitespace = "";
-        });
-    }
-
     protected async visitAwait(await_: JS.Await, p: P): Promise<J | undefined> {
         const ret = await super.visitAwait(await_, p) as JS.Await;
         return produce(ret, draft => {
-            draft.expression.prefix.whitespace = " ";
+            this.ensureSpace(draft.expression.prefix)
         });
     }
 
@@ -680,10 +666,11 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         if (c.modifiers.length > 0) {
             if (!first && c.modifiers[0].prefix.whitespace === "") {
                 c = produce(c, draft => {
-                    draft.modifiers[0].prefix.whitespace = " ";
+                    this.ensureSpace(draft.modifiers[0].prefix);
                 });
             }
             c = produce(c, draft => {
+                // TODO convert it to a usual draft syntax and use this.ensuresSpace()
                 draft.modifiers = draft.modifiers.map((m, i) => i > 0 && m.prefix.whitespace === "" ?
                     {...m, prefix: {...m.prefix, whitespace: " "}} : m);
             });
@@ -692,32 +679,32 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
 
         if (c.classKind.prefix.whitespace === "" && !first) {
             c = produce(c, draft => {
-                draft.classKind.prefix.whitespace = " ";
+                this.ensureSpace(draft.classKind.prefix);
             });
             first = false;
         }
 
         c = produce(c, draft => {
-            draft.name.prefix.whitespace = " ";
+            this.ensureSpace(draft.name.prefix);
         });
 
         if (c.typeParameters && c.typeParameters.elements.length > 0 && c.typeParameters.before.whitespace === "" && !first) {
             c = produce(c, draft => {
-                draft.typeParameters!.before.whitespace = " ";
+                this.ensureSpace(draft.typeParameters!.before);
             });
         }
 
         if (c.extends && c.extends.before.whitespace === "") {
             c = produce(c, draft => {
-                draft.extends!.before.whitespace = " ";
+                this.ensureSpace(draft.extends!.before);
             });
         }
 
         if (c.implements && c.implements.before.whitespace === "") {
             c = produce(c, draft => {
-                draft.implements!.before.whitespace = " ";
+                this.ensureSpace(draft.implements!.before);
                 if (draft.implements != undefined && draft.implements.elements.length > 0) {
-                    draft.implements.elements[0].element.prefix.whitespace = " ";
+                    this.ensureSpace(draft.implements.elements[0].element.prefix);
                 }
             });
         }
@@ -740,7 +727,7 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         if (m.modifiers.length > 0) {
             if (!first && m.modifiers[0].prefix.whitespace === "") {
                 m = produce(m, draft => {
-                    draft.modifiers[0].prefix.whitespace = " ";
+                    this.ensureSpace(draft.modifiers[0].prefix);
                 });
             }
             m = produce(m, draft => {
@@ -754,13 +741,13 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
 
         if (!first && m.name.prefix.whitespace === "") {
             m = produce(m, draft => {
-                draft.name.prefix.whitespace = " ";
+                this.ensureSpace(draft.name.prefix);
             });
         }
 
         if (m.throws && m.throws.before.whitespace === "") {
             m = produce(m, draft => {
-                draft.throws!.before.whitespace = " ";
+                this.ensureSpace(draft.throws!.before);
             });
         }
 
@@ -773,15 +760,17 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
             if (draft.modifiers.length > 0) {
                 draft.keywordType.before.whitespace=" ";
             }
-            draft.name.element.prefix.whitespace = " ";
+            this.ensureSpace(draft.name.element.prefix);
         });
     }
 
     protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
         const ret = await super.visitNewClass(newClass, p) as J.NewClass;
         return produce(ret, draft => {
-            if (draft.class != undefined) {
-                draft.class.prefix.whitespace = " ";
+            if (draft.class) {
+                if (draft.class.kind == JS.Kind.TypeTreeExpression) {
+                    this.ensureSpace((draft.class as Draft<JS.TypeTreeExpression>).expression.prefix);
+                }
             }
         });
     }
@@ -791,7 +780,7 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         if (r.expression && r.expression.prefix.whitespace === "" &&
             !r.markers.markers.find(m => m.id === "org.openrewrite.java.marker.ImplicitReturn")) {
             return produce(r, draft => {
-                draft.expression!.prefix.whitespace = " ";
+                this.ensureSpace(draft.expression!.prefix);
             });
         }
         return r;
@@ -801,16 +790,16 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitScopedVariableDeclarations(scopedVariableDeclarations, p) as JS.ScopedVariableDeclarations;
         return ret.scope && produce(ret, draft => {
             if (draft.scope && draft.modifiers.length > 0) {
-                draft.scope.before.whitespace = " ";
+                this.ensureSpace(draft.scope.before);
             }
-            draft.variables[0].element.prefix.whitespace = " ";
+            this.ensureSpace(draft.variables[0].element.prefix);
         });
     }
 
     protected async visitThrow(thrown: J.Throw, p: P): Promise<J | undefined> {
         const ret = await super.visitThrow(thrown, p) as J.Throw;
         return ret && produce(ret, draft => {
-           draft.exception.prefix.whitespace = " ";
+           this.ensureSpace(draft.exception.prefix);
         });
     }
 
@@ -818,16 +807,16 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitTypeDeclaration(typeDeclaration, p) as JS.TypeDeclaration;
         return produce(ret, draft => {
             if (draft.modifiers.length > 0) {
-                draft.name.before.whitespace = " ";
+                this.ensureSpace(draft.name.before);
             }
-            draft.name.element.prefix.whitespace = " ";
+            this.ensureSpace(draft.name.element.prefix);
         });
     }
 
     protected async visitTypeOf(typeOf: JS.TypeOf, p: P): Promise<J | undefined> {
         const ret = await super.visitTypeOf(typeOf, p) as JS.TypeOf;
         return produce(ret, draft => {
-            draft.expression.prefix.whitespace = " ";
+            this.ensureSpace(draft.expression.prefix);
         });
     }
 
@@ -835,8 +824,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitTypeParameter(typeParam, p) as J.TypeParameter;
         return produce(ret, draft => {
             if (draft.bounds && draft.bounds.elements.length > 0) {
-                draft.bounds.before.whitespace = " ";
-                draft.bounds.elements[0].element.prefix.whitespace = " ";
+                this.ensureSpace(draft.bounds.before);
+                this.ensureSpace(draft.bounds.elements[0].element.prefix);
             }
         });
     }
@@ -849,6 +838,7 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
             ret = produce(ret, draft => {
                 draft.modifiers = draft.modifiers.map((m, i) =>
                     i > 0 && m.prefix.whitespace === "" ?
+                        // TODO convert it to a usual draft syntax and use this.ensuresSpace()
                         {...m, prefix: {...m.prefix, whitespace: " "}} : m
                 );
             });
@@ -857,7 +847,7 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
 
         if (!first) {
             ret = produce(ret, draft => {
-                draft.variables[0].element.prefix.whitespace = " ";
+                this.ensureSpace(draft.variables[0].element.prefix);
             });
         }
 
@@ -876,6 +866,12 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         }
 
         return c;
+    }
+
+    private ensureSpace(spaceDraft: Draft<J.Space>) {
+        if (spaceDraft.whitespace.length === 0 && spaceDraft.comments.length === 0) {
+            spaceDraft.whitespace = " ";
+        }
     }
 }
 
@@ -972,7 +968,9 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             } else if (parent?.kind === J.Kind.Block ||
                       (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
                       (parent?.kind === J.Kind.Case)) {
-                this.ensurePrefixHasNewLine(draft);
+                if (draft.kind != J.Kind.Case) {
+                    this.ensurePrefixHasNewLine(draft);
+                }
             }
         });
     }

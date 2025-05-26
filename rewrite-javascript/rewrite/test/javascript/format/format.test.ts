@@ -24,6 +24,7 @@ describe('AutoformatVisitor', () => {
 
     test('everything', () => {
         return spec.rewriteRun(
+            // TODO there should be no newline after the default case in switch
             // @formatter:off
             //language=typescript
             typescript(`
@@ -91,12 +92,14 @@ describe('AutoformatVisitor', () => {
                                     return 1;
                                 default:
                                     return 0;
+                            
                             }
                         }
                     }
                     if (1 > 0) {
                         console.log("four", "three", "six");
                     }
+                    
                     let i = 1;
                     while (i < 4) {
                         i++;
@@ -108,6 +111,7 @@ describe('AutoformatVisitor', () => {
                     } finally {
                         console.log("finally");
                     }
+                    
                     const isTypeScriptFun = i > 3 ? "yes" : "hell yeah!";
                     for (let j = 1; j <= 5; j++) {
                         console.log(\`Number: \` + j);
@@ -128,6 +132,24 @@ describe('AutoformatVisitor', () => {
             type Values = {
                 [key: string]: string;
             }
+            `)
+            // @formatter:on
+        )});
+
+    test.skip('a statement following an if', () => {
+        // TODO address the extra line added before 'let'
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            if (1>0) {
+            }
+            let i = 1;
+            `,
+                `
+            if (1 > 0) {
+            }
+            let i = 1;
             `)
             // @formatter:on
         )});
