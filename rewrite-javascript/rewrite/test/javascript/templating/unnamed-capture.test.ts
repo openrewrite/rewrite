@@ -14,14 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {
-    capture,
-    JavaScriptVisitor,
-    pattern,
-    rewrite,
-    template,
-    typescript
-} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, pattern, replace, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {createDraft, produce} from "immer";
 
@@ -101,10 +94,13 @@ describe('unnamed capture', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
-                return await rewrite((obj = capture(), defaultValue = capture(), property = capture()) => ({
-                        matching: pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`,
-                        as: template`${obj}?.${property} ?? ${defaultValue}`
-                    }))
+                return await replace(() => {
+                    const obj = capture(), defaultValue = capture(), property = capture();
+                    return {
+                        before: pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`,
+                        after: template`${obj}?.${property} ?? ${defaultValue}`
+                    };
+                })
                         .tryOn(ternary, this.cursor) || super.visitTernary(ternary, p);
             }
         });

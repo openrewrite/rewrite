@@ -55,7 +55,7 @@ class CaptureImpl implements Capture {
  * // Multiple captures
  * const {left, right} = {left: capture(), right: capture()};
  * const pattern = pattern`${left} + ${right}`;
- * 
+ *
  * // Repeated patterns using the same capture
  * const expr = capture();
  * const redundantOr = pattern`${expr} || ${expr}`;
@@ -105,7 +105,7 @@ export class Pattern {
 class PlaceholderUtils {
     static readonly CAPTURE_PREFIX = '__capture_';
     static readonly PLACEHOLDER_PREFIX = '__PLACEHOLDER_';
-    
+
     /**
      * Checks if a node is a capture placeholder.
      *
@@ -119,7 +119,7 @@ class PlaceholderUtils {
         }
         return false;
     }
-    
+
     /**
      * Parses a capture placeholder to extract name and type constraint.
      *
@@ -130,25 +130,25 @@ class PlaceholderUtils {
         if (!identifier.startsWith(this.CAPTURE_PREFIX)) {
             return null;
         }
-        
+
         // Handle unnamed captures: "__capture_unnamed_N__"
         if (identifier.startsWith(`${this.CAPTURE_PREFIX}unnamed_`)) {
             const match = identifier.match(/__capture_(unnamed_\d+)__/);
-            return match ? { name: match[1] } : null;
+            return match ? {name: match[1]} : null;
         }
-        
+
         // Handle named captures: "__capture_name__" or "__capture_name_type__"
         const match = identifier.match(/__capture_([^_]+)(?:_([^_]+))?__/);
         if (!match) {
             return null;
         }
-        
+
         return {
             name: match[1],
             typeConstraint: match[2]
         };
     }
-    
+
     /**
      * Creates a capture placeholder string.
      *
@@ -157,7 +157,7 @@ class PlaceholderUtils {
      * @returns The formatted placeholder string
      */
     static createCapture(name: string, typeConstraint?: string): string {
-        return typeConstraint 
+        return typeConstraint
             ? `${this.CAPTURE_PREFIX}${name}_${typeConstraint}__`
             : `${this.CAPTURE_PREFIX}${name}__`;
     }
@@ -246,8 +246,8 @@ export class Matcher {
             }
 
             private matchesParameter(identifier: J.Identifier, other: J): boolean {
-                return PlaceholderUtils.isCapture(identifier) && 
-                       matcher.handleCapture(identifier, other);
+                return PlaceholderUtils.isCapture(identifier) &&
+                    matcher.handleCapture(identifier, other);
             }
         }).compare(pattern, target));
     }
@@ -262,7 +262,7 @@ export class Matcher {
     private handleCapture(pattern: J, target: J): boolean {
         const id = pattern as J.Identifier;
         const captureInfo = PlaceholderUtils.parseCapture(id.simpleName);
-        
+
         if (!captureInfo) {
             return false;
         }
@@ -335,6 +335,7 @@ export type JavaCoordinates = {
 export namespace JavaCoordinates {
     // FIXME need to come up with the equivalent of `Space.Location` support
     export type Location = 'EXPRESSION_PREFIX' | 'STATEMENT_PREFIX' | 'BLOCK_END';
+
     export enum Mode {
         Before,
         After,
@@ -364,7 +365,7 @@ export namespace JavaCoordinates {
  * const literal = ...; // Some AST node
  * const result = template`${$(literal)}`.apply(cursor, coordinates);
  */
-export class TemplateGenerator {
+export class Template {
     private readonly substitutions = new Map<string, Parameter>();
 
     /**
@@ -641,7 +642,7 @@ class TemplateApplier {
  */
 export type TemplateParameter = Capture | Tree | string | number | boolean;
 
-export function template(strings: TemplateStringsArray, ...parameters: TemplateParameter[]): TemplateGenerator {
+export function template(strings: TemplateStringsArray, ...parameters: TemplateParameter[]): Template {
     // Convert Capture objects to Parameter objects
     const processedParameters = parameters.map(param => {
         // If param is a Capture object with a tree, convert it to a Parameter
@@ -652,14 +653,14 @@ export function template(strings: TemplateStringsArray, ...parameters: TemplateP
         return {value: param};
     });
 
-    return new TemplateGenerator(strings, processedParameters);
+    return new Template(strings, processedParameters);
 }
 
 /**
  * Processor for template strings.
  * Converts a template string with captures into an AST pattern.
  */
-export class TemplateProcessor {
+class TemplateProcessor {
     /**
      * Creates a new template processor.
      *
@@ -730,35 +731,39 @@ export class TemplateProcessor {
 /**
  * Represents a replacement rule that can match a pattern and apply a template.
  */
-export interface ReplaceRule {
+export interface RewriteRule {
     tryOn(node: J, cursor: Cursor, coordinates?: JavaCoordinates): Promise<J | undefined>;
 }
 
 /**
  * Configuration for a replacement rule.
  */
-export interface ReplaceConfig {
-    matching: Pattern;
-    as: TemplateGenerator;
+export interface RewriteConfig {
+    before: Pattern | Pattern[];
+    after: Template;
 }
 
 /**
  * Implementation of a replacement rule.
  */
-class ReplaceRuleImpl implements ReplaceRule {
+class RewriteRuleImpl implements RewriteRule {
     constructor(
-        private readonly matchPattern: Pattern,
-        private readonly templateGenerator: TemplateGenerator
+        private readonly before: Pattern[],
+        private readonly after: Template
     ) {
     }
 
     async tryOn(node: J, cursor: Cursor, coordinates: JavaCoordinates): Promise<J | undefined> {
-        const matcher = this.matchPattern.against(node);
+        for (const pattern of this.before) {
+            const matcher = pattern.against(node);
 
-        if (await matcher.matches()) {
-            const result = await this.templateGenerator.apply(cursor,
-                coordinates || {tree: node, loc: "EXPRESSION_PREFIX", mode: JavaCoordinates.Mode.Replace});
-            return result || node; // Fallback to original if template fails
+            if (await matcher.matches()) {
+                const result = await this.after.apply(cursor,
+                    coordinates || {tree: node, loc: "EXPRESSION_PREFIX", mode: JavaCoordinates.Mode.Replace});
+                if (result) {
+                    return result;
+                }
+            }
         }
 
         // Return the original node if no match
@@ -767,37 +772,43 @@ class ReplaceRuleImpl implements ReplaceRule {
 }
 
 /**
- * Creates a replacement rule using a builder function with default parameters.
+ * Creates a replacement rule using a capture context and configuration.
  *
- * @param builderFn Function that takes capture objects (with defaults) and returns match/template config
+ * @param builderFn Function that takes a capture context and returns before/after configuration
  * @returns A replacement rule that can be applied to AST nodes
  *
  * @example
- * const swapOperands = rewrite((left = capture(), right = capture()) => ({
- *     matching: pattern`${left} + ${right}`,
- *     as: template`${right} + ${left}`
- * }));
+ * // Single pattern
+ * const swapOperands = replace<J.Binary>((ctx) => {
+ *     const {left, right} = ctx.captures({left: capture(), right: capture()});
+ *     return {
+ *         before: pattern`${left} + ${right}`,
+ *         after: template`${right} + ${left}`
+ *     };
+ * });
  *
  * @example
- * // Matching repeated expressions
- * const redundantOrRule = rewrite(() => {
- *     const expr = capture();
+ * // Multiple patterns
+ * const normalizeComparisons = replace<J.Binary>((ctx) => {
+ *     const {left, right} = ctx.captures({left: capture(), right: capture()});
  *     return {
- *         matching: pattern`${expr} || ${expr}`,
- *         as: template`${expr}`
+ *         before: [
+ *             pattern`${left} == ${right}`,
+ *             pattern`${left} === ${right}`
+ *         ],
+ *         after: template`${left} === ${right}`
  *     };
  * });
  */
-export function rewrite(
-    builderFn: () => ReplaceConfig
-): ReplaceRule {
-    // Call with no arguments to trigger default parameters
+export function replace<T extends J>(
+    builderFn: () => RewriteConfig
+): RewriteRule {
     const config = builderFn();
 
-    // Ensure we have valid match and template properties
-    if (!config.matching || !config.as) {
-        throw new Error('Builder function must return an object with match and template properties');
+    // Ensure we have valid before and after properties
+    if (!config.before || !config.after) {
+        throw new Error('Builder function must return an object with before and after properties');
     }
 
-    return new ReplaceRuleImpl(config.matching, config.as);
+    return new RewriteRuleImpl(Array.isArray(config.before) ? config.before : [config.before], config.after);
 }

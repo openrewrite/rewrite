@@ -13,27 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, pattern, TemplateProcessor} from "../../../src/javascript";
+import {capture, pattern} from "../../../src/javascript";
 
 describe('Pattern Matching', () => {
-    describe('TemplateProcessor', () => {
-        test('buildTemplateString creates correct string with captures', () => {
-            const templateParts = ['', ' + ', ''];
-            const captures = [
-                capture(),
-                capture()
-            ];
-
-            const processor = new TemplateProcessor(templateParts as unknown as TemplateStringsArray, captures);
-
-            // Access the private method using type assertion
-            const buildTemplateString = (processor as any).buildTemplateString.bind(processor);
-
-            const result = buildTemplateString();
-            expect(result).toBe('__capture_unnamed_1__ + __capture_unnamed_2__');
-        });
-    });
-
     describe('Pattern', () => {
         test('creates a pattern with correct template parts and captures', () => {
             const p = pattern`${capture()} + ${capture()}`;

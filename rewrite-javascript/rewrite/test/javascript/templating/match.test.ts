@@ -18,8 +18,7 @@ import {
     capture,
     JavaCoordinates,
     JavaScriptVisitor,
-    pattern,
-    rewrite,
+    pattern, replace,
     template,
     typescript
 } from "../../../src/javascript";
@@ -93,11 +92,13 @@ describe('match extraction', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
 
-                const swapOperands = rewrite(
-                    (left = capture(), right = capture()) => ({
-                        matching: pattern`${left} + ${right}`,
-                        as: template`${right} + ${left}`
-                    })
+                const swapOperands = replace(() => {
+                        const {left, right} = {left: capture(), right: capture()};
+                        return {
+                            before: pattern`${left} + ${right}`,
+                            after: template`${right} + ${left}`
+                        };
+                    }
                 );
                 return await swapOperands.tryOn(binary, this.cursor, {
                     tree: binary,
