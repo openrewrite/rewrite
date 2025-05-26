@@ -137,7 +137,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 property = this.style.aroundOperators.shift
                 break;
             default:
-                // TODO support arrowFunction, beforeUnaryNotAndNotNull, afterUnaryNotAndNotNull
                 throw new Error("Unsupported operator type " + ret.operator.element.valueOf());
         }
         return produce(ret, draft => {
