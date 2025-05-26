@@ -23,7 +23,7 @@ import static org.openrewrite.Preconditions.not;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class DoesNotNamespaceUri extends Recipe {
+public class DoesNotUseNamespaceUri extends Recipe {
 
     @Option(displayName = "Namespace URI",
             description = "The Namespace URI to check.",

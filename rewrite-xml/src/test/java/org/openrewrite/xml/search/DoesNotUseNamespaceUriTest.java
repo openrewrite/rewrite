@@ -22,12 +22,12 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
-class DoesNotNamespaceUriTest implements RewriteTest {
+class DoesNotUseNamespaceUriTest implements RewriteTest {
     @DocumentExample
     @Test
     void doesNotContain() {
         rewriteRun(
-          spec -> spec.recipe(new DoesNotNamespaceUri("http://example.com/dummy")),
+          spec -> spec.recipe(new DoesNotUseNamespaceUri("http://example.com/dummy")),
           xml(
             source,
             """
@@ -52,7 +52,7 @@ class DoesNotNamespaceUriTest implements RewriteTest {
     @Test
     void containedInRoot() {
         rewriteRun(
-          spec -> spec.recipe(new DoesNotNamespaceUri("http://www.w3.org/2001/XMLSchema-instance")),
+          spec -> spec.recipe(new DoesNotUseNamespaceUri("http://www.w3.org/2001/XMLSchema-instance")),
           xml(source)
         );
     }
@@ -61,7 +61,7 @@ class DoesNotNamespaceUriTest implements RewriteTest {
     @Test
     void containedInChild() {
         rewriteRun(
-          spec -> spec.recipe(new DoesNotNamespaceUri("http://cxf.apache.org/jaxws")),
+          spec -> spec.recipe(new DoesNotUseNamespaceUri("http://cxf.apache.org/jaxws")),
           xml(source)
         );
     }
