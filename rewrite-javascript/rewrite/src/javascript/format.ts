@@ -15,9 +15,9 @@
  */
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, J, Statement} from "../java";
+import {Comment, emptySpace, J, Statement} from "../java";
 import {Draft, produce} from "immer";
-import {Cursor, isTree, Tree} from "../tree";
+import {Cursor, Tree} from "../tree";
 import {
     BlankLinesStyle,
     SpacesStyle,
@@ -37,12 +37,34 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
         let t: R | undefined = tree as R;
         // TODO possibly cursor.fork
 
+        t = t && await new NormalizeWhitespaceVisitor().visit(t, p, cursor);
         t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
         t = t && await new BlankLinesVisitor(blankLinesStyle).visit(t, p, cursor);
         t = t && await new WrappingAndBracesVisitor(wrappingAndBracesStyle).visit(t, p, cursor);
         t = t && await new SpacesVisitor(spacesStyle).visit(t, p, cursor);
         t = t && await new TabsAndIndentsVisitor(tabsAndIndentsStyle).visit(t, p, cursor);
         return t;
+    }
+}
+
+export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
+    // called NormalizeFormat in Java
+
+    protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: P): Promise<J | undefined> {
+        const ret = await super.visitScopedVariableDeclarations(scopedVariableDeclarations, p) as JS.ScopedVariableDeclarations;
+        return produce(ret, draft => {
+            if (draft.scope) {
+                this.concatenatePrefix(draft, draft.scope!.before);
+                draft.scope!.before = emptySpace;
+            }
+        });
+    }
+
+    private concatenatePrefix(node: Draft<J>, right: J.Space) {
+        // TODO look at https://github.com/openrewrite/rewrite/commit/990a366fab9e5656812d81d0eb15ecb6bfd2fde0#diff-ec2e977fe8f1e189735e71b817f8f1ebaf79c1490c0210652e8a559f7f7877de
+        // and possibly incorporate it here - some special logic needed to merge comments better (?)
+        node.prefix.comments = [...node.prefix.comments, ...right.comments];
+        node.prefix.whitespace = node.prefix.whitespace + right.whitespace;
     }
 }
 
