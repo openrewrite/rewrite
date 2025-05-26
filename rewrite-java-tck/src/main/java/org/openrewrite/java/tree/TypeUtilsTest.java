@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -25,7 +24,8 @@ import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.*;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;

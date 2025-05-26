@@ -1486,7 +1486,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
-                public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext o) {
+                public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
                     J.VariableDeclarations param = (J.VariableDeclarations) lambda.getParameters().getParameters().getFirst();
                     J.VariableDeclarations.NamedVariable variable = param.getVariables().getFirst();
 

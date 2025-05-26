@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.Recipe;
@@ -52,12 +53,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     JavaScriptRewriteRpc client;
     PrintStream log;
 
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.validateRecipeSerialization(false)
-          .cycles(1);
-    }
-
     @BeforeEach
     void before() throws FileNotFoundException {
         this.log = new PrintStream(new FileOutputStream("rpc.java.log"));
@@ -80,6 +75,39 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void after() {
         log.close();
         client.shutdown();
+    }
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.validateRecipeSerialization(false)
+          .cycles(1);
+    }
+
+    @DocumentExample
+    @Test
+    void runRecipe() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client.prepareRecipe("org.openrewrite.example.npm.change-version",
+              Map.of("version", "1.0.0")))
+            .expectedCyclesThatMakeChanges(1),
+          json(
+            """
+              {
+                "name": "my-project",
+                "version": "0.0.1"
+              }
+              """,
+            """
+              {
+                "name": "my-project",
+                "version": "1.0.0"
+              }
+              """,
+            spec -> spec.path("package.json")
+          )
+        );
     }
 
     @Test
@@ -170,32 +198,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         rewriteRun(
           json(packageJson, spec -> spec.beforeRecipe(json ->
             assertThat(client.print(json)).isEqualTo(packageJson.trim())))
-        );
-    }
-
-    @Test
-    void runRecipe() {
-        installRecipes();
-        rewriteRun(
-          spec -> spec
-            .recipe(client.prepareRecipe("org.openrewrite.example.npm.change-version",
-              Map.of("version", "1.0.0")))
-            .expectedCyclesThatMakeChanges(1),
-          json(
-            """
-              {
-                "name": "my-project",
-                "version": "0.0.1"
-              }
-              """,
-            """
-              {
-                "name": "my-project",
-                "version": "1.0.0"
-              }
-              """,
-            spec -> spec.path("package.json")
-          )
         );
     }
 

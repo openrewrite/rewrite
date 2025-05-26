@@ -30,7 +30,7 @@ describe('AutoformatVisitor', () => {
             typescript(`
                      type T1=string;
                      export   type   T2   =   string;
-                    class L {}
+                    abstract class L {}
                     class K extends L{
                         constructor  ( ){
                             super();
@@ -71,7 +71,7 @@ describe('AutoformatVisitor', () => {
                     type T1 = string;
                     export type T2 = string;
 
-                    class L {
+                    abstract class L {
                     }
 
                     class K extends L {
@@ -99,7 +99,6 @@ describe('AutoformatVisitor', () => {
                     if (1 > 0) {
                         console.log("four", "three", "six");
                     }
-                    
                     let i = 1;
                     while (i < 4) {
                         i++;
@@ -111,7 +110,6 @@ describe('AutoformatVisitor', () => {
                     } finally {
                         console.log("finally");
                     }
-                    
                     const isTypeScriptFun = i > 3 ? "yes" : "hell yeah!";
                     for (let j = 1; j <= 5; j++) {
                         console.log(\`Number: \` + j);
@@ -136,8 +134,7 @@ describe('AutoformatVisitor', () => {
             // @formatter:on
         )});
 
-    test.skip('a statement following an if', () => {
-        // TODO address the extra line added before 'let'
+    test('a statement following an if', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -146,7 +143,7 @@ describe('AutoformatVisitor', () => {
             }
             let i = 1;
             `,
-                `
+            `
             if (1 > 0) {
             }
             let i = 1;

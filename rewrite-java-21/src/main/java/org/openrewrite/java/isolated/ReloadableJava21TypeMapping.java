@@ -488,8 +488,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             }
         }
 
-        if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR
-                || isUnknownType(symbol.type)) {
+        if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR ||
+                isUnknownType(symbol.type)) {
             return null;
         }
 
@@ -660,8 +660,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             JavaType.FullyQualified resolvedDeclaringType = declaringType;
-            if (declaringType == null && (methodSymbol.owner instanceof Symbol.ClassSymbol
-                    || methodSymbol.owner instanceof Symbol.TypeVariableSymbol)) {
+            if (declaringType == null && (methodSymbol.owner instanceof Symbol.ClassSymbol ||
+                    methodSymbol.owner instanceof Symbol.TypeVariableSymbol)) {
                     resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
                 }
 

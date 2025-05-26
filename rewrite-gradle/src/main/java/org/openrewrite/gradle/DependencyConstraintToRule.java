@@ -450,7 +450,7 @@ public class DependencyConstraintToRule extends Recipe {
         boolean isKotlinDsl;
 
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+        public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (isEmptyDependenciesBlock(m)) {
                 return null;

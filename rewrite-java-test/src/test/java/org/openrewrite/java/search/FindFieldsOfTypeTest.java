@@ -24,7 +24,6 @@ import org.openrewrite.java.table.FieldsOfTypeUses;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;

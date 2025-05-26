@@ -194,4 +194,49 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     });
+
+    test("indent 5", () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+            draft.indentSize = 5;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                class A {
+                x = 3;
+                }
+                `,
+                `
+                class A {
+                     x = 3;
+                }
+                `)
+            // @formatter:on
+        )
+    })
+
+    test("type", () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                type Message = {
+                [key: string]: any;
+                }
+                `,
+                `
+                type Message = {
+                    [key: string]: any;
+                }
+                `)
+            // @formatter:on
+        )
+    })
 });

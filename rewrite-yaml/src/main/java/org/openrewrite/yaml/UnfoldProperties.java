@@ -21,7 +21,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -63,8 +65,8 @@ public class UnfoldProperties extends Recipe {
         List<JsonPathMatcher> matchers = exclusions.stream().map(JsonPathMatcher::new).collect(toList());
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
-            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext executionContext) {
-                Yaml.Document doc = super.visitDocument(document, executionContext);
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                Yaml.Document doc = super.visitDocument(document, ctx);
                 doAfterVisit(new MergeDuplicateSectionsVisitor<>(doc));
                 return doc;
             }
