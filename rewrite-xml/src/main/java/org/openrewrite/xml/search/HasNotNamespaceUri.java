@@ -22,6 +22,8 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import static org.openrewrite.Preconditions.not;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class HasNotNamespaceUri extends Recipe {
@@ -43,16 +45,12 @@ public class HasNotNamespaceUri extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new XmlIsoVisitor<ExecutionContext>() {
-            @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                boolean notInUse = HasNamespaceUri.find(document, namespaceUri, null).isEmpty();
-
-                if (notInUse) {
-                    return document.withRoot(SearchResult.found(document.getRoot()));
-                }
-                return document;
-            }
-        };
+        return Preconditions.check(not(new HasNamespaceUri(namespaceUri, null).getVisitor()),
+                new XmlIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                        return document.withRoot(SearchResult.found(document.getRoot()));
+                    }
+                });
     }
 }
