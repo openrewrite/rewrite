@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JS} from "./tree";
+import {JS, JSX} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
@@ -86,6 +86,71 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visitLeftPaddedLocal("infer", inferType.typeParameter, p);
         await this.afterSyntax(inferType, p);
         return inferType;
+    }
+
+    override async visitJsxTag(element: JSX.Tag, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(element, p);
+        await this.visitLeftPaddedLocal("<", element.openName, p);
+        await this.visitSpace(element.afterName, p);
+        await this.visitRightPaddedLocal(element.attributes, "", p);
+
+        if (element.selfClosing) {
+            await this.visitSpace(element.selfClosing, p);
+            p.append("/>");
+        } else {
+            p.append(">");
+            if (element.children) {
+                await this.visitRightPaddedLocal(element.children, "", p);
+                await this.visitLeftPaddedLocal("</", element.closingName, p);
+                await this.visitSpace(element.afterClosingName, p);
+                p.append(">");
+            }
+        }
+
+        await this.afterSyntax(element, p);
+        return element;
+    }
+
+    override async visitJsxAttribute(attribute: JSX.Attribute, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(attribute, p);
+        await this.visit(attribute.key, p);
+        if (attribute.value) {
+            p.append("=");
+            await this.visit(attribute.value.element, p);
+        }
+        await this.afterSyntax(attribute, p);
+        return attribute;
+    }
+
+    override async visitJsxSpreadAttribute(spread: JSX.SpreadAttribute, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(spread, p);
+        p.append("{");
+        await this.visitSpace(spread.dots, p);
+        p.append("...");
+        await this.visitRightPaddedLocal([spread.expression], "}", p);
+        p.append("}");
+        await this.afterSyntax(spread, p);
+        return spread;
+    }
+
+    override async visitJsxExpression(expr: JSX.EmbeddedExpression, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(expr, p);
+        p.append("{");
+        if (expr.expression) {
+            await this.visitRightPaddedLocal([expr.expression], "}", p);
+        }
+        p.append("}");
+        await this.afterSyntax(expr, p);
+        return expr;
+    }
+
+    override async visitJsxNamespacedName(ns: JSX.NamespacedName, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(ns, p);
+        await this.visit(ns.namespace, p);
+        p.append(":");
+        await this.visitLeftPadded(ns.name, p);
+        await this.afterSyntax(ns, p);
+        return ns;
     }
 
     override async visitImportDeclaration(jsImport: JS.Import, p: PrintOutputCapture): Promise<J | undefined> {
@@ -196,7 +261,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         p.append("try");
         await this.visit(aTry.body, p);
         await this.visitNodes(aTry.catches, p);
-        aTry.finally && await this.visitJLeftPaddedLocal("finally", aTry.finally, p);
+        aTry.finally && await this.visitLeftPaddedLocal("finally", aTry.finally, p);
         await this.afterSyntax(aTry, p);
         return aTry;
     }
@@ -215,7 +280,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitArrayDimension(arrayDimension: J.ArrayDimension, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(arrayDimension, p);
         p.append("[");
-        await this.visitJRightPaddedLocalSingle(arrayDimension.index, "]", p);
+        await this.visitRightPaddedLocalSingle(arrayDimension.index, "]", p);
         await this.afterSyntax(arrayDimension, p);
         return arrayDimension;
     }
@@ -265,8 +330,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitTernary(ternary: J.Ternary, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(ternary, p);
         await this.visit(ternary.condition, p);
-        await this.visitJLeftPaddedLocal("?", ternary.truePart, p);
-        await this.visitJLeftPaddedLocal(":", ternary.falsePart, p);
+        await this.visitLeftPaddedLocal("?", ternary.truePart, p);
+        await this.visitLeftPaddedLocal(":", ternary.falsePart, p);
         await this.afterSyntax(ternary, p);
         return ternary;
     }
@@ -301,7 +366,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntax(doWhileLoop, p);
         p.append("do");
         await this.visitStatementLocal(doWhileLoop.body, p);
-        await this.visitJLeftPaddedLocal("while", doWhileLoop.whileCondition, p);
+        await this.visitLeftPaddedLocal("while", doWhileLoop.whileCondition, p);
         await this.afterSyntax(doWhileLoop, p);
         return doWhileLoop;
     }
@@ -317,7 +382,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitInstanceOf(instanceOf: J.InstanceOf, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(instanceOf, p);
-        await this.visitJRightPaddedLocalSingle(instanceOf.expression, "instanceof", p);
+        await this.visitRightPaddedLocalSingle(instanceOf.expression, "instanceof", p);
         await this.visit(instanceOf.class, p);
         instanceOf.pattern && await this.visit(instanceOf.pattern, p);
         await this.afterSyntax(instanceOf, p);
@@ -423,7 +488,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             }
 
             if (variable.element.initializer) {
-                await this.visitJLeftPaddedLocal("=", variable.element.initializer, p);
+                await this.visitLeftPaddedLocal("=", variable.element.initializer, p);
             }
 
             await this.afterSyntax(variable.element, p);
@@ -443,7 +508,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntax(variable, p);
         await this.visit(variable.name, p);
 
-        variable.initializer && await this.visitJLeftPaddedLocal("=", variable.initializer, p);
+        variable.initializer && await this.visitLeftPaddedLocal("=", variable.initializer, p);
 
         await this.afterSyntax(variable, p);
         return variable;
@@ -608,7 +673,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visit(classDecl.name, p);
         classDecl.typeParameters && await this.visitJContainerLocal("<", classDecl.typeParameters, ",", ">", p);
         classDecl.primaryConstructor && await this.visitJContainerLocal("(", classDecl.primaryConstructor, ",", ")", p);
-        classDecl.extends && await this.visitJLeftPaddedLocal("extends", classDecl.extends, p);
+        classDecl.extends && await this.visitLeftPaddedLocal("extends", classDecl.extends, p);
         classDecl.implements && await this.visitJContainerLocal(classDecl.classKind.type === J.ClassDeclaration.Kind.Type.Interface ? "extends" : "implements",
             classDecl.implements, ",", null, p);
         await this.visit(classDecl.body, p);
@@ -696,7 +761,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         if (method.name.toString().length === 0) {
             method.select && await this.visitRightPadded(method.select, p);
         } else {
-            method.select && await this.visitJRightPaddedLocalSingle(method.select, "", p);
+            method.select && await this.visitRightPaddedLocalSingle(method.select, "", p);
             await this.visit(method.name, p);
         }
 
@@ -1099,7 +1164,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     protected async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(computedPropertyName, p);
         p.append("[");
-        await this.visitJRightPaddedLocalSingle(computedPropertyName.expression, "]", p);
+        await this.visitRightPaddedLocalSingle(computedPropertyName.expression, "]", p);
         await this.afterSyntax(computedPropertyName, p);
         return computedPropertyName;
     }
@@ -1173,7 +1238,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitNewClass(newClass: J.NewClass, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(newClass, p);
-        newClass.enclosing && await this.visitJRightPaddedLocalSingle(newClass.enclosing, ".", p);
+        newClass.enclosing && await this.visitRightPaddedLocalSingle(newClass.enclosing, ".", p);
         await this.visitSpace(newClass.new, p);
 
         if (newClass.class) {
@@ -1220,7 +1285,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitLabel(label: J.Label, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(label, p);
-        await this.visitJRightPaddedLocalSingle(label.label, ":", p);
+        await this.visitRightPaddedLocalSingle(label.label, ":", p);
         await this.visit(label.statement, p);
         await this.afterSyntax(label, p);
         return label;
@@ -1246,7 +1311,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntax(fieldAccess, p);
         await this.visit(fieldAccess.target, p);
 
-        await this.visitJLeftPaddedLocal(".", fieldAccess.name, p);
+        await this.visitLeftPaddedLocal(".", fieldAccess.name, p);
         await this.afterSyntax(fieldAccess, p);
         return fieldAccess;
     }
@@ -1263,7 +1328,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitParentheses<T extends J>(parens: J.Parentheses<T>, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(parens, p);
         p.append('(');
-        await this.visitJRightPaddedLocalSingle(parens.tree, ")", p);
+        await this.visitRightPaddedLocalSingle(parens.tree, ")", p);
         await this.afterSyntax(parens, p);
         return parens;
     }
@@ -1279,7 +1344,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitAssignment(assignment: J.Assignment, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(assignment, p);
         await this.visit(assignment.variable, p);
-        await this.visitJLeftPaddedLocal("=", assignment.assignment, p);
+        await this.visitLeftPaddedLocal("=", assignment.assignment, p);
         await this.afterSyntax(assignment, p);
         return assignment;
     }
@@ -1588,7 +1653,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         p.append('(');
         await this.visitJRightPaddedLocal(ctrl.init, ",", p);
         p.append(';');
-        ctrl.condition && await this.visitJRightPaddedLocalSingle(ctrl.condition, ";", p);
+        ctrl.condition && await this.visitRightPaddedLocalSingle(ctrl.condition, ";", p);
         await this.visitJRightPaddedLocal(ctrl.update, ",", p);
         p.append(')');
         await this.visitStatementLocal(forLoop.body, p);
@@ -1735,7 +1800,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return right;
     }
 
-    private async visitJRightPaddedLocalSingle(node: J.RightPadded<J> | undefined, suffix: string, p: PrintOutputCapture) {
+    private async visitRightPaddedLocalSingle(node: J.RightPadded<J> | undefined, suffix: string, p: PrintOutputCapture) {
         if (node) {
             await this.visit(node.element, p);
 
@@ -1761,7 +1826,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         }
     }
 
-    private async visitJLeftPaddedLocal(prefix: string | null, leftPadded: J.LeftPadded<J> | J.LeftPadded<boolean> | undefined, p: PrintOutputCapture) {
+    private async visitLeftPaddedLocal(prefix: string | undefined, leftPadded: J.LeftPadded<J> | J.LeftPadded<boolean> | J.LeftPadded<string> | undefined, p: PrintOutputCapture) {
         if (leftPadded) {
             await this.beforeSyntaxExt(leftPadded.before, leftPadded.markers, p);
 
@@ -1769,23 +1834,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 p.append(prefix);
             }
 
-            if (typeof leftPadded.element !== 'boolean') {
-                await this.visit(leftPadded.element, p);
-            }
-
-            await this.afterSyntaxMarkers(leftPadded.markers, p);
-        }
-    }
-
-    private async visitLeftPaddedLocal(prefix: string | undefined, leftPadded: J.LeftPadded<J> | J.LeftPadded<boolean> | undefined, p: PrintOutputCapture) {
-        if (leftPadded) {
-            await this.beforeSyntaxExt(leftPadded.before, leftPadded.markers, p);
-
-            if (prefix) {
-                p.append(prefix);
-            }
-
-            if (typeof leftPadded.element !== 'boolean') {
+            if (typeof leftPadded.element === 'string') {
+                p.append(leftPadded.element);
+            } else if (typeof leftPadded.element !== 'boolean') {
                 await this.visit(leftPadded.element, p);
             }
 
@@ -1888,10 +1939,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         if (this.getParentCursor(1)?.value.kind === J.Kind.TypeCast) {
             p.append('<');
-            await this.visitJRightPaddedLocalSingle(controlParens.tree, ">", p);
+            await this.visitRightPaddedLocalSingle(controlParens.tree, ">", p);
         } else {
             p.append('(');
-            await this.visitJRightPaddedLocalSingle(controlParens.tree, ")", p);
+            await this.visitRightPaddedLocalSingle(controlParens.tree, ")", p);
         }
 
         await this.afterSyntax(controlParens, p);

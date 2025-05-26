@@ -158,7 +158,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitCompilationUnit(J.CompilationUnit cu, RpcReceiveQueue q) {
         return cu
                 .withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
-                .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
+                .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<J.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))

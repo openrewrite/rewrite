@@ -22,10 +22,10 @@ import {JavaScriptVisitor, typescript} from "../../src/javascript";
 describe('visitor', () => {
     test('call visitStatement for subclasses', async () => {
         // given
-        let global = "not visited yet";
+        let global = "";
         const CustomVisitor = class extends JavaScriptVisitor<ExecutionContext> {
             protected async visitStatement(statement: Statement, p: ExecutionContext): Promise<J | undefined> {
-                global = "visited " + statement.kind;
+                global = global + "/" + statement.kind;
                 return await super.visitStatement(statement, p);
             }
         }
@@ -35,11 +35,12 @@ describe('visitor', () => {
         // when
         await spec.rewriteRun(
             //language=typescript
-            typescript('class A {}')
+            typescript('class A {};"a".includes("b")')
         );
 
         // test
-        expect(global).toEqual("visited org.openrewrite.java.tree.J$ClassDeclaration");
+        // TODO I am not sure about the FieldAccess - what is it doing here?
+        expect(global).toEqual("/org.openrewrite.java.tree.J$ClassDeclaration/org.openrewrite.java.tree.J$Empty/org.openrewrite.java.tree.J$MethodInvocation/org.openrewrite.java.tree.J$FieldAccess");
     });
 
     test('call visitExpression for subclasses', async () => {
