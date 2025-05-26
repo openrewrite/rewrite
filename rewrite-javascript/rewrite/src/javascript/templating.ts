@@ -16,7 +16,7 @@
 import {JS} from '.';
 import {JavaScriptParser} from './parser';
 import {JavaScriptVisitor} from './visitor';
-import {Cursor, Tree} from '..';
+import {Cursor, isTree, Tree} from '..';
 import {J} from '../java';
 import {produce} from "immer";
 import {JavaScriptComparatorVisitor} from "./comparator";
@@ -518,7 +518,7 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         }
 
         // If the parameter value is an AST node, use it directly
-        if (typeof param.value === 'object' && param.value !== null && 'kind' in param.value) {
+        if (isTree(param.value)) {
             // Return the AST node, preserving the original prefix
             return produce(param.value as J, draft => {
                 draft.markers = placeholder.markers;
@@ -640,16 +640,20 @@ class TemplateApplier {
     }
 }
 
-export function template(strings: TemplateStringsArray, ...parameters: any[]): TemplateGenerator {
+/**
+ * Valid parameter types for template literals.
+ * - Capture: For pattern matching and reuse
+ * - Tree: AST nodes to be inserted directly
+ * - Primitives: Values to be converted to literals
+ */
+export type TemplateParameter = Capture | Tree | string | number | boolean;
+
+export function template(strings: TemplateStringsArray, ...parameters: TemplateParameter[]): TemplateGenerator {
     // Convert Capture objects to Parameter objects
     const processedParameters = parameters.map(param => {
         // If param is a Capture object with a tree, convert it to a Parameter
         if (param instanceof CaptureImpl && param.tree) {
             return {value: param.tree};
-        }
-        // If param is already a Parameter, return it as is
-        if (param && typeof param === 'object' && 'value' in param) {
-            return param;
         }
         // Otherwise, wrap it in a Parameter
         return {value: param};
