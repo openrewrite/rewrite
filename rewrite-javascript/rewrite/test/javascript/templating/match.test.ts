@@ -75,7 +75,7 @@ describe('match extraction', () => {
 
                 if (await matcher.matches()) {
                     return template`${right} + ${left}`
-                        .apply(this.cursor, {tree: binary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
+                        .apply(this.cursor, {tree: binary});
                 }
                 return binary;
             }

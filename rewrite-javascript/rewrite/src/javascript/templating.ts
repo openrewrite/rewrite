@@ -335,8 +335,8 @@ export interface Parameter {
 
 export type JavaCoordinates = {
     tree: Tree;
-    loc: JavaCoordinates.Location;
-    mode: JavaCoordinates.Mode;
+    loc?: JavaCoordinates.Location;
+    mode?: JavaCoordinates.Mode;
 };
 
 export namespace JavaCoordinates {
@@ -593,7 +593,7 @@ class TemplateApplier {
         const {tree, loc, mode} = this.coordinates;
 
         // Apply the template based on the location and mode
-        switch (loc) {
+        switch (loc || 'EXPRESSION_PREFIX') {
             case 'EXPRESSION_PREFIX':
                 return this.applyToExpression();
             case 'STATEMENT_PREFIX':

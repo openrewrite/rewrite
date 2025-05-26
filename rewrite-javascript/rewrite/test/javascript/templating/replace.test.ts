@@ -28,7 +28,7 @@ describe('template2 replace', () => {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                 if (literal.valueSource === '1') {
                     // Use the new template API with tagged template literals
-                    return template`2`.apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
+                    return template`2`.apply(this.cursor, {tree: literal});
                 }
                 return literal;
             }
@@ -44,7 +44,7 @@ describe('template2 replace', () => {
             override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
                 if (literal.valueSource === '1') {
                     // Use the new template API with tagged template literals and parameter substitution
-                    return template`${2}`.apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
+                    return template`${2}`.apply(this.cursor, {tree: literal});
                 }
                 return literal;
             }
@@ -66,7 +66,7 @@ describe('template2 replace', () => {
                     });
 
                     // Use the new template API with tagged template literals and AST node substitution
-                    return template`${two}`.apply(this.cursor, {tree: literal, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
+                    return template`${two}`.apply(this.cursor, {tree: literal});
                 }
                 return literal;
             }
@@ -85,7 +85,7 @@ describe('template2 replace', () => {
 
                         draft.left = (await template`${binary.right}`.apply(
                             this.cursor,
-                            {tree: binary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace}
+                            {tree: binary}
                         )) as Expression;
 
                     });

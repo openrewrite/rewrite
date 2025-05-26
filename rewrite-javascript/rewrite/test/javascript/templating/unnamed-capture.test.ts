@@ -77,7 +77,7 @@ describe('unnamed capture', () => {
                     .against(ternary).matches()) {
 
                     return template`${obj}?.${property} ?? ${defaultValue}`
-                        .apply(this.cursor, {tree: ternary, loc: "EXPRESSION_PREFIX", mode: Mode.Replace});
+                        .apply(this.cursor, {tree: ternary});
                 }
 
                 return await super.visitTernary(ternary, p);
