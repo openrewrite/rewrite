@@ -109,7 +109,7 @@ export class MatchResult {
 /**
  * Matcher for checking if a pattern matches an AST node and extracting captured nodes.
  */
-class Matcher implements Pick<Map<string, J>, 'get' | 'has'> {
+class Matcher {
     private readonly bindings = new Map<string, J>();
     private patternAst?: J;
     private templateProcessor?: TemplateProcessor;
@@ -138,22 +138,6 @@ class Matcher implements Pick<Map<string, J>, 'get' | 'has'> {
         }
 
         return this.matchNode(this.patternAst, this.ast);
-    }
-
-    /**
-     * Gets a captured node by name or capture object.
-     *
-     * @param capture The name of the capture or the capture object
-     * @returns The captured node, or undefined if not found
-     */
-    get(capture: Capture | string): J | undefined {
-        const name = typeof capture === "string" ? capture : capture.name;
-        return this.bindings.get(name);
-    }
-
-    has(capture: Capture | string): boolean {
-        const name = typeof capture === "string" ? capture : capture.name;
-        return this.bindings.has(name);
     }
 
     /**
