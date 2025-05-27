@@ -822,6 +822,19 @@ export function isJava(tree: any): tree is J {
     return javaKindValues.has(tree["kind"]);
 }
 
+export function isLiteral(tree: any): tree is J.Literal {
+    return tree["kind"] === J.Kind.Literal;
+}
+
+export function rightPadded<T extends J | boolean>(t: T, trailing: J.Space, markers?: Markers): J.RightPadded<T> {
+    return {
+        kind: J.Kind.JRightPadded,
+        element: t,
+        after: trailing,
+        markers: markers ?? emptyMarkers
+    };
+}
+
 export namespace TypedTree {
     const typeGetters = new Map<TypedTree["kind"], (tree: TypedTree) => JavaType | undefined>();
 
