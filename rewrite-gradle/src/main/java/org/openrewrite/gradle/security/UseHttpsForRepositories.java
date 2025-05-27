@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -55,7 +56,7 @@ public class UseHttpsForRepositories extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(true, new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             private J.Literal fixupLiteralIfNeeded(J.Literal arg) {
                 String url = (String) arg.getValue();
                 //noinspection HttpUrlsUsage
