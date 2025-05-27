@@ -59,31 +59,6 @@ class UpgradePluginVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void change() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.x", null)),
-          settingsGradle(
-            """
-              pluginManagement {
-                  plugins {
-                      String v = '5.40.0'
-                      id 'org.openrewrite.rewrite' version v
-                  }
-              }
-              """,
-            """
-              pluginManagement {
-                  plugins {
-                      String v = '5.40.6'
-                      id 'org.openrewrite.rewrite' version v
-                  }
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample("Upgrading a settings plugin")
     @Test
     void upgradeGradleSettingsPlugin() {
@@ -123,6 +98,31 @@ class UpgradePluginVersionTest implements RewriteTest {
               plugins {
                   id 'org.openrewrite.rewrite' version "$rewriteVersion"
                   id 'com.github.johnrengelman.shadow' version '6.1.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void change() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.x", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  plugins {
+                      String v = '5.40.0'
+                      id 'org.openrewrite.rewrite' version v
+                  }
+              }
+              """,
+            """
+              pluginManagement {
+                  plugins {
+                      String v = '5.40.6'
+                      id 'org.openrewrite.rewrite' version v
+                  }
               }
               """
           )
