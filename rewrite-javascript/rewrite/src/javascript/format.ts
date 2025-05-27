@@ -1098,7 +1098,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             }
             if (draft.kind === J.Kind.Block) {
                 const block = draft as Draft<J> as Draft<J.Block>;
-                block.end.whitespace = this.newline + relativeIndent;
+                block.end.whitespace = this.combineIndent(block.end.whitespace, relativeIndent);
             }
         });
     }
