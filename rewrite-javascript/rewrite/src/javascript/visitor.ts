@@ -122,7 +122,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.afterName = await this.visitSpace(element.afterName, p);
             draft.attributes = await mapAsync(element.attributes, attr => this.visitRightPadded(attr, p));
             draft.selfClosing = element.selfClosing && await this.visitSpace(element.selfClosing, p);
-            draft.children = element.children && await mapAsync(element.children, child => this.visitRightPadded(child, p));
+            draft.children = element.children && await mapAsync(element.children, child => this.visit(child, p));
             draft.closingName = element.closingName && await this.visitLeftPadded(element.closingName, p);
             draft.afterClosingName = element.afterClosingName && await this.visitSpace(element.afterClosingName, p);
         });

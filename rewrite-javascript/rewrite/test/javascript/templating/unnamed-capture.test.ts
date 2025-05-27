@@ -15,7 +15,7 @@
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
-import {J} from "../../../src/java";
+import {Expression, J} from "../../../src/java";
 
 describe('unnamed capture', () => {
     const spec = new RecipeSpec();
@@ -23,28 +23,22 @@ describe('unnamed capture', () => {
     test('more complex example', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
-                let m = await pattern`${"obj"} === null || ${"obj"} === undefined ? ${"defaultValue"} : ${"obj"}.${"property"}`
-                    .match(ternary);
-                if (m) {
-                    return await template`${"obj"}?.${"property"} ?? ${"defaultValue"}`.apply(this.cursor, ternary, m);
-                }
+            protected override async visitExpression(expr: Expression, p: any): Promise<J | undefined> {
+                //language=typescript
+                let m = await pattern`${"left"} + ${"right"}`.match(expr) ||
+                    await pattern`${"left"} * ${"right"}`.match(expr);
 
-                return await super.visitTernary(ternary, p);
+                return m && await template`${"right"} + ${"left"}`.apply(this.cursor, expr, m) || expr;
             }
         });
 
         return spec.rewriteRun(
             //language=typescript
             typescript(`
-                function getName(user) {
-                    return user === null || user === undefined ? "default" : user.name;
-                }
+                const a = 2 * 2 + 3;
             `, `
-                function getName(user) {
-                    return user?.name ?? "default";
-                }
+                const a = 3 + 2 + 2;
             `),
         );
     });
@@ -54,6 +48,7 @@ describe('unnamed capture', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
+                //language=typescript
                 return await rewrite(() => ({
                     before: [
                         pattern`${"obj"} === null || ${"obj"} === undefined ? ${"defaultValue"} : ${"obj"}.${"property"}`,

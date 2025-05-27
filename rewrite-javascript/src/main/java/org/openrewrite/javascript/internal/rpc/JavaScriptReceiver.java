@@ -436,7 +436,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
                 .withAfterName(q.receive(tag.getAfterName(), space2 -> visitSpace(space2, q)))
                 .getPadding().withAttributes(q.receiveList(tag.getPadding().getAttributes(), attr -> visitRightPadded(attr, q)))
                 .withSelfClosing(q.receive(tag.getSelfClosing(), space1 -> visitSpace(space1, q)))
-                .getPadding().withChildren(q.receiveList(tag.getPadding().getChildren(), child -> visitRightPadded(child, q)))
+                .withChildren(q.receiveList(tag.getChildren(), child -> (Expression) visitNonNull(child, q)))
                 .getPadding().withClosingName(q.receive(tag.getPadding().getClosingName(), name -> visitLeftPadded(name, q)))
                 .withAfterClosingName(q.receive(tag.getAfterClosingName(), space -> visitSpace(space, q)));
     }
