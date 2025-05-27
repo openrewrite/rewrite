@@ -358,7 +358,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
             // Visit children in lock step
             for (let i = 0; i < element.children.length; i++) {
-                await this.visit(element.children[i].element, otherElement.children![i].element);
+                await this.visit(element.children[i], otherElement.children![i]);
                 if (!this.match) return element;
             }
         }

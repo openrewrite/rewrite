@@ -3434,12 +3434,7 @@ export class JavaScriptParserVisitor {
                     this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!),
                     () => emptyMarkers
                 ),
-            children:
-                this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(
-                    node.children,
-                    this.prefix(this.findChildNode(node.closingElement, ts.SyntaxKind.LessThanToken)!),
-                    () => emptyMarkers
-                ),
+            children: this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(node.children),
             closingName: this.leftPadded(this.prefix(node.closingElement.tagName), this.visit(node.closingElement.tagName)),
             afterClosingName: this.suffix(node.closingElement.tagName)
         };
@@ -3475,12 +3470,7 @@ export class JavaScriptParserVisitor {
             openName: this.leftPadded(this.prefix(node.openingFragment), this.newEmpty()),
             afterName: this.prefix(this.findChildNode(node.openingFragment, ts.SyntaxKind.GreaterThanToken)!),
             attributes: [],
-            children:
-                this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(
-                    node.children,
-                    this.prefix(this.findChildNode(node.closingFragment, ts.SyntaxKind.LessThanToken)!),
-                    () => emptyMarkers
-                ),
+            children: this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(node.children),
             closingName: this.leftPadded(emptySpace, this.newEmpty()),
             afterClosingName: emptySpace
         };
@@ -4046,25 +4036,15 @@ export class JavaScriptParserVisitor {
         return args;
     }
 
-    private mapJsxChildren<T extends J>(elementList: readonly ts.Node[], lastAfter: J.Space, markers?: (ns: readonly ts.Node[], i: number) => Markers): J.RightPadded<T>[] {
+    private mapJsxChildren<T extends J>(elementList: readonly ts.Node[]): T[] {
         let childCount = elementList.length;
 
-        const args: J.RightPadded<T>[] = [];
+        const args: T[] = [];
         if (childCount === 0) {
-            args.push(this.rightPadded(
-                this.newEmpty() as T,
-                lastAfter,
-                emptyMarkers
-            ));
+            args.push(this.newEmpty() as T);
         } else {
             for (let i = 0; i < childCount; i++) {
-                const node = elementList[i];
-                const isLast = i === childCount - 1;
-                args.push(this.rightPadded(
-                    this.visit(node),
-                    isLast ? lastAfter : emptySpace,
-                    markers ? markers(elementList, i) : emptyMarkers
-                ));
+                args.push(this.visit(elementList[i]));
             }
         }
         return args;

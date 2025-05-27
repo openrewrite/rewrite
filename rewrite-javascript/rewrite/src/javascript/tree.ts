@@ -841,7 +841,7 @@ export namespace JSX {
         }) |
         (BaseTag & {
             readonly selfClosing?: undefined;
-            readonly children: J.RightPadded<EmbeddedExpression | Tag | J.Identifier | J.Literal | J.Empty>[];
+            readonly children: (EmbeddedExpression | Tag | J.Identifier | J.Literal | J.Empty)[];
             readonly closingName: J.LeftPadded<J.Identifier | J.FieldAccess | NamespacedName | J.Empty>;
             readonly afterClosingName: J.Space;
         });

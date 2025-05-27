@@ -93,21 +93,10 @@ public interface JSX extends JS {
         @Nullable
         Space selfClosing;
 
+        @Getter
+        @With
         @Nullable
-        List<JRightPadded<Expression>> children;
-
-        public @Nullable List<Expression> getChildren() {
-            return children == null ? null : JRightPadded.getElements(children);
-        }
-
-        public Tag withChildren(@Nullable List<Expression> children) {
-            if (this.children == null && children == null) {
-                return this;
-            } else if (this.children == null) {
-                return getPadding().withChildren(JRightPadded.withElements(new ArrayList<>(), children));
-            }
-            return getPadding().withChildren(children == null ? null : JRightPadded.withElements(this.children, children));
-        }
+        List<Expression> children;
 
         @Nullable
         JLeftPadded<String> closingName;
@@ -185,14 +174,6 @@ public interface JSX extends JS {
 
             public Tag withAttributes(List<JRightPadded<JSX>> attributes) {
                 return t.attributes == attributes ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, attributes, t.selfClosing, t.children, t.closingName, t.afterClosingName);
-            }
-
-            public @Nullable List<JRightPadded<Expression>> getChildren() {
-                return t.children;
-            }
-
-            public Tag withChildren(@Nullable List<JRightPadded<Expression>> children) {
-                return t.children == children ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, children, t.closingName, t.afterClosingName);
             }
 
             public @Nullable JLeftPadded<String> getClosingName() {
