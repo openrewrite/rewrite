@@ -488,6 +488,12 @@ class AnnotationDeserializer {
             return parseArrayValue(value);
         }
 
+        // Constant
+        if (value.startsWith("L")) {
+            int semicolonIndex = value.indexOf(';');
+            return new EnumConstant(value.substring(1, semicolonIndex).replace('/', '.'), value.substring(semicolonIndex + 2));
+        }
+
         // Nested annotation
         if (value.startsWith("@")) {
             return parseAnnotation(value);

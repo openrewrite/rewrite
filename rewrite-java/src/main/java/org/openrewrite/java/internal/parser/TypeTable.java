@@ -326,9 +326,11 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     } else if (value instanceof AnnotationDeserializer.ClassConstant) {
                                         annotationDefaultVisitor.visit(null, Type.getType("L" + ((AnnotationDeserializer.ClassConstant) value).getClassName().replace('.', '/') + ';'));
                                     } else if (value instanceof AnnotationDeserializer.EnumConstant) {
-                                        annotationDefaultVisitor.visit(null, Type.getType(((AnnotationDeserializer.ClassConstant) value).getClassName()));
+                                        AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) value;
+                                        annotationDefaultVisitor.visitEnum(null, "L" + enumConstant.getEnumType().replace('.', '/') + ';', enumConstant.getConstantName());
                                     } else if (value instanceof AnnotationDeserializer.FieldConstant) {
-                                        annotationDefaultVisitor.visit(null, Type.getType(((AnnotationDeserializer.ClassConstant) value).getClassName()));
+                                        AnnotationDeserializer.FieldConstant fieldConstant = (AnnotationDeserializer.FieldConstant) value;
+                                        annotationDefaultVisitor.visitEnum(null, "L" + fieldConstant.getClassName().replace('.', '/') + ';', fieldConstant.getFieldName());
                                     } else {
                                         annotationDefaultVisitor.visit(null, value);
                                     }
@@ -554,7 +556,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     @Override
                                     public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
                                         if (classDefinition != null) {
-                                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, null);
+                                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, null, null);
                                             return new FieldVisitor(Opcodes.ASM9) {
                                                 @Override
                                                 public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
@@ -580,7 +582,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         // Repeating check from `writeMethod()` for performance reasons
                                         if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
                                                 name != null && !"<clinit>".equals(name)) {
-                                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, exceptions);
+                                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, exceptions, null);
                                             return new MethodVisitor(Opcodes.ASM9) {
                                                 @Override
                                                 public void visitParameter(@Nullable String name, int access) {
@@ -603,7 +605,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                     return new AnnotationVisitor(Opcodes.ASM9) {
                                                         @Override
                                                         public void visit(String name, Object value) {
-                                                            member.annotationDefaultValue.add(convertAnnotationValueToString(value));
+                                                            member.annotationDefaultValue = convertAnnotationValueToString(value);
                                                         }
 
                                                         @Override
@@ -618,14 +620,14 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                                                 @Override
                                                                 public void visitEnd() {
-                                                                    member.annotationDefaultValue.add("{" + String.join(",", arrayValues) + "}");
+                                                                    member.annotationDefaultValue = "{" + String.join(",", arrayValues) + "}";
                                                                 }
                                                             };
                                                         }
 
                                                         @Override
                                                         public void visitEnum(String name, String descriptor, String value) {
-                                                            member.annotationDefaultValue.add(descriptor + "." + value);
+                                                            member.annotationDefaultValue = descriptor + "." + value;
                                                         }
                                                     };
                                                 }
@@ -713,7 +715,10 @@ public class TypeTable implements JavaParserClasspathLoader {
             String @Nullable [] exceptions;
             List<String> parameterNames = new ArrayList<>(4);
             List<String> annotations = new ArrayList<>(4);
-            List<String> annotationDefaultValue = new ArrayList<>(4);
+
+            @Nullable
+            @NonFinal
+            String annotationDefaultValue;
 
             private void writeMember(Jar jar, ClassDefinition classDefinition) {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
@@ -729,7 +734,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
                             annotations.isEmpty() ? "" : String.join("|", annotations),
-                            annotationDefaultValue.isEmpty() ? "" : String.join("|", annotationDefaultValue)
+                            annotationDefaultValue
                     );
                 }
             }
