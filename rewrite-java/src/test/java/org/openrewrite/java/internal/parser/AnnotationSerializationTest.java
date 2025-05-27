@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.Type;
 import org.openrewrite.java.internal.parser.AnnotationDeserializer.AnnotationInfo;
 import org.openrewrite.java.internal.parser.AnnotationDeserializer.AttributeInfo;
 import org.openrewrite.java.internal.parser.AnnotationDeserializer.ClassConstant;
@@ -106,49 +107,49 @@ class AnnotationSerializationTest {
     @Test
     void annotationWithClassAttribute() {
         // Test serialization
-        String attributeValue = AnnotationSerializer.serializeClassConstant("java.lang.String");
+        String attributeValue = AnnotationSerializer.serializeClassConstant(Type.getType("Ljava/lang/String;"));
         String attribute = AnnotationSerializer.serializeAttribute("value", attributeValue);
         String serialized = AnnotationSerializer.serializeAnnotationWithAttributes(
           "org.example.ClassAnnotation",
           new String[]{attribute}
         );
-        assertThat(serialized).isEqualTo("@org/example/ClassAnnotation(value=java/lang/String.class)");
+        assertThat(serialized).isEqualTo("@org/example/ClassAnnotation(value=Ljava/lang/String;)");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
         assertThat(info.getName()).isEqualTo("org.example.ClassAnnotation");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("java/lang/String.class");
+        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("Ljava/lang/String;");
 
         // Parse the value
         Object value = AnnotationDeserializer.parseValue(info.getAttributes().get(0).getValue());
         assertThat(value).isInstanceOf(ClassConstant.class);
-        assertThat(((ClassConstant) value).getClassName()).isEqualTo("java.lang.String");
+        assertThat(((ClassConstant) value).getDescriptor()).isEqualTo("Ljava/lang/String;");
     }
 
     @Test
     void annotationWithEnumAttribute() {
         // Test serialization
-        String attributeValue = AnnotationSerializer.serializeEnumConstant("java.time.DayOfWeek", "MONDAY");
+        String attributeValue = AnnotationSerializer.serializeEnumConstant("Ljava/time/DayOfWeek;", "MONDAY");
         String attribute = AnnotationSerializer.serializeAttribute("value", attributeValue);
         String serialized = AnnotationSerializer.serializeAnnotationWithAttributes(
           "org.example.EnumAnnotation",
           new String[]{attribute}
         );
-        assertThat(serialized).isEqualTo("@org/example/EnumAnnotation(value=java/time/DayOfWeek.MONDAY)");
+        assertThat(serialized).isEqualTo("@org/example/EnumAnnotation(value=Ljava/time/DayOfWeek;MONDAY)");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
         assertThat(info.getName()).isEqualTo("org.example.EnumAnnotation");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("java/time/DayOfWeek.MONDAY");
+        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("Ljava/time/DayOfWeek;MONDAY");
 
         // Parse the value
         Object value = AnnotationDeserializer.parseValue(info.getAttributes().get(0).getValue());
         assertThat(value).isInstanceOf(EnumConstant.class);
-        assertThat(((EnumConstant) value).getEnumType()).isEqualTo("java.time.DayOfWeek");
+        assertThat(((EnumConstant) value).getEnumDescriptor()).isEqualTo("Ljava/time/DayOfWeek;");
         assertThat(((EnumConstant) value).getConstantName()).isEqualTo("MONDAY");
     }
 
@@ -371,7 +372,7 @@ class AnnotationSerializationTest {
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
         // With our test setup, the actual output is:
-        assertThat(collectedAnnotations.get(0)).isEqualTo("@org/junit/jupiter/api/Test(1000L)");
+        assertThat(collectedAnnotations.get(0)).isEqualTo("@org/junit/jupiter/api/Test(timeout=1000L)");
 
         // Note: The actual output is "@org/junit/jupiter/api/Test(1000L)" because the name parameter
         // is only used if attributeName is not null, and we're creating the collector with attributeName=null.
@@ -417,7 +418,7 @@ class AnnotationSerializationTest {
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
         // With our test setup, the actual output is:
-        assertThat(collectedAnnotations.get(0)).isEqualTo("@org/example/OuterAnnotation(@org/example/InnerAnnotation(value=42))");
+        assertThat(collectedAnnotations.get(0)).isEqualTo("@org/example/OuterAnnotation(nested=@org/example/InnerAnnotation(value=42))");
 
         // Note: The actual output is missing the attribute name "nested=" because the name parameter
         // is only used if attributeName is not null, and we're creating the collector with attributeName=null.

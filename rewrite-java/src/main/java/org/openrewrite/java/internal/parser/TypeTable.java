@@ -324,13 +324,13 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             annotationDefaultVisitor.visit(null, v);
                                         }
                                     } else if (value instanceof AnnotationDeserializer.ClassConstant) {
-                                        annotationDefaultVisitor.visit(null, Type.getType("L" + ((AnnotationDeserializer.ClassConstant) value).getClassName().replace('.', '/') + ';'));
+                                        annotationDefaultVisitor.visit(null, Type.getType(((AnnotationDeserializer.ClassConstant) value).getDescriptor()));
                                     } else if (value instanceof AnnotationDeserializer.EnumConstant) {
                                         AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) value;
-                                        annotationDefaultVisitor.visitEnum(null, "L" + enumConstant.getEnumType().replace('.', '/') + ';', enumConstant.getConstantName());
+                                        annotationDefaultVisitor.visitEnum(null, enumConstant.getEnumDescriptor(), enumConstant.getConstantName());
                                     } else if (value instanceof AnnotationDeserializer.FieldConstant) {
                                         AnnotationDeserializer.FieldConstant fieldConstant = (AnnotationDeserializer.FieldConstant) value;
-                                        annotationDefaultVisitor.visitEnum(null, "L" + fieldConstant.getClassName().replace('.', '/') + ';', fieldConstant.getFieldName());
+                                        annotationDefaultVisitor.visitEnum(null, fieldConstant.getClassName(), fieldConstant.getFieldName());
                                     } else {
                                         annotationDefaultVisitor.visit(null, value);
                                     }
@@ -496,7 +496,7 @@ public class TypeTable implements JavaParserClasspathLoader {
             } else if (value instanceof String) {
                 return "\"" + value.toString().replace("\"", "\\\"") + "\"";
             } else if (value instanceof Type) {
-                return ((Type) value).getClassName() + ".class";
+                return ((Type) value).getDescriptor();
             } else if (value.getClass().isArray()) {
                 Object[] array = (Object[]) value;
                 List<String> elements = new ArrayList<>(array.length);

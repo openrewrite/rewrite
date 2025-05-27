@@ -100,7 +100,6 @@ class TypeTableTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("TODO: need to check what the issue is here")
     void writeReadJunitJupiterApi() throws IOException {
         try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
             for (Path classpath : JavaParser.runtimeClasspath()) {

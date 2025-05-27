@@ -74,13 +74,13 @@ class AnnotationApplier {
                         }
                         av.visit(attributeName, stringValue);
                     } else if (parsedValue instanceof AnnotationDeserializer.ClassConstant) {
-                        String className = ((AnnotationDeserializer.ClassConstant) parsedValue).getClassName();
+                        String className = ((AnnotationDeserializer.ClassConstant) parsedValue).getDescriptor();
                         av.visit(attributeName, org.objectweb.asm.Type.getObjectType(className.replace('.', '/')));
                     } else if (parsedValue instanceof AnnotationDeserializer.EnumConstant) {
                         AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) parsedValue;
-                        String enumType = enumConstant.getEnumType();
+                        String enumDescriptor = enumConstant.getEnumDescriptor();
                         String constantName = enumConstant.getConstantName();
-                        av.visitEnum(attributeName, "L" + enumType.replace('.', '/') + ";", constantName);
+                        av.visitEnum(attributeName, enumDescriptor, constantName);
                     } else if (parsedValue instanceof AnnotationDeserializer.AnnotationInfo) {
                         // Handle nested annotations
                         AnnotationDeserializer.AnnotationInfo nestedAnnotationInfo = (AnnotationDeserializer.AnnotationInfo) parsedValue;
@@ -108,11 +108,11 @@ class AnnotationApplier {
                                     }
                                     nestedAv.visit(nestedAttributeName, stringValue);
                                 } else if (nestedParsedValue instanceof AnnotationDeserializer.ClassConstant) {
-                                    String className = ((AnnotationDeserializer.ClassConstant) nestedParsedValue).getClassName();
+                                    String className = ((AnnotationDeserializer.ClassConstant) nestedParsedValue).getDescriptor();
                                     nestedAv.visit(nestedAttributeName, org.objectweb.asm.Type.getObjectType(className.replace('.', '/')));
                                 } else if (nestedParsedValue instanceof AnnotationDeserializer.EnumConstant) {
                                     AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) nestedParsedValue;
-                                    String enumType = enumConstant.getEnumType();
+                                    String enumType = enumConstant.getEnumDescriptor();
                                     String constantName = enumConstant.getConstantName();
                                     nestedAv.visitEnum(nestedAttributeName, "L" + enumType.replace('.', '/') + ";", constantName);
                                 }
@@ -140,13 +140,13 @@ class AnnotationApplier {
                                     }
                                     arrayVisitor.visit(null, stringValue);
                                 } else if (arrayValue instanceof AnnotationDeserializer.ClassConstant) {
-                                    String className = ((AnnotationDeserializer.ClassConstant) arrayValue).getClassName();
+                                    String className = ((AnnotationDeserializer.ClassConstant) arrayValue).getDescriptor();
                                     arrayVisitor.visit(null, org.objectweb.asm.Type.getObjectType(className.replace('.', '/')));
                                 } else if (arrayValue instanceof AnnotationDeserializer.EnumConstant) {
                                     AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) arrayValue;
-                                    String enumType = enumConstant.getEnumType();
+                                    String enumDescriptor = enumConstant.getEnumDescriptor();
                                     String constantName = enumConstant.getConstantName();
-                                    arrayVisitor.visitEnum(null, "L" + enumType.replace('.', '/') + ";", constantName);
+                                    arrayVisitor.visitEnum(null, enumDescriptor, constantName);
                                 }
                             }
                             arrayVisitor.visitEnd();
@@ -261,8 +261,7 @@ class AnnotationCollectorHelper {
 
         @Override
         public void visitEnum(@Nullable String name, String descriptor, String value) {
-            String enumType = Type.getType(descriptor).getClassName();
-            String attributeValue = AnnotationSerializer.serializeEnumConstant(enumType, value);
+            String attributeValue = AnnotationSerializer.serializeEnumConstant(descriptor, value);
             if (name == null && attributeName == null) {
                 // This is an array element
                 collectedValues.add(attributeValue);
@@ -488,34 +487,20 @@ class AnnotationDeserializer {
             return parseArrayValue(value);
         }
 
+        // Class constant
+        if (value.startsWith("L") && value.endsWith(";")) {
+            return new ClassConstant(value);
+        }
+
         // Constant
         if (value.startsWith("L")) {
             int semicolonIndex = value.indexOf(';');
-            return new EnumConstant(value.substring(1, semicolonIndex).replace('/', '.'), value.substring(semicolonIndex + 2));
+            return new EnumConstant(value.substring(0, semicolonIndex + 1), value.substring(semicolonIndex + 1));
         }
 
         // Nested annotation
         if (value.startsWith("@")) {
             return parseAnnotation(value);
-        }
-
-        // Class constant
-        if (value.endsWith(".class")) {
-            return new ClassConstant(value.substring(0, value.length() - 6).replace('/', '.'));
-        }
-
-        // Enum constant or field constant
-        if (value.contains(".") && !value.contains("(")) {
-            int lastDotIndex = value.lastIndexOf('.');
-            String typeName = value.substring(0, lastDotIndex).replace('/', '.');
-            String constantName = value.substring(lastDotIndex + 1);
-
-            // Heuristic: if the constant name starts with an uppercase letter, it's likely an enum
-            if (Character.isUpperCase(constantName.charAt(0))) {
-                return new EnumConstant(typeName, constantName);
-            } else {
-                return new FieldConstant(typeName, constantName);
-            }
         }
 
         // Numeric values
@@ -678,14 +663,14 @@ class AnnotationDeserializer {
      * Represents a class constant.
      */
     public static class ClassConstant {
-        private final String className;
+        private final String descriptor;
 
-        public ClassConstant(String className) {
-            this.className = className;
+        public ClassConstant(String descriptor) {
+            this.descriptor = descriptor;
         }
 
-        public String getClassName() {
-            return className;
+        public String getDescriptor() {
+            return descriptor;
         }
     }
 
@@ -693,16 +678,16 @@ class AnnotationDeserializer {
      * Represents an enum constant.
      */
     public static class EnumConstant {
-        private final String enumType;
+        private final String enumDescriptor;
         private final String constantName;
 
-        public EnumConstant(String enumType, String constantName) {
-            this.enumType = enumType;
+        public EnumConstant(String enumDescriptor, String constantName) {
+            this.enumDescriptor = enumDescriptor;
             this.constantName = constantName;
         }
 
-        public String getEnumType() {
-            return enumType;
+        public String getEnumDescriptor() {
+            return enumDescriptor;
         }
 
         public String getConstantName() {
@@ -878,11 +863,11 @@ class AnnotationSerializer {
     /**
      * Serializes a class constant.
      *
-     * @param className The fully qualified name of the class
+     * @param type The type
      * @return The serialized class constant
      */
-    public static String serializeClassConstant(String className) {
-        return className.replace('.', '/') + ".class";
+    public static String serializeClassConstant(Type type) {
+        return type.getDescriptor();
     }
 
     /**
@@ -899,12 +884,12 @@ class AnnotationSerializer {
     /**
      * Serializes an enum constant.
      *
-     * @param enumType The fully qualified name of the enum type
+     * @param enumDescriptor The enum type descriptor
      * @param enumConstant The name of the enum constant
      * @return The serialized enum constant
      */
-    public static String serializeEnumConstant(String enumType, String enumConstant) {
-        return enumType.replace('.', '/') + "." + enumConstant;
+    public static String serializeEnumConstant(String enumDescriptor, String enumConstant) {
+        return enumDescriptor + enumConstant;
     }
 
     /**
@@ -967,7 +952,7 @@ class AnnotationSerializer {
         if (value instanceof String) {
             return serializeString((String) value);
         } else if (value instanceof Type) {
-            return serializeClassConstant(((Type) value).getClassName());
+            return serializeClassConstant((Type) value);
         } else if (value instanceof Boolean) {
             return serializeBoolean((Boolean) value);
         } else if (value instanceof Character) {
