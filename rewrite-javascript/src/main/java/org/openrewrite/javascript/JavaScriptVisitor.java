@@ -1065,7 +1065,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         if (t.isSelfClosing()) {
             t = t.withSelfClosing(visitSpace(requireNonNull(t.getSelfClosing()), Space.Location.LANGUAGE_EXTENSION, p));
         } else if (t.hasChildren()) {
-            t = t.getPadding().withChildren(requireNonNull(ListUtils.map(t.getPadding().getChildren(), child -> visitRightPadded(child, JRightPadded.Location.LANGUAGE_EXTENSION, p))));
+            t = t.withChildren(ListUtils.map(t.getChildren(), child -> visitAndCast(child, p)));
             t = t.getPadding().withClosingName(requireNonNull(visitLeftPadded(t.getPadding().getClosingName(), JLeftPadded.Location.LANGUAGE_EXTENSION, p)));
             t = t.withAfterClosingName(visitSpace(requireNonNull(t.getAfterClosingName()), Space.Location.LANGUAGE_EXTENSION, p));
         }

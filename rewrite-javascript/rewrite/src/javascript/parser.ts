@@ -3428,25 +3428,13 @@ export class JavaScriptParserVisitor {
             afterName: attrs.length === 0 ?
                 this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
-            attributes: attrs.length === 0 ?
-                [] :
-                this.mapJsxChildren<Attribute | SpreadAttribute>(
+            attributes:
+                this.mapJsxAttributes<Attribute | SpreadAttribute>(
                     attrs,
                     this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!),
                     () => emptyMarkers
                 ),
-            children: node.children.length > 0 ?
-                this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(
-                    node.children,
-                    this.prefix(this.findChildNode(node.closingElement, ts.SyntaxKind.LessThanToken)!),
-                    () => emptyMarkers
-                ) :
-                [
-                    this.rightPadded(
-                        this.newEmpty(),
-                        this.prefix(this.findChildNode(node.closingElement, ts.SyntaxKind.LessThanToken)!)
-                    )
-                ],
+            children: this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(node.children),
             closingName: this.leftPadded(this.prefix(node.closingElement.tagName), this.visit(node.closingElement.tagName)),
             afterClosingName: this.suffix(node.closingElement.tagName)
         };
@@ -3463,9 +3451,8 @@ export class JavaScriptParserVisitor {
             afterName: attrs.length === 0 ?
                 this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
-            attributes: attrs.length === 0 ?
-                [] :
-                this.mapJsxChildren<Attribute | SpreadAttribute>(
+            attributes:
+                this.mapJsxAttributes<Attribute | SpreadAttribute>(
                     attrs,
                     this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!),
                     () => emptyMarkers
@@ -3483,18 +3470,7 @@ export class JavaScriptParserVisitor {
             openName: this.leftPadded(this.prefix(node.openingFragment), this.newEmpty()),
             afterName: this.prefix(this.findChildNode(node.openingFragment, ts.SyntaxKind.GreaterThanToken)!),
             attributes: [],
-            children: node.children.length > 0 ?
-                this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(
-                    node.children,
-                    this.prefix(this.findChildNode(node.closingFragment, ts.SyntaxKind.LessThanToken)!),
-                    () => emptyMarkers
-                ) :
-                [
-                    this.rightPadded(
-                        this.newEmpty(),
-                        this.prefix(this.findChildNode(node.closingFragment, ts.SyntaxKind.LessThanToken)!)
-                    )
-                ],
+            children: this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(node.children),
             closingName: this.leftPadded(emptySpace, this.newEmpty()),
             afterClosingName: emptySpace
         };
@@ -4060,17 +4036,26 @@ export class JavaScriptParserVisitor {
         return args;
     }
 
-    private mapJsxChildren<T extends J>(elementList: readonly ts.Node[], lastAfter: J.Space, markers?: (ns: readonly ts.Node[], i: number) => Markers): J.RightPadded<T>[] {
+    private mapJsxChildren<T extends J>(elementList: readonly ts.Node[]): T[] {
         let childCount = elementList.length;
 
-        const args: J.RightPadded<T>[] = [];
+        const args: T[] = [];
         if (childCount === 0) {
-            args.push(this.rightPadded(
-                this.newEmpty() as T,
-                lastAfter,
-                emptyMarkers
-            ));
+            args.push(this.newEmpty() as T);
         } else {
+            for (let i = 0; i < childCount; i++) {
+                args.push(this.visit(elementList[i]));
+            }
+        }
+        return args;
+    }
+
+    private mapJsxAttributes<T extends J>(elementList: readonly ts.Node[], lastAfter: J.Space, markers?: (ns: readonly ts.Node[], i: number) => Markers): J.RightPadded<T>[] {
+        let childCount = elementList.length;
+        if (childCount === 0) {
+            return [];
+        } else {
+            const args: J.RightPadded<T>[] = [];
             for (let i = 0; i < childCount; i++) {
                 const node = elementList[i];
                 const isLast = i === childCount - 1;
@@ -4080,8 +4065,8 @@ export class JavaScriptParserVisitor {
                     markers ? markers(elementList, i) : emptyMarkers
                 ));
             }
+            return args;
         }
-        return args;
     }
 
     private mapDecorators(node: ts.ClassDeclaration | ts.FunctionDeclaration | ts.MethodDeclaration | ts.ConstructorDeclaration | ts.ParameterDeclaration | ts.PropertyDeclaration | ts.SetAccessorDeclaration | ts.GetAccessorDeclaration | ts.ClassExpression): J.Annotation[] {
