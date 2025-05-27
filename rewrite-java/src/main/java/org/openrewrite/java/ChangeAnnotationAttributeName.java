@@ -20,12 +20,9 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.marker.Markers;
-
-import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;

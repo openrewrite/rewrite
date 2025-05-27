@@ -102,7 +102,7 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
     }
 
     @Test
-    void collapseImplicitValueAttributeWithEmpty() {
+    void doNotChangeWhenImplicitValueAttributeWithEmpty() {
         rewriteRun(
           spec -> spec.recipe(new ChangeAnnotationAttributeName("java.lang.SuppressWarnings", "value", "description")),
           //language=java
