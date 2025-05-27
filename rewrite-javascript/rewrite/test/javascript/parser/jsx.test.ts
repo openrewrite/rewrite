@@ -7,6 +7,7 @@ import {RecipeSpec} from "../../../src/test";
 describe("jsx mapping", () => {
     const spec = new RecipeSpec();
 
+    // noinspection TypeScriptMissingConfigOption
     test("jsx with comments", () =>
         spec.rewriteRun(
             //language=jsx
@@ -20,9 +21,11 @@ describe("jsx mapping", () => {
         )
     });
 
+
     test("jsx member expression", () => {
         spec.rewriteRun(
             //language=jsx
+            // noinspection JSXUnresolvedComponent
             tsx("<Foo.Bar />"),
         )
     });
@@ -52,6 +55,7 @@ describe("jsx mapping", () => {
             tsx("<div className=\"foo\"><span>Hello</span></div>")
         ));
 
+    // noinspection HtmlUnknownAttribute
     test("jsx with namespaced attribute", () =>
         spec.rewriteRun(
             //language=jsx
@@ -65,6 +69,7 @@ describe("jsx mapping", () => {
             tsx("<img src=\"foo.png\" alt=\"Foo\" />")
         ));
 
+    // noinspection TypeScriptMissingConfigOption,TypeScriptJSXUnresolvedComponent
     test("fragment shorthand", () =>
         spec.rewriteRun(
             //language=tsx
@@ -75,6 +80,7 @@ describe("jsx mapping", () => {
             `)
         ));
 
+    // noinspection TypeScriptMissingConfigOption
     test("jsx with nested elements", () =>
         spec.rewriteRun(
             //language=jsx

@@ -28,14 +28,14 @@ import static org.openrewrite.yaml.Assertions.yaml;
 class UnfoldPropertiesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UnfoldProperties(null));
+        spec.recipe(new UnfoldProperties(null, null));
     }
 
     @DocumentExample
     @Test
     void unfold() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/.*/))]", "$..[enable.process.files]"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/.*/))]", "$..[enable.process.files]"), null)),
           yaml(
             """
               spring.application.name: my-app
@@ -145,7 +145,7 @@ class UnfoldPropertiesTest implements RewriteTest {
             "$..[show.details]",
             "$.management.endpoint.health[show.controllers]",
             "$.management.endpoint.health.show.views"
-          ))),
+          ), null)),
           yaml(
             """
               management:
@@ -163,7 +163,7 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusionWithSubSetOfKey() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("$..['com.service']"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..['com.service']"), null)),
           yaml(
             """
               logging.level.com.service.A: DEBUG
@@ -183,7 +183,7 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusionWithRegex() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("$..[?(@property.match(/some.*/))]"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[?(@property.match(/some.*/))]"), null)),
           yaml(
             """
               A.B:
@@ -202,7 +202,7 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusionWithParentAndRegex() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/^com.*/))]"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/^com.*/))]"), null)),
           yaml(
             """
               first:
@@ -228,7 +228,7 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void exclusionWithSingleLineAndMatchAll() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/.*/))]"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[logging.level][?(@property.match(/.*/))]"), null)),
           yaml(
             """
               logging.level.com.company.extern.service: DEBUG
@@ -251,7 +251,7 @@ class UnfoldPropertiesTest implements RewriteTest {
      */
     void exclusionWithSingleLineAndGroupMatcherAndMatchAll() {
         rewriteRun(
-          spec -> spec.recipe(new UnfoldProperties(List.of("$..[root.group][?(@property.match(/^sub.*group\\./))][?(@property.match(/.*/))]"))),
+          spec -> spec.recipe(new UnfoldProperties(List.of("$..[root.group][?(@property.match(/^sub.*group\\./))][?(@property.match(/.*/))]"), null)),
           yaml(
             """
               root.group.sub1.group.org.key1: value1
@@ -384,6 +384,63 @@ class UnfoldPropertiesTest implements RewriteTest {
               some:
                 thing: else
               other: thing
+              """
+          )
+        );
+    }
+
+    @Test
+    void applyTo() {
+        rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(
+            null,
+            List.of("$..[?(@property.match(/logging.*/))]", "$..[logging.level][?(@property.match(/.*/))]")
+          )),
+          yaml(
+            """
+              spring.application:
+                name: my-app
+              logging.level:
+                root: INFO
+                org.springframework.web: DEBUG
+              """,
+            """
+              spring.application:
+                name: my-app
+              logging:
+                level:
+                  root: INFO
+                  org:
+                    springframework:
+                      web: DEBUG
+              """
+          )
+        );
+    }
+
+    @Test
+    void applyToWithExclusion() {
+        rewriteRun(
+          spec -> spec.recipe(new UnfoldProperties(
+            List.of("$..[logging.level][?(@property.match(/.*springframework.*/))]"),
+            List.of("$..[?(@property.match(/logging.*/))]", "$..[logging.level][?(@property.match(/.*/))]")
+          )),
+          yaml(
+            """
+              spring.application:
+                name: my-app
+              logging.level:
+                root: INFO
+                org.springframework.web: DEBUG
+              """,
+            """
+              spring.application:
+                name: my-app
+              logging:
+                level:
+                  root: INFO
+                  org:
+                    springframework.web: DEBUG
               """
           )
         );
