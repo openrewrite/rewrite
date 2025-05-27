@@ -406,8 +406,8 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
-            J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, executionContext);
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+            J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
             if (v.getVariableType() != null && !v.getSimpleName().equals(v.getVariableType().getName())) {
                 return v.withVariableType(v.getVariableType().withName(v.getSimpleName()));
             }

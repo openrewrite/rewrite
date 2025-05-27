@@ -1630,7 +1630,6 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-
     @Test
     void doNotRenameRandomVariablesMatchingClassName() {
         rewriteRun(
