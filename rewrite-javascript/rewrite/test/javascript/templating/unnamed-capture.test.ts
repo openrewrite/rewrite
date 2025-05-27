@@ -28,7 +28,7 @@ describe('unnamed capture', () => {
                 let m = pattern`${"obj"} === null || ${"obj"} === undefined ? ${"defaultValue"} : ${"obj"}.${"property"}`
                     .matcher(ternary);
                 if (await m.matches()) {
-                    return await template`${"obj"}?.${"property"} ?? ${"defaultValue"}`.apply(this.cursor, {tree: ternary}, m.getAll());
+                    return await template`${"obj"}?.${"property"} ?? ${"defaultValue"}`.apply(this.cursor, {tree: ternary}, m);
                 }
 
                 return await super.visitTernary(ternary, p);

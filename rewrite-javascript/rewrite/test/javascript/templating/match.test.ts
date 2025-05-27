@@ -71,7 +71,7 @@ describe('match extraction', () => {
                 const m = pattern`${left} + ${right}`.matcher(binary);
 
                 if (await m.matches()) {
-                    return await template`${right} + ${left}`.apply(this.cursor, {tree: binary}, m.getAll());
+                    return await template`${right} + ${left}`.apply(this.cursor, {tree: binary}, m);
                 }
                 return binary;
             }

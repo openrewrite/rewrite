@@ -90,7 +90,7 @@ export class Pattern {
 /**
  * Matcher for checking if a pattern matches an AST node and extracting captured nodes.
  */
-export class Matcher {
+export class Matcher implements Pick<Map<string, J>, 'get' | 'has'> {
     private readonly bindings = new Map<string, J>();
     private patternAst?: J;
     private templateProcessor?: TemplateProcessor;
@@ -130,6 +130,11 @@ export class Matcher {
     get(capture: Capture | string): J | undefined {
         const name = typeof capture === "string" ? capture : capture.name;
         return this.bindings.get(name);
+    }
+
+    has(capture: Capture | string): boolean {
+        const name = typeof capture === "string" ? capture : capture.name;
+        return this.bindings.has(name);
     }
 
     /**
@@ -277,7 +282,7 @@ export class Template {
      * @param parameters
      * @returns A Promise resolving to the generated AST node
      */
-    async apply(cursor: Cursor, coordinates: JavaCoordinates, parameters?: Map<string, J>): Promise<J | undefined> {
+    async apply(cursor: Cursor, coordinates: JavaCoordinates, parameters?: Pick<Map<string, J>, 'get'>): Promise<J | undefined> {
         return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, coordinates, parameters);
     }
 }
@@ -323,7 +328,7 @@ class TemplateEngine {
         parameters: Parameter[],
         cursor: Cursor,
         coordinates: JavaCoordinates,
-        matchResults: Map<string, J> = new Map()
+        matchResults: Pick<Map<string, J>, 'get'> = new Map()
     ): Promise<J | undefined> {
         // Build the template string with parameter placeholders
         const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
@@ -459,7 +464,7 @@ class PlaceholderUtils {
 class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
     constructor(
         private readonly substitutions: Map<string, Parameter>,
-        private readonly matchResults: Map<string, J> = new Map()
+        private readonly matchResults: Pick<Map<string, J>, 'get'> = new Map()
     ) {
         super();
     }
