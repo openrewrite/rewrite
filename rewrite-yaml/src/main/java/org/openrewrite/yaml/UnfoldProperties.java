@@ -42,12 +42,19 @@ public class UnfoldProperties extends Recipe {
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     @Option(displayName = "Exclusions",
-            description = "A list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions to specify keys that should not be unfolded.",
+            description = "An optional list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions to specify keys that should not be unfolded.",
             example = "$..[org.springframework.security]")
     List<String> exclusions;
 
-    public UnfoldProperties(@Nullable final List<String> exclusions) {
+    @Option(displayName = "Apply to",
+            description = "An optional list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions that specify which keys the recipe should target only. " +
+                    "Only the properties matching these expressions will be unfolded.",
+            example = "$..[org.springframework.security]")
+    List<String> applyTo;
+
+    public UnfoldProperties(@Nullable final List<String> exclusions, @Nullable final List<String> applyTo) {
         this.exclusions = exclusions == null ? emptyList() : exclusions;
+        this.applyTo = applyTo == null ? emptyList() : applyTo;
     }
 
     @Override
@@ -62,7 +69,7 @@ public class UnfoldProperties extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        List<JsonPathMatcher> matchers = exclusions.stream().map(JsonPathMatcher::new).collect(toList());
+        List<JsonPathMatcher> exclusionMatchers = exclusions.stream().map(JsonPathMatcher::new).collect(toList());
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
@@ -79,10 +86,10 @@ public class UnfoldProperties extends Recipe {
                 if (key.contains(".")) {
                     boolean foundMatch = false;
                     Cursor c = getCursor();
-                    while (!foundMatch && c.getValue() != Cursor.ROOT_VALUE) {
+                    while (!foundMatch && !c.isRoot()) {
                         Cursor current = c;
-                        foundMatch = matchers.stream().anyMatch(matcher -> matcher.matches(current));
-                        if(foundMatch) {
+                        foundMatch = exclusionMatchers.stream().anyMatch(it -> it.matches(current));
+                        if (foundMatch) {
                             break;
                         } else {
                             c = c.getParent();
@@ -113,6 +120,7 @@ public class UnfoldProperties extends Recipe {
             /**
              * Splits a key into parts while respecting certain exclusion rules.
              * The method ensures certain segments of the key are kept together as defined in the exclusion list.
+             * It also considers the applyTo list during the split process.
              *
              * @param key the full key to be split into parts
              * @return a list of strings representing the split parts of the key
@@ -141,6 +149,12 @@ public class UnfoldProperties extends Recipe {
                     }
                     result.add(parts.get(i));
                     i++;
+                }
+
+                if (!applyTo.isEmpty()) {
+                    if (applyTo.stream().allMatch(it -> matches(key, it, parentKey).isEmpty())) {
+                        return emptyList();
+                    }
                 }
 
                 return result;
