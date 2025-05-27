@@ -121,7 +121,7 @@ public class UnfoldProperties extends Recipe {
             /**
              * Splits a key into parts while respecting certain exclusion rules.
              * The method ensures certain segments of the key are kept together as defined in the exclusion list.
-             * It does also take the applyOnlyOn list into account.
+             * It also considers the applyTo list during the split process.
              *
              * @param key the full key to be split into parts
              * @return a list of strings representing the split parts of the key
