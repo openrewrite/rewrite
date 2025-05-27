@@ -557,14 +557,15 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
               val l = 42
-              """, spec -> spec.afterRecipe(cu -> {
-                for (Statement statement : cu.getStatements()) {
-                    if (statement instanceof J.VariableDeclarations) {
-                        J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Final);
-                        assertThat(J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Final)).isTrue();
+              """,
+                spec -> spec.afterRecipe(cu -> {
+                    for (Statement statement : cu.getStatements()) {
+                        if (statement instanceof J.VariableDeclarations) {
+                            J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Final);
+                            assertThat(J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Final)).isTrue();
+                        }
                     }
-                }
-              }))
+                }))
         );
     }
 

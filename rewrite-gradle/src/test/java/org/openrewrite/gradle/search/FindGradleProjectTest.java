@@ -34,6 +34,26 @@ class FindGradleProjectTest implements RewriteTest {
         spec.recipe(new FindGradleProject(null));
     }
 
+    @DocumentExample
+    @Test
+    void isGradleKotlinProject() {
+        rewriteRun(
+          text(
+            """
+              plugins {
+                  id("java")
+              }
+              """,
+            """
+              ~~>plugins {
+                  id("java")
+              }
+              """,
+            spec -> spec.path("build.gradle.kts")
+          )
+        );
+    }
+
     @ParameterizedTest
     @EnumSource(FindGradleProject.SearchCriteria.class)
     void isGradleGroovyProject(FindGradleProject.SearchCriteria criteria) {
@@ -51,26 +71,6 @@ class FindGradleProjectTest implements RewriteTest {
                   id 'java'
               }
               """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void isGradleKotlinProject() {
-        rewriteRun(
-          text(
-            """
-              plugins {
-                  id("java")
-              }
-              """,
-            """
-              ~~>plugins {
-                  id("java")
-              }
-              """,
-            spec -> spec.path("build.gradle.kts")
           )
         );
     }

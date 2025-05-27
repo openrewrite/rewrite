@@ -110,7 +110,7 @@ public class JavaTemplateParser {
     }
 
     public J parseExpression(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
-        return cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toString).collect(Collectors.toList()), Expression.class, imports),
+        return cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(Collectors.toList()), Expression.class, imports),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
@@ -171,7 +171,7 @@ public class JavaTemplateParser {
                                                         Space.Location location,
                                                         JavaCoordinates.Mode mode) {
         return cacheIfContextFree(cursor,
-                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toString).collect(Collectors.toList()), expected, imports),
+                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(Collectors.toList()), expected, imports),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, mode),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
@@ -276,7 +276,7 @@ public class JavaTemplateParser {
                 .findFirst()
                 .filter(JavaSourceFile.class::isInstance) // Filters out ParseErrors
                 .map(JavaSourceFile.class::cast)
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java:\n" + stub));
     }
 
     /**

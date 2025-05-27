@@ -1308,7 +1308,8 @@ class ChangeParentPomTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                   </project>
-                  """)
+                  """
+              )
             );
         }
 
@@ -1367,7 +1368,8 @@ class ChangeParentPomTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                   </project>
-                  """)
+                  """
+              )
             );
         }
     }
@@ -1539,7 +1541,8 @@ class ChangeParentPomTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>
-              """)
+              """
+          )
         );
     }
 

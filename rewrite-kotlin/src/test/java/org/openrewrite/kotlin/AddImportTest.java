@@ -37,38 +37,49 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 public class AddImportTest implements RewriteTest {
 
-    @Test
-    void normalClass() {
-        rewriteRun(
-          spec -> spec.recipe(importTypeRecipe("a.b.Target")),
-          kotlin(
-            """
-              package a.b
-              class Original
-              """),
-          kotlin(
-            """
-              package a.b
-              class Target
-              """),
-          kotlin(
-            """
-              import a.b.Original
-              
-              class A {
-                  val type : Original = Original()
-              }
-              """,
-            """
-              import a.b.Original
-              import a.b.Target
-              
-              class A {
-                  val type : Original = Original()
-              }
-              """
-          )
-        );
+    static Recipe importTypeRecipe(String type) {
+        return toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+
+                maybeAddImport(type, null, false);
+                return cu;
+            }
+        });
+    }
+
+    static Recipe importTypeRecipe(String packageName, String typeName, String alias) {
+        return toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeAddImport(packageName, typeName, null, alias, false);
+                return cu;
+            }
+        });
+    }
+
+    static Recipe importMemberRecipe(String type, String member) {
+        return toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeAddImport(type, member, false);
+                return cu;
+            }
+        });
+    }
+
+    public static ImportLayoutStyle importAliasesSeparatelyStyle() {
+        // same style as `IntelliJ.importLayout()` but just with `importAliasesSeparately` as false
+        return ImportLayoutStyle.builder()
+          .importAliasesSeparately(true)
+          .packageToFold("kotlinx.android.synthetic.*", true)
+          .packageToFold("io.ktor.*", true)
+          .importAllOthers()
+          .importPackage("java.*")
+          .importPackage("javax.*")
+          .importPackage("kotlin.*")
+          .importAllAliases()
+          .build();
     }
 
     @DocumentExample
@@ -89,6 +100,42 @@ public class AddImportTest implements RewriteTest {
               import java.lang.Long
               
               class A
+              """
+          )
+        );
+    }
+
+    @Test
+    void normalClass() {
+        rewriteRun(
+          spec -> spec.recipe(importTypeRecipe("a.b.Target")),
+          kotlin(
+            """
+              package a.b
+              class Original
+              """
+          ),
+          kotlin(
+            """
+              package a.b
+              class Target
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original
+              
+              class A {
+                  val type : Original = Original()
+              }
+              """,
+            """
+              import a.b.Original
+              import a.b.Target
+              
+              class A {
+                  val type : Original = Original()
+              }
               """
           )
         );
@@ -405,50 +452,5 @@ public class AddImportTest implements RewriteTest {
               """
           )
         );
-    }
-
-    static Recipe importTypeRecipe(String type) {
-        return toRecipe(() -> new KotlinIsoVisitor<>() {
-            @Override
-            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-
-                maybeAddImport(type, null, false);
-                return cu;
-            }
-        });
-    }
-
-    static Recipe importTypeRecipe(String packageName, String typeName, String alias) {
-        return toRecipe(() -> new KotlinIsoVisitor<>() {
-            @Override
-            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                maybeAddImport(packageName, typeName, null, alias, false);
-                return cu;
-            }
-        });
-    }
-
-    static Recipe importMemberRecipe(String type, String member) {
-        return toRecipe(() -> new KotlinIsoVisitor<>() {
-            @Override
-            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                maybeAddImport(type, member, false);
-                return cu;
-            }
-        });
-    }
-
-    public static ImportLayoutStyle importAliasesSeparatelyStyle() {
-        // same style as `IntelliJ.importLayout()` but just with `importAliasesSeparately` as false
-        return ImportLayoutStyle.builder()
-          .importAliasesSeparately(true)
-          .packageToFold("kotlinx.android.synthetic.*", true)
-          .packageToFold("io.ktor.*", true)
-          .importAllOthers()
-          .importPackage("java.*")
-          .importPackage("javax.*")
-          .importPackage("kotlin.*")
-          .importAllAliases()
-          .build();
     }
 }

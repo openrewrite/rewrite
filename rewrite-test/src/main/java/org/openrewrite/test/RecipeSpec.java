@@ -34,7 +34,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,8 +45,10 @@ import static org.assertj.core.api.Assertions.fail;
 @SuppressWarnings("UnusedReturnValue")
 @Getter
 public class RecipeSpec {
+    public static Supplier<RecipeSpec> DEFAULTS = RecipeSpec::new;
+
     public static RecipeSpec defaults() {
-        return new RecipeSpec();
+        return DEFAULTS.get();
     }
 
     @Nullable
@@ -155,7 +159,7 @@ public class RecipeSpec {
         return String.join("-", s);
     }
 
-    private static final Map<String, Recipe> RECIPE_CACHE = new HashMap<>();
+    private static final Map<String, Recipe> RECIPE_CACHE = new ConcurrentHashMap<>();
 
     /**
      * @param parser The parser supplier to use when a matching source file is found.

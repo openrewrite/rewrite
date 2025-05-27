@@ -48,6 +48,69 @@ import static org.openrewrite.test.TypeValidation.all;
  */
 class JavaParserTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void erroneousVariableDeclarations() {
+        rewriteRun(
+          spec -> spec.recipe(new FindCompileErrors())
+            .typeValidationOptions(all().erroneous(false)),
+          java(
+            """
+              package com.example.demo;
+              class Foo {
+                  /pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Foo {
+                  /*~~>*///*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Bar {
+                  pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Bar {
+                  /*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Baz {
+                  -pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Baz {
+                  /*~~>*/-/*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void incompleteAssignment() {
         rewriteRun(
@@ -74,7 +137,7 @@ class JavaParserTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
+              assertThat(cu.getClasses().getFirst().getLeadingAnnotations()).hasSize(2))
           )
         );
     }
@@ -91,7 +154,7 @@ class JavaParserTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
+              assertThat(cu.getClasses().getFirst().getLeadingAnnotations()).hasSize(2))
           )
         );
     }
@@ -246,69 +309,6 @@ class JavaParserTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void erroneousVariableDeclarations() {
-        rewriteRun(
-          spec -> spec.recipe(new FindCompileErrors())
-            .typeValidationOptions(all().erroneous(false)),
-          java(
-            """
-              package com.example.demo;
-              class Foo {
-                  /pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Foo {
-                  /*~~>*///*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              package com.example.demo;
-              class Bar {
-                  pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Bar {
-                  /*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              package com.example.demo;
-              class Baz {
-                  -pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Baz {
-                  /*~~>*/-/*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          )
-        );
-    }
-
     @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4624")
     void shouldParseComments() {
@@ -330,7 +330,7 @@ class JavaParserTest implements RewriteTest {
                    */
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getBody().getEnd().getComments())
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().getFirst().getBody().getEnd().getComments())
               .extracting("text")
               .containsExactly(
                 """
@@ -390,7 +390,8 @@ class JavaParserTest implements RewriteTest {
                 return null;
               }
             }
-            """));
+            """
+          ));
     }
 
     @Test

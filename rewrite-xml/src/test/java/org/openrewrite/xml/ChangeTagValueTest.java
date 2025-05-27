@@ -45,7 +45,8 @@ class ChangeTagValueTest implements RewriteTest {
               <dependency>
                   <version>2.0</version>
               </dependency>
-              """)
+              """
+          )
         );
     }
 
@@ -65,7 +66,8 @@ class ChangeTagValueTest implements RewriteTest {
               <dependency>
                   <version>2.0</version>
               </dependency>
-              """)
+              """
+          )
         );
     }
 
@@ -80,7 +82,8 @@ class ChangeTagValueTest implements RewriteTest {
               <dependency>
                   <version>3.0</version>
               </dependency>
-              """)
+              """
+          )
         );
     }
 
@@ -189,7 +192,7 @@ class ChangeTagValueTest implements RewriteTest {
                   @Override
                   public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
                       doAfterVisit(new ChangeTagValue.RegexReplaceVisitor<>(
-                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).getFirst(),
                         "2.0",
                         "3.0")
                       );
@@ -243,7 +246,7 @@ class ChangeTagValueTest implements RewriteTest {
                   @Override
                   public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
                       doAfterVisit(new ChangeTagValue.RegexReplaceVisitor<>(
-                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).getFirst(),
                         "7.0",
                         "8.0")
                       );
@@ -270,7 +273,7 @@ class ChangeTagValueTest implements RewriteTest {
                   @Override
                   public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
                       doAfterVisit(new ChangeTagValue.RegexReplaceVisitor<>(
-                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).getFirst(),
                         "7.0",
                         "8.0")
                       );
@@ -294,7 +297,7 @@ class ChangeTagValueTest implements RewriteTest {
                   @Override
                   public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
                       doAfterVisit(new ChangeTagValue.RegexReplaceVisitor<>(
-                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).getFirst(),
                         "invalid",
                         "2.0")
                       );

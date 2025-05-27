@@ -301,11 +301,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId) {
-        return findManagedDependency(groupId, artifactId, null);
-    }
-
-    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier) {
-        return findManagedDependency(groupId, artifactId, classifier, null);
+        return findManagedDependency(groupId, artifactId, null, null);
     }
 
     private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
@@ -415,12 +411,16 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     private static @Nullable Plugin findPlugin(Xml.Tag tag, List<Plugin> plugins) {
+        String tagGroupId = tag.getChildValue("groupId").orElse(PLUGIN_DEFAULT_GROUPID);
+        String tagArtifactId = tag.getChildValue("artifactId").orElse(null);
+        String tagVersion = tag.getChildValue("version").orElse(null);
         for (Plugin resolvedPlugin : plugins) {
-            String reqGroup = resolvedPlugin.getGroupId();
-            String reqVersion = resolvedPlugin.getVersion();
-            if (reqGroup.equals(tag.getChildValue("groupId").orElse(PLUGIN_DEFAULT_GROUPID)) &&
-                resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
+            String resGroup = resolvedPlugin.getGroupId();
+            String resArtifactId = resolvedPlugin.getArtifactId();
+            String resVersion = resolvedPlugin.getVersion();
+            if (resGroup.equals(tagGroupId) &&
+                resArtifactId.equals(tagArtifactId) &&
+                (resVersion == null || tagVersion == null || resVersion.equals(tagVersion))) {
                 return resolvedPlugin;
             }
         }

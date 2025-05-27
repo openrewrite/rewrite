@@ -31,34 +31,6 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
         spec.recipe(new ShortenFullyQualifiedTypeReferences());
     }
 
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/3736")
-    void keepHeader() {
-        rewriteRun(
-          groovy(
-            """
-              /*
-               * header comment will be removed from this groovy script, but not from similar java file
-               */
-              import java.util.regex.Pattern
-              
-              def pattern = Pattern.compile("pattern")
-              def list = new java.util.ArrayList<String>(1)
-              """,
-            """
-              /*
-               * header comment will be removed from this groovy script, but not from similar java file
-               */
-              import java.util.ArrayList
-              import java.util.regex.Pattern
-              
-              def pattern = Pattern.compile("pattern")
-              def list = new ArrayList<String>(1)
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void importWithLeadingComment() {
@@ -84,6 +56,34 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
               class Test {
                   List<String> l = new ArrayList<>()
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3736")
+    void keepHeader() {
+        rewriteRun(
+          groovy(
+            """
+              /*
+               * header comment will be removed from this groovy script, but not from similar java file
+               */
+              import java.util.regex.Pattern
+              
+              def pattern = Pattern.compile("pattern")
+              def list = new java.util.ArrayList<String>(1)
+              """,
+            """
+              /*
+               * header comment will be removed from this groovy script, but not from similar java file
+               */
+              import java.util.ArrayList
+              import java.util.regex.Pattern
+              
+              def pattern = Pattern.compile("pattern")
+              def list = new ArrayList<String>(1)
               """
           )
         );

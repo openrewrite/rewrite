@@ -136,7 +136,8 @@ class FindCommentsTest implements RewriteTest {
               class Test {
               }
               """
-            , """
+            ,
+                """
               /*~~>*/// Example comment with foo
               class Test {
               }
