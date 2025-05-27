@@ -86,7 +86,7 @@ export class Pattern {
      * @param ast The AST node to match against
      * @returns A Matcher object
      */
-    against(ast: J): Matcher {
+    matcher(ast: J): Matcher {
         return new Matcher(this, ast);
     }
 }
@@ -794,7 +794,7 @@ class RewriteRuleImpl implements RewriteRule {
 
     async tryOn(node: J, cursor: Cursor, coordinates: JavaCoordinates): Promise<J | undefined> {
         for (const pattern of this.before) {
-            const matcher = pattern.against(node);
+            const matcher = pattern.matcher(node);
 
             if (await matcher.matches()) {
                 // Use the matcher's applyTemplate method for cleaner API

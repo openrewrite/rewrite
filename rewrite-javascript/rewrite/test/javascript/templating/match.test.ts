@@ -38,12 +38,11 @@ describe('match extraction', () => {
                     // Create a pattern that matches "a + b"
                     let a = capture();
                     let b = capture();
-                    const p = pattern`${a} + ${b}`;
-                    const matcher = p.against(binary);
-                    if (await matcher.matches()) {
+                    const m = pattern`${a} + ${b}`.matcher(binary);
+                    if (await m.matches()) {
                         // Extract the captured parts
-                        const left = matcher.get(a);
-                        const right = matcher.get(b);
+                        const left = m.get(a);
+                        const right = m.get(b);
 
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
@@ -72,10 +71,10 @@ describe('match extraction', () => {
                 const left = capture(), right = capture();
 
                 // Create a pattern that matches "a + b" using the capture objects
-                const matcher = pattern`${left} + ${right}`.against(binary);
+                const m = pattern`${left} + ${right}`.matcher(binary);
 
-                if (await matcher.matches()) {
-                    return await matcher.replaceWith(template`${right} + ${left}`, this.cursor);
+                if (await m.matches()) {
+                    return await m.replaceWith(template`${right} + ${left}`, this.cursor);
                 }
                 return binary;
             }
@@ -121,13 +120,12 @@ describe('match extraction', () => {
                     const {left, right} = {left: capture(), right: capture()};
 
                     // Create a pattern that matches "a + b" using the capture objects
-                    const p = pattern`${left} + ${right}`;
-                    const matcher = p.against(binary);
+                    const m = pattern`${left} + ${right}`.matcher(binary);
 
-                    if (await matcher.matches()) {
+                    if (await m.matches()) {
                         // Extract the captured parts
-                        const leftValue = matcher.get(left);
-                        const rightValue = matcher.get(right);
+                        const leftValue = m.get(left);
+                        const rightValue = m.get(right);
 
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {

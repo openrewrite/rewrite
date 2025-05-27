@@ -29,15 +29,14 @@ describe('unnamed capture', () => {
                     const {left, right} = {left: capture(), right: capture()};
 
                     // Create a pattern that matches "a + b" using the capture objects
-                    const p = pattern`${left} + ${right}`;
-                    const matcher = p.against(binary);
+                    const m = pattern`${left} + ${right}`.matcher(binary);
 
-                    const matches = await matcher.matches();
+                    const matches = await m.matches();
 
                     if (matches) {
                         // Extract the captured parts
-                        const leftValue = matcher.get(left);
-                        const rightValue = matcher.get(right);
+                        const leftValue = m.get(left);
+                        const rightValue = m.get(right);
 
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
@@ -67,7 +66,7 @@ describe('unnamed capture', () => {
                 
                 // Use the new cleaner API - matcher.applyTemplate()
                 const result = await pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`
-                    .against(ternary)
+                    .matcher(ternary)
                     .replaceWith(template`${obj}?.${property} ?? ${defaultValue}`, this.cursor);
                 
                 return result || await super.visitTernary(ternary, p);

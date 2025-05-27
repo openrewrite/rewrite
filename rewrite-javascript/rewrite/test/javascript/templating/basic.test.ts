@@ -31,23 +31,20 @@ describe('templating basics', () => {
 
     describe('Pattern', () => {
         test('against returns a Matcher', () => {
-            const p = pattern`${capture()} + ${capture()}`;
-            const matcher = p.against({} as any);
-            expect(matcher).toBeInstanceOf(Matcher);
+            const m = pattern`${capture()} + ${capture()}`.matcher({} as any);
+            expect(m).toBeInstanceOf(Matcher);
         });
     });
 
     describe('Matcher', () => {
         test('matches returns false in initial implementation', async () => {
-            const p = pattern`${capture()} + ${capture()}`;
-            const matcher = p.against({} as any);
-            expect(await matcher.matches()).toBe(false);
+            const m = pattern`${capture()} + ${capture()}`.matcher({} as any);
+            expect(await m.matches()).toBe(false);
         });
 
         test('getAll returns empty map initially', () => {
-            const p = pattern`${capture()} + ${capture()}`;
-            const matcher = p.against({} as any);
-            expect(matcher.getAll().size).toBe(0);
+            const m = pattern`${capture()} + ${capture()}`.matcher({} as any);
+            expect(m.getAll().size).toBe(0);
         });
     });
 
