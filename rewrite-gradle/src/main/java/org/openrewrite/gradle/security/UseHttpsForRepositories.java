@@ -33,8 +33,6 @@ import static java.util.Collections.singleton;
 
 public class UseHttpsForRepositories extends Recipe {
 
-    public static final List<String> PARENT_METHOD_INVOCATIONS = Arrays.asList("repositories", "maven");
-
     @Override
     public String getDisplayName() {
         return "Use HTTPS for repositories";
@@ -69,24 +67,28 @@ public class UseHttpsForRepositories extends Recipe {
             }
 
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, ExecutionContext ctx) {
-                if (PARENT_METHOD_INVOCATIONS.contains(m.getSimpleName())) {
-                    return super.visitMethodInvocation(m, ctx);
-                } else if (m.getSimpleName().equals("url") || m.getSimpleName().equals("uri")) {
-                    m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                        if (arg instanceof J.Literal) {
-                            return fixupLiteralIfNeeded((J.Literal) arg);
-                        } else if (arg instanceof G.GString) {
-                            G.GString garg = (G.GString) arg;
-                            return garg.withStrings(ListUtils.mapFirst(garg.getStrings(),
-                                    lit -> lit instanceof J.Literal ? fixupLiteralIfNeeded((J.Literal) lit) : lit));
-                        } else if (arg instanceof K.StringTemplate) {
-                            K.StringTemplate karg = (K.StringTemplate) arg;
-                            return karg.withStrings(ListUtils.mapFirst(karg.getStrings(),
-                                    lit -> lit instanceof J.Literal ? fixupLiteralIfNeeded((J.Literal) lit) : lit));
-                        }
-                        return arg;
-                    }));
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if (m.getSimpleName().equals("url") || m.getSimpleName().equals("uri")) {
+                    try {
+                        getCursor()
+                                .dropParentUntil(e -> e instanceof J.MethodInvocation && ((J.MethodInvocation) e).getSimpleName().equals("maven"))
+                                .dropParentUntil(e -> e instanceof J.MethodInvocation && ((J.MethodInvocation) e).getSimpleName().equals("repositories"));
+                        m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                            if (arg instanceof J.Literal) {
+                                return fixupLiteralIfNeeded((J.Literal) arg);
+                            } else if (arg instanceof G.GString) {
+                                G.GString garg = (G.GString) arg;
+                                return garg.withStrings(ListUtils.mapFirst(garg.getStrings(),
+                                        lit -> lit instanceof J.Literal ? fixupLiteralIfNeeded((J.Literal) lit) : lit));
+                            } else if (arg instanceof K.StringTemplate) {
+                                K.StringTemplate karg = (K.StringTemplate) arg;
+                                return karg.withStrings(ListUtils.mapFirst(karg.getStrings(),
+                                        lit -> lit instanceof J.Literal ? fixupLiteralIfNeeded((J.Literal) lit) : lit));
+                            }
+                            return arg;
+                        }));
+                    } catch (Exception ignored) {}
                 }
                 return m;
             }
