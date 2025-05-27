@@ -38,9 +38,8 @@ class GradleConfigurationNames {
             return configuration.substring(0, configuration.length() - 11);
         } else if (configuration.endsWith("AnnotationProcessor")) {
             return configuration.substring(0, configuration.length() - 19);
-        } else {
-            return configuration;
         }
+        return configuration;
     }
 
     public static String purgeSourceSet(@Nullable String configuration) {
@@ -52,8 +51,7 @@ class GradleConfigurationNames {
             return "runtimeOnly";
         } else if (configuration.endsWith("AnnotationProcessor")) {
             return "annotationProcessor";
-        } else {
-            return configuration;
         }
+        return configuration;
     }
 }
