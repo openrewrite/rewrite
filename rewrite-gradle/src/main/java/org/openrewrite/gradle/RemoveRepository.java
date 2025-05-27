@@ -46,11 +46,12 @@ public class RemoveRepository extends Recipe {
         return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if (method.getSimpleName().equals("jcenter")) {
+                if (repository.equals(method.getSimpleName())) {
                     try {
-                        getCursor()
-                            .dropParentUntil(e -> e instanceof J.MethodInvocation && ((J.MethodInvocation) e).getSimpleName().equals("repositories"));
-                        return null;
+                        Cursor cursor = getCursor().dropParentUntil(e -> e instanceof J.MethodInvocation);
+                        if ("repositories".equals(((J.MethodInvocation) cursor.getValue()).getSimpleName())) {
+                            return null;
+                        }
                     } catch (Exception ignored) {}
                 }
                 return super.visitMethodInvocation(method, ctx);
