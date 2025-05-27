@@ -80,8 +80,7 @@ public class ChangeAnnotationAttributeName extends Recipe {
                 if (!annotationMatcher.matches(a)) {
                     return a;
                 }
-                List<Expression> emptyRemovedArguments = ListUtils.filter(a.getArguments(), arg -> !(arg instanceof J.Empty));
-                return a.withArguments(ListUtils.map(emptyRemovedArguments, arg -> {
+                return a.withArguments(ListUtils.map(a.getArguments(), arg -> {
                     if (arg instanceof J.Assignment) {
                         if (!oldAttributeName.equals(newAttributeName)) {
                             J.Assignment assignment = (J.Assignment) arg;
@@ -90,7 +89,7 @@ public class ChangeAnnotationAttributeName extends Recipe {
                                 return assignment.withVariable(variable.withSimpleName(newAttributeName));
                             }
                         }
-                    } else if (oldAttributeName.equals("value")) {
+                    } else if (oldAttributeName.equals("value") && !(arg instanceof J.Empty)) {
                         J.Identifier name = new J.Identifier(randomId(), arg.getPrefix(), Markers.EMPTY, emptyList(), newAttributeName, arg.getType(), null);
                         return new J.Assignment(randomId(), EMPTY, arg.getMarkers(), name, new JLeftPadded<>(SINGLE_SPACE, arg.withPrefix(SINGLE_SPACE), Markers.EMPTY), arg.getType());
                     }
