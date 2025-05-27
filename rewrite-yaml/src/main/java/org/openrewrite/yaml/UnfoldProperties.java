@@ -88,7 +88,7 @@ public class UnfoldProperties extends Recipe {
                     Cursor c = getCursor();
                     while (!foundMatch && !c.isRoot()) {
                         Cursor current = c;
-                        foundMatch = exclusionMatchers.stream().anyMatch(matcher -> matcher.matches(current));
+                        foundMatch = exclusionMatchers.stream().anyMatch(it -> it.matches(current));
                         if (foundMatch) {
                             break;
                         } else {
@@ -152,7 +152,7 @@ public class UnfoldProperties extends Recipe {
                 }
 
                 if (!applyTo.isEmpty()) {
-                    if (applyTo.stream().allMatch(in -> matches(key, in, parentKey).isEmpty())) {
+                    if (applyTo.stream().allMatch(it -> matches(key, it, parentKey).isEmpty())) {
                         return emptyList();
                     }
                 }
