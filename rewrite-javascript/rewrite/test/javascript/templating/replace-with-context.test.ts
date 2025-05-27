@@ -42,7 +42,7 @@ describe('replace with context', () => {
 
             // Test with == operator
             const equalityAst = await parseExpression('a == b');
-            const equalityResult = await normalizeComparisons.tryOn(equalityAst, {} as any, {tree: equalityAst});
+            const equalityResult = await normalizeComparisons.tryOn({} as any, equalityAst);
 
             expect(equalityResult).toBeDefined();
             const binaryEquality = equalityResult as J.Binary;
@@ -50,7 +50,7 @@ describe('replace with context', () => {
 
             // Test with != operator
             const inequalityAst = await parseExpression('a != b');
-            const inequalityResult = await normalizeComparisons.tryOn(inequalityAst, {} as any, {tree: inequalityAst});
+            const inequalityResult = await normalizeComparisons.tryOn({} as any, inequalityAst);
 
             expect(inequalityResult).toBeDefined();
             const binaryInequality = inequalityResult as J.Binary;
@@ -58,7 +58,7 @@ describe('replace with context', () => {
 
             // Test with unmatched operator (should return undefined)
             const additionAst = await parseExpression('a + b');
-            const additionResult = await normalizeComparisons.tryOn(additionAst, {} as any, {tree: additionAst});
+            const additionResult = await normalizeComparisons.tryOn({} as any, additionAst);
 
             expect(additionResult).toBeUndefined();
         });
@@ -77,14 +77,14 @@ describe('replace with context', () => {
 
             // Test first pattern: expr || false
             const pattern1Ast = await parseExpression('someCondition || false');
-            const pattern1Result = await rule.tryOn(pattern1Ast, {} as any, {tree: pattern1Ast});
+            const pattern1Result = await rule.tryOn({} as any, pattern1Ast);
 
             expect(pattern1Result).toBeDefined();
             expect((pattern1Result as J.Identifier).simpleName).toBe('someCondition');
 
             // Test second pattern: false || expr
             const pattern2Ast = await parseExpression('false || someCondition');
-            const pattern2Result = await rule.tryOn(pattern2Ast, {} as any, {tree: pattern2Ast});
+            const pattern2Result = await rule.tryOn({} as any, pattern2Ast);
 
             expect(pattern2Result).toBeDefined();
             expect((pattern2Result as J.Identifier).simpleName).toBe('someCondition');

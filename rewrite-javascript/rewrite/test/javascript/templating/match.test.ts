@@ -89,7 +89,7 @@ describe('match extraction', () => {
                         after: template`${"right"} + ${"left"}`
                     })
                 );
-                return await swapOperands.tryOn(binary, this.cursor);
+                return await swapOperands.tryOn(this.cursor, binary);
             }
         });
 

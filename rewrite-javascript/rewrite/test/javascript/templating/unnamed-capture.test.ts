@@ -55,15 +55,18 @@ describe('unnamed capture', () => {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
                 return await rewrite(() => ({
-                    before: pattern`${"obj"} === null || ${"obj"} === undefined ? ${"defaultValue"} : ${"obj"}.${"property"}`,
+                    before: [
+                        pattern`${"obj"} === null || ${"obj"} === undefined ? ${"defaultValue"} : ${"obj"}.${"property"}`,
+                        pattern`${"obj"} === undefined || ${"obj"} === null ? ${"defaultValue"} : ${"obj"}.${"property"}`
+                    ],
                     after: template`${"obj"}?.${"property"} ?? ${"defaultValue"}`
                 }))
-                    .tryOn(ternary, this.cursor) || super.visitTernary(ternary, p);
+                    .tryOn(this.cursor, ternary) || super.visitTernary(ternary, p);
             }
         });
 
+        //language=typescript
         return spec.rewriteRun(
-            //language=typescript
             typescript(`
                 function getName(user) {
                     return user === null || user === undefined ? "default" : user.name;
@@ -73,6 +76,15 @@ describe('unnamed capture', () => {
                     return user?.name ?? "default";
                 }
             `),
+            typescript(`
+                function getName(user) {
+                    return user === undefined || user === null ? "default" : user.name;
+                }
+            `, `
+                function getName(user) {
+                    return user?.name ?? "default";
+                }
+            `)
         );
     });
 });

@@ -711,7 +711,7 @@ class TemplateProcessor {
  * Represents a replacement rule that can match a pattern and apply a template.
  */
 export interface RewriteRule {
-    tryOn(node: J, cursor: Cursor, coordinates?: JavaCoordinates): Promise<J | undefined>;
+    tryOn(cursor: Cursor, node: J): Promise<J | undefined>;
 }
 
 /**
@@ -732,7 +732,7 @@ class RewriteRuleImpl implements RewriteRule {
     ) {
     }
 
-    async tryOn(node: J, cursor: Cursor): Promise<J | undefined> {
+    async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
         for (const pattern of this.before) {
             const match = await pattern.match(node);
 
