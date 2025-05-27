@@ -3435,18 +3435,12 @@ export class JavaScriptParserVisitor {
                     this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!),
                     () => emptyMarkers
                 ),
-            children: node.children.length > 0 ?
+            children:
                 this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(
                     node.children,
                     this.prefix(this.findChildNode(node.closingElement, ts.SyntaxKind.LessThanToken)!),
                     () => emptyMarkers
-                ) :
-                [
-                    this.rightPadded(
-                        this.newEmpty(),
-                        this.prefix(this.findChildNode(node.closingElement, ts.SyntaxKind.LessThanToken)!)
-                    )
-                ],
+                ),
             closingName: this.leftPadded(this.prefix(node.closingElement.tagName), this.visit(node.closingElement.tagName)),
             afterClosingName: this.suffix(node.closingElement.tagName)
         };
@@ -3483,18 +3477,12 @@ export class JavaScriptParserVisitor {
             openName: this.leftPadded(this.prefix(node.openingFragment), this.newEmpty()),
             afterName: this.prefix(this.findChildNode(node.openingFragment, ts.SyntaxKind.GreaterThanToken)!),
             attributes: [],
-            children: node.children.length > 0 ?
+            children:
                 this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(
                     node.children,
                     this.prefix(this.findChildNode(node.closingFragment, ts.SyntaxKind.LessThanToken)!),
                     () => emptyMarkers
-                ) :
-                [
-                    this.rightPadded(
-                        this.newEmpty(),
-                        this.prefix(this.findChildNode(node.closingFragment, ts.SyntaxKind.LessThanToken)!)
-                    )
-                ],
+                ),
             closingName: this.leftPadded(emptySpace, this.newEmpty()),
             afterClosingName: emptySpace
         };
