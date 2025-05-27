@@ -45,7 +45,7 @@ class RemoveRepositoryTest implements RewriteTest {
     }
 
     @Test
-    void removeJcenter2() {
+    void removeJcenterKotlin() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRepository("jcenter")),
           buildGradleKts(
