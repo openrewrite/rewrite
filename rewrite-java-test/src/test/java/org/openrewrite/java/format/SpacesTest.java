@@ -46,20 +46,6 @@ import static org.openrewrite.java.Assertions.java;
 })
 class SpacesTest implements RewriteTest {
 
-    private static Consumer<RecipeSpec> spaces() {
-        return spaces(style -> style);
-    }
-
-    private static Consumer<RecipeSpec> spaces(UnaryOperator<SpacesStyle> with) {
-        return spec -> spec.recipe(new Spaces())
-          .parser(JavaParser.fromJavaVersion().styles(singletonList(
-            new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(IntelliJ.spaces()))
-            )
-          )));
-    }
-
     @DocumentExample
     @Test
     void beforeParensMethodDeclarationTrue() {
@@ -88,6 +74,20 @@ class SpacesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static Consumer<RecipeSpec> spaces() {
+        return spaces(style -> style);
+    }
+
+    private static Consumer<RecipeSpec> spaces(UnaryOperator<SpacesStyle> with) {
+        return spec -> spec.recipe(new Spaces())
+          .parser(JavaParser.fromJavaVersion().styles(singletonList(
+            new NamedStyles(
+              Tree.randomId(), "test", "test", "test", emptySet(),
+              singletonList(with.apply(IntelliJ.spaces()))
+            )
+          )));
     }
 
     @Test

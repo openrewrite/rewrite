@@ -24,6 +24,7 @@ import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -32,6 +33,7 @@ public class GroovyTemplate extends JavaTemplate {
     private GroovyTemplate(boolean contextSensitive, GroovyParser.Builder parser, String code, Set<String> imports, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         super(
                 code,
+                Collections.emptySet(),
                 onAfterVariableSubstitution,
                 new GroovyTemplateParser(
                         contextSensitive,

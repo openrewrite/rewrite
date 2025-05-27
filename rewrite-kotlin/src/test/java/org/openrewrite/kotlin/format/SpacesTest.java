@@ -46,6 +46,11 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("All")
 class SpacesTest implements RewriteTest {
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spaces().accept(spec);
+    }
+
     private static Consumer<RecipeSpec> spaces() {
         return spaces(style -> style);
     }
@@ -58,11 +63,6 @@ class SpacesTest implements RewriteTest {
               singletonList(with.apply(IntelliJ.spaces()))
             )
           )));
-    }
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spaces().accept(spec);
     }
 
     @Test

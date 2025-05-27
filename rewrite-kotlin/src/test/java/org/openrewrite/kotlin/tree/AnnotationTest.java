@@ -54,7 +54,8 @@ class AnnotationTest implements RewriteTest {
               @Target(AnnotationTarget.FILE)
               @Retention(AnnotationRetention.SOURCE)
               annotation class Anno
-              """),
+              """
+          ),
           kotlin(
             //language=none
             """
@@ -108,7 +109,7 @@ class AnnotationTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.VariableDeclarations v = (J.VariableDeclarations) ((J.ClassDeclaration) cu.getStatements().get(2)).getBody().getStatements().get(0);
+                J.VariableDeclarations v = (J.VariableDeclarations) ((J.ClassDeclaration) cu.getStatements().get(2)).getBody().getStatements().getFirst();
                 assertThat(v.getLeadingAnnotations()).hasSize(2);
             })
           )
@@ -398,7 +399,7 @@ class AnnotationTest implements RewriteTest {
                 J.ClassDeclaration last = (J.ClassDeclaration) cu.getStatements().get(cu.getStatements().size() - 1);
                 List<J.Annotation> annotationList = last.getPadding().getKind().getAnnotations();
                 assertThat(annotationList).hasSize(2);
-                assertThat(annotationList.get(0).getSimpleName()).isEqualTo("C");
+                assertThat(annotationList.getFirst().getSimpleName()).isEqualTo("C");
                 assertThat(annotationList.get(1).getSimpleName()).isEqualTo("LAST");
             })
           )

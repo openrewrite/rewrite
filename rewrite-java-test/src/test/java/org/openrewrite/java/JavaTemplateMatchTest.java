@@ -26,10 +26,43 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavaTemplateMatchTest implements RewriteTest {
+
+    @DocumentExample
+    @SuppressWarnings({"ConstantValue", "ConstantConditions"})
+    @Test
+    void matchBinary() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                  return JavaTemplate.matches("1 == #{any(int)}", getCursor()) ?
+                    SearchResult.found(binary) : super.visitBinary(binary, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  boolean b1 = 1 == 2;
+                  boolean b2 = 1 == 3;
+
+                  boolean b3 = 2 == 1;
+              }
+              """,
+            """
+              class Test {
+                  boolean b1 = /*~~>*/1 == 2;
+                  boolean b2 = /*~~>*/1 == 3;
+
+                  boolean b3 = 2 == 1;
+              }
+              """
+          ));
+    }
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-templating/pull/91")
@@ -71,38 +104,6 @@ class JavaTemplateMatchTest implements RewriteTest {
           )
         );
 
-    }
-
-    @DocumentExample
-    @SuppressWarnings({"ConstantValue", "ConstantConditions"})
-    @Test
-    void matchBinary() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return JavaTemplate.matches("1 == #{any(int)}", getCursor()) ?
-                    SearchResult.found(binary) : super.visitBinary(binary, ctx);
-              }
-          })),
-          java(
-            """
-              class Test {
-                  boolean b1 = 1 == 2;
-                  boolean b2 = 1 == 3;
-
-                  boolean b3 = 2 == 1;
-              }
-              """,
-            """
-              class Test {
-                  boolean b1 = /*~~>*/1 == 2;
-                  boolean b2 = /*~~>*/1 == 3;
-
-                  boolean b3 = 2 == 1;
-              }
-              """
-          ));
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -451,7 +452,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                       System.out.println(/*~~>*/(long) /*~~>*/1);
                   }
               }
-              """)
+              """
+          )
         );
     }
 
@@ -495,7 +497,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                       }
                   }
               }
-              """)
+              """
+          )
         );
     }
 
@@ -530,7 +533,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                       return i;
                   }
               }
-              """)
+              """
+          )
         );
     }
 
@@ -570,7 +574,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                   }
                   int f = 1;
               }
-              """)
+              """
+          )
         );
     }
 
@@ -597,7 +602,8 @@ class JavaTemplateMatchTest implements RewriteTest {
               @SuppressWarnings(value = {/*~~>*/"a" + "b", "c"})
               class Test {
               }
-              """)
+              """
+          )
         );
     }
 
@@ -655,22 +661,23 @@ class JavaTemplateMatchTest implements RewriteTest {
                     boolean found = template.matches(getCursor());
                     return found ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
                 }
-          })),
+            })),
           java(
-              """
+            """
               import java.util.Collections;
               import java.util.List;
               class Test {
                   static List<Object> EMPTY_LIST = Collections.emptyList();
               }
               """,
-              """
+            """
               import java.util.Collections;
               import java.util.List;
               class Test {
                   static List<Object> EMPTY_LIST = /*~~>*/Collections.emptyList();
               }
-              """)
+              """
+          )
         );
     }
 
@@ -688,7 +695,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                 }
             })),
           java(
-              """
+            """
               import java.util.Collections;
               import java.util.List;
               class Test {
@@ -697,7 +704,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                   static List<String> COLLECTION_OF_SUBTYPE        = Collections.emptyList(); // List of Dogs is not List of Animals
               }
               """,
-              """
+            """
               import java.util.Collections;
               import java.util.List;
               class Test {
@@ -705,7 +712,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                   static List<CharSequence> EXACT_MATCH_EXPLICIT   = /*~~>*/Collections.<CharSequence>emptyList();
                   static List<String> COLLECTION_OF_SUBTYPE        = Collections.emptyList(); // List of Dogs is not List of Animals
               }
-              """)
+              """
+          )
         );
     }
 
@@ -783,6 +791,255 @@ class JavaTemplateMatchTest implements RewriteTest {
                   void test() {
                       /*~~>*/Objects.hash(new Object[5]);
                       Objects.hash(new Object(), new Object()); // varargs not yet supported
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("RedundantCast")
+    void matchSpecialPrimitives() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final JavaTemplate nullMatcher = JavaTemplate
+                  .builder("System.out.append(#{any(java.lang.CharSequence)})")
+                  .build();
+
+                @Override
+                public Expression visitExpression(Expression expression, ExecutionContext executionContext) {
+                    return nullMatcher.matches(getCursor()) ? SearchResult.found(expression) : super.visitExpression(expression, executionContext);
+                }
+            })),
+          //language=java
+          java(
+            """
+              class Foo {
+                  void test() {
+                      String a = null;
+                      System.out.append(null);
+                      System.out.append(a);
+                      System.out.append((String) null);
+                      System.out.append("Text");
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void test() {
+                      String a = null;
+                      /*~~>*/System.out.append(null);
+                      /*~~>*/System.out.append(a);
+                      /*~~>*/System.out.append((String) null);
+                      /*~~>*/System.out.append("Text");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessaryBoxing")
+    void matchBoxedTypes() {
+        rewriteRun(
+          spec -> {
+              JavaParser.Builder<? extends JavaParser, ?> parser = JavaParser.fromJavaVersion()
+                .dependsOn("""
+                  package foo;
+                  public class Utils {
+                      public static void fromNumber(Number n) {}
+                  }
+                  """);
+              spec
+                .parser(parser)
+                .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    final JavaTemplate template = JavaTemplate
+                      .builder("foo.Utils.fromNumber(#{any(java.lang.Number)})")
+                      .javaParser(parser)
+                      .build();
+
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                        return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+                    }
+                }));
+          },
+          //language=java
+          java(
+            """
+              package foo;
+              import java.math.BigDecimal;
+              import java.util.Collections;
+
+              class Foo {
+                  void test() {
+                      Utils.fromNumber(null);
+                      Utils.fromNumber(1);
+                      Utils.fromNumber(2L);
+                      Utils.fromNumber(Integer.valueOf(4));
+                      Utils.fromNumber(BigDecimal.valueOf(23L));
+                  }
+              }
+              """,
+            """
+              package foo;
+              import java.math.BigDecimal;
+              import java.util.Collections;
+
+              class Foo {
+                  void test() {
+                      /*~~>*/Utils.fromNumber(null);
+                      /*~~>*/Utils.fromNumber(1);
+                      /*~~>*/Utils.fromNumber(2L);
+                      /*~~>*/Utils.fromNumber(Integer.valueOf(4));
+                      /*~~>*/Utils.fromNumber(BigDecimal.valueOf(23L));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchUnboxing() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final JavaTemplate valueOfLong = JavaTemplate.builder("java.lang.Long.valueOf(#{any(long)})").build();
+                final JavaTemplate valueOfDouble = JavaTemplate.builder("java.lang.Double.valueOf(#{any(double)})").build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                    if (valueOfLong.matches(getCursor())) {
+                        return SearchResult.found(method, "long");
+                    } else if (valueOfDouble.matches(getCursor())) {
+                        return SearchResult.found(method, "double");
+                    } else {
+                        return super.visitMethodInvocation(method, executionContext);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              class Foo {
+                  @SuppressWarnings("all")
+                  void test() {
+                      Long.valueOf(null);
+                      Long.valueOf("1");
+                      Long.valueOf('a');
+                      Long.valueOf((byte) 1);
+                      Long.valueOf((short) 1);
+                      Long.valueOf(1);
+                      Long.valueOf(1L);
+                      Long.valueOf(Character.valueOf('a'));
+                      Long.valueOf(Byte.valueOf((byte) 1));
+                      Long.valueOf(Short.valueOf((short) 1));
+                      Long.valueOf(Integer.valueOf(1));
+                      Long.valueOf((Long) 1L);
+
+                      Double.valueOf(null);
+                      Double.valueOf("1.0");
+                      Double.valueOf('a');
+                      Double.valueOf((byte) 1);
+                      Double.valueOf((short) 1);
+                      Double.valueOf(1);
+                      Double.valueOf(1L);
+                      Double.valueOf(1.2f);
+                      Double.valueOf(1.2);
+                      Double.valueOf(Character.valueOf('a'));
+                      Double.valueOf(Byte.valueOf((byte) 1));
+                      Double.valueOf(Short.valueOf((short) 1));
+                      Double.valueOf(Integer.valueOf(1));
+                      Double.valueOf((Long) 1L);
+                      Double.valueOf(Float.valueOf(1.2f));
+                      Double.valueOf((Double) 1.2);
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  @SuppressWarnings("all")
+                  void test() {
+                      Long.valueOf(null);
+                      Long.valueOf("1");
+                      /*~~(long)~~>*/Long.valueOf('a');
+                      /*~~(long)~~>*/Long.valueOf((byte) 1);
+                      /*~~(long)~~>*/Long.valueOf((short) 1);
+                      /*~~(long)~~>*/Long.valueOf(1);
+                      /*~~(long)~~>*/Long.valueOf(1L);
+                      /*~~(long)~~>*/Long.valueOf(Character.valueOf('a'));
+                      /*~~(long)~~>*/Long.valueOf(Byte.valueOf((byte) 1));
+                      /*~~(long)~~>*/Long.valueOf(Short.valueOf((short) 1));
+                      /*~~(long)~~>*/Long.valueOf(Integer.valueOf(1));
+                      /*~~(long)~~>*/Long.valueOf((Long) 1L);
+
+                      Double.valueOf(null);
+                      Double.valueOf("1.0");
+                      /*~~(double)~~>*/Double.valueOf('a');
+                      /*~~(double)~~>*/Double.valueOf((byte) 1);
+                      /*~~(double)~~>*/Double.valueOf((short) 1);
+                      /*~~(double)~~>*/Double.valueOf(1);
+                      /*~~(double)~~>*/Double.valueOf(1L);
+                      /*~~(double)~~>*/Double.valueOf(1.2f);
+                      /*~~(double)~~>*/Double.valueOf(1.2);
+                      /*~~(double)~~>*/Double.valueOf(Character.valueOf('a'));
+                      /*~~(double)~~>*/Double.valueOf(Byte.valueOf((byte) 1));
+                      /*~~(double)~~>*/Double.valueOf(Short.valueOf((short) 1));
+                      /*~~(double)~~>*/Double.valueOf(Integer.valueOf(1));
+                      /*~~(double)~~>*/Double.valueOf((Long) 1L);
+                      /*~~(double)~~>*/Double.valueOf(Float.valueOf(1.2f));
+                      /*~~(double)~~>*/Double.valueOf((Double) 1.2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchMemberReferenceContainingParameter() {
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                JavaTemplate template = JavaTemplate.builder("java.util.function.Predicate.not(#{any(java.util.Set)}::contains)").build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                    JavaTemplate.Matcher matcher = template.matcher(getCursor());
+                    if (matcher.find()) {
+                        JavaTemplateSemanticallyEqual.TemplateMatchResult result = matcher.getMatchResult();
+                        assertThat(result.getMatchedParameters()).hasSize(1);
+                        return SearchResult.found(template.apply(getCursor(), method.getCoordinates().replace(), result.getMatchedParameters().toArray()));
+                    }
+                    return super.visitMethodInvocation(method, executionContext);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.Predicate;
+              import java.util.Set;
+
+              class Foo {
+                  Predicate<Object> test() {
+                      Set<String> set = Set.of("1", "2");
+                      return Predicate.not(set::contains);
+                  }
+              }
+              """,
+            """
+              import java.util.function.Predicate;
+              import java.util.Set;
+
+              class Foo {
+                  Predicate<Object> test() {
+                      Set<String> set = Set.of("1", "2");
+                      return /*~~>*/java.util.function.Predicate.not(set::contains);
                   }
               }
               """

@@ -85,7 +85,9 @@ public class JRightPadded<T> {
         TRY_RESOURCE(Space.Location.TRY_RESOURCE_SUFFIX),
         TYPE_PARAMETER(Space.Location.TYPE_PARAMETER_SUFFIX),
         TYPE_BOUND(Space.Location.TYPE_BOUND_SUFFIX),
-        WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX);
+        WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX),
+        ANY(Space.Location.ANY)
+        ;
 
         private final Space.Location afterLocation;
 

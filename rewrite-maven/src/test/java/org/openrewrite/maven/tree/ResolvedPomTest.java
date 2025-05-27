@@ -228,7 +228,7 @@ class ResolvedPomTest implements RewriteTest {
                 List<Plugin> pluginManagement = doc.getMarkers().findFirst(MavenResolutionResult.class)
                   .get().getPom().getPluginManagement();
                 assertThat(pluginManagement).hasSize(1);
-                Plugin plugin = pluginManagement.get(0);
+                Plugin plugin = pluginManagement.getFirst();
                 assertThat(plugin).extracting(Plugin::getArtifactId).isEqualTo("maven-enforcer-plugin");
                 ObjectMapper objectMapper = new ObjectMapper();
                 assertThat(plugin.getExecutions())

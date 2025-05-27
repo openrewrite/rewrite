@@ -31,8 +31,13 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -50,7 +55,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
-public interface J extends Tree {
+public interface J extends Tree, RpcCodec<J> {
 
     @SuppressWarnings("unchecked")
     @Override
@@ -99,6 +104,16 @@ public interface J extends Tree {
     @Deprecated
     default String printTrimmed() {
         return StringUtils.trimIndent(print());
+    }
+
+    @Override
+    default void rpcSend(J after, RpcSendQueue q) {
+        new JavaSender().visit(after, q);
+    }
+
+    @Override
+    default J rpcReceive(J before, RpcReceiveQueue q) {
+        return new JavaReceiver().visitNonNull(before, q);
     }
 
     @SuppressWarnings("unchecked")
@@ -329,7 +344,6 @@ public interface J extends Tree {
         @Nullable
         List<J.Annotation> annotations;
 
-        @Nullable // nullable for backwards compatibility only
         JLeftPadded<Space> dimension;
 
         JavaType type;
@@ -945,6 +959,14 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a Java break statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * break;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -979,6 +1001,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a switch case label in a switch statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * switch(x) {
+     *     case 1:
+     *         doSomething();
+     *         break;
+     * }
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -1202,6 +1236,15 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a Java class declaration.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * public class MyClass {
+     * }
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -1473,6 +1516,17 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a Java compilation unit (a source file).
+     *
+     * <p>Example:
+     * <pre>{@code
+     * package com.example;
+     *
+     * public class MyClass {
+     * }
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -1684,6 +1738,14 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a Java continue statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * continue;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -1718,6 +1780,16 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a Java do-while loop statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * do {
+     *     // body
+     * } while (condition);
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1812,6 +1884,14 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents an empty statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * ;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -1849,6 +1929,17 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a constant in an enum declaration.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * enum Color {
+     *     RED,
+     *     GREEN
+     * }
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -1884,6 +1975,17 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a set of enum values in an enum declaration.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * enum Color {
+     *     RED,
+     *     GREEN;
+     * }
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1961,6 +2063,14 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents access to a field of an object or class.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * object.field;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -2101,6 +2211,16 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a Java for-each loop statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * for (String s : list) {
+     *     // body
+     * }
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2270,6 +2390,16 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a Java for loop statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * for (int i = 0; i < n; i++) {
+     *     // body
+     * }
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2458,8 +2588,14 @@ public interface J extends Tree {
     }
 
     /**
-     * Java does not allow for parenthesis around TypeTree in places like a type cast where a J.ControlParenthesis is
+     * Represents a parenthesized type tree. Java does not allow for parentheses
+     * around TypeTree in places like a type cast where a J.ControlParenthesis is
      * used. But other languages, like Kotlin, do.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * (List<String>) obj;
+     * }</pre>
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2502,11 +2638,19 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents an identifier in Java code.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * MyClass variableName;
+     * }</pre>
+     */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @With
-    class Identifier implements J, TypeTree, Expression {
+    class Identifier implements J, TypeTree, Expression, VariableDeclarator {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -2526,20 +2670,6 @@ public interface J extends Tree {
 
         JavaType.@Nullable Variable fieldType;
 
-        /**
-         * @deprecated Use {@link #Identifier(UUID, Space, Markers, List, String, JavaType, JavaType.Variable)} instead.
-         */
-        @Deprecated
-        public Identifier(UUID id, Space prefix, Markers markers, String simpleName, @Nullable JavaType type, JavaType.@Nullable Variable fieldType) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.annotations = emptyList();
-            this.simpleName = simpleName;
-            this.type = type;
-            this.fieldType = fieldType;
-        }
-
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitIdentifier(this, p);
@@ -2555,8 +2685,25 @@ public interface J extends Tree {
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
+
+        @Override
+        public List<Identifier> getNames() {
+            return singletonList(this);
+        }
     }
 
+    /**
+     * Represents a Java if statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * if (condition) {
+     *     // then
+     * } else {
+     *     // else
+     * }
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2706,6 +2853,14 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a Java import declaration.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * import java.util.List;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -2940,6 +3095,14 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a Java instanceof expression.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * obj instanceof String
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
@@ -3064,6 +3227,15 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a deconstruction pattern in Java.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * case Point(int x, int y):
+     *     // use x and y
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3145,6 +3317,14 @@ public interface J extends Tree {
 
     }
 
+    /**
+     * Represents an intersection type.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * Serializable & Closeable
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3231,6 +3411,15 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a labeled statement.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * label:
+     *     statement;
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3315,6 +3504,14 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Represents a Java lambda expression.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * x -> x.toString()
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -3388,6 +3585,11 @@ public interface J extends Tree {
 
             public Parameters withParameters(List<J> parameters) {
                 return getPadding().withParameters(JRightPadded.withElements(this.parameters, parameters));
+            }
+
+            @Override
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
+                return v.visitLambdaParameters(this, p);
             }
 
             @Transient
@@ -4192,19 +4394,6 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitModifier(this, p);
-        }
-
-        /**
-         * @deprecated Use {@link #Modifier(UUID, Space, Markers, String, Type, List)} instead.
-         */
-        @Deprecated
-        public Modifier(UUID id, Space prefix, Markers markers, Type type, List<Annotation> annotations) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.keyword = null;
-            this.type = type;
-            this.annotations = annotations;
         }
 
         @Override
@@ -5726,6 +5915,11 @@ public interface J extends Tree {
 
         List<JRightPadded<TypeParameter>> typeParameters;
 
+        @Override
+        public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitTypeParameters(this, p);
+        }
+
         public List<TypeParameter> getTypeParameters() {
             return JRightPadded.getElements(typeParameters);
         }
@@ -6013,9 +6207,27 @@ public interface J extends Tree {
             @Getter
             Markers markers;
 
-            @With
-            @Getter
-            Identifier name;
+            VariableDeclarator name;
+
+            public Identifier getName() {
+                if (name.getNames().isEmpty()) {
+                    return new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                            emptyList(), "<dynamic>", name.getType(), null);
+                }
+                return name.getNames().iterator().next();
+            }
+
+            public NamedVariable withName(Identifier name) {
+                return withDeclarator(name);
+            }
+
+            public VariableDeclarator getDeclarator() {
+                return name;
+            }
+
+            public NamedVariable withDeclarator(VariableDeclarator declarator) {
+                return name == declarator ? this : new NamedVariable(id, prefix, markers, declarator, dimensionsAfterName, initializer, variableType);
+            }
 
             @With
             @Getter
@@ -6051,7 +6263,7 @@ public interface J extends Tree {
             }
 
             public String getSimpleName() {
-                return name.getSimpleName();
+                return getName().getSimpleName();
             }
 
             @Override
@@ -6432,7 +6644,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public @Nullable JavaType getType() {
+        public JavaType getType() {
             return JavaType.Unknown.getInstance();
         }
 

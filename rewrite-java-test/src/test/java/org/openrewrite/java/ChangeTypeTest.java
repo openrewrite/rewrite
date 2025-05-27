@@ -1395,7 +1395,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             spec -> spec.path("a/b/NoMatch.java").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/NoMatch.java");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "x.y.Target")).isTrue();
             })
           )
         );
@@ -1419,7 +1419,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             spec -> spec.path("a/b/Original.java").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/Target.java");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "x.y.Target")).isTrue();
             })
           )
         );
@@ -1623,7 +1623,7 @@ class ChangeTypeTest implements RewriteTest {
 
                 assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName())
                   .isEqualTo("a.A2");
-                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().get(0)).getFullyQualifiedName())
+                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().getFirst()).getFullyQualifiedName())
                   .isEqualTo("a.A2");
             })
           )
@@ -2029,7 +2029,8 @@ class ChangeTypeTest implements RewriteTest {
               public class A {
                 public static String A = "A";
               }
-              """),
+              """
+          ),
           java(
             """
               package org.ab;
@@ -2038,7 +2039,8 @@ class ChangeTypeTest implements RewriteTest {
                 public static String A = "A";
                 public static String B = "B";
               }
-              """),
+              """
+          ),
           // language=java
           java(
             """
@@ -2081,7 +2083,6 @@ class ChangeTypeTest implements RewriteTest {
               """
           )
         );
-
     }
 
     @Test
@@ -2097,9 +2098,9 @@ class ChangeTypeTest implements RewriteTest {
                 TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
 
                 J.CompilationUnit cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
-                assertEquals("GoodbyeClass", cu.getClasses().get(0).getSimpleName());
+                assertEquals("GoodbyeClass", cu.getClasses().getFirst().getSimpleName());
 
-                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().get(0), new InMemoryExecutionContext());
+                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().getFirst(), new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cd.getSimpleName());
             }))
         );
@@ -2119,7 +2120,8 @@ class ChangeTypeTest implements RewriteTest {
               a.property=java.lang.Integer
               c.property=java.lang.StringBuilder
               b.property=String
-              """, spec -> spec.path("application.properties"))
+              """,
+                spec -> spec.path("application.properties"))
         );
     }
 
@@ -2245,7 +2247,8 @@ class ChangeTypeTest implements RewriteTest {
                     return b.build();
                 }
               }
-              """, """
+              """,
+                """
               import foo.A;
               
               class Test {

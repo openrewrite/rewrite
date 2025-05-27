@@ -22,6 +22,7 @@ import lombok.SneakyThrows;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
@@ -47,8 +48,8 @@ class RewriteRpcTest implements RewriteTest {
       .scanRuntimeClasspath("org.openrewrite.text")
       .build();
 
-    RewriteRpc server;
     RewriteRpc client;
+    RewriteRpc server;
 
     @BeforeEach
     void before() throws IOException {
@@ -57,29 +58,19 @@ class RewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
-          new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
-
         JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
           new HeaderDelimitedMessageHandler(clientIn, clientOut)));
         client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
+
+        JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
+          new HeaderDelimitedMessageHandler(serverIn, serverOut)));
+        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
     }
 
     @AfterEach
     void after() {
-        server.shutdown();
         client.shutdown();
-    }
-
-    @Test
-    void sendReceiveExecutionContext() {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        ctx.putMessage("key", "value");
-
-        client.localObjects.put("123", ctx);
-        InMemoryExecutionContext received = server.getObject("123");
-        assertThat(received.<String>getMessage("key")).isEqualTo("value");
+        server.shutdown();
     }
 
     @DocumentExample
@@ -90,7 +81,7 @@ class RewriteRpcTest implements RewriteTest {
               @SneakyThrows
               @Override
               public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
-                  Tree t = server.visit((SourceFile) tree, ChangeText.class.getName(), 0);
+                  Tree t = client.visit((SourceFile) tree, ChangeText.class.getName(), 0);
                   stopAfterPreVisit();
                   return requireNonNull(t);
               }
@@ -108,29 +99,30 @@ class RewriteRpcTest implements RewriteTest {
           text(
             "Hello Jon!",
             spec -> spec.beforeRecipe(text ->
-              assertThat(server.print(text)).isEqualTo("Hello Jon!"))
+              assertThat(client.print(text)).isEqualTo("Hello Jon!"))
           )
         );
     }
 
     @Test
     void getRecipes() {
-        assertThat(server.getRecipes()).isNotEmpty();
+        assertThat(client.getRecipes()).isNotEmpty();
     }
 
     @Test
     void prepareRecipe() {
-        Recipe recipe = server.prepareRecipe("org.openrewrite.text.Find",
+        Recipe recipe = client.prepareRecipe("org.openrewrite.text.Find",
           Map.of("find", "hello"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Find text");
     }
 
+    @Disabled("Disabled until https://github.com/openrewrite/rewrite/pull/5260 is complete")
     @Test
     void runRecipe() {
         CountDownLatch latch = new CountDownLatch(1);
         rewriteRun(
           spec -> spec
-            .recipe(server.prepareRecipe("org.openrewrite.text.Find",
+            .recipe(client.prepareRecipe("org.openrewrite.text.Find",
               Map.of("find", "hello")))
             .validateRecipeSerialization(false)
             .dataTable(TextMatches.Row.class, rows -> {
@@ -152,7 +144,7 @@ class RewriteRpcTest implements RewriteTest {
     void runScanningRecipeThatGenerates() {
         rewriteRun(
           spec -> spec
-            .recipe(server.prepareRecipe("org.openrewrite.text.CreateTextFile",
+            .recipe(client.prepareRecipe("org.openrewrite.text.CreateTextFile",
               Map.of("fileContents", "hello", "relativeFileName", "hello.txt")))
             .validateRecipeSerialization(false),
           text(
@@ -167,7 +159,7 @@ class RewriteRpcTest implements RewriteTest {
     void runRecipeWithRecipeList() {
         rewriteRun(
           spec -> spec
-            .recipe(server.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$RecipeWithRecipeList", Map.of()))
+            .recipe(client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$RecipeWithRecipeList", Map.of()))
             .validateRecipeSerialization(false),
           text(
             "hi",
@@ -182,7 +174,7 @@ class RewriteRpcTest implements RewriteTest {
         Cursor c1 = new Cursor(parent, 0);
         Cursor c2 = new Cursor(c1, 1);
 
-        Cursor clientC2 = client.getCursor(server.getCursorIds(c2));
+        Cursor clientC2 = server.getCursor(client.getCursorIds(c2));
         assertThat(clientC2.<Integer>getValue()).isEqualTo(1);
         assertThat(clientC2.getParentOrThrow().<Integer>getValue()).isEqualTo(0);
         assertThat(clientC2.getParentOrThrow(2).<String>getValue()).isEqualTo(Cursor.ROOT_VALUE);

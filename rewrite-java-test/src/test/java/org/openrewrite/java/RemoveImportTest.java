@@ -31,13 +31,6 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class RemoveImportTest implements RewriteTest {
-    private static Recipe removeImport(String type) {
-        return removeImport(type, false);
-    }
-
-    private static Recipe removeImport(String type, boolean force) {
-        return toRecipe(() -> new RemoveImport<>(type, force));
-    }
 
     @DocumentExample
     @Test
@@ -52,6 +45,13 @@ class RemoveImportTest implements RewriteTest {
             "class A {}"
           )
         );
+    }
+    private static Recipe removeImport(String type) {
+        return removeImport(type, false);
+    }
+
+    private static Recipe removeImport(String type, boolean force) {
+        return toRecipe(() -> new RemoveImport<>(type, force));
     }
 
     @Test
@@ -643,7 +643,7 @@ class RemoveImportTest implements RewriteTest {
                   Collection<Integer> l;
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().get(0).getId()).isNotEqualTo(cu.getImports().get(1).getId())))
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().getFirst().getId()).isNotEqualTo(cu.getImports().get(1).getId())))
         );
     }
 

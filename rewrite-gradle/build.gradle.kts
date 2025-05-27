@@ -32,7 +32,8 @@ recipeDependencies {
     parserClasspath("org.gradle:gradle-resources:latest.release")
     parserClasspath("org.gradle:gradle-testing-base:latest.release")
     parserClasspath("org.gradle:gradle-testing-jvm:latest.release")
-    parserClasspath("com.gradle:develocity-gradle-plugin:latest.release")
+    // No particular reason to hold back upgrading this beyond 3.x, but it takes some effort: https://github.com/openrewrite/rewrite/issues/5270
+    parserClasspath("com.gradle:develocity-gradle-plugin:3.+")
 }
 
 //val rewriteVersion = rewriteRecipe.rewriteVersion.get()
@@ -54,7 +55,8 @@ dependencies {
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())
-    compileOnly("com.gradle:develocity-gradle-plugin:latest.release")
+    // No particular reason to hold back upgrading this beyond 3.x, but it takes some effort: https://github.com/openrewrite/rewrite/issues/5270
+    compileOnly("com.gradle:develocity-gradle-plugin:3.+")
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
@@ -70,7 +72,7 @@ dependencies {
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly(gradleApi())
     testRuntimeOnly("com.google.guava:guava:latest.release")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
 }
 

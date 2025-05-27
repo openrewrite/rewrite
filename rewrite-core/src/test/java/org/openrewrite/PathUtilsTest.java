@@ -37,10 +37,14 @@ class PathUtilsTest {
         assertThat(matchesGlob(path("a\\b\\c"), "a/b/c")).isTrue();
         assertThat(matchesGlob(path("/test"), "/test")).isTrue();
         assertThat(matchesGlob(path("test"), "/test")).isFalse();
+        assertThat(matchesGlob(path("a/test"), "/test")).isFalse();
+        assertThat(matchesGlob(path("a/b/test"), "/test")).isFalse();
         assertThat(matchesGlob(path("/test"), "test")).isFalse();
         assertThat(matchesGlob(path("test/"), "test/")).isFalse(); // Trailing slash on path is not maintained
         assertThat(matchesGlob(path("test"), "test/")).isFalse();
         assertThat(matchesGlob(path("test/"), "test")).isTrue(); // Trailing slash on path is not maintained
+        assertThat(matchesGlob(path("filename.ext"), "filename.ext")).isTrue();
+        assertThat(matchesGlob(path("a/filename.ext"), "filename.ext")).isFalse();
 
         // matches with ?'s
         assertThat(matchesGlob(path("/test"), "/t?st")).isTrue();

@@ -204,7 +204,7 @@ public class BlockStatementTemplateGenerator {
     @SuppressWarnings("DataFlowIssue")
     protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
-                "Template<" + typeVariables.stream().map(TypeUtils::toString).collect(Collectors.joining(", ")) + ">";
+                "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(Collectors.joining(", ")) + ">";
         if (j instanceof J.Lambda) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
@@ -591,12 +591,12 @@ public class BlockStatementTemplateGenerator {
                 J.If iff = (J.If) statement;
                 String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
                 if (condition != null) {
-                    boolean thenNeverCompletesNormally = PatternVariables.neverCompletesNormally(iff.getThenPart());
-                    boolean elseNeverCompletesNormally = iff.getElsePart() != null && PatternVariables.neverCompletesNormally(iff.getElsePart().getBody());
-                    if (thenNeverCompletesNormally || elseNeverCompletesNormally) {
+                    boolean thenAlwaysCompletesAbnormally = PatternVariables.alwaysCompletesAbnormally(iff.getThenPart());
+                    boolean elseAlwaysCompletesAbnormally = iff.getElsePart() != null && PatternVariables.alwaysCompletesAbnormally(iff.getElsePart().getBody());
+                    if (thenAlwaysCompletesAbnormally || elseAlwaysCompletesAbnormally) {
                         StringBuilder ifStatement = new StringBuilder("if (").append(condition).append(") {");
-                        ifStatement.append(thenNeverCompletesNormally ? " throw new RuntimeException(); }" : " }");
-                        ifStatement.append(elseNeverCompletesNormally ? " else { throw new RuntimeException(); }" : " else { }");
+                        ifStatement.append(thenAlwaysCompletesAbnormally ? " throw new RuntimeException(); }" : " }");
+                        ifStatement.append(elseAlwaysCompletesAbnormally ? " else { throw new RuntimeException(); }" : " else { }");
                         before.insert(0, ifStatement);
                     }
                 }

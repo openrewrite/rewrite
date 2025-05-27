@@ -28,7 +28,7 @@ public class Semver {
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isVersion(@Nullable String version) {
-        if (version == null) {
+        if (StringUtils.isBlank(version)) {
             return false;
         }
         return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
@@ -96,20 +96,32 @@ public class Semver {
     }
 
     public static @Nullable String max(@Nullable String version1, @Nullable String version2) {
-        if (StringUtils.isBlank(version1)) {
+        if (!isVersion(version1)) {
             return StringUtils.isBlank(version2) ? null : version2;
-        } else if (StringUtils.isBlank(version2)) {
+        } else if (!isVersion(version2)) {
             return version1;
         }
 
-        try {
-            int major1 = Integer.parseInt(Semver.majorVersion(version1));
-            int major2 = Integer.parseInt(Semver.majorVersion(version2));
-            if (major1 != major2) return major1 > major2 ? version1 : version2;
+        String major1 = Semver.majorVersion(version1);
+        String major2 = Semver.majorVersion(version2);
+        String minor1 = Semver.minorVersion(version1);
+        String minor2 = Semver.minorVersion(version2);
 
-            int minor1 = Integer.parseInt(Semver.minorVersion(version1));
-            int minor2 = Integer.parseInt(Semver.minorVersion(version2));
-            if (minor1 != minor2) return minor1 > minor2 ? version1 : version2;
+        if (!StringUtils.isNumeric(major1) || !StringUtils.isNumeric(major2) ||
+                !StringUtils.isNumeric(minor1) || !StringUtils.isNumeric(minor2)) {
+            if (version1.equals(version2)) {
+                return version1;
+            }
+            return version1.compareTo(version2) >= 0 ? version1 : version2;
+        }
+        try {
+            int maj1 = Integer.parseInt(major1);
+            int maj2 = Integer.parseInt(major2);
+            if (maj1 != maj2) return maj1 > maj2 ? version1 : version2;
+
+            int min1 = Integer.parseInt(minor1);
+            int min2 = Integer.parseInt(minor2);
+            if (min1 != min2) return min1 > min2 ? version1 : version2;
 
             String[] parts1 = version1.split("[.-]");
             String[] parts2 = version2.split("[.-]");

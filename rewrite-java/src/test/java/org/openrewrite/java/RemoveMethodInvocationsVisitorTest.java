@@ -28,10 +28,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings({"ResultOfMethodCallIgnored", "CodeBlock2Expr", "RedundantThrows", "Convert2MethodRef", "EmptyTryBlock", "CatchMayIgnoreException", "EmptyFinallyBlock", "StringBufferReplaceableByString", "UnnecessaryLocalVariable"})
 class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
-    private Recipe createRemoveMethodsRecipe(String... methods) {
-        return toRecipe(() -> new RemoveMethodInvocationsVisitor(List.of(methods)));
-    }
-
     @DocumentExample
     @Test
     void removeFromEnd() {
@@ -71,6 +67,10 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private Recipe createRemoveMethodsRecipe(String... methods) {
+        return toRecipe(() -> new RemoveMethodInvocationsVisitor(List.of(methods)));
     }
 
     @Test

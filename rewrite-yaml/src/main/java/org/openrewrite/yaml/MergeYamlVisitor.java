@@ -17,7 +17,6 @@ package org.openrewrite.yaml;
 
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
-import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
@@ -36,7 +35,8 @@ import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.*;
-import static org.openrewrite.yaml.MergeYaml.*;
+import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
+import static org.openrewrite.yaml.MergeYaml.InsertMode;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
 
 /**
@@ -86,14 +86,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     public MergeYamlVisitor(Yaml.Block block, Yaml incoming, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, boolean shouldAutoFormat, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
         this(block, incoming, acceptTheirs, objectIdentifyingProperty, insertMode, insertProperty);
         this.shouldAutoFormat = shouldAutoFormat;
-    }
-
-    /**
-     * @deprecated Use {@link #MergeYamlVisitor(Yaml.Block, Yaml, boolean, String, boolean, InsertMode, String)} instead.
-     */
-    @Deprecated
-    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
-        this(scope, MergeYaml.parse(yamlString), acceptTheirs, objectIdentifyingProperty, insertMode, insertProperty);
     }
 
     @Override

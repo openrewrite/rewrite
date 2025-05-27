@@ -26,6 +26,19 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class CreateTextFileTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void hasOverwrittenFile() {
+        rewriteRun(
+          spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", true)),
+          text(
+            "hello",
+            "foo",
+            spec -> spec.path(".github/CODEOWNERS")
+          )
+        );
+    }
+
     @Test
     void hasCreatedFile() {
         rewriteRun(
@@ -46,19 +59,6 @@ class CreateTextFileTest implements RewriteTest {
             null,
             "foo\n",
             spec -> spec.path(".github/CODEOWNERS").noTrim()
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void hasOverwrittenFile() {
-        rewriteRun(
-          spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", true)),
-          text(
-            "hello",
-            "foo",
-            spec -> spec.path(".github/CODEOWNERS")
           )
         );
     }
