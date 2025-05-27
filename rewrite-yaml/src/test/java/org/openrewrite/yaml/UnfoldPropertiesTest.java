@@ -446,4 +446,3 @@ class UnfoldPropertiesTest implements RewriteTest {
         );
     }
 }
-
