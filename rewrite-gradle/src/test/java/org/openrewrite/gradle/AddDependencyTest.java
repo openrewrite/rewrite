@@ -22,15 +22,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
+import org.openrewrite.tree.ParseError;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
@@ -1698,6 +1704,537 @@ class AddDependencyTest implements RewriteTest {
                     testImplementation(group = "com.google.guava", name = "guava", version = "29.0-jre")
                 }
                 """
+            )
+          )
+        );
+    }
+
+    @Test
+    void allState() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+              group 'com.allstate.ucv'
+
+              buildscript {
+                  ext {
+                      springBootVersion = '3.3.11'
+                      appFabricVersion = '5.5.1'
+                      sys_user = System.env.SYS_USER
+                      sys_pass = System.env.SYS_PASSWORD
+                  }
+                  repositories {
+                      mavenCentral()
+                      /*maven {
+                          url 'https://artifactory.allstate.com/artifactory/remote-repos'
+                          credentials {
+                              username = (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+                              password = (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+                          }
+                      }
+                      maven {
+                          url 'https://artifactory.allstate.com/artifactory/libs-release'
+                          credentials {
+                              username = (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+                              password = (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+                          }
+                      }*/
+                  }
+                  dependencies {
+                      classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+                      //classpath('org.sonarsource.scanner.gradle:sonarqube-gradle-plugin:4.4.1.3373')
+                      classpath('org.jfrog.buildinfo:build-info-extractor-gradle:5.2.5')
+                      classpath("org.openapitools:openapi-generator-gradle-plugin:6.0.1")
+                      classpath 'info.solidsoft.gradle.pitest:gradle-pitest-plugin:1.15.0'
+                  }
+              }
+        
+              apply plugin: 'java'
+              //apply plugin: 'org.sonarqube'
+              apply plugin: 'jacoco'
+              apply plugin: 'maven-publish'
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+              apply plugin: 'com.jfrog.artifactory'
+              apply plugin: 'org.openapi.generator'
+              apply plugin: 'info.solidsoft.pitest'
+        
+              sourceCompatibility = JavaVersion.VERSION_17
+        
+              version = '1.0.0'
+        
+              if (System.env.BUILD_NUMBER) {
+                  version = "1.0.${System.env.BUILD_NUMBER}"
+              }
+        
+              repositories {
+                  mavenCentral()
+                  /*maven {
+                      url 'https://artifactory.allstate.com/artifactory/libs-release'
+                      credentials {
+                          username = (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+                          password = (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+                      }
+                  }
+                  maven {
+                      url 'https://artifactory.allstate.com/artifactory/remote-repos'
+                      credentials {
+                          username = (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+                          password = (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+                      }
+                  }
+                  maven {
+                      url 'https://artifactory.allstate.com/artifactory/AITI-Engineering-Infrastructure-and-Experience-release/'
+                      credentials {
+                          username = (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+                          password = (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+                      }
+                  }*/
+              }
+        
+              task zipTestResults(type: Zip) {
+                  from projectDir
+                  archiveAppendix = 'audit'
+                  include 'build/reports/'
+                  include 'build/test-results/'
+                  include 'git-commit'
+              }
+        
+              test {
+                  testLogging {
+                      events = ['passed', 'failed']
+                      exceptionFormat = 'full'
+                  }
+                  outputs.upToDateWhen { false }
+              }
+        
+              bootJar {
+                  enabled = true
+                  manifest {
+                      attributes(
+                        'Specification-Version': archiveVersion
+                      )
+                  }
+              }
+        
+              jar {
+                  enabled = false
+              }
+        
+              /*sonar {
+                  properties {
+                      property 'sonar.projectName', 'ucvsearchconsumer-api'
+                      property 'sonar.exclusions', ''
+                      property 'sonar.host.url', 'https://sonarqube.allstate.com'
+                      property 'sonar.login', sys_user
+                      property 'sonar.password', sys_pass
+                      property 'sonar.sources', 'src/main'
+                      property 'sonar.projectKey', 'ucvsearchconsumer-api'
+                  }
+              }*/
+        
+              jacocoTestReport {
+                  reports {
+                      xml.required = true
+                  }
+              }
+        
+              publishing {
+                  publications {
+                      myArtifact(MavenPublication) {
+                          from components.java
+                          artifactId archivesBaseName
+                          artifacts = ["build/libs/ucvsearchconsumer-api-${version}.jar"]
+                          artifact(zipTestResults) {
+                              classifier 'audit'
+                          }
+                      }
+                  }
+              }
+        
+              artifactory {
+                  contextUrl = 'https://artifactory.allstate.com/artifactory'
+                  publish {
+                      repository {
+                          repoKey = 'ucv-searchconsumer'
+                          username = sys_user
+                          password = System.env.SYS_PASSWORD
+                      }
+                      defaults {
+                          properties = ['git.commit': System.env.GITHUB_COMMIT_ID]
+                          publications('myArtifact')
+                      }
+                  }
+                  clientConfig.info.setBuildNumber(System.env.BUILD_NUMBER)
+              }
+        
+              test {
+                  useJUnitPlatform()
+              }
+        
+              dependencies {
+                  implementation "com.compozed.appfabric:com-compozed-appfabric-oauth2-starter-api:${appFabricVersion}"
+                  implementation "com.compozed.appfabric:com-compozed-appfabric-oauth2-starter-jwt:${appFabricVersion}"
+                  implementation "com.compozed.appfabric:com-compozed-appfabric-logging:${appFabricVersion}"
+        
+                  implementation "org.springframework.cloud:spring-cloud-starter-vault-config:4.2.0"
+        
+                  implementation 'org.springframework.boot:spring-boot-starter-validation'
+                  implementation('org.springframework.boot:spring-boot-starter-web') {
+                      exclude group: 'com.fasterxml.jackson.core', module: 'jackson-databind'
+                  }
+        
+                  implementation 'io.swagger.core.v3:swagger-annotations:2.2.21'
+                  implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
+        
+                  implementation 'commons-io:commons-io:2.18.0'
+        
+                  // Connecting to AWS Opensearch
+                  implementation 'co.elastic.clients:elasticsearch-java:8.17.3'
+        
+                  // XSD Conversion for Postal Code Details
+                  implementation 'jakarta.xml.bind:jakarta.xml.bind-api:4.0.0'
+        
+                    // Vulnerability Remediation
+                  implementation('ch.qos.logback:logback-core') {
+                      because 'CVE-2024-12798'
+                      version {
+                          strictly '1.5.13'
+                      }
+                  }
+        
+                  implementation('ch.qos.logback:logback-classic') {
+                      because 'CVE-2024-12798'
+                      version {
+                          strictly '1.5.13'
+                      }
+                  }
+        
+                  implementation 'org.projectlombok:lombok'
+                  annotationProcessor 'org.projectlombok:lombok'
+        
+                  testImplementation "com.compozed.appfabric:com-compozed-appfabric-starter-api-testutils:${appFabricVersion}"
+                  testImplementation 'org.springframework.boot:spring-boot-starter-test'
+              }
+        
+              openApiGenerate {
+                  generatorName = "spring"
+                  library = "spring-boot"
+                  inputSpec = "$rootDir/src/main/resources/specification.yml".toString()
+                  outputDir = "${rootDir}/generated/openapi".toString()
+                  globalProperties = [
+                          modelDocs: "false",
+                          models   : "",
+                          apis     : "",
+                  ]
+                  configOptions = [
+                          useOptional          : "true",
+                          swaggerDocketConfig  : "false",
+                          performBeanValidation: "true",
+                          useBeanValidation    : "true",
+                          useTags              : "true",
+                          singleContentTypes   : "true",
+                          title                : rootProject.name,
+                          useSpringBoot3       : "true",
+                          java8                : "false",
+                          dateLibrary          : "java8",
+                          serializableModel    : "true",
+                          serializationLibrary : "jackson",
+                          skipDefaultInterface : "true",
+                          artifactId           : rootProject.name,
+                          apiPackage           : "com.allstate.ucv.search.consumer.api.api",
+                          modelPackage         : "com.allstate.ucv.search.consumer.api.model",
+                          invokerPackage       : "com.allstate.ucv.search.consumer.api",
+                          interfaceOnly        : "true"
+                  ]
+              }
+        
+              sourceSets {
+                  main {
+                      java {
+                          srcDir "${rootDir}/generated/openapi/src/main/java"
+                      }
+                  }
+              }
+        
+              clean.doFirst {
+                  delete "${rootDir}/generated/"
+              }
+        
+              task callOpenApiGenerate {
+                  doLast {
+                      println 'Call to openApiGenerate'
+                  }
+              }
+        
+              clean.finalizedBy tasks.callOpenApiGenerate
+              tasks.callOpenApiGenerate.dependsOn tasks.openApiGenerate
+              compileJava.dependsOn tasks.openApiGenerate
+              """,
+              """
+              group 'com.allstate.ucv'
+
+              buildscript {
+                  ext {
+                      springBootVersion = '3.3.11'
+                      appFabricVersion = '5.5.1'
+                      sys_user = System.env.SYS_USER
+                      sys_pass = System.env.SYS_PASSWORD
+                  }
+                  repositories {
+                      mavenCentral()
+                      /*maven {
+                          url 'https://artifactory.allstate.com/artifactory/remote-repos'
+                          credentials {
+                              username = (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+                              password = (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+                          }
+                      }
+                      maven {
+                          url 'https://artifactory.allstate.com/artifactory/libs-release'
+                          credentials {
+                              username = (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+                              password = (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+                          }
+                      }*/
+                  }
+                  dependencies {
+                      classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+                      //classpath('org.sonarsource.scanner.gradle:sonarqube-gradle-plugin:4.4.1.3373')
+                      classpath('org.jfrog.buildinfo:build-info-extractor-gradle:5.2.5')
+                      classpath("org.openapitools:openapi-generator-gradle-plugin:6.0.1")
+                      classpath 'info.solidsoft.gradle.pitest:gradle-pitest-plugin:1.15.0'
+                  }
+              }
+        
+              apply plugin: 'java'
+              //apply plugin: 'org.sonarqube'
+              apply plugin: 'jacoco'
+              apply plugin: 'maven-publish'
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+              apply plugin: 'com.jfrog.artifactory'
+              apply plugin: 'org.openapi.generator'
+              apply plugin: 'info.solidsoft.pitest'
+        
+              sourceCompatibility = JavaVersion.VERSION_17
+        
+              version = '1.0.0'
+        
+              if (System.env.BUILD_NUMBER) {
+                  version = "1.0.${System.env.BUILD_NUMBER}"
+              }
+        
+              repositories {
+                  mavenCentral()
+                  /*maven {
+                      url 'https://artifactory.allstate.com/artifactory/libs-release'
+                      credentials {
+                          username = (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+                          password = (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+                      }
+                  }
+                  maven {
+                      url 'https://artifactory.allstate.com/artifactory/remote-repos'
+                      credentials {
+                          username = (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+                          password = (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+                      }
+                  }
+                  maven {
+                      url 'https://artifactory.allstate.com/artifactory/AITI-Engineering-Infrastructure-and-Experience-release/'
+                      credentials {
+                          username = (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
+                          password = (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
+                      }
+                  }*/
+              }
+        
+              task zipTestResults(type: Zip) {
+                  from projectDir
+                  archiveAppendix = 'audit'
+                  include 'build/reports/'
+                  include 'build/test-results/'
+                  include 'git-commit'
+              }
+        
+              test {
+                  testLogging {
+                      events = ['passed', 'failed']
+                      exceptionFormat = 'full'
+                  }
+                  outputs.upToDateWhen { false }
+              }
+        
+              bootJar {
+                  enabled = true
+                  manifest {
+                      attributes(
+                        'Specification-Version': archiveVersion
+                      )
+                  }
+              }
+        
+              jar {
+                  enabled = false
+              }
+        
+              /*sonar {
+                  properties {
+                      property 'sonar.projectName', 'ucvsearchconsumer-api'
+                      property 'sonar.exclusions', ''
+                      property 'sonar.host.url', 'https://sonarqube.allstate.com'
+                      property 'sonar.login', sys_user
+                      property 'sonar.password', sys_pass
+                      property 'sonar.sources', 'src/main'
+                      property 'sonar.projectKey', 'ucvsearchconsumer-api'
+                  }
+              }*/
+        
+              jacocoTestReport {
+                  reports {
+                      xml.required = true
+                  }
+              }
+        
+              publishing {
+                  publications {
+                      myArtifact(MavenPublication) {
+                          from components.java
+                          artifactId archivesBaseName
+                          artifacts = ["build/libs/ucvsearchconsumer-api-${version}.jar"]
+                          artifact(zipTestResults) {
+                              classifier 'audit'
+                          }
+                      }
+                  }
+              }
+        
+              artifactory {
+                  contextUrl = 'https://artifactory.allstate.com/artifactory'
+                  publish {
+                      repository {
+                          repoKey = 'ucv-searchconsumer'
+                          username = sys_user
+                          password = System.env.SYS_PASSWORD
+                      }
+                      defaults {
+                          properties = ['git.commit': System.env.GITHUB_COMMIT_ID]
+                          publications('myArtifact')
+                      }
+                  }
+                  clientConfig.info.setBuildNumber(System.env.BUILD_NUMBER)
+              }
+        
+              test {
+                  useJUnitPlatform()
+              }
+        
+              dependencies {
+                  implementation "com.compozed.appfabric:com-compozed-appfabric-oauth2-starter-api:${appFabricVersion}"
+                  implementation "com.compozed.appfabric:com-compozed-appfabric-oauth2-starter-jwt:${appFabricVersion}"
+                  implementation "com.compozed.appfabric:com-compozed-appfabric-logging:${appFabricVersion}"
+        
+                  implementation "org.springframework.cloud:spring-cloud-starter-vault-config:4.2.0"
+        
+                  implementation 'org.springframework.boot:spring-boot-starter-validation'
+                  implementation('org.springframework.boot:spring-boot-starter-web') {
+                      exclude group: 'com.fasterxml.jackson.core', module: 'jackson-databind'
+                  }
+        
+                  implementation 'io.swagger.core.v3:swagger-annotations:2.2.21'
+                  implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
+        
+                  implementation 'commons-io:commons-io:2.18.0'
+        
+                  // Connecting to AWS Opensearch
+                  implementation 'co.elastic.clients:elasticsearch-java:8.17.3'
+        
+                  // XSD Conversion for Postal Code Details
+                  implementation 'jakarta.xml.bind:jakarta.xml.bind-api:4.0.0'
+        
+                    // Vulnerability Remediation
+                  implementation('ch.qos.logback:logback-core') {
+                      because 'CVE-2024-12798'
+                      version {
+                          strictly '1.5.13'
+                      }
+                  }
+        
+                  implementation('ch.qos.logback:logback-classic') {
+                      because 'CVE-2024-12798'
+                      version {
+                          strictly '1.5.13'
+                      }
+                  }
+        
+                  implementation 'org.projectlombok:lombok'
+                  annotationProcessor 'org.projectlombok:lombok'
+        
+                  testImplementation "com.compozed.appfabric:com-compozed-appfabric-starter-api-testutils:${appFabricVersion}"
+                  testImplementation "com.google.guava:guava:29.0-jre"
+                  testImplementation 'org.springframework.boot:spring-boot-starter-test'
+              }
+        
+              openApiGenerate {
+                  generatorName = "spring"
+                  library = "spring-boot"
+                  inputSpec = "$rootDir/src/main/resources/specification.yml".toString()
+                  outputDir = "${rootDir}/generated/openapi".toString()
+                  globalProperties = [
+                          modelDocs: "false",
+                          models   : "",
+                          apis     : "",
+                  ]
+                  configOptions = [
+                          useOptional          : "true",
+                          swaggerDocketConfig  : "false",
+                          performBeanValidation: "true",
+                          useBeanValidation    : "true",
+                          useTags              : "true",
+                          singleContentTypes   : "true",
+                          title                : rootProject.name,
+                          useSpringBoot3       : "true",
+                          java8                : "false",
+                          dateLibrary          : "java8",
+                          serializableModel    : "true",
+                          serializationLibrary : "jackson",
+                          skipDefaultInterface : "true",
+                          artifactId           : rootProject.name,
+                          apiPackage           : "com.allstate.ucv.search.consumer.api.api",
+                          modelPackage         : "com.allstate.ucv.search.consumer.api.model",
+                          invokerPackage       : "com.allstate.ucv.search.consumer.api",
+                          interfaceOnly        : "true"
+                  ]
+              }
+        
+              sourceSets {
+                  main {
+                      java {
+                          srcDir "${rootDir}/generated/openapi/src/main/java"
+                      }
+                  }
+              }
+        
+              clean.doFirst {
+                  delete "${rootDir}/generated/"
+              }
+        
+              task callOpenApiGenerate {
+                  doLast {
+                      println 'Call to openApiGenerate'
+                  }
+              }
+        
+              clean.finalizedBy tasks.callOpenApiGenerate
+              tasks.callOpenApiGenerate.dependsOn tasks.openApiGenerate
+              compileJava.dependsOn tasks.openApiGenerate
+              """
             )
           )
         );
