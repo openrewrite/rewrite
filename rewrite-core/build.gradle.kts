@@ -25,5 +25,6 @@ dependencies {
     implementation("org.objenesis:objenesis:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")
+    testImplementation("org.openrewrite.recipe:rewrite-hibernate:2.7.0") // For testing license detection TODO: can this stay here? Do we have the license to use this licensed one?
     testImplementation(project(":rewrite-test"))
 }
