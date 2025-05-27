@@ -17,7 +17,6 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.gradle.internal.impldep.com.google.errorprone.annotations.InlineMe;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.DependencyVersionSelector;
@@ -76,14 +75,6 @@ public class ChangePluginVersion extends Recipe {
             required = false)
     @Nullable
     String versionPattern;
-
-    @InlineMe(replacement = "new UpgradePluginVersion(pluginIdPattern, newVersion, versionPattern)")
-    @Deprecated
-    public ChangePluginVersion(String pluginIdPattern, @Nullable String newVersion, @Nullable String versionPattern) {
-        this.pluginIdPattern = pluginIdPattern;
-        this.newVersion = newVersion;
-        this.versionPattern = versionPattern;
-    }
 
     @Override
     public String getDisplayName() {
