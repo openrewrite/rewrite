@@ -31,54 +31,14 @@ describe('replace with context', () => {
     }
 
     describe('new replace API', () => {
-        test('single pattern replacement with object destructuring', async () => {
-            const swapOperands = rewrite<J.Binary>(() => {
-                const {left, right} = {left: capture(), right: capture()};
-                return {
-                    before: pattern`${left} + ${right}`,
-                    after: template`${right} + ${left}`
-                };
-            });
-
-            const ast = await parseExpression('a + b');
-            const result = await swapOperands.tryOn(ast, {} as any, {tree: ast});
-
-            expect(result).toBeDefined();
-            const binaryResult = result as J.Binary;
-            expect((binaryResult.left as J.Identifier).simpleName).toBe('b');
-            expect((binaryResult.right as J.Identifier).simpleName).toBe('a');
-        });
-
-        test('single pattern replacement with individual captures', async () => {
-            const swapOperands = rewrite<J.Binary>(() => {
-                const left = capture();
-                const right = capture();
-                return {
-                    before: pattern`${left} + ${right}`,
-                    after: template`${right} + ${left}`
-                };
-            });
-
-            const ast = await parseExpression('a + b');
-            const result = await swapOperands.tryOn(ast, {} as any, {tree: ast});
-
-            expect(result).toBeDefined();
-            const binaryResult = result as J.Binary;
-            expect((binaryResult.left as J.Identifier).simpleName).toBe('b');
-            expect((binaryResult.right as J.Identifier).simpleName).toBe('a');
-        });
-
         test('multiple patterns replacement', async () => {
-            const normalizeComparisons = rewrite<J.Binary>(() => {
-                const {left, right} = {left: capture(), right: capture()};
-                return {
-                    before: [
-                        pattern`${left} == ${right}`,
-                        pattern`${left} != ${right}`
-                    ],
-                    after: template`${left} === ${right}`
-                };
-            });
+            const normalizeComparisons = rewrite<J.Binary>(() => ({
+                before: [
+                    pattern`${"left"} == ${"right"}`,
+                    pattern`${"left"} != ${"right"}`
+                ],
+                after: template`${"left"} === ${"right"}`
+            }));
 
             // Test with == operator
             const equalityAst = await parseExpression('a == b');
@@ -136,53 +96,6 @@ describe('replace with context', () => {
                     return {} as any;
                 });
             }).toThrow('Builder function must return an object with before and after properties');
-        });
-    });
-
-    describe('compatibility with existing rewrite API', () => {
-        test('old rewrite API still works', async () => {
-            const swapOperandsOld = rewrite(() => {
-                const left = capture();
-                const right = capture();
-                return {
-                    before: pattern`${left} + ${right}`,
-                    after: template`${right} + ${left}`
-                };
-            });
-
-            const ast = await parseExpression('a + b');
-            const result = await swapOperandsOld.tryOn(ast, {} as any, {tree: ast});
-
-            expect(result).toBeDefined();
-            const binaryResult = result as J.Binary;
-            expect((binaryResult.left as J.Identifier).simpleName).toBe('b');
-            expect((binaryResult.right as J.Identifier).simpleName).toBe('a');
-        });
-
-        test('both APIs can be used in the same codebase', () => {
-            // New API
-            const newRule = rewrite<J.Binary>(() => {
-                const {left, right} = {left: capture(), right: capture()};
-                return {
-                    before: pattern`${left} + ${right}`,
-                    after: template`${right} + ${left}`
-                };
-            });
-
-            // Old API
-            const oldRule = rewrite(() => {
-                const left = capture();
-                const right = capture();
-                return {
-                    before: pattern`${left} + ${right}`,
-                    after: template`${right} + ${left}`
-                };
-            });
-
-            expect(newRule).toBeDefined();
-            expect(oldRule).toBeDefined();
-            expect(typeof newRule.tryOn).toBe('function');
-            expect(typeof oldRule.tryOn).toBe('function');
         });
     });
 });

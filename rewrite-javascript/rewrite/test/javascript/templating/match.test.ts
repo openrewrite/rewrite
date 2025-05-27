@@ -38,17 +38,14 @@ describe('match extraction', () => {
                     // Create a pattern that matches "a + b"
                     let a = capture();
                     let b = capture();
-                    const m = pattern`${a} + ${b}`.matcher(binary);
+                    const m = pattern`${"left"} + ${"right"}`.matcher(binary);
                     if (await m.matches()) {
                         // Extract the captured parts
-                        const left = m.get(a);
-                        const right = m.get(b);
-
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
-                            draft.left = createDraft(right!);
+                            draft.left = createDraft((m.get("right"))!);
                             draft.prefix = binary.left.prefix;
-                            draft.right = createDraft(left!);
+                            draft.right = createDraft((m.get("left"))!);
                             draft.right.prefix = binary.right.prefix;
                         });
                     }
@@ -74,7 +71,7 @@ describe('match extraction', () => {
                 const m = pattern`${left} + ${right}`.matcher(binary);
 
                 if (await m.matches()) {
-                    return await m.replaceWith(template`${right} + ${left}`, this.cursor);
+                    return await template`${right} + ${left}`.apply(this.cursor, {tree: binary}, m.getAll());
                 }
                 return binary;
             }
@@ -90,19 +87,12 @@ describe('match extraction', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
 
-                const swapOperands = rewrite(() => {
-                        const {left, right} = {left: capture(), right: capture()};
-                        return {
-                            before: pattern`${left} + ${right}`,
-                            after: template`${right} + ${left}`
-                        };
-                    }
+                const swapOperands = rewrite(() => ({
+                        before: pattern`${"left"} + ${"right"}`,
+                        after: template`${"right"} + ${"left"}`
+                    })
                 );
-                return await swapOperands.tryOn(binary, this.cursor, {
-                    tree: binary,
-                    loc: "EXPRESSION_PREFIX",
-                    mode: Mode.Replace
-                });
+                return await swapOperands.tryOn(binary, this.cursor);
             }
         });
 

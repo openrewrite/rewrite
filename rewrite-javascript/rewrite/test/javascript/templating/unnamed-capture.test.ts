@@ -14,62 +14,24 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
+import {JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {createDraft, produce} from "immer";
 
 describe('unnamed capture', () => {
     const spec = new RecipeSpec();
-
-    test('extract parts of a binary expression using unnamed captures', () => {
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                if (binary.operator.element === J.Binary.Type.Addition) {
-                    // Create capture objects without explicit names
-                    const {left, right} = {left: capture(), right: capture()};
-
-                    // Create a pattern that matches "a + b" using the capture objects
-                    const m = pattern`${left} + ${right}`.matcher(binary);
-
-                    const matches = await m.matches();
-
-                    if (matches) {
-                        // Extract the captured parts
-                        const leftValue = m.get(left);
-                        const rightValue = m.get(right);
-
-                        // Create a new binary expression with the swapped operands
-                        return produce(binary, draft => {
-                            draft.left = createDraft(rightValue!);
-                            draft.prefix = binary.left.prefix;
-                            draft.right = createDraft(leftValue!);
-                            draft.right.prefix = binary.right.prefix;
-                        });
-                    }
-                }
-                return binary;
-            }
-        });
-
-        return spec.rewriteRun(
-            //language=typescript
-            typescript('const result = 1 + 2;', 'const result = 2 + 1;'),
-        );
-    });
 
     test('more complex example', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
-                const {obj, defaultValue, property} = {obj: capture(), defaultValue: capture(), property: capture()};
-                
-                // Use the new cleaner API - matcher.applyTemplate()
-                const result = await pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`
-                    .matcher(ternary)
-                    .replaceWith(template`${obj}?.${property} ?? ${defaultValue}`, this.cursor);
-                
-                return result || await super.visitTernary(ternary, p);
+                let m = pattern`${"obj"} === null || ${"obj"} === undefined ? ${"defaultValue"} : ${"obj"}.${"property"}`
+                    .matcher(ternary);
+                if (await m.matches()) {
+                    return await template`${"obj"}?.${"property"} ?? ${"defaultValue"}`.apply(this.cursor, {tree: ternary}, m.getAll());
+                }
+
+                return await super.visitTernary(ternary, p);
             }
         });
 
@@ -92,14 +54,11 @@ describe('unnamed capture', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
-                return await rewrite(() => {
-                    const obj = capture(), defaultValue = capture(), property = capture();
-                    return {
-                        before: pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`,
-                        after: template`${obj}?.${property} ?? ${defaultValue}`
-                    };
-                })
-                        .tryOn(ternary, this.cursor) || super.visitTernary(ternary, p);
+                return await rewrite(() => ({
+                    before: pattern`${"obj"} === null || ${"obj"} === undefined ? ${"defaultValue"} : ${"obj"}.${"property"}`,
+                    after: template`${"obj"}?.${"property"} ?? ${"defaultValue"}`
+                }))
+                    .tryOn(ternary, this.cursor) || super.visitTernary(ternary, p);
             }
         });
 

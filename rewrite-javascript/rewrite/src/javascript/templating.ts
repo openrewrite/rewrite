@@ -76,10 +76,6 @@ export class Pattern {
     ) {
     }
 
-    configure(configuration: {}) {
-        return this;
-    }
-
     /**
      * Creates a matcher for this pattern against a specific AST node.
      *
@@ -88,71 +84,6 @@ export class Pattern {
      */
     matcher(ast: J): Matcher {
         return new Matcher(this, ast);
-    }
-}
-
-/**
- * Utility class for managing placeholder naming and parsing.
- * Centralizes all logic related to capture placeholders.
- */
-class PlaceholderUtils {
-    static readonly CAPTURE_PREFIX = '__capture_';
-    static readonly PLACEHOLDER_PREFIX = '__PLACEHOLDER_';
-
-    /**
-     * Checks if a node is a capture placeholder.
-     *
-     * @param node The node to check
-     * @returns true if the node is a capture placeholder, false otherwise
-     */
-    static isCapture(node: J): boolean {
-        if (node.kind === J.Kind.Identifier) {
-            const id = node as J.Identifier;
-            return id.simpleName.startsWith(this.CAPTURE_PREFIX);
-        }
-        return false;
-    }
-
-    /**
-     * Parses a capture placeholder to extract name and type constraint.
-     *
-     * @param identifier The identifier string to parse
-     * @returns Object with name and optional type constraint, or null if not a valid capture
-     */
-    static parseCapture(identifier: string): { name: string; typeConstraint?: string } | null {
-        if (!identifier.startsWith(this.CAPTURE_PREFIX)) {
-            return null;
-        }
-
-        // Handle unnamed captures: "__capture_unnamed_N__"
-        if (identifier.startsWith(`${this.CAPTURE_PREFIX}unnamed_`)) {
-            const match = identifier.match(/__capture_(unnamed_\d+)__/);
-            return match ? {name: match[1]} : null;
-        }
-
-        // Handle named captures: "__capture_name__" or "__capture_name_type__"
-        const match = identifier.match(/__capture_([^_]+)(?:_([^_]+))?__/);
-        if (!match) {
-            return null;
-        }
-
-        return {
-            name: match[1],
-            typeConstraint: match[2]
-        };
-    }
-
-    /**
-     * Creates a capture placeholder string.
-     *
-     * @param name The capture name
-     * @param typeConstraint Optional type constraint
-     * @returns The formatted placeholder string
-     */
-    static createCapture(name: string, typeConstraint?: string): string {
-        return typeConstraint
-            ? `${this.CAPTURE_PREFIX}${name}_${typeConstraint}__`
-            : `${this.CAPTURE_PREFIX}${name}__`;
     }
 }
 
@@ -196,8 +127,8 @@ export class Matcher {
      * @param capture The name of the capture or the capture object
      * @returns The captured node, or undefined if not found
      */
-    get(capture: Capture): J | undefined {
-        const name = capture.name;
+    get(capture: Capture | string): J | undefined {
+        const name = typeof capture === "string" ? capture : capture.name;
         return this.bindings.get(name);
     }
 
@@ -208,33 +139,6 @@ export class Matcher {
      */
     getAll(): Map<string, J> {
         return new Map(this.bindings);
-    }
-
-    /**
-     * Applies a template using the results from this matcher.
-     *
-     * This is a convenience method that combines matching and template application.
-     * If the pattern doesn't match, returns undefined.
-     *
-     * @param template The template to apply
-     * @param cursor The cursor pointing to the current location in the AST
-     * @param coordinates The coordinates specifying where and how to insert the generated AST
-     * @returns A Promise resolving to the generated AST node, or undefined if no match
-     *
-     * @example
-     * const result = await pattern`${obj} === null`.against(ternary)
-     *     .applyTemplate(template`${obj}?.prop`, cursor, coordinates);
-     */
-    async replaceWith(template: Template, cursor: Cursor, coordinates?: JavaCoordinates): Promise<J | undefined> {
-        if (!await this.matches()) {
-            return undefined;
-        }
-        const coords = coordinates || {
-            tree: this.ast,
-            loc: "EXPRESSION_PREFIX" as const,
-            mode: JavaCoordinates.Mode.Replace
-        };
-        return template.applyWithResults(cursor, coords, this.getAll());
     }
 
     /**
@@ -305,36 +209,12 @@ export class Matcher {
  * const expr = capture('expr');
  * const redundantOr = pattern`${expr} || ${expr}`;
  */
-export function pattern(strings: TemplateStringsArray, ...captures: Capture[]): Pattern {
-    // Check for undefined captures (indicates missing default parameters)
-    for (let i = 0; i < captures.length; i++) {
-        if (captures[i] === undefined || captures[i] === null) {
-            throw new Error(
-                `Capture parameter ${i} is undefined. ` +
-                `Make sure to provide default values for all parameters in your replace() function. ` +
-                `Example: (left = capture(), right = capture()) => ({...})`
-            );
-        }
-        if (typeof captures[i] !== 'object' || !('name' in captures[i])) {
-            throw new Error(
-                `Capture parameter ${i} is not a valid Capture object. ` +
-                `Expected a Capture created with capture(), got: ${typeof captures[i]}`
-            );
-        }
-    }
-
-    return new Pattern(strings, captures);
-}
-
-/**
- * Parameter specification for template generation.
- * Represents a placeholder in a template that will be replaced with a parameter value.
- */
-export interface Parameter {
-    /**
-     * The value to substitute into the template.
-     */
-    value: any;
+export function pattern(strings: TemplateStringsArray, ...captures: (Capture | string)[]): Pattern {
+    const capturesByName = captures.reduce((map, c) => {
+        const capture = typeof c === "string" ? new CaptureImpl(c) : c;
+        return map.set(capture.name, capture);
+    }, new Map<string, Capture>());
+    return new Pattern(strings, captures.map(c => capturesByName.get(typeof c === "string" ? c : c.name)!));
 }
 
 export type JavaCoordinates = {
@@ -352,6 +232,75 @@ export namespace JavaCoordinates {
         After,
         Replace,
     }
+}
+
+/**
+ * Valid parameter types for template literals.
+ * - Capture: For pattern matching and reuse
+ * - Tree: AST nodes to be inserted directly
+ * - Primitives: Values to be converted to literals
+ */
+export type TemplateParameter = Capture | Tree | string | number | boolean;
+
+/**
+ * Template for creating AST nodes.
+ *
+ * This class provides the public API for template generation.
+ * The actual templating logic is handled by the internal TemplateEngine.
+ *
+ * @example
+ * // Generate a literal AST node
+ * const result = template`2`.apply(cursor, coordinates);
+ *
+ * @example
+ * // Generate an AST node with a parameter
+ * const result = template`${capture()}`.apply(cursor, coordinates);
+ */
+export class Template {
+    /**
+     * Creates a new template.
+     *
+     * @param templateParts The string parts of the template
+     * @param parameters The parameters between the string parts
+     */
+    constructor(
+        private readonly templateParts: TemplateStringsArray,
+        private readonly parameters: Parameter[]
+    ) {
+    }
+
+    /**
+     * Applies the template to generate an AST node.
+     *
+     * @param cursor The cursor pointing to the current location in the AST
+     * @param coordinates The coordinates specifying where and how to insert the generated AST
+     * @param parameters
+     * @returns A Promise resolving to the generated AST node
+     */
+    async apply(cursor: Cursor, coordinates: JavaCoordinates, parameters?: Map<string, J>): Promise<J | undefined> {
+        return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, coordinates, parameters);
+    }
+}
+
+export function template(strings: TemplateStringsArray, ...parameters: TemplateParameter[]): Template {
+    // Convert parameters to Parameter objects (no longer need to check for mutable tree property)
+    const processedParameters = parameters.map(param => {
+        // Just wrap each parameter value in a Parameter object
+        return {value: param};
+    });
+
+    return new Template(strings, processedParameters);
+}
+
+/**
+ * Parameter specification for template generation.
+ * Represents a placeholder in a template that will be replaced with a parameter value.
+ */
+interface Parameter {
+    /**
+     * The value to substitute into the template.
+     */
+    value: any;
 }
 
 /**
@@ -396,15 +345,15 @@ class TemplateEngine {
 
         // Extract the relevant part of the AST
         const firstStatement = cu.statements[0].element;
-        const ast = firstStatement.kind === JS.Kind.ExpressionStatement
-            ? (firstStatement as JS.ExpressionStatement).expression
-            : firstStatement;
+        const ast = firstStatement.kind === JS.Kind.ExpressionStatement ?
+            (firstStatement as JS.ExpressionStatement).expression :
+            firstStatement;
 
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
         for (let i = 0; i < parameters.length; i++) {
             const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
-            substitutions.set(placeholder, parameters[i]);
+            substitutions.set(placeholder, typeof parameters[i].value === 'string' ? {value: matchResults.get(parameters[i].value) || parameters[i].value} : parameters[i]);
         }
 
         // Unsubstitute placeholders with actual parameter values and match results
@@ -427,8 +376,12 @@ class TemplateEngine {
         for (let i = 0; i < templateParts.length; i++) {
             result += templateParts[i];
             if (i < parameters.length) {
-                const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
-                result += placeholder;
+                if (parameters[i].value instanceof CaptureImpl || typeof parameters[i].value === 'string' || isTree(parameters[i].value)) {
+                    const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
+                    result += placeholder;
+                } else {
+                    result += parameters[i].value;
+                }
             }
         }
         return result;
@@ -436,53 +389,67 @@ class TemplateEngine {
 }
 
 /**
- * Template for creating AST nodes.
- *
- * This class provides the public API for template generation.
- * The actual templating logic is handled by the internal TemplateEngine.
- *
- * @example
- * // Generate a literal AST node
- * const result = template`2`.apply(cursor, coordinates);
- *
- * @example
- * // Generate an AST node with a parameter
- * const result = template`${capture()}`.apply(cursor, coordinates);
+ * Utility class for managing placeholder naming and parsing.
+ * Centralizes all logic related to capture placeholders.
  */
-export class Template {
+class PlaceholderUtils {
+    static readonly CAPTURE_PREFIX = '__capture_';
+    static readonly PLACEHOLDER_PREFIX = '__PLACEHOLDER_';
+
     /**
-     * Creates a new template.
+     * Checks if a node is a capture placeholder.
      *
-     * @param templateParts The string parts of the template
-     * @param parameters The parameters between the string parts
+     * @param node The node to check
+     * @returns true if the node is a capture placeholder, false otherwise
      */
-    constructor(
-        private readonly templateParts: TemplateStringsArray,
-        private readonly parameters: Parameter[]
-    ) {
+    static isCapture(node: J): boolean {
+        if (node.kind === J.Kind.Identifier) {
+            const id = node as J.Identifier;
+            return id.simpleName.startsWith(this.CAPTURE_PREFIX);
+        }
+        return false;
     }
 
     /**
-     * Applies the template to generate an AST node.
+     * Parses a capture placeholder to extract name and type constraint.
      *
-     * @param cursor The cursor pointing to the current location in the AST
-     * @param coordinates The coordinates specifying where and how to insert the generated AST
-     * @returns A Promise resolving to the generated AST node
+     * @param identifier The identifier string to parse
+     * @returns Object with name and optional type constraint, or null if not a valid capture
      */
-    async apply(cursor: Cursor, coordinates: JavaCoordinates): Promise<J | undefined> {
-        return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, coordinates);
+    static parseCapture(identifier: string): { name: string; typeConstraint?: string } | null {
+        if (!identifier.startsWith(this.CAPTURE_PREFIX)) {
+            return null;
+        }
+
+        // Handle unnamed captures: "__capture_unnamed_N__"
+        if (identifier.startsWith(`${this.CAPTURE_PREFIX}unnamed_`)) {
+            const match = identifier.match(/__capture_(unnamed_\d+)__/);
+            return match ? {name: match[1]} : null;
+        }
+
+        // Handle named captures: "__capture_name__" or "__capture_name_type__"
+        const match = identifier.match(/__capture_([^_]+)(?:_([^_]+))?__/);
+        if (!match) {
+            return null;
+        }
+
+        return {
+            name: match[1],
+            typeConstraint: match[2]
+        };
     }
 
     /**
-     * Applies the template with match results from pattern matching.
+     * Creates a capture placeholder string.
      *
-     * @param cursor The cursor pointing to the current location in the AST
-     * @param coordinates The coordinates specifying where and how to insert the generated AST
-     * @param matchResults Map of capture names to matched AST nodes
-     * @returns A Promise resolving to the generated AST node
+     * @param name The capture name
+     * @param typeConstraint Optional type constraint
+     * @returns The formatted placeholder string
      */
-    async applyWithResults(cursor: Cursor, coordinates: JavaCoordinates, matchResults: Map<string, J>): Promise<J | undefined> {
-        return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, coordinates, matchResults);
+    static createCapture(name: string, typeConstraint?: string): string {
+        return typeConstraint
+            ? `${this.CAPTURE_PREFIX}${name}_${typeConstraint}__`
+            : `${this.CAPTURE_PREFIX}${name}__`;
     }
 }
 
@@ -566,28 +533,6 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                 draft.markers = placeholder.markers;
                 draft.prefix = placeholder.prefix;
             });
-        }
-
-        // For primitive values, create a new literal node
-        if (placeholder.kind === J.Kind.Literal) {
-            // Create a new literal with the primitive value
-            const literal = placeholder as J.Literal;
-            return produce({} as J.Literal, draft => {
-                // Copy all properties from the original literal
-                Object.assign(draft, literal);
-                // Override the value and valueSource
-                draft.value = param.value;
-                draft.valueSource = String(param.value);
-            }) as J;
-        } else if (placeholder.kind === J.Kind.Identifier) {
-            // Create a new identifier with the primitive value
-            const identifier = placeholder as J.Identifier;
-            return produce({} as J.Identifier, draft => {
-                // Copy all properties from the original identifier
-                Object.assign(draft, identifier);
-                // Override the simpleName
-                draft.simpleName = String(param.value);
-            }) as J;
         }
 
         return placeholder;
@@ -675,24 +620,6 @@ class TemplateApplier {
         // Not implemented yet
         return this.ast;
     }
-}
-
-/**
- * Valid parameter types for template literals.
- * - Capture: For pattern matching and reuse
- * - Tree: AST nodes to be inserted directly
- * - Primitives: Values to be converted to literals
- */
-export type TemplateParameter = Capture | Tree | string | number | boolean;
-
-export function template(strings: TemplateStringsArray, ...parameters: TemplateParameter[]): Template {
-    // Convert parameters to Parameter objects (no longer need to check for mutable tree property)
-    const processedParameters = parameters.map(param => {
-        // Just wrap each parameter value in a Parameter object
-        return {value: param};
-    });
-
-    return new Template(strings, processedParameters);
 }
 
 /**
@@ -792,13 +719,12 @@ class RewriteRuleImpl implements RewriteRule {
     ) {
     }
 
-    async tryOn(node: J, cursor: Cursor, coordinates: JavaCoordinates): Promise<J | undefined> {
+    async tryOn(node: J, cursor: Cursor, coordinates?: JavaCoordinates): Promise<J | undefined> {
         for (const pattern of this.before) {
             const matcher = pattern.matcher(node);
 
             if (await matcher.matches()) {
-                // Use the matcher's applyTemplate method for cleaner API
-                const result = await matcher.replaceWith(this.after, cursor, coordinates);
+                const result = await this.after.apply(cursor, coordinates || {tree: node}, matcher.getAll());
                 if (result) {
                     return result;
                 }
@@ -818,26 +744,20 @@ class RewriteRuleImpl implements RewriteRule {
  *
  * @example
  * // Single pattern
- * const swapOperands = replace<J.Binary>((ctx) => {
- *     const {left, right} = ctx.captures({left: capture(), right: capture()});
- *     return {
- *         before: pattern`${left} + ${right}`,
- *         after: template`${right} + ${left}`
- *     };
- * });
+ * const swapOperands = replace<J.Binary>(() => ({
+ *     before: pattern`${"left"} + ${"right"}`,
+ *     after: template`${"right"} + ${"left"}`
+ * }));
  *
  * @example
  * // Multiple patterns
- * const normalizeComparisons = replace<J.Binary>((ctx) => {
- *     const {left, right} = ctx.captures({left: capture(), right: capture()});
- *     return {
- *         before: [
- *             pattern`${left} == ${right}`,
- *             pattern`${left} === ${right}`
- *         ],
- *         after: template`${left} === ${right}`
- *     };
- * });
+ * const normalizeComparisons = replace<J.Binary>(() => ({
+ *     before: [
+ *         pattern`${"left"} == ${"right"}`,
+ *         pattern`${"left"} === ${"right"}`
+ *     ],
+ *     after: template`${"left"} === ${"right"}`
+ * }));
  */
 export function rewrite<T extends J>(
     builderFn: () => RewriteConfig

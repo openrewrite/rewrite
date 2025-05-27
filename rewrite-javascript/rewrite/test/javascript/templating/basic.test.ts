@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, Matcher, Pattern, pattern, rewrite, template} from "../../../src/javascript";
+import {capture, Matcher, Pattern, pattern} from "../../../src/javascript";
 
 describe('templating basics', () => {
     describe('match', () => {
@@ -45,34 +45,6 @@ describe('templating basics', () => {
         test('getAll returns empty map initially', () => {
             const m = pattern`${capture()} + ${capture()}`.matcher({} as any);
             expect(m.getAll().size).toBe(0);
-        });
-    });
-
-    describe('API comparison', () => {
-        test('both rewrite and replace APIs are available', () => {
-            // Old API
-            const oldRule = rewrite(() => {
-                const left = capture();
-                const right = capture();
-                return {
-                    before: pattern`${left} + ${right}`,
-                    after: template`${right} + ${left}`
-                };
-            });
-
-            // New API  
-            const newRule = rewrite(() => {
-                const left = capture(), right = capture();
-                return {
-                    before: pattern`${left} + ${right}`,
-                    after: template`${right} + ${left}`
-                };
-            });
-
-            expect(oldRule).toBeDefined();
-            expect(newRule).toBeDefined();
-            expect(typeof oldRule.tryOn).toBe('function');
-            expect(typeof newRule.tryOn).toBe('function');
         });
     });
 });
