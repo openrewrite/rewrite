@@ -70,7 +70,6 @@ public class UnfoldProperties extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<JsonPathMatcher> exclusionMatchers = exclusions.stream().map(JsonPathMatcher::new).collect(toList());
-        List<JsonPathMatcher> applyToMatchers = applyTo.stream().map(JsonPathMatcher::new).collect(toList());
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
@@ -152,13 +151,10 @@ public class UnfoldProperties extends Recipe {
                     i++;
                 }
 
-                if (!applyToMatchers.isEmpty()) {
-                    for (String in : applyTo) {
-                        if (!matches(key, in, parentKey).isEmpty()) {
-                            return result;
-                        }
+                if (!applyTo.isEmpty()) {
+                    if (applyTo.stream().allMatch(in -> matches(key, in, parentKey).isEmpty())) {
+                        return emptyList();
                     }
-                    return emptyList();
                 }
 
                 return result;
