@@ -422,7 +422,7 @@ class UnfoldPropertiesTest implements RewriteTest {
     void applyToWithExclusion() {
         rewriteRun(
           spec -> spec.recipe(new UnfoldProperties(
-            List.of("$..[logging.level][?(@property.match(/springframework.*/))]"),
+            List.of("$..[logging.level][?(@property.match(/.*springframework.*/))]"),
             List.of("$..[?(@property.match(/logging.*/))]", "$..[logging.level][?(@property.match(/.*/))]")
           )),
           yaml(
