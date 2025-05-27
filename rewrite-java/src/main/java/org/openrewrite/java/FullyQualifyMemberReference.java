@@ -38,13 +38,13 @@ public class FullyQualifyMemberReference<P> extends JavaVisitor<P> {
     @Override
     public J visitMethodInvocation(J.MethodInvocation methodInvocation, P p) {
         J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(methodInvocation, p);
-        if (!(memberToFullyQualify instanceof JavaType.Method) || methodInvocation.getSelect() != null
-                || methodInvocation.getMethodType() == null) {
+        if (!(memberToFullyQualify instanceof JavaType.Method) || methodInvocation.getSelect() != null ||
+                methodInvocation.getMethodType() == null) {
             return mi;
         }
         JavaType.Method m = (JavaType.Method) memberToFullyQualify;
-        if (m.getName().equals(methodInvocation.getMethodType().getName())
-                && m.getDeclaringType().getFullyQualifiedName().equals(methodInvocation.getMethodType().getDeclaringType().getFullyQualifiedName())) {
+        if (m.getName().equals(methodInvocation.getMethodType().getName()) &&
+                m.getDeclaringType().getFullyQualifiedName().equals(methodInvocation.getMethodType().getDeclaringType().getFullyQualifiedName())) {
             return mi.withSelect(toIdentifier(m.getDeclaringType()));
         }
         return mi;
@@ -64,8 +64,8 @@ public class FullyQualifyMemberReference<P> extends JavaVisitor<P> {
             return super.visitIdentifier(identifier, p);
         }
 
-        if (memberToFullyQualifyOwner.getFullyQualifiedName().equals(identifierOwner.getFullyQualifiedName())
-                && memberToFullyQualify.getName().equals(identifier.getSimpleName())) {
+        if (memberToFullyQualifyOwner.getFullyQualifiedName().equals(identifierOwner.getFullyQualifiedName()) &&
+                memberToFullyQualify.getName().equals(identifier.getSimpleName())) {
             return toFieldAccess(memberToFullyQualify, identifier);
         }
         return super.visitIdentifier(identifier, p);

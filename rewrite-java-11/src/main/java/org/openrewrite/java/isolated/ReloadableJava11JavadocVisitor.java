@@ -289,6 +289,8 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
             if (docTree instanceof DCTree.DCText) {
                 body.addAll(visitText(((DCTree.DCText) docTree).getBody()));
+            } else if (docTree instanceof DCTree.DCComment) {
+                body.addAll(visitText(((DCTree.DCComment) docTree).getBody()));
             } else {
                 body.add((Javadoc) scan(docTree, body));
             }
@@ -1223,6 +1225,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
             NameTree id = (NameTree) javaVisitor.scan(node.getType(), Space.EMPTY);
             List<JRightPadded<Expression>> expressions = new ArrayList<>(node.getTypeArguments().size());
+            String spaceBeforeTypeParams = whitespaceBeforeAsString();
             cursor += 1; // skip '<', JavaDocVisitor does not interpret List <Integer> as Parameterized.
             int argsSize = node.getTypeArguments().size();
             for (int i = 0; i < argsSize; i++) {
@@ -1237,7 +1240,9 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 expression = expression.withAfter(after);
                 expressions.add(expression);
             }
-            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions), typeMapping.type(node));
+            JContainer<Expression> typeArgs = JContainer.build(expressions)
+                    .withBefore(Space.build(spaceBeforeTypeParams, emptyList()));
+            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, typeArgs, typeMapping.type(node));
         }
     }
 }

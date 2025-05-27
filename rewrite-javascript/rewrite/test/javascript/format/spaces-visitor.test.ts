@@ -14,34 +14,28 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../../src/javascript";
-import {AutoformatVisitor} from "../../../src/javascript/format";
+import {BlankLinesStyle, IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../../src/javascript";
+import {AutoformatVisitor, SpacesVisitor} from "../../../src/javascript/format";
 import {Draft, produce} from "immer";
 import {MarkersKind, NamedStyles, randomId, Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
 
-function spaces(customizer: StyleCustomizer<SpacesStyle>): NamedStyles {
-    return {
-        displayName: "", name: "", tags: [],
-        kind: MarkersKind.NamedStyles,
-        id: randomId(),
-        styles: [produce(IntelliJ.TypeScript.spaces(), customizer)]
-    }
+function spaces(customizer: StyleCustomizer<SpacesStyle>): SpacesStyle {
+    return produce(IntelliJ.TypeScript.spaces(), draft => customizer(draft));
 }
 
 describe('SpacesVisitor', () => {
     const spec = new RecipeSpec()
-    spec.recipe = fromVisitor(new AutoformatVisitor());
 
     test('space before function declaration parentheses', () => {
-        let styles = spaces(draft => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
             draft.beforeParentheses.functionDeclarationParentheses = true;
-        });
-        return spec.rewriteRun({
+        })));
+        return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            ...typescript(`
+            typescript(`
                     interface K {
                         m(): number;
                     }
@@ -50,9 +44,118 @@ describe('SpacesVisitor', () => {
                     interface K {
                         m (): number;
                     }
-                `),
+                `)
             // @formatter:on
-            parser: _ => new JavaScriptParser({styles: [styles]})
-        })
+        )
     });
+
+    test('spaces after export or import', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                export{MyPreciousClass} from'./my-precious-class';
+                export type{MyOtherClass} from'./my-other-class';
+                import{delta,gamma,zeta}from'delta.js';
+                import{b}from'qux.js';
+                import*as foo from'foo.js';
+                import a from'baz.js';
+                import'module-without-export.js';
+                import type{Models} from'../models';
+                `,
+                `
+                export {MyPreciousClass} from './my-precious-class';
+                export type {MyOtherClass} from './my-other-class';
+                import {delta, gamma, zeta} from 'delta.js';
+                import {b} from 'qux.js';
+                import * as foo from 'foo.js';
+                import a from 'baz.js';
+                import 'module-without-export.js';
+                import type {Models} from '../models';
+                `
+                // @formatter:on
+            ));
+    });
+
+    test('ES6 Import Export braces', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.within.es6ImportExportBraces = true;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                export{MyPreciousClass} from'./my-precious-class';
+                import{delta,gamma,zeta}from'delta.js';
+                import no from 'change.js';
+                `,
+                `
+                export { MyPreciousClass } from './my-precious-class';
+                import { delta, gamma, zeta } from 'delta.js';
+                import no from 'change.js';
+                `
+                // @formatter:on
+            ));
+    });
+
+    test('await', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                async function fetchData(): Promise<string> {
+                    const response = await fetch('https://api.example.com/data');
+                    return response.json().name;
+                }
+                `
+                // @formatter:on
+            ));
+    });
+
+    test('types', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            type Values={
+                [key:string]:string;
+            }
+            `,
+                `
+            type Values = {
+                [key: string]: string;
+            }
+            `)
+            // @formatter:on
+        )});
+
+    test('space around assignment operator: true', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.aroundOperators.assignment = true;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`const x=3; class A {m() { this.x=4; }}`,
+                `const x = 3; class A {m() { this.x = 4; }}`)
+            // @formatter:on
+        )});
+
+    test('space around assignment operator: false', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.aroundOperators.assignment = false;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`const x = 3; class A {m() { this.x = 4; }}`,
+                `const x=3; class A {m() { this.x=4; }}`)
+            // @formatter:on
+        )});
 });

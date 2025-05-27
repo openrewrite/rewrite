@@ -24,11 +24,16 @@ describe('AutoformatVisitor', () => {
 
     test('everything', () => {
         return spec.rewriteRun(
+            // TODO there should be no newline after the default case in switch
             // @formatter:off
             //language=typescript
             typescript(`
-                    class K{
+                     type T1=string;
+                     export   type   T2   =   string;
+                    abstract class L {}
+                    class K extends L{
                         constructor  ( ){
+                            super();
                         }
                         m ( x :number  ,  y  :  number[] ) :number{
                             this.m( x, [1] );
@@ -63,19 +68,31 @@ describe('AutoformatVisitor', () => {
                     }
                 `,
                 `
-                    class K {
+                    type T1 = string;
+                    export type T2 = string;
+
+                    abstract class L {
+                    }
+
+                    class K extends L {
                         constructor() {
+                            super();
                         }
+
+
                         m(x: number, y: number[]): number {
                             this.m(x, [1]);
                             return y[0];
                         }
+
+
                         s(s: string): number {
                             switch (s) {
                                 case "apple":
                                     return 1;
                                 default:
                                     return 0;
+                            
                             }
                         }
                     }
@@ -101,4 +118,36 @@ describe('AutoformatVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('types', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            type Values={[key:string]:string;}
+            `,
+            `
+            type Values = {
+                [key: string]: string;
+            }
+            `)
+            // @formatter:on
+        )});
+
+    test('a statement following an if', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            if (1>0) {
+            }
+            let i = 1;
+            `,
+            `
+            if (1 > 0) {
+            }
+            let i = 1;
+            `)
+            // @formatter:on
+        )});
 });
