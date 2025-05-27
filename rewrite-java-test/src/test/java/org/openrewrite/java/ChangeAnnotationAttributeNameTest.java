@@ -102,6 +102,30 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
     }
 
     @Test
+    void collapseImplicitValueAttributeWithEmpty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeAnnotationAttributeName("java.lang.SuppressWarnings", "value", "description")),
+          //language=java
+          java(
+            """
+              @SuppressWarnings()
+              class A {
+                  @SuppressWarnings
+                  void blah() {}
+              }
+              """,
+            """
+              @SuppressWarnings
+              class A {
+                  @SuppressWarnings
+                  void blah() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void rewriteEnumValue() {
         rewriteRun(
           spec -> spec.recipe(new ChangeAnnotationAttributeName("org.example.Foo", "value", "bar")),
