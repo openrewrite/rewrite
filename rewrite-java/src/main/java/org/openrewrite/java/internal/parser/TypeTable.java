@@ -45,7 +45,7 @@ import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static org.objectweb.asm.ClassReader.SKIP_CODE;
+import static org.objectweb.asm.ClassReader.SKIP_DEBUG;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
@@ -68,6 +68,7 @@ import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
  *     <li>parameterNames</li>
  *     <li>exceptions[]</li>
  *     <li>annotations[]</li>
+ *     <li>annotationDefaultValue</li>
  * </ul>
  * <p>
  * Descriptor and signature are in <a href="https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.3">JVMS 4.3</a> format.
@@ -211,7 +212,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         fields[5].isEmpty() ? null : fields[5],
                                         fields[6].isEmpty() ? null : fields[6],
                                         fields[7].isEmpty() ? null : fields[7].split("\\|"),
-                                        fields.length > 14 && !fields[14].isEmpty() ? fields[14].split("\\|") : null
+                                        fields.length > 14 && !fields[14].isEmpty() ? fields[14].split("\\|") : null,
+                                        fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null
                                 ));
                         int lastIndexOf$ = className.lastIndexOf('$');
                         if (lastIndexOf$ != -1) {
@@ -229,7 +231,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     fields[11].isEmpty() ? null : fields[11],
                                     fields[12].isEmpty() ? null : fields[12].split("\\|"),
                                     fields[13].isEmpty() ? null : fields[13].split("\\|"),
-                                    fields.length > 14 && !fields[14].isEmpty() ? fields[14].split("\\|") : null
+                                    fields.length > 14 && !fields[14].isEmpty() ? fields[14].split("\\|") : null,
+                                    fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null
                             ));
                         }
                     }
@@ -297,6 +300,14 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             member.getSignature(),
                                             member.getExceptions()
                                     );
+
+                            // Apply annotations to the method
+                            if (member.getAnnotations() != null) {
+                                for (String annotation : member.getAnnotations()) {
+                                    AnnotationApplier.applyAnnotation(annotation, mv::visitAnnotation);
+                                }
+                            }
+
                             String[] parameterNames = member.getParameterNames();
                             if (parameterNames != null) {
                                 for (String parameterName : parameterNames) {
@@ -304,10 +315,24 @@ public class TypeTable implements JavaParserClasspathLoader {
                                 }
                             }
 
-                            // Apply annotations to the method
-                            if (member.getAnnotations() != null) {
-                                for (String annotation : member.getAnnotations()) {
-                                    AnnotationApplier.applyAnnotation(annotation, mv::visitAnnotation);
+                            if (member.getAnnotationDefaultValue() != null) {
+                                AnnotationVisitor annotationDefaultVisitor = mv.visitAnnotationDefault();
+                                if (annotationDefaultVisitor != null) {
+                                    Object value = AnnotationDeserializer.parseValue(member.getAnnotationDefaultValue());
+                                    if (value.getClass().isArray()) {
+                                        for (Object v : ((Object[]) value)) {
+                                            annotationDefaultVisitor.visit(null, v);
+                                        }
+                                    } else if (value instanceof AnnotationDeserializer.ClassConstant) {
+                                        annotationDefaultVisitor.visit(null, Type.getType("L" + ((AnnotationDeserializer.ClassConstant) value).getClassName().replace('.', '/') + ';'));
+                                    } else if (value instanceof AnnotationDeserializer.EnumConstant) {
+                                        annotationDefaultVisitor.visit(null, Type.getType(((AnnotationDeserializer.ClassConstant) value).getClassName()));
+                                    } else if (value instanceof AnnotationDeserializer.FieldConstant) {
+                                        annotationDefaultVisitor.visit(null, Type.getType(((AnnotationDeserializer.ClassConstant) value).getClassName()));
+                                    } else {
+                                        annotationDefaultVisitor.visit(null, value);
+                                    }
+                                    annotationDefaultVisitor.visitEnd();
                                 }
                             }
 
@@ -341,7 +366,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                     }
                 });
                 future.complete(classesDir);
-            } catch (Exception e) {
+            } catch (
+                    Exception e) {
                 future.completeExceptionally(e);
             }
         }
@@ -449,7 +475,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         public Writer(OutputStream out) throws IOException {
             this.deflater = new GZIPOutputStream(out);
             this.out = new PrintStream(deflater);
-            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\tannotations");
+            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\tannotations\tannotationDefaultValue");
         }
 
         public Jar jar(String groupId, String artifactId, String version) {
@@ -460,6 +486,25 @@ public class TypeTable implements JavaParserClasspathLoader {
         public void close() throws IOException {
             deflater.flush();
             out.close();
+        }
+
+        private static String convertAnnotationValueToString(Object value) {
+            if (value == null) {
+                return "null";
+            } else if (value instanceof String) {
+                return "\"" + value.toString().replace("\"", "\\\"") + "\"";
+            } else if (value instanceof Type) {
+                return ((Type) value).getClassName() + ".class";
+            } else if (value.getClass().isArray()) {
+                Object[] array = (Object[]) value;
+                List<String> elements = new ArrayList<>(array.length);
+                for (Object element : array) {
+                    elements.add(convertAnnotationValueToString(element));
+                }
+                return "{" + String.join(",", elements) + "}";
+            } else {
+                return value.toString();
+            }
         }
 
         @Value
@@ -553,6 +598,39 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                 }
 
                                                 @Override
+                                                public AnnotationVisitor visitAnnotationDefault() {
+                                                    // Collect default values for annotation methods
+                                                    return new AnnotationVisitor(Opcodes.ASM9) {
+                                                        @Override
+                                                        public void visit(String name, Object value) {
+                                                            member.annotationDefaultValue.add(convertAnnotationValueToString(value));
+                                                        }
+
+                                                        @Override
+                                                        public AnnotationVisitor visitArray(String name) {
+                                                            return new AnnotationVisitor(Opcodes.ASM9) {
+                                                                final List<String> arrayValues = new ArrayList<>();
+
+                                                                @Override
+                                                                public void visit(String name, Object value) {
+                                                                    arrayValues.add(convertAnnotationValueToString(value));
+                                                                }
+
+                                                                @Override
+                                                                public void visitEnd() {
+                                                                    member.annotationDefaultValue.add("{" + String.join(",", arrayValues) + "}");
+                                                                }
+                                                            };
+                                                        }
+
+                                                        @Override
+                                                        public void visitEnum(String name, String descriptor, String value) {
+                                                            member.annotationDefaultValue.add(descriptor + "." + value);
+                                                        }
+                                                    };
+                                                }
+
+                                                @Override
                                                 public void visitEnd() {
                                                     classDefinition.addMethod(member);
                                                 }
@@ -568,7 +646,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             classDefinition.writeClass();
                                         }
                                     }
-                                }, SKIP_CODE);
+                                }, SKIP_DEBUG);
                             }
                         }
                     }
@@ -598,14 +676,15 @@ public class TypeTable implements JavaParserClasspathLoader {
             public void writeClass() {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & classAccess) == 0) {
                     out.printf(
-                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s%n",
+                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
                             classAccess, className,
                             classSignature == null ? "" : classSignature,
                             classSuperclassName,
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
                             -1, "", "", "", "", "",
-                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations));
+                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations),
+                            ""); // Empty annotation default values for class row
 
                     for (Writer.Member member : members) {
                         member.writeMember(jar, this);
@@ -634,11 +713,12 @@ public class TypeTable implements JavaParserClasspathLoader {
             String @Nullable [] exceptions;
             List<String> parameterNames = new ArrayList<>(4);
             List<String> annotations = new ArrayList<>(4);
+            List<String> annotationDefaultValue = new ArrayList<>(4);
 
             private void writeMember(Jar jar, ClassDefinition classDefinition) {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
                     out.printf(
-                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s%n",
+                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
                             classDefinition.classAccess, classDefinition.className,
                             classDefinition.classSignature == null ? "" : classDefinition.classSignature,
@@ -648,7 +728,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                             signature == null ? "" : signature,
                             parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
-                            annotations.isEmpty() ? "" : String.join("|", annotations)
+                            annotations.isEmpty() ? "" : String.join("|", annotations),
+                            annotationDefaultValue.isEmpty() ? "" : String.join("|", annotationDefaultValue)
                     );
                 }
             }
@@ -677,6 +758,9 @@ public class TypeTable implements JavaParserClasspathLoader {
         String @Nullable [] superinterfaceSignatures;
 
         String @Nullable [] annotations;
+
+        @Nullable
+        String annotationDefaultValue;
 
         @NonFinal
         @Nullable
@@ -708,5 +792,8 @@ public class TypeTable implements JavaParserClasspathLoader {
         String @Nullable [] parameterNames;
         String @Nullable [] exceptions;
         String @Nullable [] annotations;
+
+        @Nullable
+        String annotationDefaultValue;
     }
 }

@@ -24,6 +24,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParserExecutionContextView;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 
@@ -129,13 +130,13 @@ class TypeTableTest implements RewriteTest {
               import org.junit.jupiter.api.Assertions;
               import org.junit.jupiter.api.BeforeEach;
               import org.junit.jupiter.api.Test;
-
+              
               class Test {
-
+              
                   @BeforeEach
                   void before() {
                   }
-
+              
                   @Test
                   void foo() {
                       Assertions.assertTrue(true);
@@ -148,13 +149,13 @@ class TypeTableTest implements RewriteTest {
 
     @Test
     void writeReadWithAnnotations() throws IOException, URISyntaxException {
-        URL resource = TypeTableTest.class.getClassLoader().getResource("smallrye-common-annotation-2.2.0.jar");
+        URL resource = TypeTableTest.class.getClassLoader().getResource("jakarta.validation-api-3.1.1.jar");
         try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
             writeJar(Path.of(resource.toURI()), writer);
         }
 
-        TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("smallrye-common-annotation"));
-        Path classesDir = table.load("smallrye-common-annotation");
+        TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("jakarta.validation-api"));
+        Path classesDir = table.load("jakarta.validation-api");
         assertThat(classesDir).isNotNull();
 
         // Test that we can use the annotations in code
@@ -163,19 +164,23 @@ class TypeTableTest implements RewriteTest {
             .classpath(List.of(classesDir))),
           java(
             """
-              import io.smallrye.common.annotation.Blocking;
-
-              @Blocking
+              import jakarta.validation.constraints.AssertFalse;
+              
               class AnnotatedTest {
+                  @AssertFalse
+                  int i;
               }
               """,
             spec -> spec.afterRecipe(cu -> {
                 // Assert that the JavaType.Class has the annotation
-                cu.getClasses().forEach(classDecl -> {
-                    JavaType.Class annotationType = (JavaType.Class) classDecl.getLeadingAnnotations().get(0).getType();
-                    assertThat(annotationType).isNotNull();
-                    assertThat(annotationType.getAnnotations()).isNotEmpty();
-                });
+                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                JavaType.Class assertFalseType = (JavaType.Class) field.getLeadingAnnotations().get(0).getType();
+                assertThat(assertFalseType).isNotNull();
+                assertThat(assertFalseType.getFullyQualifiedName()).isEqualTo("jakarta.validation.constraints.AssertFalse");
+                assertThat(assertFalseType.getAnnotations().size()).isEqualTo(5);
+                assertThat(assertFalseType.getMethods().stream().filter(m -> m.getName().equals("message"))).satisfiesExactly(
+                  m -> assertThat(m.getDefaultValue()).containsExactly("{jakarta.validation.constraints.AssertFalse.message}")
+                );
             })
           )
         );
