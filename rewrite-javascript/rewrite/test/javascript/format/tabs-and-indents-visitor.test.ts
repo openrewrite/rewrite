@@ -217,4 +217,26 @@ describe('TabsAndIndentsVisitor', () => {
             // @formatter:on
         )
     })
+
+    test("type", () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                type Message = {
+                [key: string]: any;
+                }
+                `,
+                `
+                type Message = {
+                    [key: string]: any;
+                }
+                `)
+            // @formatter:on
+        )
+    })
 });

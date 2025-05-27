@@ -170,9 +170,7 @@ class JavaScriptParserTest {
         });
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu -> {
-            assertThat(cu.printAll()).isEqualTo(input.getSource(new InMemoryExecutionContext()).readFully());
-//            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(typescript.get()).satisfies(cu ->
+            assertThat(cu.printAll()).isEqualTo(input.getSource(new InMemoryExecutionContext()).readFully()));
     }
 }

@@ -15,8 +15,9 @@
  */
 package org.openrewrite.kotlin.internal.template;
 
-import java.util.Collections;
 import org.openrewrite.java.internal.template.Substitutions;
+
+import java.util.Collections;
 
 public class KotlinSubstitutions extends Substitutions {
     public KotlinSubstitutions(String code, Object[] parameters) {
