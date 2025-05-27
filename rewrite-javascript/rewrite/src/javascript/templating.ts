@@ -89,20 +89,14 @@ export class Pattern {
     }
 }
 
-export class MatchResult {
+export class MatchResult implements Pick<Map<string, J>, "get"> {
     constructor(
         private readonly bindings: Map<string, J> = new Map()
     ) {}
 
-    // Convenience methods
     get(capture: Capture | string): J | undefined {
         const name = typeof capture === "string" ? capture : capture.name;
         return this.bindings.get(name);
-    }
-
-    has(capture: Capture | string): boolean {
-        const name = typeof capture === "string" ? capture : capture.name;
-        return this.bindings.has(name);
     }
 }
 
@@ -225,13 +219,13 @@ export function pattern(strings: TemplateStringsArray, ...captures: (Capture | s
     return new Pattern(strings, captures.map(c => capturesByName.get(typeof c === "string" ? c : c.name)!));
 }
 
-export type JavaCoordinates = {
-    tree: Tree;
+type JavaCoordinates = {
+    tree?: Tree;
     loc?: JavaCoordinates.Location;
     mode?: JavaCoordinates.Mode;
 };
 
-export namespace JavaCoordinates {
+namespace JavaCoordinates {
     // FIXME need to come up with the equivalent of `Space.Location` support
     export type Location = 'EXPRESSION_PREFIX' | 'STATEMENT_PREFIX' | 'BLOCK_END';
 
@@ -278,15 +272,18 @@ export class Template {
     }
 
     /**
-     * Applies the template to generate an AST node.
+     * Applies this template and returns the resulting tree.
      *
      * @param cursor The cursor pointing to the current location in the AST
-     * @param coordinates The coordinates specifying where and how to insert the generated AST
-     * @param parameters
+     * @param tree Input tree
+     * @param values values for parameters in template
      * @returns A Promise resolving to the generated AST node
      */
-    async apply(cursor: Cursor, coordinates: JavaCoordinates, parameters?: Pick<Map<string, J>, 'get'>): Promise<J | undefined> {
-        return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, coordinates, parameters);
+    async apply(cursor: Cursor, tree: J, values?: Pick<Map<string, J>, 'get'>): Promise<J | undefined> {
+        return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, {
+            tree,
+            mode: JavaCoordinates.Mode.Replace
+        }, values);
     }
 }
 
@@ -604,9 +601,9 @@ class TemplateApplier {
         const {tree} = this.coordinates;
 
         // Create a copy of the AST with the prefix from the target
-        return produce(this.ast, draft => {
+        return tree ? produce(this.ast, draft => {
             draft.prefix = (tree as J).prefix;
-        });
+        }) : this.ast;
     }
 
     /**
@@ -615,8 +612,12 @@ class TemplateApplier {
      * @returns A Promise resolving to the modified AST
      */
     private async applyToStatement(): Promise<J | undefined> {
-        // Not implemented yet
-        return this.ast;
+        const {tree} = this.coordinates;
+
+        // Create a copy of the AST with the prefix from the target
+        return produce(this.ast, draft => {
+            draft.prefix = (tree as J).prefix;
+        });
     }
 
     /**
@@ -625,8 +626,12 @@ class TemplateApplier {
      * @returns A Promise resolving to the modified AST
      */
     private async applyToBlock(): Promise<J | undefined> {
-        // Not implemented yet
-        return this.ast;
+        const {tree} = this.coordinates;
+
+        // Create a copy of the AST with the prefix from the target
+        return produce(this.ast, draft => {
+            draft.prefix = (tree as J).prefix;
+        });
     }
 }
 
@@ -727,12 +732,12 @@ class RewriteRuleImpl implements RewriteRule {
     ) {
     }
 
-    async tryOn(node: J, cursor: Cursor, coordinates?: JavaCoordinates): Promise<J | undefined> {
+    async tryOn(node: J, cursor: Cursor): Promise<J | undefined> {
         for (const pattern of this.before) {
             const match = await pattern.match(node);
 
             if (match) {
-                const result = await this.after.apply(cursor, coordinates || {tree: node}, match);
+                const result = await this.after.apply(cursor, node, match);
                 if (result) {
                     return result;
                 }

@@ -16,7 +16,6 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
     capture,
-    JavaCoordinates,
     JavaScriptVisitor,
     pattern,
     rewrite,
@@ -25,7 +24,6 @@ import {
 } from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {createDraft, produce} from "immer";
-import Mode = JavaCoordinates.Mode;
 
 describe('match extraction', () => {
     const spec = new RecipeSpec();
@@ -70,7 +68,7 @@ describe('match extraction', () => {
                 // Create a pattern that matches "a + b" using the capture objects
                 const m = await pattern`${left} + ${right}`.match(binary);
                 if (m) {
-                    return await template`${right} + ${left}`.apply(this.cursor, {tree: binary}, m);
+                    return await template`${right} + ${left}`.apply(this.cursor, binary, m);
                 }
                 return binary;
             }
