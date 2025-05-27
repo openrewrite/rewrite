@@ -3428,9 +3428,8 @@ export class JavaScriptParserVisitor {
             afterName: attrs.length === 0 ?
                 this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
-            attributes: attrs.length === 0 ?
-                [] :
-                this.mapJsxChildren<Attribute | SpreadAttribute>(
+            attributes:
+                this.mapJsxAttributes<Attribute | SpreadAttribute>(
                     attrs,
                     this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!),
                     () => emptyMarkers
@@ -3457,9 +3456,8 @@ export class JavaScriptParserVisitor {
             afterName: attrs.length === 0 ?
                 this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
-            attributes: attrs.length === 0 ?
-                [] :
-                this.mapJsxChildren<Attribute | SpreadAttribute>(
+            attributes:
+                this.mapJsxAttributes<Attribute | SpreadAttribute>(
                     attrs,
                     this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!),
                     () => emptyMarkers
@@ -4070,6 +4068,25 @@ export class JavaScriptParserVisitor {
             }
         }
         return args;
+    }
+
+    private mapJsxAttributes<T extends J>(elementList: readonly ts.Node[], lastAfter: J.Space, markers?: (ns: readonly ts.Node[], i: number) => Markers): J.RightPadded<T>[] {
+        let childCount = elementList.length;
+        if (childCount === 0) {
+            return [];
+        } else {
+            const args: J.RightPadded<T>[] = [];
+            for (let i = 0; i < childCount; i++) {
+                const node = elementList[i];
+                const isLast = i === childCount - 1;
+                args.push(this.rightPadded(
+                    this.visit(node),
+                    isLast ? lastAfter : emptySpace,
+                    markers ? markers(elementList, i) : emptyMarkers
+                ));
+            }
+            return args;
+        }
     }
 
     private mapDecorators(node: ts.ClassDeclaration | ts.FunctionDeclaration | ts.MethodDeclaration | ts.ConstructorDeclaration | ts.ParameterDeclaration | ts.PropertyDeclaration | ts.SetAccessorDeclaration | ts.GetAccessorDeclaration | ts.ClassExpression): J.Annotation[] {
