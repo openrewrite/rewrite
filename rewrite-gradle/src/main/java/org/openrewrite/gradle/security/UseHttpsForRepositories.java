@@ -15,10 +15,7 @@
  */
 package org.openrewrite.gradle.security;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.groovy.tree.G;
@@ -28,11 +25,15 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.tree.K;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.singleton;
 
 public class UseHttpsForRepositories extends Recipe {
+
+    public static final List<String> PARENT_METHOD_INVOCATIONS = Arrays.asList("repositories", "maven");
 
     @Override
     public String getDisplayName() {
@@ -68,9 +69,10 @@ public class UseHttpsForRepositories extends Recipe {
             }
 
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (method.getSimpleName().equals("url") || method.getSimpleName().equals("uri")) {
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, ExecutionContext ctx) {
+                if (PARENT_METHOD_INVOCATIONS.contains(m.getSimpleName())) {
+                    return super.visitMethodInvocation(m, ctx);
+                } else if (m.getSimpleName().equals("url") || m.getSimpleName().equals("uri")) {
                     m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                         if (arg instanceof J.Literal) {
                             return fixupLiteralIfNeeded((J.Literal) arg);
