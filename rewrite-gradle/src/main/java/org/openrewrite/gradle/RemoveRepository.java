@@ -21,6 +21,8 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveRepository extends Recipe {
@@ -41,15 +43,15 @@ public class RemoveRepository extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        //MethodMatcher repositories = new MethodMatcher("org.gradle.api.artifacts.dsl.RepositoryHandler " + repository + "()");
         return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
-
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                // TODO check for repositories {} block
                 if (method.getSimpleName().equals("jcenter")) {
-                    //noinspection ConstantConditions
-                    return null;
+                    try {
+                        getCursor()
+                            .dropParentUntil(e -> e instanceof J.MethodInvocation && ((J.MethodInvocation) e).getSimpleName().equals("repositories"));
+                        return null;
+                    } catch (Exception ignored) {}
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
