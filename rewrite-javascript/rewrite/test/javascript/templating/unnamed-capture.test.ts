@@ -25,9 +25,9 @@ describe('unnamed capture', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
 
-                let m = pattern`${"obj"} === null || ${"obj"} === undefined ? ${"defaultValue"} : ${"obj"}.${"property"}`
-                    .matcher(ternary);
-                if (await m.matches()) {
+                let m = await pattern`${"obj"} === null || ${"obj"} === undefined ? ${"defaultValue"} : ${"obj"}.${"property"}`
+                    .match(ternary);
+                if (m) {
                     return await template`${"obj"}?.${"property"} ?? ${"defaultValue"}`.apply(this.cursor, {tree: ternary}, m);
                 }
 

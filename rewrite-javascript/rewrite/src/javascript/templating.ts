@@ -82,15 +82,34 @@ export class Pattern {
      * @param ast The AST node to match against
      * @returns A Matcher object
      */
-    matcher(ast: J): Matcher {
-        return new Matcher(this, ast);
+    async match(ast: J): Promise<MatchResult | undefined> {
+        const matcher = new Matcher(this, ast);
+        const success = await matcher.matches();
+        return success ? new MatchResult(matcher.getAll()) : undefined;
+    }
+}
+
+export class MatchResult {
+    constructor(
+        private readonly bindings: Map<string, J> = new Map()
+    ) {}
+
+    // Convenience methods
+    get(capture: Capture | string): J | undefined {
+        const name = typeof capture === "string" ? capture : capture.name;
+        return this.bindings.get(name);
+    }
+
+    has(capture: Capture | string): boolean {
+        const name = typeof capture === "string" ? capture : capture.name;
+        return this.bindings.has(name);
     }
 }
 
 /**
  * Matcher for checking if a pattern matches an AST node and extracting captured nodes.
  */
-export class Matcher implements Pick<Map<string, J>, 'get' | 'has'> {
+class Matcher implements Pick<Map<string, J>, 'get' | 'has'> {
     private readonly bindings = new Map<string, J>();
     private patternAst?: J;
     private templateProcessor?: TemplateProcessor;
@@ -320,7 +339,7 @@ class TemplateEngine {
      * @param parameters The parameters between the string parts
      * @param cursor The cursor pointing to the current location in the AST
      * @param coordinates The coordinates specifying where and how to insert the generated AST
-     * @param matchResults Map of capture names to matched AST nodes
+     * @param values Map of capture names to values to replace the parameters with
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplate(
@@ -328,7 +347,7 @@ class TemplateEngine {
         parameters: Parameter[],
         cursor: Cursor,
         coordinates: JavaCoordinates,
-        matchResults: Pick<Map<string, J>, 'get'> = new Map()
+        values: Pick<Map<string, J>, 'get'> = new Map()
     ): Promise<J | undefined> {
         // Build the template string with parameter placeholders
         const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
@@ -358,11 +377,11 @@ class TemplateEngine {
         const substitutions = new Map<string, Parameter>();
         for (let i = 0; i < parameters.length; i++) {
             const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
-            substitutions.set(placeholder, typeof parameters[i].value === 'string' ? {value: matchResults.get(parameters[i].value) || parameters[i].value} : parameters[i]);
+            substitutions.set(placeholder, typeof parameters[i].value === 'string' ? {value: values.get(parameters[i].value) || parameters[i].value} : parameters[i]);
         }
 
         // Unsubstitute placeholders with actual parameter values and match results
-        const visitor = new PlaceholderReplacementVisitor(substitutions, matchResults);
+        const visitor = new PlaceholderReplacementVisitor(substitutions, values);
         const unsubstitutedAst = (await visitor.visit(ast, null))!;
 
         // Apply the template to the current AST
@@ -464,7 +483,7 @@ class PlaceholderUtils {
 class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
     constructor(
         private readonly substitutions: Map<string, Parameter>,
-        private readonly matchResults: Pick<Map<string, J>, 'get'> = new Map()
+        private readonly values: Pick<Map<string, J>, 'get'> = new Map()
     ) {
         super();
     }
@@ -520,7 +539,7 @@ class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
 
         // If the parameter value is a Capture, look up the matched result
         if (param.value instanceof CaptureImpl) {
-            const matchedNode = this.matchResults.get(param.value.name);
+            const matchedNode = this.values.get(param.value.name);
             if (matchedNode) {
                 return produce(matchedNode, draft => {
                     draft.markers = placeholder.markers;
@@ -726,10 +745,10 @@ class RewriteRuleImpl implements RewriteRule {
 
     async tryOn(node: J, cursor: Cursor, coordinates?: JavaCoordinates): Promise<J | undefined> {
         for (const pattern of this.before) {
-            const matcher = pattern.matcher(node);
+            const match = await pattern.match(node);
 
-            if (await matcher.matches()) {
-                const result = await this.after.apply(cursor, coordinates || {tree: node}, matcher.getAll());
+            if (match) {
+                const result = await this.after.apply(cursor, coordinates || {tree: node}, match);
                 if (result) {
                     return result;
                 }

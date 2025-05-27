@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, Matcher, Pattern, pattern} from "../../../src/javascript";
+import {capture, Pattern, pattern} from "../../../src/javascript";
 
 describe('templating basics', () => {
     describe('match', () => {
@@ -29,22 +29,10 @@ describe('templating basics', () => {
         });
     });
 
-    describe('Pattern', () => {
-        test('against returns a Matcher', () => {
-            const m = pattern`${capture()} + ${capture()}`.matcher({} as any);
-            expect(m).toBeInstanceOf(Matcher);
-        });
-    });
-
     describe('Matcher', () => {
         test('matches returns false in initial implementation', async () => {
-            const m = pattern`${capture()} + ${capture()}`.matcher({} as any);
-            expect(await m.matches()).toBe(false);
-        });
-
-        test('getAll returns empty map initially', () => {
-            const m = pattern`${capture()} + ${capture()}`.matcher({} as any);
-            expect(m.getAll().size).toBe(0);
+            const m = await pattern`${capture()} + ${capture()}`.match({} as any);
+            expect(m).toBeFalsy();
         });
     });
 });

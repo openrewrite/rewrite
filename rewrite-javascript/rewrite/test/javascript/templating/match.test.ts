@@ -38,8 +38,8 @@ describe('match extraction', () => {
                     // Create a pattern that matches "a + b"
                     let a = capture();
                     let b = capture();
-                    const m = pattern`${"left"} + ${"right"}`.matcher(binary);
-                    if (await m.matches()) {
+                    const m = await pattern`${"left"} + ${"right"}`.match(binary);
+                    if (m) {
                         // Extract the captured parts
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
@@ -68,9 +68,8 @@ describe('match extraction', () => {
                 const left = capture(), right = capture();
 
                 // Create a pattern that matches "a + b" using the capture objects
-                const m = pattern`${left} + ${right}`.matcher(binary);
-
-                if (await m.matches()) {
+                const m = await pattern`${left} + ${right}`.match(binary);
+                if (m) {
                     return await template`${right} + ${left}`.apply(this.cursor, {tree: binary}, m);
                 }
                 return binary;
@@ -110,9 +109,8 @@ describe('match extraction', () => {
                     const {left, right} = {left: capture(), right: capture()};
 
                     // Create a pattern that matches "a + b" using the capture objects
-                    const m = pattern`${left} + ${right}`.matcher(binary);
-
-                    if (await m.matches()) {
+                    const m = await pattern`${left} + ${right}`.match(binary);
+                    if (m) {
                         // Extract the captured parts
                         const leftValue = m.get(left);
                         const rightValue = m.get(right);
