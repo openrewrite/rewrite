@@ -29,7 +29,7 @@ import static org.openrewrite.groovy.Assertions.groovy;
 /**
  * Prove that {@link ChangePackage}, written for Java, can adapt to working on Groovy code.
  */
-public class ChangePackageAdaptabilityTest implements RewriteTest {
+class ChangePackageAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -54,14 +54,14 @@ public class ChangePackageAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import a.b.Original
-                          
+              
               class A {
                   Original type
               }
               """,
             """
               import x.y.Original
-                          
+              
               class A {
                   Original type
               }
@@ -117,7 +117,7 @@ public class ChangePackageAdaptabilityTest implements RewriteTest {
               """,
             spec -> spec.path("org/foo/internal/Test.groovy").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/foo/test/internal/Test.groovy");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.foo.test.internal.Test")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "org.foo.test.internal.Test")).isTrue();
             })
           )
         );
@@ -141,7 +141,7 @@ public class ChangePackageAdaptabilityTest implements RewriteTest {
               """,
             spec -> spec.path("org/foo/Test.groovy").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.groovy");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "x.y.z.Test")).isTrue();
             })
           )
         );

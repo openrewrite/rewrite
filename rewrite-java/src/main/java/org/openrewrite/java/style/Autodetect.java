@@ -18,12 +18,13 @@ package org.openrewrite.java.style;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
@@ -64,13 +65,19 @@ public class Autodetect extends NamedStyles {
         private final FindLineFormatJavaVisitor findLineFormat = new FindLineFormatJavaVisitor();
 
         public void sample(SourceFile cu) {
-            if(cu instanceof JavaSourceFile) {
-                findImportLayout.visitNonNull(cu, 0);
-                findIndent.visitNonNull(cu, indentStatistics);
-                findSpaces.visitNonNull(cu, spacesStatistics);
-                findWrappingAndBraces.visitNonNull(cu, wrappingAndBracesStatistics);
-                findLineFormat.visitNonNull(cu, generalFormatStatistics);
+            // only sample Java sources; extending languages need their own `Autodetect.Detector`
+            // and can call `sampleJava()` from their `sample()` method if that helps
+            if (cu instanceof J.CompilationUnit) {
+                sampleJava((JavaSourceFile) cu);
             }
+        }
+
+        public void sampleJava(JavaSourceFile cu) {
+            findImportLayout.visitNonNull(cu, 0);
+            findIndent.visitNonNull(cu, indentStatistics);
+            findSpaces.visitNonNull(cu, spacesStatistics);
+            findWrappingAndBraces.visitNonNull(cu, wrappingAndBracesStatistics);
+            findLineFormat.visitNonNull(cu, generalFormatStatistics);
         }
 
         public Autodetect build() {
@@ -80,6 +87,23 @@ public class Autodetect extends NamedStyles {
                     spacesStatistics.getSpacesStyle(),
                     wrappingAndBracesStatistics.getWrappingAndBracesStyle(),
                     generalFormatStatistics.getFormatStyle()));
+        }
+
+        public TabsAndIndentsStyle getTabsAndIndentsStyle() {
+            return indentStatistics.getTabsAndIndentsStyle();
+        }
+
+        public ImportLayoutStyle getImportLayoutStyle(){
+            return findImportLayout.aggregate().getImportLayoutStyle();
+        }
+        public SpacesStyle getSpacesStyle(){
+            return spacesStatistics.getSpacesStyle();
+        }
+        public WrappingAndBracesStyle getWrappingAndBracesStyle(){
+            return wrappingAndBracesStatistics.getWrappingAndBracesStyle();
+        }
+        public GeneralFormatStyle getFormatStyle(){
+            return generalFormatStatistics.getFormatStyle();
         }
     }
 
@@ -166,16 +190,10 @@ public class Autodetect extends NamedStyles {
         private int multilineAlignedToFirstArgument = 0;
         private int multilineNotAlignedToFirstArgument = 0;
 
+        @Getter
         private int depth = 0;
+        @Getter
         private int continuationDepth = 1;
-
-        public int getDepth() {
-            return depth;
-        }
-
-        public int getContinuationDepth() {
-            return continuationDepth;
-        }
 
         public void incrementDepth() {
             depth++;
@@ -421,8 +439,8 @@ public class Autodetect extends NamedStyles {
             // (newline-separated) annotations on some common target are not continuations
             boolean isContinuation = !(expression instanceof J.Annotation && !(
                     // ...but annotations which are *arguments* to other annotations can be continuations
-                    getCursor().getParentTreeCursor().getValue() instanceof J.Annotation
-                    || getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
+                    getCursor().getParentTreeCursor().getValue() instanceof J.Annotation ||
+                    getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
             ));
             countIndents(expression.getPrefix().getWhitespace(), isContinuation, stats);
 
@@ -432,6 +450,12 @@ public class Autodetect extends NamedStyles {
         @SuppressWarnings("CommentedOutCode")
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, IndentStatistics stats) {
+            for (Expression argument : m.getArguments()) {
+                if (argument instanceof J.Lambda) {
+                    visit((((J.Lambda) argument).getBody()), stats);
+                }
+            }
+
             Set<Expression> statementExpressions = getCursor().getNearestMessage("STATEMENT_EXPRESSION", emptySet());
             if (statementExpressions.contains(m)) {
                 visitStatement(m, stats);
@@ -553,7 +577,7 @@ public class Autodetect extends NamedStyles {
                         List<Integer> countOfBlocksInStaticGroups = new ArrayList<>();
 
                         for (Block block : longestBlocks) {
-                            if (BlockType.ImportStatic.equals(block.type)) {
+                            if (BlockType.ImportStatic == block.type) {
                                 staticBlocks.add(block);
                                 countOfBlocksInStaticGroups.add(0);
                                 countOfBlocksInStaticGroups.set(staticCountPos, countOfBlocksInStaticGroups.get(staticCountPos) + 1);
@@ -878,9 +902,9 @@ public class Autodetect extends NamedStyles {
             for (List<ImportAttributes> imports : importsBySourceFile) {
                 Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
 
-                importLayoutStatistics.staticAtBotCount += (imports.size() > 0 &&
+                importLayoutStatistics.staticAtBotCount += (!imports.isEmpty() &&
                                                             imports.get(imports.size() - 1).isStatic()) ? 1 : 0;
-                importLayoutStatistics.staticAtTopCount += (imports.size() > 0 &&
+                importLayoutStatistics.staticAtTopCount += (!imports.isEmpty() &&
                                                             imports.get(0).isStatic()) ? 1 : 0;
 
                 boolean staticBlock = false;
@@ -1126,7 +1150,7 @@ public class Autodetect extends NamedStyles {
         public J.Lambda visitLambda(J.Lambda lambda, SpacesStatistics stats) {
             List<J> parameters = lambda.getParameters().getParameters();
             if (parameters.size() > 1) {
-                List<JRightPadded<J>> paddedParameters = lambda.getParameters().getPadding().getParams();
+                List<JRightPadded<J>> paddedParameters = lambda.getParameters().getPadding().getParameters();
                 for (int i = 0; i < paddedParameters.size() - 1; i++) {
                     stats.beforeComma += hasSpace(paddedParameters.get(i).getAfter());
                 }

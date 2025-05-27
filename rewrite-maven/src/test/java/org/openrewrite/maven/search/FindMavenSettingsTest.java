@@ -27,7 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class FindMavenSettingsTest implements RewriteTest {
+class FindMavenSettingsTest implements RewriteTest {
 
     @SuppressWarnings("ConstantConditions")
     //language=xml

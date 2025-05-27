@@ -18,11 +18,16 @@ package org.openrewrite.json.tree;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.internal.JsonPrinter;
+import org.openrewrite.json.internal.rpc.JsonReceiver;
+import org.openrewrite.json.internal.rpc.JsonSender;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -31,7 +36,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
-public interface Json extends Tree {
+public interface Json extends Tree, RpcCodec<Json> {
 
     @SuppressWarnings("unchecked")
     @Override
@@ -39,8 +44,7 @@ public interface Json extends Tree {
         return (R) acceptJson(v.adapt(JsonVisitor.class), p);
     }
 
-    @Nullable
-    default <P> Json acceptJson(JsonVisitor<P> v, P p) {
+    default <P> @Nullable Json acceptJson(JsonVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -52,6 +56,16 @@ public interface Json extends Tree {
     Space getPrefix();
 
     <J extends Json> J withPrefix(Space prefix);
+
+    @Override
+    default void rpcSend(Json after, RpcSendQueue q) {
+        new JsonSender().visit(after, q);
+    }
+
+    @Override
+    default Json rpcReceive(Json before, RpcReceiveQueue q) {
+        return new JsonReceiver().visitNonNull(before, q);
+    }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -82,7 +96,7 @@ public interface Json extends Tree {
         }
 
         public Array withValues(List<JsonValue> values) {
-            return getPadding().withParameters(JsonRightPadded.withElements(this.values, values));
+            return getPadding().withValues(JsonRightPadded.withElements(this.values, values));
         }
 
         @Override
@@ -113,7 +127,7 @@ public interface Json extends Tree {
                 return t.values;
             }
 
-            public Array withParameters(List<JsonRightPadded<JsonValue>> values) {
+            public Array withValues(List<JsonRightPadded<JsonValue>> values) {
                 return t.values == values ? t : new Array(t.id, t.prefix, t.markers, values);
             }
         }
@@ -141,6 +155,7 @@ public interface Json extends Tree {
         Markers markers;
 
         @Nullable // for backwards compatibility
+        @Getter
         @With(AccessLevel.PRIVATE)
         String charsetName;
 
@@ -163,8 +178,9 @@ public interface Json extends Tree {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
-        public SourceFile withCharset(Charset charset) {
+        public Json.Document withCharset(Charset charset) {
             return withCharsetName(charset.name());
         }
 
@@ -246,6 +262,7 @@ public interface Json extends Tree {
 
         String source;
 
+        @Nullable // for `null` values
         Object value;
 
         @Override

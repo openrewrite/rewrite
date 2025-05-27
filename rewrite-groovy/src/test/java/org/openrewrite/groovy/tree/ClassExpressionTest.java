@@ -34,4 +34,66 @@ class ClassExpressionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void innerClassExpression() {
+        rewriteRun(
+          groovy(
+            """
+              ProcessBuilder.Redirect.to(new File("wat"))
+              """
+          )
+        );
+
+    }
+
+    @Test
+    void innerClassViaImport() {
+        rewriteRun(
+          groovy(
+            """
+              import java.lang.ProcessBuilder.Redirect
+              Redirect.to(new File("wat"))
+              """
+          )
+        );
+    }
+
+    @Test
+    void unqualified() {
+        rewriteRun(
+          groovy(
+            """
+              package foo
+              
+              interface MyEntity {
+              }
+              class Foo {
+                  void setUp() {
+                      e = MyEntity.class
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualified() {
+        rewriteRun(
+          groovy(
+            """
+              package foo
+              
+              interface MyEntity {
+              }
+              class Foo {
+                  void setUp() {
+                      e = foo.MyEntity.class
+                  }
+              }
+              """
+          )
+        );
+    }
 }

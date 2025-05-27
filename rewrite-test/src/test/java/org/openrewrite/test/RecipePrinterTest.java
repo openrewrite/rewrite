@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.CompositeRecipe;
-import org.openrewrite.java.recipes.SelectRecipeExamples;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,19 +41,19 @@ class RecipePrinterTest implements RewriteTest {
     void printRecipeTreeForSimpleRecipe() {
         rewriteRun(
           spec -> spec
-            .recipe(new SelectRecipeExamples())
+            .recipe(new AnotherTestRecipe())
             .printRecipe(() -> sb::append)
         );
 
-        assertThat(sb.toString()).isEqualTo(SelectRecipeExamples.class.getName() + System.lineSeparator());
+        assertThat(sb.toString()).isEqualTo(AnotherTestRecipe.class.getName() + System.lineSeparator());
     }
 
     @Test
     void printRecipeTreeForRecipeWithNestedRecipes() {
         Recipe recipe = new CompositeRecipe(Arrays.asList(
           new TestRecipe("the option"),
-          new SelectRecipeExamples(),
-          new CompositeRecipe(Collections.singletonList(new SelectRecipeExamples()))
+          new AnotherTestRecipe(),
+          new CompositeRecipe(Collections.singletonList(new AnotherTestRecipe()))
         ));
         rewriteRun(
           spec -> spec
@@ -70,14 +69,14 @@ class RecipePrinterTest implements RewriteTest {
           "  %3$s%n" +
           "  %1$s%n" +
           "    %3$s%n",
-          CompositeRecipe.class.getName(), TestRecipe.class.getName(), SelectRecipeExamples.class.getName()
+          CompositeRecipe.class.getName(), TestRecipe.class.getName(), AnotherTestRecipe.class.getName()
         );
 
         assertThat(output).isEqualTo(expected);
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     private static class TestRecipe extends Recipe {
 
         @Option(displayName = "An option",
@@ -93,6 +92,21 @@ class RecipePrinterTest implements RewriteTest {
         @Override
         public String getDescription() {
             return "Test recipe.";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class AnotherTestRecipe extends Recipe {
+
+        @Override
+        public String getDisplayName() {
+            return "Another Test recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Another Test recipe.";
         }
     }
 }

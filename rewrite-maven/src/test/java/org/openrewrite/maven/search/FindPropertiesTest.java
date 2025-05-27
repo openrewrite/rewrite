@@ -27,7 +27,11 @@ class FindPropertiesTest implements RewriteTest {
     @Test
     void findProperty() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("guava.*")),
+          spec -> spec.recipe(new FindProperties("guava.*", null))
+            .dataTableAsCsv("org.openrewrite.maven.table.MavenProperties", """
+              property,value
+              guava.version,28.2-jre
+              """),
           pomXml(
             """
               <project>
@@ -70,9 +74,64 @@ class FindPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void findPropertyValue() {
+        rewriteRun(
+          spec -> spec.recipe(new FindProperties("guava.*", "28.*"))
+            .dataTableAsCsv("org.openrewrite.maven.table.MavenProperties", """
+              property,value
+              guava.version,28.2-jre
+              """),
+          pomXml(
+            """
+              <project>
+                <properties>
+                  <someNullProp/>
+                  <guava.version>28.2-jre</guava.version>
+                </properties>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            """
+              <project>
+                <properties>
+                  <someNullProp/>
+                  <!--~~>--><guava.version>28.2-jre</guava.version>
+                </properties>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotFindPropertyValue() {
+        rewriteRun(
+          spec -> spec.recipe(new FindProperties("guava.*", "30.*")),
+          pomXml(
+            """
+              <project>
+                <properties>
+                  <someNullProp/>
+                  <guava.version>28.2-jre</guava.version>
+                </properties>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotMatchOtherPropertyUsages() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("guava.*")),
+          spec -> spec.recipe(new FindProperties("guava.*", null)),
           pomXml(
             """
               <project>

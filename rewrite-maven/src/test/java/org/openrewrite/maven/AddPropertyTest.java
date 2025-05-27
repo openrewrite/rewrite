@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -28,74 +29,6 @@ class AddPropertyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new AddProperty("key", "value", null, false));
-    }
-
-    @Test
-    void notIfParentHasDefined() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-parent</artifactId>
-                <version>1</version>
-                <properties>
-                  <key>value</key>
-                </properties>
-              </project>
-              """
-          ),
-          mavenProject("my-app",
-            pomXml(
-"""
-                  <project>
-                    <parent>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-parent</artifactId>
-                      <version>1</version>
-                    </parent>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
-              """
-            )
-          )
-        );
-    }
-
-    @Test
-    void trustParent() {
-        rewriteRun(
-          spec -> spec.recipe(new AddProperty("key", "value", null, true)),
-          pomXml(
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-parent</artifactId>
-                <version>1</version>
-                <properties>
-                  <key>v</key>
-                </properties>
-              </project>
-              """,
-            SourceSpec::skip
-          ),
-          mavenProject("my-app",
-            pomXml(
-"""
-                  <project>
-                    <parent>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-parent</artifactId>
-                      <version>1</version>
-                    </parent>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
-              """
-            )
-          )
-        );
     }
 
     @DocumentExample
@@ -126,6 +59,250 @@ class AddPropertyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void notIfParentHasDefined() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+          ),
+          mavenProject("my-app",
+            pomXml(
+       """
+              <project>
+                <parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                </parent>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+            )
+          )
+        );
+    }
+
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3895")
+    @Test
+    void prefersToUpdateParent() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <modules>
+                  <module>my-app</module>
+                </modules>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <modules>
+                  <module>my-app</module>
+                </modules>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+          ),
+          mavenProject("my-app",
+            pomXml(
+        """
+               <project>
+                 <parent>
+                   <groupId>com.mycompany.app</groupId>
+                   <artifactId>my-parent</artifactId>
+                   <version>1</version>
+                   <relativePath>../pom.xml</relativePath>
+                 </parent>
+                 <artifactId>my-app</artifactId>
+                 <version>1</version>
+                 <properties>
+                  <key>oldValue</key>
+                 </properties>
+               </project>
+               """,
+          """
+                 <project>
+                   <parent>
+                     <groupId>com.mycompany.app</groupId>
+                     <artifactId>my-parent</artifactId>
+                     <version>1</version>
+                     <relativePath>../pom.xml</relativePath>
+                   </parent>
+                   <artifactId>my-app</artifactId>
+                   <version>1</version>
+                 </project>
+                 """
+            )
+          )
+        );
+    }
+
+    @Test
+    void trustParent() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty("key", "value", null, true)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>v</key>
+                </properties>
+              </project>
+              """,
+            SourceSpec::skip
+          ),
+          mavenProject("my-app",
+            pomXml(
+        """
+              <project>
+                <parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                </parent>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+            )
+          )
+        );
+    }
+
+    @Test
+    void ifRemoteParentIsDefined() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+              </project>
+              """,
+                """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+
+          )
+        );
+    }
+
+    @Test
+    void ifRemoteParentIsDefined_2() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                  <relativePath></relativePath>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+              </project>
+              """,
+                """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                  <relativePath></relativePath>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+
+          )
+        );
+    }
+
+    @Test
+    void ifRemoteParentIsDefined_3() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+              </project>
+              """,
+                """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.2</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+
           )
         );
     }
@@ -194,7 +371,7 @@ class AddPropertyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddProperty("key", "value", true, false)),
           pomXml(
-"""
+     """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>

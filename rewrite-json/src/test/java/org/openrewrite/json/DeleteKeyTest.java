@@ -29,7 +29,8 @@ class DeleteKeyTest implements RewriteTest {
     void deleteNestedKey() {
         rewriteRun(
           spec -> spec.recipe(new DeleteKey("$.metadata.name")),
-          json("""
+          json(
+                """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -54,7 +55,8 @@ class DeleteKeyTest implements RewriteTest {
     void deleteArrayKey() {
         rewriteRun(
           spec -> spec.recipe(new DeleteKey("$.subjects.kind")),
-          json("""
+          json(
+                """
               {
                 "subjects": [
                   {
@@ -83,7 +85,8 @@ class DeleteKeyTest implements RewriteTest {
     void deleteNestedKeyRemovingUnusedKeysRecursively() {
         rewriteRun(
           spec -> spec.recipe(new DeleteKey("$.b.c.d")),
-          json("""
+          json(
+                """
               {
                 "a": "a-value",
                 "b": {

@@ -31,6 +31,7 @@ import static org.openrewrite.marker.OperatingSystemProvenance.hostname;
 public class TravisBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
+
     String buildNumber;
     String buildId;
     String buildUrl;

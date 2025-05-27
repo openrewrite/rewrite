@@ -39,6 +39,42 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class VariableNameUtilsTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void incrementExistingNumberPostFix() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
+                  if (identifier.getSimpleName().equals("name2")) {
+                      return identifier.withSimpleName(VariableNameUtils.generateVariableName("name1", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
+                  }
+                  return identifier;
+              }
+          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          java(
+            """
+              @SuppressWarnings("all")
+              class Test {
+                  int name = 0;
+                  void method(int name1) {
+                      int name2 = 0;
+                  }
+              }
+              """,
+            """
+              @SuppressWarnings("all")
+              class Test {
+                  int name = 0;
+                  void method(int name1) {
+                      int name3 = 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> baseTest(String scope, String expected) {
         return spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
             @Override
@@ -100,6 +136,23 @@ class VariableNameUtilsTest implements RewriteTest {
                             
               class Test {
                   boolean classBlock;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumFieldNames() {
+        rewriteRun(
+          baseTest("myType", "myType,TYPES"),
+          java(
+            """
+              class Test {
+                  TYPES myType;
+              }
+              enum TYPES {
+               VALUE, NUMBER, TEXT
               }
               """
           )
@@ -185,7 +238,24 @@ class VariableNameUtilsTest implements RewriteTest {
               """
           )
         );
+    }
 
+    @Test
+    void detectInstanceOf() {
+        rewriteRun(
+          baseTest("ifBlock", "ifBlock,pattern,methodParam"),
+          java(
+            """
+              class Test {
+                  void method(Object methodParam) {
+                      if (methodParam instanceof String pattern) {
+                          boolean ifBlock;
+                      }
+                  }
+              }
+              """
+          )
+        );
     }
 
     @Test
@@ -433,42 +503,6 @@ class VariableNameUtilsTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void incrementExistingNumberPostFix() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
-                  if (identifier.getSimpleName().equals("name2")) {
-                      return identifier.withSimpleName(VariableNameUtils.generateVariableName("name1", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
-                  }
-                  return identifier;
-              }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
-          java(
-            """
-              @SuppressWarnings("all")
-              class Test {
-                  int name = 0;
-                  void method(int name1) {
-                      int name2 = 0;
-                  }
-              }
-              """,
-            """
-              @SuppressWarnings("all")
-              class Test {
-                  int name = 0;
-                  void method(int name1) {
-                      int name3 = 0;
-                  }
-              }
-              """
-          )
-        );
-    }
-
     @Test
     void conflictsInModifiedContents() {
         rewriteRun(
@@ -476,9 +510,9 @@ class VariableNameUtilsTest implements RewriteTest {
               @Override
               public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
                   lambda = super.visitLambda(lambda, ctx);
-                  if (((J.VariableDeclarations) lambda.getParameters().getParameters().get(0)).getVariables().get(0).getSimpleName().startsWith("i")) {
-                      J.VariableDeclarations declarations = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
-                      J.VariableDeclarations.NamedVariable variable = declarations.getVariables().get(0);
+                  if (((J.VariableDeclarations) lambda.getParameters().getParameters().getFirst()).getVariables().getFirst().getSimpleName().startsWith("i")) {
+                      J.VariableDeclarations declarations = (J.VariableDeclarations) lambda.getParameters().getParameters().getFirst();
+                      J.VariableDeclarations.NamedVariable variable = declarations.getVariables().getFirst();
                       variable = variable.withName(variable.getName().withSimpleName(VariableNameUtils.generateVariableName("j", new Cursor(getCursor(), lambda), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER)));
                       lambda = lambda.withParameters(lambda.getParameters().withParameters(List.of(declarations.withVariables(List.of(variable)))));
                   }

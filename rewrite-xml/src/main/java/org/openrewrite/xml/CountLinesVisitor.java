@@ -66,11 +66,17 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
         if(tag.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
-        if (tag.getClosing() != null && tag.getClosing().getPrefix().contains("\n")) {
+
+        return super.visitTag(tag, count);
+    }
+
+    @Override
+    public Xml visitTagClosing(Xml.Tag.Closing closing, AtomicInteger count) {
+        if (closing.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
 
-        return super.visitTag(tag, count);
+        return super.visitTagClosing(closing, count);
     }
 
     @Override

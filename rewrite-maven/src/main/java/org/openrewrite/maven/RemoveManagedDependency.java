@@ -17,15 +17,14 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveManagedDependency extends Recipe {
 
     @Option(displayName = "Group",
@@ -39,7 +38,7 @@ public class RemoveManagedDependency extends Recipe {
     String artifactId;
 
     @Option(displayName = "Scope",
-            description = "Only remove managed dependencies if they are in this scope. If `runtime`, this will" +
+            description = "Only remove managed dependencies if they are in this scope. If `runtime`, this will " +
                           "also remove managed dependencies in the 'compile' scope because `compile` dependencies are part of the runtime dependency set.",
             valid = {"compile", "test", "runtime", "provided"},
             example = "compile",
@@ -70,7 +69,7 @@ public class RemoveManagedDependency extends Recipe {
     @Override
     public Validated<Object> validate() {
         return super.validate().and(Validated.test("scope", "Scope must be one of compile, runtime, test, or provided",
-                scope, s -> !Scope.Invalid.equals(Scope.fromName(s))));
+                scope, s -> Scope.Invalid != Scope.fromName(s)));
     }
 
     private class RemoveManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
@@ -78,9 +77,9 @@ public class RemoveManagedDependency extends Recipe {
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isManagedDependencyTag(groupId, artifactId)) {
                 Scope checkScope = scope != null ? Scope.fromName(scope) : null;
-                ResolvedManagedDependency managedDependency = findManagedDependency(tag, checkScope);
-                if (managedDependency != null) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                boolean isBomImport = tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
+                if (isBomImport || findManagedDependency(tag, checkScope) != null) {
+                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                     maybeUpdateModel();
                 }
             }

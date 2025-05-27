@@ -25,7 +25,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
-import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ALL")
@@ -376,6 +375,14 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       boolean i=a!=true
                   }
               }
+              """,
+            """
+              class A {
+                  def m() {
+                      boolean a=true
+                      boolean i=!a
+                  }
+              }
               """
           )
         );
@@ -398,6 +405,23 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
               class A {
                   def m() {
                       if (false) {
+                          System.out.println("")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void mapFields() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  def foo(boolean a, Map m) {
+                      if (a || m.foo || m.bar) {
                           System.out.println("")
                       }
                   }
@@ -461,7 +485,6 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       a == null || !a.isEmpty() && "b" != null && !"b".isEmpty() // a == null || !a.isEmpty()
       """)
     void simplifyLiteralNull(String before, String after) {
-        //language=java
         String template = """
           class A {
               void foo(String a) {

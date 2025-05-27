@@ -77,8 +77,16 @@ public class HttpUrlConnectionSender implements HttpSender {
             } else {
                 con = (HttpURLConnection) request.getUrl().openConnection();
             }
-            con.setConnectTimeout(connectTimeoutMs);
-            con.setReadTimeout(readTimeoutMs);
+            if (request.getConnectTimeout() != null) {
+                con.setConnectTimeout((int) request.getConnectTimeout().toMillis());
+            } else {
+                con.setConnectTimeout(connectTimeoutMs);
+            }
+            if (request.getReadTimeout() != null) {
+                con.setReadTimeout((int) request.getReadTimeout().toMillis());
+            } else {
+                con.setReadTimeout(readTimeoutMs);
+            }
             Method method = request.getMethod();
             con.setRequestMethod(method.name());
 

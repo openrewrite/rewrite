@@ -12,20 +12,32 @@ val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
+
 dependencies {
     compileOnly(files(tools))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
     implementation(project(":rewrite-java"))
+    implementation(project(":rewrite-java-lombok"))
     implementation("org.ow2.asm:asm:latest.release")
 
     implementation("io.micrometer:micrometer-core:1.9.+")
 
-    testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
+    testImplementation("org.junit.jupiter:junit-jupiter-api")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 
     testImplementation(project(":rewrite-test"))
     "javaTck"(project(":rewrite-java-tck"))
+}
+
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "org.assertj" && requested.name == "assertj-core") {
+                useVersion("3.+") // Pin to latest 3.+ version as AssertJ 4 requires Java 17
+            }
+        }
+    }
 }
 
 java {
@@ -68,9 +80,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        useJUnitPlatform {
-                            excludeTags("java11", "java17", "java21")
-                        }
+                        useJUnitPlatform()
                         testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)

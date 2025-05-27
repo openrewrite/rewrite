@@ -369,7 +369,8 @@ class RemoveExclusionTest implements RewriteTest {
     @Test
     void removeUnusedExclusionsFromDependencyManagement() {
         rewriteRun(
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -421,7 +422,8 @@ class RemoveExclusionTest implements RewriteTest {
             "*",
             true
           )),
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -495,7 +497,8 @@ class RemoveExclusionTest implements RewriteTest {
             "*",
             true
           )),
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -536,7 +539,8 @@ class RemoveExclusionTest implements RewriteTest {
             "*",
             true
           )),
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -580,6 +584,62 @@ class RemoveExclusionTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedExclusionsWithProperties() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                  <exclusionGroupId>commons-lang</exclusionGroupId>
+                  <exclusionArtifactId>commons-lang</exclusionArtifactId>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>${groupId}</groupId>
+                    <artifactId>${artifactId}</artifactId>
+                    <version>${version}</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>${exclusionGroupId}</groupId>
+                        <artifactId>${exclusionArtifactId}</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                  <exclusionGroupId>commons-lang</exclusionGroupId>
+                  <exclusionArtifactId>commons-lang</exclusionArtifactId>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>${groupId}</groupId>
+                    <artifactId>${artifactId}</artifactId>
+                    <version>${version}</version>
+                  </dependency>
+                </dependencies>
               </project>
               """
           )

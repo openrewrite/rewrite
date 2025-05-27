@@ -22,6 +22,7 @@ import org.gradle.api.initialization.Settings
 
 interface PluginManagementSpec extends org.gradle.plugin.management.PluginManagementSpec {
     void repositories(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RepositoryHandlerSpec) Closure cl)
+    void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
 }
 
 interface GradleEnterpriseSpec extends GradleEnterpriseExtension {

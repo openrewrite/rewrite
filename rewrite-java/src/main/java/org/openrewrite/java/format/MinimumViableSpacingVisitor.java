@@ -16,9 +16,9 @@
 package org.openrewrite.java.format;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
@@ -136,12 +136,12 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
                 if (returnTypeExpression instanceof J.AnnotatedType) {
                     J.AnnotatedType annotatedType = (J.AnnotatedType) returnTypeExpression;
                     List<J.Annotation> annotations = ListUtils.mapFirst(annotatedType.getAnnotations(), annotation ->
-                        annotation.withPrefix(annotation.getPrefix().withWhitespace(" "))
+                            annotation.withPrefix(annotation.getPrefix().withWhitespace(" "))
                     );
                     m = m.withReturnTypeExpression(annotatedType.withAnnotations(annotations));
                 } else {
                     m = m.withReturnTypeExpression(returnTypeExpression
-                        .withPrefix(returnTypeExpression.getPrefix().withWhitespace(" ")));
+                            .withPrefix(returnTypeExpression.getPrefix().withWhitespace(" ")));
                 }
             }
             first = false;
@@ -180,12 +180,11 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
          * We need at least one space between multiple modifiers, otherwise we could get a run-on like "publicstaticfinal".
          * Note, this is applicable anywhere that modifiers can exist, such as class declarations, etc.
          */
-        if (!v.getModifiers().isEmpty()) {
-            boolean needFirstSpace = !first;
+        if (first && !v.getModifiers().isEmpty()) {
             v = v.withModifiers(
                     ListUtils.map(v.getModifiers(), (index, modifier) -> {
-                        if (index != 0 || needFirstSpace) {
-                            if (modifier.getPrefix().getWhitespace().isEmpty()) {
+                        if (index != 0) {
+                            if (modifier.getPrefix().isEmpty()) {
                                 modifier = modifier.withPrefix(modifier.getPrefix().withWhitespace(" "));
                             }
                         }
@@ -196,14 +195,14 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         if (!first && v.getTypeExpression() != null) {
-            if (v.getTypeExpression().getPrefix().getWhitespace().isEmpty()) {
+            if (v.getTypeExpression().getPrefix().isEmpty()) {
                 v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace(" ")));
             }
         }
 
         J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
-        if (!(firstEnclosing instanceof J.Lambda)) {
-            if (Space.firstPrefix(v.getVariables()).getWhitespace().isEmpty()) {
+        if (!(firstEnclosing instanceof J.Lambda.Parameters)) {
+            if (Space.firstPrefix(v.getVariables()).isEmpty()) {
                 v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
                         v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));
             }
@@ -212,18 +211,30 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         return v;
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public J.Case visitCase(J.Case _case, P p) {
+        J.Case c = super.visitCase(_case, p);
+
+        if (c.getGuard() != null) {
+            // At a minimum, we need a space between the guard and the case label
+            JContainer.Padding<J> padding = c.getPadding().getCaseLabels().getPadding();
+            return c.getPadding().withCaseLabels(padding.withElements(ListUtils.mapLast(padding.getElements(),
+                    last -> last != null && last.getAfter().isEmpty() ? last.withAfter(Space.SINGLE_SPACE) : last)));
+        }
+
+        return c;
+    }
+
+    @Override
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }

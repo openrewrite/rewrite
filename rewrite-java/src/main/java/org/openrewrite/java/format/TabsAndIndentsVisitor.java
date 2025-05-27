@@ -15,17 +15,21 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 
 public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
@@ -43,8 +47,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    @Nullable
-    public J visit(@Nullable Tree tree, P p, Cursor parent) {
+    public @Nullable J visit(@Nullable Tree tree, P p, Cursor parent) {
         setCursor(parent);
         for (Cursor c = parent; c != null; c = c.getParent()) {
             Object v = c.getValue();
@@ -76,8 +79,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    @Nullable
-    public J preVisit(@Nullable J tree, P p) {
+    public @Nullable J preVisit(@Nullable J tree, P p) {
         if (tree instanceof JavaSourceFile ||
                 tree instanceof J.Package ||
                 tree instanceof J.Import ||
@@ -145,18 +147,18 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         // block spaces are always aligned to their parent
         Object value = getCursor().getValue();
-        boolean alignBlockPrefixToParent = loc.equals(Space.Location.BLOCK_PREFIX) && space.getWhitespace().contains("\n") &&
+        boolean alignBlockPrefixToParent = loc == Space.Location.BLOCK_PREFIX && space.getWhitespace().contains("\n") &&
                 // ignore init blocks.
                 (value instanceof J.Block && !(getCursor().getParentTreeCursor().getValue() instanceof J.Block));
 
-        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END) ||
-                loc.equals(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX) ||
-                loc.equals(Space.Location.CATCH_PREFIX) ||
-                loc.equals(Space.Location.TRY_FINALLY) ||
-                loc.equals(Space.Location.ELSE_PREFIX);
+        boolean alignBlockToParent = loc == Space.Location.BLOCK_END ||
+                loc == Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX ||
+                loc == Space.Location.CATCH_PREFIX ||
+                loc == Space.Location.TRY_FINALLY ||
+                loc == Space.Location.ELSE_PREFIX;
 
-        if ((loc.equals(Space.Location.EXTENDS) && space.getWhitespace().contains("\n")) ||
-                Space.Location.EXTENDS.equals(getCursor().getParent().getMessage("lastLocation"))) {
+        if ((loc == Space.Location.EXTENDS && space.getWhitespace().contains("\n")) ||
+                Space.Location.EXTENDS == getCursor().getParent().getMessage("lastLocation")) {
             indentType = IndentType.CONTINUATION_INDENT;
         }
 
@@ -186,7 +188,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
+    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;
@@ -228,30 +230,27 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         }
                         JContainer<J> container = getCursor().getParentOrThrow().getValue();
                         List<J> elements = container.getElements();
-                        J firstArg = elements.iterator().next();
                         J lastArg = elements.get(elements.size() - 1);
-                        if (style.getMethodDeclarationParameters().getAlignWhenMultiple()) {
+                        if (elements.size() > 1 && style.getMethodDeclarationParameters().getAlignWhenMultiple()) {
                             J.MethodDeclaration method = getCursor().firstEnclosing(J.MethodDeclaration.class);
                             if (method != null) {
-                                int alignTo;
-                                if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
-                                    alignTo = getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
+                                int alignTo = computeFirstParameterColumn(method);
+                                if (alignTo != -1) {
+                                    getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
+                                    elem = visitAndCast(elem, p);
+                                    getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                                    after = indentTo(right.getAfter(), t == lastArg ? indent : alignTo, loc.getAfterLocation());
                                 } else {
-                                    String source = method.print(getCursor());
-                                    int firstArgIndex = source.indexOf(firstArg.print(getCursor()));
-                                    int lineBreakIndex = source.lastIndexOf('\n', firstArgIndex);
-                                    alignTo = (firstArgIndex - (lineBreakIndex == -1 ? 0 : lineBreakIndex)) - 1;
+                                    after = right.getAfter();
                                 }
-                                getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
-                                elem = visitAndCast(elem, p);
-                                getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                                after = indentTo(right.getAfter(), t == lastArg ? indent : alignTo, loc.getAfterLocation());
                             } else {
                                 after = right.getAfter();
                             }
-                        } else {
+                        } else if (elements.size() > 1) {
                             elem = visitAndCast(elem, p);
                             after = indentTo(right.getAfter(), t == lastArg ? indent : style.getContinuationIndent(), loc.getAfterLocation());
+                        } else {
+                            after = right.getAfter();
                         }
                         break;
                     }
@@ -355,8 +354,43 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
+    private int computeFirstParameterColumn(J.MethodDeclaration method) {
+        List<JRightPadded<Statement>> arguments = method.getPadding().getParameters().getPadding().getElements();
+        J firstArg = arguments.isEmpty() ? null : arguments.get(0).getElement();
+        if (firstArg == null || firstArg instanceof J.Empty) {
+            return -1;
+        }
+
+        if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
+            return getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
+        } else {
+            TreeVisitor<?, PrintOutputCapture<TreeVisitor<?, ?>>> printer = method.printer(getCursor());
+            PrintOutputCapture<TreeVisitor<?, ?>> capture = new PrintOutputCapture<TreeVisitor<?, ?>>(printer) {
+                @Override
+                public PrintOutputCapture<TreeVisitor<?, ?>> append(@Nullable String text) {
+                    if (getContext().getCursor().getValue() == firstArg) {
+                        throw new CancellationException();
+                    }
+                    return super.append(text);
+                }
+            };
+            try {
+                printer.visit(method, capture, getCursor().getParentOrThrow());
+                throw new IllegalStateException();
+            } catch (RecipeRunException e) {
+                String out = capture.getOut();
+                int lineBreakIndex = out.lastIndexOf('\n');
+                return (out.length() - (lineBreakIndex == -1 ? 0 : lineBreakIndex)) - 1;
+            }
+        }
+    }
+
     @Override
-    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, JContainer.Location loc, P p) {
+    public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
+        if (container == null) {
+            return null;
+        }
+
         setCursor(new Cursor(getCursor(), container));
 
         Space before;
@@ -619,18 +653,16 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         throw new IllegalStateException("For loops must have a control section");
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }

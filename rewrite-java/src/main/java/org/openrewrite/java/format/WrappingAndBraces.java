@@ -15,13 +15,14 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.style.Style;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -43,7 +44,7 @@ public class WrappingAndBraces extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return new LinkedHashSet<>(Arrays.asList("RSPEC-121", "RSPEC-2681", "RSPEC-3972", "RSPEC-3973"));
+        return new LinkedHashSet<>(Arrays.asList("RSPEC-S121", "RSPEC-S2681", "RSPEC-S3972", "RSPEC-S3973"));
     }
 
     @Override
@@ -72,8 +73,8 @@ public class WrappingAndBraces extends Recipe {
     }
 
     public static <J2 extends J> J2 formatWrappingAndBraces(J j, Cursor cursor) {
-        WrappingAndBracesStyle style = cursor.firstEnclosingOrThrow(SourceFile.class)
-                .getStyle(WrappingAndBracesStyle.class);
+        SourceFile sourceFile = cursor.firstEnclosingOrThrow(SourceFile.class);
+        WrappingAndBracesStyle style = Style.from(WrappingAndBracesStyle.class, sourceFile);
         //noinspection unchecked
         return (J2) new WrappingAndBracesVisitor<>(style == null ? IntelliJ.wrappingAndBraces() : style)
                 .visitNonNull(j, 0, cursor);

@@ -16,9 +16,9 @@
 
 package org.openrewrite.yaml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -47,7 +47,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext ctx) {
         Cursor parent = getCursor().getParent();
         if (matcher.matches(parent) &&
-            !existingSeq.getMarkers().findFirst(AlreadyReplaced.class).filter(m -> m.getFind().equals(value)).isPresent() &&
+            !existingSeq.getMarkers().findFirst(AlreadyReplaced.class).filter(m -> value.equals(m.getFind())).isPresent() &&
             checkExistingSequenceValues(existingSeq, parent)) {
             return appendToSequence(existingSeq, this.value, ctx);
         }
@@ -65,7 +65,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                     .sorted()
                     .collect(Collectors.toList());
             if (this.matchExistingSequenceValuesInAnyOrder) {
-                List<String> sorted = new ArrayList<String>(this.existingSequenceValues);
+                List<String> sorted = new ArrayList<>(this.existingSequenceValues);
                 Collections.sort(sorted);
                 return values.equals(sorted);
             } else {
@@ -112,7 +112,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                 entries.set(lastEntryIndex, existingEntry.withTrailingCommaPrefix(""));
             }
         }
-        Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, value);
+        Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value);
         Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
         return newSequence.withMarkers(Markers.EMPTY.addIfAbsent(new AlreadyReplaced(randomId(), value, value)));

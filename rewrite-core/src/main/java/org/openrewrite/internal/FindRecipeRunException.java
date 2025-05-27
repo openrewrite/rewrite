@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.Markup;
@@ -39,7 +40,7 @@ public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
     }
 
     @Override
-    public Tree preVisit(Tree tree, Integer integer) {
+    public @Nullable Tree preVisit(Tree tree, Integer integer) {
         if (nearestTree == null) {
             return null;
         } else if (tree == nearestTree) {

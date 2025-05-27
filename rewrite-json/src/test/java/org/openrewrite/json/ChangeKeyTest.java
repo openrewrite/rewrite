@@ -17,7 +17,6 @@ package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.Example;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
@@ -31,7 +30,8 @@ class ChangeKeyTest implements RewriteTest {
             "$.description",
             "\"newDescription\""
           )),
-          json("""
+          json(
+                """
               {
                 "id": "something",
                 "description": "desc",
@@ -49,7 +49,6 @@ class ChangeKeyTest implements RewriteTest {
         );
     }
 
-    @Example
     @Test
     void changeNestedKey() {
         rewriteRun(
@@ -57,7 +56,8 @@ class ChangeKeyTest implements RewriteTest {
             "$.metadata.name",
             "\"name2\""
           )),
-          json("""
+          json(
+                """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -86,7 +86,8 @@ class ChangeKeyTest implements RewriteTest {
             "$.subjects.kind",
             "\"kind2\""
           )),
-          json("""
+          json(
+                """
               {
                 "subjects": [
                   {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
@@ -109,6 +110,33 @@ class JsonPathMatcherTest {
               """
           ),
           List.of("&abc yo: friend", "*abc: friendly")
+        );
+    }
+
+    @Test
+    void complex() {
+        assertMatched(
+          "..spec.containers[:1].resources.limits.cpu",
+          List.of(
+            //language=yaml
+            """
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  labels:
+                    app: application
+                spec:
+                  template:
+                    spec:
+                      containers:
+                        - image: nginx:latest
+                          name: nginx
+                          resources:
+                            limits:
+                              cpu: "64Mi"
+              """
+          ),
+          List.of("cpu: \"64Mi\"")
         );
     }
 
@@ -344,6 +372,33 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void booleanLiteralMatching() {
+        //language=yaml
+        assertMatched(
+          "$[?(@.bool == true)]",
+          List.of(
+            """
+              "bool": true
+              """
+          ),
+          List.of(
+            """
+              "bool": true
+              """
+          )
+        );
+        //language=yaml
+        assertNotMatched(
+          "$[?(@.bool == true)]",
+          List.of(
+            """
+              "bool": false
+              """
+          )
+        );
+    }
+
+    @Test
     void recurseToMatchProperties() {
         assertMatched(
           "$..object.literal",
@@ -453,6 +508,36 @@ class JsonPathMatcherTest {
                       property: property
               """
           )
+        );
+    }
+
+    @Test
+    void documentLevelSequenceWildcard() {
+        assertMatched(
+          "$[*].id",
+          List.of(
+            """
+              - id: 0
+              - id: 1
+              - id: 2
+              """
+          ),
+          List.of("id: 0", "id: 1", "id: 2")
+        );
+    }
+
+    @Test
+    void documentLevelSequenceSingle() {
+        assertMatched(
+          "$[1].id",
+          List.of(
+            """
+              - id: 0
+              - id: 1
+              - id: 2
+              """
+          ),
+          List.of("id: 1")
         );
     }
 
@@ -678,6 +763,148 @@ class JsonPathMatcherTest {
         );
     }
 
+    @Test
+    void matchesListInPropertyWithByFilterConditionInList() {
+        assertMatched(
+          "$.build_types.build_type[?(@.name == 'release')].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: another
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 3
+                - name: command 4
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesListsInPropertyWithByFilterConditionInList() {
+        assertMatched(
+          "$.build_types.build_type[?(@.name == 'quick')].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 1
+                - name: command 2
+              """,
+            """
+              build:
+                - name: command 5
+                - name: command 6
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesListItemInPropertyWithByFilterConditionInList() {
+        assertMatched(
+          "$.build_types.build_type[?(@.name == 'quick')][1].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 5
+                - name: command 6
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesInNestedPropertyByFilterCondition() {
+        assertMatched(
+          "$..[?(@.name == 'quick')].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 1
+                - name: command 2
+              """,
+              """
+              build:
+                - name: command 5
+                - name: command 6
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/3401")
     @Test
     void multipleBinaryExpressions() {
@@ -732,6 +959,18 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void dontMatchThis() {
+        assertNotMatched("$..[?(@.task=='delete-this')]",
+          //language=yaml
+          List.of("""
+          foo:
+            bar:
+              - task: not-this
+              - task: not-this-either
+          """));
+    }
+
+    @Test
     void returnResultsWithVisitDocument() {
 //            var ctx = InMemoryExecutionContext
 //            {
@@ -763,26 +1002,26 @@ class JsonPathMatcherTest {
 //            assertThat(results).hasSize(1);
     }
 
-    private void assertNotMatched(String jsonPath, List<String> before) {
+    private void assertNotMatched(@Language("jsonpath") String jsonPath, List<String> before) {
         var results = visit(before, jsonPath, false);
         assertThat(results).hasSize(0);
     }
 
-    private void assertMatched(String jsonPath, List<String> before, List<String> after) {
+    private void assertMatched(@Language("jsonpath") String jsonPath, List<String> before, List<String> after) {
         assertMatched(jsonPath, before, after, false);
     }
 
-    private void assertMatched(String jsonPath, List<String> before, List<String> after,
+    private void assertMatched(@Language("jsonpath") String jsonPath, List<String> before, List<String> after,
                                @SuppressWarnings("SameParameterValue") boolean printMatches) {
         var results = visit(before, jsonPath, printMatches);
         assertThat(results).hasSize(after.size());
         for (int i = 0; i < results.size(); i++) {
-            assertThat(StringUtils.trimIndent(results.get(i)).replaceAll("\s+", "  "))
-              .isEqualTo(StringUtils.trimIndent(after.get(i)).replaceAll("\s+", "  "));
+            assertThat(StringUtils.trimIndent(results.get(i)).replaceAll("\\s+", "  "))
+              .isEqualTo(StringUtils.trimIndent(after.get(i)).replaceAll("\\s+", "  "));
         }
     }
 
-    private List<String> visit(List<String> before, String jsonPath, boolean printMatches) {
+    private List<String> visit(List<String> before, @Language("jsonpath") String jsonPath, boolean printMatches) {
         var matcher = new JsonPathMatcher(jsonPath);
         return new YamlVisitor<List<String>>() {
             @Override

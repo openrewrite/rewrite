@@ -15,52 +15,62 @@
  */
 package org.openrewrite.maven.tree;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+
+@SuppressWarnings("unused")
 public interface ResolutionEventListener {
     ResolutionEventListener NOOP = new ResolutionEventListener() {
-        @Override
-        public void downloadError(GroupArtifactVersion gav, Pom containing) {
-        }
-
-        @Override
-        public void parent(Pom parent, Pom containing) {
-        }
-
-        @Override
-        public void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing) {
-        }
-
-        @Override
-        public void bomImport(ResolvedGroupArtifactVersion gav, Pom containing) {
-        }
-
-        @Override
-        public void property(String key, String value, Pom containing) {
-        }
-
-        @Override
-        public void dependencyManagement(ManagedDependency dependencyManagement, Pom containing) {
-        }
-
-        @Override
-        public void clear() {
-        }
-
-        @Override
-        public void downloadSuccess(ResolvedGroupArtifactVersion gav, @Nullable ResolvedPom containing) {
-        }
     };
 
-    void clear();
+    default void clear() {
+    }
+
+    default void downloadMetadata(GroupArtifactVersion gav) {
+    }
+
+    default void download(GroupArtifactVersion gav) {
+    }
 
     default void downloadSuccess(ResolvedGroupArtifactVersion gav, @Nullable ResolvedPom containing) {
     }
 
-    void downloadError(GroupArtifactVersion gav, Pom containing);
-    void parent(Pom parent, Pom containing);
-    void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing);
-    void bomImport(ResolvedGroupArtifactVersion gav, Pom containing);
-    void property(String key, String value, Pom containing);
-    void dependencyManagement(ManagedDependency dependencyManagement, Pom containing);
+    /**
+     * @param gav           - GAV coordinate of the dependency which failed to download
+     * @param attemptedUris - The URIs which were attempted, in the order they were attempted, before resolution was determined to have failed
+     * @param containing    - The pom containing the dependency which failed to resolve, if resolution was attempted from such a context
+     */
+    default void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
+    }
+
+    default void parent(Pom parent, Pom containing) {
+    }
+
+    default void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing) {
+    }
+
+    default void bomImport(ResolvedGroupArtifactVersion gav, Pom containing) {
+    }
+
+    default void property(String key, String value, Pom containing) {
+    }
+
+    default void dependencyManagement(ManagedDependency dependencyManagement, Pom containing) {
+    }
+
+    default void repository(MavenRepository mavenRepository, @Nullable ResolvedPom containing) {
+    }
+
+    default void repositoryAccessFailed(String uri, Throwable e) {
+    }
+
+    /**
+     * This is called if a previous failure to access a repository was cached and used.
+     * Useful to log when a persistent maven cache is used to debug issues where repositories are not being attempted for downloads.
+      * @param uri The repository URI which was not attempted to access
+     */
+    default void repositoryAccessFailedPreviously(String uri) {
+    }
+
 }

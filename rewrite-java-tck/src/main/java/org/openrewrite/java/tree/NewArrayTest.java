@@ -49,6 +49,19 @@ class NewArrayTest implements RewriteTest {
     }
 
     @Test
+    void initializersWithTrailingComma() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int[] n = new int[] { 0, 1, 2, };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void dimensions() {
         rewriteRun(
           java(

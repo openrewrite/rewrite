@@ -22,26 +22,32 @@ import org.openrewrite.java.tree.Statement;
 
 public class GroovyIsoVisitor<P> extends GroovyVisitor<P> {
 
+    @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, P p) {
         return (G.CompilationUnit) super.visitCompilationUnit(cu, p);
     }
 
+    @Override
     public G.GString visitGString(G.GString gString, P p) {
         return (G.GString) super.visitGString(gString, p);
     }
 
+    @Override
     public G.GString.Value visitGStringValue(G.GString.Value value, P p) {
         return (G.GString.Value) super.visitGStringValue(value, p);
     }
 
+    @Override
     public G.ListLiteral visitListLiteral(G.ListLiteral listLiteral, P p) {
         return (G.ListLiteral) super.visitListLiteral(listLiteral, p);
     }
 
+    @Override
     public G.MapLiteral visitMapLiteral(G.MapLiteral mapLiteral, P p) {
         return (G.MapLiteral) super.visitMapLiteral(mapLiteral, p);
     }
 
+    @Override
     public G.Binary visitBinary(G.Binary binary, P p) {
         return (G.Binary) super.visitBinary(binary, p);
     }

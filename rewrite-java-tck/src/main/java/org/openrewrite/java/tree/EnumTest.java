@@ -34,7 +34,7 @@ class EnumTest implements RewriteTest {
               public enum Test {
                   @Deprecated(since = "now")
                   One,
-                  
+
                   @Deprecated(since = "now")
                   Two;
               }
@@ -55,7 +55,7 @@ class EnumTest implements RewriteTest {
                   };
 
                   A(int n) {}
-                  
+
                   abstract void foo();
               }
               """
@@ -73,7 +73,7 @@ class EnumTest implements RewriteTest {
                       @Override
                       void foo() {}
                   };
-                  
+
                   abstract void foo();
               }
               """
@@ -89,10 +89,10 @@ class EnumTest implements RewriteTest {
               public class Outer {
                   public enum A {
                       A1(1);
-                            
+
                       A(int n) {}
                   }
-                  
+
                   private static final class ContextFailedToStart {
                       private static Object[] combineArguments(String context, Throwable ex, Object[] arguments) {
                           return new Object[arguments.length + 2];
@@ -125,7 +125,7 @@ class EnumTest implements RewriteTest {
               public enum A {
                   ONE(1),
                   TWO(2);
-                            
+              
                   A(int n) {}
               }
               """
@@ -149,9 +149,53 @@ class EnumTest implements RewriteTest {
     }
 
     @Test
+    void enumValuesTerminatedWithComma() {
+        rewriteRun(
+          java("enum A { ONE, }")
+        );
+    }
+
+    @Test
     void enumWithEmptyParameters() {
         rewriteRun(
           java("public enum A { ONE ( ), TWO ( ) }")
+        );
+    }
+
+    @Test
+    void enumWithParametersAndTrailingComma() {
+        rewriteRun(
+          java(
+            """
+              public enum A {
+                  ONE(1),
+                  TWO(2),
+                  ;
+
+                  A(int n) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5146")
+    void noValuesJustSemicolon() {
+        rewriteRun(
+          java(
+            """
+             public enum A {
+                 ;
+                 public static final String X = "receipt-id";
+             }
+             """,
+            spec -> spec.afterRecipe( cu -> {
+                J.EnumValueSet enumValueStatement = (J.EnumValueSet) cu.getClasses().get(0).getBody().getStatements().get(0);
+                assert enumValueStatement.getEnums().isEmpty();
+                assert enumValueStatement.isTerminatedWithSemicolon();
+            })
+          )
         );
     }
 }

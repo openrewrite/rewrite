@@ -15,26 +15,24 @@
  */
 package org.openrewrite.gradle;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
-import static java.util.Objects.requireNonNull;
-
-public class IsSettingsGradle<P> extends JavaIsoVisitor<P> {
-
+public class IsSettingsGradle<P> extends TreeVisitor<Tree, P> {
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable Tree preVisit(@NonNull Tree tree, P p) {
+        stopAfterPreVisit();
         if (tree instanceof JavaSourceFile) {
-            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            JavaSourceFile cu = (JavaSourceFile) tree;
             if (cu.getSourcePath().toString().endsWith("settings.gradle") ||
-                cu.getSourcePath().toString().endsWith("settings.gradle.kts")) {
+                    cu.getSourcePath().toString().endsWith("settings.gradle.kts")) {
                 return SearchResult.found(cu);
             }
         }
-        return super.visit(tree, p);
+        return tree;
     }
 }

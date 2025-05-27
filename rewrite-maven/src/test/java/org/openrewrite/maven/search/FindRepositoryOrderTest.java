@@ -16,6 +16,7 @@
 package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -23,18 +24,18 @@ import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.table.MavenRepositoryOrder;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.ByteArrayInputStream;
 import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class FindRepositoryOrderTest implements RewriteTest {
+class FindRepositoryOrderTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findRepositoryOrder() {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -58,8 +59,8 @@ public class FindRepositoryOrderTest implements RewriteTest {
                     </profile>
                 </profiles>
             </settings>
-            """.getBytes()
-        )), ctx));
+            """
+        ), ctx));
 
         rewriteRun(
           spec -> spec

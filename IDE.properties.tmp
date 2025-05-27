@@ -18,9 +18,11 @@ rewrite-test
 # language parser.
 
 rewrite-java
+rewrite-java-lombok
 rewrite-java-test
 rewrite-java-tck
 rewrite-java-17
+rewrite-java-21
 
 # Other language modules
 
@@ -28,9 +30,11 @@ rewrite-gradle
 rewrite-groovy
 rewrite-hcl
 rewrite-json
+rewrite-kotlin
 rewrite-maven
 rewrite-properties
 rewrite-protobuf
+rewrite-toml
 rewrite-xml
 rewrite-yaml
 
@@ -42,4 +46,4 @@ rewrite-bom
 
 # Tools that are used less frequently to, for example, build new language parsers.
 
-tools
+#tools

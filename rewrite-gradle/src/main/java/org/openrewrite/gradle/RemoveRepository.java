@@ -18,12 +18,13 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.groovy.GroovyVisitor;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveRepository extends Recipe {
     @Override
     public String getDisplayName() {
@@ -42,13 +43,16 @@ public class RemoveRepository extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher repositories = new MethodMatcher("org.gradle.api.artifacts.dsl.RepositoryHandler " + repository + "()");
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if(repositories.matches(method)) {
-                    //noinspection ConstantConditions
-                    return null;
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                if (repository.equals(method.getSimpleName())) {
+                    try {
+                        Cursor cursor = getCursor().dropParentUntil(e -> e instanceof J.MethodInvocation);
+                        if ("repositories".equals(((J.MethodInvocation) cursor.getValue()).getSimpleName())) {
+                            return null;
+                        }
+                    } catch (Exception ignored) {}
                 }
                 return super.visitMethodInvocation(method, ctx);
             }

@@ -17,7 +17,7 @@ package org.openrewrite.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -29,7 +29,10 @@ import java.util.UUID;
 @With
 public class AlreadyReplaced implements Marker {
     UUID id;
+
+    @Nullable
     String find;
+
     @Nullable
     String replace;
 }

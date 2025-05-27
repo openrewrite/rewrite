@@ -20,9 +20,10 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class AddPluginTest implements RewriteTest {
+class AddPluginTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -34,7 +35,7 @@ public class AddPluginTest implements RewriteTest {
     void addPluginWithConfiguration() {
         rewriteRun(
           spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0",
-            "<configuration>\n<activeRecipes>\n<recipe>io.moderne.FindTest</recipe>\n</activeRecipes>\n</configuration>",
+            "<configuration><activeRecipes><recipe>io.moderne.FindTest</recipe></activeRecipes></configuration>",
             null, null, null)),
           pomXml(
             """
@@ -336,7 +337,8 @@ public class AddPluginTest implements RewriteTest {
     void addPluginWithExistingPlugin() {
         rewriteRun(
           spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -358,6 +360,126 @@ public class AddPluginTest implements RewriteTest {
               """,
             spec -> spec.path("pom.xml")
           )
+        );
+    }
+
+    @Test
+    void addPluginOnlyToRootPom() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-maven-plugin</artifactId>
+                      <version>3.1.5</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          mavenProject("my-app-child",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-child</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <build>
+                    <plugins>
+                    </plugins>
+                  </build>
+                </project>
+                """))
+        );
+    }
+
+    @Test
+    void addPluginOnlyToRootPomWithParent() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.1.5</version>
+                </parent>
+                <build>
+                  <plugins>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.1.5</version>
+                </parent>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-maven-plugin</artifactId>
+                      <version>3.1.5</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          mavenProject("my-app-child",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-child</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <build>
+                    <plugins>
+                    </plugins>
+                  </build>
+                </project>
+                """))
         );
     }
 }

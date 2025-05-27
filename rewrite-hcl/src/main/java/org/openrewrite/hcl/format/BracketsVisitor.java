@@ -15,12 +15,12 @@
  */
 package org.openrewrite.hcl.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.BracketsStyle;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,11 +42,11 @@ public class BracketsVisitor<P> extends HclIsoVisitor<P> {
 
     @Override
     public Space visitSpace(Space space, Space.Location loc, P p) {
-        if (loc.equals(Space.Location.BLOCK_CLOSE) && !space.getLastWhitespace().contains("\n")) {
+        if (loc == Space.Location.BLOCK_CLOSE && !space.getLastWhitespace().contains("\n")) {
             return space.withLastWhitespace("\n");
         }
 
-        if (loc.equals(Space.Location.BLOCK_OPEN) && !space.getWhitespace().equals(" ")) {
+        if (loc == Space.Location.BLOCK_OPEN && !space.getWhitespace().equals(" ")) {
             return space.withWhitespace(" ");
         }
 
@@ -112,19 +112,16 @@ public class BracketsVisitor<P> extends HclIsoVisitor<P> {
         return super.visitBlock(block, p);
     }
 
-
-    @Nullable
     @Override
-    public Hcl postVisit(Hcl tree, P p) {
+    public @Nullable Hcl postVisit(Hcl tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Hcl.ConfigFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Hcl visit(@Nullable Tree tree, P p) {
+    public @Nullable Hcl visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Hcl) tree;
         }

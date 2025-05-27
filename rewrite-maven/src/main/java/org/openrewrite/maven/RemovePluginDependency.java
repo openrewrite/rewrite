@@ -30,7 +30,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemovePluginDependency extends Recipe {
     private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
 
@@ -100,8 +100,8 @@ public class RemovePluginDependency extends Recipe {
             }
             Xml.Tag dependencies = maybeDependencies.get();
             plugins = filterTagChildren(plugins, dependencies, dependencyTag ->
-                    !(childValueMatches(dependencyTag, "groupId", groupId)
-                            && childValueMatches(dependencyTag, "artifactId", artifactId))
+                    !(childValueMatches(dependencyTag, "groupId", groupId) &&
+                            childValueMatches(dependencyTag, "artifactId", artifactId))
             );
             plugins = filterTagChildren(plugins, plugin, pluginChildTag ->
                     !(pluginChildTag.getName().equals("dependencies") && pluginChildTag.getChildren().isEmpty()));

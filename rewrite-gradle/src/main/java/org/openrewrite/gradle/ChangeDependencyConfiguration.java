@@ -17,13 +17,15 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
-import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.gradle.internal.Dependency;
+import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
+import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.Traits;
+import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -33,7 +35,7 @@ import java.time.Duration;
 import java.util.List;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyConfiguration extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -85,15 +87,21 @@ public class ChangeDependencyConfiguration extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+            // Still need to be able to change the configuration for project dependencies which are not yet supported by the `GradleDependency.Matcher`
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!dependencyDsl.matches(m) || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+
+                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency()
+                        .configuration(configuration);
+
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent() && !matchesOtherDependency(m)) {
                     return m;
                 }
+
 
                 DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
                 List<Expression> args = m.getArguments();
@@ -104,7 +112,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
 
                     Dependency dependency = DependencyStringNotationConverter.parse((String) arg.getValue());
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else if (args.get(0) instanceof G.GString) {
@@ -119,22 +127,68 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
 
                     Dependency dependency = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
-                } else if (args.get(0) instanceof G.MapEntry && args.size() >= 2) {
-                    Expression groupValue = ((G.MapEntry) args.get(0)).getValue();
-                    Expression artifactValue = ((G.MapEntry) args.get(1)).getValue();
-                    if (!(groupValue instanceof J.Literal) || !(artifactValue instanceof J.Literal)) {
-                        return m;
-                    }
-                    J.Literal groupLiteral = (J.Literal) groupValue;
-                    J.Literal artifactLiteral = (J.Literal) artifactValue;
-                    if (!(groupLiteral.getValue() instanceof String) || !(artifactLiteral.getValue() instanceof String)) {
+                } else if (args.get(0) instanceof G.MapEntry) {
+                    if (args.size() < 2) {
                         return m;
                     }
 
-                    if (!dependencyMatcher.matches((String) groupLiteral.getValue(), (String) artifactLiteral.getValue())) {
+                    String groupId = null;
+                    String artifactId = null;
+                    for (Expression e : args) {
+                        if (!(e instanceof G.MapEntry)) {
+                            continue;
+                        }
+                        G.MapEntry arg = (G.MapEntry) e;
+                        if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
+                            continue;
+                        }
+                        J.Literal key = (J.Literal) arg.getKey();
+                        J.Literal value = (J.Literal) arg.getValue();
+                        if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+                            continue;
+                        }
+                        String keyValue = (String) key.getValue();
+                        String valueValue = (String) value.getValue();
+                        if ("group".equals(keyValue)) {
+                            groupId = valueValue;
+                        } else if ("name".equals(keyValue)) {
+                            artifactId = valueValue;
+                        }
+                    }
+
+                    if (artifactId == null || !dependencyMatcher.matches(groupId, artifactId)) {
+                        return m;
+                    }
+                } else if (args.get(0) instanceof G.MapLiteral) {
+                    if (args.size() < 2) {
+                        return m;
+                    }
+
+                    G.MapLiteral map = (G.MapLiteral) args.get(0);
+                    String groupId = null;
+                    String artifactId = null;
+                    for (G.MapEntry arg : map.getElements()) {
+                        if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
+                            continue;
+                        }
+                        J.Literal key = (J.Literal) arg.getKey();
+                        J.Literal value = (J.Literal) arg.getValue();
+                        if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+                            continue;
+                        }
+                        String keyValue = (String) key.getValue();
+                        String valueValue = (String) value.getValue();
+                        if ("group".equals(keyValue)) {
+                            groupId = valueValue;
+                        } else if ("name".equals(keyValue)) {
+                            artifactId = valueValue;
+                        }
+                    }
+
+                    if (artifactId == null || !dependencyMatcher.matches(groupId, artifactId)) {
                         return m;
                     }
                 } else if (args.get(0) instanceof J.MethodInvocation) {
@@ -158,7 +212,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                         dependency = DependencyStringNotationConverter.parse((String) value.getValue());
                     }
 
-                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
                 } else {
@@ -170,6 +224,23 @@ public class ChangeDependencyConfiguration extends Recipe {
                 }
 
                 return m.withName(m.getName().withSimpleName(newConfiguration));
+            }
+
+            private boolean matchesOtherDependency(J.MethodInvocation m) {
+                if (!dependencyDsl.matches(m)) {
+                    return false;
+                }
+
+                if (m.getArguments().isEmpty() || !(m.getArguments().get(0) instanceof J.MethodInvocation)) {
+                    return false;
+                }
+
+                J.MethodInvocation inner = (J.MethodInvocation) m.getArguments().get(0);
+                if (!(inner.getSimpleName().equals("project") || inner.getSimpleName().equals("platform") || inner.getSimpleName().equals("enforcedPlatform"))) {
+                    return false;
+                }
+
+                return StringUtils.isBlank(configuration) || configuration.equals(m.getSimpleName());
             }
         });
     }

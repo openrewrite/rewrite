@@ -29,6 +29,11 @@ public class YamlIsoVisitor<P> extends YamlVisitor<P> {
     }
 
     @Override
+    public Yaml.Document.End visitDocumentEnd(Yaml.Document.End end, P p) {
+        return (Yaml.Document.End) super.visitDocumentEnd(end, p);
+    }
+
+    @Override
     public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
         return (Yaml.Mapping) super.visitMapping(mapping, p);
     }
@@ -51,5 +56,10 @@ public class YamlIsoVisitor<P> extends YamlVisitor<P> {
     @Override
     public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
         return (Yaml.Sequence.Entry) super.visitSequenceEntry(entry, p);
+    }
+
+    @Override
+    public Yaml.Tag visitTag(Yaml.Tag tag, P p) {
+        return (Yaml.Tag) super.visitTag(tag, p);
     }
 }

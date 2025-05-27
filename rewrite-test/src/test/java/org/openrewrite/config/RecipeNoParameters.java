@@ -20,7 +20,7 @@ import lombok.Value;
 import org.openrewrite.Recipe;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RecipeNoParameters extends Recipe {
     @Override
     public String getDisplayName() {

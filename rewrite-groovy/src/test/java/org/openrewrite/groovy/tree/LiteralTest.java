@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -40,9 +41,46 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void string() {
+    void singleQuoteString() {
         rewriteRun(
-          groovy("'hello'")
+          groovy(
+            """
+              'hello'
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternSingleQuoteString() {
+        rewriteRun(
+          groovy(
+            """
+              ~"hello"
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleQuoteString() {
+        rewriteRun(
+          groovy(
+            """
+              "hello"
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternDoubleQuoteString() {
+        rewriteRun(
+          groovy(
+            """
+              ~"hello"
+              """
+          )
         );
     }
 
@@ -74,6 +112,19 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void regexPatternQuotedString() {
+        rewriteRun(
+          groovy(
+            """
+              ~\"""
+                  " Hi "
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
     void slashString() {
         rewriteRun(
           groovy(
@@ -85,12 +136,45 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void regexPatternSlashString() {
+        rewriteRun(
+          groovy(
+            """
+              ~/foo/
+              """
+          )
+        );
+    }
+
+    @Test
+    void escapedString() {
+        rewriteRun(
+          groovy(
+            """
+              "f\\"o\\\\\\"o"
+              """
+          )
+        );
+    }
+
+    @Test
     void gString() {
         rewriteRun(
           groovy(
             """
-              "uid: ${ UUID.randomUUID() } "
-               """
+              " uid: ${ UUID.randomUUID() } "
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternGString() {
+        rewriteRun(
+          groovy(
+            """
+              ~"${ UUID.randomUUID() }"
+              """
           )
         );
     }
@@ -110,36 +194,44 @@ class LiteralTest implements RewriteTest {
     @Test
     void gStringMultiPropertyAccess() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             "$System.env.BAR_BAZ"
-            """)
+            """
+          )
         );
     }
 
     @Test
     void emptyGString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             "${}"
-            """)
+            """
+          )
         );
     }
 
     @Test
     void nestedGString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             " ${ " ${ " " } " } "
-            """)
+            """
+          )
         );
     }
 
     @Test
     void gStringInterpolateString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             " ${""}\\n${" "} "
-            """)
+            """
+          )
         );
     }
 
@@ -160,6 +252,28 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               String s = "${ ARTIFACTORY_URL }"
+              """
+          )
+        );
+    }
+
+    @Test
+    void gStringWithEscapedDelimiter() {
+        rewriteRun(
+          groovy(
+            """
+              String s = "<a href=\\"$url\\">${displayName}</a>"
+              """
+          )
+        );
+    }
+
+    @Test
+    void gStringWithStringLiteralsWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              "Hello ${from(":-)").via(''':-|(''').via(":-)").to(':-(')}!"
               """
           )
         );
@@ -200,26 +314,14 @@ class LiteralTest implements RewriteTest {
                 // Groovy AST represents 1.8 as a BigDecimal
                 // Java AST would represent it as Double
                 // Our AST could reasonably make either choice
-                var initializer = requireNonNull((J.Literal) ((J.VariableDeclarations) cu.getStatements().get(0))
-                  .getVariables().get(0).getInitializer());
+                var initializer = requireNonNull((J.Literal) ((J.VariableDeclarations) cu.getStatements().getFirst())
+                  .getVariables().getFirst().getInitializer());
                 if (initializer.getType() == JavaType.Primitive.Double) {
                     assertThat(initializer.getValue()).isEqualTo(1.8);
                 } else if (TypeUtils.isOfClassType(initializer.getType(), "java.math.BigDecimal")) {
                     assertThat(initializer.getValue()).isInstanceOf(BigDecimal.class);
                 }
             })
-          )
-        );
-    }
-
-    @Test
-    void emptyListLiteral() {
-        rewriteRun(
-          groovy(
-            """
-              def a = []
-              def b = [   ]
-              """
           )
         );
     }
@@ -251,17 +353,6 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void listLiteralTrailingComma() {
-        rewriteRun(
-          groovy(
-            """
-              def a = [ "foo" /* "foo" suffix */ , /* "]" prefix */ ]
-              """
-          )
-        );
-    }
-
-    @Test
     void gStringThatHasEmptyValueExpressionForUnknownReason() {
         rewriteRun(
           groovy(
@@ -278,13 +369,58 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              "\\\\n\\t"
-              '\\\\n\\t'
-              ///\\\\n\\t///
-              
+            "\\\\\\\\n\\\\t"
+            '\\\\n\\t'
+            ///\\\\n\\t///
             """
           )
         );
+    }
 
+    @Test
+    void differentiateEscapeFromLiteral() {
+        rewriteRun(
+          groovy(
+            """
+            '\t'
+            '	'
+            """
+          )
+        );
+    }
+
+    @Test
+    void stringLiteralInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def a = (       "-"  )
+              """
+          ),
+          groovy(
+            """
+              def a = (("-"))
+              """
+          ),
+          groovy(
+            """
+              from(":-)").via(''':-|(''').via(":-)").to(':-(')
+              """
+          )
+        );
+    }
+
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5232")
+    void stringWithMultipleBackslashes() {
+        rewriteRun(
+          groovy(
+            """
+              "".replaceAll('\\\\', '/')
+              "a\\b".replaceAll('\\\\', '/')
+              """
+          )
+        );
     }
 }

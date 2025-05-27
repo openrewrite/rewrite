@@ -32,6 +32,7 @@ import static org.openrewrite.Tree.randomId;
 public class BitbucketBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
+
     String httpOrigin;
     String branch;
     String sha;
@@ -46,9 +47,9 @@ public class BitbucketBuildEnvironment implements BuildEnvironment {
 
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
-        if (StringUtils.isBlank(httpOrigin)
-            || StringUtils.isBlank(branch)
-            || StringUtils.isBlank(sha)) {
+        if (StringUtils.isBlank(httpOrigin) ||
+            StringUtils.isBlank(branch) ||
+            StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException();
         } else {
             return new GitProvenance(UUID.randomUUID(), httpOrigin, branch, sha,

@@ -26,7 +26,7 @@ import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ExplicitPluginGroupId extends Recipe {
     @Override
     public String getDisplayName() {
@@ -44,7 +44,7 @@ public class ExplicitPluginGroupId extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-                if (isPluginTag() && !t.getChild("groupId").isPresent()) {
+                if (isPluginTag() && !t.getChild("groupId").isPresent() && t.getChild("artifactId").isPresent()) {
                     Xml.Tag groupIdTag = Xml.Tag.build("<groupId>org.apache.maven.plugins</groupId>");
                     t = (Xml.Tag) new AddToTagVisitor<>(t, groupIdTag, new MavenTagInsertionComparator(t.getChildren()))
                             .visitNonNull(t, ctx, getCursor().getParentOrThrow());

@@ -15,34 +15,42 @@
  */
 package org.openrewrite.java.internal.template;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.antlr.v4.runtime.*;
+import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
+import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
 import org.openrewrite.java.tree.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.java.ParenthesizeVisitor.maybeParenthesize;
+
 @RequiredArgsConstructor
+@ToString
 public class Substitutions {
     private static final Pattern PATTERN_COMMENT = Pattern.compile("__p(\\d+)__");
+    private static final List<String> VALID_MATCHERS = Arrays.asList("any", "anyArray");
 
     private final String code;
+    private final Set<String> genericTypes;
     private final Object[] parameters;
     private final PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper(
             "#{", "}", null);
+    @Getter
+    private final Set<JavaType.GenericTypeVariable> typeVariables = Collections.newSetFromMap(new IdentityHashMap<>());
 
     public String substitute() {
+        Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
+        typeVariables.addAll(generics.values());
         AtomicInteger requiredParameters = new AtomicInteger(0);
         AtomicInteger index = new AtomicInteger(0);
         String substituted = code;
@@ -52,13 +60,7 @@ public class Substitutions {
             substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
                 String s;
                 if (!key.isEmpty()) {
-                    TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
-                            CharStreams.fromString(key))));
-
-                    parser.removeErrorListeners();
-                    parser.addErrorListener(new ThrowingErrorListener());
-
-                    TemplateParameterParser.MatcherPatternContext ctx = parser.matcherPattern();
+                    TemplateParameterParser.MatcherPatternContext ctx = TypeParameter.parser(key).matcherPattern();
                     TemplateParameterParser.TypedPatternContext typedPattern = ctx.typedPattern();
                     if (typedPattern == null) {
                         String paramName = ctx.parameterName().Identifier().getText();
@@ -68,7 +70,7 @@ public class Substitutions {
                         }
                     } else {
                         int i = index.getAndIncrement();
-                        s = substituteTypedPattern(key, i, typedPattern);
+                        s = substituteTypedPattern(key, i, typedPattern, generics);
                         if (ctx.typedPattern().parameterName() != null) {
                             String paramName = ctx.typedPattern().parameterName().Identifier().getText();
                             typedPatternByName.put(paramName, s);
@@ -96,96 +98,74 @@ public class Substitutions {
         return substituted;
     }
 
-    private String substituteTypedPattern(String key, int index, TemplateParameterParser.TypedPatternContext typedPattern) {
+    private String substituteTypedPattern(String key, int index, TemplateParameterParser.TypedPatternContext typedPattern, Map<String, JavaType.GenericTypeVariable> generics) {
+        if (index >= parameters.length) {
+            throw new IllegalArgumentException("This template requires more parameters.");
+        }
         Object parameter = parameters[index];
         String s;
+        TypeContext param = typedPattern.patternType().type();
         String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
-        List<TemplateParameterParser.MatcherParameterContext> params = typedPattern.patternType().matcherParameter();
-
-        if ("anyArray".equals(matcherName)) {
-            if (!(parameter instanceof TypedTree)) {
-                throw new IllegalArgumentException("anyArray can only be used on TypedTree parameters");
-            }
-
-            JavaType type = ((TypedTree) parameter).getType();
-            JavaType.Array arrayType = TypeUtils.asArray(type);
-            if (arrayType == null) {
-                arrayType = TypeUtils.asArray(type);
-                if (arrayType == null) {
-                    throw new IllegalArgumentException("anyArray can only be used on parameters containing JavaType.Array type attribution");
-                }
-            }
-
-            s = "(/*__p" + index + "__*/new ";
-
-            StringBuilder extraDim = new StringBuilder();
-            for (; arrayType.getElemType() instanceof JavaType.Array; arrayType = (JavaType.Array) arrayType.getElemType()) {
-                extraDim.append("[0]");
-            }
-
-            if (arrayType.getElemType() instanceof JavaType.Primitive) {
-                s += ((JavaType.Primitive) arrayType.getElemType()).getKeyword();
-            } else if (arrayType.getElemType() instanceof JavaType.FullyQualified) {
-                s += ((JavaType.FullyQualified) arrayType.getElemType()).getFullyQualifiedName().replace("$", ".");
-            }
-
-            s += "[0]" + extraDim + ")";
-        } else if ("any".equals(matcherName)) {
-            String fqn;
-
-            if (params.size() == 1) {
-                if (params.get(0).Identifier() != null) {
-                    fqn = params.get(0).Identifier().getText();
-                } else {
-                    fqn = params.get(0).FullyQualifiedName().getText();
-                }
-            } else {
-                if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null
-                    && ((J.NewClass) parameter).getClazz() != null) {
-                    // for anonymous classes get the type from the supertype
-                    fqn = getTypeName(((J.NewClass) parameter).getClazz().getType());
-                } else if (!(parameter instanceof TypedTree)) {
-                    // any should only be used on TypedTree parameters, but will give it best effort
-                    fqn = "java.lang.Object";
-                } else {
-                    fqn = getTypeName(((TypedTree) parameter).getType());
-                }
-            }
-
-            fqn = fqn.replace("$", ".");
-
-            JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
-            s = "__P__." + (primitive == null || primitive.equals(JavaType.Primitive.String) ?
-                    "<" + fqn + ">/*__p" + index + "__*/p()" :
-                    "/*__p" + index + "__*/" + fqn + "p()"
-            );
-
-            parameters[index] = ((J) parameter).withPrefix(Space.EMPTY);
-        } else {
+        if (!VALID_MATCHERS.contains(matcherName)) {
             throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
         }
+
+        JavaType type;
+        if (param != null) {
+            type = TypeParameter.toJavaType(param, generics);
+            if ("anyArray".equals(matcherName)) {
+                type = new JavaType.Array(null, type, null);
+            }
+        } else {
+            if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null &&
+                    ((J.NewClass) parameter).getClazz() != null) {
+                // for anonymous classes get the type from the supertype
+                type = ((J.NewClass) parameter).getClazz().getType();
+            } else if (parameter instanceof J.Empty && ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).isPresent()) {
+                type = ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).get().getType();
+            } else if (parameter instanceof TypedTree) {
+                type = ((TypedTree) parameter).getType();
+            } else if ("anyArray".equals(matcherName)) {
+                type = new JavaType.Array(null, JavaType.ShallowClass.build("java.lang.Object"), null);
+            } else {
+                type = null;
+            }
+            extractTypeVariables(type);
+        }
+
+        String fqn = getTypeName(type);
+        JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
+        s = primitive == null || primitive == JavaType.Primitive.String ?
+                newObjectParameter(fqn, index) :
+                newPrimitiveParameter(fqn, index);
+
+        parameters[index] = ((J) parameter).withPrefix(Space.EMPTY);
         return s;
     }
 
+    protected String newObjectParameter(String fqn, int index) {
+        return "__P__." + "<" + fqn + ">/*__p" + index + "__*/p()";
+    }
+
+    protected String newPrimitiveParameter(String fqn, int index) {
+        return "__P__./*__p" + index + "__*/" + fqn + "p()";
+    }
+
     private String getTypeName(@Nullable JavaType type) {
-        if (type instanceof JavaType.Parameterized) {
-            StringJoiner joiner = new StringJoiner(",", "<", ">");
-            for (JavaType parameter : ((JavaType.Parameterized) type).getTypeParameters()) {
-                joiner.add(getTypeName(parameter));
-            }
-            return ((JavaType.Parameterized) type).getFullyQualifiedName() + joiner;
-        } else if (type instanceof JavaType.GenericTypeVariable) {
-            String name = ((JavaType.GenericTypeVariable) type).getName();
-            return "?".equals(name) ? "Object" : name;
-        } else if (type instanceof JavaType.FullyQualified) {
-            return ((JavaType.FullyQualified) type).getFullyQualifiedName();
-        } else if (type instanceof JavaType.Primitive) {
-            return ((JavaType.Primitive) type).getKeyword();
-        } else if (type instanceof JavaType.Array) {
-            return getTypeName(((JavaType.Array) type).getElemType()) + "[]";
-        } else {
+        if (type == null) {
             return "java.lang.Object";
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
+            if (!genericType.getName().equals("?")) {
+                return genericType.getName();
+            } else if (genericType.getVariance() != JavaType.GenericTypeVariable.Variance.COVARIANT || genericType.getBounds().size() != 1) {
+                // wildcards cannot be used as type parameters on method invocations as in `foo.<?> bar()`
+                return "java.lang.Object";
+            } else {
+                return TypeUtils.toString(genericType.getBounds().get(0));
+            }
         }
+        return TypeUtils.toString(type).replace("$", ".");
     }
 
     private String substituteUntyped(Object parameter, int index) {
@@ -217,12 +197,63 @@ public class Substitutions {
     }
 
     private static String typeHintFor(@Nullable JavaType t) {
-        if (t instanceof JavaType.Primitive) {
-            return ((JavaType.Primitive) t).getKeyword();
-        } else if (t instanceof JavaType.FullyQualified) {
-            return ((JavaType.FullyQualified) t).getFullyQualifiedName();
+        if (t == null || t instanceof JavaType.GenericTypeVariable) {
+            return "";
         }
-        return "";
+        return TypeUtils.toString(t);
+    }
+
+    private void extractTypeVariables(@Nullable JavaType type) {
+        if (type == null) {
+            return;
+        }
+        Set<JavaType> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        new JavaTypeVisitor<Integer>() {
+            @Override
+            public JavaType visitAnnotation(JavaType.Annotation annotation, Integer p) {
+                return annotation.getType();
+            }
+
+            @Override
+            public JavaType visitArray(JavaType.Array array, Integer p) {
+                visit(array.getElemType(), p);
+                return array;
+            }
+
+            @Override
+            public JavaType visitClass(JavaType.Class aClass, Integer p) {
+                return aClass;
+            }
+
+            @Override
+            public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Integer p) {
+                if (!visited.add(generic)) {
+                    return generic;
+                }
+                if (!generic.getName().equals("?")) {
+                    typeVariables.add(generic);
+                }
+                return super.visitGenericTypeVariable(generic, p);
+            }
+
+            @Override
+            public JavaType visitMethod(JavaType.Method method, Integer p) {
+                return method;
+            }
+
+            @Override
+            public JavaType visitParameterized(JavaType.Parameterized parameterized, Integer p) {
+                for (JavaType typeParameter : parameterized.getTypeParameters()) {
+                    visit(typeParameter, p);
+                }
+                return super.visitParameterized(parameterized, p);
+            }
+
+            @Override
+            public JavaType visitVariable(JavaType.Variable variable, Integer p) {
+                return variable;
+            }
+        }.visit(type, 0);
     }
 
     @SuppressWarnings("SpellCheckingInspection")
@@ -231,13 +262,13 @@ public class Substitutions {
     }
 
     @SuppressWarnings("SpellCheckingInspection")
-    public <J2 extends J> J2 unsubstitute(J2 j) {
+    public <J2 extends J> @Nullable J2 unsubstitute(J2 j) {
         if (parameters.length == 0) {
             return j;
         }
 
         //noinspection unchecked
-        J2 unsub = (J2) new JavaVisitor<Integer>() {
+        return (J2) new JavaVisitor<Integer>() {
             @SuppressWarnings("ConstantConditions")
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
@@ -261,7 +292,9 @@ public class Substitutions {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                 J param = maybeParameter(method.getName());
-                if (param != null) {
+                if (param instanceof Expression) {
+                    return maybeParenthesize((Expression) param, getCursor());
+                } else if (param != null) {
                     return param;
                 }
                 return super.visitMethodInvocation(method, integer);
@@ -270,7 +303,9 @@ public class Substitutions {
             @Override
             public <T extends J> J visitParentheses(J.Parentheses<T> parens, Integer integer) {
                 J param = maybeParameter(parens.getTree());
-                if (param != null) {
+                if (param instanceof Expression) {
+                    return maybeParenthesize((Expression) param, getCursor());
+                } else if (param != null) {
                     return param;
                 }
                 return super.visitParentheses(parens, integer);
@@ -279,24 +314,24 @@ public class Substitutions {
             @Override
             public J visitLiteral(J.Literal literal, Integer integer) {
                 J param = maybeParameter(literal);
-                if (param != null) {
+                if (param instanceof Expression) {
+                    return maybeParenthesize((Expression) param, getCursor());
+                } else if (param != null) {
                     return param;
                 }
                 return super.visitLiteral(literal, integer);
             }
 
-            @Nullable
-            private J maybeParameter(J j) {
-                Integer param = parameterIndex(j.getPrefix());
+            private @Nullable J maybeParameter(J j1) {
+                Integer param = parameterIndex(j1.getPrefix());
                 if (param != null) {
                     J j2 = (J) parameters[param];
-                    return j2.withPrefix(j2.getPrefix().withWhitespace(j.getPrefix().getWhitespace()));
+                    return j2.withPrefix(j2.getPrefix().withWhitespace(j1.getPrefix().getWhitespace()));
                 }
                 return null;
             }
 
-            @Nullable
-            private Integer parameterIndex(Space space) {
+            private @Nullable Integer parameterIndex(Space space) {
                 for (Comment comment : space.getComments()) {
                     if (comment instanceof TextComment) {
                         Matcher matcher = PATTERN_COMMENT.matcher(((TextComment) comment).getText());
@@ -307,18 +342,6 @@ public class Substitutions {
                 }
                 return null;
             }
-        }.visit(j, 0);
-
-        assert unsub != null;
-        return unsub;
-    }
-
-    private static class ThrowingErrorListener extends BaseErrorListener {
-        @Override
-        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                int line, int charPositionInLine, String msg, RecognitionException e) {
-            throw new IllegalArgumentException(
-                    String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
-        }
+        }.visitNonNull(j, 0);
     }
 }

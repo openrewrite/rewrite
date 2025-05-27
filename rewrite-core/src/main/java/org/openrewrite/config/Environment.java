@@ -15,6 +15,8 @@
  */
 package org.openrewrite.config;
 
+import org.apache.commons.lang3.StringUtils;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
@@ -26,9 +28,15 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
+import static java.util.Comparator.comparingInt;
+import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
+import static org.openrewrite.config.ResourceLoader.RecipeDetail.CONTRIBUTORS;
+import static org.openrewrite.config.ResourceLoader.RecipeDetail.EXAMPLES;
 
 public class Environment {
     private final Collection<? extends ResourceLoader> resourceLoaders;
@@ -39,6 +47,9 @@ public class Environment {
         for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
             dependencyRecipes.addAll(dependencyResourceLoader.listRecipes());
         }
+        Map<String, Recipe> dependencyRecipeMap = new HashMap<>();
+        dependencyRecipes.forEach(r -> dependencyRecipeMap.putIfAbsent(r.getName(), r));
+
         Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
         Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
         for (ResourceLoader r : resourceLoaders) {
@@ -54,9 +65,13 @@ public class Environment {
         }
         for (Recipe recipe : dependencyRecipes) {
             if (recipe instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) recipe).initialize(dependencyRecipes, recipeToContributors);
+                ((DeclarativeRecipe) recipe).initialize(dependencyRecipeMap::get, recipeToContributors);
             }
         }
+
+        Map<String, Recipe> availableRecipeMap = new HashMap<>(dependencyRecipeMap);
+        recipes.forEach(r -> availableRecipeMap.putIfAbsent(r.getName(), r));
+
         for (Recipe recipe : recipes) {
             recipe.setContributors(recipeToContributors.get(recipe.getName()));
 
@@ -65,10 +80,7 @@ public class Environment {
             }
 
             if (recipe instanceof DeclarativeRecipe) {
-                List<Recipe> availableRecipes = new ArrayList<>();
-                availableRecipes.addAll(dependencyRecipes);
-                availableRecipes.addAll(recipes);
-                ((DeclarativeRecipe) recipe).initialize(availableRecipes, recipeToContributors);
+                ((DeclarativeRecipe) recipe).initialize(availableRecipeMap::get, recipeToContributors);
             }
         }
         return recipes;
@@ -133,25 +145,57 @@ public class Environment {
         return result;
     }
 
+    @Deprecated
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
-        List<Recipe> allRecipes = listRecipes();
+        List<String> asList = new ArrayList<>();
+        for (String activeRecipe : activeRecipes) {
+            asList.add(activeRecipe);
+        }
+        return activateRecipes(asList);
+    }
+
+    public Recipe activateRecipes(Collection<String> activeRecipes) {
+        List<Recipe> recipes;
+        if (activeRecipes.isEmpty()) {
+            recipes = emptyList();
+        } else if (activeRecipes.size() == 1) {
+            Recipe recipe = loadRecipe(activeRecipes.iterator().next(), CONTRIBUTORS, EXAMPLES);
+            if (recipe != null) {
+                return recipe;
+            }
+            recipes = listRecipes();
+        } else {
+            recipes = listRecipes();
+        }
+
+        Map<String, Recipe> recipesByName = recipes.stream().collect(toMap(Recipe::getName, identity()));
         List<String> recipesNotFound = new ArrayList<>();
         List<Recipe> activatedRecipes = new ArrayList<>();
         for (String activeRecipe : activeRecipes) {
-            boolean foundRecipe = false;
-            for (Recipe recipe : allRecipes) {
-                if (activeRecipe.equals(recipe.getName())) {
-                    activatedRecipes.add(recipe);
-                    foundRecipe = true;
-                    break;
-                }
-            }
-            if (!foundRecipe) {
+            Recipe recipe = recipesByName.get(activeRecipe);
+            if (recipe == null) {
                 recipesNotFound.add(activeRecipe);
+            } else {
+                activatedRecipes.add(recipe);
             }
         }
         if (!recipesNotFound.isEmpty()) {
-            throw new RecipeException("Recipes not found: " + String.join(", ", recipesNotFound));
+            @SuppressWarnings("deprecation")
+            List<String> suggestions = recipesNotFound.stream()
+                    .map(r -> recipesByName.keySet().stream()
+                            .min(comparingInt(a -> StringUtils.getLevenshteinDistance(a, r)))
+                            .orElse(r))
+                    .collect(toList());
+            String message = String.format("Recipe(s) not found: %s\nDid you mean: %s",
+                    String.join(", ", recipesNotFound),
+                    String.join(", ", suggestions));
+            throw new RecipeException(message);
+        }
+        if (activatedRecipes.isEmpty()) {
+            return Recipe.noop();
+        }
+        if (activatedRecipes.size() == 1) {
+            return activatedRecipes.get(0);
         }
         return new CompositeRecipe(activatedRecipes);
     }
@@ -160,9 +204,72 @@ public class Environment {
         return activateRecipes(Arrays.asList(activeRecipes));
     }
 
-    //TODO: Nothing uses this and in most cases it would be a bad idea anyway, should consider removing
-    public Recipe activateAll() {
-        return new CompositeRecipe(listRecipes());
+    private @Nullable Recipe loadRecipe(String recipeName, ResourceLoader.RecipeDetail... details) {
+        Recipe recipe = null;
+        for (ResourceLoader loader : resourceLoaders) {
+            recipe = loader.loadRecipe(recipeName, details);
+            if (recipe != null) {
+                break;
+            }
+        }
+        if (recipe == null) {
+            return null;
+        }
+
+        boolean includeExamples = ResourceLoader.RecipeDetail.EXAMPLES.includedIn(details);
+        boolean includeContributors = ResourceLoader.RecipeDetail.CONTRIBUTORS.includedIn(details);
+
+        Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
+        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
+        if (includeContributors || includeExamples) {
+            for (ResourceLoader r : resourceLoaders) {
+                if (r instanceof YamlResourceLoader) {
+                    if (includeExamples) {
+                        recipeExamples.putAll(r.listRecipeExamples());
+                    }
+                    if (includeContributors) {
+                        recipeToContributors.putAll(r.listContributors());
+                    }
+                }
+            }
+        }
+
+        Map<String, Recipe> dependencyRecipes = new HashMap<>();
+        for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
+            for (Recipe listedRecipe : dependencyResourceLoader.listRecipes()) {
+                dependencyRecipes.putIfAbsent(listedRecipe.getName(), listedRecipe);
+            }
+        }
+        for (Recipe dependency : dependencyRecipes.values()) {
+            if (dependency instanceof DeclarativeRecipe) {
+                ((DeclarativeRecipe) dependency).initialize(dependencyRecipes::get, recipeToContributors);
+            }
+        }
+
+        if (includeContributors && recipeToContributors.containsKey(recipe.getName())) {
+            recipe.setContributors(recipeToContributors.get(recipe.getName()));
+        }
+
+        if (includeExamples && recipeExamples.containsKey(recipe.getName())) {
+            recipe.setExamples(recipeExamples.get(recipe.getName()));
+        }
+
+        if (recipe instanceof DeclarativeRecipe) {
+            Function<String, @Nullable Recipe> loadFunction = key -> {
+                if (dependencyRecipes.containsKey(key)) {
+                    return dependencyRecipes.get(key);
+                }
+                for (ResourceLoader resourceLoader : resourceLoaders) {
+                    Recipe r = resourceLoader.loadRecipe(key, details);
+                    if (r != null) {
+                        return r;
+                    }
+                }
+                return null;
+            };
+            ((DeclarativeRecipe) recipe).initialize(loadFunction, recipeToContributors);
+        }
+        return recipe;
     }
 
     /**
@@ -240,12 +347,23 @@ public class Environment {
          */
         @SuppressWarnings("unused")
         public Builder scanJar(Path jar, Collection<Path> dependencies, ClassLoader classLoader) {
-            List<ClasspathScanningLoader> list = new ArrayList<>();
+            List<ClasspathScanningLoader> firstPassLoaderList = new ArrayList<>();
             for (Path dep : dependencies) {
-                ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader(dep, properties, emptyList(), classLoader);
-                list.add(classpathScanningLoader);
+                firstPassLoaderList.add(new ClasspathScanningLoader(dep, properties, emptyList(), classLoader));
             }
-            return load(new ClasspathScanningLoader(jar, properties, list, classLoader), list);
+
+            /*
+             * Second loader creation pass where the firstPassLoaderList is passed as the
+             * dependencyResourceLoaders list to ensure that we can resolve transitive
+             * dependencies using the loaders we just created. This is necessary because
+             * the first pass may have missing recipes since the full list of loaders was
+             * not provided.
+             */
+            List<ClasspathScanningLoader> secondPassLoaderList = new ArrayList<>();
+            for (Path dep : dependencies) {
+                secondPassLoaderList.add(new ClasspathScanningLoader(dep, properties, firstPassLoaderList, classLoader));
+            }
+            return load(new ClasspathScanningLoader(jar, properties, secondPassLoaderList, classLoader), secondPassLoaderList);
         }
 
         @SuppressWarnings("unused")

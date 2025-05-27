@@ -15,15 +15,17 @@
  */
 package org.openrewrite.semver;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.StringUtils;
 
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public interface VersionComparator extends Comparator<String> {
-    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?([-+].*)?.*");
+    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?([-.+].*)?");
     String[] RELEASE_SUFFIXES = new String[]{".final", ".ga", ".release"};
     Pattern PRE_RELEASE_ENDING = Pattern.compile("[.-](alpha|a|beta|b|milestone|m|rc|cr|snapshot)[.-]?\\d*$", Pattern.CASE_INSENSITIVE);
 
@@ -53,4 +55,32 @@ public interface VersionComparator extends Comparator<String> {
         return (seen ? Optional.of(best) : Optional.<String>empty())
                 .filter(v -> !v.equals(currentVersion));
     }
+
+    static boolean checkVersion(String version, @Nullable String metadataPattern, boolean requireRelease) {
+        Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(version);
+        if (!matcher.matches()) {
+            return false;
+        }
+        if (requireRelease && PRE_RELEASE_ENDING.matcher(version).find()) {
+            return false;
+        }
+
+        boolean requireMeta = !StringUtils.isNullOrEmpty(metadataPattern);
+        String versionMeta = matcher.group(6);
+        if (requireMeta) {
+            return versionMeta != null && versionMeta.matches(metadataPattern);
+        } else if (versionMeta == null) {
+            return true;
+        } else if (requireRelease) {
+            String lowercaseVersionMeta = versionMeta.toLowerCase();
+            for (String suffix : RELEASE_SUFFIXES) {
+                if (suffix.equals(lowercaseVersionMeta)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+
 }

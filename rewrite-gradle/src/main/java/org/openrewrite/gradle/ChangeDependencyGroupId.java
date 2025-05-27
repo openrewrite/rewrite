@@ -17,25 +17,31 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.util.ChangeStringLiteral;
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
-import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.Dependency;
+import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.Traits;
+import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class ChangeDependencyGroupId extends Recipe {
     @Option(displayName = "Group",
@@ -82,19 +88,42 @@ public class ChangeDependencyGroupId extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
-            final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
+
+            GradleProject gradleProject;
 
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!dependencyDsl.matches(m) || !(StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration))) {
+            public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
+                if (!maybeGp.isPresent()) {
+                    return cu;
+                }
+
+                gradleProject = maybeGp.get();
+
+                G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
+                if (g != cu) {
+                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject)));
+                }
+                return g;
+            }
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+
+                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency()
+                        .configuration(configuration)
+                        .groupId(groupId)
+                        .artifactId(artifactId);
+
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;
                 }
 
                 List<Expression> depArgs = m.getArguments();
-                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
+                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral) {
                     m = updateDependency(m);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
                         (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
@@ -111,9 +140,7 @@ public class ChangeDependencyGroupId extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
-                        if (!newGroupId.equals(dependency.getGroupId()) &&
-                                ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
-                                        (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
+                        if (dependency != null && !newGroupId.equals(dependency.getGroupId())) {
                             Dependency newDependency = dependency.withGroupId(newGroupId);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
                         }
@@ -122,11 +149,10 @@ public class ChangeDependencyGroupId extends Recipe {
                     List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
                     if (strings.size() >= 2 &&
                             strings.get(0) instanceof J.Literal) {
-                        Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
-                        if (!newGroupId.equals(dependency.getGroupId())
-                                && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
-                            dependency = dependency.withGroupId(newGroupId);
-                            String replacement = dependency.toStringNotation();
+                        Dependency dependency = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) strings.get(0)).getValue()));
+                        if (dependency != null && !newGroupId.equals(dependency.getGroupId())) {
+                            Dependency newDependency = dependency.withGroupId(newGroupId);
+                            String replacement = newDependency.toStringNotation();
                             m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
                                 G.GString gString = (G.GString) arg;
                                 return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
@@ -137,7 +163,6 @@ public class ChangeDependencyGroupId extends Recipe {
                     G.MapEntry groupEntry = null;
                     String groupId = null;
                     String artifactId = null;
-                    String version = null;
 
                     String versionStringDelimiter = "'";
                     for (Expression e : depArgs) {
@@ -163,13 +188,9 @@ public class ChangeDependencyGroupId extends Recipe {
                             groupId = valueValue;
                         } else if ("name".equals(keyValue)) {
                             artifactId = valueValue;
-                        } else if ("version".equals(keyValue)) {
-                            version = valueValue;
                         }
                     }
-                    if (groupId == null || artifactId == null
-                            || (version == null && !depMatcher.matches(groupId, artifactId))
-                            || (version != null && !depMatcher.matches(groupId, artifactId, version))) {
+                    if (groupId == null || artifactId == null) {
                         return m;
                     }
                     String delimiter = versionStringDelimiter;
@@ -182,9 +203,85 @@ public class ChangeDependencyGroupId extends Recipe {
                         }
                         return arg;
                     }));
+                } else if (depArgs.get(0) instanceof G.MapLiteral) {
+                    G.MapLiteral map = (G.MapLiteral) depArgs.get(0);
+                    G.MapEntry groupEntry = null;
+                    String groupId = null;
+                    String artifactId = null;
+
+                    String versionStringDelimiter = "'";
+                    for (G.MapEntry arg : map.getElements()) {
+                        if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
+                            continue;
+                        }
+                        J.Literal key = (J.Literal) arg.getKey();
+                        J.Literal value = (J.Literal) arg.getValue();
+                        if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+                            continue;
+                        }
+                        String keyValue = (String) key.getValue();
+                        String valueValue = (String) value.getValue();
+                        if ("group".equals(keyValue) && !newGroupId.equals(valueValue)) {
+                            if (value.getValueSource() != null) {
+                                versionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
+                            }
+                            groupEntry = arg;
+                            groupId = valueValue;
+                        } else if ("name".equals(keyValue)) {
+                            artifactId = valueValue;
+                        }
+                    }
+                    if (groupId == null || artifactId == null) {
+                        return m;
+                    }
+                    String delimiter = versionStringDelimiter;
+                    G.MapEntry finalGroup = groupEntry;
+                    m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                        G.MapLiteral mapLiteral = (G.MapLiteral) arg;
+                        return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> {
+                            if (e == finalGroup) {
+                                return finalGroup.withValue(((J.Literal) finalGroup.getValue())
+                                        .withValue(newGroupId)
+                                        .withValueSource(delimiter + newGroupId + delimiter));
+                            }
+                            return e;
+                        }));
+                    }));
                 }
 
                 return m;
+            }
+
+            private GradleProject updateGradleModel(GradleProject gp) {
+                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
+                Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
+                boolean anyChanged = false;
+                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
+                    if (!StringUtils.isBlank(configuration) && configuration.equals(gdc.getName())) {
+                        newNameToConfiguration.put(gdc.getName(), gdc);
+                        continue;
+                    }
+
+                    GradleDependencyConfiguration newGdc = gdc;
+                    newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
+                        if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
+                            return requested.withGav(requested.getGav().withGroupId(newGroupId));
+                        }
+                        return requested;
+                    }));
+                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
+                        if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
+                            return resolved.withGav(resolved.getGav().withGroupId(newGroupId));
+                        }
+                        return resolved;
+                    }));
+                    anyChanged |= newGdc != gdc;
+                    newNameToConfiguration.put(newGdc.getName(), newGdc);
+                }
+                if (anyChanged) {
+                    gp = gp.withNameToConfiguration(newNameToConfiguration);
+                }
+                return gp;
             }
         });
     }

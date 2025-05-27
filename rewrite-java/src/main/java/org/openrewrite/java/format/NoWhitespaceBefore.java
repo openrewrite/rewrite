@@ -15,13 +15,14 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.style.Style;
 
 import static java.util.Objects.requireNonNull;
 
@@ -53,13 +54,19 @@ public class NoWhitespaceBefore extends Recipe {
         EmptyForIteratorPadStyle emptyForIteratorPadStyle;
 
         @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            // This visitor causes problems for Groovy sources as method invocations without parentheses get squashed
+            return sourceFile instanceof J.CompilationUnit;
+        }
+
+        @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
-                spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
-                noWhitespaceBeforeStyle = cu.getStyle(NoWhitespaceBeforeStyle.class) == null ? Checkstyle.noWhitespaceBeforeStyle() : cu.getStyle(NoWhitespaceBeforeStyle.class);
-                emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
-                emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
+                spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
+                noWhitespaceBeforeStyle = Style.from(NoWhitespaceBeforeStyle.class, cu, Checkstyle::noWhitespaceBeforeStyle);
+                emptyForInitializerPadStyle = Style.from(EmptyForInitializerPadStyle.class, cu);
+                emptyForIteratorPadStyle = Style.from(EmptyForIteratorPadStyle.class, cu);
             }
             return super.visit(tree, ctx);
         }

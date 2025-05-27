@@ -23,7 +23,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -32,6 +32,26 @@ class FindGradleProjectTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FindGradleProject(null));
+    }
+
+    @DocumentExample
+    @Test
+    void isGradleKotlinProject() {
+        rewriteRun(
+          text(
+            """
+              plugins {
+                  id("java")
+              }
+              """,
+            """
+              ~~>plugins {
+                  id("java")
+              }
+              """,
+            spec -> spec.path("build.gradle.kts")
+          )
+        );
     }
 
     @ParameterizedTest
@@ -51,27 +71,6 @@ class FindGradleProjectTest implements RewriteTest {
                   id 'java'
               }
               """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void isGradleKotlinProject() {
-        rewriteRun(
-          text(
-            //language=kotlin
-            """
-              plugins {
-                  id("java")
-              }
-              """,
-            """
-              ~~>plugins {
-                  id("java")
-              }
-              """,
-            spec -> spec.path("build.gradle.kts")
           )
         );
     }

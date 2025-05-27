@@ -1,0 +1,148 @@
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.groovy.format.AutoFormat
+examples:
+- description: ''
+  sources:
+  - before: |
+      /*
+       * This is a sample file.
+       */
+
+
+
+
+      package com.intellij.samples
+
+      class Test {
+      }
+    after: |
+      /*
+       * This is a sample file.
+       */
+
+
+      package com.intellij.samples
+
+      class Test {
+      }
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.groovy.format.GStringCurlyBraces
+examples:
+- description: ''
+  sources:
+  - before: |
+      def name = 'world'
+      "Hello $name!"
+    after: |
+      def name = 'world'
+      "Hello ${name}!"
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangePackage
+examples:
+- description: ''
+  parameters:
+  - a.b
+  - x.y
+  - 'false'
+  sources:
+  - before: |
+      import a.b.Original
+
+      class A {
+          Original type
+      }
+    after: |
+      import x.y.Original
+
+      class A {
+          Original type
+      }
+    language: groovy
+  - before: |
+      package a.b
+      class Original {}
+    after: |
+      package x.y
+      class Original {}
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangeType
+examples:
+- description: ''
+  parameters:
+  - file
+  - newFile
+  - 'false'
+  sources:
+  - before: |
+      class file {
+      }
+    after: |
+      class newFile {
+      }
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ShortenFullyQualifiedTypeReferences
+examples:
+- description: ''
+  sources:
+  - before: |
+      package foo
+
+      /* comment */
+      import java.util.List
+
+      class Test {
+          List<String> l = new java.util.ArrayList<>()
+      }
+    after: |
+      package foo
+
+      /* comment */
+      import java.util.ArrayList
+      import java.util.List
+
+      class Test {
+          List<String> l = new ArrayList<>()
+      }
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindTypes
+examples:
+- description: ''
+  parameters:
+  - org.junit.jupiter.api.Test
+  - 'null'
+  sources:
+  - before: |
+      import org.junit.jupiter.api.Test
+      class A {
+          Test t
+      }
+    after: |
+      import org.junit.jupiter.api.Test
+      class A {
+          /*~~>*/Test t
+      }
+    language: groovy

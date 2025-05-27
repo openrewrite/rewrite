@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -43,8 +44,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
               public class A {
                   boolean a;
                   {
-                      if(true == a) {
-                      }
+                      if (true == a) {}
+                      if (a == true) {}
                   }
               }
               """,
@@ -52,8 +53,55 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
               public class A {
                   boolean a;
                   {
-                      if(a) {
-                      }
+                      if (a) {}
+                      if (a) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @DocumentExample
+    @Test
+    void skipMissingTypeAttribution() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+          java(
+            """
+              public class A {
+                  boolean a = null instanceof Unknown || null instanceof java.lang.Unknown;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void simplifyEqualsLiteralFalseIf() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean a;
+                  boolean b;
+                  {
+                      if (false == a) {}
+                      if (a == false) {}
+                      if ((a && b) == false) {}
+                      if (false == (a && b)) {}
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean a;
+                  boolean b;
+                  {
+                      if (!a) {}
+                      if (!a) {}
+                      if (!(a && b)) {}
+                      if (!(a && b)) {}
                   }
               }
               """
@@ -76,7 +124,9 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       boolean f = (e == true) || e;
                       boolean g = f && false;
                       boolean h = g;
-                      boolean i = (a != false);
+                      boolean i = a == false;
+                      boolean j = a != false;
+                      boolean k = a != true;
                   }
               }
               """,
@@ -91,7 +141,9 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       boolean f = e;
                       boolean g = false;
                       boolean h = g;
-                      boolean i = a;
+                      boolean i = !a;
+                      boolean j = a;
+                      boolean k = !a;
                   }
               }
               """
@@ -108,6 +160,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       boolean a = !false;
                       boolean b = !true;
+                      boolean c = !(false);
+                      boolean d = !(true);
+                      boolean e = !((false));
+                      boolean f = !((true));
                   }
               }
               """,
@@ -116,6 +172,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       boolean a = true;
                       boolean b = false;
+                      boolean c = true;
+                      boolean d = false;
+                      boolean e = true;
+                      boolean f = false;
                   }
               }
               """
@@ -374,6 +434,14 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       boolean i=a!=true;
                   }
               }
+              """,
+            """
+              public class A {
+                  {
+                      boolean a=true;
+                      boolean i=!a;
+                  }
+              }
               """
           )
         );
@@ -398,6 +466,126 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       if (false) {
                           System.out.println("");
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ternaryConstant() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  String alwaysA() {
+                      return true ? "a" : "b";
+                  }
+                  String alwaysA2() {
+                      return (true) ? "a" : "b";
+                  }
+                  String alwaysA3() {
+                      return (true ? "a" : "b");
+                  }
+                  String alwaysA4() {
+                      return !false ? "a" : "b";
+                  }
+                  String alwaysA5() {
+                      return (!false) ? "a" : "b";
+                  }
+                  String alwaysA6() {
+                      return !(false) ? "a" : "b";
+                  }
+                  String alwaysB() {
+                      return false ? "a" : "b";
+                  }
+              }
+              """,
+            """
+              class A {
+                  String alwaysA() {
+                      return "a";
+                  }
+                  String alwaysA2() {
+                      return "a";
+                  }
+                  String alwaysA3() {
+                      return "a";
+                  }
+                  String alwaysA4() {
+                      return "a";
+                  }
+                  String alwaysA5() {
+                      return "a";
+                  }
+                  String alwaysA6() {
+                      return "a";
+                  }
+                  String alwaysB() {
+                      return "b";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ternaryDoubleNegation() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  boolean orElse(Boolean nullable, boolean nonnull) {
+                      return !(nullable != null ? nullable : nonnull);
+                  }
+              }
+              """,
+            """
+              class A {
+                  boolean orElse(Boolean nullable, boolean nonnull) {
+                      return nullable == null ? nonnull : nullable;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ternayNegation() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m1(boolean a, boolean b, boolean c) {
+                      return !(a ? b : c);
+                  }
+                  boolean m2(boolean a, boolean b, boolean c) {
+                      return !(!a ? b : c);
+                  }
+                  boolean m3(boolean a, boolean b, boolean c) {
+                      return !a ? b : c;
+                  }
+                  boolean m4(boolean a, boolean b, boolean c) {
+                      return a ? b : c;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m1(boolean a, boolean b, boolean c) {
+                      return a ? c : b;
+                  }
+                  boolean m2(boolean a, boolean b, boolean c) {
+                      return a ? b : c;
+                  }
+                  boolean m3(boolean a, boolean b, boolean c) {
+                      return a ? c : b;
+                  }
+                  boolean m4(boolean a, boolean b, boolean c) {
+                      return a ? b : c;
                   }
               }
               """
@@ -448,6 +636,27 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                           return true;
                       }
                       return /*a*/false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleMethodInvocationNotSimplified() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  void foo() {
+                      boolean a = booleanExpression() || booleanExpression();
+                      boolean b = !(booleanExpression() && booleanExpression());
+                      boolean c = booleanExpression() == booleanExpression();
+                      boolean d = booleanExpression() != booleanExpression();
+                  }
+                  boolean booleanExpression() {
+                    return true;
                   }
               }
               """
@@ -523,5 +732,85 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         } else {
             rewriteRun(java(beforeJava, template.formatted(after)));
         }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-feature-flags/issues/40")
+    @Test
+    void simplifyStringLiteralEqualsStringLiteral() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      String foo = "foo";
+                      if ("foo".equals("foo")) {}
+                      if (foo.equals(foo)) {}
+                      if (foo.equals("foo")) {}
+                      if ("foo".equals(foo)) {}
+                      if ("foo".equals("bar")) {}
+                  }
+              }
+              """,
+            """
+              class A {
+                  {
+                      String foo = "foo";
+                      if (true) {}
+                      if (true) {}
+                      if (foo.equals("foo")) {}
+                      if ("foo".equals(foo)) {}
+                      if (false) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4821")
+    @Test
+    void stringComparisonInBinary() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private boolean notNullAndNotEqual(String one, String other) {
+                      return one != null && !one.equals(other);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void defensiveSetter() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  String a;
+                  void setA(String a) {
+                      if (!a.equals(this.a)) {
+                          this.a = a;
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class B {
+                  String b;
+                  void setB(String b) {
+                      if (b.equals(this.b)) {
+                          return;
+                      }
+                      this.b = b;
+                  }
+              }
+              """
+          )
+        );
     }
 }

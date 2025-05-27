@@ -5,22 +5,18 @@ plugins {
 dependencies {
     implementation("org.assertj:assertj-core:latest.release")
     implementation(project(":rewrite-java"))
+    implementation(project(":rewrite-groovy"))
     implementation(project(":rewrite-test"))
 
     testImplementation("io.github.classgraph:classgraph:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
-    testRuntimeOnly(project(":rewrite-java-17"))
-    testRuntimeOnly("junit:junit:4.13.2") {
-        because("Used for RemoveUnneededAssertionTest")
-    }
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.apache.hbase:hbase-shaded-client:2.4.11")
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
-    testRuntimeOnly("org.projectlombok:lombok:latest.release")
-    testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
     testRuntimeOnly(project(":rewrite-yaml"))
-    testImplementation(project(":rewrite-maven"))
-    testRuntimeOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
+    testImplementation(project(":rewrite-properties"))
+    testImplementation(project(":rewrite-xml"))
 }
 
 tasks.withType<Javadoc> {
@@ -29,8 +25,8 @@ tasks.withType<Javadoc> {
 }
 
 tasks.named<JavaCompile>("compileTestJava") {
-    sourceCompatibility = JavaVersion.VERSION_17.toString()
-    targetCompatibility = JavaVersion.VERSION_17.toString()
+    sourceCompatibility = JavaVersion.VERSION_21.toString()
+    targetCompatibility = JavaVersion.VERSION_21.toString()
 
     options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
 }

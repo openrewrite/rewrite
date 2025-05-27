@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -32,7 +31,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings("GroovyUnusedAssignment")
+@SuppressWarnings({"GroovyUnusedAssignment", "DataFlowIssue", "GrUnnecessaryDefModifier"})
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
@@ -42,6 +41,19 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void finalKeyword() {
+        rewriteRun(
+          groovy("final a = 1")
+        );
+    }
+
+    @Test
+    void nestedGenerics() {
+        rewriteRun(
+          groovy("final map = new HashMap<String, List<String>>()")
+        );
+    }
 
     @Test
     void singleVariableDeclaration() {
@@ -70,10 +82,10 @@ class VariableDeclarationsTest implements RewriteTest {
               List<? extends String> l
               """,
             spec -> spec.beforeRecipe(cu -> {
-                var varDecl = (J.VariableDeclarations) cu.getStatements().get(0);
+                var varDecl = (J.VariableDeclarations) cu.getStatements().getFirst();
                 assertThat(varDecl.getTypeExpression()).isInstanceOf(J.ParameterizedType.class);
                 var typeExpression = requireNonNull(requireNonNull((J.ParameterizedType) varDecl.getTypeExpression())
-                  .getTypeParameters()).get(0);
+                  .getTypeParameters()).getFirst();
                 assertThat(typeExpression).isInstanceOf(J.Wildcard.class);
                 assertThat(((J.Wildcard) typeExpression).getBound()).isEqualTo(J.Wildcard.Bound.Extends);
             })
@@ -103,7 +115,8 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void numericValueWithUnderscores() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
           def l1 = 10_000L
           def l2 = 10_000l
           def i = 10_000
@@ -111,11 +124,11 @@ class VariableDeclarationsTest implements RewriteTest {
           def d2 = 10_000D
           def f1 = 10_000f
           def f2 = 10_000.0F
-          """)
+          """
+          )
         );
     }
 
-    @Disabled
     @Test
     void singleTypeMultipleVariableDeclaration() {
         rewriteRun(
@@ -123,7 +136,6 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void multipleTypeMultipleVariableDeclaration() {
         rewriteRun(
@@ -169,8 +181,47 @@ class VariableDeclarationsTest implements RewriteTest {
                         return SearchResult.found(multiVariable);
                     }
                 }, cu, new ArrayList<>(), J.VariableDeclarations.class, v -> v);
-                assertThat(variables.get(0).getLeadingAnnotations()).hasSize(1);
+                assertThat(variables.getFirst().getLeadingAnnotations()).hasSize(1);
             })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4702")
+    @Test
+    void nestedTypeParameters() {
+        rewriteRun(
+          groovy(
+                """
+            class A {
+                def map = new HashMap<String, List<String>>()
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4705")
+    @Test
+    void defAndExplicitReturnType() {
+        rewriteRun(
+          groovy(
+            """
+              def /*int*/ int one = 1
+              def /*Object*/ Object two = 2
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4877")
+    @Test
+    void defVariableStartsWithDef() {
+        rewriteRun(
+          groovy(
+            """
+              def defaultPublicStaticFinal = 0
+              """
           )
         );
     }

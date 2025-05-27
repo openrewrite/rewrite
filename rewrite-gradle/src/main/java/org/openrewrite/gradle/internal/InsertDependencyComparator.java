@@ -15,55 +15,67 @@
  */
 package org.openrewrite.gradle.internal;
 
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class InsertDependencyComparator implements Comparator<Statement> {
     private final Map<Statement, Float> positions = new LinkedHashMap<>();
 
+    @Getter
+    @Nullable
     private Statement afterDependency;
+
+    @Getter
+    @Nullable
     private Statement beforeDependency;
 
-    public InsertDependencyComparator(List<Statement> existingStatements, J.MethodInvocation dependencyToAdd) {
-        for (int i = 0, len = existingStatements.size(); i < len; i++) {
-            positions.put(existingStatements.get(i), (float) i);
+    public InsertDependencyComparator(List<Statement> statements, J.MethodInvocation dependencyToAdd) {
+        for (int i = 0, len = statements.size(); i < len; i++) {
+            positions.put(statements.get(i), (float) i);
         }
 
-        List<Statement> ideallySortedDependencies = existingStatements.stream()
-                .filter(s -> s instanceof J.MethodInvocation || (s instanceof J.Return && ((J.Return) s).getExpression() instanceof J.MethodInvocation))
-                .collect(Collectors.toList());
+        // Make a copy of statements with only dependencies
+        List<Statement> dependencies = new ArrayList<>(statements.size() + 1);
+        for (Statement s : statements) {
+            if (s instanceof J.MethodInvocation || (s instanceof J.Return && ((J.Return) s).getExpression() instanceof J.MethodInvocation)) {
+                dependencies.add(s);
+            }
+        }
 
-        ideallySortedDependencies.add(dependencyToAdd);
-        ideallySortedDependencies.sort(dependenciesComparator);
+        if (dependencies.isEmpty()) {
+            positions.put(dependencyToAdd, statements.size() + 0.5f);
+            return;
+        }
 
-        for (int i = 0, len = ideallySortedDependencies.size(); i < len; i++) {
-            Statement d = ideallySortedDependencies.get(i);
-            if (dependencyToAdd == d) {
+        // Fill `afterDependency` and `beforeDependency`
+        dependencies.add(dependencyToAdd);
+        dependencies.sort(dependenciesComparator);
+        for (int i = 0, len = dependencies.size(); i < len; i++) {
+            if (dependencyToAdd == dependencies.get(i)) {
                 if (i > 0) {
-                    afterDependency = ideallySortedDependencies.get(i - 1);
+                    afterDependency = dependencies.get(i - 1);
                 }
-                if (i + 1 < ideallySortedDependencies.size()) {
-                    beforeDependency = ideallySortedDependencies.get(i + 1);
+                if (i + 1 < dependencies.size()) {
+                    beforeDependency = dependencies.get(i + 1);
                 }
                 break;
             }
         }
 
-        float insertPos = afterDependency == null ? -0.5f : 0.5f;
-        List<Statement> statements = new ArrayList<>(positions.keySet());
-        for (float f = afterDependency == null ? 0 : positions.get(afterDependency); f < statements.size(); f++) {
+        // Put `dependencyToAdd` at the proper place in the positions map
+        boolean isFirst = afterDependency == null;
+        for (float f = isFirst ? 0 : positions.get(afterDependency); f < statements.size(); f++) {
             Statement s = statements.get((int) f);
             if (!(s instanceof J.MethodInvocation || (s instanceof J.Return && ((J.Return) s).getExpression() instanceof J.MethodInvocation))) {
                 continue;
             }
-            positions.put(dependencyToAdd, positions.get(statements.get((int) f)) + insertPos);
+            positions.put(dependencyToAdd, positions.get(s) + (isFirst ? -0.5f : 0.5f));
             break;
         }
     }
@@ -73,15 +85,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
         return positions.get(o1).compareTo(positions.get(o2));
     }
 
-    public Statement getAfterDependency() {
-        return afterDependency;
-    }
-
-    public Statement getBeforeDependency() {
-        return beforeDependency;
-    }
-
-    private static Comparator<Statement> dependenciesComparator = (s1, s2) -> {
+    private static final Comparator<Statement> dependenciesComparator = (s1, s2) -> {
         J.MethodInvocation d1;
         if (s1 instanceof J.Return) {
             d1 = (J.MethodInvocation) ((J.Return) s1).getExpression();
@@ -96,6 +100,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
             d2 = (J.MethodInvocation) s2;
         }
 
+        assert d1 != null && d2 != null;
         String configuration1 = d1.getSimpleName();
         String configuration2 = d2.getSimpleName();
         if (!configuration1.equals(configuration2)) {
@@ -135,7 +140,14 @@ public class InsertDependencyComparator implements Comparator<Statement> {
 
     private static Optional<String> getEntry(String entry, J.MethodInvocation invocation) {
         if (invocation.getArguments().get(0) instanceof J.Literal) {
-            Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) invocation.getArguments().get(0)).getValue());
+            Object value = ((J.Literal) invocation.getArguments().get(0)).getValue();
+            if(value == null) {
+                return Optional.empty();
+            }
+            Dependency dependency = DependencyStringNotationConverter.parse((String) value);
+            if(dependency == null) {
+                return Optional.empty();
+            }
             switch (entry) {
                 case "group":
                     return Optional.ofNullable(dependency.getGroupId());

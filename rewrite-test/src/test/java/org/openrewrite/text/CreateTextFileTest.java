@@ -15,6 +15,7 @@
  */
 package org.openrewrite.text;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -24,6 +25,19 @@ import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class CreateTextFileTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void hasOverwrittenFile() {
+        rewriteRun(
+          spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", true)),
+          text(
+            "hello",
+            "foo",
+            spec -> spec.path(".github/CODEOWNERS")
+          )
+        );
+    }
 
     @Test
     void hasCreatedFile() {
@@ -45,19 +59,6 @@ class CreateTextFileTest implements RewriteTest {
             null,
             "foo\n",
             spec -> spec.path(".github/CODEOWNERS").noTrim()
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void hasOverwrittenFile() {
-        rewriteRun(
-          spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", true)),
-          text(
-            "hello",
-            "foo",
-            spec -> spec.path(".github/CODEOWNERS")
           )
         );
     }
@@ -103,6 +104,7 @@ class CreateTextFileTest implements RewriteTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite-jenkins/issues/52")
     void shouldOverrideDifferentSourceFileType() {
+        @Language("groovy")
         String after = """
           /*
            See the documentation for more options:

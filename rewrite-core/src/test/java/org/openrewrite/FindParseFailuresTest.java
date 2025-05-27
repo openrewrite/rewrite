@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.marker.BuildMetadata;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.table.ParseFailures;
 import org.openrewrite.test.RecipeSpec;
@@ -23,16 +24,21 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class FindParseFailuresTest implements RewriteTest {
+class FindParseFailuresTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindParseFailures(5, null, null));
+        spec.recipe(new FindParseFailures(5, null, null, null));
     }
 
     @Test
@@ -41,7 +47,7 @@ public class FindParseFailuresTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTable(ParseFailures.Row.class, rows -> {
               assertThat(rows).hasSize(1);
-              ParseFailures.Row row = rows.get(0);
+              ParseFailures.Row row = rows.getFirst();
               assertThat(row.getParser()).isEqualTo("PlainTextParser");
               assertThat(row.getSourcePath()).isEqualTo("file.txt");
               assertThat(row.getExceptionType()).isEqualTo("RuntimeException");
@@ -53,8 +59,53 @@ public class FindParseFailuresTest implements RewriteTest {
             spec -> spec
               .mapBeforeRecipe(pt -> pt
                 .withSnippets(List.of(new PlainText.Snippet(
-                  Tree.randomId(),
-                  new Markers(Tree.randomId(), List.of(per)),
+                  randomId(),
+                  new Markers(randomId(), List.of(per)),
+                  pt.getText())))
+                .withText("")
+              )
+          )
+        );
+    }
+
+    @Test
+    void findParseFailuresAfter() {
+        long t0 = LocalDate.parse("2025-01-01").atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli();
+        long t1 = LocalDate.parse("2025-01-02").atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli();
+        ParseExceptionResult per = ParseExceptionResult.build(PlainTextParser.class, new RuntimeException("boom"), null);
+        rewriteRun(
+          spec -> spec.recipe(new FindParseFailures(5, null, null, "2025-01-02"))
+            .dataTable(ParseFailures.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                ParseFailures.Row row = rows.getFirst();
+                assertThat(row.getParser()).isEqualTo("PlainTextParser");
+                assertThat(row.getSourcePath()).isEqualTo("file1.txt");
+                assertThat(row.getExceptionType()).isEqualTo("RuntimeException");
+                assertThat(row.getSnippet()).isEqualTo("hello");
+            }),
+          text(
+            "hello world!",
+            spec -> spec
+              .path("file0.txt")
+              .mapBeforeRecipe(pt -> pt
+                .withMarkers(Markers.build(Set.of(new BuildMetadata(randomId(), Map.of("createdAt", Long.toString(t0))))))
+                .withSnippets(List.of(new PlainText.Snippet(
+                  randomId(),
+                  new Markers(randomId(), List.of(per)),
+                  pt.getText())))
+                .withText("")
+              )
+          ),
+          text(
+            "hello world!",
+            "~~(%s)~~>hello world!".formatted(per.getMessage()),
+            spec -> spec
+              .path("file1.txt")
+              .mapBeforeRecipe(pt -> pt
+                .withMarkers(Markers.build(Set.of(new BuildMetadata(randomId(), Map.of("createdAt", Long.toString(t1))))))
+                .withSnippets(List.of(new PlainText.Snippet(
+                  randomId(),
+                  new Markers(randomId(), List.of(per)),
                   pt.getText())))
                 .withText("")
               )

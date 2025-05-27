@@ -20,11 +20,20 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyArtifactIdTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi());
+    }
 
     @DocumentExample
     @Test
@@ -36,11 +45,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   implementation 'org.springframework.boot:spring-boot-starter:2.5.4'
               }
@@ -49,11 +58,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   implementation 'org.springframework.boot:new-starter:2.5.4'
               }
@@ -72,11 +81,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release'
                   api "org.openrewrite:rewrite-core:latest.release"
@@ -86,16 +95,22 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   api 'org.openrewrite:dewrite-core:latest.release'
                   api "org.openrewrite:dewrite-core:latest.release"
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(cu.getMarkers().findFirst(GradleProject.class))
+                .map(gp -> gp.getConfiguration("api"))
+                .map(conf -> conf.findRequestedDependency("org.openrewrite", "dewrite-core"))
+                .as("Requested dependency model should have been updated to have artifactId dewrite")
+                .isPresent())
           )
         );
     }
@@ -110,11 +125,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release"
@@ -124,11 +139,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   api group: 'org.openrewrite', name: 'dewrite-core', version: 'latest.release'
                   api group: "org.openrewrite", name: "dewrite-core", version: "latest.release"
@@ -138,42 +153,43 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
-    @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
-    void worksWithoutVersion(String group, String artifact) {
+    @Test
+    void worksWithoutVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyArtifactId(group, artifact, "dewrite-core", null)),
+          spec -> spec.recipe(new ChangeDependencyArtifactId("org.openrewrite", "rewrite-core", "rewrite-gradle", null)),
           buildGradle(
             """
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api 'org.openrewrite:rewrite-core'
                   api "org.openrewrite:rewrite-core"
-                  api group: 'org.openrewrite', name: 'dewrite-core'
-                  api group: "org.openrewrite", name: "dewrite-core"
+                  api group: 'org.openrewrite', name: 'rewrite-gradle'
+                  api group: "org.openrewrite", name: "rewrite-gradle"
               }
               """,
             """
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
-                  api 'org.openrewrite:dewrite-core'
-                  api "org.openrewrite:dewrite-core"
-                  api group: 'org.openrewrite', name: 'dewrite-core'
-                  api group: "org.openrewrite", name: "dewrite-core"
+                  implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
+                  api 'org.openrewrite:rewrite-gradle'
+                  api "org.openrewrite:rewrite-gradle"
+                  api group: 'org.openrewrite', name: 'rewrite-gradle'
+                  api group: "org.openrewrite", name: "rewrite-gradle"
               }
               """
           )
@@ -190,11 +206,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:tests'
                   api "org.openrewrite:rewrite-core:latest.release:tests"
@@ -206,11 +222,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   api 'org.openrewrite:dewrite-core:latest.release:tests'
                   api "org.openrewrite:dewrite-core:latest.release:tests"
@@ -232,11 +248,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   api 'org.eclipse.jetty:jetty-servlet@jar'
                   api "org.eclipse.jetty:jetty-servlet@jar"
@@ -256,11 +272,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   api 'org.eclipse.jetty:jetty-servlet-tests@jar'
                   api "org.eclipse.jetty:jetty-servlet-tests@jar"
@@ -287,12 +303,28 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyArtifactId("javax.validation", "validation-api", "jakarta.validation-api", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+                            
+              repositories {
+                  mavenCentral()
+              }
+
               dependencies {
                   def jakartaVersion = "2.0.1.Final"
                   implementation "javax.validation:validation-api:${jakartaVersion}"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+                            
+              repositories {
+                  mavenCentral()
+              }   
+
               dependencies {
                   def jakartaVersion = "2.0.1.Final"
                   implementation "javax.validation:jakarta.validation-api:${jakartaVersion}"
@@ -312,11 +344,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   implementation platform("org.optaplanner:optaplanner-bom:9.37.0.Final")
                   implementation "org.optaplanner:optaplanner-core"
@@ -326,15 +358,135 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   implementation platform("org.optaplanner:timefold-solver-bom:9.37.0.Final")
                   implementation "org.optaplanner:optaplanner-core"
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInJvmTestSuite() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyArtifactId("org.springframework.boot", "spring-boot-starter", "new-starter", "")),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.springframework.boot:spring-boot-starter:2.5.4'
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation 'org.springframework.boot:new-starter:2.5.4'
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithDependencyDefinedInBuildScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyArtifactId("org.springframework.boot", "spring-boot-starter", "new-starter", "")),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.springframework.boot:spring-boot-starter:2.5.4'
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath 'org.springframework.boot:new-starter:2.5.4'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyArtifactId("org.springframework.boot", "spring-boot-starter", "new-starter", null)),
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter:2.5.4")
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.springframework.boot:new-starter:2.5.4")
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
               """
           )
         );

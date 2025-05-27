@@ -16,11 +16,11 @@
 package org.openrewrite.java;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.cleanup.RenameJavaDocParamNameVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -43,7 +43,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        if (!VariableNameUtils.JavaKeywords.isReserved(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
+        if (!JavaKeywordUtils.isReservedKeyword(toName) && !JavaKeywordUtils.isReservedLiteral(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
             doAfterVisit(new RenameVariableVisitor(variable, toName));
             return variable;
         }
@@ -90,7 +90,12 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             }
             Cursor parent = getCursor().getParentTreeCursor();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
-                if (parent.getValue() instanceof J.FieldAccess) {
+                if (ident.getFieldType() != null && ident.getFieldType().getOwner() instanceof JavaType.FullyQualified &&
+                        TypeUtils.isOfType(ident.getFieldType(), renameVariable.getVariableType())) {
+                    parent.putMessage("renamed", true);
+                    return ident.withFieldType(ident.getFieldType().withName(newName)).withSimpleName(newName);
+                } else if (parent.getValue() instanceof J.FieldAccess &&
+                        !ident.equals(((J.FieldAccess) parent.getValue()).getTarget())) {
                     if (fieldAccessTargetsVariable(parent.getValue())) {
                         if (ident.getFieldType() != null) {
                             ident = ident.withFieldType(ident.getFieldType().withName(newName));
@@ -149,19 +154,20 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         }
 
         /**
-         * FieldAccess targets the variable if its target is an Identifier and either
-         * its target FieldType equals variable.Name.FieldType
-         * or its target Type equals variable.Name.FieldType.Owner
+         * FieldAccess targets the variable if its target type equals variable.Name.FieldType.Owner.
          */
         private boolean fieldAccessTargetsVariable(J.FieldAccess fieldAccess) {
-            if (renameVariable.getName().getFieldType() != null && fieldAccess.getTarget() instanceof J.Identifier) {
-                J.Identifier fieldAccessTarget = (J.Identifier) fieldAccess.getTarget();
+            if (renameVariable.getName().getFieldType() != null &&
+                    fieldAccess.getTarget().getType() != null) {
+                JavaType targetType = resolveType(fieldAccess.getTarget().getType());
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
-                JavaType fieldAccessTargetType = fieldAccessTarget.getType() instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fieldAccessTarget.getType()).getType() : fieldAccessTarget.getType();
-                return variableNameFieldType.equals(fieldAccessTarget.getFieldType()) ||
-                       (fieldAccessTargetType != null && fieldAccessTargetType.equals(variableNameFieldType.getOwner()));
+                return TypeUtils.isOfType(resolveType(variableNameFieldType.getOwner()), targetType);
             }
             return false;
+        }
+
+        private @Nullable JavaType resolveType(@Nullable JavaType type) {
+            return type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type;
         }
 
         @Override
@@ -197,9 +203,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             return super.visitCatch(_catch, p);
         }
 
-        @Nullable
         @Override
-        public J postVisit(J tree, P p) {
+        public @Nullable J postVisit(J tree, P p) {
             maybeChangeNameScope(tree);
             return super.postVisit(tree, p);
         }

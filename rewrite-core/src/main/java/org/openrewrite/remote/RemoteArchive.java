@@ -19,11 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Checksum;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.Markers;
 
@@ -34,6 +34,7 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -46,8 +47,8 @@ import java.util.zip.ZipInputStream;
  * Useful when a Recipe wishes to create a SourceFile based on something specific from within a remote archive, but not
  * the entire archive.
  * <p>
- * Downloading and extracting the correct file from within the archive are not handled during Recipe execution.
- * Post-processing of Recipe results by a build plugin or other caller of OpenRewrite is responsible for this.
+ * Downloading and extracting the correct file from within the archive are not handled during recipe execution.
+ * Post-processing of recipe results by a build plugin or other caller of OpenRewrite is responsible for this.
  */
 @Value
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -69,6 +70,7 @@ public class RemoteArchive implements Remote {
     FileAttributes fileAttributes;
 
     @Language("markdown")
+    @Nullable
     String description;
 
     /**
@@ -91,9 +93,16 @@ public class RemoteArchive implements Remote {
         RemoteArtifactCache cache = RemoteExecutionContextView.view(ctx).getArtifactCache();
         try {
             Path localArchive = cache.compute(uri, () -> {
+                if ("file".equals(uri.getScheme())) {
+                    return Files.newInputStream(Paths.get(uri));
+                }
                 //noinspection resource
                 HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
-                return response.getBody();
+                if (response.isSuccessful()) {
+                    return response.getBody();
+                } else {
+                    throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
+                }
             }, ctx.getOnError());
 
             if (localArchive == null) {

@@ -59,6 +59,7 @@ public abstract class CoordinateBuilder {
             return new HclCoordinates(tree, Space.Location.BLOCK_CLOSE, HclCoordinates.Mode.BEFORE, idealOrdering);
         }
 
+        @Override
         public HclCoordinates replace() {
             return replace(Space.Location.BLOCK);
         }

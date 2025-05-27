@@ -21,10 +21,8 @@ import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
-import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored", "PointlessBooleanExpression"})
@@ -50,8 +48,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
@@ -75,8 +72,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(5);
     }
@@ -97,8 +93,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getMethodDeclarationParameters().getAlignWhenMultiple()).isTrue();
     }
@@ -126,7 +121,7 @@ class AutodetectTest implements RewriteTest {
         cus.forEach(detector::sample);
         var styles = detector.build();
 
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = styles.getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -162,8 +157,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
@@ -205,8 +199,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(2);
@@ -238,8 +231,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
@@ -265,8 +257,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -296,8 +287,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -328,8 +318,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(3);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(3);
@@ -359,8 +348,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -385,8 +373,7 @@ class AutodetectTest implements RewriteTest {
         );
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -416,8 +403,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -446,10 +432,10 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
+        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
 
-        assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
+
+        assertThat(importLayout.getLayout().getFirst()).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
         assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(2))
@@ -505,10 +491,9 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
+        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
 
-        assertThat(importLayout.getLayout().get(0))
+        assertThat(importLayout.getLayout().getFirst())
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
           .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("com\\.example\\..+"));
@@ -545,8 +530,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
+        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
 
         assertThat(importLayout.getClassCountToUseStarImport()).isEqualTo(6);
     }
@@ -582,8 +566,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
+        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
 
         assertThat(importLayout.getClassCountToUseStarImport()).isEqualTo(2147483647);
         assertThat(importLayout.getNameCountToUseStarImport()).isEqualTo(2147483647);
@@ -603,8 +586,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isTrue();
         assertThat(spacesStyle.getOther().getAfterComma()).isFalse();
@@ -624,8 +606,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -646,8 +627,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeColonInForEach()).isTrue();
     }
@@ -666,8 +646,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getAfterTypeCast()).isTrue();
     }
@@ -687,8 +666,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeForSemicolon()).isFalse();
         assertThat(spacesStyle.getOther().getAfterForSemicolon()).isTrue();
@@ -708,8 +686,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -729,8 +706,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isFalse();
@@ -750,8 +726,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isTrue();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -771,8 +746,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -796,8 +770,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -825,8 +798,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -849,8 +821,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getWithin().getEmptyMethodCallParentheses()).isFalse();
     }
@@ -870,8 +841,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getWithin().getMethodCallParentheses()).isTrue();
     }
@@ -894,8 +864,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var wrappingAndBracesStyle = NamedStyles.merge(WrappingAndBracesStyle.class, singletonList(styles));
+        var wrappingAndBracesStyle = detector.build().getStyle(WrappingAndBracesStyle.class);
 
         assertThat(wrappingAndBracesStyle.getIfStatement().getElseOnNewLine()).isFalse();
     }
@@ -920,8 +889,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var wrappingAndBracesStyle = NamedStyles.merge(WrappingAndBracesStyle.class, singletonList(styles));
+        var wrappingAndBracesStyle = detector.build().getStyle(WrappingAndBracesStyle.class);
 
         assertThat(wrappingAndBracesStyle.getIfStatement().getElseOnNewLine()).isTrue();
     }
@@ -939,8 +907,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var lineFormatStyle = NamedStyles.merge(GeneralFormatStyle.class, singletonList(styles));
+        var lineFormatStyle = detector.build().getStyle(GeneralFormatStyle.class);
 
         assertThat(lineFormatStyle.isUseCRLFNewLines()).isTrue();
     }
@@ -958,8 +925,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var lineFormatStyle = NamedStyles.merge(GeneralFormatStyle.class, singletonList(styles));
+        var lineFormatStyle = detector.build().getStyle(GeneralFormatStyle.class);
 
         assertThat(lineFormatStyle.isUseCRLFNewLines()).isFalse();
     }
@@ -988,8 +954,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(6);
@@ -1039,8 +1004,7 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var styles = detector.build();
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
@@ -1068,8 +1032,7 @@ class AutodetectTest implements RewriteTest {
 
             var detector = Autodetect.detector();
             cus.forEach(detector::sample);
-            var styles = detector.build();
-            var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+            var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
             assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
             assertThat(tabsAndIndents.getContinuationIndent())
@@ -1098,8 +1061,7 @@ class AutodetectTest implements RewriteTest {
 
             var detector = Autodetect.detector();
             cus.forEach(detector::sample);
-            var styles = detector.build();
-            var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+            var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
             assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
             assertThat(tabsAndIndents.getContinuationIndent())
@@ -1127,8 +1089,7 @@ class AutodetectTest implements RewriteTest {
 
             var detector = Autodetect.detector();
             cus.forEach(detector::sample);
-            var styles = detector.build();
-            var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+            var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
             assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
             assertThat(tabsAndIndents.getContinuationIndent())
@@ -1157,8 +1118,7 @@ class AutodetectTest implements RewriteTest {
 
             var detector = Autodetect.detector();
             cus.forEach(detector::sample);
-            var styles = detector.build();
-            var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+            var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
 
             assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
             assertThat(tabsAndIndents.getContinuationIndent())

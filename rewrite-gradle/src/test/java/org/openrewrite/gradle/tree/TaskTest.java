@@ -42,7 +42,7 @@ class TaskTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1929")
     @Test
-    void testDsl() {
+    void dsl() {
         rewriteRun(
           spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           buildGradle(

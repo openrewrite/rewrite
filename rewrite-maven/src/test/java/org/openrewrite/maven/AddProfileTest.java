@@ -17,23 +17,20 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.xml.Assertions.xml;
 
-public class AddProfileTest implements RewriteTest {
+class AddProfileTest implements RewriteTest {
 
 
     @DocumentExample
     @Test
     void addProfileToPom() {
         rewriteRun(
-          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
-            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>"))
-          .cycles(1)
-          .expectedCyclesThatMakeChanges(1),
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
               <project>
@@ -72,10 +69,8 @@ public class AddProfileTest implements RewriteTest {
     @Test
     void preExistingOtherProfile() {
         rewriteRun(
-          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
-            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>"))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
               <project>
@@ -127,10 +122,8 @@ public class AddProfileTest implements RewriteTest {
     @Test
     void preExistingMatchingProfile() {
         rewriteRun(
-          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
-            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>"))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
               <project>
@@ -138,6 +131,7 @@ public class AddProfileTest implements RewriteTest {
                 <artifactId>artifact</artifactId>
                 <version>1</version>
                 <profiles>
+                  <!-- retained comment -->
                   <profile>
                     <id>myprofile</id>
                     <activation>
@@ -153,6 +147,7 @@ public class AddProfileTest implements RewriteTest {
                 <artifactId>artifact</artifactId>
                 <version>1</version>
                 <profiles>
+                  <!-- retained comment -->
                   <profile>
                     <id>myprofile</id>
                     <activation>
@@ -191,4 +186,3 @@ public class AddProfileTest implements RewriteTest {
     }
 
 }
-

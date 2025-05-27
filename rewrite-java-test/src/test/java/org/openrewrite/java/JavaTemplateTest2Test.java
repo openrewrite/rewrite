@@ -44,6 +44,36 @@ class JavaTemplateTest2Test implements RewriteTest {
         }
     });
 
+    @DocumentExample
+    @Test
+    void chainedMethodInvocationsAsNewClassArgument2() {
+        rewriteRun(
+          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
+          java(
+            """
+              class T {
+                  void m(String jsonPayload) {
+                      HttpEntity entity = new HttpEntity(jsonPayload.toString(), 0);
+                  }
+                  class HttpEntity {
+                      HttpEntity(String s, int i){}
+                  }
+              }
+              """,
+            """
+              class T {
+                  void m(String jsonPayload) {
+                      HttpEntity entity = new HttpEntity(jsonPayload, 0);
+                  }
+                  class HttpEntity {
+                      HttpEntity(String s, int i){}
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("StringOperationCanBeSimplified")
     @Issue("https://github.com/openrewrite/rewrite/issues/2185")
     @Test
@@ -72,36 +102,6 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
                   class U {
                       U(char[] chars){}
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void chainedMethodInvocationsAsNewClassArgument2() {
-        rewriteRun(
-          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
-          java(
-            """
-              class T {
-                  void m(String jsonPayload) {
-                      HttpEntity entity = new HttpEntity(jsonPayload.toString(), 0);
-                  }
-                  class HttpEntity {
-                      HttpEntity(String s, int i){}
-                  }
-              }
-              """,
-            """
-              class T {
-                  void m(String jsonPayload) {
-                      HttpEntity entity = new HttpEntity(jsonPayload, 0);
-                  }
-                  class HttpEntity {
-                      HttpEntity(String s, int i){}
                   }
               }
               """
@@ -190,7 +190,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                       return JavaTemplate.builder("createBis(#{anyArray()})")
                         .contextSensitive()
                         .build()
-                        .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().get(0));
+                        .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().getFirst());
                   }
                   return newClass;
               }
@@ -256,7 +256,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
                   return identifier;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          }).withMaxCycles(1)),
           java(
             """
               import java.io.File;

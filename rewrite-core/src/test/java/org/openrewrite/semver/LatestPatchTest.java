@@ -41,6 +41,11 @@ class LatestPatchTest {
     }
 
     @Test
+    void noSnapshots() {
+        assertThat(latestPatch.isValid("1.0.0", "1.0.1-SNAPSHOT")).isFalse();
+    }
+
+    @Test
     void upgrade() {
         var upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.0"));
         assertThat(upgrade.isPresent()).isFalse();

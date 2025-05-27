@@ -15,11 +15,13 @@
  */
 package org.openrewrite.yaml.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
+
+import static org.openrewrite.format.LineBreaks.normalizeNewLines;
 
 public class NormalizeLineBreaksVisitor<P> extends YamlIsoVisitor<P> {
     private final GeneralFormatStyle generalFormatStyle;
@@ -32,18 +34,16 @@ public class NormalizeLineBreaksVisitor<P> extends YamlIsoVisitor<P> {
         this.stopAfter = stopAfter;
     }
 
-    @Nullable
     @Override
-    public Yaml postVisit(Yaml tree, P p) {
+    public @Nullable Yaml postVisit(Yaml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Yaml.Documents.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Yaml visit(@Nullable Tree tree, P p) {
+    public @Nullable Yaml visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Yaml) tree;
         }
@@ -56,23 +56,5 @@ public class NormalizeLineBreaksVisitor<P> extends YamlIsoVisitor<P> {
             }
         }
         return y;
-    }
-
-    private static String normalizeNewLines(String text, boolean useCrlf) {
-        if (!text.contains("\n")) {
-            return text;
-        }
-
-        StringBuilder normalized = new StringBuilder();
-        char[] charArray = text.toCharArray();
-        for (int i = 0; i < charArray.length; i++) {
-            char c = charArray[i];
-            if (useCrlf && c == '\n' && (i == 0 || text.charAt(i - 1) != '\r')) {
-                normalized.append('\r').append('\n');
-            } else if (useCrlf || c != '\r') {
-                normalized.append(c);
-            }
-        }
-        return normalized.toString();
     }
 }

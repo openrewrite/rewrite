@@ -48,6 +48,49 @@ class TabsAndIndentsTest implements RewriteTest {
         spec.recipe(new TabsAndIndents());
     }
 
+    // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
+    @DocumentExample
+    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
+    @Test
+    void rspec3973() {
+        rewriteRun(
+          java(
+            """
+              class Test {{
+                  if (true == false)
+                  doTheThing();
+                            
+                  doTheOtherThing();
+                  somethingElseEntirely();
+                            
+                  foo();
+              }
+                  public static void doTheThing() {}
+                  public static void doTheOtherThing() {}
+                  public static void somethingElseEntirely() {}
+                  public static void foo() {}
+              }
+              """,
+            """
+              class Test {{
+                  if (true == false)
+                      doTheThing();
+                            
+                  doTheOtherThing();
+                  somethingElseEntirely();
+                            
+                  foo();
+              }
+                  public static void doTheThing() {}
+                  public static void doTheOtherThing() {}
+                  public static void somethingElseEntirely() {}
+                  public static void foo() {}
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
         return spec -> spec.recipe(new TabsAndIndents())
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
@@ -174,6 +217,31 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
+    void firstParameterNameConflictWithReturnTypeAndMethodName() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withMethodDeclarationParameters(new TabsAndIndentsStyle.MethodDeclarationParameters(true))),
+          java(
+            """
+              class Test {
+                  private String first(String first,
+                                                int times,
+                                                String third) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  private String first(String first,
+                                       int times,
+                                       String third) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void alignMethodDeclarationParamsWhenContinuationIndentUsingTabs() {
         rewriteRun(
           tabsAndIndents(style -> style.withUseTabCharacter(true)),
@@ -190,49 +258,6 @@ class TabsAndIndentsTest implements RewriteTest {
             	}
             }
             """
-          )
-        );
-    }
-
-    // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
-    @DocumentExample
-    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
-    @Test
-    void rspec3973() {
-        rewriteRun(
-          java(
-            """
-              class Test {{
-                  if (true == false)
-                  doTheThing();
-                            
-                  doTheOtherThing();
-                  somethingElseEntirely();
-                            
-                  foo();
-              }
-                  public static void doTheThing() {}
-                  public static void doTheOtherThing() {}
-                  public static void somethingElseEntirely() {}
-                  public static void foo() {}
-              }
-              """,
-            """
-              class Test {{
-                  if (true == false)
-                      doTheThing();
-                            
-                  doTheOtherThing();
-                  somethingElseEntirely();
-                            
-                  foo();
-              }
-                  public static void doTheThing() {}
-                  public static void doTheOtherThing() {}
-                  public static void somethingElseEntirely() {}
-                  public static void foo() {}
-              }
-              """
           )
         );
     }
@@ -1391,7 +1416,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               enum Scope {
                   None, // the root of a resolution tree
-                  Compile,
+                  Compile
               }
               """
           )

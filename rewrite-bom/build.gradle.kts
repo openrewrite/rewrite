@@ -6,9 +6,15 @@ plugins {
 
 dependencies {
     constraints {
-        rootProject.subprojects.filter { it != project && !it.name.contains("benchmark") }.sortedBy { it.name }.forEach {
-            api(it)
-        }
+        rootProject.subprojects
+            .filter {
+                it != project &&
+                        !it.name.contains("benchmark") &&
+                        !it.name.contains("tck") &&
+                        it.name != "tools"
+            }
+            .sortedBy { it.name }
+            .forEach { api(it) }
     }
 }
 

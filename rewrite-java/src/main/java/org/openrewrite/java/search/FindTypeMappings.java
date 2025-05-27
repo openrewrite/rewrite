@@ -17,8 +17,8 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.table.TypeMappings;
 import org.openrewrite.java.tree.J;
@@ -33,7 +33,7 @@ import java.util.Map;
 import static java.util.Collections.emptyList;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindTypeMappings extends ScanningRecipe<Map<FindTypeMappings.TypeAssociation, Integer>> {
     transient TypeMappings typeMappingsPerSource = new TypeMappings(this);
 

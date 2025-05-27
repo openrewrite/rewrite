@@ -16,20 +16,24 @@
 package org.openrewrite.test;
 
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
+@RequiredArgsConstructor
 public class AdHocRecipe extends Recipe {
     @With
     @Nullable
@@ -45,6 +49,7 @@ public class AdHocRecipe extends Recipe {
     Boolean causesAnotherCycle;
 
     @With
+    @Nullable
     transient Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
 
     @With
@@ -59,6 +64,7 @@ public class AdHocRecipe extends Recipe {
         return new AdHocScanningRecipe(displayName, name, causesAnotherCycle, getVisitor, generator, maintainers, maxCycles);
     }
 
+    @Override
     public String getDisplayName() {
         return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
     }
@@ -68,6 +74,7 @@ public class AdHocRecipe extends Recipe {
         return "An ad hoc recipe used in RewriteTest.";
     }
 
+    @Override
     public String getName() {
         return StringUtils.isBlank(name) ? super.getName() : name;
     }
@@ -82,12 +89,13 @@ public class AdHocRecipe extends Recipe {
         return maxCycles == null ? super.maxCycles() : maxCycles;
     }
 
+    @Override
     public List<Maintainer> getMaintainers() {
         return maintainers == null ? Collections.emptyList() : maintainers;
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return getVisitor.get();
+        return requireNonNull(getVisitor).get();
     }
 }

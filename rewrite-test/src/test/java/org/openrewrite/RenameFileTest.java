@@ -24,7 +24,7 @@ import java.nio.file.Paths;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RenameFileTest implements RewriteTest {
+class RenameFileTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new RenameFile("**/hello.txt", "goodbye.txt"));
@@ -37,11 +37,10 @@ public class RenameFileTest implements RewriteTest {
           text(
             "hello world",
             "hello world",
-            spec -> {
+            spec ->
                 spec
                   .path("a/b/hello.txt")
-                  .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("a/b/goodbye.txt")));
-            }
+                  .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("a/b/goodbye.txt")))
           )
         );
     }

@@ -25,7 +25,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.J;
 
 import java.util.concurrent.TimeUnit;
 

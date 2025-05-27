@@ -16,6 +16,7 @@
 package org.openrewrite.config;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 
 import java.time.Duration;
@@ -41,7 +42,7 @@ public class CompositeRecipe extends Recipe {
     }
 
     @Override
-    public Duration getEstimatedEffortPerOccurrence() {
+    public @Nullable Duration getEstimatedEffortPerOccurrence() {
         return null;
     }
 

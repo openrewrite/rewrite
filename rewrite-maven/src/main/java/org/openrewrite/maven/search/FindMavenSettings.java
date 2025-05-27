@@ -19,12 +19,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.table.EffectiveMavenSettings;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.tree.Xml;
@@ -60,7 +62,8 @@ public class FindMavenSettings extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 MavenResolutionResult mrr = getResolutionResult();
-                if (mrr.getMavenSettings() != null) {
+                MavenSettings effectiveSettings = MavenExecutionContextView.view(ctx).effectiveSettings(mrr);
+                if (effectiveSettings != null) {
                     try {
                         settings.insertRow(ctx, new EffectiveMavenSettings.Row(
                                 document.getSourcePath().toString(),
@@ -71,11 +74,6 @@ public class FindMavenSettings extends Recipe {
                     } catch (JsonProcessingException e) {
                         throw new UncheckedIOException(e);
                     }
-                } else {
-                    settings.insertRow(ctx, new EffectiveMavenSettings.Row(
-                            document.getSourcePath().toString(),
-                            ""
-                    ));
                 }
                 return document;
             }

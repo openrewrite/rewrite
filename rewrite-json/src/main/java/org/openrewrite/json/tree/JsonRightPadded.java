@@ -22,10 +22,7 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
@@ -38,7 +35,7 @@ import java.util.stream.Collectors;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Data
-public class JsonRightPadded<T> {
+public class JsonRightPadded<T extends Json> {
     @With
     T element;
 
@@ -52,7 +49,7 @@ public class JsonRightPadded<T> {
         return withElement(map.apply(element));
     }
 
-    public static <T> List<T> getElements(List<JsonRightPadded<T>> ls) {
+    public static <T extends Json> List<T> getElements(List<JsonRightPadded<T>> ls) {
         List<T> list = new ArrayList<>();
         for (JsonRightPadded<T> l : ls) {
             T elem = l.getElement();
@@ -63,7 +60,8 @@ public class JsonRightPadded<T> {
 
     public static <J2 extends Json> List<JsonRightPadded<J2>> withElements(List<JsonRightPadded<J2>> before, List<J2> elements) {
         // a cheaper check for the most common case when there are no changes
-        if (elements.size() == before.size()) {
+        boolean hasSizeChanged = elements.size() != before.size();
+        if (!hasSizeChanged) {
             boolean hasChanges = false;
             for (int i = 0; i < before.size(); i++) {
                 if (before.get(i).getElement() != elements.get(i)) {
@@ -80,19 +78,31 @@ public class JsonRightPadded<T> {
         Map<UUID, JsonRightPadded<J2>> beforeById = before.stream().collect(Collectors
                 .toMap(j -> j.getElement().getId(), Function.identity()));
 
+        int counter = 0;
+        String paddingAfterLastElement = "\n";
+        if (!before.isEmpty()) {
+            JsonRightPadded<J2> previousFinalElement = before.get(before.size() - 1);
+            paddingAfterLastElement = previousFinalElement.getAfter().getWhitespace();
+        }
         for (J2 t : elements) {
+            counter++;
             if (beforeById.get(t.getId()) != null) {
                 JsonRightPadded<J2> found = beforeById.get(t.getId());
+                if (counter == before.size() && hasSizeChanged) {
+                    paddingAfterLastElement = found.getAfter().getWhitespace();
+                    found = found.withAfter(Space.EMPTY);
+                }
                 after.add(found.withElement(t));
             } else {
-                after.add(new JsonRightPadded<>(t, Space.EMPTY, Markers.EMPTY));
+                Space space = counter == elements.size() ? Space.build(paddingAfterLastElement, Collections.emptyList()) : Space.EMPTY;
+                after.add(new JsonRightPadded<>(t, space, Markers.EMPTY));
             }
         }
 
         return after;
     }
 
-    public static <T> JsonRightPadded<T> build(T element) {
+    public static <T extends Json> JsonRightPadded<T> build(T element) {
         return new JsonRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
     }
 

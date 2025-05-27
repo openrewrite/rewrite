@@ -36,7 +36,7 @@ document
     ;
 
 prolog
-    :   xmldecl? misc*
+    :   xmldecl? misc* jspdirective*
     ;
 
 xmldecl
@@ -78,6 +78,10 @@ content
 element
     :   OPEN Name attribute* CLOSE content* OPEN '/' Name CLOSE
     |   OPEN Name attribute* '/>'
+    ;
+
+jspdirective
+    :   OPEN DIRECTIVE_OPEN Name attribute* DIRECTIVE_CLOSE CLOSE
     ;
 
 reference

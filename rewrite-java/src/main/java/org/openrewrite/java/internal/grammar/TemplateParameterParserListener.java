@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -32,6 +32,16 @@ public interface TemplateParameterParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitMatcherPattern(TemplateParameterParser.MatcherPatternContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#genericPattern}.
+	 * @param ctx the parse tree
+	 */
+	void enterGenericPattern(TemplateParameterParser.GenericPatternContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#genericPattern}.
+	 * @param ctx the parse tree
+	 */
+	void exitGenericPattern(TemplateParameterParser.GenericPatternContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link TemplateParameterParser#typedPattern}.
 	 * @param ctx the parse tree
@@ -53,15 +63,45 @@ public interface TemplateParameterParserListener extends ParseTreeListener {
 	 */
 	void exitPatternType(TemplateParameterParser.PatternTypeContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link TemplateParameterParser#matcherParameter}.
+	 * Enter a parse tree produced by {@link TemplateParameterParser#type}.
 	 * @param ctx the parse tree
 	 */
-	void enterMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx);
+	void enterType(TemplateParameterParser.TypeContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link TemplateParameterParser#matcherParameter}.
+	 * Exit a parse tree produced by {@link TemplateParameterParser#type}.
 	 * @param ctx the parse tree
 	 */
-	void exitMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx);
+	void exitType(TemplateParameterParser.TypeContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#typeParameter}.
+	 * @param ctx the parse tree
+	 */
+	void enterTypeParameter(TemplateParameterParser.TypeParameterContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#typeParameter}.
+	 * @param ctx the parse tree
+	 */
+	void exitTypeParameter(TemplateParameterParser.TypeParameterContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#variance}.
+	 * @param ctx the parse tree
+	 */
+	void enterVariance(TemplateParameterParser.VarianceContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#variance}.
+	 * @param ctx the parse tree
+	 */
+	void exitVariance(TemplateParameterParser.VarianceContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#typeArray}.
+	 * @param ctx the parse tree
+	 */
+	void enterTypeArray(TemplateParameterParser.TypeArrayContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#typeArray}.
+	 * @param ctx the parse tree
+	 */
+	void exitTypeArray(TemplateParameterParser.TypeArrayContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link TemplateParameterParser#parameterName}.
 	 * @param ctx the parse tree
@@ -72,6 +112,26 @@ public interface TemplateParameterParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitParameterName(TemplateParameterParser.ParameterNameContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#genericName}.
+	 * @param ctx the parse tree
+	 */
+	void enterGenericName(TemplateParameterParser.GenericNameContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#genericName}.
+	 * @param ctx the parse tree
+	 */
+	void exitGenericName(TemplateParameterParser.GenericNameContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#typeName}.
+	 * @param ctx the parse tree
+	 */
+	void enterTypeName(TemplateParameterParser.TypeNameContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#typeName}.
+	 * @param ctx the parse tree
+	 */
+	void exitTypeName(TemplateParameterParser.TypeNameContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link TemplateParameterParser#matcherName}.
 	 * @param ctx the parse tree

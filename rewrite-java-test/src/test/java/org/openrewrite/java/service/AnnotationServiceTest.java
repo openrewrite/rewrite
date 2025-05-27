@@ -26,7 +26,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-public class AnnotationServiceTest implements RewriteTest {
+class AnnotationServiceTest implements RewriteTest {
 
     @Test
     void classAnnotations() {
@@ -34,7 +34,7 @@ public class AnnotationServiceTest implements RewriteTest {
           java(
             """
               import javax.annotation.processing.Generated;
-                            
+              
               @SuppressWarnings("all")
               public @Generated("foo") class T {}
               """,
@@ -68,7 +68,7 @@ public class AnnotationServiceTest implements RewriteTest {
               import java.lang.annotation.*;
               
               import static java.lang.annotation.ElementType.*;
-                            
+              
               class T {
                   public @A1 Integer @A2 [] arg;
               }
@@ -137,11 +137,11 @@ public class AnnotationServiceTest implements RewriteTest {
                     AnnotationService service = service(AnnotationService.class);
                     if (arrayType.getElementType() instanceof J.Identifier) {
                         assertThat(service.getAllAnnotations(new Cursor(null, arrayType))).satisfiesExactly(
-                          ann -> assertThat(ann.getSimpleName()).isEqualTo("A1")
+                          ann -> assertThat(ann.getSimpleName()).isEqualTo("A2")
                         );
                     } else if (arrayType.getElementType() instanceof J.ArrayType) {
                         assertThat(service.getAllAnnotations(new Cursor(null, arrayType))).satisfiesExactly(
-                          ann -> assertThat(ann.getSimpleName()).isEqualTo("A2")
+                          ann -> assertThat(ann.getSimpleName()).isEqualTo("A1")
                         );
                     }
                     return super.visitArrayType(arrayType, integer);
@@ -159,9 +159,9 @@ public class AnnotationServiceTest implements RewriteTest {
               import java.lang.annotation.*;
               
               import static java.lang.annotation.ElementType.*;
-                            
+              
               class T {
-                  java. lang. @Ann Map arg;
+                  java. lang. @Ann Integer arg;
               }
 
               @Retention(RetentionPolicy.RUNTIME)

@@ -15,32 +15,35 @@
  */
 package org.openrewrite.java;
 
-import com.sun.tools.javac.comp.*;
+import com.sun.tools.javac.comp.Check;
+import com.sun.tools.javac.comp.Enter;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
+import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.tree.ParseError;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.lombok.LombokSupport;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
+import org.slf4j.LoggerFactory;
 
+import javax.annotation.processing.Processor;
 import javax.tools.*;
 import java.io.*;
 import java.net.URI;
@@ -48,11 +51,10 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static com.sun.tools.javac.util.List.nil;
 import static java.util.stream.Collectors.toList;
 
 class ReloadableJava8Parser implements JavaParser {
@@ -70,6 +72,7 @@ class ReloadableJava8Parser implements JavaParser {
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
+    private final List<Processor> annotationProcessors;
 
     ReloadableJava8Parser(@Nullable Collection<Path> classpath,
                           Collection<byte[]> classBytesClasspath,
@@ -100,6 +103,25 @@ class ReloadableJava8Parser implements JavaParser {
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
 
+        // Ensure type attribution continues despite errors in individual files or nodes.
+        // If an error occurs in a single file or node, type attribution should still proceed
+        // for all other source files and unaffected nodes within the same file.
+        Options.instance(context).put("should-stop.ifError", "GENERATE");
+
+        annotationProcessors = new ArrayList<>(1);
+        if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
+            classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+            try {
+                Processor lombokProcessor = LombokSupport.createLombokProcessor(getClass().getClassLoader());
+                if (lombokProcessor != null) {
+                    Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
+                    annotationProcessors.add(lombokProcessor);
+                }
+            } catch (ReflectiveOperationException ignore) {
+                // Lombok was not found or could not be initialized
+            }
+        }
+
         // MUST be created (registered with the context) after pfm and compilerLog
         compiler = new JavaCompiler(context);
 
@@ -118,7 +140,7 @@ class ReloadableJava8Parser implements JavaParser {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
                     if (!StringUtils.isBlank(log)) {
-                        org.slf4j.LoggerFactory.getLogger(ReloadableJava8Parser.class).warn(log);
+                        LoggerFactory.getLogger(ReloadableJava8Parser.class).warn(log);
                     }
                 }
             }
@@ -138,45 +160,7 @@ class ReloadableJava8Parser implements JavaParser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        if (classpath != null) { // override classpath
-            if (context.get(JavaFileManager.class) != pfm) {
-                throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
-            }
-
-            try {
-                pfm.setLocation(StandardLocation.CLASS_PATH, classpath.stream().map(Path::toFile).collect(toList()));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-
-        @SuppressWarnings("ConstantConditions") LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles)
-                .collect(Collectors.toMap(
-                        Function.identity(),
-                        input -> {
-                            try {
-                                return compiler.parse(new Java8ParserInputFileObject(input, ctx));
-                            } catch (IllegalStateException e) {
-                                if ("endPosTable already set".equals(e.getMessage())) {
-                                    throw new IllegalStateException(
-                                            "Call reset() on JavaParser before parsing another set of source files that " +
-                                            "have some of the same fully qualified names. Source file [" +
-                                            input.getPath() + "]\n[\n" + StringUtils.readFully(input.getSource(ctx), getCharset(ctx)) + "\n]", e);
-                                }
-                                throw e;
-                            }
-                        },
-                        (e2, e1) -> e1, LinkedHashMap::new));
-
-        try {
-            enterAll(cus.values());
-            compiler.attribute(new TimedTodo(compiler.todo));
-        } catch (Throwable t) {
-            // when symbol entering fails on problems like missing types, attribution can often times proceed
-            // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
-            ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
-        }
-
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
             parsingListener.startedParsing(input);
@@ -190,6 +174,7 @@ class ReloadableJava8Parser implements JavaParser {
                         ctx,
                         context);
                 J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
+                //noinspection DataFlowIssue
                 cuByPath.setValue(null); // allow memory used by this JCCompilationUnit to be released
                 parsingListener.parsed(input, cu);
                 return requirePrintEqualsInput(cu, input, relativeTo, ctx);
@@ -198,6 +183,67 @@ class ReloadableJava8Parser implements JavaParser {
                 return ParseError.build(this, input, relativeTo, ctx, t);
             }
         });
+    }
+
+    LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
+        if (classpath != null) { // override classpath
+            // Lombok is expected to replace the file manager with its own, so we need to check for that
+            if (context.get(JavaFileManager.class) != pfm && (annotationProcessors.isEmpty() || !(context.get(JavaFileManager.class) instanceof ForwardingJavaFileManager))) {
+                throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
+            }
+
+            try {
+                pfm.setLocation(StandardLocation.CLASS_PATH, classpath.stream().map(Path::toFile).collect(toList()));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
+        List<Java8ParserInputFileObject> inputFileObjects = acceptedInputs(sourceFiles)
+                .map(input -> new Java8ParserInputFileObject(input, ctx))
+                .collect(toList());
+        if (!annotationProcessors.isEmpty()) {
+            compiler.initProcessAnnotations(annotationProcessors);
+        }
+        try {
+            //noinspection unchecked
+            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = com.sun.tools.javac.util.List.from(
+                    inputFileObjects.stream()
+                            .map(input -> compiler.parse(input))
+                            .toArray(JCTree.JCCompilationUnit[]::new));
+            for (int i = 0; i < inputFileObjects.size(); i++) {
+                cus.put(inputFileObjects.get(i).getInput(), jcCompilationUnits.get(i));
+            }
+            try {
+                enterAll(cus.values());
+                JavaCompiler delegate = annotationProcessors.isEmpty() ? compiler : compiler.processAnnotations(jcCompilationUnits, nil());
+                while (!delegate.todo.isEmpty()) {
+                    try {
+                        delegate.attribute(delegate.todo);
+                    } catch (Throwable t) {
+                        handleParsingException(ctx, t);
+                    }
+                }
+            } catch (Throwable t) {
+                handleParsingException(ctx, t);
+            }
+        } catch (IllegalStateException e) {
+            if ("endPosTable already set".equals(e.getMessage())) {
+                throw new IllegalStateException(
+                        "Call reset() on JavaParser before parsing another set of source files that " +
+                                "have some of the same fully qualified names.", e);
+            }
+            throw e;
+        }
+
+        return cus;
+    }
+
+    private void handleParsingException(ExecutionContext ctx, Throwable t) {
+        // when symbol entering fails on problems like missing types, attribution can often times proceed
+        // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
+        ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
     }
 
     @Override
@@ -261,35 +307,6 @@ class ReloadableJava8Parser implements JavaParser {
         }
     }
 
-    private static class TimedTodo extends Todo {
-        private final Todo todo;
-        private @Nullable Timer.Sample sample;
-
-        private TimedTodo(Todo todo) {
-            super(new Context());
-            this.todo = todo;
-        }
-
-        @Override
-        public boolean isEmpty() {
-            if (sample != null) {
-                sample.stop(MetricsHelper.successTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent by the JDK in type attributing the source file")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(2) Type attribution"))
-                        .register(Metrics.globalRegistry));
-            }
-            return todo.isEmpty();
-        }
-
-        @Override
-        public Env<AttrContext> remove() {
-            this.sample = Timer.start();
-            return todo.remove();
-        }
-    }
-
     private static class ByteArrayCapableJavacFileManager extends JavacFileManager {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
 
@@ -318,7 +335,7 @@ class ReloadableJava8Parser implements JavaParser {
 
         @Override
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
-            if (StandardLocation.CLASS_PATH.equals(location)) {
+            if (StandardLocation.CLASS_PATH == location) {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
                 return Stream.concat(
                         classByteClasspath.stream()
@@ -332,6 +349,7 @@ class ReloadableJava8Parser implements JavaParser {
 
     private static class PackageAwareJavaFileObject extends SimpleJavaFileObject {
         private final String pkg;
+        @Getter
         private final String className;
         private final byte[] classBytes;
 
@@ -363,10 +381,6 @@ class ReloadableJava8Parser implements JavaParser {
 
         public String getPackage() {
             return pkg;
-        }
-
-        public String getClassName() {
-            return className;
         }
 
         @Override

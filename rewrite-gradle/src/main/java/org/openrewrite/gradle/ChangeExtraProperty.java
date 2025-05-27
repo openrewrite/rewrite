@@ -26,7 +26,7 @@ import java.util.Objects;
 
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangeExtraProperty extends Recipe {
 
     @Override
@@ -75,8 +75,8 @@ public class ChangeExtraProperty extends Recipe {
                     if(!Objects.equals(key, var.getSimpleName())) {
                         return as;
                     }
-                    if((var.getTarget() instanceof J.Identifier && ((J.Identifier) var.getTarget()).getSimpleName().equals("ext"))
-                       ||  (var.getTarget() instanceof J.FieldAccess && ((J.FieldAccess) var.getTarget()).getSimpleName().equals("ext")) ) {
+                    if((var.getTarget() instanceof J.Identifier && ((J.Identifier) var.getTarget()).getSimpleName().equals("ext")) ||
+                       (var.getTarget() instanceof J.FieldAccess && ((J.FieldAccess) var.getTarget()).getSimpleName().equals("ext")) ) {
                         as = updateAssignment(as);
                     }
                 }

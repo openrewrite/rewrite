@@ -15,14 +15,14 @@
  */
 package org.openrewrite.java.isolated;
 
+import com.sun.source.doctree.*;
 import com.sun.source.doctree.ErroneousTree;
 import com.sun.source.doctree.LiteralTree;
 import com.sun.source.doctree.ProvidesTree;
 import com.sun.source.doctree.ReturnTree;
 import com.sun.source.doctree.UsesTree;
-import com.sun.source.doctree.*;
-import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.*;
+import com.sun.source.tree.IdentifierTree;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
@@ -32,9 +32,9 @@ import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -52,8 +52,7 @@ import static org.openrewrite.java.tree.Space.format;
 public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private final Attr attr;
 
-    @Nullable
-    private final Symbol.TypeSymbol symbol;
+    private final Symbol.@Nullable TypeSymbol symbol;
 
     @Nullable
     private final Type enclosingClassType;
@@ -291,8 +290,10 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             if (!(docTree instanceof DCTree.DCText && i > 0)) {
                 body.addAll(whitespaceBefore());
             }
-            if (docTree instanceof DCTree.DCText) {
-                body.addAll(visitText(((DCTree.DCText) docTree).getBody()));
+            if (docTree instanceof DCTree.DCText textNode) {
+                body.addAll(visitText(textNode.getBody()));
+            } else if (docTree instanceof DCTree.DCComment commentNode) {
+                body.addAll(visitText(commentNode.getBody()));
             } else {
                 body.add((Javadoc) scan(docTree, body));
             }
@@ -572,7 +573,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     @Override
-    public J visitReference(@Nullable ReferenceTree node, List<Javadoc> body) {
+    public @Nullable J visitReference(@Nullable ReferenceTree node, List<Javadoc> body) {
         DCTree.DCReference ref = (DCTree.DCReference) node;
         if (node == null) {
             //noinspection ConstantConditions
@@ -681,41 +682,24 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return qualifier;
     }
 
-    @Nullable
-    private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         if (type instanceof JavaType.Class) {
             JavaType.Class classType = (JavaType.Class) type;
 
-            nextMethod:
-            for (JavaType.Method method : classType.getMethods()) {
-                if (method.getName().equals(ref.memberName.toString())) {
-                    if (ref.paramTypes != null) {
-                        for (JCTree param : ref.paramTypes) {
-                            for (JavaType testParamType : method.getParameterTypes()) {
-                                Type paramType = attr.attribType(param, symbol);
-                                if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                    List<JavaType> bounds = ((JavaType.GenericTypeVariable) testParamType).getBounds();
-                                    if (bounds.isEmpty() && paramType.tsym != null && "java.lang.Object".equals(paramType.tsym.getQualifiedName().toString())) {
-                                        return method;
-                                    }
-                                    for (JavaType bound : bounds) {
-                                        if (paramTypeMatches(bound, paramType)) {
-                                            return method;
-                                        }
-                                    }
-                                    continue nextMethod;
-                                }
+            JavaType.@Nullable Method method = methodReferenceType(ref, classType.getMethods());
+            if (method != null) return method;
 
-                                if (paramTypeMatches(testParamType, paramType)) {
-                                    continue nextMethod;
-                                }
-                            }
-                        }
-                    }
+            // Superclass fields takes presence over interface fields
+            method = methodReferenceType(ref, classType.getSupertype());
 
-                    return method;
+            if (method == null) {
+                for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
+                    method = methodReferenceType(ref, interface_.getMethods());
+                    if (method != null) return method;
                 }
             }
+
+            return method;
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
             for (JavaType bound : generic.getBounds()) {
@@ -729,17 +713,52 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return null;
     }
 
-    private boolean paramTypeMatches(JavaType testParamType, Type paramType) {
-        if (paramType instanceof Type.ClassType) {
-            JavaType.FullyQualified fqTestParamType = TypeUtils.asFullyQualified(testParamType);
-            return fqTestParamType == null || !fqTestParamType.getFullyQualifiedName().equals(((Symbol.ClassSymbol) paramType.tsym)
-                    .fullname.toString());
+    private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, List<JavaType.Method> methods) {
+        nextMethod:
+        for (JavaType.Method method : methods) {
+            if (ref.memberName.toString().equals(method.getName()) || ref.memberName.toString().equals(method.getConstructorName())) {
+                if (ref.paramTypes != null) {
+                    List<JavaType> parameterTypes = method.getParameterTypes();
+                    if (ref.paramTypes.size() != parameterTypes.size()) {
+                        continue;
+                    }
+                    for (int i = 0; i < ref.paramTypes.size(); i++) {
+                        JCTree param = ref.paramTypes.get(i);
+                        JavaType testParamType = parameterTypes.get(i);
+                        Type paramType = attr.attribType(param, symbol);
+                        if (!paramTypeMatches(testParamType, paramType)) {
+                            continue nextMethod;
+                        }
+                    }
+                }
+                return method;
+            }
         }
-        return false;
+        return null;
     }
 
-    @Nullable
-    private JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private boolean paramTypeMatches(JavaType parameterType, Type javadocType) {
+        return paramTypeMatches(parameterType, typeMapping.type(javadocType));
+    }
+
+    // Javadoc type references typically don't have generic type parameters
+    private static boolean paramTypeMatches(JavaType parameterType, JavaType mappedJavadocType) {
+        if (parameterType instanceof JavaType.Array && mappedJavadocType instanceof JavaType.Array) {
+            if (((JavaType.Array) parameterType).getElemType() instanceof JavaType.Primitive) {
+                return TypeUtils.isAssignableTo(parameterType, mappedJavadocType);
+            }
+            return paramTypeMatches(((JavaType.Array) parameterType).getElemType(), ((JavaType.Array) mappedJavadocType).getElemType());
+        } else if (parameterType instanceof JavaType.GenericTypeVariable && !((JavaType.GenericTypeVariable) parameterType).getBounds().isEmpty()) {
+            return paramTypeMatches(((JavaType.GenericTypeVariable) parameterType).getBounds().get(0), mappedJavadocType);
+        } else if (parameterType instanceof JavaType.GenericTypeVariable) {
+            return TypeUtils.isObject(mappedJavadocType);
+        } else if (parameterType instanceof JavaType.Parameterized && !(mappedJavadocType instanceof JavaType.Parameterized)) {
+            return paramTypeMatches(((JavaType.Parameterized) parameterType).getType(), mappedJavadocType);
+        }
+        return TypeUtils.isAssignableTo(parameterType, mappedJavadocType);
+    }
+
+    private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;
@@ -751,8 +770,20 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
         }
 
-        // a member reference, but not matching anything on type attribution
-        return null;
+        // Superclass fields takes presence over interface fields
+        JavaType.@Nullable Variable refType = fieldReferenceType(ref, classType.getSupertype());
+
+        if (refType == null) {
+            for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
+                for (JavaType.Variable member : interface_.getMembers()) {
+                    if (member.getName().equals(ref.memberName.toString())) {
+                        return member;
+                    }
+                }
+            }
+        }
+
+        return refType;
     }
 
     @Override
@@ -877,26 +908,29 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
-        if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
-                !Character.isWhitespace(source.charAt(cursor))) {
+        if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) && !Character.isWhitespace(source.charAt(cursor))) {
             node = node.stripLeading();
         }
 
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < node.length(); i++) {
             char c = node.charAt(i);
-            cursor++;
             if (c == '\n') {
                 if (text.length() > 0) {
                     texts.add(new Javadoc.Text(randomId(), Markers.EMPTY, text.toString()));
                     text = new StringBuilder();
                 }
 
+                cursor++;
                 Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
-                assert lineBreak != null;
                 texts.add(lineBreak);
+            } else if (source.charAt(cursor) != c && (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor) )) {
+                int escapedCharLength = unicodeEscaped(c).length();
+                text.append(source, cursor, cursor + escapedCharLength);
+                cursor += escapedCharLength;
             } else {
                 text.append(c);
+                cursor++;
             }
         }
 
@@ -905,6 +939,10 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         }
 
         return texts;
+    }
+
+    private static String unicodeEscaped(char c) {
+        return String.format("\\u%04X", (int) c);
     }
 
     @Override
@@ -1164,7 +1202,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
             } else {
                 cursor = saveCursor;
-                return elemType;
+                return elemType.withPrefix(fmt);
             }
 
             return new J.ArrayType(
@@ -1192,6 +1230,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
             NameTree id = (NameTree) javaVisitor.scan(node.getType(), Space.EMPTY);
             List<JRightPadded<Expression>> expressions = new ArrayList<>(node.getTypeArguments().size());
+            String spaceBeforeTypeParams = whitespaceBeforeAsString();
             cursor += 1; // skip '<', JavaDocVisitor does not interpret List <Integer> as Parameterized.
             int argsSize = node.getTypeArguments().size();
             for (int i = 0; i < argsSize; i++) {
@@ -1206,7 +1245,9 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 expression = expression.withAfter(after);
                 expressions.add(expression);
             }
-            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions), typeMapping.type(node));
+            JContainer<Expression> typeArgs = JContainer.build(expressions)
+                    .withBefore(Space.build(spaceBeforeTypeParams, emptyList()));
+            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, typeArgs, typeMapping.type(node));
         }
     }
 }

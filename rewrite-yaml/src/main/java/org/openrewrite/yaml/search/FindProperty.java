@@ -17,10 +17,10 @@ package org.openrewrite.yaml.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.YamlVisitor;
@@ -28,10 +28,11 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindProperty extends Recipe {
 
     @Option(displayName = "Property key",
@@ -45,6 +46,13 @@ public class FindProperty extends Recipe {
             required = false)
     @Nullable
     Boolean relaxedBinding;
+
+    @Option(displayName = "Property value",
+            example = "false",
+            description = "If provided, only properties specified in propertyKey having this value will be found. Works only for scalar values",
+            required = false)
+    @Nullable
+    String propertyValue;
 
     @Override
     public String getDisplayName() {
@@ -66,7 +74,16 @@ public class FindProperty extends Recipe {
                 if (!Boolean.FALSE.equals(relaxedBinding) ?
                         NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
                         StringUtils.matchesGlob(prop, propertyKey)) {
-                    e = e.withValue(SearchResult.found(e.getValue()));
+                    if (!Objects.isNull(propertyValue)) {
+                        if (entry.getValue() instanceof Yaml.Scalar) {
+                            Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
+                            if (scalar.getValue().equals(propertyValue)) {
+                                e = e.withValue(SearchResult.found(e.getValue()));
+                            }
+                        }
+                    } else {
+                        e = e.withValue(SearchResult.found(e.getValue()));
+                    }
                 }
                 return e;
             }

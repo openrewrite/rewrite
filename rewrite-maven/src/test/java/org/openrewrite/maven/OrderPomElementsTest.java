@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -29,48 +30,100 @@ class OrderPomElementsTest implements RewriteTest {
         spec.recipe(new OrderPomElements());
     }
 
+    @DocumentExample
+    @Test
+    void updatePluginChildTagOrder() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <artifactId>my-project</artifactId>
+                  <groupId>my.org.project</groupId>
+                  <version>4.3.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <configuration>
+                                  <source>1.8</source>
+                                  <target>1.8</target>
+                              </configuration>
+                              <version>3.8.1</version>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <groupId>org.apache.maven.plugins</groupId>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>my.org.project</groupId>
+                  <artifactId>my-project</artifactId>
+                  <version>4.3.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.8.1</version>
+                              <configuration>
+                                  <source>1.8</source>
+                                  <target>1.8</target>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void validOrderNoChange() {
         rewriteRun(
-          pomXml("""
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-
-                <groupId>my.org.project</groupId>
-                <artifactId>my-project</artifactId>
-                <version>4.3.0</version>
-                
-                <name>Some Project</name>
-                <description>Some project desc</description>
-                
-                <properties>
-                </properties>
-                
-                <dependencyManagement>
-                    <dependencies>
-                    </dependencies>
-                </dependencyManagement>
-                
-                <dependencies>
-                </dependencies>
-
-                <repositories>
-                </repositories>
-                
-                <pluginRepositories>
-                </pluginRepositories>
-                
-                <build>
-                </build>
-            </project>
+          pomXml(
             """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+
+                  <groupId>my.org.project</groupId>
+                  <artifactId>my-project</artifactId>
+                  <version>4.3.0</version>
+              
+                  <name>Some Project</name>
+                  <description>Some project desc</description>
+              
+                  <properties>
+                  </properties>
+              
+                  <dependencyManagement>
+                      <dependencies>
+                      </dependencies>
+                  </dependencyManagement>
+              
+                  <dependencies>
+                  </dependencies>
+
+                  <repositories>
+                  </repositories>
+              
+                  <pluginRepositories>
+                  </pluginRepositories>
+              
+                  <build>
+                  </build>
+              </project>
+              """
           )
         );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1228")
     @Test
-    void updateOrder() {
+    void updateDependencyChildTagOrder() {
         rewriteRun(
           pomXml(
             """
@@ -81,7 +134,7 @@ class OrderPomElementsTest implements RewriteTest {
                       <version>7.4.0</version>
                   </parent>
                   <!-- modelVersion1 -->
-                  
+              
                   <!-- modelVersion2 -->
                   <modelVersion>4.0.0</modelVersion>
                   <artifactId>my-project</artifactId>
@@ -123,7 +176,7 @@ class OrderPomElementsTest implements RewriteTest {
             """
               <project>
                   <!-- modelVersion1 -->
-                  
+              
                   <!-- modelVersion2 -->
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
@@ -183,22 +236,22 @@ class OrderPomElementsTest implements RewriteTest {
                       <artifactId>jpl</artifactId>
                       <version>7.4.0</version>
                   </parent>
-                  
+              
                   <!-- model version comment -->
-                  
+              
                   <!-- model version comment 2 -->
                   <modelVersion>4.0.0</modelVersion>
-                  
+              
                   <artifactId>my-project</artifactId>
                   <groupId>my.org.project</groupId>
                   <version>4.3.0</version>
-                  
+              
                   <properties>
                   </properties>
-                  
+              
                   <description>Some project desc</description>
                   <name>Some Project</name>
-                  
+              
                   <dependencies>
                       <dependency>
                           <!-- artifact content
@@ -217,12 +270,12 @@ class OrderPomElementsTest implements RewriteTest {
                           <artifactId>my-project-thing</artifactId>
                       </dependency>
                   </dependencyManagement>
-                  
+              
                   <repositories>
                   </repositories>
                   <pluginRepositories>
                   </pluginRepositories>
-                  
+              
                   <build>
                   </build>
               </project>
@@ -230,26 +283,26 @@ class OrderPomElementsTest implements RewriteTest {
             """
               <project>
                   <!-- model version comment -->
-                  
+              
                   <!-- model version comment 2 -->
                   <modelVersion>4.0.0</modelVersion>
-                  
+              
                   <parent>
                       <groupId>jpl</groupId>
                       <artifactId>jpl</artifactId>
                       <version>7.4.0</version>
                   </parent>
-                  
+              
                   <groupId>my.org.project</groupId>
                   <artifactId>my-project</artifactId>
                   <version>4.3.0</version>
-                  
+              
                   <name>Some Project</name>
-                  
+              
                   <description>Some project desc</description>
                   <properties>
                   </properties>
-                  
+              
                   <dependencyManagement>
                       <dependency>
                           <groupId>my.org.project</groupId>
@@ -268,12 +321,12 @@ class OrderPomElementsTest implements RewriteTest {
                           <version>4.3.0</version>
                       </dependency>
                   </dependencies>
-                  
+              
                   <repositories>
                   </repositories>
                   <pluginRepositories>
                   </pluginRepositories>
-                  
+              
                   <build>
                   </build>
               </project>

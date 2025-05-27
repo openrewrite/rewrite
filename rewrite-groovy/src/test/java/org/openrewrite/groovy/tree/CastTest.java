@@ -25,6 +25,18 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class CastTest implements RewriteTest {
 
     @Test
+    void cast() {
+        rewriteRun(
+          groovy(
+            """
+              String foo = ( String ) "hallo"
+              String bar = "hallo" as String
+              """
+          )
+        );
+    }
+
+    @Test
     void javaStyleCast() {
         rewriteRun(
           groovy(
@@ -63,6 +75,50 @@ class CastTest implements RewriteTest {
               ]
               foo(r)
               foo((String [ ] [ ] )r)
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyCastAndInvokeMethod() {
+        rewriteRun(
+          groovy(
+            """
+              ( "x" as String      ).toString()
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyCastAndInvokeMethodWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              (((((( "" as String ))))).toString())
+              """
+          )
+        );
+    }
+
+    @Test
+    void javaCastAndInvokeMethod() {
+        rewriteRun(
+          groovy(
+            """
+              ( (String) "" ).toString()
+              """
+          )
+        );
+    }
+
+    @Test
+    void javaCastAndInvokeMethodWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              (((((( (String) "" )).toString()))))
               """
           )
         );

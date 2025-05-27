@@ -16,8 +16,9 @@
 package org.openrewrite.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 
@@ -39,16 +40,29 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
 
     private List<Recipe> currentRecipeStack;
 
+    @Nullable
+    private ClassLoader recipeClassLoader;
+
     public InMemoryLargeSourceSet(List<SourceFile> ls) {
-        this(null, null, ls);
+        this(null, null, ls, null);
     }
 
-    private InMemoryLargeSourceSet(@Nullable InMemoryLargeSourceSet initialState,
-                                   @Nullable Map<SourceFile, List<Recipe>> deletions,
-                                   List<SourceFile> ls) {
+    public InMemoryLargeSourceSet(List<SourceFile> ls, @Nullable ClassLoader classLoader) {
+        this(null, null, ls, classLoader);
+    }
+
+    protected InMemoryLargeSourceSet(@Nullable InMemoryLargeSourceSet initialState,
+                                     @Nullable Map<SourceFile, List<Recipe>> deletions,
+                                     List<SourceFile> ls,
+                                     @Nullable ClassLoader classLoader) {
         this.initialState = initialState;
         this.ls = ls;
         this.deletions = deletions;
+        this.recipeClassLoader = classLoader;
+    }
+
+    protected InMemoryLargeSourceSet withChanges(@Nullable Map<SourceFile, List<Recipe>> deletions, List<SourceFile> mapped) {
+        return new InMemoryLargeSourceSet(getInitialState(), deletions, mapped, recipeClassLoader);
     }
 
     @Override
@@ -58,17 +72,31 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
 
     @Override
     public LargeSourceSet edit(UnaryOperator<SourceFile> map) {
-        List<SourceFile> mapped = ListUtils.map(ls, before -> {
-            SourceFile after = map.apply(before);
-            if (after == null) {
-                if (deletions == null) {
-                    deletions = new LinkedHashMap<>();
-                }
-                deletions.put(before, currentRecipeStack);
+        ClassLoader originalTCCL = null;
+        try {
+            if (recipeClassLoader != null) {
+                // set TCCL to the recipe's classloader and store the original value, needed by SPI to load providers from recipe artifacts
+                originalTCCL = Thread.currentThread().getContextClassLoader();
+                Thread.currentThread().setContextClassLoader(recipeClassLoader);
             }
-            return after;
-        });
-        return mapped != ls ? new InMemoryLargeSourceSet(getInitialState(), deletions, mapped) : this;
+            List<SourceFile> mapped = ListUtils.map(ls, before -> {
+                SourceFile after = map.apply(before);
+                if (after == null) {
+                    if (deletions == null) {
+                        deletions = new LinkedHashMap<>();
+                    }
+                    deletions.put(before, currentRecipeStack);
+                }
+                return after;
+            });
+            return mapped != ls ? withChanges(deletions, mapped) : this;
+        } finally {
+            if (originalTCCL != null) {
+                // reset TCCL value to the original one to no infer with other tooling
+                Thread.currentThread().setContextClassLoader(originalTCCL);
+            }
+        }
+
     }
 
     @Override
@@ -78,15 +106,15 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
             return this;
         } else if (ls.isEmpty()) {
             //noinspection unchecked
-            return new InMemoryLargeSourceSet(getInitialState(), deletions, (List<SourceFile>) t);
+            return withChanges(deletions, (List<SourceFile>) t);
         }
 
         List<SourceFile> newLs = new ArrayList<>(ls);
         newLs.addAll(t);
-        return new InMemoryLargeSourceSet(getInitialState(), deletions, newLs);
+        return withChanges(deletions, newLs);
     }
 
-    private InMemoryLargeSourceSet getInitialState() {
+    protected InMemoryLargeSourceSet getInitialState() {
         return initialState == null ? this : initialState;
     }
 
@@ -104,7 +132,7 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
             SourceFile original = sourceFileIdentities.get(s.getId());
             if (original != s) {
                 if (original != null) {
-                    if (original.getMarkers().findFirst(Generated.class).isPresent()) {
+                    if (original.getMarkers().findFirst(Generated.class).isPresent() || s.getMarkers().findFirst(DeserializationError.class).isPresent()) {
                         continue;
                     }
                     changes.add(new Result(original, s));
@@ -124,9 +152,8 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
         return new InMemoryChangeset(changes);
     }
 
-    @Nullable
     @Override
-    public SourceFile getBefore(Path sourcePath) {
+    public @Nullable SourceFile getBefore(Path sourcePath) {
         List<SourceFile> sourceFiles = getInitialState().ls;
         for (SourceFile s : sourceFiles) {
             if (s.getSourcePath().equals(sourcePath)) {

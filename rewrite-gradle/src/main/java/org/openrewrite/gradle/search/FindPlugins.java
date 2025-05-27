@@ -17,9 +17,11 @@ package org.openrewrite.gradle.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.tree.GradlePlugin;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -28,19 +30,36 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindPlugins extends Recipe {
     @Option(displayName = "Plugin id",
-            description = "The `ID` part of `plugin { ID }`.",
+            description = "The unique identifier used to apply a plugin in the `plugins` block. " +
+                          "Note that this alone is insufficient to search for plugins applied by fully qualified class name and the `buildscript` block.",
             example = "`com.jfrog.bintray`")
     String pluginId;
+
+    @Option(displayName = "Plugin class",
+            description = "The fully qualified name of a class implementing a Gradle plugin. ",
+            required = false,
+            example = "com.jfrog.bintray.gradle.BintrayPlugin")
+    @Nullable
+    String pluginClass;
+
+    @Override
+    public Validated<Object> validate(ExecutionContext ctx) {
+        return Validated.none().and(new Validated.Either<>(
+                Validated.notBlank("pluginId", pluginId),
+                Validated.notBlank("pluginClass", pluginClass)));
+    }
 
     @Override
     public String getDisplayName() {
@@ -49,24 +68,53 @@ public class FindPlugins extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find a Gradle plugin by id.";
+        return "Find a Gradle plugin by id and/or class name. " +
+               "For best results both should be specified, as one cannot automatically be used to infer the other.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
-        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaVisitor<ExecutionContext>() {
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if (pluginMatcher.matches(method)) {
-                    if (method.getArguments().get(0) instanceof J.Literal &&
-                            pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
-                        return SearchResult.found(method);
-                    }
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
                 }
-                return super.visitMethodInvocation(method, ctx);
+                SourceFile s = (SourceFile) tree;
+
+                AtomicBoolean found = new AtomicBoolean(false);
+                TreeVisitor<?, ExecutionContext> jv = Preconditions.check(
+                        Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
+                        new JavaVisitor<ExecutionContext>() {
+
+                            @Override
+                            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                if (pluginMatcher.matches(method)) {
+                                    if (method.getArguments().get(0) instanceof J.Literal &&
+                                        pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
+                                        found.set(true);
+                                        return SearchResult.found(method);
+                                    }
+                                }
+                                return super.visitMethodInvocation(method, ctx);
+                            }
+                        });
+                if (jv.isAcceptable(s, ctx)) {
+                    s = (SourceFile) jv.visitNonNull(s, ctx);
+                }
+
+                // Even if we couldn't find a declaration the metadata might show the plugin is in use
+                GradleProject gp = s.getMarkers().findFirst(GradleProject.class).orElse(null);
+                if (!found.get() && gp != null && gp.getPlugins().stream().anyMatch(plugin ->
+                        matchesGlob(plugin.getId(), pluginId) || matchesGlob(plugin.getFullyQualifiedClassName(), pluginClass))) {
+                    s = SearchResult.found(s);
+                }
+
+                return s;
             }
-        });
+        };
     }
 
     /**
@@ -77,7 +125,7 @@ public class FindPlugins extends Recipe {
      */
     public static List<GradlePlugin> find(J j, String pluginIdPattern) {
         List<J.MethodInvocation> plugins = TreeVisitor.collect(
-                new FindPlugins(pluginIdPattern).getVisitor(),
+                new FindPlugins(pluginIdPattern, null).getVisitor(),
                 j,
                 new ArrayList<>(),
                 J.MethodInvocation.class,
@@ -86,17 +134,18 @@ public class FindPlugins extends Recipe {
 
         MethodMatcher idMatcher = new MethodMatcher("PluginSpec id(..)", false);
         MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
-        List<GradlePlugin> pluginsWithVersion = plugins.stream().flatMap(plugin -> {
-            if (versionMatcher.matches(plugin) && idMatcher.matches(plugin.getSelect())) {
-                return Stream.of(new GradlePlugin(
-                        plugin,
-                        requireNonNull(((J.Literal) requireNonNull(((J.MethodInvocation) plugin.getSelect()))
-                                .getArguments().get(0)).getValue()).toString(),
-                        requireNonNull(((J.Literal) plugin.getArguments().get(0)).getValue()).toString()
-                ));
-            }
-            return Stream.empty();
-        }).collect(toList());
+        List<GradlePlugin> pluginsWithVersion = plugins.stream()
+                .flatMap(plugin -> {
+                    if (versionMatcher.matches(plugin) && idMatcher.matches(plugin.getSelect()) && plugin.getArguments().get(0) instanceof J.Literal) {
+                        return Stream.of(new GradlePlugin(
+                                plugin,
+                                requireNonNull(((J.Literal) requireNonNull(((J.MethodInvocation) plugin.getSelect()))
+                                        .getArguments().get(0)).getValue()).toString(),
+                                requireNonNull(((J.Literal) plugin.getArguments().get(0)).getValue()).toString()
+                        ));
+                    }
+                    return Stream.empty();
+                }).collect(toList());
         List<GradlePlugin> pluginsWithoutVersion = plugins.stream().flatMap(plugin -> {
             if (idMatcher.matches(plugin) && pluginsWithVersion.stream()
                     .noneMatch(it -> it.getPluginId().equals(plugin.getSimpleName()))) {

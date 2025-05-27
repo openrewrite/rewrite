@@ -18,12 +18,14 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 class NoStaticImportTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void replaceWithNoStaticImports() {
         rewriteRun(
@@ -96,7 +98,8 @@ class NoStaticImportTest implements RewriteTest {
         void getClassCallsNotChanged() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
-              java("""
+              java(
+                    """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport0 {
@@ -109,14 +112,16 @@ class NoStaticImportTest implements RewriteTest {
                     }
                   }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
         void interfaceDefaultMethodNotUpdated() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
-              java("""
+              java(
+                    """
                 package org.springframework.data.domain;
 
                 public interface Window {
@@ -126,14 +131,16 @@ class NoStaticImportTest implements RewriteTest {
                     
                     boolean hasNext();
                 }
-                """));
+                """
+              ));
         }
 
         @Test
         void methodFromSuperClassNotUpdated() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
-              java("""
+              java(
+                    """
                 package org.example;
                         
                 public abstract class AbstractClass {
@@ -141,8 +148,10 @@ class NoStaticImportTest implements RewriteTest {
                         return false;
                     }
                 }
-                """),
-              java("""
+                """
+              ),
+              java(
+                    """
                 package org.example;
 
                 public class SomeWindow extends AbstractClass {
@@ -150,14 +159,16 @@ class NoStaticImportTest implements RewriteTest {
                         return foo();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
         void verifyInnerCallsAreNotUpdated() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
-              java("""
+              java(
+                    """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport {
@@ -169,14 +180,16 @@ class NoStaticImportTest implements RewriteTest {
                         method0();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
         void superCallsNotChanged() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
-              java("""
+              java(
+                    """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport {
@@ -185,14 +198,16 @@ class NoStaticImportTest implements RewriteTest {
                         super();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
         void innerClassCallingOuterClassMethod() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
-              java("""
+              java(
+                    """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport {
@@ -205,14 +220,16 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
         void staticInnerClassCallingOuterClassMethod() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
-              java("""
+              java(
+                    """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport {
@@ -225,14 +242,16 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
         void outerClassCallingInnerClassMethod() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
-              java("""
+              java(
+                    """
                 package org.openrewrite.java;
 
                 class TestNoStaticImport {
@@ -245,14 +264,16 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
         void runnableCallingOuterMethod() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
-              java("""
+              java(
+                    """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport {
@@ -268,7 +289,8 @@ class NoStaticImportTest implements RewriteTest {
                         }.run();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -276,7 +298,8 @@ class NoStaticImportTest implements RewriteTest {
         void localImport() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
-              java("""
+              java(
+                    """
                 package org.openrewrite.java;
                                 
                 import static org.openrewrite.test.Test.Nested.foo;
@@ -291,7 +314,8 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """, """
+                """,
+                    """
                 package org.openrewrite.java;
                                 
                 public class Test {
@@ -304,7 +328,8 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
     }
 }

@@ -22,7 +22,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.maven.MavenParser;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.Scope;
 
 import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
@@ -85,6 +88,6 @@ class LocalMavenArtifactCacheTest {
         MavenResolutionResult mavenModel = parsed.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
         assertThat(mavenModel.getDependencies()).isNotEmpty();
         List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
-        return runtimeDependencies.get(0);
+        return runtimeDependencies.getFirst();
     }
 }

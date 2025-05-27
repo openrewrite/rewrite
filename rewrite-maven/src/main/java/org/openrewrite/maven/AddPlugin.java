@@ -18,13 +18,9 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.PathUtils;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
@@ -33,7 +29,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddPlugin extends Recipe {
 
     private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
@@ -72,7 +68,7 @@ public class AddPlugin extends Recipe {
 
     @Option(displayName = "Executions",
             description = "Optional executions provided as raw XML.",
-            example = "<execution><phase>generate-sources</phase><goals><goal>add-source</goal></goals></execution>",
+            example = "<executions><execution><phase>generate-sources</phase><goals><goal>add-source</goal></goals></execution></executions>",
             required = false)
     @Nullable
     String executions;
@@ -114,6 +110,12 @@ public class AddPlugin extends Recipe {
             if (filePattern != null) {
                 return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, ctx);
             }
+
+            MavenResolutionResult mrr = sourceFile.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
+            if (mrr == null || mrr.parentPomIsProjectPom()) {
+                return false;
+            }
+
             return super.isAcceptable(sourceFile, ctx);
         }
 
@@ -134,7 +136,7 @@ public class AddPlugin extends Recipe {
             if (BUILD_MATCHER.matches(getCursor())) {
                 Optional<Xml.Tag> maybePlugins = t.getChild("plugins");
                 Xml.Tag plugins;
-                if(maybePlugins.isPresent()) {
+                if (maybePlugins.isPresent()) {
                     plugins = maybePlugins.get();
                 } else {
                     t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build("<plugins/>")).visitNonNull(t, ctx, getCursor().getParentOrThrow());
@@ -158,7 +160,8 @@ public class AddPlugin extends Recipe {
                         }
                     }
                 } else {
-                    Xml.Tag pluginTag = Xml.Tag.build("<plugin>\n" +
+                    Xml.Tag pluginTag = Xml.Tag.build(
+                            "<plugin>\n" +
                             "<groupId>" + groupId + "</groupId>\n" +
                             "<artifactId>" + artifactId + "</artifactId>\n" +
                             (version != null ? "<version>" + version + "</version>\n" : "") +

@@ -17,7 +17,7 @@ package org.openrewrite.groovy;
 
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -43,6 +43,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeCache);
     }
 
+    @Override
     public JavaType type(@Nullable ASTNode type) {
         if (type == null) {
             return JavaType.Class.Unknown.getInstance();
@@ -83,12 +84,12 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
     }
 
-    private JavaType.Class classType(ClassNode node, String signature) {
-        JavaType.Class clazz;
+    private JavaType.FullyQualified classType(ClassNode node, String signature) {
         try {
             JavaType type = reflectionTypeMapping.type(node.getTypeClass());
-            clazz = (JavaType.Class) (type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type);
+            return (JavaType.FullyQualified) (type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type);
         } catch (GroovyBugError | NoClassDefFoundError ignored1) {
+            JavaType.Class clazz;
             clazz = new JavaType.Class(null, Flag.Public.getBitMask(), node.getName(), JavaType.Class.Kind.Class,
                     null, null, null, null, null, null, null);
             typeCache.put(signature, clazz);
@@ -97,7 +98,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(node.getOuterClass()));
 
             List<JavaType.Variable> fields = null;
-            if(node.getFields().size() > 0) {
+            if (!node.getFields().isEmpty()) {
                 fields = new ArrayList<>(node.getFields().size());
                 for (FieldNode field : node.getFields()) {
                     if (!field.isSynthetic()) {
@@ -107,9 +108,9 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             }
 
             List<JavaType.Method> methods = null;
-            if(node.getAllDeclaredMethods().size() > 0) {
-                methods = new ArrayList<>(node.getAllDeclaredMethods().size());
-                for (MethodNode method : node.getAllDeclaredMethods()) {
+            if (!node.getMethods().isEmpty()) {
+                methods = new ArrayList<>(node.getMethods().size());
+                for (MethodNode method : node.getMethods()) {
                     if (!method.isSynthetic()) {
                         methods.add(methodType(method));
                     }
@@ -130,16 +131,16 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             List<JavaType.FullyQualified> annotations = getAnnotations(node);
 
             clazz.unsafeSet(null, supertype, owner, annotations, interfaces, fields, methods);
+            return clazz;
         }
 
-        return clazz;
     }
 
     private JavaType parameterizedType(ClassNode type, String signature) {
         JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
         typeCache.put(signature, pt);
 
-        JavaType.Class clazz = classType(type, type.getPlainNodeReference().getName());
+        JavaType.FullyQualified clazz = classType(type, type.getPlainNodeReference().getName());
 
         List<JavaType> typeParameters = emptyList();
         if (type.getGenericsTypes() != null && type.getGenericsTypes().length > 0) {
@@ -154,13 +155,13 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     }
 
     private JavaType.Array arrayType(ClassNode array, String signature) {
-        JavaType.Array arr = new JavaType.Array(null, null);
+        JavaType.Array arr = new JavaType.Array(null, null, null);
         typeCache.put(signature, arr);
 
         if (array.getComponentType().isUsingGenerics()) {
-            arr.unsafeSet(type(array.getComponentType().getGenericsTypes()[0]));
+            arr.unsafeSet(type(array.getComponentType().getGenericsTypes()[0]), null);
         } else {
-            arr.unsafeSet(type(array.getComponentType()));
+            arr.unsafeSet(type(array.getComponentType()), null);
         }
 
         return arr;
@@ -202,8 +203,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return gtv;
     }
 
-    @Nullable
-    public JavaType.Method methodType(@Nullable MethodNode node) {
+    public JavaType.@Nullable Method methodType(@Nullable MethodNode node) {
         if (node == null) {
             return null;
         }
@@ -230,6 +230,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                 null,
                 paramNames,
                 null, null, null,
+                null,
                 null
         );
         typeCache.put(signature, method);
@@ -242,8 +243,8 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             }
         }
 
-        List<JavaType.FullyQualified> thrownExceptions = null;
-        if(node.getExceptions() != null) {
+        List<JavaType> thrownExceptions = null;
+        if (node.getExceptions() != null) {
             for (ClassNode e : node.getExceptions()) {
                 thrownExceptions = new ArrayList<>(node.getExceptions().length);
                 JavaType.FullyQualified qualified = TypeUtils.asFullyQualified(type(e));
@@ -264,8 +265,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return method;
     }
 
-    @Nullable
-    public JavaType.Variable variableType(@Nullable FieldNode node) {
+    public JavaType.@Nullable Variable variableType(@Nullable FieldNode node) {
         if (node == null) {
             return null;
         }
@@ -294,13 +294,11 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     /**
      * With an undefined owner
      */
-    @Nullable
-    public JavaType.Variable variableType(String name, @Nullable ASTNode type) {
+    public JavaType.@Nullable Variable variableType(String name, @Nullable ASTNode type) {
         return variableType(name, type(type));
     }
 
-    @Nullable
-    public JavaType.Variable variableType(String name, @Nullable JavaType type) {
+    public JavaType.@Nullable Variable variableType(String name, @Nullable JavaType type) {
         if (type == null) {
             return null;
         }
@@ -324,8 +322,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return variable;
     }
 
-    @Nullable
-    private List<JavaType.FullyQualified> getAnnotations(AnnotatedNode node) {
+    private @Nullable List<JavaType.FullyQualified> getAnnotations(AnnotatedNode node) {
         List<JavaType.FullyQualified> annotations = null;
         for (AnnotationNode a : node.getAnnotations()) {
             annotations = new ArrayList<>(node.getAnnotations().size());

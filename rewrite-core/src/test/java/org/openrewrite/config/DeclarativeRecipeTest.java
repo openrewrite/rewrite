@@ -17,36 +17,39 @@ package org.openrewrite.config;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.ChangeText;
+import org.openrewrite.text.Find;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.net.URI;
+import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class DeclarativeRecipeTest implements RewriteTest {
+class DeclarativeRecipeTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void precondition() {
         rewriteRun(
           spec -> {
               spec.validateRecipeSerialization(false);
-              DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
-                null, null, true, null);
+              DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+                null, URI.create("null"), true, emptyList());
               dr.addPrecondition(
                 toRecipe(() -> new PlainTextVisitor<>() {
                     @Override
@@ -73,12 +76,94 @@ public class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
+    void addingPreconditionsWithOptions() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        dr.addPrecondition(
+          toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                  if ("1".equals(text.getText())) {
+                      return SearchResult.found(text);
+                  }
+                  return text;
+              }
+          })
+        );
+        dr.addUninitialized(
+          new ChangeText("2")
+        );
+        dr.addUninitialized(
+          new ChangeText("3")
+        );
+        dr.initialize(List.of(), Map.of());
+        assertThat(dr.getDescriptor().getRecipeList())
+          .hasSize(3) // precondition + 2 recipes with options
+          .flatExtracting(RecipeDescriptor::getOptions)
+          .hasSize(2)
+          .extracting(OptionDescriptor::getName)
+          .containsOnly("toText");
+    }
+
+    @Test
+    void uninitializedFailsValidation() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        dr.addUninitializedPrecondition(
+          toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                  if ("1".equals(text.getText())) {
+                      return SearchResult.found(text);
+                  }
+                  return text;
+              }
+          })
+        );
+        dr.addUninitialized(
+          new ChangeText("2")
+        );
+        dr.addUninitialized(
+          new ChangeText("3")
+        );
+        Validated<Object> validation = dr.validate();
+        assertThat(validation.isValid()).isFalse();
+        assertThat(validation.failures().size()).isEqualTo(2);
+        assertThat(validation.failures().getFirst().getProperty()).isEqualTo("initialization");
+    }
+
+    @Test
+    void uninitializedWithInitializedRecipesPassesValidation() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        dr.setPreconditions(
+          List.of(
+            toRecipe(() -> new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    if ("1".equals(text.getText())) {
+                        return SearchResult.found(text);
+                    }
+                    return text;
+                }
+            }))
+        );
+        dr.setRecipeList(List.of(
+          new ChangeText("2"),
+          new ChangeText("3")
+        ));
+        Validated<Object> validation = dr.validate();
+        assertThat(validation.isValid()).isTrue();
+    }
+
+    @Test
     void yamlPrecondition() {
         rewriteRun(
           spec -> spec.recipeFromYaml("""
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.PreconditionTest
+            description: Test.
             preconditions:
               - org.openrewrite.text.Find:
                   find: 1
@@ -94,13 +179,176 @@ public class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
+    void yamlDeclarativeRecipeAsPrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.PreconditionTest
+            description: Test.
+            preconditions:
+              - org.openrewrite.DeclarativePrecondition
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                 toText: 3
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.DeclarativePrecondition
+            recipeList:
+              - org.openrewrite.text.Find:
+                  find: 1
+            """,
+            "org.openrewrite.PreconditionTest"
+          ),
+          text("1", "3"),
+          text("2")
+        );
+    }
+
+    @Test
+    void orPreconditions() {
+        // As documented https://docs.openrewrite.org/reference/yaml-format-reference#creating-or-preconditions-instead-of-and
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.DoSomething
+              description: Test.
+              preconditions:
+                - org.sample.FindAnyJson
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: 2
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.FindAnyJson
+              recipeList:
+                - org.openrewrite.FindSourceFiles:
+                    filePattern: "**/my.json"
+                - org.openrewrite.FindSourceFiles:
+                    filePattern: "**/your.json"
+                - org.openrewrite.FindSourceFiles:
+                    filePattern: "**/our.json"
+              """,
+            "org.sample.DoSomething"
+          ),
+          text("1", "2", spec -> spec.path("a/my.json")),
+          text("a", spec -> spec.path("a/not-my.json"))
+        );
+    }
+
+    @Test
+    void yamlPreconditionWithScanningRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.text.Find:
+                    find: 1
+              recipeList:
+                - org.openrewrite.text.CreateTextFile:
+                   relativeFileName: test.txt
+                   fileContents: "test"
+              """, "org.openrewrite.PreconditionTest")
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).anySatisfy(
+              s -> {
+                  //noinspection DataFlowIssue
+                  assertThat(s.getAfter()).isNotNull();
+                  assertThat(s.getAfter().getSourcePath()).isEqualTo(Paths.get("test.txt"));
+              }
+            ))
+            .expectedCyclesThatMakeChanges(1),
+          text("1")
+        );
+    }
+
+    @Test
+    void scanningPreconditionMet() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.ScanningPreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: sam.txt
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: foo
+                    replace: bar
+              """, "org.openrewrite.ScanningPreconditionTest"),
+          text("sam", spec -> spec.path("sam.txt")),
+          text("foo", "bar")
+        );
+    }
+
+    @Test
+    void scanningPreconditionNotMet() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.ScanningPreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: sam.txt
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: foo
+                    replace: bar
+              """, "org.openrewrite.ScanningPreconditionTest"),
+          text("foo")
+        );
+    }
+
+    @Test
+    void preconditionOnNestedDeclarative() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionOnDeclarative
+              description: Test.
+              preconditions:
+                - org.openrewrite.text.Find:
+                    find: foo
+              recipeList:
+                - org.openrewrite.DeclarativeExample
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.DeclarativeExample
+              description: Test.
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: foo
+                    replace: bar
+              """, "org.openrewrite.PreconditionOnDeclarative"),
+          text("foo", "bar")
+        );
+    }
+
+    @Test
+    void exposesUnderlyingDataTables() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
+          "test", emptySet(), null, URI.create("dummy"), true, Collections.emptyList());
+        dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
+        dr.initialize(List.of(), Map.of());
+        assertThat(dr.getDataTableDescriptors()).anyMatch(it -> "org.openrewrite.table.TextMatches".equals(it.getName()));
+    }
+
+    @Test
     void maxCycles() {
         rewriteRun(
           spec -> spec.recipe(new RepeatedFindAndReplace(".+", "$0+1", 1)),
           text("1", "1+1")
         );
         rewriteRun(
-          spec -> spec.recipe(new RepeatedFindAndReplace(".+", "$0+1", 2)),
+          spec -> spec.recipe(new RepeatedFindAndReplace(".+", "$0+1", 2)).expectedCyclesThatMakeChanges(2),
           text("1", "1+1+1")
         );
     }
@@ -124,7 +372,7 @@ public class DeclarativeRecipeTest implements RewriteTest {
           )
         );
         rewriteRun(
-          spec -> spec.recipe(root).cycles(10).expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(2),
           text("1", "1+1+1")
         );
         assertThat(cycleCount).hasValue(3);
@@ -178,7 +426,7 @@ public class DeclarativeRecipeTest implements RewriteTest {
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<>() {
                 @Override
-                public @Nullable @NonNull Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                     PlainText text = ((PlainText) tree);
                     assert text != null;
                     return text.withText(text.getText().replaceAll(find, replace));

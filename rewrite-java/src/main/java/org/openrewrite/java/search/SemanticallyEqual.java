@@ -15,15 +15,13 @@
  */
 package org.openrewrite.java.search;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -43,22 +41,12 @@ public class SemanticallyEqual {
         return semanticallyEqualVisitor.isEqual();
     }
 
-    /**
-     * Compares method invocations and new class constructors based on the `JavaType.Method` instead of checking
-     * each types of each parameter.
-     * I.E. void foo(Object obj) {} invoked with `java.lang.String` or `java.lang.Integer` will return true.
-     */
-    public static boolean areSemanticallyEqual(J firstElem, J secondElem) {
-        SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor(false);
-        semanticallyEqualVisitor.visit(firstElem, secondElem);
-        return semanticallyEqualVisitor.isEqual.get();
-    }
-
     @SuppressWarnings("ConstantConditions")
     protected static class SemanticallyEqualVisitor extends JavaIsoVisitor<J> {
         private final boolean compareMethodArguments;
 
         protected final AtomicBoolean isEqual = new AtomicBoolean(true);
+        private final Deque<Map<String, String>> variableScope = new ArrayDeque<>();
 
         public SemanticallyEqualVisitor(boolean compareMethodArguments) {
             this.compareMethodArguments = compareMethodArguments;
@@ -110,8 +98,7 @@ public class SemanticallyEqual {
             return super.visit(unwrap(tree), unwrap(j));
         }
 
-        @Nullable
-        private static J unwrap(@Nullable Tree tree) {
+        private static @Nullable J unwrap(@Nullable Tree tree) {
             if (tree instanceof Expression) {
                 tree = ((Expression) tree).unwrap();
             }
@@ -122,9 +109,29 @@ public class SemanticallyEqual {
         }
 
         @Override
+        public @Nullable J preVisit(J tree, J j) {
+            if (declaresVariableScope(tree)) {
+                variableScope.push(new HashMap<>());
+            }
+            return tree;
+        }
+
+        @Override
+        public @Nullable J postVisit(J tree, J j) {
+            if (declaresVariableScope(tree)) {
+                variableScope.pop();
+            }
+            return tree;
+        }
+
+        protected boolean declaresVariableScope(J tree) {
+            return tree instanceof J.Lambda;
+        }
+
+        @Override
         public Expression visitExpression(Expression expression, J j) {
             if (isEqual.get()) {
-                if (!TypeUtils.isOfType(expression.getType(), ((Expression) j).getType())) {
+                if (!isOfType(expression.getType(), ((Expression) j).getType())) {
                     isEqual.set(false);
                 }
             }
@@ -140,7 +147,7 @@ public class SemanticallyEqual {
                 }
 
                 J.Annotation compareTo = (J.Annotation) j;
-                if (!TypeUtils.isOfType(annotation.getType(), compareTo.getType()) ||
+                if (!isOfType(annotation.getType(), compareTo.getType()) ||
                     nullListSizeMissMatch(annotation.getArguments(), compareTo.getArguments())) {
                     isEqual.set(false);
                     return annotation;
@@ -161,7 +168,7 @@ public class SemanticallyEqual {
                 }
 
                 J.AnnotatedType compareTo = (J.AnnotatedType) j;
-                if (!TypeUtils.isOfType(annotatedType.getType(), compareTo.getType()) ||
+                if (!isOfType(annotatedType.getType(), compareTo.getType()) ||
                     annotatedType.getAnnotations().size() != compareTo.getAnnotations().size()) {
                     isEqual.set(false);
                     return annotatedType;
@@ -182,7 +189,7 @@ public class SemanticallyEqual {
                 }
 
                 J.ArrayAccess compareTo = (J.ArrayAccess) j;
-                if (!TypeUtils.isOfType(arrayAccess.getType(), compareTo.getType())) {
+                if (!isOfType(arrayAccess.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return arrayAccess;
                 }
@@ -216,7 +223,7 @@ public class SemanticallyEqual {
                 }
 
                 J.ArrayType compareTo = (J.ArrayType) j;
-                if (!TypeUtils.isOfType(arrayType.getType(), compareTo.getType())) {
+                if (!isOfType(arrayType.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return arrayType;
                 }
@@ -257,7 +264,7 @@ public class SemanticallyEqual {
                 }
 
                 J.Assignment compareTo = (J.Assignment) j;
-                if (!TypeUtils.isOfType(assignment.getType(), compareTo.getType())) {
+                if (!isOfType(assignment.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return assignment;
                 }
@@ -277,7 +284,7 @@ public class SemanticallyEqual {
                 }
 
                 J.AssignmentOperation compareTo = (J.AssignmentOperation) j;
-                if (!TypeUtils.isOfType(assignOp.getType(), compareTo.getType())) {
+                if (!isOfType(assignOp.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return assignOp;
                 }
@@ -298,7 +305,7 @@ public class SemanticallyEqual {
 
                 J.Binary compareTo = (J.Binary) j;
                 if (binary.getOperator() != compareTo.getOperator() ||
-                    !TypeUtils.isOfType(binary.getType(), compareTo.getType())) {
+                    !isOfType(binary.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return binary;
                 }
@@ -359,7 +366,13 @@ public class SemanticallyEqual {
                 J.Case compareTo = (J.Case) j;
                 this.visitList(_case.getStatements(), compareTo.getStatements());
                 visit(_case.getBody(), compareTo.getBody());
-                this.visitList(_case.getExpressions(), compareTo.getExpressions());
+                this.visitList(_case.getCaseLabels(), compareTo.getCaseLabels());
+                if (_case.getGuard() != null && compareTo.getGuard() != null) {
+                    visit(_case.getGuard(), compareTo.getGuard());
+                } else if (nullMissMatch(_case.getGuard(), compareTo.getGuard())) {
+                    isEqual.set(false);
+                    return _case;
+                }
             }
             return _case;
         }
@@ -389,7 +402,7 @@ public class SemanticallyEqual {
 
                 J.ClassDeclaration compareTo = (J.ClassDeclaration) j;
                 if (!classDecl.getSimpleName().equals(compareTo.getSimpleName()) ||
-                    !TypeUtils.isOfType(classDecl.getType(), compareTo.getType()) ||
+                    !isOfType(classDecl.getType(), compareTo.getType()) ||
                     modifierListMissMatch(classDecl.getModifiers(), compareTo.getModifiers()) ||
                     classDecl.getKind() != compareTo.getKind() ||
                     nullListSizeMissMatch(classDecl.getPermits(), compareTo.getPermits()) ||
@@ -450,7 +463,7 @@ public class SemanticallyEqual {
             if (isEqual.get()) {
                 if (j instanceof J.ControlParentheses) {
                     J.ControlParentheses<T> compareTo = (J.ControlParentheses<T>) j;
-                    if (!TypeUtils.isOfType(controlParens.getType(), compareTo.getType())) {
+                    if (!isOfType(controlParens.getType(), compareTo.getType())) {
                         isEqual.set(false);
                         return controlParens;
                     }
@@ -542,7 +555,7 @@ public class SemanticallyEqual {
 
                 J.EnumValue compareTo = (J.EnumValue) j;
                 if (!_enum.getName().getSimpleName().equals(compareTo.getName().getSimpleName()) ||
-                    !TypeUtils.isOfType(_enum.getName().getType(), compareTo.getName().getType()) ||
+                    !isOfType(_enum.getName().getType(), compareTo.getName().getType()) ||
                     nullListSizeMissMatch(_enum.getAnnotations(), compareTo.getAnnotations()) ||
                     nullMissMatch(_enum.getInitializer(), compareTo.getInitializer())) {
                     isEqual.set(false);
@@ -577,7 +590,7 @@ public class SemanticallyEqual {
                 JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
                 if (!(j instanceof J.FieldAccess)) {
                     if (!(j instanceof J.Identifier) ||
-                        !TypeUtils.isOfType(fieldType, ((J.Identifier) j).getFieldType()) ||
+                        !isOfType(fieldType, ((J.Identifier) j).getFieldType()) ||
                         !fieldAccess.getSimpleName().equals(((J.Identifier) j).getSimpleName())) {
                         isEqual.set(false);
                     } else {
@@ -594,8 +607,9 @@ public class SemanticallyEqual {
                         isEqual.set(false);
                         return fieldAccess;
                     }
-                } else if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType())
-                           || !TypeUtils.isOfType(fieldType, compareTo.getName().getFieldType())) {
+                } else if (!fieldAccess.getSimpleName().equals(compareTo.getSimpleName()) ||
+                           !isOfType(fieldAccess.getType(), compareTo.getType()) ||
+                           !isOfType(fieldType, compareTo.getName().getFieldType())) {
                     isEqual.set(false);
                     return fieldAccess;
                 }
@@ -674,17 +688,67 @@ public class SemanticallyEqual {
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, J j) {
             if (isEqual.get()) {
-                if (!(j instanceof J.Identifier)) {
-                    if (!(j instanceof J.FieldAccess) || !TypeUtils.isOfType(identifier.getFieldType(), ((J.FieldAccess) j).getName().getFieldType())) {
-                        isEqual.set(false);
-                    } else if (identifier.getFieldType() != null && !identifier.getFieldType().hasFlags(Flag.Static)) {
-                        isEqual.set(false);
+                if (j instanceof J.FieldAccess) {
+                    J.FieldAccess field = (J.FieldAccess) j;
+                    Expression fieldTarget = field.getTarget();
+
+                    // Consider implicit-this "a" equivalent to "this.a"
+                    // Definitely does not account for every possible edge case around "this", but handles the common case
+                    if (fieldTarget instanceof J.Identifier && "this".equals(((J.Identifier) fieldTarget).getSimpleName())) {
+                        visit(identifier, field.getName());
+                        return identifier;
                     }
+
+                    // Identifier name and type aren't the same as the field access they are obviously different
+                    if (!identifier.getSimpleName().equals(field.getSimpleName()) || !isOfType(identifier.getFieldType(), field.getName().getFieldType())) {
+                        isEqual.set(false);
+                        return identifier;
+                    }
+
+                    // Either both are variables or both are not (e.g. types)
+                    if ((identifier.getFieldType() == null) ^ (field.getName().getFieldType() == null)) {
+                        isEqual.set(false);
+                        return identifier;
+                    }
+
+                    String identifierTypeFqn = identifier.getType() instanceof JavaType.FullyQualified ? ((JavaType.FullyQualified) identifier.getType()).getFullyQualifiedName() : "";
+                    // If the field access is a static field access, the identifier must be a class reference
+                    // e.g.: Pattern is semantically equal to java.util.regex.Pattern
+                    if (field.isFullyQualifiedClassReference(identifierTypeFqn)) {
+                        return identifier;
+                    }
+
+                    if (identifier.getFieldType() != null) {
+                        // Similarly, might be comparing a statically imported field to a fully qualified
+                        // e.g. java.util.regex.Pattern.CASE_INSENSITIVE is semantically equal to CASE_INSENSITIVE when the latter is a static import of the former
+                        JavaType identifierOwner = identifier.getFieldType().getOwner();
+                        String identifierOwnerFqn = identifierOwner instanceof JavaType.FullyQualified ? ((JavaType.FullyQualified) identifierOwner).getFullyQualifiedName() : "";
+                        if (field.getTarget() instanceof J.FieldAccess && ((J.FieldAccess) field.getTarget()).isFullyQualifiedClassReference(identifierOwnerFqn)) {
+                            return identifier;
+                        }
+
+                        // Identifier is statically imported field name "CASE_INSENSITIVE", field is field  access "Pattern.CASE_INSENSITIVE"
+                        if (identifierOwner instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) identifierOwner).getClassName().equals(fieldTarget.toString()) && isOfType(identifier.getFieldType().getOwner(), fieldTarget.getType())) {
+                            return identifier;
+                        }
+                    }
+
+                    isEqual.set(false);
+                    return identifier;
+                }
+                if (!(j instanceof J.Identifier)) {
+                    isEqual.set(false);
                     return identifier;
                 }
 
                 J.Identifier compareTo = (J.Identifier) j;
-                if (!identifier.getSimpleName().equals(compareTo.getSimpleName())) {
+                if (identifier.getFieldType() != null) {
+                    Map<String, String> scope = variableScope.peek();
+                    if (scope != null && scope.containsKey(identifier.getSimpleName()) && scope.get(identifier.getSimpleName()).equals(compareTo.getSimpleName())) {
+                        return identifier;
+                    }
+                }
+                if (!identifier.getSimpleName().equals(compareTo.getSimpleName()) || !isOfType(identifier.getFieldType(), compareTo.getFieldType())) {
                     isEqual.set(false);
                     return identifier;
                 }
@@ -726,7 +790,7 @@ public class SemanticallyEqual {
                 if (_import.isStatic() != compareTo.isStatic() ||
                     !_import.getPackageName().equals(compareTo.getPackageName()) ||
                     !_import.getClassName().equals(compareTo.getClassName()) ||
-                    !TypeUtils.isOfType(_import.getQualid().getType(), compareTo.getQualid().getType())) {
+                    !isOfType(_import.getQualid().getType(), compareTo.getQualid().getType())) {
                     isEqual.set(false);
                     return _import;
                 }
@@ -743,7 +807,7 @@ public class SemanticallyEqual {
                 }
 
                 J.InstanceOf compareTo = (J.InstanceOf) j;
-                if (!TypeUtils.isOfType(instanceOf.getType(), compareTo.getType())) {
+                if (!isOfType(instanceOf.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return instanceOf;
                 }
@@ -751,6 +815,25 @@ public class SemanticallyEqual {
                 visit(instanceOf.getExpression(), compareTo.getExpression());
             }
             return instanceOf;
+        }
+
+        @Override
+        public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, J j) {
+            if (isEqual.get()) {
+                if (!(j instanceof J.DeconstructionPattern)) {
+                    isEqual.set(false);
+                    return deconstructionPattern;
+                }
+
+                J.DeconstructionPattern compareTo = (J.DeconstructionPattern) j;
+                if (!isOfType(deconstructionPattern.getType(), compareTo.getType())) {
+                    isEqual.set(false);
+                    return deconstructionPattern;
+                }
+                visit(deconstructionPattern.getDeconstructor(), compareTo.getDeconstructor());
+                this.visitList(deconstructionPattern.getNested(), compareTo.getNested());
+            }
+            return deconstructionPattern;
         }
 
         @Override
@@ -763,7 +846,7 @@ public class SemanticallyEqual {
 
                 J.Label compareTo = (J.Label) j;
                 if (!label.getLabel().getSimpleName().equals(compareTo.getLabel().getSimpleName()) ||
-                    !TypeUtils.isOfType(label.getLabel().getType(), compareTo.getLabel().getType())) {
+                    !isOfType(label.getLabel().getType(), compareTo.getLabel().getType())) {
                     isEqual.set(false);
                     return label;
                 }
@@ -785,8 +868,8 @@ public class SemanticallyEqual {
                     isEqual.set(false);
                     return lambda;
                 }
+                visitList(lambda.getParameters().getParameters(), compareTo.getParameters().getParameters());
                 visit(lambda.getBody(), compareTo.getBody());
-                this.visitList(lambda.getParameters().getParameters(), compareTo.getParameters().getParameters());
             }
             return lambda;
         }
@@ -800,13 +883,31 @@ public class SemanticallyEqual {
                 }
 
                 J.Literal compareTo = (J.Literal) j;
-                if (!TypeUtils.isOfType(literal.getType(), compareTo.getType()) ||
-                    !Objects.equals(literal.getValue(), compareTo.getValue())) {
+                if (!samePrimitiveValue(literal, compareTo)) {
                     isEqual.set(false);
                     return literal;
                 }
             }
             return literal;
+        }
+
+        private static boolean samePrimitiveValue(J.Literal literal, J.Literal compareTo) {
+            Object value = literal.getValue();
+            Object compareToValue = compareTo.getValue();
+            if (Objects.equals(value, compareToValue)) {
+                return true;
+            } else if (value == null) {
+                return compareToValue == null;
+            } else if (value instanceof Number) {
+                if (!(compareToValue instanceof Number)) {
+                    return false;
+                } else if (value instanceof Double || value instanceof Float || compareToValue instanceof Double || compareToValue instanceof Float) {
+                    return ((Number) value).doubleValue() == ((Number) compareToValue).doubleValue();
+                } else if  (value instanceof Integer || value instanceof Long  || value instanceof Short ||  value instanceof Byte) {
+                    return ((Number) value).longValue() == ((Number) compareToValue).longValue();
+                }
+            }
+            return false;
         }
 
         @Override
@@ -819,17 +920,17 @@ public class SemanticallyEqual {
 
                 J.MemberReference compareTo = (J.MemberReference) j;
                 if (!memberRef.getReference().getSimpleName().equals(compareTo.getReference().getSimpleName()) ||
-                    !TypeUtils.isOfType(memberRef.getReference().getType(), compareTo.getReference().getType()) ||
-                    !TypeUtils.isOfType(memberRef.getType(), compareTo.getType()) ||
-                    !TypeUtils.isOfType(memberRef.getVariableType(), compareTo.getVariableType()) ||
-                    !TypeUtils.isOfType(memberRef.getMethodType(), compareTo.getMethodType()) ||
+                    !isOfType(memberRef.getReference().getType(), compareTo.getReference().getType()) ||
+                    !isOfType(memberRef.getType(), compareTo.getType()) ||
+                    !isOfType(memberRef.getVariableType(), compareTo.getVariableType()) ||
+                    !isOfType(memberRef.getMethodType(), compareTo.getMethodType()) ||
                     nullListSizeMissMatch(memberRef.getTypeParameters(), compareTo.getTypeParameters())) {
                     isEqual.set(false);
                     return memberRef;
                 }
 
                 visit(memberRef.getContaining(), compareTo.getContaining());
-                this.visitList(memberRef.getTypeParameters(), compareTo.getTypeParameters());
+                visitList(memberRef.getTypeParameters(), compareTo.getTypeParameters());
             }
             return memberRef;
         }
@@ -844,7 +945,7 @@ public class SemanticallyEqual {
 
                 J.MethodDeclaration compareTo = (J.MethodDeclaration) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
-                    !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
+                    !isOfType(method.getMethodType(), compareTo.getMethodType()) ||
                     modifierListMissMatch(method.getModifiers(), compareTo.getModifiers()) ||
 
                     method.getLeadingAnnotations().size() != compareTo.getLeadingAnnotations().size() ||
@@ -890,11 +991,12 @@ public class SemanticallyEqual {
                 boolean static_ = method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static);
                 J.MethodInvocation compareTo = (J.MethodInvocation) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
-                    !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
+                    method.getArguments().size() != compareTo.getArguments().size() ||
                     !(static_ == (compareTo.getMethodType() != null && compareTo.getMethodType().hasFlags(Flag.Static)) ||
                       !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
-                    method.getArguments().size() != compareTo.getArguments().size() ||
-                    nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters())) {
+                    method.getMethodType() == null ||
+                    compareTo.getMethodType() == null ||
+                    !isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType())) {
                     isEqual.set(false);
                     return method;
                 }
@@ -906,6 +1008,16 @@ public class SemanticallyEqual {
                     }
 
                     visit(method.getSelect(), compareTo.getSelect());
+                } else {
+                    JavaType.FullyQualified methodDeclaringType = method.getMethodType().getDeclaringType();
+                    JavaType.FullyQualified compareToDeclaringType = compareTo.getMethodType().getDeclaringType();
+                    if (!isAssignableTo(methodDeclaringType instanceof JavaType.Parameterized ?
+                                    ((JavaType.Parameterized) methodDeclaringType).getType() : methodDeclaringType,
+                            compareToDeclaringType instanceof JavaType.Parameterized ?
+                                    ((JavaType.Parameterized) compareToDeclaringType).getType() : compareToDeclaringType)) {
+                        isEqual.set(false);
+                        return method;
+                    }
                 }
                 boolean containsLiteral = false;
                 if (!compareMethodArguments) {
@@ -917,7 +1029,7 @@ public class SemanticallyEqual {
                     }
                     if (!containsLiteral) {
                         if (nullMissMatch(method.getMethodType(), compareTo.getMethodType()) ||
-                            !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType())) {
+                            !isOfType(method.getMethodType(), compareTo.getMethodType())) {
                             isEqual.set(false);
                             return method;
                         }
@@ -926,7 +1038,6 @@ public class SemanticallyEqual {
                 if (compareMethodArguments || containsLiteral) {
                     this.visitList(method.getArguments(), compareTo.getArguments());
                 }
-                this.visitList(method.getTypeParameters(), compareTo.getTypeParameters());
             }
             return method;
         }
@@ -951,7 +1062,7 @@ public class SemanticallyEqual {
                 for (int i = 0; i < ((JavaType.MultiCatch) multiCatch.getType()).getThrowableTypes().size(); i++) {
                     JavaType first = ((JavaType.MultiCatch) multiCatch.getType()).getThrowableTypes().get(i);
                     JavaType second = ((JavaType.MultiCatch) compareTo.getType()).getThrowableTypes().get(i);
-                    if (!TypeUtils.isOfType(first, second)) {
+                    if (!isOfType(first, second)) {
                         isEqual.set(false);
                         return multiCatch;
                     }
@@ -971,7 +1082,7 @@ public class SemanticallyEqual {
                 }
 
                 J.NewArray compareTo = (J.NewArray) j;
-                if (!TypeUtils.isOfType(newArray.getType(), compareTo.getType()) ||
+                if (!isOfType(newArray.getType(), compareTo.getType()) ||
                     newArray.getDimensions().size() != compareTo.getDimensions().size() ||
                     nullMissMatch(newArray.getTypeExpression(), compareTo.getTypeExpression()) ||
                     nullListSizeMissMatch(newArray.getInitializer(), compareTo.getInitializer())) {
@@ -997,8 +1108,8 @@ public class SemanticallyEqual {
                 }
 
                 J.NewClass compareTo = (J.NewClass) j;
-                if (!TypeUtils.isOfType(newClass.getType(), compareTo.getType()) ||
-                    !TypeUtils.isOfType(newClass.getConstructorType(), compareTo.getConstructorType()) ||
+                if (!isOfType(newClass.getType(), compareTo.getType()) ||
+                    !isOfType(newClass.getConstructorType(), compareTo.getConstructorType()) ||
                     nullMissMatch(newClass.getEnclosing(), compareTo.getEnclosing()) ||
                     nullMissMatch(newClass.getClazz(), compareTo.getClazz()) ||
                     nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
@@ -1028,7 +1139,7 @@ public class SemanticallyEqual {
                         }
                         if (!containsLiteral) {
                             if (nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
-                                newClass.getConstructorType() != null && compareTo.getConstructorType() != null && !TypeUtils.isOfType(newClass.getConstructorType(), compareTo.getConstructorType())) {
+                                newClass.getConstructorType() != null && compareTo.getConstructorType() != null && !isOfType(newClass.getConstructorType(), compareTo.getConstructorType())) {
                                 isEqual.set(false);
                                 return newClass;
                             }
@@ -1070,13 +1181,15 @@ public class SemanticallyEqual {
                 }
 
                 J.ParameterizedType compareTo = (J.ParameterizedType) j;
-                if (!TypeUtils.isOfType(type.getType(), compareTo.getType()) ||
+                if (!isOfType(type.getType(), compareTo.getType()) ||
                     nullListSizeMissMatch(type.getTypeParameters(), compareTo.getTypeParameters())) {
                     isEqual.set(false);
                     return type;
                 }
 
-                this.visitList(type.getTypeParameters(), compareTo.getTypeParameters());
+                if (!(type.getTypeParameters().get(0) instanceof J.Empty || compareTo.getTypeParameters().get(0) instanceof J.Empty)) {
+                    this.visitList(type.getTypeParameters(), compareTo.getTypeParameters());
+                }
             }
             return type;
         }
@@ -1103,7 +1216,7 @@ public class SemanticallyEqual {
                 }
 
                 J.Primitive compareTo = (J.Primitive) j;
-                if (!TypeUtils.isOfType(primitive.getType(), compareTo.getType())) {
+                if (!isOfType(primitive.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return primitive;
                 }
@@ -1185,7 +1298,7 @@ public class SemanticallyEqual {
                 }
 
                 J.Ternary compareTo = (J.Ternary) j;
-                if (!TypeUtils.isOfType(ternary.getType(), compareTo.getType())) {
+                if (!isOfType(ternary.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return ternary;
                 }
@@ -1258,7 +1371,7 @@ public class SemanticallyEqual {
                 }
 
                 Expression compareTo = (Expression) j;
-                if (!TypeUtils.isOfType(typeCast.getType(), compareTo.getType())) {
+                if (!isOfType(typeCast.getType(), compareTo.getType())) {
                     isEqual.set(false);
                 } else {
                     if (compareTo instanceof J.TypeCast) {
@@ -1302,7 +1415,7 @@ public class SemanticallyEqual {
 
                 J.Unary compareTo = (J.Unary) j;
                 if (unary.getOperator() != compareTo.getOperator() ||
-                    !TypeUtils.isOfType(unary.getType(), compareTo.getType())) {
+                    !isOfType(unary.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return unary;
                 }
@@ -1321,7 +1434,7 @@ public class SemanticallyEqual {
                 }
 
                 J.VariableDeclarations compareTo = (J.VariableDeclarations) j;
-                if (!TypeUtils.isOfType(multiVariable.getType(), compareTo.getType()) ||
+                if (!isOfType(multiVariable.getType(), compareTo.getType()) ||
                     nullMissMatch(multiVariable.getTypeExpression(), compareTo.getTypeExpression()) ||
                     multiVariable.getVariables().size() != compareTo.getVariables().size() ||
                     multiVariable.getLeadingAnnotations().size() != compareTo.getLeadingAnnotations().size()) {
@@ -1347,8 +1460,14 @@ public class SemanticallyEqual {
                 }
 
                 J.VariableDeclarations.NamedVariable compareTo = (J.VariableDeclarations.NamedVariable) j;
-                if (!variable.getSimpleName().equals(compareTo.getSimpleName()) ||
-                    !TypeUtils.isOfType(variable.getType(), compareTo.getType()) ||
+                Map<String, String> scope = variableScope.peek();
+                if (scope != null) {
+                    scope.put(variable.getSimpleName(), compareTo.getSimpleName());
+                } else if (!variable.getSimpleName().equals(compareTo.getSimpleName())) {
+                    isEqual.set(false);
+                    return variable;
+                }
+                if (!isOfType(variable.getType(), compareTo.getType()) ||
                     nullMissMatch(variable.getInitializer(), compareTo.getInitializer())) {
                     isEqual.set(false);
                     return variable;
@@ -1399,12 +1518,20 @@ public class SemanticallyEqual {
         @Override
         public <N extends NameTree> N visitTypeName(N firstTypeName, J j) {
             if (isEqual.get()) {
-                if (!(j instanceof NameTree) && !TypeUtils.isOfType(firstTypeName.getType(), ((NameTree) j).getType())) {
+                if (!(j instanceof NameTree) && !isOfType(firstTypeName.getType(), ((NameTree) j).getType())) {
                     isEqual.set(false);
                     return firstTypeName;
                 }
             }
             return firstTypeName;
+        }
+
+        protected boolean isOfType(JavaType target, JavaType source) {
+            return TypeUtils.isOfType(target, source);
+        }
+
+        protected boolean isAssignableTo(JavaType to, JavaType from) {
+            return TypeUtils.isAssignableTo(to, from);
         }
     }
 }

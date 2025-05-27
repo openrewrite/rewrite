@@ -15,8 +15,8 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -25,18 +25,16 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.function.Predicate;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class StringUtils {
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
+
     private StringUtils() {
     }
 
-    public static String trimIndentPreserveCRLF(@Nullable String text) {
+    public static @Nullable String trimIndentPreserveCRLF(@Nullable String text) {
         if (text == null) {
             //noinspection DataFlowIssue
             return null;
@@ -133,7 +131,7 @@ public class StringUtils {
      * @param text A string with zero or more line breaks.
      * @return The minimum count of white space characters preceding each line of content.
      */
-    private static int minCommonIndentLevel(String text) {
+    public static int minCommonIndentLevel(String text) {
         int minIndent = Integer.MAX_VALUE;
         int whiteSpaceCount = 0;
         boolean contentEncountered = false;
@@ -158,50 +156,6 @@ public class StringUtils {
             minIndent = Math.min(whiteSpaceCount, minIndent);
         }
         return minIndent;
-    }
-
-    public static int mostCommonIndent(SortedMap<Integer, Long> indentFrequencies) {
-        // the frequency with which each indent level is an integral divisor of longer indent levels
-        SortedMap<Integer, Integer> indentFrequencyAsDivisors = new TreeMap<>();
-        for (Map.Entry<Integer, Long> indentFrequency : indentFrequencies.entrySet()) {
-            int indent = indentFrequency.getKey();
-            int freq;
-            switch (indent) {
-                case 0:
-                    freq = indentFrequency.getValue().intValue();
-                    break;
-                case 1:
-                    // gcd(1, N) == 1, so we can avoid the test for this case
-                    freq = (int) indentFrequencies.tailMap(indent).values().stream().mapToLong(l -> l).sum();
-                    break;
-                default:
-                    freq = (int) indentFrequencies.tailMap(indent).entrySet().stream()
-                            .filter(inF -> gcd(inF.getKey(), indent) != 0)
-                            .mapToLong(Map.Entry::getValue)
-                            .sum();
-            }
-
-            indentFrequencyAsDivisors.put(indent, freq);
-        }
-
-        if (indentFrequencies.getOrDefault(0, 0L) > 1) {
-            return 0;
-        }
-
-        return indentFrequencyAsDivisors.entrySet().stream()
-                .max((e1, e2) -> {
-                    int valCompare = e1.getValue().compareTo(e2.getValue());
-                    return valCompare != 0 ?
-                            valCompare :
-                            // take the smallest indent otherwise, unless it would be zero
-                            e1.getKey() == 0 ? -1 : e2.getKey().compareTo(e1.getKey());
-                })
-                .map(Map.Entry::getKey)
-                .orElse(0);
-    }
-
-    static int gcd(int n1, int n2) {
-        return n2 == 0 ? n1 : gcd(n2, n1 % n2);
     }
 
     /**
@@ -468,8 +422,8 @@ public class StringUtils {
             if (ch == '*') {
                 break;
             }
-            if (ch != '?'
-                && different(caseSensitive, ch, str.charAt(strIdxStart))) {
+            if (ch != '?' &&
+                different(caseSensitive, ch, str.charAt(strIdxStart))) {
                 return false; // Character mismatch
             }
             patIdxStart++;
@@ -556,9 +510,9 @@ public class StringUtils {
     }
 
     private static boolean different(boolean caseSensitive, char ch, char other) {
-        return caseSensitive
-                ? ch != other
-                : Character.toUpperCase(ch) != Character.toUpperCase(other);
+        return caseSensitive ?
+                ch != other :
+                Character.toUpperCase(ch) != Character.toUpperCase(other);
     }
 
     public static String indent(String text) {
@@ -637,9 +591,6 @@ public class StringUtils {
         return true;
     }
 
-    private static final Pattern SINGLE_DOT_OR_DOLLAR = Pattern.compile("(?:([^.]+)|^)\\.(?:([^.]+)|$)");
-    private static final String SINGLE_DOT_OR_DOLLAR_REPLACEMENT = "$1" + Matcher.quoteReplacement("[.$]") + "$2";
-
     /**
      * See <a href="https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns">https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns</a>
      * <p>
@@ -651,13 +602,34 @@ public class StringUtils {
      * the code is in any declaration of a type whose name begins with "com.xerox.".
      */
     public static String aspectjNameToPattern(String name) {
-        String replaced = name
-                .replace("$", "\\$")
-                .replace("[", "\\[")
-                .replace("]", "\\]");
-        return SINGLE_DOT_OR_DOLLAR.matcher(replaced).replaceAll(SINGLE_DOT_OR_DOLLAR_REPLACEMENT)
-                .replace("*", "[^.]*")
-                .replace("..", "\\.(.+\\.)?");
+        int length = name.length();
+        StringBuilder sb = new StringBuilder(length);
+        char prev = 0;
+        for (int i = 0; i < length; i++) {
+            boolean isLast = i == length - 1;
+            char c = name.charAt(i);
+            switch (c) {
+                case '.':
+                    if (prev != '.' && (isLast || name.charAt(i + 1) != '.')) {
+                        sb.append("[.$]");
+                    } else if (prev == '.') {
+                        sb.append("\\.(.+\\.)?");
+                    }
+                    break;
+                case '*':
+                    sb.append("[^.]*");
+                    break;
+                case '$':
+                case '[':
+                case ']':
+                    sb.append('\\');
+                    // fall-through
+                default:
+                    sb.append(c);
+            }
+            prev = c;
+        }
+        return sb.toString();
     }
 
     /**
@@ -720,16 +692,18 @@ public class StringUtils {
                 continue;
             } else if (length > cursor + 1) {
                 char next = source.charAt(cursor + 1);
-                if (current == '/' && next == '/') {
+                if (inMultiLineComment) {
+                    if (current == '*' && next == '/') {
+                        inMultiLineComment = false;
+                        cursor++;
+                        continue;
+                    }
+                } else if (current == '/' && next == '/') {
                     inSingleLineComment = true;
                     cursor++;
                     continue;
                 } else if (current == '/' && next == '*') {
                     inMultiLineComment = true;
-                    cursor++;
-                    continue;
-                } else if (current == '*' && next == '/') {
-                    inMultiLineComment = false;
                     cursor++;
                     continue;
                 }
@@ -739,5 +713,23 @@ public class StringUtils {
             }
         }
         return cursor;
+    }
+
+    public static String formatUriForPropertiesFile(String uri) {
+        return uri.replaceAll("(?<!\\\\)://", "\\\\://");
+    }
+
+    public static boolean hasLineBreak(@Nullable String s) {
+        return s != null && LINE_BREAK.matcher(s).find();
+    }
+
+    public static boolean containsWhitespace(String s) {
+        for (int i = 0; i < s.length(); ++i) {
+            if (Character.isWhitespace(s.charAt(i))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

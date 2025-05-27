@@ -16,5 +16,6 @@
 package org.openrewrite.hcl.tree;
 
 public interface BodyContent extends Hcl {
+    @Override
     BodyContent withPrefix(Space prefix);
 }

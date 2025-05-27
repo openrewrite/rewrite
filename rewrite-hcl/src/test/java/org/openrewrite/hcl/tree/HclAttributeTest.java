@@ -26,38 +26,11 @@ import static org.openrewrite.hcl.Assertions.hcl;
 
 class HclAttributeTest implements RewriteTest {
 
-    @Test
-    void attribute() {
-        rewriteRun(
-          hcl("a = true")
-        );
-    }
-
-    @Test
-    void objectValueAttributes() {
-        rewriteRun(
-          hcl("""
-            locals {
-                simple_str = "str1"
-                objectvalue = {
-                  simple_attr = "value1"
-                  "quoted_attr" = "value2"
-                  (template_attr) = "value3"
-                  "${local.simple_str}quoted_template" = "value4"
-                }
-            }
-            """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void attributeValue() {
         rewriteRun(
           spec -> spec
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .recipe(RewriteTest.toRecipe(() -> new HclVisitor<ExecutionContext>() {
                   @Override
                   public Hcl visitBlock(Hcl.Block block, ExecutionContext executionContext) {
@@ -66,7 +39,7 @@ class HclAttributeTest implements RewriteTest {
                       return block.withAttributeValue("key", "goodbye");
                   }
               }
-            )),
+            ).withMaxCycles(1)),
           hcl(
             """
               provider {
@@ -78,6 +51,32 @@ class HclAttributeTest implements RewriteTest {
                   key = "goodbye"
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void attribute() {
+        rewriteRun(
+          hcl("a = true")
+        );
+    }
+
+    @Test
+    void objectValueAttributes() {
+        rewriteRun(
+          hcl(
+                """
+            locals {
+                simple_str = "str1"
+                objectvalue = {
+                  simple_attr = "value1"
+                  "quoted_attr" = "value2"
+                  (template_attr) = "value3"
+                  "${local.simple_str}quoted_template" = "value4"
+                }
+            }
+            """
           )
         );
     }

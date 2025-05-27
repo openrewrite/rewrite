@@ -17,10 +17,8 @@ package org.openrewrite.xml.security;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlIsoVisitor;
@@ -29,10 +27,9 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemoveOwaspSuppressions extends Recipe {
 
     @Override
@@ -40,11 +37,18 @@ public class RemoveOwaspSuppressions extends Recipe {
         return "Remove out-of-date OWASP suppressions";
     }
 
+    @Option(displayName = "Until date",
+            required = false,
+            description = "Suppressions will be removed if they expired before the provided date. Default will be yesterday.",
+            example = "2023-01-01")
+    @Nullable
+    String cutOffDate;
+
     @Override
     public String getDescription() {
         return "Remove all OWASP suppressions with a suppression end date in the past, as these are no longer valid. " +
-               "For use with the OWASP `dependency-check` tool. " +
-               "More details on OWASP suppression files can be found [here](https://jeremylong.github.io/DependencyCheck/general/suppression.html).";
+                "For use with the OWASP `dependency-check` tool. " +
+                "More details on OWASP suppression files can be found [here](https://jeremylong.github.io/DependencyCheck/general/suppression.html).";
     }
 
     @Override
@@ -70,8 +74,12 @@ public class RemoveOwaspSuppressions extends Recipe {
                                     maybeDate = maybeDate.substring(0, maybeDate.length() - 1);
                                 }
                                 try {
+                                    LocalDate maxDate = LocalDate.now().minusDays(1);
+                                    if (cutOffDate != null) {
+                                        maxDate = LocalDate.parse(cutOffDate);
+                                    }
                                     LocalDate date = LocalDate.parse(maybeDate);
-                                    if (date.isBefore(LocalDate.now().minus(1, ChronoUnit.DAYS))) {
+                                    if (date.isBefore(maxDate)) {
                                         return true;
                                     }
                                 } catch (DateTimeParseException e) {

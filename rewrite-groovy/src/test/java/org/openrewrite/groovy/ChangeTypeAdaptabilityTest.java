@@ -31,11 +31,33 @@ import static org.openrewrite.groovy.Assertions.groovy;
 /**
  * Prove that {@link ChangeType}, written for Java, can adapt to working on Groovy code.
  */
-public class ChangeTypeAdaptabilityTest implements RewriteTest {
+class ChangeTypeAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
+    }
+
+    @DocumentExample
+    @Test
+    void changeDefinition() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
+          groovy(
+            """
+              class file {
+              }
+              """,
+            """
+              class newFile {
+              }
+              """,
+            spec -> spec.path("file.groovy").afterRecipe(cu -> {
+                assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "newFile")).isTrue();
+            })
+          )
+        );
     }
 
     @SuppressWarnings("GrPackage")
@@ -51,14 +73,14 @@ public class ChangeTypeAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import a.b.Original
-                          
+              
               class A {
                   Original type
               }
               """,
             """
               import x.y.Target
-                          
+              
               class A {
                   Target type
               }
@@ -79,37 +101,19 @@ public class ChangeTypeAdaptabilityTest implements RewriteTest {
           ),
           groovy(
             """
+              import a.b.Original
+              
               class A {
-                  a.b.Original type
+                  Original type
               }
               """,
             """
+              import x.y.Target
+              
               class A {
-                  x.y.Target type
+                  Target type
               }
               """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void changeDefinition() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
-          groovy(
-            """
-              class file {
-              }
-              """,
-            """
-              class newFile {
-              }
-              """,
-            spec -> spec.path("file.groovy").afterRecipe(cu -> {
-                assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
-            })
           )
         );
     }
@@ -130,8 +134,8 @@ public class ChangeTypeAdaptabilityTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
-                J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().get(0).getInitializer();
+                J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().getFirst().getInitializer();
                 assertThat(TypeUtils.isOfClassType(sizeMi.getMethodType().getDeclaringType(),
                   "java.util.ArrayList")).isTrue();
                 J.MethodInvocation emptyListMi = (J.MethodInvocation) sizeMi.getSelect();

@@ -33,7 +33,7 @@ package org.openrewrite.java.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.function.UnaryOperator;
@@ -76,7 +76,8 @@ public class JLeftPadded<T> {
         TRY_FINALLY(Space.Location.TRY_FINALLY),
         UNARY_OPERATOR(Space.Location.UNARY_OPERATOR),
         VARIABLE_INITIALIZER(Space.Location.VARIABLE_INITIALIZER),
-        WHILE_CONDITION(Space.Location.WHILE_CONDITION);
+        WHILE_CONDITION(Space.Location.WHILE_CONDITION),
+        WILDCARD_BOUND(Space.Location.WILDCARD_BOUND);
 
         private final Space.Location beforeLocation;
 
@@ -89,16 +90,12 @@ public class JLeftPadded<T> {
         }
     }
 
-    @Nullable
-    public static <T> JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T element) {
-        if (before == null) {
-            if (element == null) {
-                return null;
-            }
-            return new JLeftPadded<>(Space.EMPTY, element, Markers.EMPTY);
-        }
+    public static <T> @Nullable JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T element) {
         if (element == null) {
             return null;
+        }
+        if (before == null) {
+            return new JLeftPadded<>(Space.EMPTY, element, Markers.EMPTY);
         }
         return before.withElement(element);
     }

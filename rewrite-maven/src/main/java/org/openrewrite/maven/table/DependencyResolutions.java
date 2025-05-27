@@ -26,14 +26,14 @@ import org.openrewrite.Recipe;
 public class DependencyResolutions extends DataTable<DependencyResolutions.Row> {
 
     public DependencyResolutions(Recipe recipe) {
-        super(recipe, Row.class, DependencyResolutions.class.getName(),
+        super(recipe,
                 "Dependency resolutions",
                 "Latencies of individual dependency resolution requests and their outcomes.");
     }
 
     @Value
     public static class Row {
-        @Option(displayName = "Group",
+        @Option(example = "groupId", displayName = "Group",
                 description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.")
         String groupId;
 

@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GrUnnecessarySemicolon", "GroovyVariableNotAssigned"})
+@SuppressWarnings({"GrUnnecessarySemicolon", "GroovyVariableNotAssigned", "GroovyFallthrough"})
 class SwitchTest implements RewriteTest {
 
     @Test
@@ -46,7 +46,7 @@ class SwitchTest implements RewriteTest {
             """
               int n;
               switch(n) {
-                 case 0: break;
+                 case 0: break ;
               }
               """
           )
@@ -59,13 +59,13 @@ class SwitchTest implements RewriteTest {
           groovy(
             """
               switch(0) {
-                  default: System.out.println("default!");
+                  default: System.out.println("default!") ;
               }
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(1);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Switch.class);
-                assertThat(((J.Switch) cu.getStatements().get(0)).getCases().getStatements()).hasSize(1);
+                assertThat(cu.getStatements().getFirst()).isInstanceOf(J.Switch.class);
+                assertThat(((J.Switch) cu.getStatements().getFirst()).getCases().getStatements()).hasSize(1);
             })
           )
         );
@@ -105,8 +105,8 @@ class SwitchTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(1);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Switch.class);
-                assertThat(((J.Switch) cu.getStatements().get(0)).getCases().getStatements()).hasSize(3);
+                assertThat(cu.getStatements().getFirst()).isInstanceOf(J.Switch.class);
+                assertThat(((J.Switch) cu.getStatements().getFirst()).getCases().getStatements()).hasSize(3);
             })
           )
         );

@@ -18,13 +18,11 @@ package org.openrewrite.java.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 
 /**
  * A Java element that could have trailing space.
@@ -49,6 +47,7 @@ public class JRightPadded<T> {
         BLOCK_STATEMENT(Space.Location.BLOCK_STATEMENT_SUFFIX),
         CASE(Space.Location.CASE_SUFFIX),
         CASE_EXPRESSION(Space.Location.CASE_EXPRESSION),
+        CASE_LABEL(Space.Location.CASE_LABEL),
         CASE_BODY(Space.Location.CASE_BODY),
         CATCH_ALTERNATIVE(Space.Location.CATCH_ALTERNATIVE_SUFFIX),
         DIMENSION(Space.Location.DIMENSION_SUFFIX),
@@ -62,6 +61,7 @@ public class JRightPadded<T> {
         IF_ELSE(Space.Location.IF_ELSE_SUFFIX),
         IF_THEN(Space.Location.IF_THEN_SUFFIX),
         IMPLEMENTS(Space.Location.IMPLEMENTS_SUFFIX),
+        DECONSTRUCTION_PATTERN_NESTED(Space.Location.DECONSTRUCTION_PATTERN_NESTED_SUFFIX),
         PERMITS(Space.Location.PERMITS_SUFFIX),
         IMPORT(Space.Location.IMPORT_SUFFIX),
         INSTANCEOF(Space.Location.INSTANCEOF_SUFFIX),
@@ -85,7 +85,9 @@ public class JRightPadded<T> {
         TRY_RESOURCE(Space.Location.TRY_RESOURCE_SUFFIX),
         TYPE_PARAMETER(Space.Location.TYPE_PARAMETER_SUFFIX),
         TYPE_BOUND(Space.Location.TYPE_BOUND_SUFFIX),
-        WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX);
+        WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX),
+        ANY(Space.Location.ANY)
+        ;
 
         private final Space.Location afterLocation;
 
@@ -113,16 +115,12 @@ public class JRightPadded<T> {
         return list;
     }
 
-    @Nullable
-    public static <T> JRightPadded<T> withElement(@Nullable JRightPadded<T> before, @Nullable T element) {
-        if (before == null) {
-            if (element == null) {
-                return null;
-            }
-            return new JRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
-        }
+    public static <T> @Nullable JRightPadded<T> withElement(@Nullable JRightPadded<T> before, @Nullable T element) {
         if (element == null) {
             return null;
+        }
+        if (before == null) {
+            return new JRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
         }
         return before.withElement(element);
     }
@@ -145,8 +143,12 @@ public class JRightPadded<T> {
         }
 
         List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
-        Map<UUID, JRightPadded<J2>> beforeById = before.stream().collect(Collectors
-                .toMap(j -> j.getElement().getId(), Function.identity()));
+        Map<UUID, JRightPadded<J2>> beforeById = new HashMap<>((int) Math.ceil(elements.size() / 0.75));
+        for (JRightPadded<J2> j : before) {
+            if (beforeById.put(j.getElement().getId(), j) != null) {
+                throw new IllegalStateException("Duplicate key");
+            }
+        }
 
         for (J2 t : elements) {
             JRightPadded<J2> found;

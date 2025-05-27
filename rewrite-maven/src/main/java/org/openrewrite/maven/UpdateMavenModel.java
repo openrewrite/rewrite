@@ -15,9 +15,9 @@
  */
 package org.openrewrite.maven;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
@@ -38,6 +38,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
 
         MavenResolutionResult resolutionResult = getResolutionResult();
         Pom requested = resolutionResult.getPom().getRequested();
+        requested.getProperties().clear();
 
         Optional<Xml.Tag> properties = document.getRoot().getChild("properties");
         if (properties.isPresent()) {
@@ -45,6 +46,11 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 requested.getProperties().put(propertyTag.getName(),
                         propertyTag.getValue().orElse(""));
             }
+        }
+        // for backwards compatibility with ASTs that were serialized before userProperties was added
+        //noinspection ConstantValue
+        if (resolutionResult.getUserProperties() != null) {
+            requested.getProperties().putAll(resolutionResult.getUserProperties());
         }
 
         Optional<Xml.Tag> parent = document.getRoot().getChild("parent");
@@ -119,6 +125,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     t.getChild("releases").flatMap(s -> s.getChildValue("enabled")).orElse(null),
                     t.getChild("snapshots").flatMap(s -> s.getChildValue("enabled")).orElse(null),
                     null,
+                    null,
                     null
             )).collect(Collectors.toList()));
         } else {
@@ -135,8 +142,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         }
     }
 
-    @Nullable
-    private List<GroupArtifact> mapExclusions(Xml.Tag tag) {
+    private @Nullable List<GroupArtifact> mapExclusions(Xml.Tag tag) {
         return tag.getChild("exclusions")
                 .map(exclusions -> {
                     List<Xml.Tag> eachExclusion = exclusions.getChildren("exclusion");

@@ -16,9 +16,9 @@
 package org.openrewrite.remote;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.io.InputStream;
@@ -44,10 +44,6 @@ import static java.util.Objects.requireNonNull;
  * If a Checksum is provided it will be used to validate the integrity of the downloaded file.
  */
 public interface Remote extends SourceFile {
-    URI getUri();
-
-    <R extends Remote> R withUri(URI uri);
-
     /**
      * Any text describing what this remote URI represents. Used to present human-readable results to an end user.
      */
@@ -55,16 +51,16 @@ public interface Remote extends SourceFile {
 
     <R extends Remote> R withDescription(String description);
 
-    @Nullable
-    default Checksum getChecksum() {
+    @Override
+    default @Nullable Checksum getChecksum() {
         return null;
     }
 
+    @Override
     default <T extends SourceFile> T withChecksum(@Nullable Checksum checksum) {
         //noinspection unchecked
         return (T) this;
     }
-
 
     /**
      * Download the remote file
@@ -96,16 +92,12 @@ public interface Remote extends SourceFile {
         return v.isAdaptableTo(RemoteVisitor.class);
     }
 
-    static Builder builder(SourceFile before, URI uri) {
-        return new Builder(before.getId(), before.getSourcePath(), before.getMarkers(), uri);
+    static Builder builder(SourceFile before) {
+        return new Builder(before.getId(), before.getSourcePath(), before.getMarkers());
     }
 
-    static Builder builder(Path sourcePath, URI uri) {
-        return new Builder(Tree.randomId(), sourcePath, Markers.EMPTY, uri);
-    }
-
-    static Builder builder(UUID id, Path sourcePath, Markers markers, URI uri) {
-        return new Builder(id, sourcePath, markers, uri);
+    static Builder builder(Path sourcePath) {
+        return new Builder(Tree.randomId(), sourcePath, Markers.EMPTY);
     }
 
     @Override
@@ -126,7 +118,6 @@ public interface Remote extends SourceFile {
         protected final UUID id;
         protected final Path sourcePath;
         protected final Markers markers;
-        protected final URI uri;
 
         @Nullable
         @Language("markdown")
@@ -143,11 +134,10 @@ public interface Remote extends SourceFile {
         @Nullable
         FileAttributes fileAttributes;
 
-        Builder(UUID id, Path sourcePath, Markers markers, URI uri) {
+        Builder(UUID id, Path sourcePath, Markers markers) {
             this.id = id;
             this.sourcePath = sourcePath;
             this.markers = markers;
-            this.uri = uri;
         }
 
         public Builder description(@Language("markdown") String description) {
@@ -175,17 +165,21 @@ public interface Remote extends SourceFile {
             return this;
         }
 
-        public RemoteFile build() {
+        public RemoteResource build(InputStream inputStream) {
+            return new RemoteResource(id, sourcePath, markers, inputStream, charset, charsetBomMarked, fileAttributes, description, checksum);
+        }
+
+        public RemoteFile build(URI uri) {
             return new RemoteFile(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description, checksum);
         }
 
-        public RemoteArchive build(Path path) {
+        public RemoteArchive build(URI uri, Path path) {
             return new RemoteArchive(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description,
                     Arrays.asList(path.toString().replace("/", "\\/").replace(".", "\\.")
                             .split("!")), checksum);
         }
 
-        public RemoteArchive build(String... paths) {
+        public RemoteArchive build(URI uri, String... paths) {
             return new RemoteArchive(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description,
                     Arrays.asList(paths), checksum);
         }

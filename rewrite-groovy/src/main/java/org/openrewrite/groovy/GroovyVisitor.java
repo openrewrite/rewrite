@@ -15,13 +15,10 @@
  */
 package org.openrewrite.groovy;
 
-import org.openrewrite.Cursor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
-import org.openrewrite.groovy.format.MinimumViableSpacingVisitor;
-import org.openrewrite.groovy.format.OmitParenthesesForLastArgumentLambdaVisitor;
 import org.openrewrite.groovy.tree.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -123,6 +120,22 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
+    public J visitUnary(G.Unary unary, P p) {
+        G.Unary u = unary;
+        u = u.withPrefix(visitSpace(u.getPrefix(), GSpace.Location.UNARY_PREFIX, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(u, p);
+        if (!(temp instanceof G.Unary)) {
+            return temp;
+        } else {
+            u = (G.Unary) temp;
+        }
+        u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), GLeftPadded.Location.UNARY_OPERATOR, p));
+        u = u.withExpression(visitAndCast(u.getExpression(), p));
+        u = u.withType(visitType(u.getType(), p));
+        return u;
+    }
+
     public J visitBinary(G.Binary binary, P p) {
         G.Binary b = binary;
         b = b.withPrefix(visitSpace(b.getPrefix(), GSpace.Location.BINARY_PREFIX, p));
@@ -172,17 +185,5 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
                                                         GContainer.Location loc, P p) {
         return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
-    }
-
-    @Override
-    public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor cursor) {
-        J after = super.autoFormat(j, stopAfter, p, cursor.fork());
-
-        after = new OmitParenthesesForLastArgumentLambdaVisitor<>(stopAfter).visitNonNull(after, p, cursor.fork());
-
-        after = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(after, p, cursor.fork());
-
-        //noinspection unchecked
-        return (J2) after;
     }
 }

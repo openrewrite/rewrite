@@ -26,7 +26,7 @@ import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class RemovePlugin extends Recipe {
 
     @Option(displayName = "Group",
@@ -60,7 +60,7 @@ public class RemovePlugin extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 for (Xml.Tag plugin : FindPlugin.find(document, groupId, artifactId)) {
-                    doAfterVisit(new RemoveContentVisitor<>(plugin, true));
+                    doAfterVisit(new RemoveContentVisitor<>(plugin, true, true));
                 }
                 return super.visitDocument(document, ctx);
             }

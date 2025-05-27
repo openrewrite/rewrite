@@ -17,31 +17,31 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
-import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * When changing a plugin id that uses the `apply` syntax or versionless plugins syntax, the version is will not be changed.
@@ -51,19 +51,23 @@ import static java.util.Objects.requireNonNull;
  * If you are using either of these plugin styles, you should ensure that the plugin's version is appropriately updated.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ChangePlugin extends Recipe {
+
+    @EqualsAndHashCode.Exclude
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
     @Option(displayName = "Plugin ID",
             description = "The current Gradle plugin id.",
             example = "org.openrewrite.rewrite")
     String pluginId;
 
-    @Option(displayName = "New Plugin ID",
+    @Option(displayName = "New plugin ID",
             description = "The new Gradle plugin id.",
             example = "org.openrewrite.rewrite")
     String newPluginId;
 
-    @Option(displayName = "New Plugin Version",
+    @Option(displayName = "New plugin version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
                           "You can also use `latest.release` for the latest available version and `latest.patch` if " +
                           "the current version is a valid semantic version. For more details, you can look at the documentation " +
@@ -105,7 +109,9 @@ public class ChangePlugin extends Recipe {
         return Preconditions.check(
                 Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
                 new GroovyIsoVisitor<ExecutionContext>() {
+                    @Nullable
                     GradleProject gradleProject;
+                    @Nullable
                     GradleSettings gradleSettings;
 
                     @Override
@@ -129,7 +135,7 @@ public class ChangePlugin extends Recipe {
                                     return plugin;
                                 }));
                                 g = g.withMarkers(g.getMarkers().setByType(updatedGp));
-                            } else {
+                            } else if (gradleSettings != null) {
                                 GradleSettings updatedGs = gradleSettings.withPlugins(ListUtils.map(gradleSettings.getPlugins(), plugin -> {
                                     if (pluginId.equals(plugin.getId())) {
                                         return new GradlePluginDescriptor("unknown", newPluginId);
@@ -144,7 +150,7 @@ public class ChangePlugin extends Recipe {
 
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                        J.MethodInvocation m = method;
                         if (versionMatcher.matches(m) &&
                             m.getSelect() instanceof J.MethodInvocation &&
                             pluginMatcher.matches(m.getSelect())) {
@@ -154,11 +160,12 @@ public class ChangePlugin extends Recipe {
                         } else if (applyMatcher.matches(m)) {
                             m = maybeUpdateApplySyntax(m);
                         }
-                        return m;
+                        return super.visitMethodInvocation(m, ctx);
                     }
 
                     private J.MethodInvocation maybeUpdateVersion(J.MethodInvocation m, ExecutionContext ctx) {
-                        if (!newPluginId.equals(((J.Literal) requireNonNull((J.MethodInvocation) m.getSelect()).getArguments().get(0)).getValue())) {
+                        J.MethodInvocation select = (J.MethodInvocation) m.getSelect();
+                        if (select == null || !pluginId.equals(((J.Literal) select.getArguments().get(0)).getValue())) {
                             return m;
                         }
 
@@ -174,13 +181,14 @@ public class ChangePlugin extends Recipe {
 
                         if (!StringUtils.isBlank(newVersion)) {
                             try {
-                                String resolvedVersion = AddPluginVisitor.resolvePluginVersion(newPluginId, "0", newVersion, null, getPluginRepositories(), ctx)
-                                        .orElse(null);
+                                String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                        .select(new GroupArtifact(newPluginId, newPluginId + ".gradle.plugin"), "classpath", newVersion, null, ctx);
                                 if (resolvedVersion == null) {
                                     return m;
                                 }
 
-                                m = m.withArguments(Collections.singletonList(ChangeStringLiteral.withStringValue(versionLiteral, resolvedVersion)));
+                                m = m.withSelect(select.withArguments(ListUtils.mapFirst(select.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newPluginId))))
+                                        .withArguments(Collections.singletonList(ChangeStringLiteral.withStringValue(versionLiteral, resolvedVersion)));
                             } catch (MavenDownloadingException e) {
                                 return e.warn(m);
                             }
@@ -215,7 +223,7 @@ public class ChangePlugin extends Recipe {
                         }
 
                         G.MapEntry entry = (G.MapEntry) args.get(0);
-                        if (!(entry.getKey() instanceof J.Literal) && !(entry.getValue() instanceof J.Literal)) {
+                        if (!(entry.getKey() instanceof J.Literal) || !(entry.getValue() instanceof J.Literal)) {
                             return m;
                         }
 
@@ -241,13 +249,6 @@ public class ChangePlugin extends Recipe {
 
                         entry = entry.withValue(ChangeStringLiteral.withStringValue(valueLiteral, newPluginId));
                         return m.withArguments(ListUtils.concat(entry, args.subList(1, args.size())));
-                    }
-
-                    private List<MavenRepository> getPluginRepositories() {
-                        if (gradleProject != null) {
-                            return gradleProject.getMavenPluginRepositories();
-                        }
-                        return gradleSettings.getPluginRepositories();
                     }
                 }
         );

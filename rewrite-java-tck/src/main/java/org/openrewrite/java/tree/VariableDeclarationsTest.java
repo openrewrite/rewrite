@@ -20,11 +20,13 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
+@SuppressWarnings("UnnecessaryLocalVariable")
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
@@ -34,7 +36,7 @@ class VariableDeclarationsTest implements RewriteTest {
             """
               import java.util.Collections;
               import java.util.ArrayList;
-                            
+              
               class Test {
                   void test() {
                       ArrayList<String> categories = new ArrayList<>();
@@ -113,7 +115,7 @@ class VariableDeclarationsTest implements RewriteTest {
                   int [ ] n2;
                   String [ ] [ ] s2;
               }
-               """
+              """
           )
         );
     }
@@ -260,6 +262,23 @@ class VariableDeclarationsTest implements RewriteTest {
                     return multiVariable;
                 }
             })
+          )
+        );
+    }
+
+    @Test
+    @MinimumJava11
+    void unknownVar() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              class Test {
+                  void test(Unknown b) {
+                      final var a = b;
+                  }
+              }
+              """
           )
         );
     }

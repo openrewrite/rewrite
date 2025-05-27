@@ -22,6 +22,8 @@ import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.artifacts.Dependency
 import org.gradle.api.artifacts.ExternalDependency
+import org.gradle.api.artifacts.ProjectDependency
+import org.gradle.api.artifacts.dsl.DependencyConstraintHandler
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileTree
@@ -37,6 +39,8 @@ import org.gradle.process.JavaForkOptions
 import org.gradle.process.ProcessForkOptions
 
 interface DependencyHandlerSpec extends DependencyHandler {
+    ProjectDependency project(String path)
+    ProjectDependency project(String path, String configuration)
     Dependency annotationProcessor(Object... dependencyNotation)
     Dependency annotationProcessor(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency api(Object... dependencyNotation)
@@ -49,6 +53,10 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency compileOnly(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency implementation(Object... dependencyNotation)
     Dependency implementation(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency providedCompile(Object... dependencyNotation)
+    Dependency providedCompile(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency providedRuntime(Object... dependencyNotation)
+    Dependency providedRuntime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency runtime(Object... dependencyNotation)
     Dependency runtime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency runtimeOnly(Object... dependencyNotation)
@@ -65,6 +73,13 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency testRuntime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency testRuntimeOnly(Object... dependencyNotation)
     Dependency testRuntimeOnly(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency deploy(Object... dependencyNotation)
+    Dependency deploy(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency earlib(Object... dependencyNotation)
+    Dependency earlib(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+
+    @Override
+    void constraints(Action<? super DependencyConstraintHandler> configureAction)
 }
 
 interface RewriteTestSpec {
@@ -113,11 +128,11 @@ interface RewriteTestSpec {
     RewriteTestSpec include(String... includes)
     RewriteTestSpec include(Iterable<String> includes)
     RewriteTestSpec include(Spec<FileTreeElement> includeSpec)
-    RewriteTestSpec include(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=FileTreeElement)Closure includeSpec)
+    RewriteTestSpec include(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=FileTreeElement) Closure includeSpec)
     RewriteTestSpec exclude(String... excludes)
     RewriteTestSpec exclude(Iterable<String> excludes)
     RewriteTestSpec exclude(Spec<FileTreeElement> excludeSpec)
-    RewriteTestSpec exclude(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=FileTreeElement)Closure excludeSpec)
+    RewriteTestSpec exclude(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=FileTreeElement) Closure excludeSpec)
     RewriteTestSpec setTestNameIncludePatterns(List<String> testNamePattern)
     FileCollection getTestClassesDirs()
     void setTestClassesDirs(FileCollection testClassesDirs)
@@ -125,15 +140,15 @@ interface RewriteTestSpec {
     RewriteTestSpec setIncludes(Iterable<String> includes)
     Set<String> getExcludes()
     RewriteTestSpec setExcludes(Iterable<String> excludes)
-    TestFrameworkOptions options(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=TestFrameworkOptions)Closure testFrameworkConfigure)
+    TestFrameworkOptions options(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=TestFrameworkOptions) Closure testFrameworkConfigure)
     TestFrameworkOptions options(Action<? super TestFrameworkOptions> testFrameworkConfigure)
     void useJUnit()
-    void useJUnit(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=JUnitOptions)Closure testFrameworkConfigure) // delegate
+    void useJUnit(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=JUnitOptions) Closure testFrameworkConfigure) // delegate
     void useJUnit(Action<? super JUnitOptions> testFrameworkConfigure)
     void useJUnitPlatform()
     void useJUnitPlatform(Action<? super JUnitPlatformOptions> testFrameworkConfigure)
     void useTestNG()
-    void useTestNG(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=TestNGOptions)Closure testFrameworkConfigure)
+    void useTestNG(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=TestNGOptions) Closure testFrameworkConfigure)
     void useTestNG(Action<? super TestNGOptions> testFrameworkConfigure)
     FileCollection getClasspath()
     void setClasspath(FileCollection classpath)
@@ -178,6 +193,8 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract Task task(Map<String, ?> options)
     abstract Task task(Map<String, ?> options, Closure configureClosure)
     abstract Task task(String name, Closure configureClosure)
+
+    @Override
     abstract Task task(String name)
     abstract <T extends Task> T task(String name, Class<T> type)
     abstract <T extends Task> T task(String name, Class<T> type, Object... constructorArgs)

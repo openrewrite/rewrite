@@ -15,11 +15,11 @@
  */
 package org.openrewrite.xml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.format.AutoFormatVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -94,8 +94,19 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         return t;
     }
 
+    public Xml visitTagClosing(Xml.Tag.Closing closing, P p) {
+        return closing.withMarkers(visitMarkers(closing.getMarkers(), p));
+    }
+
     public Xml visitAttribute(Xml.Attribute attribute, P p) {
-        return attribute.withMarkers(visitMarkers(attribute.getMarkers(), p));
+        Xml.Attribute a = attribute;
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withValue(visitAndCast(a.getValue(), p));
+        return a;
+    }
+
+    public Xml visitAttributeValue(Xml.Attribute.Value value, P p) {
+        return value.withMarkers(visitMarkers(value.getMarkers(), p));
     }
 
     public Xml visitCharData(Xml.CharData charData, P p) {
@@ -114,11 +125,19 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         return d;
     }
 
+    public Xml visitDocTypeDeclExternalSubsets(Xml.DocTypeDecl.ExternalSubsets externalSubsets, P p) {
+        Xml.DocTypeDecl.ExternalSubsets e = externalSubsets;
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withElements(ListUtils.map(e.getElements(), i -> visitAndCast(i, p)));
+        return e;
+    }
+
     public Xml visitProlog(Xml.Prolog prolog, P p) {
         Xml.Prolog pl = prolog;
         pl = pl.withMarkers(visitMarkers(pl.getMarkers(), p));
         pl = pl.withXmlDecl(visitAndCast(prolog.getXmlDecl(), p));
         pl = pl.withMisc(ListUtils.map(pl.getMisc(), m -> visitAndCast(m, p)));
+        pl = pl.withJspDirectives(ListUtils.map(pl.getJspDirectives(), m -> visitAndCast(m, p)));
         return pl;
     }
 
@@ -131,5 +150,12 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
         e = e.withSubset(ListUtils.map(e.getSubset(), i -> visitAndCast(i, p)));
         return e;
+    }
+
+    public Xml visitJspDirective(Xml.JspDirective jspDirective, P p) {
+        Xml.JspDirective j = jspDirective;
+        j = j.withMarkers(visitMarkers(j.getMarkers(), p));
+        j = j.withAttributes(ListUtils.map(j.getAttributes(), a -> visitAndCast(a, p)));
+        return j;
     }
 }

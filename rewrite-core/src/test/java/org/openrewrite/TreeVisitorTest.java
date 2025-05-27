@@ -15,8 +15,8 @@
  */
 package org.openrewrite;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 
@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
-public class TreeVisitorTest {
+class TreeVisitorTest {
 
     @Test
     void scheduleAfterOnVisitWithCursor() {

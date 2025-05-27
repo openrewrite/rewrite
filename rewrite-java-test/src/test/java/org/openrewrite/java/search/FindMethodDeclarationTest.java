@@ -16,12 +16,14 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("InfiniteRecursion")
-public class FindMethodDeclarationTest implements RewriteTest {
+class FindMethodDeclarationTest implements RewriteTest {
+    @DocumentExample
     @Test
     void find() {
         rewriteRun(
@@ -44,7 +46,8 @@ public class FindMethodDeclarationTest implements RewriteTest {
                   void a(String s) {
                   }
               }
-              """)
+              """
+          )
         );
     }
 }

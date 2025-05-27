@@ -15,13 +15,12 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyEmptyStatementBody", "GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
+@SuppressWarnings({"GroovyEmptyStatementBody", "GroovyUnusedAssignment", "GrUnnecessarySemicolon", "GroovyUnnecessaryContinue"})
 class ForLoopTest implements RewriteTest {
 
     @Test
@@ -148,7 +147,6 @@ class ForLoopTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void multiVariableInitialization() {
         rewriteRun(
@@ -165,6 +163,17 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
+              for(def i : [1, 2, 3]) {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void forEachTypedWithColon() {
+        rewriteRun(
+          groovy(
+            """
               for(int i : [1, 2, 3]) {}
               """
           )
@@ -176,9 +185,7 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def dependenciesType = ['implementation', 'testImplementation']
-              for (type in dependenciesType) {
-              }
+              for (type in ['implementation', 'testImplementation']) {}
               """
           )
         );
@@ -200,7 +207,7 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              for(int i in [1, 2, 3]) {continue}
+              for(int i in [1, 2, 3]) { continue }
               """
           )
         );
@@ -211,7 +218,7 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              f: for(int i in [1, 2, 3]) {continue f}
+              f: for(int i in [1, 2, 3]) { continue f }
               """
           )
         );

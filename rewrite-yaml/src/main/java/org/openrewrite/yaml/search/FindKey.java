@@ -30,7 +30,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindKey extends Recipe {
     @Option(displayName = "Path",
             description = "A JsonPath expression used to find matching keys.",
@@ -44,7 +44,7 @@ public class FindKey extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find YAML entries that match the specified [JsonPath](https://github.com/json-path/JsonPath) expression.";
+        return "Find YAML entries that match the specified [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression.";
     }
 
     @Override

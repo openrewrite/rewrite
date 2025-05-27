@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ShortenFullyQualifiedTypeReferences;
 import org.openrewrite.test.RecipeSpec;
@@ -23,11 +24,41 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest {
+class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ShortenFullyQualifiedTypeReferences());
+    }
+
+    @DocumentExample
+    @Test
+    void importWithLeadingComment() {
+        rewriteRun(
+          groovy(
+            """
+              package foo
+              
+              /* comment */
+              import java.util.List
+              
+              class Test {
+                  List<String> l = new java.util.ArrayList<>()
+              }
+              """,
+            """
+              package foo
+              
+              /* comment */
+              import java.util.ArrayList
+              import java.util.List
+              
+              class Test {
+                  List<String> l = new ArrayList<>()
+              }
+              """
+          )
+        );
     }
 
     @Test
@@ -53,35 +84,6 @@ public class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements Rewr
               
               def pattern = Pattern.compile("pattern")
               def list = new ArrayList<String>(1)
-              """
-          )
-        );
-    }
-
-    @Test
-    void importWithLeadingComment() {
-        rewriteRun(
-          groovy(
-            """
-              package foo
-              
-              /* comment */
-              import java.util.List
-              
-              class Test {
-                  List<String> l = new java.util.ArrayList<>()
-              }
-              """,
-            """
-              package foo
-              
-              /* comment */
-              import java.util.ArrayList
-              import java.util.List
-              
-              class Test {
-                  List<String> l = new ArrayList<>()
-              }
               """
           )
         );

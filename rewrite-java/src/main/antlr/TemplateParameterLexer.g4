@@ -5,6 +5,15 @@ RPAREN          : ')';
 DOT             : '.';
 COLON           : ':';
 COMMA           : ',';
+LBRACK          : '<';
+RBRACK          : '>';
+WILDCARD        : '?';
+LSBRACK         : '[';
+RSBRACK         : ']';
+AND             : '&';
+
+Extends    :   'extends';
+Super      :   'super';
 
 FullyQualifiedName
     :   'boolean'

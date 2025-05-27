@@ -15,33 +15,25 @@
  */
 package org.openrewrite;
 
-import de.danielbechler.diff.ObjectDiffer;
-import de.danielbechler.diff.ObjectDifferBuilder;
-import de.danielbechler.diff.inclusion.Inclusion;
-import de.danielbechler.diff.inclusion.InclusionResolver;
-import de.danielbechler.diff.node.DiffNode;
-import io.micrometer.core.instrument.DistributionSummary;
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.TreeVisitorAdapter;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
-import java.beans.Transient;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -55,7 +47,7 @@ import static java.util.Collections.emptyList;
  * @param <T> The type of tree.
  * @param <P> An input object that is passed to every visit method.
  */
-public abstract class TreeVisitor<T extends Tree, P> {
+public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     private static final String STOP_AFTER_PRE_VISIT = "__org.openrewrite.stopVisitor__";
 
     Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
@@ -76,50 +68,23 @@ public abstract class TreeVisitor<T extends Tree, P> {
         };
     }
 
-    private List<TreeVisitor<?, P>> afterVisit;
+    private @Nullable List<TreeVisitor<?, P>> afterVisit;
 
     private int visitCount;
-    private final DistributionSummary visitCountSummary = DistributionSummary.builder("rewrite.visitor.visit.method.count").description("Visit methods called per source file visited.").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry);
-
-    private ObjectDiffer differ;
-
-    private ObjectDiffer getObjectDiffer() {
-        if (differ == null) {
-            differ = ObjectDifferBuilder.startBuilding()
-                    .inclusion()
-                    .resolveUsing(new InclusionResolver() {
-                        @Override
-                        public Inclusion getInclusion(DiffNode node) {
-                            if (node.getPropertyAnnotation(Transient.class) != null) {
-                                return Inclusion.EXCLUDED;
-                            }
-                            return Inclusion.DEFAULT;
-                        }
-
-                        @Override
-                        public boolean enablesStrictIncludeMode() {
-                            return false;
-                        }
-                    })
-                    .and()
-                    .build();
-        }
-        return differ;
-    }
 
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return true;
     }
 
     public void setCursor(@Nullable Cursor cursor) {
+        assert cursor != null;
         this.cursor = cursor;
     }
 
     /**
      * @return Describes the language type that this visitor applies to, e.g. java, xml, properties.
      */
-    @Nullable
-    public String getLanguage() {
+    public @Nullable String getLanguage() {
         return null;
     }
 
@@ -160,7 +125,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         if (!(old instanceof Tree)) {
             throw new IllegalArgumentException("To update the cursor, it must currently be positioned at a Tree instance");
         }
-        if (!((Tree) old).getId().equals(currentValue.getId())) {
+        if (!((Tree) old).getId().equals(requireNonNull(currentValue).getId())) {
             throw new IllegalArgumentException("Updating the cursor in place is only supported for mutations on a Tree instance " +
                                                "that maintain the same ID after the mutation.");
         }
@@ -168,18 +133,23 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return cursor;
     }
 
-    @Nullable
-    public T preVisit(T tree, P p) {
+    public @Nullable T preVisit(@NonNull T tree, P p) {
         return defaultValue(tree, p);
     }
 
-    @Nullable
-    public T postVisit(T tree, P p) {
+    public @Nullable T postVisit(@NonNull T tree, P p) {
         return defaultValue(tree, p);
     }
 
-    @Nullable
-    public T visit(@Nullable Tree tree, P p, Cursor parent) {
+    public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
+        assert parent.isRoot() ||
+               !(parent.getValue() instanceof Tree) ||
+               !((Tree) parent.getValue()).isScope(tree) ||
+               !(p instanceof ExecutionContext) ||
+               !CursorValidatingExecutionContextView.view((ExecutionContext) p).getValidateCursorAcyclic() :
+                "The `parent` cursor must not point to the same `tree` as the tree to be visited. " +
+                "This usually indicates that you have used getCursor() where getCursor().getParent() is appropriate. " +
+                "This is a test-only validation which can be opted out of by configuring your test's type validation options with `cursorAcyclic(false)`.";
         this.cursor = parent;
         return visit(tree, p);
     }
@@ -193,13 +163,13 @@ public abstract class TreeVisitor<T extends Tree, P> {
      * @param p    A state object that passes through the visitor.
      * @return A non-null tree.
      */
-    public T visitNonNull(Tree tree, P p) {
+    public @NonNull T visitNonNull(Tree tree, P p) {
         T t = visit(tree, p);
         assert t != null;
         return t;
     }
 
-    public T visitNonNull(Tree tree, P p, Cursor parent) {
+    public @NonNull T visitNonNull(Tree tree, P p, Cursor parent) {
         T t = visit(tree, p, parent);
         assert t != null;
         return t;
@@ -249,17 +219,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return p;
     }
 
-    @Nullable
-    public T visit(@Nullable Tree tree, P p) {
+    public @Nullable T visit(@Nullable Tree tree, P p) {
         if (tree == null) {
             return defaultValue(null, p);
         }
 
-        Timer.Sample sample = null;
         boolean topLevel = false;
         if (visitCount == 0) {
             topLevel = true;
-            sample = Timer.start();
         }
 
         visitCount++;
@@ -285,16 +252,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                     ExecutionContext ctx = (ExecutionContext) p;
                     for (TreeObserver.Subscription observer : ctx.getObservers()) {
                         if (observer.isSubscribed(tree)) {
-                            observer.getObserver().treeChanged(getCursor(), t);
-                            DiffNode diff = getObjectDiffer().compare(t, tree);
-                            AtomicReference<T> t2 = new AtomicReference<>(t);
-                            diff.visit((node, visit) -> {
-                                if (!node.hasChildren() && node.getPropertyName() != null) {
-                                    //noinspection unchecked
-                                    t2.set((T) observer.getObserver().propertyChanged(node.getPropertyName(), getCursor(), t2.get(), node.canonicalGet(tree), node.canonicalGet(t2.get())));
-                                }
-                            });
-                            t = t2.get();
+                            t = observer.treeChanged(getCursor(), t, tree);
                         }
                     }
                 }
@@ -303,20 +261,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
             setCursor(cursor.getParent());
 
             if (topLevel) {
-                sample.stop(Timer.builder("rewrite.visitor.visit").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry));
-                visitCountSummary.record(visitCount);
-
                 if (t != null && afterVisit != null) {
                     for (TreeVisitor<?, P> v : afterVisit) {
-                        if (v != null) {
-                             v.setCursor(getCursor());
-                            //noinspection unchecked
-                            t = (T) v.visit(t, p);
-                        }
+                         v.setCursor(getCursor());
+                        //noinspection unchecked
+                        t = (T) v.visit(t, p);
                     }
                 }
 
-                sample.stop(Timer.builder("rewrite.visitor.visit.cumulative").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry));
                 afterVisit = null;
                 visitCount = 0;
             }
@@ -342,8 +294,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @SuppressWarnings("unused")
-    @Nullable
-    public T defaultValue(@Nullable Tree tree, P p) {
+    public @Nullable T defaultValue(@Nullable Tree tree, P p) {
         //noinspection unchecked
         return (T) tree;
     }
@@ -355,8 +306,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @Incubating(since = "7.0.0")
-    @Nullable
-    protected final <T2 extends T> T2 visitAndCast(@Nullable Tree tree, P p) {
+    protected final <T2 extends T> @Nullable T2 visitAndCast(@Nullable Tree tree, P p) {
         //noinspection unchecked
         return (T2) visit(tree, p);
     }

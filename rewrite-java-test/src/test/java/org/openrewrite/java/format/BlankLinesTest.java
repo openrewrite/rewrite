@@ -38,6 +38,32 @@ import static org.openrewrite.java.Assertions.java;
 
 class BlankLinesTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void eachMethodOnItsOwnLine() {
+        rewriteRun(
+          blankLines(),
+          java(
+            """
+              public class Test {
+                  void a() {
+                  }    void b() {
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void a() {
+                  }
+                            
+                  void b() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> blankLines() {
         return blankLines(style -> style);
     }
@@ -81,32 +107,6 @@ class BlankLinesTest implements RewriteTest {
               public enum TheEnum {
                   FIRST,
                   SECOND
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void eachMethodOnItsOwnLine() {
-        rewriteRun(
-          blankLines(),
-          java(
-            """
-              public class Test {
-                  void a() {
-                  }    void b() {
-                  }
-              }
-              """,
-            """
-              public class Test {
-                  void a() {
-                  }
-                            
-                  void b() {
-                  }
               }
               """
           )
@@ -508,7 +508,7 @@ class BlankLinesTest implements RewriteTest {
             "\nclass Test {}",
             "class Test {}",
             spec -> spec
-              .afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPrefix().getWhitespace()).isEmpty())
+              .afterRecipe(cu -> assertThat(cu.getClasses().getFirst().getPrefix().getWhitespace()).isEmpty())
               .noTrim()
           )
         );
@@ -921,6 +921,58 @@ class BlankLinesTest implements RewriteTest {
                   A,
                   @Deprecated
                   B
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4154")
+    void eachMethodOnItsOwnLineAnonymousInnerClass() {
+        rewriteRun(
+          blankLines(),
+          java(
+            """
+              public class Test {
+                  void a() {
+                      new Runnable() {
+                          void b() {
+                          }
+                          void c() {
+                          }
+                            
+                          public void run() {
+                          }
+            
+                          public void d() {
+                          }
+                      };
+                  }
+                  void e() {
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  void a() {
+                      new Runnable() {
+                          void b() {
+                          }
+                              
+                          void c() {
+                          }
+                              
+                          public void run() {
+                          }
+            
+                          public void d() {
+                          }
+                      };
+                  }
+    
+                  void e() {
+                  }
               }
               """
           )

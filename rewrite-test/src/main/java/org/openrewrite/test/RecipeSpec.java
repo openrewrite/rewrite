@@ -15,16 +15,17 @@
  */
 package org.openrewrite.test;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -33,7 +34,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,8 +45,10 @@ import static org.assertj.core.api.Assertions.fail;
 @SuppressWarnings("UnusedReturnValue")
 @Getter
 public class RecipeSpec {
+    public static Supplier<RecipeSpec> DEFAULTS = RecipeSpec::new;
+
     public static RecipeSpec defaults() {
-        return new RecipeSpec();
+        return DEFAULTS.get();
     }
 
     @Nullable
@@ -86,8 +91,7 @@ public class RecipeSpec {
 
     boolean serializationValidation = true;
 
-    @Nullable
-    PrintOutputCapture.MarkerPrinter markerPrinter;
+    PrintOutputCapture.@Nullable MarkerPrinter markerPrinter;
 
     List<UncheckedConsumer<List<SourceFile>>> beforeRecipes = new ArrayList<>();
 
@@ -145,7 +149,8 @@ public class RecipeSpec {
 
     private static Recipe recipeFromInputStream(InputStream yaml, String... activeRecipes) {
         return Environment.builder()
-                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
+                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, Collections.emptyList(),
+                        mapper -> mapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)))
                 .build()
                 .activateRecipes(activeRecipes);
     }
@@ -154,7 +159,7 @@ public class RecipeSpec {
         return String.join("-", s);
     }
 
-    private static final Map<String, Recipe> RECIPE_CACHE = new HashMap<>();
+    private static final Map<String, Recipe> RECIPE_CACHE = new ConcurrentHashMap<>();
 
     /**
      * @param parser The parser supplier to use when a matching source file is found.
@@ -225,7 +230,7 @@ public class RecipeSpec {
     }
 
     @Incubating(since = "7.35.0")
-    public <E, V> RecipeSpec dataTableAsCsv(Class<DataTable<?>> dataTableClass, String expect) {
+    public <E, V> RecipeSpec dataTableAsCsv(Class<? extends DataTable<?>> dataTableClass, String expect) {
         return dataTableAsCsv(dataTableClass.getName(), expect);
     }
 

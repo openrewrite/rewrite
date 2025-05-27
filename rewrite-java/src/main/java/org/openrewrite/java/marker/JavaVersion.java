@@ -23,10 +23,9 @@ import org.openrewrite.marker.Marker;
 import java.util.UUID;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
 public class JavaVersion implements Marker {
-    @EqualsAndHashCode.Include
+    @EqualsAndHashCode.Exclude
     UUID id;
 
     String createdBy;

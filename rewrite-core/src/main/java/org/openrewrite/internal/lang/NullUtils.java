@@ -15,10 +15,12 @@
  */
 package org.openrewrite.internal.lang;
 
+import org.jspecify.annotations.NonNull;
 import org.openrewrite.Option;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
 public class NullUtils {
@@ -34,8 +36,9 @@ public class NullUtils {
      * <li>org.openrewrite.internal.lang.NonNullFields</li>
      * <li>org.springframework.lang.NonNullFields</li>
      */
-    private static final List<String> PACKAGE_LEVEL_NON_NULL_ANNOTATIONS = Collections.singletonList(
-            "NonNullFields"
+    private static final List<String> PACKAGE_LEVEL_NON_NULL_ANNOTATIONS = Arrays.asList(
+            "NonNullFields",
+            "NullMarked"
     );
 
     /**
@@ -55,7 +58,7 @@ public class NullUtils {
             "NonNull",
             "Nonnull",
             "NotNull"
-            );
+    );
 
     /**
      * A list of field-level annotation names that indicate a field is Nullable. The matching logic is not
@@ -99,7 +102,7 @@ public class NullUtils {
         List<Field> nonNullFields = new ArrayList<>(fields.length);
         for (Field field : fields) {
             field.setAccessible(true);
-            if (fieldHasNullableAnnotation(field)) {
+            if ((field.getModifiers() & Modifier.STATIC) != 0 || fieldHasNullableAnnotation(field)) {
                 continue;
             }
             if (defaultNonNull || fieldHasNonNullableAnnotation(field) || fieldIsRequiredOption(field)) {
@@ -124,10 +127,23 @@ public class NullUtils {
                 return true;
             }
         }
+        for (Annotation a : field.getAnnotatedType().getDeclaredAnnotations()) {
+            String simpleName = a.annotationType().getSimpleName();
+            if (FIELD_LEVEL_NON_NULL_ANNOTATIONS.contains(simpleName)) {
+                return true;
+            }
+        }
         return false;
     }
+
     private static boolean fieldHasNullableAnnotation(Field field) {
         for (Annotation a : field.getDeclaredAnnotations()) {
+            String simpleName = a.annotationType().getSimpleName();
+            if (FIELD_LEVEL_NULLABLE_ANNOTATIONS.contains(simpleName)) {
+                return true;
+            }
+        }
+        for (Annotation a : field.getAnnotatedType().getDeclaredAnnotations()) {
             String simpleName = a.annotationType().getSimpleName();
             if (FIELD_LEVEL_NULLABLE_ANNOTATIONS.contains(simpleName)) {
                 return true;

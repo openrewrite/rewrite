@@ -34,12 +34,12 @@ public class OrderPomElements extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Order POM elements according to the [recommended](http://maven.apache.org/developers/conventions/code.html#pom-code-convention) order.";
+        return "Order POM elements according to the [recommended](https://maven.apache.org/developers/conventions/code.html#pom-code-convention) order.";
     }
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-3423");
+        return Collections.singleton("RSPEC-S3423");
     }
 
     @Override
@@ -137,7 +137,9 @@ public class OrderPomElements extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag tg = super.visitTag(tag, ctx);
-                if ("dependency".equals(tg.getName()) || "parent".equals(tg.getName())) {
+                if ("dependency".equals(tg.getName()) ||
+                        "parent".equals(tg.getName()) ||
+                        "plugin".equals(tg.getName())) {
                     tg = orderGav(tg);
                 }
                 return tg;

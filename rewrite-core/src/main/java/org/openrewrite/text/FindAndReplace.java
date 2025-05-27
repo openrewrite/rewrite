@@ -17,15 +17,16 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,23 +35,36 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class FindAndReplace extends Recipe {
 
+    @Override
+    public String getDisplayName() {
+        return "Find and replace";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Textual find and replace, optionally interpreting the search query as a Regular Expression (regex). " +
+               "When operating on source files that are language-specific Lossless Semantic " +
+               "Tree, such as Java or XML, this operation converts the source file to plain text for the rest of the recipe run. " +
+               "So if you are combining this recipe with language-specific recipes in a single recipe run put all the language-specific recipes before this recipe.";
+    }
+
     @Option(displayName = "Find",
-            description = "The text to find (and replace).",
+            description = "The text to find (and replace). This snippet can be multiline.",
             example = "blacklist")
     String find;
 
     @Option(displayName = "Replace",
-            description = "The replacement text for `find`. This supports multiline strings.",
+            description = "The replacement text for `find`. This snippet can be multiline.",
             example = "denylist",
             required = false)
     @Nullable
     String replace;
 
     @Option(displayName = "Regex",
-            description = "Default false. If true, `find` will be interpreted as a Regular Expression, and capture group contents will be available in `replace`.",
+            description = "Default false. If true, `find` will be interpreted as a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression), and capture group contents will be available in `replace`.",
             required = false)
     @Nullable
     Boolean regex;
@@ -80,23 +94,16 @@ public class FindAndReplace extends Recipe {
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
                           "Multiple patterns may be specified, separated by a semicolon `;`. " +
                           "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
-                          "When not set, all source files are searched. ",
+                          "When not set, all source files are searched.",
             required = false,
             example = "**/*.java")
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Find and replace";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Simple text find and replace. When the original source file is a language-specific Lossless Semantic " +
-               "Tree, this operation irreversibly converts the source file to a plain text file. Subsequent recipes " +
-               "will not be able to operate on language-specific type.";
-    }
+    @Option(displayName = "Plaintext only", description = "Only alter files that are parsed as plaintext to prevent language-specific LST information loss. Defaults to false.",
+            required = false)
+    @Nullable
+    Boolean plaintextOnly;
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -145,15 +152,17 @@ public class FindAndReplace extends Recipe {
                         .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
             }
         };
-        //noinspection DuplicatedCode
         if (filePattern != null) {
-            //noinspection unchecked
-            TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                    .map(FindSourceFiles::new)
-                    .map(Recipe::getVisitor)
-                    .toArray(TreeVisitor[]::new));
+            visitor = Preconditions.check(new FindSourceFiles(filePattern), visitor);
+        }
 
-            visitor = Preconditions.check(check, visitor);
+        if (Boolean.TRUE.equals(plaintextOnly)) {
+            visitor = Preconditions.check(new PlainTextVisitor<ExecutionContext>(){
+                @Override
+                public @NonNull PlainText visitText(@NonNull PlainText text, @NonNull ExecutionContext ctx) {
+                    return SearchResult.found(text);
+                }
+            }, visitor);
         }
         return visitor;
     }

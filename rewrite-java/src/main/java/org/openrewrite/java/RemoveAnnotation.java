@@ -20,7 +20,7 @@ import lombok.Value;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Value
 public class RemoveAnnotation extends Recipe {
     @Option(displayName = "Annotation pattern",

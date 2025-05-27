@@ -27,6 +27,28 @@ import static org.openrewrite.properties.Assertions.properties;
 @SuppressWarnings("UnusedProperty")
 class AddPropertyTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void newProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "management.metrics.enable.process.files",
+            "true",
+            null,
+            null
+          )),
+          properties(
+            """
+              management=true
+              """,
+            """
+              management=true
+              management.metrics.enable.process.files=true
+              """
+          )
+        );
+    }
+
     @Test
     void emptyProperty() {
         rewriteRun(
@@ -72,28 +94,6 @@ class AddPropertyTest implements RewriteTest {
           )),
           properties(
             """
-              management.metrics.enable.process.files=true
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void newProperty() {
-        rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            null
-          )),
-          properties(
-            """
-              management=true
-              """,
-            """
-              management=true
               management.metrics.enable.process.files=true
               """
           )
@@ -221,10 +221,90 @@ class AddPropertyTest implements RewriteTest {
               management.metrics.enable.process.files=true
               """,
             spec -> spec.afterRecipe(after -> {
-                Properties.Entry entry = (Properties.Entry) after.getContent().get(0);
+                Properties.Entry entry = (Properties.Entry) after.getContent().getFirst();
                 assertThat(entry.getValue().getText()).isEqualTo("true");
                 assertThat(entry.getValue().getSource()).isEqualTo("tr\\\n  ue");
             })
+          )
+        );
+    }
+
+    @Test
+    void orderedInsertionBeginning() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "com.sam",
+            "true",
+            "sam",
+            null
+          )),
+          properties(
+            """
+              com.zoe=true
+              """,
+            """
+              # sam
+              com.sam=true
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void orderedInsertionMiddle() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "com.sam",
+            "true",
+            "sam",
+            null
+          )),
+          properties(
+            """
+              # amy
+              com.amy=true
+              # bea
+              com.bea=true
+              # seb
+              com.seb=true
+              # zoe
+              com.zoe=true
+              """,
+            """
+              # amy
+              com.amy=true
+              # bea
+              com.bea=true
+              # sam
+              com.sam=true
+              # seb
+              com.seb=true
+              # zoe
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void orderedInsertionEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "com.sam",
+            "true",
+            "sam",
+            null
+          )),
+          properties(
+            """
+              com.amy=true
+              """,
+            """
+              com.amy=true
+              # sam
+              com.sam=true
+              """
           )
         );
     }

@@ -15,10 +15,10 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Range;
@@ -68,7 +68,7 @@ class UpdateSourcePositionsTest {
             }
             """
         ).collect(Collectors.toList());
-        Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().get(0);
+        Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().getFirst();
         assertThat(printWithLines(result.getAfter())).isEqualTo(
           """
             package [(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
@@ -99,7 +99,7 @@ class UpdateSourcePositionsTest {
             }
             """
         ).collect(Collectors.toList());
-        Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().get(0);
+        Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().getFirst();
         assertThat(printWithLines(result.getAfter())).isEqualTo(
           """
             class[(1, 6), (1, 10)] Test {

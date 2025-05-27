@@ -16,13 +16,14 @@
 package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
@@ -33,25 +34,24 @@ import java.util.Objects;
 import java.util.Optional;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class AddRepository extends Recipe {
-    private static final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/repositories");
 
-    @Option(displayName = "Repository ID",
+    @Option(example = "repo-id", displayName = "Repository ID",
             description = "A unique name to describe the repository.")
     String id;
 
-    @Option(displayName = "Repository URL",
+    @Option(example = "http://myrepo.maven.com/repo", displayName = "Repository URL",
             description = "The URL of the repository.")
     String url;
 
-    @Option(required = false,
+    @Option(example = "My Great Repo Name", required = false,
             displayName = "Repository name",
             description = "A display name for the repository.")
     @Nullable
     String repoName;
 
-    @Option(required = false,
+    @Option(example = "default", required = false,
             displayName = "Repository layout",
             description = "The Maven layout of the repository.")
     @Nullable
@@ -63,13 +63,13 @@ public class AddRepository extends Recipe {
     @Nullable
     Boolean snapshotsEnabled;
 
-    @Option(required = false,
+    @Option(example = "warn", required = false,
             displayName = "Snapshots checksum policy",
             description = "Governs whether snapshots require checksums.")
     @Nullable
     String snapshotsChecksumPolicy;
 
-    @Option(required = false,
+    @Option(example = "always", required = false,
             displayName = "Snapshots update policy",
             description = "The policy governing snapshot updating interval.")
     @Nullable
@@ -81,17 +81,37 @@ public class AddRepository extends Recipe {
     @Nullable
     Boolean releasesEnabled;
 
-    @Option(required = false,
+    @Option(example = "fail", required = false,
             displayName = "Releases checksum policy",
             description = "Governs whether releases require checksums.")
     @Nullable
     String releasesChecksumPolicy;
 
-    @Option(required = false,
+    @Option(example = "never", required = false,
             displayName = "Releases update policy",
             description = "The policy governing release updating interval.")
     @Nullable
     String releasesUpdatePolicy;
+
+    @Option(displayName = "Repository type",
+            description = "The type of repository to add.",
+            example = "Repository",
+            required = false)
+    @Nullable
+    Type type;
+
+    @RequiredArgsConstructor
+    public enum Type {
+        Repository("repository", "repositories"),
+        PluginRepository("pluginRepository", "pluginRepositories");
+
+        final String xmlTagSingle;
+        final String xmlTagPlural;
+    }
+
+    public Type getType() {
+        return type == null ? Type.Repository : type;
+    }
 
     @Override
     public String getDisplayName() {
@@ -106,11 +126,13 @@ public class AddRepository extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
+            private final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/" + getType().xmlTagPlural);
+
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Tag root = document.getRoot();
-                if (!root.getChild("repositories").isPresent()) {
-                    document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<repositories/>"))
+                if (!root.getChild(getType().xmlTagPlural).isPresent()) {
+                    document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<" + getType().xmlTagPlural + "/>"))
                             .visitNonNull(document, ctx, getCursor().getParentOrThrow());
                 }
                 return super.visitDocument(document, ctx);
@@ -123,7 +145,7 @@ public class AddRepository extends Recipe {
                 if (REPOS_MATCHER.matches(getCursor())) {
                     Optional<Xml.Tag> maybeRepo = repositories.getChildren().stream()
                             .filter(repo ->
-                                    "repository".equals(repo.getName()) &&
+                                    getType().xmlTagSingle.equals(repo.getName()) &&
                                     (id.equals(repo.getChildValue("id").orElse(null)) || (isReleasesEqual(repo) && isSnapshotsEqual(repo))) &&
                                     url.equals(repo.getChildValue("url").orElse(null))
                             )
@@ -148,7 +170,7 @@ public class AddRepository extends Recipe {
                                 repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases()))
                                         .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             } else {
-                                repositories = (Xml.Tag) new RemoveContentVisitor<>(releases, true)
+                                repositories = (Xml.Tag) new RemoveContentVisitor<>(releases, true, true)
                                         .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 if (!isNoSnapshots()) {
                                     repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases()))
@@ -162,7 +184,7 @@ public class AddRepository extends Recipe {
                             if (snapshots == null) {
                                 repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleSnapshots())).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             } else {
-                                repositories = (Xml.Tag) new RemoveContentVisitor<>(snapshots, true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
+                                repositories = (Xml.Tag) new RemoveContentVisitor<>(snapshots, true, true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 if (!isNoSnapshots()) {
                                     repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleSnapshots())).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 }
@@ -171,14 +193,14 @@ public class AddRepository extends Recipe {
                         }
                     } else {
                         @Language("xml")
-                        String sb = "<repository>\n" +
+                        String sb = "<" + getType().xmlTagSingle + ">\n" +
                                     assembleTagWithValue("id", id) +
                                     assembleTagWithValue("url", url) +
                                     assembleTagWithValue("name", repoName) +
                                     assembleTagWithValue("layout", layout) +
                                     assembleReleases() +
                                     assembleSnapshots() +
-                                    "</repository>\n";
+                                    "</" + getType().xmlTagSingle + ">\n";
 
                         Xml.Tag repoTag = Xml.Tag.build(sb);
                         repositories = (Xml.Tag) new AddToTagVisitor<>(repositories, repoTag).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
@@ -245,9 +267,9 @@ public class AddRepository extends Recipe {
         if (releases == null) {
             return isNoReleases();
         } else {
-            return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null))
-                   && Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null))
-                   && Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
+            return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null)) &&
+                   Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null)) &&
+                   Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
         }
     }
 
@@ -260,9 +282,9 @@ public class AddRepository extends Recipe {
         if (snapshots == null) {
             return isNoSnapshots();
         } else {
-            return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null))
-                   && Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null))
-                   && Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
+            return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null)) &&
+                   Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null)) &&
+                   Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
         }
     }
 

@@ -31,13 +31,6 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class RemoveImportTest implements RewriteTest {
-    private static Recipe removeImport(String type) {
-        return removeImport(type, false);
-    }
-
-    private static Recipe removeImport(String type, boolean force) {
-        return toRecipe(() -> new RemoveImport<>(type, force));
-    }
 
     @DocumentExample
     @Test
@@ -52,6 +45,13 @@ class RemoveImportTest implements RewriteTest {
             "class A {}"
           )
         );
+    }
+    private static Recipe removeImport(String type) {
+        return removeImport(type, false);
+    }
+
+    private static Recipe removeImport(String type, boolean force) {
+        return toRecipe(() -> new RemoveImport<>(type, force));
     }
 
     @Test
@@ -331,6 +331,162 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void preservesWhitespaceAfterRemovedImportForWindowsWhitespace() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+              "package com.example.foo;\r\n" +
+              "\r\n" +
+              "import java.util.Collection;\r\n" +
+              "import java.util.List;\r\n" +
+              "\r\n" +
+              "import java.util.ArrayList;\r\n" +
+              "\r\n" +
+              "public class A {\r\n" +
+              "}\r\n",
+              "package com.example.foo;\r\n" +
+              "\r\n" +
+              "import java.util.Collection;\r\n" +
+              "\r\n" +
+              "import java.util.ArrayList;\r\n" +
+              "\r\n" +
+              "public class A {\r\n" +
+              "}\r\n"
+          )
+        );
+    }
+
+    @Test
+    void preservesWhitespaceAfterRemovedImportForMixedWhitespaceBefore() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+              "package com.example.foo;\n" +
+              "\n" +
+              "import java.util.Collection;\r\n" +
+              "import java.util.List;\n" +
+              "import java.util.ArrayList;\n" +
+              "\n" +
+              "public class A {\n" +
+              "}\n",
+              "package com.example.foo;\n" +
+              "\n" +
+              "import java.util.Collection;\n" +
+              "import java.util.ArrayList;\n" +
+              "\n" +
+              "public class A {\n" +
+              "}\n"
+          )
+        );
+    }
+
+    @Test
+    void preservesWhitespaceAfterRemovedImportForMixedWhitespaceAfter() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+              "package com.example.foo;\n" +
+              "\n" +
+              "import java.util.Collection;\n" +
+              "\n" +
+              "import java.util.List;\r\n" +
+              "import java.util.ArrayList;\n" +
+              "\n" +
+              "public class A {\n" +
+              "}\n",
+              "package com.example.foo;\n" +
+              "\n" +
+              "import java.util.Collection;\n" +
+              "\n" +
+              "import java.util.ArrayList;\n" +
+              "\n" +
+              "public class A {\n" +
+              "}\n"
+          )
+        );
+    }
+
+    @Test
+    void doNotLeaveLeaveInitialBlankLine() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Collection")),
+          java(
+            """
+              import static java.util.Collection.*;
+              import static java.util.List.*;
+                            
+              public class A {
+              }
+              """,
+            """
+              import static java.util.List.*;
+                            
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesCommentAfterRemovedImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              package com.example.foo;
+                            
+              import java.util.List;
+              // import java.util.UUID
+              import java.util.ArrayList;
+                            
+              public class A {
+              }
+              """,
+            """
+              package com.example.foo;
+                            
+              // import java.util.UUID
+              import java.util.ArrayList;
+                            
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesWhitespaceAfterRemovedStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Collections.singletonList")),
+          java(
+            """
+              package com.example.foo;
+
+              import static java.util.Collections.emptySet;
+              import static java.util.Collections.singletonList;
+                            
+              import java.util.UUID;
+                            
+              public class A {
+              }
+              """,
+            """
+              package com.example.foo;
+                            
+              import static java.util.Collections.emptySet;
+
+              import java.util.UUID;
+                            
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/701")
     @Test
     void preservesWhitespaceAfterPackageDeclarationNoImportsRemain() {
@@ -487,7 +643,7 @@ class RemoveImportTest implements RewriteTest {
                   Collection<Integer> l;
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().get(0).getId()).isNotEqualTo(cu.getImports().get(1).getId())))
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().getFirst().getId()).isNotEqualTo(cu.getImports().get(1).getId())))
         );
     }
 

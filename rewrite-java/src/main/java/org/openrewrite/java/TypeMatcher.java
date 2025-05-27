@@ -18,23 +18,22 @@ package org.openrewrite.java;
 import lombok.Getter;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.trait.Reference;
 
 import java.util.regex.Pattern;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
-@SuppressWarnings("NotNullFieldNotInitialized")
 @Getter
-public class TypeMatcher {
-    private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
+public class TypeMatcher implements Reference.Matcher {
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     @Getter
@@ -51,16 +50,6 @@ public class TypeMatcher {
     @Getter
     private final boolean matchInherited;
 
-    public boolean matches(@Nullable TypeTree tt) {
-        return tt != null && matches(tt.getType());
-    }
-
-    public boolean matchesPackage(String packageName) {
-        return targetTypePattern.matcher(packageName).matches() ||
-               targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
-                       "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
-    }
-
     public TypeMatcher(@Nullable String fieldType) {
         this(fieldType, false);
     }
@@ -73,20 +62,31 @@ public class TypeMatcher {
             targetTypePattern = Pattern.compile(".*");
         } else {
             MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
-                    CharStreams.fromString(fieldType))));
+                    CharStreams.fromString(fieldType + "#dummy()"))));
 
             new MethodSignatureParserBaseVisitor<Void>() {
+
                 @Override
-                public Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
+                public @Nullable Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
                     String pattern = new TypeVisitor().visitTargetTypePattern(ctx);
-                    targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(ctx));
-                    targetType = isPlainIdentifier(ctx)
-                            ? pattern.replace(ASPECTJ_DOT_PATTERN, ".").replace("\\", "")
-                            : null;
+                    if (isPlainIdentifier(ctx)) {
+                        targetType = pattern;
+                    }
+                    targetTypePattern = Pattern.compile(StringUtils.aspectjNameToPattern(pattern));
                     return null;
                 }
             }.visitTargetTypePattern(parser.targetTypePattern());
         }
+    }
+
+    public boolean matches(@Nullable TypeTree tt) {
+        return tt != null && matches(tt.getType());
+    }
+
+    public boolean matchesPackage(String packageName) {
+        return targetTypePattern.matcher(packageName).matches() ||
+               targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
+                       "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
     }
 
     public boolean matches(@Nullable JavaType type) {
@@ -99,7 +99,7 @@ public class TypeMatcher {
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
         return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
-               this.targetType == null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+               this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
@@ -108,5 +108,15 @@ public class TypeMatcher {
                context.OR() == null &&
                context.classNameOrInterface().DOTDOT().isEmpty() &&
                context.classNameOrInterface().WILDCARD().isEmpty();
+    }
+
+    @Override
+    public boolean matchesReference(Reference reference) {
+        return reference.getKind() == Reference.Kind.TYPE && matchesTargetTypeName(reference.getValue());
+    }
+
+    @Override
+    public Reference.Renamer createRenamer(String newName) {
+        return reference -> newName;
     }
 }

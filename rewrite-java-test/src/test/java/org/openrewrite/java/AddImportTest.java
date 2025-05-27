@@ -15,12 +15,12 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
@@ -42,33 +42,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("rawtypes")
 class AddImportTest implements RewriteTest {
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/2155")
-    @Test
-    void addImportBeforeImportWithSameInsertIndex() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertFalse", false))),
-          java(
-            """
-              import static org.junit.jupiter.api.Assertions.assertTrue;
-
-              import org.junit.Test;
-
-              public class MyTest {
-              }
-              """,
-            """
-              import static org.junit.jupiter.api.Assertions.assertFalse;
-              import static org.junit.jupiter.api.Assertions.assertTrue;
-
-              import org.junit.Test;
-
-              public class MyTest {
-              }
-              """
-          )
-        );
-    }
 
     @DocumentExample
     @Test
@@ -99,6 +72,33 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2155")
+    @Test
+    void addImportBeforeImportWithSameInsertIndex() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertFalse", false))),
+          java(
+            """
+              import static org.junit.jupiter.api.Assertions.assertTrue;
+
+              import org.junit.Test;
+
+              public class MyTest {
+              }
+              """,
+            """
+              import static org.junit.jupiter.api.Assertions.assertFalse;
+              import static org.junit.jupiter.api.Assertions.assertTrue;
+
+              import org.junit.Test;
+
+              public class MyTest {
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void dontDuplicateImports() {
         rewriteRun(
@@ -111,7 +111,7 @@ class AddImportTest implements RewriteTest {
             """
               import org.springframework.http.HttpStatus;
               import org.springframework.http.HttpStatus.Series;
-                            
+
               class A {}
               """
           )
@@ -121,8 +121,7 @@ class AddImportTest implements RewriteTest {
     @Test
     void dontDuplicateImports2() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Test", null, false)))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Test", null, false))),
           java(
             """
               import org.junit.jupiter.api.AfterEach;
@@ -138,7 +137,7 @@ class AddImportTest implements RewriteTest {
               import org.junit.jupiter.api.*;
               import org.slf4j.Logger;
               import org.slf4j.LoggerFactory;
-                            
+
               class A {}
               """
           )
@@ -149,22 +148,21 @@ class AddImportTest implements RewriteTest {
     void dontDuplicateImports3() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertNull", false)))
-            .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")),
           java(
             """
               import static org.junit.jupiter.api.Assertions.assertFalse;
               import static org.junit.jupiter.api.Assertions.assertTrue;
-                            
+
               import java.util.List;
 
               class A {}
               """,
             """
               import static org.junit.jupiter.api.Assertions.*;
-                            
+
               import java.util.List;
-                            
+
               class A {}
               """
           )
@@ -178,7 +176,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package com.myorg;
-                            
+
               class A {
               }
               """
@@ -186,6 +184,84 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/540")
+    @Test
+    void forceImportNonJavaLangRecord() {
+        // Add import for a class named `Record`, even within the same package, to avoid conflicts with java.lang.Record
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.acme.bank.Record", null, false)))
+            .parser(JavaParser.fromJavaVersion().dependsOn("package com.acme.bank; public class Record {}")),
+          //language=java
+          java(
+            """
+              package com.acme.bank;
+
+              class Foo {
+              }
+              """,
+            """
+              package com.acme.bank;
+
+              import com.acme.bank.Record;
+
+              class Foo {
+              }
+              """,
+            spec -> spec.markers(javaVersion(11))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/540")
+    @Test
+    void forceImportNonJavaLangRecordFromWildcardImport() {
+        // Add import for a class named `Record`, even within the same package, to avoid conflicts with java.lang.Record
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.acme.bank.Record", null, false)))
+            .parser(JavaParser.fromJavaVersion().dependsOn("package com.acme.bank; public class Record {}")),
+          //language=java
+          java(
+            """
+              package com.acme.bank;
+              
+              import com.acme.bank.*;
+              
+              class Foo {
+              }
+              """,
+            """
+              package com.acme.bank;
+              
+              import com.acme.bank.*;
+              
+              import com.acme.bank.Record;
+              
+              class Foo {
+              }
+              """,
+            spec -> spec.markers(javaVersion(11))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/540")
+    @Test
+    void notForceImportJavaRecord() {
+        // Do not add import for java.lang.Record by default
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.Record", null, false))),
+          //language=java
+          java(
+            """
+              package com.acme.bank;
+
+              class Foo {
+              }
+              """,
+            spec -> spec.markers(javaVersion(11))
+          )
+        );
+    }
     @Test
     void dontImportJavaLang() {
         rewriteRun(
@@ -241,7 +317,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package com.myorg;
-                            
+
               class B {
               }
               """
@@ -249,7 +325,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package com.myorg;
-                            
+
               class A {
               }
               """
@@ -309,7 +385,7 @@ class AddImportTest implements RewriteTest {
           java("class A {}",
             """
               import java.util.List;
-                            
+
               class A {}
               """
           )
@@ -323,7 +399,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               class A {}
               """
           )
@@ -337,22 +413,22 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               import com.sun.naming.*;
-                            
+
               import static java.util.Collections.*;
-                            
+
               class A {}
               """,
             """
               package a;
-                            
+
               import com.sun.naming.*;
-                            
+
               import java.util.List;
-                            
+
               import static java.util.Collections.*;
-                            
+
               class A {}
               """
           )
@@ -366,14 +442,14 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               class A {}
               """,
             """
               package a;
-                            
+
               import java.util.List;
-                            
+
               class A {}
               """
           )
@@ -410,10 +486,10 @@ class AddImportTest implements RewriteTest {
               """,
             """
               package a;
-                            
+
               import java.math.BigDecimal;
               import java.math.RoundingMode;
-                            
+
               class A {
                   BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);
               }
@@ -429,7 +505,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               class A {}
               """
           )
@@ -443,7 +519,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               import java.util.List;
-                            
+
               /**
                * My type
                */
@@ -451,9 +527,9 @@ class AddImportTest implements RewriteTest {
               """,
             """
               import java.util.List;
-                            
+
               import static java.util.Collections.*;
-                            
+
               /**
                * My type
                */
@@ -474,9 +550,9 @@ class AddImportTest implements RewriteTest {
               """,
             """
               package a;
-                            
+
               import java.util.List;
-                            
+
               class A {}
               """
           )
@@ -516,18 +592,18 @@ class AddImportTest implements RewriteTest {
               java(
                 """
                   package a;
-                      
+                  
                   import c.C0;
                   import c.c.C1;
                   import c.c.c.C2;
-                      
+                  
                   class A {}
                   """,
                 String.format("""
                     package a;
-                                        
+
                     %s
-                                        
+
                     class A {}
                     """,
                   expectedImports.stream().map(i -> "import " + i + ";").collect(Collectors.joining("\n"))
@@ -549,7 +625,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               import java.util.List;
               class A {}
               """
@@ -564,7 +640,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               import java.util.*;
               class A {}
               """
@@ -595,17 +671,17 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               import static java.util.List.*;
               class A {}
               """,
             """
               package a;
-                            
+
               import java.util.List;
-                            
+
               import static java.util.List.*;
-                            
+
               class A {}
               """
           )
@@ -623,9 +699,9 @@ class AddImportTest implements RewriteTest {
               """,
             """
               import java.util.*;
-                              
+
               import static java.util.Collections.emptyList;
-                              
+
               class A {}
               """
           )
@@ -640,7 +716,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package mycompany;
-                            
+
               public class Type {
                   public static String FIELD;
               }
@@ -650,7 +726,7 @@ class AddImportTest implements RewriteTest {
             "class A {}",
             """
               import static mycompany.Type.FIELD;
-                            
+
               class A {}
               """
           )
@@ -683,17 +759,17 @@ class AddImportTest implements RewriteTest {
           java(
             """
               public class A {
-                          
+
               }
               """,
             """
               import java.time.temporal.ChronoUnit;
-                          
+
               import static java.time.temporal.ChronoUnit.MILLIS;
-                          
+
               public class A {
                   ChronoUnit unit = MILLIS;
-                          
+
               }
               """
           )
@@ -708,9 +784,9 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               import java.time.temporal.ChronoUnit;
-                            
+
               class A {
                   static final int MILLIS = 1;
                   ChronoUnit unit = ChronoUnit.MILLIS;
@@ -727,7 +803,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               class A {}
               """
           )
@@ -749,9 +825,9 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               import java.util.List;
-                            
+
               class A {
                   public A() {
                       List<String> list = java.util.Collections.emptyList();
@@ -760,14 +836,57 @@ class AddImportTest implements RewriteTest {
               """,
             """
               package a;
-                            
+
               import java.util.List;
-                            
+
               import static java.util.Collections.emptyList;
-                            
+
               class A {
                   public A() {
                       List<String> list = emptyList();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addNamedStaticImportWhenReferenced2() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+                  method = super.visitMethodDeclaration(method, executionContext);
+                  method = JavaTemplate.builder("List<Builder> list = new ArrayList<>();")
+                    .imports("java.util.ArrayList", "java.util.List")
+                    .staticImports("java.util.Calendar.Builder")
+                    .build()
+                    .apply(getCursor(), method.getBody().getCoordinates().firstStatement());
+                  maybeAddImport("java.util.ArrayList");
+                  maybeAddImport("java.util.List");
+                  maybeAddImport("java.util.Calendar", "Builder");
+                  return method;
+              }
+          }).withMaxCycles(1)),
+          java(
+            """
+              import static java.util.Calendar.Builder;
+
+              class A {
+                  public A() {
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              import static java.util.Calendar.Builder;
+
+              class A {
+                  public A() {
+                      List<Builder> list = new ArrayList<>();
                   }
               }
               """
@@ -782,7 +901,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                            
+
               class A {}
               """
           )
@@ -807,9 +926,9 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-                              
+
               import java.util.List;
-                              
+
               class A {
                   public A() {
                       List<String> list = java.util.Collections.emptyList();
@@ -818,11 +937,11 @@ class AddImportTest implements RewriteTest {
               """,
             """
               package a;
-                              
+
               import java.util.List;
-                              
+
               import static java.util.Collections.*;
-                              
+
               class A {
                   public A() {
                       List<String> list = emptyList();
@@ -883,14 +1002,14 @@ class AddImportTest implements RewriteTest {
             """
               import foo.B;
               import foo.C;
-                              
+
               import java.util.Collections;
               import java.util.List;
               import java.util.HashSet;
               import java.util.HashMap;
               import java.util.Map;
               import java.util.Set;
-                              
+
               class A {
                   B b = new B();
                   C c = new C();
@@ -903,7 +1022,7 @@ class AddImportTest implements RewriteTest {
             """
               import foo.B;
               import foo.C;
-                              
+
               import java.util.*;
 
               class A {
@@ -912,7 +1031,7 @@ class AddImportTest implements RewriteTest {
                   Map<String, String> map = new HashMap<>();
                   Set<String> set = new HashSet<>();
                   List<String> test = Collections.singletonList("test");
-                  List<String> test2 = new java.util.ArrayList<>();
+                  List<String> test2 = new ArrayList<>();
               }
               """
           )
@@ -928,15 +1047,15 @@ class AddImportTest implements RewriteTest {
             """
               import javax.ws.rs.Path;
               import javax.ws.rs.Path;
-                            
+
               class A {}
               """,
             """
               import org.springframework.http.MediaType;
-                            
+
               import javax.ws.rs.Path;
               import javax.ws.rs.Path;
-                            
+
               class A {}
               """
           )
@@ -952,15 +1071,15 @@ class AddImportTest implements RewriteTest {
             """
               import org.foo.B;
               import org.foo.A;
-                            
+
               class A {}
               """,
             """
               import org.foo.B;
               import org.foo.A;
-                            
+
               import java.time.Duration;
-                            
+
               class A {}
               """
           )
@@ -1136,7 +1255,7 @@ class AddImportTest implements RewriteTest {
               """,
             """
               import java.util.List;
-                            
+
               import static java.util.Collections.*;
               """
           )
@@ -1154,9 +1273,9 @@ class AddImportTest implements RewriteTest {
               """.replace("\n", "\r\n"),
             """
               package a;
-                            
+
               import java.util.List;
-                            
+
               class A {}
               """.replace("\n", "\r\n")
           )
@@ -1170,17 +1289,17 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-              
+
               import java.util.Set;
-              
+
               class A {}
               """.replace("\n", "\r\n"),
             """
               package a;
-                            
+
               import java.util.List;
               import java.util.Set;
-                            
+
               class A {}
               """.replace("\n", "\r\n")
           )
@@ -1194,13 +1313,13 @@ class AddImportTest implements RewriteTest {
           java(
             """
               import java.util.Set;
-              
+
               class A {}
               """.replace("\n", "\r\n"),
             """        
               import java.util.List;
               import java.util.Set;
-                            
+
               class A {}
               """.replace("\n", "\r\n")
           )
@@ -1214,13 +1333,13 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-              
+
               import java.util.Arrays;
               import java.util.Set;
               """.replace("\n", "\r\n"),
             """
               package a;
-              
+
               import java.util.Arrays;
               import java.util.List;
               import java.util.Set;
@@ -1269,10 +1388,10 @@ class AddImportTest implements RewriteTest {
                * limitations under the License.
                */
               """.replace("\n", "\r\n") +
-            """
-              import java.util.Arrays;
-              import java.util.Set;
-              """,
+              """
+                import java.util.Arrays;
+                import java.util.Set;
+                """,
             """
               /*
                * Copyright 2023 the original author or authors.
@@ -1305,31 +1424,31 @@ class AddImportTest implements RewriteTest {
             """
               import java.util.Arrays;
               import java.util.Set;
-              
+
               """ +
-            """
-              /**
-               * Copyright 2023 the original author or authors.
-               * <p>
-               * Licensed under the Apache License, Version 2.0 (the "License");
-               * you may not use this file except in compliance with the License.
-               * You may obtain a copy of the License at
-               * <p>
-               * https://www.apache.org/licenses/LICENSE-2.0
-               * <p>
-               * Unless required by applicable law or agreed to in writing, software
-               * distributed under the License is distributed on an "AS IS" BASIS,
-               * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-               * See the License for the specific language governing permissions and
-               * limitations under the License.
-               */
-              """.replace("\n", "\r\n") +
-            "class Foo {}",
+              """
+                /**
+                 * Copyright 2023 the original author or authors.
+                 * <p>
+                 * Licensed under the Apache License, Version 2.0 (the "License");
+                 * you may not use this file except in compliance with the License.
+                 * You may obtain a copy of the License at
+                 * <p>
+                 * https://www.apache.org/licenses/LICENSE-2.0
+                 * <p>
+                 * Unless required by applicable law or agreed to in writing, software
+                 * distributed under the License is distributed on an "AS IS" BASIS,
+                 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+                 * See the License for the specific language governing permissions and
+                 * limitations under the License.
+                 */
+                """.replace("\n", "\r\n") +
+              "class Foo {}",
             """
               import java.util.Arrays;
               import java.util.List;
               import java.util.Set;
-              
+
               /**
                * Copyright 2023 the original author or authors.
                * <p>
@@ -1347,6 +1466,138 @@ class AddImportTest implements RewriteTest {
                */
               class Foo {}
               """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyOnAmbiguousImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                  maybeAddImport("java.sql.Date");
+                  JavaTemplate template = JavaTemplate.builder(
+                      "Date sqlDate = new Date(System.currentTimeMillis());")
+                    .imports("java.sql.Date")
+                    .build();
+                  return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)),
+          java(
+            """
+              import java.util.Date;
+
+              class Ambiguous {
+                  Date date = new Date(System.currentTimeMillis());
+              }
+              """,
+              """
+              import java.util.Date;
+
+              class Ambiguous {
+                  java.sql.Date sqlDate = new java.sql.Date(System.currentTimeMillis());
+                  Date date = new Date(System.currentTimeMillis());
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyOnAmbiguousStaticFieldImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                  maybeAddImport("java.awt.Color", "RED", true);
+                  maybeAddImport("java.awt.Color", true);
+                  JavaTemplate template = JavaTemplate.builder(
+                      "Color color = RED;")
+                    .imports("java.awt.Color")
+                    .staticImports("java.awt.Color.RED")
+                    .build();
+                  return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1))
+          .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+              package com.example;
+
+              public class CustomColor {
+                  public static final String RED = "red";
+              }
+              """
+          )),
+          java(
+            """
+              import static com.example.CustomColor.RED;
+
+              class Ambiguous {
+                  void method() {
+                      // RED is from com.example.CustomColor
+                      System.out.println(RED);
+                  }
+              }
+              """,
+              """
+              import java.awt.Color;
+              
+              import static com.example.CustomColor.RED;
+
+              class Ambiguous {
+                  Color color = Color.RED;
+                  void method() {
+                      // RED is from com.example.CustomColor
+                      System.out.println(RED);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyOnAmbiguousStaticMethodImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                  maybeAddImport("java.util.Arrays", "sort", true);
+                  maybeAddImport("java.util.List", true);
+                  JavaTemplate template = JavaTemplate.builder(
+                      "List<Integer> list = sort(new int[]{1, 2, 3});")
+                    .imports("java.util.List")
+                    .staticImports("java.util.Arrays.sort")
+                    .build();
+                  return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)),
+          java(
+            """
+              import static java.util.Collections.sort;
+              
+              import java.util.ArrayList;
+
+              class Ambiguous {
+                  void method() {
+                      sort(new ArrayList<String>());
+                  }
+              }
+              """,
+              """
+              import static java.util.Collections.sort;
+              
+              import java.util.ArrayList;
+              import java.util.List;
+              
+              class Ambiguous {
+                  List<Integer> list = java.util.Arrays.sort(new int[]{1, 2, 3});
+                  void method() {
+                      sort(new ArrayList<String>());
+                  }
+              }
+              """
           )
         );
     }

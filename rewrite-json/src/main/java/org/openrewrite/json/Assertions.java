@@ -16,7 +16,7 @@
 package org.openrewrite.json;
 
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;

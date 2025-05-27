@@ -18,6 +18,8 @@ package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
@@ -35,6 +37,30 @@ import static org.openrewrite.groovy.Assertions.groovy;
 @Disabled
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessaryPublicModifier", "ConstantConditions", "GrMethodMayBeStatic"})
 class GroovyTypeAttributionTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void typeFromClasspathResources() {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes("org.junit.jupiter.api.Test", null))
+            .parser(GroovyParser.builder()
+                .classpathFromResource(new InMemoryExecutionContext(), "junit-jupiter-api-5.+")),
+          groovy(
+                """
+            import org.junit.jupiter.api.Test
+            class A {
+                Test t
+            }
+            """,
+            """
+            import org.junit.jupiter.api.Test
+            class A {
+                /*~~>*/Test t
+            }
+            """
+          )
+        );
+    }
 
     @Test
     void defTypeAttributed() {
@@ -81,7 +107,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
     @Test
     void closureImplicitParameterAttributed() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
               public <T> T register(String name, Class<T> type, Closure<T> configurationAction) {
                   return null
               }
@@ -94,7 +121,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 assertThat(m.getArguments()).hasSize(3);
                 assertThat(m.getArguments().get(2)).isInstanceOf(J.Lambda.class);
                 var it = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(2)).getBody())
-                  .getStatements().get(0)).getExpression();
+                  .getStatements().getFirst()).getExpression();
                 assertThat(TypeUtils.asFullyQualified(it.getSelect().getType()).getFullyQualifiedName()).isEqualTo("java.lang.String");
                 assertThat(it.getMethodType().getName()).isEqualTo("substring");
                 assertThat(it.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.String");
@@ -106,7 +133,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
     @Test
     void closureImplicitParameterAttributedZeroArgMethod() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
               public <T> T register(String name, Class<T> type, Closure<T> configurationAction) {
                   return null
               }
@@ -119,7 +147,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 assertThat(m.getArguments()).hasSize(3);
                 assertThat(m.getArguments().get(2)).isInstanceOf(J.Lambda.class);
                 var it = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(2)).getBody())
-                  .getStatements().get(0)).getExpression();
+                  .getStatements().getFirst()).getExpression();
                 assertThat(TypeUtils.asFullyQualified(it.getSelect().getType()).getFullyQualifiedName()).isEqualTo("java.lang.Integer");
                 assertThat(it.getMethodType().getName()).isEqualTo("byteValue");
                 assertThat(it.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.Integer");
@@ -131,7 +159,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
     @Test
     void closureNamedParameterAttributed() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
               public <T> T register(String name, Class<T> type, Closure<T> configurationAction) {
                   return null
               }
@@ -143,7 +172,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 var m = (J.MethodInvocation) cu.getStatements().get(1);
                 assertThat(m.getArguments()).hasSize(3);
                 assertThat(m.getArguments().get(2)).isInstanceOf(J.Lambda.class);
-                var foo = (J.Identifier) ((G.ExpressionStatement) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(2)).getBody()).getStatements().get(0))
+                var foo = (J.Identifier) ((G.ExpressionStatement) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(2)).getBody()).getStatements().getFirst())
                   .getExpression()).getExpression();
                 assertThat(TypeUtils.asFullyQualified(foo.getType()).getFullyQualifiedName()).isEqualTo("java.lang.String");
             })
@@ -154,7 +183,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
     @Test
     void closureWithDelegate() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
               public String register(@DelegatesTo(String) Closure stringAction) {
                   return null
               }
@@ -165,8 +195,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 var m = (J.MethodInvocation) cu.getStatements().get(1);
                 assertThat(m.getArguments()).hasSize(1);
-                assertThat(m.getArguments().get(0)).isInstanceOf(J.Lambda.class);
-                var substring = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
+                assertThat(m.getArguments().getFirst()).isInstanceOf(J.Lambda.class);
+                var substring = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().getFirst()).getBody()).getStatements().getFirst()).getExpression();
                 assertThat(substring.getMethodType().getName()).isEqualTo("substring");
                 assertThat(substring.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.String");
             })
@@ -175,11 +205,12 @@ class GroovyTypeAttributionTest implements RewriteTest {
     }
 
     @SuppressWarnings({"GrPackage", "OptionalGetWithoutIsPresent"})
-    @Disabled
+    @ExpectedToFail
     @Test
     void infersDelegateViaSimilarGradleApi() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
               package org.gradle.api
               
               interface Action<T> {
@@ -199,33 +230,12 @@ class GroovyTypeAttributionTest implements RewriteTest {
                   .findFirst()
                   .get();
                 assertThat(m.getArguments()).hasSize(1);
-                assertThat(m.getArguments().get(0)).isInstanceOf(J.Lambda.class);
-                var substring = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
+                assertThat(m.getArguments().getFirst()).isInstanceOf(J.Lambda.class);
+                var substring = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().getFirst()).getBody()).getStatements().getFirst()).getExpression();
                 assertThat(substring.getMethodType().getName()).isEqualTo("substring");
                 assertThat(substring.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.String");
             })
           )
-        );
-    }
-
-    @Test
-    void typeFromClasspathResources() {
-        rewriteRun(
-          spec -> spec.recipe(new FindTypes("org.junit.jupiter.api.Test", null))
-            .parser(GroovyParser.builder()
-                .classpathFromResource(new InMemoryExecutionContext(), "junit-jupiter-api-5.+")),
-          groovy("""
-            import org.junit.jupiter.api.Test
-            class A {
-                Test t
-            }
-            """,
-            """
-            import org.junit.jupiter.api.Test
-            class A {
-                /*~~>*/Test t
-            }
-            """)
         );
     }
 

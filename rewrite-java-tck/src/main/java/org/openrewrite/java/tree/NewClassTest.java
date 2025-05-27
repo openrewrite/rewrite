@@ -17,8 +17,10 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class NewClassTest implements RewriteTest {
@@ -80,6 +82,75 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void delegate() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private String name;
+                  A() {
+                    this("ABC");
+                  }
+                  A(String name) {
+                    this.name = name;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterizedTypeAttribution() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+              class Test {
+                  List<String> l = new ArrayList<>();
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable l =
+                  ((J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0);
+                J.NewClass arrayList = (J.NewClass) l.getInitializer();
+                JavaType.Parameterized javaType = (JavaType.Parameterized) arrayList.getType();
+                assertThat(javaType.getType().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
+                assertThat(javaType.getTypeParameters()).satisfiesExactly(
+                  p -> assertThat(((JavaType.Class) p).getFullyQualifiedName()).isEqualTo("java.lang.String")
+                );
+            })
+          )
+        );
+    }
+
+    @Test
+    @MinimumJava11
+    void anonymousTypeAttribution() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+              class Test {
+                  List<String> l = new ArrayList<>() {};
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable l =
+                  ((J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0);
+                J.NewClass arrayList = (J.NewClass) l.getInitializer();
+                JavaType.Class javaType = (JavaType.Class) arrayList.getType();
+                JavaType.Parameterized arrayListType = (JavaType.Parameterized) javaType.getSupertype();
+                assertThat(arrayListType.getType().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
+                assertThat(arrayListType.getTypeParameters()).satisfiesExactly(
+                  p -> assertThat(((JavaType.Class) p).getFullyQualifiedName()).isEqualTo("java.lang.String")
+                );
+            })
+          )
+        );
+    }
+
+    @Test
     void anonymousClass() {
         rewriteRun(
           java(
@@ -89,7 +160,7 @@ class NewClassTest implements RewriteTest {
               
               class Test {
                   List<Integer> l = new ArrayList<Integer>() {
-                      /** Javadoc */
+                      /* Javadoc */
                       @Override
                       public boolean isEmpty() {
                           return false;
@@ -116,7 +187,7 @@ class NewClassTest implements RewriteTest {
                   void method() {
                       Arrays.sort(new ArrayList[]{new ArrayList<File>()}, new Comparator<Object>() {
                           long time1, time2;
-                  
+              
                           @Override
                           public int compare(Object o1, Object o2) {
                               time1 = ((File) o1).lastModified();
@@ -125,6 +196,82 @@ class NewClassTest implements RewriteTest {
                           }
                       });
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody1() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  Object o = new Object() {;;;;;
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      }
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody1WithComment() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  Object o = new Object() {    /*~~>*/    ; /*<~~*/
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      }
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody2() {
+        rewriteRun(
+          java(
+            """
+              class B {
+                  Object o = new Object() {
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      };;;;
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody2WithComment() {
+        rewriteRun(
+          java(
+            """
+              class B {
+                  Object o = new Object() {
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      }     /*~~>*/    ; /*<~~*/
+                  };
               }
               """
           )

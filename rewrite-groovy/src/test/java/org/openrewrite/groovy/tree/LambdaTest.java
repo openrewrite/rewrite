@@ -27,52 +27,62 @@ class LambdaTest implements RewriteTest {
     @Test
     void lambdaExpressionNoParens() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             def lambda = a -> a
-            """)
+            """
+          )
         );
     }
 
     @Test
     void lambdaExpressionNoArguments() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             ( ) -> arg
-            """)
+            """
+          )
         );
     }
     @Test
     void lambdaExpressionWithArgument() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             ( String arg ) -> arg
-            """)
+            """
+          )
         );
     }
 
     @Test
     void closureReturningLambda() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             def foo(Closure cl) {}
             foo { String a ->
                 ( _ ) -> a
             }
-            """)
+            """
+          )
         );
     }
 
     @Test
     void closureParameterWithType() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             class A {}
             def foo(Closure cl) {}
             foo { A a ->
                 a
                 a
             }
-            """)
+            """
+          )
         );
     }
 

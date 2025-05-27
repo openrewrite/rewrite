@@ -31,17 +31,42 @@ import static org.openrewrite.java.Assertions.java;
 class JavaTypeTest implements RewriteTest {
 
     @Test
+    void methodOverridesOfGenericParameters() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(java.util.List<Integer> l) {
+                      l.add(0);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                    MethodMatcher matcher = new MethodMatcher("java.util.List add(..)");
+                    JavaType.Method methodType = method.getMethodType();
+                    assertThat(matcher.matches(methodType)).isTrue();
+                    assertThat(methodType.getOverride()).isNotNull();
+                    return method;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
     void resolvedSignatureOfGenericMethodDeclarations() {
         rewriteRun(
           java(
             """
               import java.util.ListIterator;
               import static java.util.Collections.singletonList;
-                              
+
               interface MyList<E> {
                   ListIterator<E> listIterator();
               }
-                              
+
               class Test {
                   ListIterator<Integer> s = singletonList(1).listIterator();
               }
@@ -56,7 +81,7 @@ class JavaTypeTest implements RewriteTest {
                 @Override
                 public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
                     JavaType returnType = ((J.MethodInvocation) variable.getInitializer()).getMethodType().getReturnType();
-                    assertThat(TypeUtils.asFullyQualified(TypeUtils.asParameterized(returnType).getTypeParameters().get(0))
+                    assertThat(TypeUtils.asFullyQualified(TypeUtils.asParameterized(returnType).getTypeParameters().getFirst())
                       .getFullyQualifiedName()).isEqualTo("java.lang.Integer");
                     return variable;
                 }
@@ -81,7 +106,7 @@ class JavaTypeTest implements RewriteTest {
                 public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
                     List<JavaType.FullyQualified> annotations = multiVariable.getTypeAsFullyQualified().getAnnotations();
                     assertThat(annotations).hasSize(1);
-                    assertThat(annotations.get(0).getFullyQualifiedName()).isEqualTo("java.lang.FunctionalInterface");
+                    assertThat(annotations.getFirst().getFullyQualifiedName()).isEqualTo("java.lang.FunctionalInterface");
                     return multiVariable;
                 }
             })
@@ -134,7 +159,7 @@ class JavaTypeTest implements RewriteTest {
                   void method() {
                       Test a = test(null);
                   }
-                  
+
                   Test test(Test test) {
                       return test;
                   }
@@ -151,6 +176,30 @@ class JavaTypeTest implements RewriteTest {
                     return m;
                 }
             })
+          )
+        );
+    }
+
+    @Issue("https://github.com/apache/maven/pull/2291")
+    @Test
+    void overrideFromClass() {
+        rewriteRun(
+          java(
+            """
+              import java.io.FileNotFoundException;
+              class A {
+                  @Override
+                  public String toString() {
+                      return "A";
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(
+              ((J.MethodDeclaration)
+                cu.getClasses().getFirst()
+                  .getBody().getStatements().getFirst())
+                .getMethodType().isOverride())
+              .isTrue())
           )
         );
     }

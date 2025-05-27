@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.format;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -54,6 +53,35 @@ class NoWhitespaceAfterTest implements RewriteTest {
         spec.recipe(new NoWhitespaceAfter());
     }
 
+    @DocumentExample
+    @Test
+    void variableDeclaration() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+          java(
+            """
+              class Test {
+                  static void method() {
+                      int [] [] a;
+                      int [] b;
+                      int c, d = 0;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  static void method() {
+                      int[][] a;
+                      int[] b;
+                      int c, d = 0;
+                  }
+              }
+              """,
+            autoFormatIsIdempotent()
+          )
+        );
+    }
+
     private static List<NamedStyles> noWhitespaceAfterStyle() {
         return noWhitespaceAfterStyle(style -> style);
     }
@@ -76,35 +104,6 @@ class NoWhitespaceAfterTest implements RewriteTest {
               class Test {
                   static void method(int[] n) {
                       int m = n[0];
-                  }
-              }
-              """,
-            autoFormatIsIdempotent()
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void variableDeclaration() {
-        rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
-              class Test {
-                  static void method() {
-                      int [] [] a;
-                      int [] b;
-                      int c, d = 0;
-                  }
-              }
-              """,
-            """
-              class Test {
-                  static void method() {
-                      int[][] a;
-                      int[] b;
-                      int c, d = 0;
                   }
               }
               """,

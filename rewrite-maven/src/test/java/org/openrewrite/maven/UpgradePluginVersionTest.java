@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -140,6 +141,149 @@ class UpgradePluginVersionTest implements RewriteTest {
         );
     }
 
+    @Nested
+    class PluginRepos {
+
+        @Test
+        @Issue("https://github.com/openrewrite/rewrite/issues/5065")
+        void update() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradePluginVersion(
+                "io.quarkus",
+                "quarkus-maven-plugin",
+                "3.15.3.redhat-00002",
+                null,
+                null,
+                null
+              )),
+              pomXml(
+                """
+                  <project>
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>io.quarkus</groupId>
+                          <artifactId>quarkus-maven-plugin</artifactId>
+                          <version>3.14.0</version>
+                         </plugin>
+                      </plugins>
+                    </build>
+                    <pluginRepositories>
+                      <pluginRepository>
+                        <id>redhat-ga</id>
+                        <url>https://maven.repository.redhat.com/ga/</url>
+                      </pluginRepository>
+                    </pluginRepositories>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>io.quarkus</groupId>
+                          <artifactId>quarkus-maven-plugin</artifactId>
+                          <version>3.15.3.redhat-00002</version>
+                         </plugin>
+                      </plugins>
+                    </build>
+                    <pluginRepositories>
+                      <pluginRepository>
+                        <id>redhat-ga</id>
+                        <url>https://maven.repository.redhat.com/ga/</url>
+                      </pluginRepository>
+                    </pluginRepositories>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        @Issue("https://github.com/openrewrite/rewrite/issues/5065")
+        void repoUnreachable() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradePluginVersion(
+                "io.quarkus",
+                "quarkus-maven-plugin",
+                "3.15.3.redhat-00002",
+                null,
+                null,
+                null
+              )),
+              pomXml(
+                """
+                  <project>
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>io.quarkus</groupId>
+                          <artifactId>quarkus-maven-plugin</artifactId>
+                          <version>3.14.0</version>
+                         </plugin>
+                      </plugins>
+                    </build>
+                    <pluginRepositories>
+                      <pluginRepository>
+                        <id>unreachable</id>
+                        <url>https://nexus.client.com/repository/maven-public</url>
+                      </pluginRepository>
+                    </pluginRepositories>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        @Issue("https://github.com/openrewrite/rewrite/issues/5065")
+        void noNewerVersion() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradePluginVersion(
+                "io.quarkus",
+                "quarkus-maven-plugin",
+                "3.15.3.redhat-00002",
+                null,
+                null,
+                null
+              )),
+              pomXml(
+                """
+                  <project>
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>io.quarkus</groupId>
+                          <artifactId>quarkus-maven-plugin</artifactId>
+                          <version>3.14.0</version>
+                         </plugin>
+                      </plugins>
+                    </build>
+                    <pluginRepositories>
+                      <pluginRepository>
+                        <id>maven-mirror1</id>
+                        <url>https://repo1.maven.org/maven2/</url>
+                      </pluginRepository>
+                    </pluginRepositories>
+                  </project>
+                  """
+              )
+            );
+        }
+    }
+
     @Test
     @Issue("Should be changed/removed when this recipe supports dynamic version resolution")
     void ignorePluginWithoutExplicitVersionDeclared() {
@@ -244,12 +388,12 @@ class UpgradePluginVersionTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-
+              
                 <packaging>pom</packaging>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app-bom</artifactId>
                 <version>1</version>
-
+              
                 <build>
                   <pluginManagement>
                     <plugins>
@@ -257,6 +401,28 @@ class UpgradePluginVersionTest implements RewriteTest {
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>rewrite-maven-plugin</artifactId>
                         <version>4.2.2</version>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <packaging>pom</packaging>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-bom</artifactId>
+                <version>1</version>
+              
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>rewrite-maven-plugin</artifactId>
+                        <version>4.2.3</version>
                       </plugin>
                     </plugins>
                   </pluginManagement>

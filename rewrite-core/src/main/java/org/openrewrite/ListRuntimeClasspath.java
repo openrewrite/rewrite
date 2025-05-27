@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class ListRuntimeClasspath extends ScanningRecipe<Void> {
+public class ListRuntimeClasspath extends ScanningRecipe<Integer> {
     transient ClasspathReport report = new ClasspathReport(this);
 
     @Override
@@ -42,17 +42,17 @@ public class ListRuntimeClasspath extends ScanningRecipe<Void> {
     }
 
     @Override
-    public Void getInitialValue(ExecutionContext ctx) {
-        return null;
+    public Integer getInitialValue(ExecutionContext ctx) {
+        return 0;
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Void acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(Integer acc) {
         return TreeVisitor.noop();
     }
 
     @Override
-    public Collection<? extends SourceFile> generate(Void acc, ExecutionContext ctx) {
+    public Collection<? extends SourceFile> generate(Integer acc, ExecutionContext ctx) {
         try (ScanResult result = new ClassGraph().scan()) {
             ResourceList resources = result.getResourcesWithExtension(".jar");
             Map<String, List<Resource>> classpathEntriesWithJarResources = resources.stream()

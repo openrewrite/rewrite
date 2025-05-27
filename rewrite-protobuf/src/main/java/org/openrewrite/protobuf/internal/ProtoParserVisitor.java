@@ -19,8 +19,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Parser;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2ParserBaseVisitor;
@@ -39,6 +39,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     @Nullable
     private final FileAttributes fileAttributes;
+
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
@@ -282,8 +283,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         return name;
     }
 
-    @Nullable
-    private ProtoContainer<Proto.Option> mapOptionList(@Nullable Protobuf2Parser.OptionListContext ctx) {
+    private @Nullable ProtoContainer<Proto.Option> mapOptionList(Protobuf2Parser.@Nullable OptionListContext ctx) {
         if (ctx == null) {
             return null;
         }
@@ -437,8 +437,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         return Space.format(prefix);
     }
 
-    @Nullable
-    private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, Space, T> conversion) {
+    private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, Space, T> conversion) {
         //noinspection ConstantConditions
         if (ctx == null) {
             return null;
@@ -456,10 +455,6 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         T t = conversion.apply(node, prefix(node));
         cursor = node.getSymbol().getStopIndex() + 1;
         return t;
-    }
-
-    private void skip(TerminalNode node) {
-        cursor = node.getSymbol().getStopIndex() + 1;
     }
 
     /**
@@ -492,7 +487,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     switch (source.substring(delimIndex, delimIndex + 2)) {
                         case "//":
-                            inSingleLineComment = true;
+                            inSingleLineComment = !inMultiLineComment;
                             delimIndex++;
                             break;
                         case "/*":

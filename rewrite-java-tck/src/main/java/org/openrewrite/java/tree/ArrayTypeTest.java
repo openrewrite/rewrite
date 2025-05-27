@@ -15,9 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -37,45 +39,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class ArrayTypeTest implements RewriteTest {
 
-    @ParameterizedTest
-    @ValueSource(strings = {
-      "String [] [ ] s;",
-      """
-      String [] [ ] method() {
-          return null;
-      }
-      """
-    })
-    void arrayType(String input) {
-        rewriteRun(
-          java(
-            String.format("""
-              class Test {
-                %s
-              }
-              """, input), spec -> spec.afterRecipe(cu -> {
-                AtomicBoolean firstDimension = new AtomicBoolean(false);
-                AtomicBoolean secondDimension = new AtomicBoolean(false);
-                new JavaIsoVisitor<>() {
-                    @Override
-                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
-                        if (arrayType.getElementType() instanceof J.ArrayType) {
-                            assertThat(arrayType.toString()).isEqualTo("String [] [ ]");
-                            secondDimension.set(true);
-                        } else {
-                            assertThat(arrayType.toString()).isEqualTo("String []");
-                            firstDimension.set(true);
-                        }
-                        return super.visitArrayType(arrayType, o);
-                    }
-                }.visit(cu, 0);
-                assertThat(firstDimension.get()).isTrue();
-                assertThat(secondDimension.get()).isTrue();
-            })
-          )
-        );
-    }
-
+    @DocumentExample
     @Test
     void javaTypesFromJsonCreatorConstructor() {
         rewriteRun(
@@ -137,6 +101,45 @@ class ArrayTypeTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "String [] [ ] s;",
+      """
+        String [] [ ] method() {
+            return null;
+        }
+        """
+    })
+    void arrayType(String input) {
+        rewriteRun(
+          java(
+            String.format("""
+              class Test {
+                %s
+              }
+              """, input), spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean firstDimension = new AtomicBoolean(false);
+                AtomicBoolean secondDimension = new AtomicBoolean(false);
+                new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                        if (arrayType.getElementType() instanceof J.ArrayType) {
+                            assertThat(arrayType.toString()).isEqualTo("String [] [ ]");
+                            secondDimension.set(true);
+                        } else {
+                            assertThat(arrayType.toString()).isEqualTo("String [ ]");
+                            firstDimension.set(true);
+                        }
+                        return super.visitArrayType(arrayType, o);
+                    }
+                }.visit(cu, 0);
+                assertThat(firstDimension.get()).isTrue();
+                assertThat(secondDimension.get()).isTrue();
+            })
+          )
+        );
+    }
+
     @Test
     void arrayTypeWithoutDimensions() {
         J.Identifier elementType = new J.Identifier(
@@ -160,5 +163,34 @@ class ArrayTypeTest implements RewriteTest {
           null
         );
         assertThat(migratedArrayType.toString()).isEqualTo("String");
+    }
+
+    @Disabled("Fails print idempotency test")
+    @Test
+    void annotatedVarargsParameter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void m1(String @Deprecated... s) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled("Fails print idempotency test")
+    @Test
+    @SuppressWarnings("CStyleArrayDeclaration")
+    void annotatedCStyleArrayParameter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void m2(String  s @Deprecated[]) {}
+              }
+              """
+          )
+        );
     }
 }

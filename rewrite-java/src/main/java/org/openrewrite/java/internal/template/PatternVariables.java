@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.internal.template;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Loop;
@@ -34,8 +34,7 @@ final class PatternVariables {
         boolean instanceOfFound;
     }
 
-    @Nullable
-    static String simplifiedPatternVariableCondition(Expression condition, @Nullable J toReplace) {
+    static @Nullable String simplifiedPatternVariableCondition(Expression condition, @Nullable J toReplace) {
         ResultCollector resultCollector = new ResultCollector();
         simplifiedPatternVariableCondition0(condition, toReplace, resultCollector);
         return resultCollector.instanceOfFound ? resultCollector.builder.toString() : null;
@@ -189,31 +188,34 @@ final class PatternVariables {
         return false;
     }
 
-    static boolean neverCompletesNormally(Statement statement) {
-        return neverCompletesNormally0(statement, new HashSet<>());
+    static boolean alwaysCompletesAbnormally(Statement statement) {
+        return alwaysCompletesAbnormally0(statement, new HashSet<>());
     }
 
-    private static boolean neverCompletesNormally0(@Nullable Statement statement, Set<String> labelsToIgnore) {
+    private static boolean alwaysCompletesAbnormally0(@Nullable Statement statement, Set<String> labelsToIgnore) {
         if (statement instanceof J.Return || statement instanceof J.Throw) {
             return true;
         } else if (statement instanceof J.Break) {
             J.Break breakStatement = (J.Break) statement;
-            return breakStatement.getLabel() != null && !labelsToIgnore.contains(breakStatement.getLabel().getSimpleName())
-                    || breakStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
+            return breakStatement.getLabel() != null && !labelsToIgnore.contains(breakStatement.getLabel().getSimpleName()) ||
+                   breakStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
         } else if (statement instanceof J.Continue) {
             J.Continue continueStatement = (J.Continue) statement;
-            return continueStatement.getLabel() != null && !labelsToIgnore.contains(continueStatement.getLabel().getSimpleName())
-                    || continueStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
+            return continueStatement.getLabel() != null && !labelsToIgnore.contains(continueStatement.getLabel().getSimpleName()) ||
+                   continueStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
         } else if (statement instanceof J.Block) {
-            return neverCompletesNormally0(getLastStatement(statement), labelsToIgnore);
+            return alwaysCompletesAbnormally0(getLastStatement(statement), labelsToIgnore);
+        } else if (statement instanceof J.MethodInvocation) {
+            J.MethodInvocation method = (J.MethodInvocation) statement;
+            return isSystemExit(method);
         } else if (statement instanceof Loop) {
             Loop loop = (Loop) statement;
-            return neverCompletesNormallyIgnoringLabel(loop.getBody(), DEFAULT_LABEL, labelsToIgnore);
+            return alwaysCompletesAbnormallyIgnoringLabel(loop.getBody(), DEFAULT_LABEL, labelsToIgnore) || isEndlessLoop(loop, labelsToIgnore);
         } else if (statement instanceof J.If) {
             J.If if_ = (J.If) statement;
-            return if_.getElsePart() != null
-                    && neverCompletesNormally0(if_.getThenPart(), labelsToIgnore)
-                    && neverCompletesNormally0(if_.getElsePart().getBody(), labelsToIgnore);
+            return if_.getElsePart() != null &&
+                   alwaysCompletesAbnormally0(if_.getThenPart(), labelsToIgnore) &&
+                   alwaysCompletesAbnormally0(if_.getElsePart().getBody(), labelsToIgnore);
         } else if (statement instanceof J.Switch) {
             J.Switch switch_ = (J.Switch) statement;
             if (switch_.getCases().getStatements().isEmpty()) {
@@ -221,7 +223,7 @@ final class PatternVariables {
             }
             Statement defaultCase = null;
             for (Statement case_ : switch_.getCases().getStatements()) {
-                if (!neverCompletesNormallyIgnoringLabel(case_, DEFAULT_LABEL, labelsToIgnore)) {
+                if (!alwaysCompletesAbnormallyIgnoringLabel(case_, DEFAULT_LABEL, labelsToIgnore)) {
                     return false;
                 }
                 if (case_ instanceof J.Case) {
@@ -231,45 +233,131 @@ final class PatternVariables {
                     }
                 }
             }
-            return neverCompletesNormallyIgnoringLabel(defaultCase, DEFAULT_LABEL, labelsToIgnore);
+            return alwaysCompletesAbnormallyIgnoringLabel(defaultCase, DEFAULT_LABEL, labelsToIgnore);
         } else if (statement instanceof J.Case) {
             J.Case case_ = (J.Case) statement;
             if (case_.getStatements().isEmpty()) {
                 // fallthrough to next case
                 return true;
             }
-            return neverCompletesNormally0(getLastStatement(case_), labelsToIgnore);
+            return alwaysCompletesAbnormally0(getLastStatement(case_), labelsToIgnore);
         } else if (statement instanceof J.Try) {
             J.Try try_ = (J.Try) statement;
-            if (try_.getFinally() != null && !try_.getFinally().getStatements().isEmpty()
-                    && neverCompletesNormally0(try_.getFinally(), labelsToIgnore)) {
+            if (try_.getFinally() != null && !try_.getFinally().getStatements().isEmpty() &&
+                alwaysCompletesAbnormally0(try_.getFinally(), labelsToIgnore)) {
                 return true;
             }
             boolean bodyHasExit = false;
-            if (!try_.getBody().getStatements().isEmpty()
-                    && !(bodyHasExit = neverCompletesNormally0(try_.getBody(), labelsToIgnore))) {
+            if (!try_.getBody().getStatements().isEmpty() &&
+                !(bodyHasExit = alwaysCompletesAbnormally0(try_.getBody(), labelsToIgnore))) {
                 return false;
             }
             for (J.Try.Catch catch_ : try_.getCatches()) {
-                if (!neverCompletesNormally0(catch_.getBody(), labelsToIgnore)) {
+                if (!alwaysCompletesAbnormally0(catch_.getBody(), labelsToIgnore)) {
                     return false;
                 }
             }
             return bodyHasExit;
         } else if (statement instanceof J.Synchronized) {
-            return neverCompletesNormally0(((J.Synchronized) statement).getBody(), labelsToIgnore);
+            return alwaysCompletesAbnormally0(((J.Synchronized) statement).getBody(), labelsToIgnore);
         } else if (statement instanceof J.Label) {
             String label = ((J.Label) statement).getLabel().getSimpleName();
             Statement labeledStatement = ((J.Label) statement).getStatement();
-            return neverCompletesNormallyIgnoringLabel(labeledStatement, label, labelsToIgnore);
+            return alwaysCompletesAbnormallyIgnoringLabel(labeledStatement, label, labelsToIgnore);
         }
         return false;
     }
 
-    private static boolean neverCompletesNormallyIgnoringLabel(@Nullable Statement statement, String label, Set<String> labelsToIgnore) {
+    private static boolean isEndlessLoop(Loop loop, Set<String> labelsToIgnore) {
+        if (loop instanceof J.ForLoop) {
+            J.ForLoop forLoop = (J.ForLoop) loop;
+            return alwaysTrue(forLoop.getControl().getCondition()) && !containsBreak(forLoop.getBody(), labelsToIgnore);
+        } else if (loop instanceof J.WhileLoop) {
+            J.WhileLoop whileLoop = (J.WhileLoop) loop;
+            return alwaysTrue(whileLoop.getCondition().getTree()) && !containsBreak(whileLoop.getBody(), labelsToIgnore);
+        } else if (loop instanceof J.DoWhileLoop) {
+            J.DoWhileLoop doWhileLoop = (J.DoWhileLoop) loop;
+            return alwaysTrue(doWhileLoop.getWhileCondition().getTree()) && !containsBreak(doWhileLoop.getBody(), labelsToIgnore);
+        }
+        return false;
+    }
+
+    private static boolean containsBreak(@Nullable Statement statement, Set<String> labelsToIgnore) {
+        if (statement instanceof J.Break) {
+            J.Break breakStatement = (J.Break) statement;
+            return breakStatement.getLabel() != null && !labelsToIgnore.contains(breakStatement.getLabel().getSimpleName()) ||
+                   breakStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
+        } else if (statement instanceof J.Block) {
+            J.Block block = (J.Block) statement;
+            for (Statement blockStatement : block.getStatements()) {
+                if (containsBreak(blockStatement, labelsToIgnore)) {
+                    return true;
+                }
+            }
+        } else if (statement instanceof Loop) {
+            Loop loop = (Loop) statement;
+            return containsBreak(loop.getBody(), labelsToIgnore) || isEndlessLoop(loop, labelsToIgnore);
+        } else if (statement instanceof J.If) {
+            J.If if_ = (J.If) statement;
+            return containsBreak(if_.getThenPart(), labelsToIgnore) &&
+                   (if_.getElsePart() == null || containsBreak(if_.getElsePart().getBody(), labelsToIgnore));
+        } else if (statement instanceof J.Switch) {
+            J.Switch switch_ = (J.Switch) statement;
+            for (Statement case_ : switch_.getCases().getStatements()) {
+                if (containsBreak(case_, labelsToIgnore)) {
+                    return true;
+                }
+            }
+        } else if (statement instanceof J.Case) {
+            J.Case case_ = (J.Case) statement;
+            if (case_.getStatements().isEmpty()) {
+                // fallthrough to next case
+                return false;
+            }
+            return containsBreak(getLastStatement(case_), labelsToIgnore);
+        } else if (statement instanceof J.Try) {
+            J.Try try_ = (J.Try) statement;
+            if (try_.getFinally() != null && !try_.getFinally().getStatements().isEmpty() &&
+                containsBreak(try_.getFinally(), labelsToIgnore)) {
+                return true;
+            }
+            if (!try_.getBody().getStatements().isEmpty() &&
+                containsBreak(try_.getBody(), labelsToIgnore)) {
+                return true;
+            }
+            for (J.Try.Catch catch_ : try_.getCatches()) {
+                if (!containsBreak(catch_.getBody(), labelsToIgnore)) {
+                    return false;
+                }
+            }
+        } else if (statement instanceof J.Synchronized) {
+            return containsBreak(((J.Synchronized) statement).getBody(), labelsToIgnore);
+        } else if (statement instanceof J.Label) {
+            String label = ((J.Label) statement).getLabel().getSimpleName();
+            labelsToIgnore.add(label);
+            try {
+                return containsBreak(((J.Label) statement).getStatement(), labelsToIgnore);
+            } finally {
+                labelsToIgnore.remove(label);
+            }
+        }
+        return false;
+    }
+
+    private static boolean alwaysTrue(Expression condition) {
+        return condition instanceof J.Empty || condition instanceof J.Literal && Boolean.TRUE.equals(((J.Literal) condition).getValue());
+    }
+
+    private static boolean isSystemExit(J.MethodInvocation method) {
+        return method.getMethodType() != null &&
+               method.getMethodType().getName().equals("exit") &&
+               method.getMethodType().getDeclaringType().getFullyQualifiedName().equals("java.lang.System");
+    }
+
+    private static boolean alwaysCompletesAbnormallyIgnoringLabel(@Nullable Statement statement, String label, Set<String> labelsToIgnore) {
         boolean added = labelsToIgnore.add(label);
         try {
-            return neverCompletesNormally0(statement, labelsToIgnore);
+            return alwaysCompletesAbnormally0(statement, labelsToIgnore);
         } finally {
             if (added) {
                 labelsToIgnore.remove(label);
@@ -277,8 +365,7 @@ final class PatternVariables {
         }
     }
 
-    @Nullable
-    private static Statement getLastStatement(Statement statement) {
+    private static @Nullable Statement getLastStatement(Statement statement) {
         if (statement instanceof J.Block) {
             List<Statement> statements = ((J.Block) statement).getStatements();
             return statements.isEmpty() ? null : getLastStatement(statements.get(statements.size() - 1));

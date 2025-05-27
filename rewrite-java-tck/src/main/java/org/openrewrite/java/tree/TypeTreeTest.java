@@ -68,4 +68,14 @@ class TypeTreeTest {
         assertEquals("foo.bar.some escaped name", name.toString());
         assertEquals("some escaped name", name.getSimpleName());
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/564")
+    @Test
+    void buildQuotedNameContainingDelimiter() {
+        J.FieldAccess name = TypeTree.build("foo.bar.`$`", '`');
+
+        assertTrue(name.getName().getMarkers().findFirst(Quoted.class).isPresent());
+        assertEquals("foo.bar.$", name.toString());
+        assertEquals("$", name.getSimpleName());
+    }
 }

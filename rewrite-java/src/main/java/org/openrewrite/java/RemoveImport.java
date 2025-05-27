@@ -17,9 +17,9 @@ package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -75,8 +75,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-                if (fq != null && (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), type)
-                        || TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), owner))) {
+                if (fq != null && (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), type) ||
+                        TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), owner))) {
                     methodsAndFieldsUsed.add(variable.getName());
                 }
             }
@@ -101,8 +101,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
                     if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), type)) {
                         typeUsed = true;
-                    } else if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), owner)
-                            || TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getPackageName(), owner)) {
+                    } else if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), owner) ||
+                            TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getPackageName(), owner)) {
                         if (!originalImports.contains(fullyQualified.getFullyQualifiedName().replace("$", "."))) {
                             otherTypesInPackageUsed.add(fullyQualified.getClassName());
                         }
@@ -116,7 +116,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             AtomicReference<Space> spaceForNextImport = new AtomicReference<>();
             c = c.withImports(ListUtils.flatMap(c.getImports(), import_ -> {
                 if (spaceForNextImport.get() != null) {
-                    import_ = import_.withPrefix(spaceForNextImport.get());
+                    Space removedPrefix = spaceForNextImport.get();
+                    Space currentPrefix = import_.getPrefix();
+                    if (removedPrefix.getLastWhitespace().isEmpty() ||
+                        (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix))) {
+                        import_ = import_.withPrefix(currentPrefix.withWhitespace(removedPrefix.getLastWhitespace()));
+                    }
                     spaceForNextImport.set(null);
                 }
 
@@ -127,8 +132,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
-                    } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)
-                            || TypeUtils.fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), type))) {
+                    } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) ||
+                            TypeUtils.fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), type))) {
                         if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                             spaceForNextImport.set(import_.getPrefix());
                             return null;
@@ -143,9 +148,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         return null;
                     }
                 } else if (!keepImport && TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)) {
-                    if (import_.getPrefix().isEmpty() || import_.getPrefix().getLastWhitespace().chars().filter(s -> s == '\n').count() > 1) {
-                        spaceForNextImport.set(import_.getPrefix());
-                    }
+                    spaceForNextImport.set(import_.getPrefix());
                     return null;
                 } else if (!keepImport && import_.getPackageName().equals(owner) &&
                         "*".equals(import_.getClassName()) &&
@@ -170,6 +173,10 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         }
 
         return j;
+    }
+
+    private long countTrailingLinebreaks(Space space) {
+        return space.getLastWhitespace().chars().filter(s -> s == '\n').count();
     }
 
     private Object unfoldStarImport(J.Import starImport, Set<String> otherImportsUsed) {

@@ -18,8 +18,8 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
@@ -35,7 +35,7 @@ import static java.util.Objects.requireNonNull;
  * array of parameter names.
  */
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class ReorderMethodArguments extends Recipe {
 
     /**
@@ -43,7 +43,7 @@ public class ReorderMethodArguments extends Recipe {
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method invocations.",
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "com.yourorg.A foo(String, Integer, Integer)")
     String methodPattern;
 
@@ -63,8 +63,7 @@ public class ReorderMethodArguments extends Recipe {
             description = "If the original method signature is not type-attributed, this is an optional list that indicates the original order in which the arguments were arranged.",
             required = false,
             example = "[baz, bar, foo]")
-    @Nullable
-    String[] oldParameterNames;
+    String @Nullable [] oldParameterNames;
 
     @Option(displayName = "Ignore type definition",
             description = "When set to `true` the definition of the old type will be left untouched. " +
@@ -91,6 +90,11 @@ public class ReorderMethodArguments extends Recipe {
     @Override
     public String getDescription() {
         return "Reorder method arguments into the specified order.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
     }
 
     @Override

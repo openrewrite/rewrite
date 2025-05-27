@@ -17,8 +17,9 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -53,9 +54,8 @@ public class ReplaceConstant extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
-            @Nullable
-            J.Literal literal;
+        JavaVisitor<ExecutionContext> replacementVisitor = new JavaVisitor<ExecutionContext>() {
+            J.@Nullable Literal literal;
 
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
@@ -75,7 +75,7 @@ public class ReplaceConstant extends Recipe {
                 return super.visitIdentifier(ident, ctx);
             }
 
-            private boolean isConstant(@Nullable JavaType.Variable varType) {
+            private boolean isConstant(JavaType.@Nullable Variable varType) {
                 return varType != null && TypeUtils.isOfClassType(varType.getOwner(), owningType) &&
                         varType.getName().equals(constantName);
             }
@@ -118,5 +118,9 @@ public class ReplaceConstant extends Recipe {
                 return literal;
             }
         };
+        return Preconditions.check(
+                new UsesType<>(owningType, true),
+                replacementVisitor
+        );
     }
 }
