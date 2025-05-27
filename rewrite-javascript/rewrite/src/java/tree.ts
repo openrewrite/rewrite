@@ -127,9 +127,9 @@ export namespace J {
         WhileLoop: "org.openrewrite.java.tree.J$WhileLoop",
         Wildcard: "org.openrewrite.java.tree.J$Wildcard",
         Yield: "org.openrewrite.java.tree.J$Yield",
-        JContainer: "org.openrewrite.java.tree.JContainer",
-        JLeftPadded: "org.openrewrite.java.tree.JLeftPadded",
-        JRightPadded: "org.openrewrite.java.tree.JRightPadded",
+        Container: "org.openrewrite.java.tree.Container",
+        LeftPadded: "org.openrewrite.java.tree.LeftPadded",
+        RightPadded: "org.openrewrite.java.tree.RightPadded",
         Space: "org.openrewrite.java.tree.Space",
     } as const;
 
@@ -742,21 +742,21 @@ export namespace J {
     }
 
     export interface LeftPadded<T extends J | Space | number | string | boolean> {
-        readonly kind: typeof Kind.JLeftPadded;
+        readonly kind: typeof Kind.LeftPadded;
         readonly before: Space;
         readonly element: T;
         readonly markers: Markers;
     }
 
     export interface RightPadded<T extends J | boolean> {
-        readonly kind: typeof Kind.JRightPadded;
+        readonly kind: typeof Kind.RightPadded;
         readonly element: T;
         readonly after: Space;
         readonly markers: Markers;
     }
 
     export interface Container<T extends J> {
-        readonly kind: typeof Kind.JContainer;
+        readonly kind: typeof Kind.Container;
         readonly before: Space;
         readonly elements: RightPadded<T>[];
         readonly markers: Markers;
@@ -791,7 +791,7 @@ export const emptySpace: J.Space = {
 
 export function emptyContainer<T extends J>(): J.Container<T> {
     return {
-        kind: J.Kind.JContainer,
+        kind: J.Kind.Container,
         before: emptySpace,
         elements: [],
         markers: emptyMarkers,
@@ -820,6 +820,19 @@ const javaKindValues = new Set(Object.values(J.Kind));
 
 export function isJava(tree: any): tree is J {
     return javaKindValues.has(tree["kind"]);
+}
+
+export function isLiteral(tree: any): tree is J.Literal {
+    return tree["kind"] === J.Kind.Literal;
+}
+
+export function rightPadded<T extends J | boolean>(t: T, trailing: J.Space, markers?: Markers): J.RightPadded<T> {
+    return {
+        kind: J.Kind.RightPadded,
+        element: t,
+        after: trailing,
+        markers: markers ?? emptyMarkers
+    };
 }
 
 export namespace TypedTree {
