@@ -23,10 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -90,13 +87,13 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (isPluginTag(oldGroupId, oldArtifactId)) {
                     if (newGroupId != null) {
-                        t = changeChildTagValue2(t, "groupId", newGroupId, ctx);
+                        t = changeChildTagValue(t, "groupId", newGroupId, ctx);
                     }
                     if (newArtifactId != null) {
-                        t = changeChildTagValue2(t, "artifactId", newArtifactId, ctx);
+                        t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
                     }
                     if (newVersion != null) {
-                        t = changeChildTagValue2(t, "version", newVersion, ctx);
+                        t = changeChildTagValue(t, "version", newVersion, ctx);
                     }
                     if (t != tag) {
                         maybeUpdateModel();
@@ -104,14 +101,6 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                 }
                 //noinspection ConstantConditions
                 return t;
-            }
-
-            private Xml.Tag changeChildTagValue2(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
-                Optional<Xml.Tag> childTag = tag.getChild(childTagName);
-                if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
-                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
-                }
-                return tag;
             }
         };
     }

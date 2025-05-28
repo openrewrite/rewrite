@@ -50,13 +50,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     // there are several implicitly defined version properties that we should never attempt to update
     private static final Set<String> IMPLICITLY_DEFINED_VERSION_PROPERTIES = new HashSet<>(Arrays.asList(
-            "${version}",
-            "${project.version}",
-            "${pom.version}",
-            "${project.parent.version}",
-            "${revision}",
-            "${sha1}",
-            "${changelist}"
+            "${version}", "${project.version}", "${pom.version}", "${project.parent.version}"
     ));
 
     private transient Xml.@Nullable Document document;
