@@ -165,6 +165,18 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         private final ExecutionContext ctx;
 
+        private static String[] splitUnescaped(String input, char delimiter) {
+            if (input.isEmpty()) return new String[0];
+            // Use negative lookbehind to split on delimiter not preceded by backslash
+            return input.split("(?<!\\\\)" + Pattern.quote(String.valueOf(delimiter)));
+        }
+
+        private static String unescapeDelimiters(String value) {
+            return value.replace("\\|", "|")
+                    .replace("\\\"", "\"")
+                    .replace("\\\\", "\\");
+        }
+
         public void read(InputStream is, Collection<String> artifactNames) throws IOException {
             if (artifactNames.isEmpty()) {
                 // could be empty due to the filtering in `artifactsNotYetWritten()`
@@ -212,7 +224,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         fields[5].isEmpty() ? null : fields[5],
                                         fields[6].isEmpty() ? null : fields[6],
                                         fields[7].isEmpty() ? null : fields[7].split("\\|"),
-                                        fields.length > 14 && !fields[14].isEmpty() ? fields[14].split("\\|") : null,
+                                        fields.length > 14 && !fields[14].isEmpty() ? splitUnescaped(fields[14], '|') : null,
                                         fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null
                                 ));
                         int lastIndexOf$ = className.lastIndexOf('$');
@@ -231,7 +243,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     fields[11].isEmpty() ? null : fields[11],
                                     fields[12].isEmpty() ? null : fields[12].split("\\|"),
                                     fields[13].isEmpty() ? null : fields[13].split("\\|"),
-                                    fields.length > 14 && !fields[14].isEmpty() ? fields[14].split("\\|") : null,
+                                    fields.length > 14 && !fields[14].isEmpty() ? splitUnescaped(fields[14], '|') : null,
                                     fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null
                             ));
                         }
@@ -277,7 +289,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                     // Apply annotations to the class
                     if (classDef.getAnnotations() != null) {
                         for (String annotation : classDef.getAnnotations()) {
-                            AnnotationApplier.applyAnnotation(annotation, classWriter::visitAnnotation);
+                            AnnotationApplier.applyAnnotation(unescapeDelimiters(annotation), classWriter::visitAnnotation);
                         }
                     }
 
@@ -304,7 +316,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             // Apply annotations to the method
                             if (member.getAnnotations() != null) {
                                 for (String annotation : member.getAnnotations()) {
-                                    AnnotationApplier.applyAnnotation(annotation, mv::visitAnnotation);
+                                    AnnotationApplier.applyAnnotation(unescapeDelimiters(annotation), mv::visitAnnotation);
                                 }
                             }
 
@@ -353,7 +365,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             // Apply annotations to the field
                             if (member.getAnnotations() != null) {
                                 for (String annotation : member.getAnnotations()) {
-                                    AnnotationApplier.applyAnnotation(annotation, fv::visitAnnotation);
+                                    AnnotationApplier.applyAnnotation(unescapeDelimiters(annotation), fv::visitAnnotation);
                                 }
                             }
 
@@ -494,7 +506,7 @@ public class TypeTable implements JavaParserClasspathLoader {
             if (value == null) {
                 return "null";
             } else if (value instanceof String) {
-                return "\"" + value.toString().replace("\"", "\\\"") + "\"";
+                return "\"" + escapeDelimiters(value.toString()) + "\"";
             } else if (value instanceof Type) {
                 return ((Type) value).getDescriptor();
             } else if (value.getClass().isArray()) {
@@ -507,6 +519,13 @@ public class TypeTable implements JavaParserClasspathLoader {
             } else {
                 return value.toString();
             }
+        }
+
+        private static String escapeDelimiters(String value) {
+            if (value == null) return null;
+            return value.replace("\\", "\\\\")  // Escape backslashes first
+                    .replace("|", "\\|")    // Escape pipes
+                    .replace("\"", "\\\""); // Escape quotes
         }
 
         @Value
@@ -685,7 +704,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classSuperclassName,
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
                             -1, "", "", "", "", "",
-                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations),
+                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations.stream().map(Writer::escapeDelimiters).toArray(String[]::new)),
                             ""); // Empty annotation default values for class row
 
                     for (Writer.Member member : members) {
@@ -733,8 +752,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                             signature == null ? "" : signature,
                             parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
-                            annotations.isEmpty() ? "" : String.join("|", annotations),
-                            annotationDefaultValue
+                            annotations.isEmpty() ? "" : String.join("|", annotations.stream().map(Writer::escapeDelimiters).toArray(String[]::new)),
+                            annotationDefaultValue == null ? "" : escapeDelimiters(annotationDefaultValue)
                     );
                 }
             }
