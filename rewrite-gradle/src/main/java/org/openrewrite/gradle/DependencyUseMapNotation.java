@@ -19,13 +19,13 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.internal.Dependency;
+import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
+import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -53,15 +53,13 @@ public class DependencyUseMapNotation extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
-            final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
-
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
-                
-                if (!(gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m))) {
+                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;
                 }
                 m = forBasicString(m);

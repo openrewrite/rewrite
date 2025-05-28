@@ -16,22 +16,26 @@
 package org.openrewrite.java.search;
 
 import lombok.Getter;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
+import org.openrewrite.SourceFileWithReferences;
 import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.trait.Reference;
 
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
-public class UsesType<P> extends JavaIsoVisitor<P> {
+public class UsesType<P> extends TreeVisitor<Tree, P> {
 
     @Nullable
     @Getter
@@ -40,6 +44,8 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     @Nullable
     @Getter
     private final Predicate<JavaType> typePattern;
+
+    private final Reference.Matcher referenceMatcher;
 
     @Nullable
     private final Boolean includeImplicit;
@@ -50,24 +56,38 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
             if (fullyQualifiedType.indexOf('*') == fullyQualifiedType.length() - 1) {
                 int dotdot = fullyQualifiedType.indexOf("..");
                 if (dotdot == -1 && fullyQualifiedType.charAt(fullyQualifiedType.length() - 2) == '.') {
-                    this.typePattern = packagePattern(fullyQualifiedType.substring(0, fullyQualifiedType.length() - 2));
+                    PackagePattern packagePattern = new PackagePattern(fullyQualifiedType.substring(0, fullyQualifiedType.length() - 2));
+                    this.typePattern = packagePattern;
+                    this.referenceMatcher = packagePattern;
                 } else if (dotdot == fullyQualifiedType.length() - 3) {
-                    this.typePattern = packagePrefixPattern(fullyQualifiedType.substring(0, dotdot));
+                    PackagePrefixPattern packagePrefixPattern = new PackagePrefixPattern(fullyQualifiedType.substring(0, dotdot));
+                    this.typePattern = packagePrefixPattern;
+                    this.referenceMatcher = packagePrefixPattern;
                 } else {
-                    this.typePattern = genericPattern(Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType)));
+                    GenericPattern genericPattern = new GenericPattern(Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType)));
+                    this.typePattern = genericPattern;
+                    this.referenceMatcher = genericPattern;
                 }
             } else {
-                this.typePattern = genericPattern(Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType)));
+                GenericPattern genericPattern = new GenericPattern(Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType)));
+                this.typePattern = genericPattern;
+                this.referenceMatcher = genericPattern;
             }
         } else {
             this.fullyQualifiedType = fullyQualifiedType;
             this.typePattern = null;
+            this.referenceMatcher = new ExactMatch(fullyQualifiedType);
         }
         this.includeImplicit = includeImplicit;
     }
 
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
+        return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithReferences;
+    }
+
+    @Override
+    public @Nullable Tree visit(@Nullable Tree tree, P p) {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
             JavaSourceFile c = cu;
@@ -105,8 +125,14 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
                     }
                 }
             }
+        } else if (tree instanceof SourceFileWithReferences) {
+            SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
+            SourceFileWithReferences.References references = sourceFile.getReferences();
+            for (Reference ignored : references.findMatches(referenceMatcher)) {
+                return SearchResult.found(sourceFile);
+            }
         }
-        return (J) tree;
+        return tree;
     }
 
     private JavaSourceFile maybeMark(JavaSourceFile c, @Nullable JavaType type) {
@@ -122,33 +148,96 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
         return c;
     }
 
-    private static Predicate<JavaType> genericPattern(Pattern pattern) {
-        return type -> {
+    @Value
+    private static class PackagePrefixPattern implements Predicate<JavaType>, Reference.Matcher {
+        String prefix;
+        String subPackagePrefix;
+
+        public PackagePrefixPattern(String prefix) {
+            this.prefix = prefix;
+            this.subPackagePrefix = prefix + '.';
+        }
+
+        @Override
+        public boolean test(JavaType type) {
+            if (type instanceof JavaType.FullyQualified) {
+                String packageName = ((JavaType.FullyQualified) type).getPackageName();
+                return packageName.equals(prefix) || packageName.startsWith(subPackagePrefix);
+            }
+            return false;
+        }
+
+        @Override
+        public boolean matchesReference(Reference reference) {
+            return reference.getKind() == Reference.Kind.TYPE && reference.getValue().startsWith(subPackagePrefix);
+        }
+
+        @Override
+        public Reference.Renamer createRenamer(String newName) {
+            return reference -> newName;
+        }
+    }
+
+    @Value
+    private static class PackagePattern implements Predicate<JavaType>, Reference.Matcher {
+        String name;
+
+        @Override
+        public boolean test(JavaType type) {
+            return type instanceof JavaType.FullyQualified &&
+                   // optimization to avoid unnecessary memory allocations
+                   ((JavaType.FullyQualified) type).getFullyQualifiedName().startsWith(name) &&
+                   ((JavaType.FullyQualified) type).getPackageName().equals(name);
+        }
+
+        @Override
+        public boolean matchesReference(Reference reference) {
+            return reference.getKind() == Reference.Kind.TYPE && reference.getValue().startsWith(name + '.');
+        }
+
+        @Override
+        public Reference.Renamer createRenamer(String newName) {
+            return reference -> newName;
+        }
+    }
+
+    @Value
+    private static class GenericPattern implements Predicate<JavaType>, Reference.Matcher {
+        Pattern pattern;
+
+        @Override
+        public boolean test(JavaType type) {
             if (type instanceof JavaType.FullyQualified) {
                 return pattern.matcher(((JavaType.FullyQualified) type).getFullyQualifiedName()).matches();
             } else if (type instanceof JavaType.Primitive) {
                 return pattern.matcher(((JavaType.Primitive) type).getKeyword()).matches();
             }
             return false;
-        };
+        }
+
+        @Override
+        public boolean matchesReference(Reference reference) {
+            return reference.getKind() == Reference.Kind.TYPE && pattern.matcher(reference.getValue()).matches();
+        }
+
+        @Override
+        public Reference.Renamer createRenamer(String newName) {
+            return reference -> newName;
+        }
     }
 
-    private static Predicate<JavaType> packagePattern(String name) {
-        return type -> type instanceof JavaType.FullyQualified &&
-                       // optimization to avoid unnecessary memory allocations
-                       ((JavaType.FullyQualified) type).getFullyQualifiedName().startsWith(name) &&
-                       ((JavaType.FullyQualified) type).getPackageName().equals(name);
-    }
+    @Value
+    private static class ExactMatch implements Reference.Matcher {
+        String qualifiedName;
 
-    private static Predicate<JavaType> packagePrefixPattern(String prefix) {
-        String subPackagePrefix = prefix + ".";
-        return type -> {
-            if (type instanceof JavaType.FullyQualified) {
-                String packageName = ((JavaType.FullyQualified) type).getPackageName();
-                return packageName.equals(prefix) || packageName.startsWith(subPackagePrefix);
-            }
-            return false;
-        };
-    }
+        @Override
+        public boolean matchesReference(Reference reference) {
+            return reference.getKind() == Reference.Kind.TYPE && qualifiedName.equals(reference.getValue());
+        }
 
+        @Override
+        public Reference.Renamer createRenamer(String newName) {
+            return reference -> newName;
+        }
+    }
 }

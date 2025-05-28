@@ -19,19 +19,21 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.gradle.internal.InsertDependencyComparator;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
@@ -40,6 +42,9 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.tree.ParseError;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -50,7 +55,7 @@ import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @RequiredArgsConstructor
-public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
+public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
     private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
     private static final GradleParser GRADLE_PARSER = GradleParser.builder().build();
 
@@ -81,51 +86,90 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
     private final Predicate<Cursor> insertPredicate;
 
     @Override
-    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-        Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
-        if (!maybeGp.isPresent()) {
-            return cu;
-        }
-
-        GradleProject gp = maybeGp.get();
-        GradleDependencyConfiguration gdc = gp.getConfiguration(configuration);
-        if (gdc == null || gdc.findRequestedDependency(groupId, artifactId) != null) {
-            return cu;
-        }
-
-        G.CompilationUnit g = cu;
-        boolean dependenciesBlockMissing = true;
-        for (Statement statement : g.getStatements()) {
-            if (statement instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) statement)) {
-                dependenciesBlockMissing = false;
+    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) super.visit(tree, ctx);
+            Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
+            if (!maybeGp.isPresent()) {
+                return cu;
             }
-        }
 
-        if (dependenciesBlockMissing) {
-            Statement dependenciesInvocation = GRADLE_PARSER.parse("dependencies {}")
-                    .findFirst()
-                    .map(G.CompilationUnit.class::cast)
-                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
-                    .getStatements().get(0);
-            dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(getCursor(), cu));
-            g = g.withStatements(ListUtils.concat(g.getStatements(),
-                    g.getStatements().isEmpty() ?
-                            dependenciesInvocation :
-                            dependenciesInvocation.withPrefix(Space.format("\n\n"))));
-        }
+            GradleProject gp = maybeGp.get();
+            GradleDependencyConfiguration gdc = gp.getConfiguration(configuration);
+            if (gdc == null || gdc.findRequestedDependency(groupId, artifactId) != null) {
+                return cu;
+            }
 
-        g = (G.CompilationUnit) new InsertDependencyInOrder(configuration, gp)
-                .visitNonNull(g, ctx, requireNonNull(getCursor().getParent()));
+            boolean dependenciesBlockMissing = true;
+            if (cu instanceof G.CompilationUnit) {
+                G.CompilationUnit g = (G.CompilationUnit) cu;
+                for (Statement statement : g.getStatements()) {
+                    if (statement instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) statement)) {
+                        dependenciesBlockMissing = false;
+                    }
+                }
+            } else if (cu instanceof K.CompilationUnit) {
+                K.CompilationUnit k = (K.CompilationUnit) cu;
+                for (Statement statement : ((J.Block) k.getStatements().get(0)).getStatements()) {
+                    if (statement instanceof J.MethodInvocation && ((J.MethodInvocation) statement).getSimpleName().equals("dependencies")) {
+                        dependenciesBlockMissing = false;
+                    }
+                }
+            }
 
-        if (g != cu) {
-            String versionWithPattern = StringUtils.isBlank(resolvedVersion) || resolvedVersion.startsWith("$") ? null : resolvedVersion;
-            g = addDependency(g,
-                    gdc,
-                    new GroupArtifactVersion(groupId, artifactId, versionWithPattern),
-                    classifier,
-                    ctx);
+            if (dependenciesBlockMissing) {
+                if (cu instanceof G.CompilationUnit) {
+                    G.CompilationUnit g = (G.CompilationUnit) cu;
+                    Statement dependenciesInvocation = GRADLE_PARSER.parse(ctx, "dependencies {}")
+                            .findFirst()
+                            .map(G.CompilationUnit.class::cast)
+                            .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
+                            .getStatements().get(0);
+                    Cursor parent = getCursor();
+                    setCursor(new Cursor(parent, g));
+                    dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(parent, g));
+                    setCursor(parent);
+                    cu = g.withStatements(ListUtils.concat(g.getStatements(),
+                            g.getStatements().isEmpty() ?
+                                    dependenciesInvocation :
+                                    dependenciesInvocation.withPrefix(Space.format("\n\n"))));
+                } else {
+                    K.CompilationUnit k = (K.CompilationUnit) cu;
+                    J.MethodInvocation dependenciesInvocation = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(Collections.singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream("dependencies {}".getBytes(StandardCharsets.UTF_8)))), null, ctx)
+                            .findFirst()
+                            .map(K.CompilationUnit.class::cast)
+                            .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
+                            .getStatements().get(0)).getStatements().get(0);
+                    Cursor parent = getCursor();
+                    setCursor(new Cursor(parent, k));
+                    dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(getCursor(), k));
+                    setCursor(parent);
+                    dependenciesInvocation = dependenciesInvocation.withArguments(ListUtils.mapFirst(dependenciesInvocation.getArguments(), arg -> {
+                        J.Lambda lambda = (J.Lambda) requireNonNull(arg);
+                        J.Block block = (J.Block) lambda.getBody();
+                        return lambda.withBody(block.withEnd(Space.format("\n")));
+                    }));
+                    cu = k.withStatements(ListUtils.concat(k.getStatements(),
+                            k.getStatements().isEmpty() ?
+                                    dependenciesInvocation :
+                                    dependenciesInvocation.withPrefix(Space.format("\n\n"))));
+                }
+            }
+
+            cu = (JavaSourceFile) new InsertDependencyInOrder(configuration, gp)
+                    .visitNonNull(cu, ctx);
+
+            if (cu != tree) {
+                String versionWithPattern = StringUtils.isBlank(resolvedVersion) || resolvedVersion.startsWith("$") ? null : resolvedVersion;
+                cu = addDependency(cu,
+                        gdc,
+                        new GroupArtifactVersion(groupId, artifactId, versionWithPattern),
+                        classifier,
+                        ctx);
+            }
+            return cu;
         }
-        return g;
+        return super.visit(tree, ctx);
     }
 
     /**
@@ -139,8 +183,8 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
      * @param ctx           context which will be used to download the pom for the dependency
      * @return a copy of buildScript with the dependency added
      */
-    static G.CompilationUnit addDependency(
-            G.CompilationUnit buildScript,
+    static JavaSourceFile addDependency(
+            JavaSourceFile buildScript,
             @Nullable GradleDependencyConfiguration configuration,
             GroupArtifactVersion gav,
             @Nullable String classifier,
@@ -212,7 +256,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
     }
 
     @RequiredArgsConstructor
-    private class InsertDependencyInOrder extends GroovyIsoVisitor<ExecutionContext> {
+    private class InsertDependencyInOrder extends JavaIsoVisitor<ExecutionContext> {
         private final String configuration;
 
         private final GradleProject gp;
@@ -220,7 +264,8 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (!DEPENDENCIES_DSL_MATCHER.matches(m)) {
+            boolean isKotlinDsl = getCursor().firstEnclosing(JavaSourceFile.class) instanceof K.CompilationUnit;
+            if (!DEPENDENCIES_DSL_MATCHER.matches(m) && !(isKotlinDsl && m.getSimpleName().equals("dependencies"))) {
                 return m;
             }
 
@@ -251,27 +296,53 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             String codeTemplate;
             DependencyStyle style = autodetectDependencyStyle(body.getStatements());
             if (style == DependencyStyle.String) {
-                codeTemplate = "dependencies {\n" +
-                               escapeIfNecessary(configuration) + " \"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
-                               "\n}";
+                if (!isKotlinDsl) {
+                    codeTemplate = "dependencies {\n" +
+                                   escapeIfNecessary(configuration) + " \"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
+                                   "\n}";
+                } else {
+                    codeTemplate = "dependencies {\n" +
+                                   configuration + "(\"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\")" +
+                                   "\n}";
+                }
             } else {
-                codeTemplate = "dependencies {\n" +
-                               escapeIfNecessary(configuration) + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version: \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
-                               "\n}";
+                if (!isKotlinDsl) {
+                    codeTemplate = "dependencies {\n" +
+                                   escapeIfNecessary(configuration) + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version: \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
+                                   "\n}";
+                } else {
+                    codeTemplate = "dependencies {\n" +
+                                   configuration + "(group = \"" + groupId + "\", name = \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version = \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier = \"" + classifier + "\"") + (extension == null ? "" : ", ext = \"" + extension + "\"") + ")" +
+                                   "\n}";
+                }
             }
 
-            ExecutionContext parseCtx = new InMemoryExecutionContext();
-            parseCtx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-            SourceFile parsed = GRADLE_PARSER.parse(parseCtx, codeTemplate)
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
+            Boolean requirePrintEqualsInput = ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT);
+            ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+            SourceFile parsed;
+            if (!isKotlinDsl) {
+                parsed = GRADLE_PARSER.parse(ctx, codeTemplate)
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
+            } else {
+                parsed = GRADLE_PARSER.parseInputs(Collections.singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(codeTemplate.getBytes(StandardCharsets.UTF_8)))), null, ctx)
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
+            }
+            ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, requirePrintEqualsInput);
 
             if (parsed instanceof ParseError) {
                 throw ((ParseError) parsed).toException();
             }
 
-            J.MethodInvocation addDependencyInvocation = requireNonNull((J.MethodInvocation) ((J.Return) (((J.Block) ((J.Lambda) ((J.MethodInvocation)
-                    ((G.CompilationUnit) parsed).getStatements().get(0)).getArguments().get(0)).getBody()).getStatements().get(0))).getExpression());
+            J.MethodInvocation addDependencyInvocation;
+            if (!isKotlinDsl) {
+                addDependencyInvocation = requireNonNull((J.MethodInvocation) ((J.Return) (((J.Block) ((J.Lambda) ((J.MethodInvocation)
+                        ((G.CompilationUnit) parsed).getStatements().get(0)).getArguments().get(0)).getBody()).getStatements().get(0))).getExpression());
+            } else {
+                addDependencyInvocation = requireNonNull((J.MethodInvocation) (((J.Block) ((J.Lambda) ((J.MethodInvocation)
+                        ((J.Block) ((K.CompilationUnit) parsed).getStatements().get(0)).getStatements().get(0)).getArguments().get(0)).getBody()).getStatements().get(0)));
+            }
             addDependencyInvocation = autoFormat(addDependencyInvocation, ctx, new Cursor(getCursor(), body));
             InsertDependencyComparator dependencyComparator = new InsertDependencyComparator(body.getStatements(), addDependencyInvocation);
 
@@ -290,22 +361,10 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                             }
                         } else {
                             Space originalPrefix = addDependencyInvocation.getPrefix();
-                            if (currentStatement instanceof J.VariableDeclarations) {
-                                J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) currentStatement;
-                                if (variableDeclarations.getTypeExpression() != null) {
-                                    addDependencyInvocation = addDependencyInvocation.withPrefix(variableDeclarations.getTypeExpression().getPrefix());
-                                }
-                            } else {
-                                addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
-                            }
+                            addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
 
                             if (addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
-                                if (currentStatement instanceof J.VariableDeclarations) {
-                                    J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) currentStatement;
-                                    if (variableDeclarations.getTypeExpression() != null && !variableDeclarations.getTypeExpression().getPrefix().equals(originalPrefix)) {
-                                        statements.set(i, variableDeclarations.withTypeExpression(variableDeclarations.getTypeExpression().withPrefix(originalPrefix)));
-                                    }
-                                } else if (!currentStatement.getPrefix().equals(originalPrefix)) {
+                                if (!currentStatement.getPrefix().equals(originalPrefix)) {
                                     statements.set(i, currentStatement.withPrefix(originalPrefix));
                                 }
                             }
@@ -359,12 +418,16 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     string++;
                 } else if (invocation.getArguments().get(0) instanceof G.MapEntry) {
                     map++;
+                } else if (invocation.getArguments().get(0) instanceof J.Assignment) {
+                    map++;
                 }
             } else if (statement instanceof J.MethodInvocation) {
                 J.MethodInvocation invocation = (J.MethodInvocation) statement;
                 if (invocation.getArguments().get(0) instanceof J.Literal || invocation.getArguments().get(0) instanceof G.GString) {
                     string++;
                 } else if (invocation.getArguments().get(0) instanceof G.MapEntry) {
+                    map++;
+                } else if (invocation.getArguments().get(0) instanceof J.Assignment) {
                     map++;
                 }
             }

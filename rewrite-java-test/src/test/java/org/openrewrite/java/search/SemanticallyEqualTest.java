@@ -29,8 +29,10 @@ import java.util.Map;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@SuppressWarnings({"UnnecessaryCallToStringValueOf", "AccessStaticViaInstance", "RedundantCast", "rawtypes", "UnnecessaryLocalVariable", "ComparatorCombinators", "SameParameterValue"})
 class SemanticallyEqualTest {
 
     private final JavaParser javaParser = JavaParser.fromJavaVersion().build();
@@ -95,6 +97,22 @@ class SemanticallyEqualTest {
           """
             class A {
                 int n = 1;
+            }
+            """
+        );
+    }
+
+    @Test
+    void longLiterals() {
+        assertEqual(
+          """
+            class A {
+                long n = 1;
+            }
+            """,
+          """
+            class A {
+                long n = 1L;
             }
             """
         );
@@ -193,26 +211,16 @@ class SemanticallyEqualTest {
         assertExpressionsEqual(
           """
             class T {
-                Number a = (java.lang.Number) "";
-                Number b = (java.lang.Number) "";
+                Number a = (java.lang.Number) null;
+                Number b = (java.lang.Number) null;
             }
             """
         );
         assertExpressionsEqual(
           """
             class T {
-                Number a = (java.lang.Number) "";
-                Number b = (Number) "";
-            }
-            """
-        );
-        assertExpressionsEqual(
-          """
-            import java.util.List;
-            import java.util.UUID;
-            class T {
-                Number a = (List<UUID>) "";
-                Number b = (List<java.util.UUID>) "";
+                Number a = (java.lang.Number) null;
+                Number b = (Number) null;
             }
             """
         );
@@ -221,8 +229,18 @@ class SemanticallyEqualTest {
             import java.util.List;
             import java.util.UUID;
             class T {
-                Number a = (List<java.util.UUID>) "";
-                Number b = (java.util.List<UUID>) "";
+                List a = (List<UUID>) null;
+                List b = (List<java.util.UUID>) null;
+            }
+            """
+        );
+        assertExpressionsEqual(
+          """
+            import java.util.List;
+            import java.util.UUID;
+            class T {
+                List a = (List<java.util.UUID>) null;
+                List b = (java.util.List<UUID>) null;
             }
             """
         );
@@ -259,6 +277,15 @@ class SemanticallyEqualTest {
                 int b = n;
             }
             """
+        );
+        assertExpressionsNotEqual(
+          """
+           import java.math.BigDecimal;
+           class T {
+               BigDecimal a = BigDecimal.ONE;
+               BigDecimal b = BigDecimal.ZERO;
+           }
+           """
         );
     }
 
@@ -321,6 +348,7 @@ class SemanticallyEqualTest {
         );
     }
 
+    @SuppressWarnings({"DataFlowIssue", "OptionalGetWithoutIsPresent", "Convert2Diamond"})
     @Nested
     class Generics {
         @Test
@@ -386,6 +414,45 @@ class SemanticallyEqualTest {
                 }
                 """
             );
+        }
+
+        @Test
+        void fieldNotEqualToShadowedNameVariable() {
+            J.CompilationUnit cu = javaParser.parse(
+                """
+                  class T {
+                      int a = 1;
+                      void m(int a) {
+                          this.a = a;
+                      }
+                  }
+                  """
+              ).findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .get();
+            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(1);
+            J.Assignment a = (J.Assignment) m.getBody().getStatements().getFirst();
+            assertFalse(SemanticallyEqual.areEqual(a.getVariable(), a.getAssignment()));
+            assertFalse(SemanticallyEqual.areEqual(((J.FieldAccess) a.getVariable()).getName(), a.getAssignment()));
+        }
+
+        @Test
+        void fieldsFromDifferentInstances() {
+            J.CompilationUnit cu = javaParser.parse(
+                """
+                  class T {
+                      int n;
+                      boolean m(T a, T b) {
+                          return a.n == b.n;
+                      }
+                  }
+                  """
+              ).findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .get();
+            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(1);
+            J.Binary b = (J.Binary) ((J.Return) m.getBody().getStatements().getFirst()).getExpression();
+            assertFalse(SemanticallyEqual.areEqual(b.getLeft(), b.getRight()));
         }
     }
 

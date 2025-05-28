@@ -29,7 +29,8 @@ class LabelsTest implements RewriteTest {
           groovy(
                 """
             given: "hello"
-            """)
+            """
+          )
         );
     }
 
@@ -44,7 +45,8 @@ class LabelsTest implements RewriteTest {
             label2:
             label3:
             foo()
-            """)
+            """
+          )
         );
     }
 }

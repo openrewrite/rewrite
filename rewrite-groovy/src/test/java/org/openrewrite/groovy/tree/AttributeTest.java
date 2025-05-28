@@ -20,19 +20,26 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
 class AttributeTest implements RewriteTest {
 
     @Test
-    void usingGroovyNode() {
+    void attribute() {
         rewriteRun(
-          groovy(
-            """
-              def xml = new Node(null, "ivy")
-              def n = xml.dependencies.dependency.find { it.@name == 'test-module' }
-              n.@conf = 'runtime->default;docs->docs;sources->sources'
-              """
-          )
+          groovy("new User('Bob').@name")
+        );
+    }
+
+    @Test
+    void attributeInClosure() {
+        rewriteRun(
+          groovy("[new User('Bob')].collect { it.@name }")
+        );
+    }
+
+    @Test
+    void attributeWithParentheses() {
+        rewriteRun(
+          groovy("(new User('Bob').@name)")
         );
     }
 }

@@ -18,9 +18,13 @@ package org.openrewrite;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.marker.BuildMetadata;
+import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.table.ParseFailures;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Objects;
 
 @Value
@@ -35,9 +39,9 @@ public class FindParseFailures extends Recipe {
     Integer maxSnippetLength;
 
     @Option(displayName = "Parser type",
-            description = "Only display failures from parsers with this fully qualified name.",
+            description = "Only display failures from parsers with this simple name.",
             required = false,
-            example = "org.openrewrite.yaml.YamlParser")
+            example = "YamlParser")
     @Nullable
     String parserType;
 
@@ -46,6 +50,13 @@ public class FindParseFailures extends Recipe {
             required = false)
     @Nullable
     String stackTrace;
+
+    @Option(displayName = "Created after",
+            description = "Only report on source files that were created after this date.",
+            example = "2025-01-01",
+            required = false)
+    @Nullable
+    String createdAfter;
 
     transient ParseFailures failures = new ParseFailures(this);
 
@@ -61,40 +72,88 @@ public class FindParseFailures extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(Validated.test("createdAfter", "Must be empty or a valid date of format yyyy-MM-dd", createdAfter, date -> {
+            if (date != null && !date.isEmpty()) {
+                try {
+                    LocalDate.parse(date);
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+            return true;
+        }));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new TreeVisitor<Tree, ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> precondition = new TreeVisitor<Tree, ExecutionContext>() {
+            final long createdAfterEpoch = createdAfter == null ? -1L : LocalDate.parse(createdAfter).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli();
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                return createdAfterEpoch == -1L || tree != null && tree.getMarkers().findFirst(BuildMetadata.class)
+                        .map(BuildMetadata::getMetadata)
+                        .map(m -> m.get("createdAt"))
+                        .map(Long::parseLong)
+                        .map(t -> t >= createdAfterEpoch)
+                        .orElse(false) ? null : tree;
+            }
+        };
+        return Preconditions.check(precondition, new TreeVisitor<Tree, ExecutionContext>() {
 
             @Override
             public Tree postVisit(Tree tree, ExecutionContext ctx) {
                 return tree.getMarkers().findFirst(ParseExceptionResult.class)
-                        .map(exceptionResult -> {
-                            if (parserType != null && !Objects.equals(exceptionResult.getParserType(), parserType)) {
-                                return tree;
-                            }
-
-                            if (stackTrace != null && !exceptionResult.getMessage().contains(stackTrace)) {
-                                return tree;
-                            }
-
-                            String snippet = tree instanceof SourceFile ? null : tree.printTrimmed(getCursor().getParentTreeCursor());
-                            if (snippet != null && maxSnippetLength != null && snippet.length() > maxSnippetLength) {
-                                snippet = snippet.substring(0, maxSnippetLength);
-                            }
-
-                            failures.insertRow(ctx, new ParseFailures.Row(
-                                    exceptionResult.getParserType(),
-                                    (tree instanceof SourceFile ? (SourceFile) tree : getCursor().firstEnclosingOrThrow(SourceFile.class))
-                                            .getSourcePath().toString(),
-                                    exceptionResult.getExceptionType(),
-                                    exceptionResult.getTreeType(),
-                                    snippet,
-                                    exceptionResult.getMessage()
-                            ));
-
-                            return Markup.info(tree, exceptionResult.getMessage());
-                        })
-                        .orElse(tree);
+                        .map(exceptionResult -> report(tree, exceptionResult, ctx))
+                        .orElse(tree.getMarkers().findFirst(DeserializationError.class)
+                                .map(error -> report(tree, error, ctx))
+                                .orElse(tree)
+                        );
             }
-        };
+
+            private Tree report(Tree tree, DeserializationError error, ExecutionContext ctx) {
+                if (stackTrace != null && !error.getDetail().contains(stackTrace)) {
+                    return tree;
+                }
+
+                failures.insertRow(ctx, new ParseFailures.Row(
+                        "Unknown",
+                        (tree instanceof SourceFile ? (SourceFile) tree : getCursor().firstEnclosingOrThrow(SourceFile.class))
+                                .getSourcePath().toString(),
+                        "DeserializationError",
+                        null,
+                        null,
+                        error.getDetail()
+                ));
+
+                return Markup.info(tree, error.getMessage());
+            }
+
+            private Tree report(Tree tree, ParseExceptionResult exceptionResult, ExecutionContext ctx) {
+                if (parserType != null && !Objects.equals(exceptionResult.getParserType(), parserType)) {
+                    return tree;
+                } else if (stackTrace != null && !exceptionResult.getMessage().contains(stackTrace)) {
+                    return tree;
+                }
+
+                String snippet = tree instanceof SourceFile ? null : tree.printTrimmed(getCursor().getParentTreeCursor());
+                if (snippet != null && maxSnippetLength != null && snippet.length() > maxSnippetLength) {
+                    snippet = snippet.substring(0, maxSnippetLength);
+                }
+
+                failures.insertRow(ctx, new ParseFailures.Row(
+                        exceptionResult.getParserType(),
+                        (tree instanceof SourceFile ? (SourceFile) tree : getCursor().firstEnclosingOrThrow(SourceFile.class))
+                                .getSourcePath().toString(),
+                        exceptionResult.getExceptionType(),
+                        exceptionResult.getTreeType(),
+                        snippet,
+                        exceptionResult.getMessage()
+                ));
+
+                return Markup.info(tree, exceptionResult.getMessage());
+            }
+        });
     }
 }

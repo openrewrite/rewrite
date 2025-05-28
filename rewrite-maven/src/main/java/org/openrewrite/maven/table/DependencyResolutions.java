@@ -26,7 +26,7 @@ import org.openrewrite.Recipe;
 public class DependencyResolutions extends DataTable<DependencyResolutions.Row> {
 
     public DependencyResolutions(Recipe recipe) {
-        super(recipe, Row.class, DependencyResolutions.class.getName(),
+        super(recipe,
                 "Dependency resolutions",
                 "Latencies of individual dependency resolution requests and their outcomes.");
     }

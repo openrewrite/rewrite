@@ -33,8 +33,13 @@ public class PathUtils {
     }
 
     private static final char UNIX_SEPARATOR = '/';
-
     private static final char WINDOWS_SEPARATOR = '\\';
+
+    // Regular expression to match {...}
+    private static final Pattern ALTERNATIVES_PATTERN = Pattern.compile("\\{(.*?)}");
+
+    // Regular expression to match !(...)
+    private static final Pattern NEGATION_PATTERN = Pattern.compile("!\\((.*?)\\)");
 
     /**
      * Compare two paths, returning true if they indicate the same path, regardless of separators.
@@ -92,8 +97,10 @@ public class PathUtils {
                 }
             }
             return false;
-        } else { // If eitherOrPatterns is empty and excludedPatterns is not
-            if (!matchesGlob(convertNegationToWildcard(globPattern), relativePath)) {
+        } else {
+            // When only a segment of a path is negated the other segments must still match
+            String wildcard = convertNegationToWildcard(globPattern);
+            if (!matchesGlob(wildcard, relativePath)) {
                 return false;
             }
             for (String excludedPattern : excludedPatterns) {
@@ -214,9 +221,9 @@ public class PathUtils {
 
     public static String convertNegationToWildcard(String globPattern) {
         // Regular expression to match !(...)
-        String negationPattern = "\\!\\((.*?)\\)";
+        String negationPattern = "!\\((.*?)\\)";
         // Replace all negation patterns with *
-        return globPattern.replaceAll(negationPattern, "*");
+        return globPattern.replaceAll(negationPattern, "**");
     }
 
     public static List<String> getExcludedPatterns(String globPattern) {
@@ -226,10 +233,7 @@ public class PathUtils {
 
         List<String> excludedPatterns = new ArrayList<>(3);
 
-        // Regular expression to match !(...)
-        String negationPattern = "\\!\\((.*?)\\)";
-        Pattern pattern = Pattern.compile(negationPattern);
-        Matcher matcher = pattern.matcher(globPattern);
+        Matcher matcher = NEGATION_PATTERN.matcher(globPattern);
 
         // Find all negation patterns and generate excluded patterns
         while (matcher.find()) {
@@ -250,15 +254,12 @@ public class PathUtils {
 
         List<String> eitherOrPatterns = new ArrayList<>(3);
 
-        // Regular expression to match {...}
-        String eitherOrPattern = "\\{(.*?)\\}";
-        Pattern pattern = Pattern.compile(eitherOrPattern);
-        Matcher matcher = pattern.matcher(globPattern);
+        Matcher matcher = ALTERNATIVES_PATTERN.matcher(globPattern);
 
         // Find all possible patterns and generate patterns
         while (matcher.find()) {
             String eitherOrContent = matcher.group(1);
-            String[] options = eitherOrContent.split("\\,");
+            String[] options = eitherOrContent.split(",");
             for (String option : options) {
                 eitherOrPatterns.add(globPattern.replace(matcher.group(), option));
             }

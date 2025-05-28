@@ -23,9 +23,7 @@ import org.openrewrite.Recipe;
 public class ManagedDependencyGraph extends DataTable<ManagedDependencyGraph.Row> {
 
     public ManagedDependencyGraph(Recipe recipe) {
-        super(recipe, ManagedDependencyGraph.Row.class,
-                DependenciesInUse.class.getName(),
-                "Managed dependency graph",
+        super(recipe, "Managed dependency graph",
                 "Relationships between POMs and their ancestors that define managed dependencies.");
     }
 

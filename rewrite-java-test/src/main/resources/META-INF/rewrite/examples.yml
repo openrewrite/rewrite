@@ -1,0 +1,1306 @@
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.AddLiteralMethodArgument
+examples:
+- description: ''
+  parameters:
+  - B foo(int, int)
+  - '1'
+  - '-1'
+  - int
+  sources:
+  - before: class A {{ B.foo(0, 1); }}
+    after: class A {{ B.foo(0, -1, 1); }}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.AddNullMethodArgument
+examples:
+- description: ''
+  parameters:
+  - B foo(Integer, Integer)
+  - '1'
+  - java.lang.Integer
+  - n2
+  - 'false'
+  sources:
+  - before: class A {{ B.foo(0, 1); }}
+    after: class A {{ B.foo(0, null, 1); }}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangeAnnotationAttributeName
+examples:
+- description: ''
+  parameters:
+  - java.lang.Deprecated
+  - since
+  - asOf
+  sources:
+  - before: |
+      @Deprecated(since = "1.0")
+      class A {}
+    after: |
+      @Deprecated(asOf = "1.0")
+      class A {}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangeMethodAccessLevel
+examples:
+- description: ''
+  parameters:
+  - com.abc.A aMethod(..)
+  - private
+  - 'null'
+  sources:
+  - before: |
+      package com.abc;
+
+      class A {
+          @SuppressWarnings("ALL") // comment
+          public void aMethod(String s) {
+          }
+
+          // comment
+          @SuppressWarnings("ALL")
+          public void aMethod() {
+          }
+
+          // comment
+          public void aMethod(Integer i) {
+          }
+
+          public void aMethod(Double i) {
+          }
+      }
+    after: |
+      package com.abc;
+
+      class A {
+          @SuppressWarnings("ALL") // comment
+          private void aMethod(String s) {
+          }
+
+          // comment
+          @SuppressWarnings("ALL")
+          private void aMethod() {
+          }
+
+          // comment
+          private void aMethod(Integer i) {
+          }
+
+          private void aMethod(Double i) {
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangeMethodName
+examples:
+- description: ''
+  parameters:
+  - com.abc.B singleArg(String)
+  - bar
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      package com.abc;
+      class A {
+         public void test() {
+             new B().singleArg("boo");
+         }
+      }
+    after: |
+      package com.abc;
+      class A {
+         public void test() {
+             new B().bar("boo");
+         }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangePackage
+examples:
+- description: ''
+  parameters:
+  - org.openrewrite
+  - openrewrite
+  - 'false'
+  sources:
+  - before: |
+      import org.openrewrite.Foo;
+      class Test {
+      }
+    after: |
+      import openrewrite.Foo;
+      class Test {
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ChangeType
+examples:
+- description: ''
+  parameters:
+  - java.lang.Integer
+  - java.lang.Long
+  - 'true'
+  sources:
+  - before: public class ThinkPositive { private Integer fred = 1;}
+    after: public class ThinkPositive { private Long fred = 1;}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.CreateEmptyJavaClass
+examples:
+- description: ''
+  parameters:
+  - src/main/java
+  - org.openrewrite.example
+  - public
+  - ExampleClass
+  - 'null'
+  - foo/bar/
+  sources:
+  - after: |
+      package org.openrewrite.example;
+
+      public class ExampleClass {
+      }
+    language: java
+- description: ''
+  parameters:
+  - src/main/java
+  - org.openrewrite.example
+  - protected
+  - ExampleClass
+  - 'true'
+  - 'null'
+  sources:
+  - before: |
+      package org.openrewrite.example;
+
+      public class ExampleClass { Object o = null; }
+    after: |
+      package org.openrewrite.example;
+
+      protected class ExampleClass {
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.DeleteMethodArgument
+examples:
+- description: ''
+  parameters:
+  - B foo(int, int, int)
+  - '1'
+  sources:
+  - before: public class A {{ B.foo(0, 1, 2); }}
+    after: public class A {{ B.foo(0, 2); }}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ExtractInterfaceTest$ExtractTestInterface
+examples:
+- description: ''
+  sources:
+  - after: |
+      package org.openrewrite.interfaces;
+
+      interface ITest {
+
+          int test();
+      }
+    language: java
+  - before: |
+      package org.openrewrite;
+
+      class Test {
+          int f;
+
+          public Test() {
+          }
+
+          public final int test() {
+              return 0;
+          }
+
+          private int privateTest() {
+          }
+
+          public static int staticTest() {
+          }
+      }
+    after: |
+      package org.openrewrite;
+
+      import org.openrewrite.interfaces.ITest;
+
+      class Test implements ITest {
+          int f;
+
+          public Test() {
+          }
+
+          @Override
+          public final int test() {
+              return 0;
+          }
+
+          private int privateTest() {
+          }
+
+          public static int staticTest() {
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.NoStaticImport
+examples:
+- description: ''
+  parameters:
+  - java.util.Collections emptyList()
+  sources:
+  - before: |
+      import static java.util.Collections.emptyList;
+      class Test {
+          void test() {
+              Object o = emptyList();
+          }
+      }
+    after: |
+      import java.util.Collections;
+
+      class Test {
+          void test() {
+              Object o = Collections.emptyList();
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.OrderImports
+examples:
+- description: ''
+  parameters:
+  - 'false'
+  sources:
+  - before: |
+      import java.util.List;
+      import java.util.ArrayList;
+      import java.util.regex.Pattern;
+      import java.util.Objects;
+      import java.util.Set;
+      import java.util.Map;
+    after: |
+      import java.util.*;
+      import java.util.regex.Pattern;
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.RemoveAnnotation
+examples:
+- description: ''
+  parameters:
+  - '@java.lang.Deprecated'
+  sources:
+  - before: |
+      import java.util.List;
+
+      @Deprecated
+      public class Test {
+          @Deprecated
+          void test() {
+              @Deprecated int n;
+          }
+      }
+    after: |
+      import java.util.List;
+
+      public class Test {
+          void test() {
+              int n;
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.RemoveAnnotationAttribute
+examples:
+- description: ''
+  parameters:
+  - java.lang.Deprecated
+  - since
+  sources:
+  - before: |
+      @Deprecated(since = "1.0", forRemoval = true)
+      class A {}
+    after: |
+      @Deprecated(forRemoval = true)
+      class A {}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.RemoveImplements
+examples:
+- description: ''
+  parameters:
+  - java.io.Serializable
+  - 'null'
+  sources:
+  - before: |
+      import java.io.Serializable;
+
+      class A implements Serializable {
+      }
+    after: |
+      class A {
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.RemoveUnusedImports
+examples:
+- description: ''
+  sources:
+  - before: |
+      import java.util.List;
+      class A {}
+    after: class A {}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ReplaceConstant
+examples:
+- description: ''
+  parameters:
+  - com.google.common.base.Charsets
+  - UTF_8
+  - '"UTF_8"'
+  sources:
+  - before: |
+      import com.google.common.base.Charsets;
+      class Test {
+          Object o = Charsets.UTF_8;
+      }
+    after: |
+      class Test {
+          Object o = "UTF_8";
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ReplaceConstantWithAnotherConstant
+examples:
+- description: ''
+  parameters:
+  - java.io.File.pathSeparator
+  - java.io.File.separator
+  sources:
+  - before: |
+      import java.io.File;
+
+      import static java.io.File.pathSeparator;
+
+      class Test {
+          Object o = File.pathSeparator;
+          void foo() {
+              System.out.println(pathSeparator);
+              System.out.println(java.io.File.pathSeparator);
+          }
+      }
+    after: |
+      import java.io.File;
+
+      import static java.io.File.separator;
+
+      class Test {
+          Object o = File.separator;
+          void foo() {
+              System.out.println(separator);
+              System.out.println(File.separator);
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ReplaceStringLiteralWithConstant
+examples:
+- description: ''
+  parameters:
+  - EXAMPLE_STRING_CONSTANT
+  - EXAMPLE_STRING_FQN
+  sources:
+  - before: |
+      package org.openrewrite.java;
+
+      class Test {
+          Object o = "Hello World!";
+      }
+    after: |
+      package org.openrewrite.java;
+
+      class Test {
+          Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.ShortenFullyQualifiedTypeReferences
+examples:
+- description: ''
+  sources:
+  - before: |
+      import java.util.List;
+
+      class T {
+          java.util.List<String> list;
+      }
+    after: |
+      import java.util.List;
+
+      class T {
+          List<String> list;
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.SimplifyMethodChain
+examples:
+- description: ''
+  parameters:
+  - Arrays.asList("A b()", "B c()")
+  - c2
+  - 'false'
+  sources:
+  - before: |
+      class A {
+          static B b() { return new B(); }
+          static C c2() { return new C(); }
+      }
+
+      class B {
+          C c() { return new C(); }
+      }
+
+      class C {
+      }
+    language: java
+  - before: |
+      class Test {
+          C c = A.b().c();
+      }
+    after: |
+      class Test {
+          C c = A.c2();
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.UseStaticImport
+examples:
+- description: ''
+  parameters:
+  - org.junit.jupiter.api.Assertions assert*(..)
+  sources:
+  - before: |
+      package org.openrewrite;
+
+      import org.junit.jupiter.api.Test;
+      import org.junit.jupiter.api.Assertions;
+
+      class SampleTest {
+          @Test
+          void sample() {
+              Assertions.assertEquals(42, 21*2);
+          }
+      }
+    after: |
+      package org.openrewrite;
+
+      import org.junit.jupiter.api.Test;
+
+      import static org.junit.jupiter.api.Assertions.assertEquals;
+
+      class SampleTest {
+          @Test
+          void sample() {
+              assertEquals(42, 21*2);
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.format.MethodParamPad
+examples:
+- description: ''
+  sources:
+  - before: |
+      enum E {
+          E1()
+      }
+
+      class B {
+      }
+
+      class A extends B {
+          A() {
+              super();
+          }
+
+          static void method(int x, int y) {
+              A a = new A();
+              method(0, 1);
+          }
+      }
+    after: |
+      enum E {
+          E1 ()
+      }
+
+      class B {
+      }
+
+      class A extends B {
+          A () {
+              super ();
+          }
+
+          static void method (int x, int y) {
+              A a = new A ();
+              method (0, 1);
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.format.NoWhitespaceAfter
+examples:
+- description: ''
+  sources:
+  - before: |
+      class Test {
+          static void method() {
+              int [] [] a;
+              int [] b;
+              int c, d = 0;
+          }
+      }
+    after: |
+      class Test {
+          static void method() {
+              int[][] a;
+              int[] b;
+              int c, d = 0;
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.format.NoWhitespaceBefore
+examples:
+- description: ''
+  sources:
+  - before: |
+      class Test {
+          int m;
+
+          static void method() {
+              new Test()
+                      .m = 2;
+              new Test() .m = 2;
+          }
+      }
+    after: |
+      class Test {
+          int m;
+
+          static void method() {
+              new Test().m = 2;
+              new Test().m = 2;
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.format.PadEmptyForLoopComponents
+examples:
+- description: ''
+  sources:
+  - before: |
+      public class A {
+          {
+              int i = 0;
+              int j = 10;
+              for (; i < j; i++, j--) { }
+          }
+      }
+    after: |
+      public class A {
+          {
+              int i = 0;
+              int j = 10;
+              for ( ; i < j; i++, j--) { }
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.format.RemoveTrailingWhitespace
+examples:
+- description: ''
+  sources:
+  - before: "class Test {\n\n    public void method(Test t) {  \n    }  \n}  \n"
+    after: |
+      class Test {
+
+          public void method(Test t) {
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.format.SingleLineComments
+examples:
+- description: ''
+  sources:
+  - before: |
+      //hi
+      class Test {
+      }
+    after: |
+      // hi
+      class Test {
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.format.TabsAndIndents
+examples:
+- description: ''
+  sources:
+  - before: |
+      class Test {{
+          if (true == false)
+          doTheThing();
+
+          doTheOtherThing();
+          somethingElseEntirely();
+
+          foo();
+      }
+          public static void doTheThing() {}
+          public static void doTheOtherThing() {}
+          public static void somethingElseEntirely() {}
+          public static void foo() {}
+      }
+    after: |
+      class Test {{
+          if (true == false)
+              doTheThing();
+
+          doTheOtherThing();
+          somethingElseEntirely();
+
+          foo();
+      }
+          public static void doTheThing() {}
+          public static void doTheOtherThing() {}
+          public static void somethingElseEntirely() {}
+          public static void foo() {}
+      }
+    language: java
+- description: ''
+  sources:
+  - before: |
+      class Test {
+          @Deprecated
+          public void method(Test t) {
+          }
+      }
+    after: |
+      class Test {
+
+          public void method(Test t) {
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.format.TypecastParenPad
+examples:
+- description: ''
+  sources:
+  - before: |
+      class Test {
+          static void method() {
+              long m = 0L;
+              int n = (int) m;
+              n = ( int) m;
+              n = (int ) m;
+              n = ( int ) m;
+          }
+      }
+    after: |
+      class Test {
+          static void method() {
+              long m = 0L;
+              int n = ( int ) m;
+              n = ( int ) m;
+              n = ( int ) m;
+              n = ( int ) m;
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindAnnotations
+examples:
+- description: ''
+  parameters:
+  - '@org.jspecify.annotations.Nullable'
+  - 'true'
+  sources:
+  - before: |
+      import org.openrewrite.internal.lang.Nullable;
+      public class Test {
+          @Nullable String name;
+      }
+    after: |
+      import org.openrewrite.internal.lang.Nullable;
+      public class Test {
+          /*~~>*/@Nullable String name;
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindComments
+examples:
+- description: ''
+  parameters:
+  - Arrays.asList("test", "12.*")
+  sources:
+  - before: |
+      // not this one
+      // test
+      // not this one, either
+      // comment 123
+      class Test {
+          int n = 123;
+          String s = "test";
+          String s = "mytest";
+      }
+    after: |
+      // not this one
+      /*~~>*/// test
+      // not this one, either
+      /*~~>*/// comment 123
+      class Test {
+          int n = /*~~>*/123;
+          String s = /*~~>*/"test";
+          String s = /*~~>*/"mytest";
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindCompileErrors
+examples:
+- description: ''
+  sources:
+  - before: |
+      package com.example.demo;
+      class Bar {
+          pet
+          public void test() {
+          }
+      }
+    after: |
+      package com.example.demo;
+      class Bar {
+          /*~~>*/pet
+          public void test() {
+          }
+      }
+    language: java
+  - before: |
+      package com.example.demo;
+      class Baz {
+          -pet
+          public void test() {
+          }
+      }
+    after: |
+      package com.example.demo;
+      class Baz {
+          /*~~>*/-/*~~>*/pet
+          public void test() {
+          }
+      }
+    language: java
+  - before: |
+      package com.example.demo;
+      class Foo {
+          /pet
+          public void test() {
+          }
+      }
+    after: |
+      package com.example.demo;
+      class Foo {
+          /*~~>*///*~~>*/pet
+          public void test() {
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindDeprecatedClasses
+examples:
+- description: ''
+  parameters:
+  - org.old..*
+  - 'false'
+  - 'true'
+  sources:
+  - before: |
+      import org.old.types.D;
+      class Test {
+          D d;
+      }
+    after: |
+      import org.old.types.D;
+      class Test {
+          /*~~>*/D d;
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindDeprecatedFields
+examples:
+- description: ''
+  parameters:
+  - org.old.types..*
+  - 'null'
+  - 'false'
+  sources:
+  - before: |
+      import org.old.types.D;
+      class Test {
+          void test(int n) {
+              System.out.println(D.FIELD);
+          }
+      }
+    after: |
+      import org.old.types.D;
+      class Test {
+          void test(int n) {
+              System.out.println(D./*~~>*/FIELD);
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindDeprecatedMethods
+examples:
+- description: ''
+  parameters:
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      class Test {
+          @Deprecated
+          void test(int n) {
+              if(n == 1) {
+                  test(n + 1);
+              }
+          }
+      }
+    after: |
+      class Test {
+          @Deprecated
+          void test(int n) {
+              if(n == 1) {
+                  /*~~>*/test(n + 1);
+              }
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindEmptyClasses
+examples:
+- description: ''
+  sources:
+  - before: |
+      class IsEmpty {
+      }
+    after: |
+      /*~~>*/class IsEmpty {
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindEmptyMethods
+examples:
+- description: ''
+  parameters:
+  - 'true'
+  sources:
+  - before: |
+      import java.util.Collection;
+
+      class Test implements Collection<String> {
+          @Override
+          public boolean isEmpty() {
+          }
+      }
+    after: |
+      import java.util.Collection;
+
+      class Test implements Collection<String> {
+          /*~~>*/@Override
+          public boolean isEmpty() {
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindFields
+examples:
+- description: ''
+  parameters:
+  - java.nio.charset.StandardCharsets
+  - 'null'
+  - UTF_8
+  sources:
+  - before: |
+      class Test {
+          Object o = java.nio.charset.StandardCharsets.UTF_8;
+      }
+    after: |
+      class Test {
+          Object o = /*~~>*/java.nio.charset.StandardCharsets.UTF_8;
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindFieldsOfType
+examples:
+- description: ''
+  parameters:
+  - java.lang.String
+  - 'null'
+  sources:
+  - before: |
+      import java.util.*;
+      public class A {
+         private String[] s;
+      }
+    after: |
+      import java.util.*;
+      public class A {
+         /*~~>*/private String[] s;
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindImplementations
+examples:
+- description: ''
+  parameters:
+  - java.lang.Runnable
+  sources:
+  - before: |
+      class Test implements Runnable {
+          @Override
+          public void run() {
+          }
+      }
+    after: |
+      /*~~>*/class Test implements Runnable {
+          @Override
+          public void run() {
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindImports
+examples:
+- description: ''
+  parameters:
+  - java.util..*
+  - 'null'
+  sources:
+  - before: |
+      import java.util.concurrent.atomic.AtomicBoolean;
+      class Test {
+      }
+    after: |
+      /*~~>*/import java.util.concurrent.atomic.AtomicBoolean;
+      class Test {
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindLiterals
+examples:
+- description: ''
+  parameters:
+  - Hello.*
+  sources:
+  - before: |
+      class Test {
+          String s = "Hello Jonathan";
+      }
+    after: |
+      class Test {
+          String s = /*~~>*/"Hello Jonathan";
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindMethodDeclaration
+examples:
+- description: ''
+  parameters:
+  - A a(int)
+  - 'false'
+  sources:
+  - before: |
+      class A {
+          void a(int n) {
+            a(1);
+          }
+          void a(String s) {
+          }
+      }
+    after: |
+      class A {
+          /*~~>*/void a(int n) {
+            a(1);
+          }
+          void a(String s) {
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindMethods
+examples:
+- description: ''
+  parameters:
+  - A <constructor>(String)
+  - 'false'
+  sources:
+  - before: |
+      class A {
+          public A(String s) {}
+      }
+    language: java
+  - before: |
+      class Test {
+          A a = new A("test");
+      }
+    after: |
+      class Test {
+          A a = /*~~>*/new A("test");
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindMissingTypes
+examples:
+- description: ''
+  parameters:
+  - 'false'
+  sources:
+  - before: |
+      import org.junit.Test;
+
+      class ATest {
+          @Test
+          void foo() {}
+      }
+    after: |
+      import org.junit.Test;
+
+      class ATest {
+          @/*~~(Identifier type is missing or malformed)~~>*/Test
+          void foo() {}
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindRepeatableAnnotations
+examples:
+- description: ''
+  sources:
+  - before: |
+      import org.mapstruct.*;
+      class Test {
+          @ValueMappings({
+                  @ValueMapping(source = "UNKNOWN", target = MappingConstants.NULL),
+                  @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
+          })
+          void test() {
+          }
+      }
+    after: |
+      import org.mapstruct.*;
+      class Test {
+          @ValueMappings({
+                  /*~~>*/@ValueMapping(source = "UNKNOWN", target = MappingConstants.NULL),
+                  /*~~>*/@ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
+          })
+          void test() {
+          }
+      }
+    language: java
+  - before: |
+      package org.mapstruct;
+
+      import java.lang.annotation.ElementType;
+      import java.lang.annotation.Repeatable;
+      import java.lang.annotation.Retention;
+      import java.lang.annotation.RetentionPolicy;
+      import java.lang.annotation.Target;
+
+      @Repeatable(ValueMappings.class)
+      @Retention(RetentionPolicy.CLASS)
+      @Target(ElementType.METHOD)
+      public @interface ValueMapping {
+          String source();
+
+          String target();
+      }
+    language: java
+  - before: |
+      package org.mapstruct;
+
+      import java.lang.annotation.ElementType;
+      import java.lang.annotation.Retention;
+      import java.lang.annotation.RetentionPolicy;
+      import java.lang.annotation.Target;
+
+      @Target({ElementType.METHOD})
+      @Retention(RetentionPolicy.CLASS)
+      public @interface ValueMappings {
+          ValueMapping[] value();
+      }
+    language: java
+  - before: |
+      package org.mapstruct;
+
+      public class MappingConstants {
+          public static final String NULL = "null";
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindTypes
+examples:
+- description: ''
+  parameters:
+  - a.A1
+  - 'false'
+  sources:
+  - before: |
+      import a.A1;
+      public class B extends A1 {}
+    after: |
+      import a.A1;
+      public class B extends /*~~>*/A1 {}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.HasMinimumJavaVersion
+examples:
+- description: ''
+  parameters:
+  - 8-21
+  - 'false'
+  sources:
+  - before: |
+      class Higher {
+      }
+    language: java
+  - before: |
+      class Test {
+      }
+    after: |
+      /*~~(Java version 8)~~>*/class Test {
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.ResultOfMethodCallIgnored
+examples:
+- description: ''
+  parameters:
+  - java.io.File mkdir*()
+  - 'false'
+  sources:
+  - before: |
+      import java.io.File;
+      class Test {
+          void test() {
+              new File("dir").mkdirs();
+              new File("dir").mkdir();
+              boolean b1 = new File("dir").mkdirs();
+              if(!new File("dir").mkdirs()) {
+                  throw new IllegalStateException("oops");
+              }
+          }
+      }
+    after: |
+      import java.io.File;
+      class Test {
+          void test() {
+              /*~~>*/new File("dir").mkdirs();
+              /*~~>*/new File("dir").mkdir();
+              boolean b1 = new File("dir").mkdirs();
+              if(!new File("dir").mkdirs()) {
+                  throw new IllegalStateException("oops");
+              }
+          }
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.text.FindAndReplace
+examples:
+- description: ''
+  parameters:
+  - Test
+  - Replaced
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: class Test {}
+    after: class Replaced {}
+    language: java

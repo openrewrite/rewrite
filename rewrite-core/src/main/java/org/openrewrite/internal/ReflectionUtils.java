@@ -16,13 +16,18 @@
 package org.openrewrite.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.PathUtils;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -36,7 +41,18 @@ public class ReflectionUtils {
      * Cache for {@link Class#getDeclaredMethods()} plus equivalent default methods
      * from Java 8 based interfaces, allowing for fast iteration.
      */
-    private static final Map<Class<?>, Method[]> declaredMethodsCache = new ConcurrentHashMap<>(256);
+    private static final Map<Class<?>, Method[]> DECLARED_METHODS_CACHE = new ConcurrentHashMap<>(256);
+
+    public static boolean isClassAvailable(String fullyQualifiedClassName) {
+        try {
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            ClassLoader classLoader = contextClassLoader == null ? ReflectionUtils.class.getClassLoader() : contextClassLoader;
+            Class.forName(fullyQualifiedClassName, false, classLoader);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
 
     public static @Nullable Method findMethod(Class<?> clazz, String name, Class<?>... paramTypes) {
         Class<?> searchType = clazz;
@@ -53,8 +69,30 @@ public class ReflectionUtils {
         return null;
     }
 
+    public static List<Path> findClassPathEntriesFor(String resourceName, ClassLoader classLoader) {
+        List<Path> classPathEntries = new ArrayList<>();
+        try {
+            Enumeration<URL> resources = classLoader.getResources(resourceName);
+            while (resources.hasMoreElements()) {
+                URL resource = resources.nextElement();
+                String path = PathUtils.separatorsToUnix(resource.getPath());
+                if (resource.getProtocol().equals("jar") && resource.getPath().startsWith("file:")) {
+                    classPathEntries.add(Paths.get(URI.create(path.substring(0, path.indexOf("!")))));
+                } else if (resource.getProtocol().equals("file")) {
+                    path = PathUtils.separatorsToUnix(Paths.get(resource.toURI()).toString());
+                    classPathEntries.add(Paths.get(path.substring(0, path.indexOf(resourceName))));
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+        return classPathEntries;
+    }
+
     private static Method[] getDeclaredMethods(Class<?> clazz) {
-        Method[] result = declaredMethodsCache.get(clazz);
+        Method[] result = DECLARED_METHODS_CACHE.get(clazz);
         if (result == null) {
             try {
                 Method[] declaredMethods = clazz.getDeclaredMethods();
@@ -70,7 +108,7 @@ public class ReflectionUtils {
                 } else {
                     result = declaredMethods;
                 }
-                declaredMethodsCache.put(clazz, (result.length == 0 ? EMPTY_METHOD_ARRAY : result));
+                DECLARED_METHODS_CACHE.put(clazz, (result.length == 0 ? EMPTY_METHOD_ARRAY : result));
             } catch (Throwable ex) {
                 throw new IllegalStateException("Failed to introspect Class [" + clazz.getName() +
                                                 "] from ClassLoader [" + clazz.getClassLoader() + "]", ex);

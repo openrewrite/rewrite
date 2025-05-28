@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -56,6 +57,7 @@ public class PropertyPlaceholderHelper {
         this.valueSeparator = valueSeparator;
     }
 
+    @Contract("null -> false")
     public boolean hasPlaceholders(@Nullable String value) {
         if (value == null) {
             return false;
@@ -68,11 +70,11 @@ public class PropertyPlaceholderHelper {
         return replacePlaceholders(value, properties::getProperty);
     }
 
-    public String replacePlaceholders(String value, Function<String, String> placeholderResolver) {
+    public String replacePlaceholders(String value, Function<String, @Nullable String> placeholderResolver) {
         return parseStringValue(value, placeholderResolver, null);
     }
 
-    protected String parseStringValue(String value, Function<String, String> placeholderResolver,
+    protected String parseStringValue(String value, Function<String, @Nullable String> placeholderResolver,
                                       @Nullable Set<String> visitedPlaceholders) {
         int startIndex = value.indexOf(placeholderPrefix);
         if (startIndex == -1) {
@@ -119,7 +121,7 @@ public class PropertyPlaceholderHelper {
                 }
 
                 // Proceed with unprocessed value.
-                startIndex = result.indexOf(placeholderPrefix, endIndex + placeholderSuffix.length());
+                startIndex = result.indexOf(placeholderPrefix, endIndex);
                 visitedPlaceholders.remove(originalPlaceholder);
             } else {
                 startIndex = -1;

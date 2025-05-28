@@ -25,6 +25,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.xml.Assertions.xml;
 
 @SuppressWarnings("RedundantThrows")
 class FindTypesTest implements RewriteTest {
@@ -46,6 +47,10 @@ class FindTypesTest implements RewriteTest {
     @Test
     void simpleName() {
         rewriteRun(
+          spec -> spec.dataTable(TypeUses.Row.class, rows -> assertThat(rows)
+            .containsExactly(
+              new TypeUses.Row("B.java", "A1", "a.A1")
+            )),
           java(
             """
               import a.A1;
@@ -153,8 +158,8 @@ class FindTypesTest implements RewriteTest {
           spec -> spec.recipe(new FindTypes("java.util.Collection", true))
             .dataTable(TypeUses.Row.class, rows -> {
                 assertThat(rows).hasSize(1);
-                assertThat(rows.get(0).getConcreteType()).isEqualTo("java.util.List");
-                assertThat(rows.get(0).getCode()).isEqualTo("List<String>");
+                assertThat(rows.getFirst().getConcreteType()).isEqualTo("java.util.List");
+                assertThat(rows.getFirst().getCode()).isEqualTo("List<String>");
             }),
           java(
             """
@@ -423,6 +428,49 @@ class FindTypesTest implements RewriteTest {
               """
           ),
           java(a1)
+        );
+    }
+
+    @Test
+    void springXml() {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes("a.A1", false)),
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xmlns="http://www.springframework.org/schema/beans"
+                  xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+                <bean id="testBean" class="a.A1" scope="prototype">
+                  <property name="age" value="10"/>
+                  <property name="sibling">
+                      <bean class="a.A1">
+                          <property name="age" value="11" class="java.lang.Integer"/>
+                          <property name="someName">
+                              <value>a.A1</value>
+                          </property>
+                      </bean>
+                  </property>
+                </bean>
+              </beans>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xmlns="http://www.springframework.org/schema/beans"
+                  xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+                <bean id="testBean" <!--~~>-->class="a.A1" scope="prototype">
+                  <property name="age" value="10"/>
+                  <property name="sibling">
+                      <bean <!--~~>-->class="a.A1">
+                          <property name="age" value="11" class="java.lang.Integer"/>
+                          <property name="someName">
+                              <!--~~>--><value>a.A1</value>
+                          </property>
+                      </bean>
+                  </property>
+                </bean>
+              </beans>
+              """
+          )
         );
     }
 

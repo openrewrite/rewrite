@@ -26,13 +26,15 @@ import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class FindPluginsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindPlugins("org.openrewrite.rewrite"));
+        spec.recipe(new FindPlugins("org.openrewrite.rewrite", "org.openrewrite.gradle.RewritePlugin"));
     }
 
     @DocumentExample
@@ -43,21 +45,146 @@ class FindPluginsTest implements RewriteTest {
           buildGradle(
             """
               plugins {
+                  id 'java'
                   id 'org.openrewrite.rewrite' version '6.18.0'
               }
               """,
             """
               plugins {
+                  id 'java'
                   /*~~>*/id 'org.openrewrite.rewrite' version '6.18.0'
               }
               """,
-            spec -> spec
-              .beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "org.openrewrite.rewrite"))
-                .isNotEmpty()
-                .anySatisfy(p -> {
-                    assertThat(p.getPluginId()).isEqualTo("org.openrewrite.rewrite");
-                    assertThat(p.getVersion()).isEqualTo("6.18.0");
-                }))
+            spec -> spec.beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "org.openrewrite.rewrite"))
+              .isNotEmpty()
+              .anySatisfy(p -> {
+                  assertThat(p.getPluginId()).isEqualTo("org.openrewrite.rewrite");
+                  assertThat(p.getVersion()).isEqualTo("6.18.0");
+              }))
+          )
+        );
+    }
+
+    @Test
+    void settingsResolutionStrategy() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          settingsGradle(
+              """
+            pluginManagement {
+                repositories {
+                    mavenLocal()
+                    gradlePluginPortal()
+                }
+                resolutionStrategy {
+                    eachPlugin {
+                        if (requested.id.id == 'org.openrewrite.rewrite') {
+                            useVersion('6.22.0')
+                        }
+                    }
+                }
+            }
+            """
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id "org.openrewrite.rewrite"
+              }
+              """,
+            """
+              plugins {
+                  /*~~>*/id "org.openrewrite.rewrite"
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "org.openrewrite.rewrite"))
+              .isNotEmpty()
+              .anySatisfy(p -> assertThat(p.getPluginId()).isEqualTo("org.openrewrite.rewrite")))
+          )
+        );
+    }
+
+    @Test
+    void property() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          properties("rewritePluginVersion=6.22.0", spec -> spec.path("gradle.properties")),
+          buildGradle(
+            """
+              plugins {
+                  id "org.openrewrite.rewrite" version "${rewritePluginVersion}"
+              }
+              """,
+            """
+              plugins {
+                  /*~~>*/id "org.openrewrite.rewrite" version "${rewritePluginVersion}"
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "org.openrewrite.rewrite"))
+              .isNotEmpty()
+              .anySatisfy(p -> assertThat(p.getPluginId()).isEqualTo("org.openrewrite.rewrite")))
+          )
+        );
+    }
+
+    @Test
+    void buildscriptId() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+             buildscript {
+                 repositories {
+                     gradlePluginPortal()
+                 }
+                 dependencies {
+                     classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.1.3")
+                 }
+             }
+             apply plugin: "org.openrewrite.rewrite"
+             """,
+            """
+             /*~~>*/buildscript {
+                 repositories {
+                     gradlePluginPortal()
+                 }
+                 dependencies {
+                     classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.1.3")
+                 }
+             }
+             apply plugin: "org.openrewrite.rewrite"
+             """
+          )
+        );
+    }
+
+    @Test
+    void buildscriptClassname() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+             buildscript {
+                 repositories {
+                     gradlePluginPortal()
+                 }
+                 dependencies {
+                     classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.1.3")
+                 }
+             }
+             apply plugin: org.openrewrite.gradle.RewritePlugin
+             """,
+            """
+             /*~~>*/buildscript {
+                 repositories {
+                     gradlePluginPortal()
+                 }
+                 dependencies {
+                     classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.1.3")
+                 }
+             }
+             apply plugin: org.openrewrite.gradle.RewritePlugin
+             """
           )
         );
     }

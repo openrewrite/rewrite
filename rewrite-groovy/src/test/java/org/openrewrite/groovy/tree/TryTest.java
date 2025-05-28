@@ -15,8 +15,8 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -90,7 +90,7 @@ class TryTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1944")
-    @Disabled
+    @ExpectedToFail
     @Test
     void multiCatch() {
         rewriteRun(
@@ -106,7 +106,7 @@ class TryTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1945")
-    @Disabled
+    @ExpectedToFail
     @Test
     void tryWithResource() {
         rewriteRun(
@@ -123,7 +123,7 @@ class TryTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1945")
-    @Disabled
+    @ExpectedToFail
     @Test
     void tryWithResources() {
         rewriteRun(

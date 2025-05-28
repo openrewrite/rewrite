@@ -26,14 +26,14 @@ import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.trait.Reference;
 
 import java.util.regex.Pattern;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 @Getter
-public class TypeMatcher {
-    private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
+public class TypeMatcher implements Reference.Matcher {
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     @Getter
@@ -54,7 +54,7 @@ public class TypeMatcher {
         this(fieldType, false);
     }
 
-    public @Nullable TypeMatcher(@Nullable String fieldType, boolean matchInherited) {
+    public TypeMatcher(@Nullable String fieldType, boolean matchInherited) {
         this.signature = fieldType == null ? ".*" : fieldType;
         this.matchInherited = matchInherited;
 
@@ -62,7 +62,7 @@ public class TypeMatcher {
             targetTypePattern = Pattern.compile(".*");
         } else {
             MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
-                    CharStreams.fromString(fieldType))));
+                    CharStreams.fromString(fieldType + "#dummy()"))));
 
             new MethodSignatureParserBaseVisitor<Void>() {
 
@@ -108,5 +108,15 @@ public class TypeMatcher {
                context.OR() == null &&
                context.classNameOrInterface().DOTDOT().isEmpty() &&
                context.classNameOrInterface().WILDCARD().isEmpty();
+    }
+
+    @Override
+    public boolean matchesReference(Reference reference) {
+        return reference.getKind() == Reference.Kind.TYPE && matchesTargetTypeName(reference.getValue());
+    }
+
+    @Override
+    public Reference.Renamer createRenamer(String newName) {
+        return reference -> newName;
     }
 }

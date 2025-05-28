@@ -24,6 +24,7 @@ import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.trait.Reference;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -60,6 +61,14 @@ public class ChangeType extends Recipe {
 
     @Override
     public String getInstanceNameSuffix() {
+        // Defensively guard against null values when recipes are first classloaded. This
+        // is a temporary workaround until releases of workers/CLI that include the defensive
+        // coding in Recipe.
+        //noinspection ConstantValue
+        if (oldFullyQualifiedTypeName == null || newFullyQualifiedTypeName == null) {
+            return getDisplayName();
+        }
+
         String oldShort = oldFullyQualifiedTypeName.substring(oldFullyQualifiedTypeName.lastIndexOf('.') + 1);
         String newShort = newFullyQualifiedTypeName.substring(newFullyQualifiedTypeName.lastIndexOf('.') + 1);
         if (oldShort.equals(newShort)) {
@@ -79,24 +88,51 @@ public class ChangeType extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    JavaSourceFile cu = (JavaSourceFile) tree;
                     if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
+                } else if (tree instanceof SourceFileWithReferences) {
+                    SourceFileWithReferences cu = (SourceFileWithReferences) tree;
+                    return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
-                return (J) tree;
+                return tree;
             }
         };
 
-        return Preconditions.check(condition, new ChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition));
+        return Preconditions.check(condition, new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithReferences;
+            }
+
+            @Override
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                if (tree instanceof J) {
+                    return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                } else if (tree instanceof SourceFileWithReferences) {
+                    SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
+                    SourceFileWithReferences.References references = sourceFile.getReferences();
+                    TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
+                    Map<Tree, Reference> matches = new HashMap<>();
+                    for (Reference ref : references.findMatches(matcher)) {
+                        matches.put(ref.getTree(), ref);
+                    }
+                    return new ReferenceChangeTypeVisitor(matches, matcher.createRenamer(newFullyQualifiedTypeName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                }
+                return tree;
+            }
+        });
     }
 
-    private static class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
+    private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
 
@@ -109,7 +145,7 @@ public class ChangeType extends Recipe {
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
 
-        private ChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
+        private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
             this.ignoreDefinition = ignoreDefinition;
@@ -228,7 +264,15 @@ public class ChangeType extends Recipe {
                     }
                 }
 
-                j = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
+                j = sf.withImports(ListUtils.map(sf.getImports(), i -> {
+                    Cursor cursor = getCursor();
+                    setCursor(new Cursor(cursor, i));
+                    try {
+                        return visitAndCast(i, ctx, super::visitImport);
+                    } finally {
+                        setCursor(cursor);
+                    }
+                }));
             }
 
             return j;
@@ -238,8 +282,14 @@ public class ChangeType extends Recipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             if (fieldAccess.isFullyQualifiedClassReference(originalType.getFullyQualifiedName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
-                    return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                    J.FieldAccess fa = (J.FieldAccess) updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
                             .withPrefix(fieldAccess.getPrefix()));
+                    if (getCursor().firstEnclosing(J.Import.class) == null) {
+                        // don't shorten qualified names in imports
+                        fa = fa.withName(fa.getName().withType(targetType));
+                        doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(fa));
+                    }
+                    return fa;
                 } else if (targetType instanceof JavaType.Primitive) {
                     return new J.Primitive(
                             fieldAccess.getId(),
@@ -367,7 +417,7 @@ public class ChangeType extends Recipe {
 
                 if (type.getOwningClass() == null) {
                     // just a performance shortcut when this isn't an inner class
-                    typeTree.withType(updateType(targetType));
+                    return typeTree.withType(updateType(targetType));
                 }
 
                 Stack<Expression> typeStack = new Stack<>();
@@ -527,6 +577,22 @@ public class ChangeType extends Recipe {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class ReferenceChangeTypeVisitor extends TreeVisitor<Tree, ExecutionContext> {
+        Map<Tree, Reference> matches;
+        Reference.Renamer renamer;
+
+        @Override
+        public Tree postVisit(Tree tree, ExecutionContext ctx) {
+            Reference reference = matches.get(tree);
+            if (reference != null && reference.supportsRename()) {
+                return reference.rename(renamer, getCursor(), ctx);
+            }
+            return tree;
+        }
+    }
+
     private static class ChangeClassDefinition extends JavaIsoVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType.Class targetType;
@@ -573,13 +639,13 @@ public class ChangeType extends Recipe {
 
         private boolean updatePath(JavaSourceFile sf, String oldPath, String newPath) {
             return !oldPath.equals(newPath) && sf.getClasses().stream()
-                    .anyMatch(o -> !J.Modifier.hasModifier(o.getModifiers(), J.Modifier.Type.Private) &&
+                    .anyMatch(o -> !o.hasModifier(J.Modifier.Type.Private) &&
                                    o.getType() != null && !o.getType().getFullyQualifiedName().contains("$") &&
                                    TypeUtils.isOfClassType(o.getType(), getTopLevelClassName(originalType).getFullyQualifiedName()));
         }
 
         @Override
-        public  J.@Nullable Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+        public J.@Nullable Package visitPackage(J.Package pkg, ExecutionContext ctx) {
             Boolean updatePackage = getCursor().pollNearestMessage("UPDATE_PACKAGE");
             if (updatePackage != null && updatePackage) {
                 String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");

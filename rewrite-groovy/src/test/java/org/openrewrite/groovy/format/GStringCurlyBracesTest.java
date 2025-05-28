@@ -41,7 +41,8 @@ class GStringCurlyBracesTest implements RewriteTest {
             """
             def name = 'world'
             "Hello ${name}!"
-            """)
+            """
+          )
         );
     }
 
@@ -56,7 +57,8 @@ class GStringCurlyBracesTest implements RewriteTest {
             """
             def to = [ you : 'world']
             "Hello ${to.you}!"
-            """)
+            """
+          )
         );
     }
 }

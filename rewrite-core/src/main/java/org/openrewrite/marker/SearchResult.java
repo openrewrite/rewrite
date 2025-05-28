@@ -17,6 +17,7 @@ package org.openrewrite.marker;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
@@ -40,10 +41,12 @@ public final class SearchResult implements Marker {
     @Nullable
     String description;
 
+    @Contract("null -> null; !null -> !null")
     public static <T extends @Nullable Tree> @Nullable T found(T t) {
         return found(t, null);
     }
 
+    @Contract("null, _ -> null; !null, _ -> !null")
     public static <T extends @Nullable Tree> @Nullable T found(T t, @Nullable String description) {
         if (t == null) {
             //noinspection ConstantConditions

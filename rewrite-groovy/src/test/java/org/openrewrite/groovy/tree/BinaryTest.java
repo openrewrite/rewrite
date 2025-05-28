@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon", "UnnecessaryQualifiedReference"})
+@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon", "UnnecessaryQualifiedReference", "GrMethodMayBeStatic"})
 class BinaryTest implements RewriteTest {
 
     @SuppressWarnings("GroovyConstantConditional")
@@ -33,7 +33,10 @@ class BinaryTest implements RewriteTest {
 
           // NOT inside parentheses, but verifies the parser's
           // test for "inside parentheses" condition
-          groovy("(1) + 1")
+          groovy("( 1 ) + 1"),
+          groovy("(1) + 1"),
+          // And combine the two cases
+          groovy("((1) + 1)")
         );
     }
 
@@ -56,6 +59,31 @@ class BinaryTest implements RewriteTest {
             """
               def a = []
               boolean b = 42 in a;
+              """
+          )
+        );
+    }
+
+    @Test
+    void notIn() {
+        rewriteRun(
+          groovy(
+            """
+              def a = []
+              boolean b = 42 !in a;
+              """
+          )
+        );
+    }
+
+    @Test
+    void withVariable() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(int a) {
+                  60 + a
+              }
               """
           )
         );
@@ -160,7 +188,8 @@ class BinaryTest implements RewriteTest {
           groovy(
             """
               def isString = "" instanceof java.lang.String
-              """)
+              """
+          )
         );
     }
 
@@ -174,7 +203,8 @@ class BinaryTest implements RewriteTest {
                   def value = 1
               }
               [ new A() ].findAll { it -> it.value == 1 } *. value = 2
-              """)
+              """
+          )
         );
     }
 
@@ -198,5 +228,67 @@ class BinaryTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void cxds() {
+        rewriteRun(
+          groovy(
+            """
+              def differenceInDays(int time) {
+                  return (int) ((time)/(1000*60*60*24))
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void extraParensAroundInfixOxxxperator() {
+        rewriteRun(
+          groovy(
+            """
+              def timestamp(int hours, int minutes, int seconds) {
+                  30 * (hours)
+                  (((((hours))))) * 30
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void extraParensAroundInfixOperator() {
+        rewriteRun(
+          groovy(
+            """
+              def timestamp(int hours, int minutes, int seconds) {
+                  (hours) * 60 * 60 + (minutes * 60) + seconds
+              }
+              def differenceInDays(int time) {
+                  return (int) ((time)/(1000*60*60*24))
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void spaceShipOperator() {
+        rewriteRun(
+          groovy(
+            """
+              def justPrint(){
+                  println(1 <=> 2)
+                  println('a' <=> 'z')
+                  def a = 'tiger'
+                  def b = 'cheetah'
+                  println(a <=> b)
+              }
+              """
+          ));
     }
 }

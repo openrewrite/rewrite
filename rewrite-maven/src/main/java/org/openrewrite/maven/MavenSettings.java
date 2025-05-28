@@ -109,9 +109,39 @@ public class MavenSettings {
                 .filter(MavenSettings::exists)
                 .map(path -> parse(path, ctx));
         final MavenSettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
-        return userSettings.map(mavenSettings -> mavenSettings.merge(installSettings))
+        MavenSettings settings = userSettings.map(mavenSettings -> mavenSettings.merge(installSettings))
                 .orElse(installSettings);
+
+        if (settings != null) {
+            settings.maybeDecryptPasswords(ctx);
+        }
+
+        return settings;
     }
+
+    void maybeDecryptPasswords(ExecutionContext ctx) {
+        MavenSecuritySettings security = MavenSecuritySettings.readMavenSecuritySettingsFromDisk(ctx);
+        if (security == null) {
+            return;
+        }
+
+        String decryptedMasterPassword = security.decrypt(security.getMaster(), "settings.security");
+        if (decryptedMasterPassword != null) {
+            if (mavenLocal != null) {
+                String password = security.decrypt(mavenLocal.getPassword(), decryptedMasterPassword);
+                if (password != null) {
+                    mavenLocal = mavenLocal.withPassword(password);
+                }
+            }
+            if (servers != null) {
+                servers.servers = ListUtils.map(servers.servers, server -> {
+                    String password = security.decrypt(server.getPassword(), decryptedMasterPassword);
+                    return password == null ? server : server.withPassword(password);
+                });
+            }
+        }
+    }
+
 
     public static boolean readFromDiskEnabled() {
         final String propertyValue = System.getProperty("org.openrewrite.test.readMavenSettingsFromDisk");
@@ -158,7 +188,7 @@ public class MavenSettings {
         if (profiles != null) {
             for (Profile profile : profiles.getProfiles()) {
                 if (profile.isActive(activeProfiles) || (this.activeProfiles != null &&
-                                                         profile.isActive(this.activeProfiles.getActiveProfiles()))) {
+                        profile.isActive(this.activeProfiles.getActiveProfiles()))) {
                     if (profile.repositories != null) {
                         for (RawRepositories.Repository repository : profile.repositories.getRepositories()) {
                             activeRepositories.put(repository.getId(), repository);
@@ -409,7 +439,8 @@ public class MavenSettings {
     @JsonIgnoreProperties(value = "httpHeaders")
     public static class ServerConfiguration {
         @JacksonXmlProperty(localName = "property")
-        @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true) // wrapping is disabled by default on MavenXmlMapper
+        @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true)
+        // wrapping is disabled by default on MavenXmlMapper
         @Nullable
         List<HttpHeader> httpHeaders;
 

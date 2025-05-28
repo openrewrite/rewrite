@@ -166,24 +166,33 @@ class JsonPathMatcherTest {
     }
 
     @Test
-    void wildcardAtRoot() {
+    void booleanLiteralMatching() {
         assertMatched(
-          "$.*",
-          simple,
+          "$[?(@.bool == true)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "bool": true
+              }
+              """
+          ),
           List.of(
             """
-                  "root": {
-                    "literal": "$.root.literal",
-                    "object": {
-                      "literal": "$.root.object.literal",
-                      "list": [{
-                        "literal": "$.root.object.list[0]"
-                      }]
-                    },
-                    "list": [{
-                      "literal": "$.root.list[0]"
-                    }]
-                  }
+              {
+                "bool": true
+              }
+              """
+          )
+        );
+        assertNotMatched(
+          "$[?(@.bool == true)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "bool": false
+              }
               """
           )
         );
@@ -545,6 +554,41 @@ class JsonPathMatcherTest {
                     "item2": "index1",
                     "property": "property"
                   }
+              """)
+        );
+    }
+
+    @Test
+    void bracketOperatorByIndexesMultipleDigits() {
+        assertMatched(
+          "$.list[10]",
+          List.of(
+            //language=json5
+            """
+                  {
+                    "list": [
+                      {"item1": "index0"},
+                      {"item2": "index1"},
+                      {"item3": "index2"},
+                      {"item4": "index3"},
+                      {"item5": "index4"},
+                      {"item6": "index5"},
+                      {"item7": "index6"},
+                      {"item8": "index7"},
+                      {"item9": "index8"},
+                      {"item10": "index9"},
+                      {"item11": "index10"},
+                      {"item12": "index11"},
+                      {"item13": "index12"},
+                      {"item3": "index13"}
+                    ]
+                  }
+              """
+          ),
+        //language=json5
+          List.of(
+            """
+                  {"item11": "index10"}
               """)
         );
     }

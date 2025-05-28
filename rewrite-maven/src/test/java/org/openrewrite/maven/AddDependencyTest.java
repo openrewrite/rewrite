@@ -31,6 +31,7 @@ import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
+@SuppressWarnings("NewClassNamingConvention")
 class AddDependencyTest implements RewriteTest {
 
     @Override
@@ -48,6 +49,34 @@ class AddDependencyTest implements RewriteTest {
               }
           }
       """;
+
+    @DocumentExample
+    @Test
+    void addDependenciesOnEmptyProject() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null)),
+          pomXml("""
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              </project>""",
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                      </dependency>
+                  </dependencies>
+              </project>"""
+          )
+        );
+    }
 
     @Test
     void dontAddDuplicateIfUpdateModelOnPriorRecipeCycleFailed() {
@@ -203,33 +232,43 @@ class AddDependencyTest implements RewriteTest {
     void onlyIfUsingCompileScope(String onlyIfUsing) {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
-          mavenProject("project",
+          mavenProject("uses",
             srcMainJava(
               java(usingGuavaIntMath)
             ),
             pomXml(
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>uses</artifactId>
+                    <version>1</version>
+                </project>
                 """,
               """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>29.0-jre</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>uses</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
+          ),
+          mavenProject("nouses",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>nouses</artifactId>
+                    <version>1</version>
+                </project>
+                """)
           )
         );
     }
@@ -1250,34 +1289,6 @@ class AddDependencyTest implements RewriteTest {
           ));
     }
 
-    @DocumentExample
-    @Test
-    void addDependenciesOnEmptyProject() {
-        rewriteRun(
-          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null)),
-          pomXml("""
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-              </project>""",
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>29.0-jre</version>
-                      </dependency>
-                  </dependencies>
-              </project>"""
-          )
-        );
-    }
-
     @Test
     void dependencyThatIsTransitivelyProvidedWithWrongScopeShouldBeAdded() {
         rewriteRun(
@@ -1453,6 +1464,45 @@ class AddDependencyTest implements RewriteTest {
                   </project>
                   """
               )
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5433")
+    @Test
+    void doNotAddDependencyTransitivelyProvidedByBom() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("org.springframework", "spring-webmvc", "5.3.31",
+            null, null, null, null, null, null, null, null, true)),
+          mavenProject(
+            "project",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-dependencies</artifactId>
+                                <version>2.7.18</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-web</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
             )
           )
         );

@@ -35,9 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.tree.TypeUtils.asClass;
-import static org.openrewrite.java.tree.TypeUtils.asGeneric;
-import static org.openrewrite.java.tree.TypeUtils.asParameterized;
+import static org.openrewrite.java.tree.TypeUtils.*;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "StatementWithEmptyBody"})
@@ -182,7 +180,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationOnUnknownType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodDeclarations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodDeclarations(false).constructorInvocations(false).build()),
           java(
             """
               import java.util.ArrayList;
@@ -359,42 +357,43 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                   private @interface A2 {
                   }
               }
-              """, spec -> spec.afterRecipe(cu -> {
-                  AtomicBoolean firstDimension = new AtomicBoolean(false);
-                  AtomicBoolean secondDimension = new AtomicBoolean(false);
-                  new JavaIsoVisitor<Integer>() {
-                      @Override
-                      public J.ArrayType visitArrayType(J.ArrayType arrayType, Integer n) {
-                          assert arrayType.getType() instanceof JavaType.Array;
-                          JavaType.Array array = (JavaType.Array) arrayType.getType();
-                          if (arrayType.getElementType() instanceof J.ArrayType) {
-                              List<JavaType.FullyQualified> annotations = collectAnnotations(array, new ArrayList<>());
-                              assertThat(annotations).satisfiesExactly(
-                                  ann1 -> assertThat(ann1.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A1"),
-                                  ann2 -> assertThat(ann2.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A2")
-                              );
-                              firstDimension.set(true);
-                          } else {
-                              List<JavaType.FullyQualified> annotations = collectAnnotations(array, new ArrayList<>());
-                              assertThat(annotations).satisfiesExactly(
-                                ann -> assertThat(ann.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A2")
-                              );
-                              secondDimension.set(true);
-                          }
-                          return super.visitArrayType(arrayType, n);
-                      }
+              """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean firstDimension = new AtomicBoolean(false);
+                    AtomicBoolean secondDimension = new AtomicBoolean(false);
+                    new JavaIsoVisitor<Integer>() {
+                        @Override
+                        public J.ArrayType visitArrayType(J.ArrayType arrayType, Integer n) {
+                            assert arrayType.getType() instanceof JavaType.Array;
+                            JavaType.Array array = (JavaType.Array) arrayType.getType();
+                            if (arrayType.getElementType() instanceof J.ArrayType) {
+                                List<JavaType.FullyQualified> annotations = collectAnnotations(array, new ArrayList<>());
+                                assertThat(annotations).satisfiesExactly(
+                                        ann1 -> assertThat(ann1.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A1"),
+                                        ann2 -> assertThat(ann2.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A2")
+                                );
+                                firstDimension.set(true);
+                            } else {
+                                List<JavaType.FullyQualified> annotations = collectAnnotations(array, new ArrayList<>());
+                                assertThat(annotations).satisfiesExactly(
+                                        ann -> assertThat(ann.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A2")
+                                );
+                                secondDimension.set(true);
+                            }
+                            return super.visitArrayType(arrayType, n);
+                        }
 
-                      private List<JavaType.FullyQualified> collectAnnotations(JavaType type, List<JavaType.FullyQualified> annotations) {
-                          if (type instanceof JavaType.Array) {
-                              annotations.addAll(((JavaType.Array) type).getAnnotations());
-                              collectAnnotations(((JavaType.Array) type).getElemType(), annotations);
-                          }
-                          return annotations;
-                      }
-                  }.visit(cu, 0);
-                  assertThat(firstDimension.get()).isTrue();
-                  assertThat(secondDimension.get()).isTrue();
-            })
+                        private List<JavaType.FullyQualified> collectAnnotations(JavaType type, List<JavaType.FullyQualified> annotations) {
+                            if (type instanceof JavaType.Array) {
+                                annotations.addAll(((JavaType.Array) type).getAnnotations());
+                                collectAnnotations(((JavaType.Array) type).getElemType(), annotations);
+                            }
+                            return annotations;
+                        }
+                    }.visit(cu, 0);
+                    assertThat(firstDimension.get()).isTrue();
+                    assertThat(secondDimension.get()).isTrue();
+                })
           )
         );
     }

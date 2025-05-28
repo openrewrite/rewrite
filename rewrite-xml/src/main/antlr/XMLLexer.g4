@@ -29,7 +29,9 @@
 /** XML lexer derived from ANTLR v4 ref guide book example */
 lexer grammar XMLLexer;
 
+
 // Default "mode": Everything OUTSIDE of a tag
+WS                : [ \t\n\r\u000C]+ -> skip;
 COMMENT           :  '<!--' .*? '-->' ;
 CDATA             :  '<![CDATA[' .*? ']]>' ;
 

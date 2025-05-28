@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -55,6 +56,21 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       if (a) {}
                       if (a) {}
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @DocumentExample
+    @Test
+    void skipMissingTypeAttribution() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+          java(
+            """
+              public class A {
+                  boolean a = null instanceof Unknown || null instanceof java.lang.Unknown;
               }
               """
           )
@@ -716,5 +732,85 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         } else {
             rewriteRun(java(beforeJava, template.formatted(after)));
         }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-feature-flags/issues/40")
+    @Test
+    void simplifyStringLiteralEqualsStringLiteral() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      String foo = "foo";
+                      if ("foo".equals("foo")) {}
+                      if (foo.equals(foo)) {}
+                      if (foo.equals("foo")) {}
+                      if ("foo".equals(foo)) {}
+                      if ("foo".equals("bar")) {}
+                  }
+              }
+              """,
+            """
+              class A {
+                  {
+                      String foo = "foo";
+                      if (true) {}
+                      if (true) {}
+                      if (foo.equals("foo")) {}
+                      if ("foo".equals(foo)) {}
+                      if (false) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4821")
+    @Test
+    void stringComparisonInBinary() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private boolean notNullAndNotEqual(String one, String other) {
+                      return one != null && !one.equals(other);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void defensiveSetter() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  String a;
+                  void setA(String a) {
+                      if (!a.equals(this.a)) {
+                          this.a = a;
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class B {
+                  String b;
+                  void setB(String b) {
+                      if (b.equals(this.b)) {
+                          return;
+                      }
+                      this.b = b;
+                  }
+              }
+              """
+          )
+        );
     }
 }

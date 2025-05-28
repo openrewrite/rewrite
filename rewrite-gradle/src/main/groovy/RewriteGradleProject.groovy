@@ -78,6 +78,7 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency earlib(Object... dependencyNotation)
     Dependency earlib(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
 
+    @Override
     void constraints(Action<? super DependencyConstraintHandler> configureAction)
 }
 
@@ -192,6 +193,8 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract Task task(Map<String, ?> options)
     abstract Task task(Map<String, ?> options, Closure configureClosure)
     abstract Task task(String name, Closure configureClosure)
+
+    @Override
     abstract Task task(String name)
     abstract <T extends Task> T task(String name, Class<T> type)
     abstract <T extends Task> T task(String name, Class<T> type, Object... constructorArgs)

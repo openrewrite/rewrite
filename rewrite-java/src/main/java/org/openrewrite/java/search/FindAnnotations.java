@@ -67,25 +67,15 @@ public class FindAnnotations extends Recipe {
         return Preconditions.check(
                 new JavaIsoVisitor<ExecutionContext>() {
                     @Override
-                    public J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                        if (tree instanceof JavaSourceFile) {
-                            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                            for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                                if (annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
-                                    return SearchResult.found(cu);
-                                }
+                    public J preVisit(J tree, ExecutionContext ctx) {
+                        stopAfterPreVisit();
+                        JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                        for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                            if (annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
+                                return SearchResult.found(cu);
                             }
                         }
-                        return super.visit(tree, ctx);
-                    }
-
-                    @Override
-                    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-                        J.Annotation a = super.visitAnnotation(annotation, ctx);
-                        if (annotationMatcher.matches(annotation)) {
-                            a = SearchResult.found(a);
-                        }
-                        return a;
+                        return tree;
                     }
                 },
                 new JavaIsoVisitor<ExecutionContext>() {

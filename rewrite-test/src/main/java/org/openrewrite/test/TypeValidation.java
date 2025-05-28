@@ -21,6 +21,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
+import java.util.function.Function;
+
 /**
  * Controls the test framework's validation of invariants which are expected to hold true in an LST both before and
  * after the recipe run. Originally this applied only to validating the well-formedness of type metadata in Java LSTs
@@ -89,6 +91,43 @@ public class TypeValidation {
     private boolean cursorAcyclic = true;
 
     /**
+     * Given finer control to client when they need to allow missing type metadata for a specific node.
+     */
+    @Builder.Default
+    private Function<Object, Boolean> allowMissingType = o -> false;
+
+
+    /**
+     * Controls whether the LST is validated not to contain any `J.Erroneous` elements.
+     */
+    @Builder.Default
+    private boolean erroneous = true;
+
+    /**
+     * Controls whether the LST is validated not to contain any `J.Unknown` elements.
+     */
+    @Builder.Default
+    private boolean unknown = true;
+
+    /**
+     * Adding messages to execution context is a side effect which makes the recipe run itself stateful.
+     * Potentially allows recipes to interfere with each other in surprising and hard to debug ways.
+     * Problematic for all the same reasons mutable global variables or singletons are.
+     */
+    @Builder.Default
+    private boolean immutableExecutionContext = true;
+
+    /**
+     * If ScanningRecipe.getScanner() attempts an edit during normal recipe execution it will be silently ignored.
+     * This can be a source of confusion for new recipe authors that don't understand the difference between the
+     * scanning and editing phases of the recipe lifecycle.
+     * This validation raises an error if a scanner attempts an edit. You can disable this validation if your recipe
+     * deliberately attempts an edit during scanning, and you don't care that this edit is ultimately ignored.
+     */
+    @Builder.Default
+    private boolean immutableScanning = true;
+
+    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -99,7 +138,7 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false);
+        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {

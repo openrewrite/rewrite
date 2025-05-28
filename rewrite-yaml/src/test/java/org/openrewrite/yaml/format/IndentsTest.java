@@ -37,26 +37,12 @@ class IndentsTest implements RewriteTest {
         ));
     }
 
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/3531")
-    void multilineString() {
-        rewriteRun(
-          yaml("""
-            foo:
-              bar: >
-                A multiline string.
-              baz:
-                quz: Another string.
-            """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void indentSequence() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                   root:
                       - a: 0
                         b: 0
@@ -71,9 +57,26 @@ class IndentsTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3531")
+    void multilineString() {
+        rewriteRun(
+          yaml(
+                """
+            foo:
+              bar: >
+                A multiline string.
+              baz:
+                quz: Another string.
+            """
+          )
+        );
+    }
+
+    @Test
     void indents() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                   apiVersion: storage.cnrm.cloud.google.com/v1beta1
                   kind: StorageBucket
                   spec:
@@ -103,7 +106,8 @@ class IndentsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1135")
     void maintainIndentSpacingOnMixedTypeSequences() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                 steps:
                   - checkout
                   - run:
@@ -120,7 +124,8 @@ class IndentsTest implements RewriteTest {
     @Test
     void indentSequenceComments() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
               key:
               # a under-indented
                   # a over-indented
@@ -145,7 +150,8 @@ class IndentsTest implements RewriteTest {
     @Test
     void indentMappingComments() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
               key: # no change
               # under-indented
                   # over-indented
@@ -174,7 +180,8 @@ class IndentsTest implements RewriteTest {
     @Test
     void indentRootComments() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                 # over-indented 1
               ---
                 # over-indented 2

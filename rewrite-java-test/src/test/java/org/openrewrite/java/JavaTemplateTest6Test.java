@@ -182,7 +182,7 @@ class JavaTemplateTest6Test implements RewriteTest {
                   if (classDecl.getImplements() == null) {
                       maybeAddImport("java.io.Closeable");
                       maybeAddImport("java.io.Serializable");
-                      return JavaTemplate.builder("Serializable, Closeable").contextSensitive()
+                      return JavaTemplate.builder("Serializable, Closeable")
                         .imports("java.io.*")
                         .build()
                         .apply(getCursor(), classDecl.getCoordinates().replaceImplementsClause());
@@ -246,16 +246,17 @@ class JavaTemplateTest6Test implements RewriteTest {
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getThrows() == null) {
                       return JavaTemplate.builder("Exception")
-                        .contextSensitive()
                         .build()
                         .apply(getCursor(), method.getCoordinates().replaceThrows());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-              assertThat(testMethodDecl.getMethodType().getThrownExceptions().stream().map(JavaType.FullyQualified::getFullyQualifiedName))
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+              assertThat(testMethodDecl.getMethodType().getThrownExceptions().stream()
+                .map(JavaType.FullyQualified.class::cast)
+                .map(JavaType.FullyQualified::getFullyQualifiedName))
                 .containsExactly("java.lang.Exception");
           }),
           java(
@@ -290,11 +291,11 @@ class JavaTemplateTest6Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
               assertThat(type).isNotNull();
               var paramTypes = type.getParameterTypes();
-              assertThat(paramTypes.get(0))
+              assertThat(paramTypes.getFirst())
                 .as("The method declaration's type's genericSignature first argument should have type 'java.util.List'")
                 .matches(tType -> tType instanceof JavaType.FullyQualified &&
                                   TypeUtils.asFullyQualified(tType).getFullyQualifiedName().equals("java.util.List"));
@@ -360,7 +361,7 @@ class JavaTemplateTest6Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  var statement = method.getBody().getStatements().get(0);
+                  var statement = method.getBody().getStatements().getFirst();
                   if (statement instanceof J.Unary) {
                       return JavaTemplate.builder("n = 1;")
                         .contextSensitive()
@@ -436,7 +437,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (matcher.matches(method)) {
                       return JavaTemplate.apply("new Integer(#{any()})",
-                        getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                        getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
                   }
                   return super.visitMethodInvocation(method, p);
               }

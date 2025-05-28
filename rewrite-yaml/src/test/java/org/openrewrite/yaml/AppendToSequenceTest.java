@@ -444,4 +444,152 @@ class AppendToSequenceTest implements RewriteTest {
               """,
             sourceSpec -> sourceSpec.path("devops/deploy/dev-vars.yaml")));
     }
+
+    @Test
+    void appendWithJsonPathThatFiltersSequenceByAttributeValue() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              //language=jsonpath
+              "$..[?(@.name == 'quick')].build",
+              "name: command 3",
+              null,
+              null
+            )),
+          yaml(
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 4
+                    - name: command 5
+              """,
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+                    - name: command 3
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 4
+                    - name: command 5
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendWithIndexedJsonPathThatFiltersSequenceByAttributeValue() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              //language=jsonpath
+              "$.build_types.build_type[?(@.name == 'quick')][1].build",
+              "name: command 6",
+              null,
+              null
+            )),
+          yaml(
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+              """,
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendWithWildcardedJsonPathThatFiltersSequenceByAttributeValue() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              //language=jsonpath
+              "$.build_types.build_type[?(@.name == 'quick')].build[*]",
+              "name: all commands",
+              null,
+              null
+            )),
+          yaml(
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """,
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+                    - name: all commands
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+                    - name: all commands
+              """
+          )
+        );
+    }
 }

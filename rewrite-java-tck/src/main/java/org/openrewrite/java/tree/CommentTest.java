@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -45,6 +46,50 @@ class CommentTest implements RewriteTest {
           java(
             """
               class Test {// /*
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4995")
+    @Test
+    void trailingComment() {
+        rewriteRun(
+          java(
+            """
+              abstract class Test {
+                void alert(String msg) /*-{ $wnd.alert(msg); }-*/;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentAsLastLine() {
+        rewriteRun(
+          java(
+            """
+            class A {
+            }
+            //
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/5090")
+    void multiLineCommentWithUrl() {
+        rewriteRun(
+          java(
+            """
+              package hello;
+              public class Test {
+                public static void test() {
+                  /*addItem("Site A", "https://hello.com/A");*/
+                }
               }
               """
           )
