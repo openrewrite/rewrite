@@ -40,8 +40,12 @@ import org.openrewrite.semver.Semver;
 
 import java.util.List;
 
+/**
+ * @deprecated in favor of {@link org.openrewrite.gradle.plugins.UpgradePluginVersion}.
+ */
 @Value
 @EqualsAndHashCode(callSuper = false)
+@Deprecated
 public class ChangePluginVersion extends Recipe {
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
 

@@ -15,9 +15,9 @@
  */
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, J, Statement} from "../java";
+import {Comment, emptySpace, J, Statement} from "../java";
 import {Draft, produce} from "immer";
-import {Cursor, isTree, Tree} from "../tree";
+import {Cursor, Tree} from "../tree";
 import {
     BlankLinesStyle,
     SpacesStyle,
@@ -30,19 +30,44 @@ import {produceAsync} from "../visitor";
 
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
-        const spacesStyle = styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle;
-        const wrappingAndBracesStyle = styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle;
-        const blankLinesStyle = styleFromSourceFile(StyleKind.BlankLinesStyle, tree) as BlankLinesStyle;
-        const tabsAndIndentsStyle = styleFromSourceFile(StyleKind.TabsAndIndentsStyle, tree) as TabsAndIndentsStyle;
-        let t: R | undefined = tree as R;
-        // TODO possibly cursor.fork
+        const visitors = [
+            new NormalizeWhitespaceVisitor(),
+            new MinimumViableSpacingVisitor(),
+            new BlankLinesVisitor(styleFromSourceFile(StyleKind.BlankLinesStyle, tree) as BlankLinesStyle),
+            new WrappingAndBracesVisitor(styleFromSourceFile(StyleKind.WrappingAndBracesStyle, tree) as WrappingAndBracesStyle),
+            new SpacesVisitor(styleFromSourceFile(StyleKind.SpacesStyle, tree) as SpacesStyle),
+            new TabsAndIndentsVisitor(styleFromSourceFile(StyleKind.TabsAndIndentsStyle, tree) as TabsAndIndentsStyle),
+        ]
 
-        t = t && await new MinimumViableSpacingVisitor().visit(t, p, cursor);
-        t = t && await new BlankLinesVisitor(blankLinesStyle).visit(t, p, cursor);
-        t = t && await new WrappingAndBracesVisitor(wrappingAndBracesStyle).visit(t, p, cursor);
-        t = t && await new SpacesVisitor(spacesStyle).visit(t, p, cursor);
-        t = t && await new TabsAndIndentsVisitor(tabsAndIndentsStyle).visit(t, p, cursor);
+        let t: R | undefined = tree as R;
+        for (const visitor of visitors) {
+            t = await visitor.visit(t, p, cursor);
+            if (t === undefined) {
+                return undefined;
+            }
+        }
         return t;
+    }
+}
+
+export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
+    // called NormalizeFormat in Java
+
+    protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: P): Promise<J | undefined> {
+        const ret = await super.visitScopedVariableDeclarations(scopedVariableDeclarations, p) as JS.ScopedVariableDeclarations;
+        return produce(ret, draft => {
+            if (draft.scope) {
+                this.concatenatePrefix(draft, draft.scope!.before);
+                draft.scope!.before = emptySpace;
+            }
+        });
+    }
+
+    private concatenatePrefix(node: Draft<J>, right: J.Space) {
+        // TODO look at https://github.com/openrewrite/rewrite/commit/990a366fab9e5656812d81d0eb15ecb6bfd2fde0#diff-ec2e977fe8f1e189735e71b817f8f1ebaf79c1490c0210652e8a559f7f7877de
+        // and possibly incorporate it here - some special logic needed to merge comments better (?)
+        node.prefix.comments = [...node.prefix.comments, ...right.comments];
+        node.prefix.whitespace = node.prefix.whitespace + right.whitespace;
     }
 }
 
@@ -112,7 +137,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 property = this.style.aroundOperators.shift
                 break;
             default:
-                // TODO support arrowFunction, beforeUnaryNotAndNotNull, afterUnaryNotAndNotNull
                 throw new Error("Unsupported operator type " + ret.operator.element.valueOf());
         }
         return produce(ret, draft => {
@@ -331,7 +355,9 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 catch_ = await this.spaceBefore(catch_, this.style.beforeKeywords.catchKeyword);
                 catch_.parameter.prefix.whitespace = this.style.beforeParentheses.catchParentheses ? " " : "";
                 catch_.parameter.tree = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(catch_.parameter.tree, this.style.within.catchParentheses), this.style.within.catchParentheses);
-                catch_.parameter.tree.element.variables[catch_.parameter.tree.element.variables.length - 1].after.whitespace = "";
+                if (catch_.parameter.tree.element.variables.length > 0) {
+                    catch_.parameter.tree.element.variables[catch_.parameter.tree.element.variables.length - 1].after.whitespace = "";
+                }
                 catch_.body.prefix.whitespace = this.style.beforeLeftBrace.catchLeftBrace ? " " : "";
                 return catch_;
             }));
@@ -669,9 +695,9 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
                 });
             }
             c = produce(c, draft => {
-                // TODO convert it to a usual draft syntax and use this.ensuresSpace()
-                draft.modifiers = draft.modifiers.map((m, i) => i > 0 && m.prefix.whitespace === "" ?
-                    {...m, prefix: {...m.prefix, whitespace: " "}} : m);
+                for (let i = 1; i < draft.modifiers.length; i++) {
+                    this.ensureSpace(draft.modifiers[i].prefix);
+                }
             });
             first = false;
         }
@@ -730,10 +756,9 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
                 });
             }
             m = produce(m, draft => {
-                draft.modifiers = draft.modifiers.map((mod, i) =>
-                    i > 0 && mod.prefix.whitespace === "" ?
-                        {...mod, prefix: {...mod.prefix, whitespace: " "}} : mod
-                );
+                for (let i = 1; i < draft.modifiers.length; i++) {
+                    this.ensureSpace(draft.modifiers[i].prefix);
+                }
             });
             first = false;
         }
@@ -835,11 +860,9 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
 
         if (first && ret.modifiers.length > 0) {
             ret = produce(ret, draft => {
-                draft.modifiers = draft.modifiers.map((m, i) =>
-                    i > 0 && m.prefix.whitespace === "" ?
-                        // TODO convert it to a usual draft syntax and use this.ensuresSpace()
-                        {...m, prefix: {...m.prefix, whitespace: " "}} : m
-                );
+                for (let i = 1; i < draft.modifiers.length; i++) {
+                    this.ensureSpace(draft.modifiers[i].prefix);
+                }
             });
             first = false;
         }
@@ -1077,7 +1100,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             }
             if (draft.kind === J.Kind.Block) {
                 const block = draft as Draft<J> as Draft<J.Block>;
-                block.end.whitespace = this.newline + relativeIndent;
+                block.end.whitespace = this.combineIndent(block.end.whitespace, relativeIndent);
             }
         });
     }

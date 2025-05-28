@@ -377,7 +377,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSendList(tag, el => el.attributes, attr => attr.element.id, attr => this.visitRightPadded(attr, q));
 
         await q.getAndSend(tag, el => el.selfClosing, space => this.visitSpace(space, q));
-        await q.getAndSendList(tag, el => el.children!, child => child.element.id, child => this.visitRightPadded(child, q));
+        await q.getAndSendList(tag, el => el.children!, child => child.id, child => this.visit(child, q));
         await q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
         await q.getAndSend(tag, el => el.afterClosingName, el => this.visitSpace(el, q));
 
@@ -943,7 +943,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.attributes = await q.receiveListDefined(draft.attributes, attr => this.visitRightPadded(attr, q));
 
         draft.selfClosing = await q.receive(draft.selfClosing, space => this.visitSpace(space, q));
-        draft.children = await q.receiveListDefined(draft.children, child => this.visitRightPadded(child, q));
+        draft.children = await q.receiveListDefined(draft.children, child => this.visit(child, q));
         draft.closingName = await q.receive(draft.closingName, el => this.visitLeftPadded(el, q));
         draft.afterClosingName = await q.receive(draft.afterClosingName, el => this.visitSpace(el, q));
 
