@@ -102,35 +102,16 @@ public class UpdateJavaCompatibility extends Recipe {
 
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                doAfterVisit(new JavaIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                        if (tree instanceof G.CompilationUnit) {
-                            G.CompilationUnit c = (G.CompilationUnit) super.visit(tree, ctx);
-                            if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
-                                c = addCompatibilityTypeToSourceFile(c, "source", ctx);
-                            }
-                            if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
-                                c = addCompatibilityTypeToSourceFile(c, "target", ctx);
-                            }
-                            return c;
-                        }
-                        return (J) tree;
+                Tree t = super.visit(tree, ctx);
+                if (t instanceof G.CompilationUnit) {
+                    if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
+                        t = addCompatibilityTypeToSourceFile((G.CompilationUnit) t, "source", ctx);
                     }
-                });
-                return super.visit(tree, ctx);
-            }
-
-            @Override
-            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
-                if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
-                    c = addCompatibilityTypeToSourceFile(c, "source", ctx);
+                    if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
+                        t = addCompatibilityTypeToSourceFile((G.CompilationUnit) t, "target", ctx);
+                    }
                 }
-                if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
-                    c = addCompatibilityTypeToSourceFile(c, "target", ctx);
-                }
-                return c;
+                return (J) t;
             }
 
             @Override
@@ -140,10 +121,10 @@ public class UpdateJavaCompatibility extends Recipe {
                 if (a.getVariable() instanceof J.Identifier) {
                     J.Identifier variable = (J.Identifier) a.getVariable();
                     if ("sourceCompatibility".equals(variable.getSimpleName())) {
-                        getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, a.getAssignment());
+                        getCursor().getRoot().putMessage(SOURCE_COMPATIBILITY_FOUND, a.getAssignment());
                     }
                     if ("targetCompatibility".equals(variable.getSimpleName())) {
-                        getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, TARGET_COMPATIBILITY_FOUND, a.getAssignment());
+                        getCursor().getRoot().putMessage(TARGET_COMPATIBILITY_FOUND, a.getAssignment());
                     }
 
                     if (compatibilityType == null) {
@@ -191,10 +172,10 @@ public class UpdateJavaCompatibility extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if ("sourceCompatibility".equals(m.getSimpleName())) {
-                    getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, true);
+                    getCursor().getRoot().putMessage(SOURCE_COMPATIBILITY_FOUND, true);
                 }
                 if ("targetCompatibility".equals(m.getSimpleName())) {
-                    getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, TARGET_COMPATIBILITY_FOUND, true);
+                    getCursor().getRoot().putMessage(TARGET_COMPATIBILITY_FOUND, true);
                 }
                 if (javaLanguageVersionMatcher.matches(m)) {
                     List<Expression> args = m.getArguments();

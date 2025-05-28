@@ -23,6 +23,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 @SuppressWarnings("GroovyUnusedAssignment")
 class UpdateJavaCompatibilityTest implements RewriteTest {
@@ -52,6 +53,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
           )
         );
     }
+
     @ParameterizedTest
     @CsvSource(textBlock = """
       1.8,1.8,11,11
@@ -470,6 +472,31 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               }
               
               compileJava.options.release = 11
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlindsl() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+              
+              sourceCompatibility = JavaVersion.VERSION_1_8
+              targetCompatibility = JavaVersion.VERSION_1_8
+              """,
+            """
+              plugins {
+                  java
+              }
+
+              sourceCompatibility = JavaVersion.VERSION_11
+              targetCompatibility = JavaVersion.VERSION_1_8
               """
           )
         );
