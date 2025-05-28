@@ -90,13 +90,13 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (isPluginTag(oldGroupId, oldArtifactId)) {
                     if (newGroupId != null) {
-                        t = changeChildTagValue(t, "groupId", newGroupId, ctx);
+                        t = changeChildTagValue2(t, "groupId", newGroupId, ctx);
                     }
                     if (newArtifactId != null) {
-                        t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
+                        t = changeChildTagValue2(t, "artifactId", newArtifactId, ctx);
                     }
                     if (newVersion != null) {
-                        t = changeChildTagValue(t, "version", newVersion, ctx);
+                        t = changeChildTagValue2(t, "version", newVersion, ctx);
                     }
                     if (t != tag) {
                         maybeUpdateModel();
@@ -106,7 +106,7 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                 return t;
             }
 
-            private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
+            private Xml.Tag changeChildTagValue2(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
                 Optional<Xml.Tag> childTag = tag.getChild(childTagName);
                 if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
                     tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
