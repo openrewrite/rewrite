@@ -33,35 +33,37 @@ export class OrderImports extends Recipe {
             protected async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {
                 return produce(cu, draft => {
                     const importCount = this.countImports(cu);
-                    const importsToSort = draft.statements.slice(0, importCount);
+                    const importsToSort = draft.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
                     const restStatements = cu.statements.slice(importCount);
-                    const importsSorted = importsToSort.sort((a, b) => {
-                        const aImport = a.element as JS.Import;
-                        const bImport = b.element as JS.Import;
+                    const originalImportPosition = Object.fromEntries(importsToSort.map((item, i) => [item.element.id, i]));
+                    const importsSorted = importsToSort.sort((aPadded, bPadded) => {
+                        const a = aPadded.element;
+                        const b = bPadded.element;
 
-                        const noSpecifier = (aImport.importClause == undefined ? 1 : 0) - (bImport.importClause == undefined ? 1 : 0);
+                        const noSpecifier = (a.importClause == undefined ? 1 : 0) - (b.importClause == undefined ? 1 : 0);
                         if (noSpecifier != 0) {
                             return -noSpecifier;
                         }
-                        const asterisk = this.isAsteriskImport(aImport) - this.isAsteriskImport(bImport);
+                        const asterisk = this.isAsteriskImport(a) - this.isAsteriskImport(b);
                         if (asterisk != 0) {
                             return -asterisk;
                         }
-                        const multipleImport = this.isMultipleImport(aImport) - this.isMultipleImport(bImport);
+                        const multipleImport = this.isMultipleImport(a) - this.isMultipleImport(b);
                         if (multipleImport != 0) {
                             return -multipleImport;
                         }
-                        const comparedSpecifiers = this.compareStringArrays(this.extractImportSpecifierNames(aImport), this.extractImportSpecifierNames(bImport));
+                        const comparedSpecifiers = this.compareStringArrays(this.extractImportSpecifierNames(a), this.extractImportSpecifierNames(b));
                         if (comparedSpecifiers != 0) {
                             return comparedSpecifiers;
                         }
-                        return 0; // TODO, have some tiebreakers, 0 might actually confuse the sorting algorithm
+                        // Tiebreaker, keep the sort stable
+                        return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
                     });
                     draft.statements = [...importsSorted, ...restStatements];
                     for (let i = 0; i < importsSorted.length; i++) {
                         draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
                     }
-                    // TODO deal with prefixes
+                    // TODO deal with comments in the whitespace around imports
                 });
             }
 
@@ -81,7 +83,7 @@ export class OrderImports extends Recipe {
                     if (import_.importClause.namedBindings != undefined) {
                         if (import_.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                             const namedImports = import_.importClause.namedBindings as JS.NamedImports;
-                            if (namedImports.elements.kind == J.Kind.JContainer) {
+                            if (namedImports.elements.kind == J.Kind.Container) {
                                 return namedImports.elements.elements.length > 1 ? 1 : 0;
                             }
                         }
@@ -96,7 +98,7 @@ export class OrderImports extends Recipe {
                     if (import_.importClause.namedBindings != undefined) {
                         if (import_.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                             const namedImports = import_.importClause.namedBindings as JS.NamedImports;
-                            if (namedImports.elements.kind == J.Kind.JContainer) {
+                            if (namedImports.elements.kind == J.Kind.Container) {
                                 const elements = namedImports.elements.elements;
                                 for (let i = 0; i < elements.length; i++) {
                                     if (elements[i].element.kind == JS.Kind.Alias) {
