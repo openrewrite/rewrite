@@ -503,9 +503,9 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     }
 
     @Test
-    void SourceCompatibilityInKotlinDSL() {
+    void addCompatibilityInKotlinDSL() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, true)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, true)),
           buildGradleKts(
             """
               plugins {
@@ -519,6 +519,63 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               
               java {
                   sourceCompatibility = JavaVersion.VERSION_11
+                  targetCompatibility = JavaVersion.VERSION_11
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handlesJavaToolchainsInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+              
+              java {
+                  toolchain {
+                      languageVersion.set(JavaLanguageVersion.of(8))
+                  }
+              }
+              """,
+            """
+              plugins {
+                  java
+              }
+              
+              java {
+                  toolchain {
+                      languageVersion.set(JavaLanguageVersion.of(11))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void toVersionInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradleKts(
+            """
+              version = "0.1.0-SNAPSHOT"
+              group = "com.example"
+              java {
+                  sourceCompatibility = JavaVersion.toVersion("1.8")
+                  targetCompatibility = JavaVersion.toVersion("1.8")
+              }
+              """,
+            """
+              version = "0.1.0-SNAPSHOT"
+              group = "com.example"
+              java {
+                  sourceCompatibility = JavaVersion.toVersion("11")
+                  targetCompatibility = JavaVersion.toVersion("11")
               }
               """
           )
