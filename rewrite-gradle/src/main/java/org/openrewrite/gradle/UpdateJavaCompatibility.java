@@ -25,11 +25,15 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -106,6 +110,14 @@ public class UpdateJavaCompatibility extends Recipe {
                     }
                     if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
                         t = addCompatibilityTypeToSourceFile((G.CompilationUnit) t, "target", ctx);
+                    }
+                }
+                if (t instanceof K.CompilationUnit) {
+                    if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
+                        t = addCompatibilityTypeToSourceFile((K.CompilationUnit) t, "source", ctx);
+                    }
+                    if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
+                        t = addCompatibilityTypeToSourceFile((K.CompilationUnit) t, "target", ctx);
                     }
                 }
                 return (J) t;
@@ -394,13 +406,28 @@ public class UpdateJavaCompatibility extends Recipe {
             G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse(ctx, "\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
-            sourceFile.getStatements();
+            c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+        }
+        return c;
+    }
+
+    private K.CompilationUnit addCompatibilityTypeToSourceFile(K.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
+        if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
+            K.CompilationUnit sourceFile = (K.CompilationUnit) KotlinParser.builder()
+                    .isKotlinScript(true)
+                    .build().parse(ctx, "\n\njava {\n    " + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum) + "\n}")
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
             c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
         }
         return c;
     }
 
     private String styleMissingCompatibilityVersion() {
+        return styleMissingCompatibilityVersion(declarationStyle);
+    }
+
+    private String styleMissingCompatibilityVersion(DeclarationStyle declarationStyle) {
         if (declarationStyle == DeclarationStyle.String) {
             return version <= 8 ? "'1." + version + "'" : "'" + version + "'";
         } else if (declarationStyle == DeclarationStyle.Enum) {
@@ -410,6 +437,8 @@ public class UpdateJavaCompatibility extends Recipe {
         }
         return String.valueOf(version);
     }
+
+
 
     public enum CompatibilityType {
         source, target

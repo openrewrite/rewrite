@@ -478,7 +478,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     }
 
     @Test
-    void kotlindsl() {
+    void updateExisitingSourceCompatibilityInKotlinDSL() {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, null)),
           buildGradleKts(
@@ -497,6 +497,29 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               
               sourceCompatibility = JavaVersion.VERSION_11
               targetCompatibility = JavaVersion.VERSION_1_8
+              """
+          )
+        );
+    }
+
+    @Test
+    void SourceCompatibilityInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, true)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+              """,
+            """
+              plugins {
+                  java
+              }
+              
+              java {
+                  sourceCompatibility = JavaVersion.VERSION_11
+              }
               """
           )
         );
