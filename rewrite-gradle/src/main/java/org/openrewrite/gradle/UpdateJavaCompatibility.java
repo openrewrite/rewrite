@@ -26,6 +26,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -101,21 +102,11 @@ public class UpdateJavaCompatibility extends Recipe {
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 Tree t = super.visit(tree, ctx);
-                if (t instanceof G.CompilationUnit) {
-                    if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
-                        t = addCompatibilityTypeToSourceFile((G.CompilationUnit) t, "source", ctx);
-                    }
-                    if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
-                        t = addCompatibilityTypeToSourceFile((G.CompilationUnit) t, "target", ctx);
-                    }
+                if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
+                    t = addCompatibilityTypeToSourceFile(t, "source", ctx);
                 }
-                if (t instanceof K.CompilationUnit) {
-                    if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
-                        t = addCompatibilityTypeToSourceFile((K.CompilationUnit) t, "source", ctx);
-                    }
-                    if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
-                        t = addCompatibilityTypeToSourceFile((K.CompilationUnit) t, "target", ctx);
-                    }
+                if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
+                    t = addCompatibilityTypeToSourceFile(t, "target", ctx);
                 }
                 return (J) t;
             }
@@ -406,6 +397,16 @@ public class UpdateJavaCompatibility extends Recipe {
         });
     }
 
+    private J addCompatibilityTypeToSourceFile(Tree t, String compatibilityType, ExecutionContext ctx) {
+        if (t instanceof G.CompilationUnit) {
+            return addCompatibilityTypeToSourceFile((G.CompilationUnit) t, compatibilityType, ctx);
+        }
+        if (t instanceof K.CompilationUnit) {
+            return addCompatibilityTypeToSourceFile((K.CompilationUnit) t, compatibilityType, ctx);
+        }
+        return (J) t;
+    }
+
     private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
         if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
             G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse(ctx, "\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
@@ -422,6 +423,7 @@ public class UpdateJavaCompatibility extends Recipe {
             if (withExistingJavaMethod != c) {
                 return (K.CompilationUnit) withExistingJavaMethod;
             }
+
             K.CompilationUnit sourceFile = (K.CompilationUnit) KotlinParser.builder()
                     .isKotlinScript(true)
                     .build().parse(ctx, "\n\njava {\n    " + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum) + "\n}")
