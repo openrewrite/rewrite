@@ -150,4 +150,25 @@ describe('AutoformatVisitor', () => {
             `)
             // @formatter:on
         )});
+
+    test('try catch-all', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            try {
+                m();
+            } catch {
+                console.log("It failed", e);
+            }
+            `,
+                `
+            try {
+                m();
+            } catch {
+                console.log("It failed", e);
+            }
+            `)
+            // @formatter:on
+        )});
 });
