@@ -419,7 +419,7 @@ public class UpdateJavaCompatibility extends Recipe {
     private K.CompilationUnit addCompatibilityTypeToSourceFile(K.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
         if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
             J withExistingJavaMethod = maybeAddToExistingJavaMethod(c, compatibilityType, ctx);
-            if (withExistingJavaMethod != null) {
+            if (withExistingJavaMethod != c) {
                 return (K.CompilationUnit) withExistingJavaMethod;
             }
             K.CompilationUnit sourceFile = (K.CompilationUnit) KotlinParser.builder()
@@ -434,14 +434,13 @@ public class UpdateJavaCompatibility extends Recipe {
     }
 
     private @Nullable J maybeAddToExistingJavaMethod(K.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
-        AtomicBoolean addedToExistingJavaBlock = new AtomicBoolean(false);
-        J visited = new JavaIsoVisitor<AtomicBoolean>() {
+        return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean addedToExistingJavaBlock) {
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (method.getSimpleName().equals("java")) {
-                    return new JavaIsoVisitor<AtomicBoolean>() {
+                    return new JavaIsoVisitor<ExecutionContext>() {
                         @Override
-                        public J.Lambda visitLambda(J.Lambda lambda, AtomicBoolean atomicBoolean) {
+                        public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
                             J.Block body = (J.Block) lambda.getBody();
                             List<Statement> statements = body.getStatements();
                             K.CompilationUnit sourceFile = (K.CompilationUnit) KotlinParser.builder()
@@ -449,18 +448,13 @@ public class UpdateJavaCompatibility extends Recipe {
                                     .build().parse(ctx, "\n    " + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum))
                                     .findFirst()
                                     .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
-                            addedToExistingJavaBlock.set(true);
                             return lambda.withBody(body.withStatements(ListUtils.concatAll(statements, sourceFile.getStatements())));
                         }
-                    }.visitMethodInvocation(method, addedToExistingJavaBlock);
+                    }.visitMethodInvocation(method, ctx);
                 }
-                return super.visitMethodInvocation(method, addedToExistingJavaBlock);
+                return super.visitMethodInvocation(method, ctx);
             }
-        }.visit(c, addedToExistingJavaBlock);
-        if (addedToExistingJavaBlock.get()) {
-            return visited;
-        }
-        return null;
+        }.visit(c, ctx);
     }
 
     private String styleMissingCompatibilityVersion() {
