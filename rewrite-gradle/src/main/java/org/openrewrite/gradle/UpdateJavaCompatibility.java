@@ -23,7 +23,10 @@ import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.TreeVisitingPrinter;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -91,11 +94,32 @@ public class UpdateJavaCompatibility extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             final MethodMatcher sourceCompatibilityDsl = new MethodMatcher("RewriteGradleProject setSourceCompatibility(..)");
             final MethodMatcher targetCompatibilityDsl = new MethodMatcher("RewriteGradleProject setTargetCompatibility(..)");
             final MethodMatcher javaLanguageVersionMatcher = new MethodMatcher("org.gradle.jvm.toolchain.JavaLanguageVersion of(int)");
             final MethodMatcher javaVersionToVersionMatcher = new MethodMatcher("org.gradle.api.JavaVersion toVersion(..)");
+
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                doAfterVisit(new JavaIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (tree instanceof G.CompilationUnit) {
+                            G.CompilationUnit c = (G.CompilationUnit) super.visit(tree, ctx);
+                            if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
+                                c = addCompatibilityTypeToSourceFile(c, "source", ctx);
+                            }
+                            if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
+                                c = addCompatibilityTypeToSourceFile(c, "target", ctx);
+                            }
+                            return c;
+                        }
+                        return (J) tree;
+                    }
+                });
+                return super.visit(tree, ctx);
+            }
 
             @Override
             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
@@ -110,8 +134,8 @@ public class UpdateJavaCompatibility extends Recipe {
             }
 
             @Override
-            public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
-                J.Assignment a = (J.Assignment) super.visitAssignment(assignment, ctx);
+            public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+                J.Assignment a = super.visitAssignment(assignment, ctx);
 
                 if (a.getVariable() instanceof J.Identifier) {
                     J.Identifier variable = (J.Identifier) a.getVariable();
@@ -164,8 +188,8 @@ public class UpdateJavaCompatibility extends Recipe {
             }
 
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if ("sourceCompatibility".equals(m.getSimpleName())) {
                     getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, true);
                 }
