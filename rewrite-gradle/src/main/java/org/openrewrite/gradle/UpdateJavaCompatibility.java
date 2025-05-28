@@ -183,7 +183,7 @@ public class UpdateJavaCompatibility extends Recipe {
                 if ("targetCompatibility".equals(m.getSimpleName())) {
                     getCursor().getRoot().putMessage(TARGET_COMPATIBILITY_FOUND, true);
                 }
-                if (isMaybeMethodInvocation(m, "JavaLanguageVersion", "of")) {
+                if (isMethodInvocation(m, "JavaLanguageVersion", "of")) {
                     List<Expression> args = m.getArguments();
 
                     if (args.size() == 1 && args.get(0) instanceof J.Literal) {
@@ -256,7 +256,7 @@ public class UpdateJavaCompatibility extends Recipe {
                     J.FieldAccess field = (J.FieldAccess) expression;
                     J.Identifier identifier = field.getName();
                     return getMajorVersion(identifier.getSimpleName());
-                } else if (isMaybeMethodInvocation(expression, "JavaVersion", "toVersion")) {
+                } else if (isMethodInvocation(expression, "JavaVersion", "toVersion")) {
                     J.MethodInvocation method = (J.MethodInvocation) expression;
                     if (method.getArguments().get(0) instanceof J.Literal) {
                         return getMajorVersion(method.getArguments().get(0));
@@ -349,7 +349,7 @@ public class UpdateJavaCompatibility extends Recipe {
                             expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
                         }
                     }
-                } else if (isMaybeMethodInvocation(expression, "JavaVersion", "toVersion")) {
+                } else if (isMethodInvocation(expression, "JavaVersion", "toVersion")) {
                     J.MethodInvocation m = (J.MethodInvocation) expression;
                     if (style == null) {
                         expression = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
@@ -396,7 +396,7 @@ public class UpdateJavaCompatibility extends Recipe {
                 return expression;
             }
 
-            private boolean isMaybeMethodInvocation(J expression, String clazz, String method) {
+            private boolean isMethodInvocation(J expression, String clazz, String method) {
                 return
                         expression instanceof J.MethodInvocation &&
                                 ((J.MethodInvocation) expression).getSimpleName().equals(method) &&
