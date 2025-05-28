@@ -25,6 +25,7 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -177,13 +178,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 if (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId)) {
                     String groupId = newGroupId;
                     if (groupId != null) {
-                        t = changeChildTagValue(t, "groupId", groupId, ctx);
+                        t = changeChildTagValue2(t, "groupId", groupId, ctx);
                     } else {
                         groupId = t.getChildValue("groupId").orElseThrow(NoSuchElementException::new);
                     }
                     String artifactId = newArtifactId;
                     if (artifactId != null) {
-                        t = changeChildTagValue(t, "artifactId", artifactId, ctx);
+                        t = changeChildTagValue2(t, "artifactId", artifactId, ctx);
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }
@@ -207,7 +208,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
                                     // Otherwise, change the version to the new value.
-                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                    t = changeChildTagValue2(t, "version", resolvedNewVersion, ctx);
                                 }
                             } else if (configuredToOverrideManageVersion || !newDependencyManaged) {
                                 //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
@@ -238,7 +239,17 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                         .anyMatch(rd -> (version == null) || version.equals(rd.getVersion()));
             }
 
+            @Deprecated // Use changeChildTagValue from MavenVisitor instead: https://github.com/openrewrite/rewrite/pull/5516
+            private Xml.Tag changeChildTagValue2(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
+                Optional<Xml.Tag> childTag = tag.getChild(childTagName);
+                if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
+                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
+                }
+                return tag;
+            }
+
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
+
                 MavenResolutionResult result = getResolutionResult();
                 for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
