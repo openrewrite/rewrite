@@ -355,7 +355,9 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 catch_ = await this.spaceBefore(catch_, this.style.beforeKeywords.catchKeyword);
                 catch_.parameter.prefix.whitespace = this.style.beforeParentheses.catchParentheses ? " " : "";
                 catch_.parameter.tree = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(catch_.parameter.tree, this.style.within.catchParentheses), this.style.within.catchParentheses);
-                catch_.parameter.tree.element.variables[catch_.parameter.tree.element.variables.length - 1].after.whitespace = "";
+                if (catch_.parameter.tree.element.variables.length > 0) {
+                    catch_.parameter.tree.element.variables[catch_.parameter.tree.element.variables.length - 1].after.whitespace = "";
+                }
                 catch_.body.prefix.whitespace = this.style.beforeLeftBrace.catchLeftBrace ? " " : "";
                 return catch_;
             }));
