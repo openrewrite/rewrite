@@ -4012,7 +4012,7 @@ public interface J extends Tree, RpcCodec<J> {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return methodType == null ? null : methodType.getReturnType();
         }
 
@@ -5100,7 +5100,7 @@ public interface J extends Tree, RpcCodec<J> {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return tree.getElement() instanceof Expression ? ((Expression) tree.getElement()).getType() :
                     tree.getElement() instanceof NameTree ? ((NameTree) tree.getElement()).getType() :
                             null;
