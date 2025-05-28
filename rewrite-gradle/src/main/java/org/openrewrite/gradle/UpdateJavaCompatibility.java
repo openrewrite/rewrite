@@ -17,7 +17,6 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.gradle.jvm.toolchain.JavaLanguageVersion;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
@@ -25,7 +24,6 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.search.FindMethodDeclaration;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.tree.K;
@@ -34,10 +32,7 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -406,7 +401,7 @@ public class UpdateJavaCompatibility extends Recipe {
                         expression instanceof J.MethodInvocation &&
                                 ((J.MethodInvocation) expression).getSimpleName().equals(method) &&
                                 ((J.MethodInvocation) expression).getSelect() instanceof J.Identifier &&
-                                ((J.Identifier) ((J.MethodInvocation)expression).getSelect()).getSimpleName().equals(clazz);
+                                ((J.Identifier) ((J.MethodInvocation) expression).getSelect()).getSimpleName().equals(clazz);
             }
         });
     }
@@ -462,7 +457,7 @@ public class UpdateJavaCompatibility extends Recipe {
                 return super.visitMethodInvocation(method, addedToExistingJavaBlock);
             }
         }.visit(c, addedToExistingJavaBlock);
-        if(addedToExistingJavaBlock.get()) {
+        if (addedToExistingJavaBlock.get()) {
             return visited;
         }
         return null;
