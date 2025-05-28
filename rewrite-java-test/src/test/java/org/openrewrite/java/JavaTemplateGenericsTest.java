@@ -51,7 +51,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().getFirst();
                   if ("o".equals(variable.getSimpleName())) {
                       Expression exp = Objects.requireNonNull(variable.getInitializer());
@@ -65,7 +65,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
                       assertThat(res4.getMethodType()).isNotNull();
                       return res3;
                   }
-                  return super.visitVariableDeclarations(multiVariable, executionContext);
+                  return super.visitVariableDeclarations(multiVariable, ctx);
               }
           })),
           java(
@@ -135,8 +135,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
           })),
           java(
@@ -178,8 +178,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   .build();
 
                 @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                    return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
                 }
             })),
           java(
@@ -221,8 +221,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
                 .build();
 
               @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
           })),
           java(
@@ -257,8 +257,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
                 .build();
 
               @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
           })),
           java(
@@ -309,12 +309,12 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   .build();
 
                 @Override
-                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
+                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                     JavaTemplate.Matcher matcher = refTemplate.matcher(getCursor());
                     if (matcher.find()) {
                         return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
                     } else {
-                        return super.visitMemberReference(memberRef, executionContext);
+                        return super.visitMemberReference(memberRef, ctx);
                     }
                 }
             })),
@@ -366,12 +366,12 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   .build();
 
                 @Override
-                public J visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
+                public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
                     JavaTemplate.Matcher matcher = lambdaTemplate.matcher(getCursor());
                     if (matcher.find()) {
                         return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
                     } else {
-                        return super.visitLambda(lambda, executionContext);
+                        return super.visitLambda(lambda, ctx);
                     }
                 }
             })),
@@ -422,12 +422,12 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   .build();
 
                 @Override
-                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
+                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                     JavaTemplate.Matcher matcher = refTemplate.matcher(getCursor());
                     if (matcher.find()) {
                         return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
                     } else {
-                        return super.visitMemberReference(memberRef, executionContext);
+                        return super.visitMemberReference(memberRef, ctx);
                     }
                 }
             })),
