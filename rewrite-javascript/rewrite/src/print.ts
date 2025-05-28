@@ -71,10 +71,10 @@ interface TreePrinter {
 
 export class TreePrinters {
     private static _registry =
-        new Map<string, () => TreePrinter>();
+        new Map<string, TreePrinter>();
 
     static register(kind: string, printer: () => TreeVisitor<any, PrintOutputCapture>): void {
-        this._registry.set(kind, () => new class implements TreePrinter {
+        this._registry.set(kind, {
             async print(tree: Tree, out?: PrintOutputCapture): Promise<string> {
                 const p = out || new PrintOutputCapture();
                 await printer().visit(tree, p);
@@ -97,7 +97,7 @@ export class TreePrinters {
         if (!this._registry.has(sourceFileKind)) {
             throw new Error(`No printer registered for ${sourceFileKind}`)
         }
-        return this._registry.get(sourceFileKind)!();
+        return this._registry.get(sourceFileKind)!;
     }
 
     static print(sourceFile: SourceFile): Promise<string> {
