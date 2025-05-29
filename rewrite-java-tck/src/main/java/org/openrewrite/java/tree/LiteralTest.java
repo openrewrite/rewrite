@@ -237,6 +237,19 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void escapedString() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  String s = "\\t	\\n";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void escapedCharacter() {
         rewriteRun(
           java(
