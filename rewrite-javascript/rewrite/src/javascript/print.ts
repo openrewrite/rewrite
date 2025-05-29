@@ -1923,4 +1923,4 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 }
 
-TreePrinters.register(JS.Kind.CompilationUnit, new JavaScriptPrinter());
+TreePrinters.register(JS.Kind.CompilationUnit, () => new JavaScriptPrinter());

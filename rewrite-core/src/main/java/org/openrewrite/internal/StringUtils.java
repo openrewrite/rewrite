@@ -19,11 +19,11 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -36,7 +36,6 @@ public class StringUtils {
 
     public static @Nullable String trimIndentPreserveCRLF(@Nullable String text) {
         if (text == null) {
-            //noinspection DataFlowIssue
             return null;
         }
         return trimIndent((text.endsWith("\r\n") ? text.substring(0, text.length() - 2) : text)
@@ -227,7 +226,7 @@ public class StringUtils {
             return value;
         }
         return Character.toUpperCase(value.charAt(0)) +
-               value.substring(1);
+                value.substring(1);
     }
 
     public static String uncapitalize(String value) {
@@ -372,49 +371,40 @@ public class StringUtils {
         return new String(multiple);
     }
 
-    public static boolean matchesGlob(@Nullable String value, @Nullable String globPattern) {
-        if ("*".equals(globPattern)) {
+    /**
+     * Checks if a given string matches a specified glob pattern. A glob pattern may include
+     * special characters such as '*' to represent any sequence of characters and '?' to
+     * represent any single character.
+     * <p>
+     * For file path matching, use {@link org.openrewrite.PathUtils#matchesGlob(Path, String)},
+     * which properly interprets '*' and '**' wildcards for file paths.
+     *
+     * @param str the input string to match against the pattern, can be null
+     * @param pattern the glob pattern to evaluate, can be null
+     * @return true if the input string matches the glob pattern, false otherwise
+     * @see org.openrewrite.PathUtils#matchesGlob(Path, String)
+     */
+    public static boolean matchesGlob(@Nullable String str, @Nullable String pattern) {
+        if ("*".equals(pattern)) {
             return true;
-        }
-        if (globPattern == null) {
+        } else if (pattern == null) {
             return false;
         }
-        if (value == null) {
-            value = "";
+
+        if (str == null) {
+            str = "";
         }
 
-        return matchesGlob(
-                globPattern.replace(wrongFileSeparatorChar, File.separatorChar),
-                value.replace(wrongFileSeparatorChar, File.separatorChar),
-                false
-        );
-    }
+        if (str.isEmpty() && !pattern.isEmpty()) {
+            return allStars(pattern, 0, pattern.length() - 1);
+        } else if (pattern.isEmpty()) {
+            return str.isEmpty();
+        }
 
-    private static final char wrongFileSeparatorChar = File.separatorChar == '/' ? '\\' : '/';
-
-    private static boolean matchesGlob(String pattern, String str, boolean caseSensitive) {
         int patIdxStart = 0;
         int patIdxEnd = pattern.length() - 1;
         int strIdxStart = 0;
         int strIdxEnd = str.length() - 1;
-
-        if (!pattern.contains("*")) {
-            // No '*'s, so we make a shortcut
-            if (patIdxEnd != strIdxEnd) {
-                return false; // Pattern and string do not have the same size
-            }
-            for (int i = 0; i <= patIdxEnd; i++) {
-                char ch = pattern.charAt(i);
-                if (ch != '?' && different(caseSensitive, ch, str.charAt(i))) {
-                    return false; // Character mismatch
-                }
-            }
-            return true; // String matches against pattern
-        }
-
-        if (patIdxEnd == 0) {
-            return true; // Pattern contains only '*', which matches anything
-        }
 
         // Process characters before first star
         while (patIdxStart <= patIdxEnd && strIdxStart <= strIdxEnd) {
@@ -422,8 +412,7 @@ public class StringUtils {
             if (ch == '*') {
                 break;
             }
-            if (ch != '?' &&
-                different(caseSensitive, ch, str.charAt(strIdxStart))) {
+            if (ch != '?' && different(ch, str.charAt(strIdxStart))) {
                 return false; // Character mismatch
             }
             patIdxStart++;
@@ -444,7 +433,7 @@ public class StringUtils {
             if (ch == '*') {
                 break;
             }
-            if (ch != '?' && different(caseSensitive, ch, str.charAt(strIdxEnd))) {
+            if (ch != '?' && different(ch, str.charAt(strIdxEnd))) {
                 return false; // Character mismatch
             }
             patIdxEnd--;
@@ -456,7 +445,7 @@ public class StringUtils {
             return allStars(pattern, patIdxStart, patIdxEnd);
         }
 
-        // process pattern between stars. padIdxStart and patIdxEnd point
+        // Process pattern between stars. patIdxStart and patIdxEnd point
         // always to a '*'.
         while (patIdxStart != patIdxEnd && strIdxStart <= strIdxEnd) {
             int patIdxTmp = -1;
@@ -475,18 +464,9 @@ public class StringUtils {
             // strIdxStart & strIdxEnd
             int patLength = (patIdxTmp - patIdxStart - 1);
             int strLength = (strIdxEnd - strIdxStart + 1);
-            int foundIdx = -1;
-            strLoop:
-            for (int i = 0; i <= strLength - patLength; i++) {
-                for (int j = 0; j < patLength; j++) {
-                    char ch = pattern.charAt(patIdxStart + j + 1);
-                    if (ch != '?' && different(caseSensitive, ch, str.charAt(strIdxStart + i + j))) {
-                        continue strLoop;
-                    }
-                }
-                foundIdx = strIdxStart + i;
-                break;
-            }
+
+            int foundIdx = findPatternInString(pattern, patIdxStart + 1, patLength,
+                    str, strIdxStart, strLength);
 
             if (foundIdx == -1) {
                 return false;
@@ -500,6 +480,21 @@ public class StringUtils {
         return allStars(pattern, patIdxStart, patIdxEnd);
     }
 
+    private static int findPatternInString(String pattern, int patStart, int patLength,
+                                           String str, int strStart, int strLength) {
+        strLoop:
+        for (int i = 0; i <= strLength - patLength; i++) {
+            for (int j = 0; j < patLength; j++) {
+                char ch = pattern.charAt(patStart + j);
+                if (ch != '?' && different(ch, str.charAt(strStart + i + j))) {
+                    continue strLoop;
+                }
+            }
+            return strStart + i;
+        }
+        return -1;
+    }
+
     private static boolean allStars(String chars, int start, int end) {
         for (int i = start; i <= end; ++i) {
             if (chars.charAt(i) != '*') {
@@ -509,10 +504,8 @@ public class StringUtils {
         return true;
     }
 
-    private static boolean different(boolean caseSensitive, char ch, char other) {
-        return caseSensitive ?
-                ch != other :
-                Character.toUpperCase(ch) != Character.toUpperCase(other);
+    private static boolean different(char ch, char other) {
+        return Character.toUpperCase(ch) != Character.toUpperCase(other);
     }
 
     public static String indent(String text) {
