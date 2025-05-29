@@ -3316,7 +3316,7 @@ export class JavaScriptParserVisitor {
                     propertyName: this.rightPadded(this.convert(node.propertyName), this.suffix(node.propertyName)),
                     alias: this.convert(node.name)
                 } as JS.Alias
-                : this.convert(node.name),
+                : this.convert(node.name) as J.Identifier,
             type: this.mapType(node),
         };
     }
