@@ -26,8 +26,8 @@ describe("order-imports", () => {
         return spec.rewriteRun(
             typescript(
             `
-            import {delta, gamma} from 'delta.js';
-            import {alpha, beta} from 'alpha.js';
+            import {gamma, delta} from 'delta.js';
+            import {beta as bet, alpha} from 'alpha.js';
             import {b} from 'qux.js';
             import * as foo from 'foo.js';
             import * as bar from 'bar.js';
@@ -38,7 +38,7 @@ describe("order-imports", () => {
             import 'module-without-export.js';
             import * as bar from 'bar.js';
             import * as foo from 'foo.js';
-            import {alpha, beta} from 'alpha.js';
+            import {alpha, beta as bet} from 'alpha.js';
             import {delta, gamma} from 'delta.js';
             import a from 'baz.js';
             import {b} from 'qux.js';

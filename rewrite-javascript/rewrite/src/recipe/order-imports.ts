@@ -15,11 +15,13 @@
  */
 
 import {Recipe} from "../recipe";
-import {TreeVisitor} from "../visitor";
+import {produceAsync, TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor, JS} from "../javascript";
-import {J} from "../java";
-import {produce} from "immer";
+import {Expression, J} from "../java";
+import {Draft, produce} from "immer";
+import {mapAsync} from "../util";
+import {AutoformatVisitor} from "../javascript/format";
 
 export class OrderImports extends Recipe {
     name = "org.openrewrite.OrderImports";
@@ -31,12 +33,13 @@ export class OrderImports extends Recipe {
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
             protected async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {
-                return produce(cu, draft => {
+                return produceAsync(cu, async draft => {
                     const importCount = this.countImports(cu);
-                    const importsToSort = draft.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
+                    const imports = draft.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
                     const restStatements = cu.statements.slice(importCount);
-                    const originalImportPosition = Object.fromEntries(importsToSort.map((item, i) => [item.element.id, i]));
-                    const importsSorted = importsToSort.sort((aPadded, bPadded) => {
+                    const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.element.id, i]));
+                    this.sortNamesWithinEachLine(imports);
+                    imports.sort((aPadded, bPadded) => {
                         const a = aPadded.element;
                         const b = bPadded.element;
 
@@ -59,8 +62,8 @@ export class OrderImports extends Recipe {
                         // Tiebreaker, keep the sort stable
                         return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
                     });
-                    draft.statements = [...importsSorted, ...restStatements];
-                    for (let i = 0; i < importsSorted.length; i++) {
+                    draft.statements = [...imports, ...restStatements];
+                    for (let i = 0; i < imports.length; i++) {
                         draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
                     }
                     // TODO deal with comments in the whitespace around imports
@@ -149,6 +152,29 @@ export class OrderImports extends Recipe {
                     i++;
                 }
                 return i;
+            }
+
+            private async sortNamesWithinEachLine(imports: Draft<J.RightPadded<JS.Import>>[]) {
+                imports.map(async importPadded => {
+                    const import_ = importPadded.element;
+                    if (this.isMultipleImport(import_) == 1) {
+                        const namedImports = import_.importClause!.namedBindings as Draft<JS.NamedImports>;
+                        namedImports.elements.elements.sort((a, b) => {
+                            const namesExtracted: string[] = [a.element, b.element].map(expr => {
+                                const is = expr as JS.ImportSpecifier;
+                                if (is.specifier.kind == JS.Kind.Alias) {
+                                    return (is.specifier as JS.Alias).propertyName.element.simpleName;
+                                } else if (is.specifier.kind == J.Kind.Identifier) {
+                                    return (is.specifier as J.Identifier).simpleName;
+                                } else {
+                                    throw new Error("Unsupported kind " + expr.kind);
+                                }
+                            });
+                            return namesExtracted[0].localeCompare(namesExtracted[1]);
+                        });
+                        import_.importClause!.namedBindings = await new AutoformatVisitor().visit(namedImports, {});
+                    }
+                });
             }
         }
     }
