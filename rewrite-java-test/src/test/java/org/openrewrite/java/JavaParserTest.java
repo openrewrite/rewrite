@@ -431,7 +431,9 @@ class JavaParserTest implements RewriteTest {
                 return temp;
               }
             }
-            """));
+            """
+          )
+        );
     }
 
 }
