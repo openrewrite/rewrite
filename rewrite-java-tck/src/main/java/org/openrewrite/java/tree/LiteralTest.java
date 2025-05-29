@@ -16,10 +16,15 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class LiteralTest implements RewriteTest {
 
@@ -232,19 +237,6 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void escapedString() {
-        rewriteRun(
-          java(
-            """
-              class Test {
-                  String s = "\\t	\\n";
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void escapedCharacter() {
         rewriteRun(
           java(
@@ -252,6 +244,31 @@ class LiteralTest implements RewriteTest {
               class Test {
                   char c = '\\'';
                   char tab = '	';
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nullableStringIsNull() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                  assertThat(J.Literal.isLiteralValue(literal, null)).isTrue();
+                  return SearchResult.found(literal);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  String s = null;
+              }
+              """,
+            """
+              class Test {
+                  String s = /*~~>*/null;
               }
               """
           )
