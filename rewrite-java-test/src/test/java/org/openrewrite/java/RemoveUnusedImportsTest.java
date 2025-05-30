@@ -2085,12 +2085,12 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   Optional<String> optional;
                   Map.Entry<String, String> favoriteEntry;
               }
-            """,
+              """,
             """
               import java.util.HashMap;
               import java.util.Map;
               import java.util.Optional;
-
+                      
               public class Usages {
                   HashMap<String, String> hashMap;
                   Map<String, String> map;
