@@ -852,46 +852,6 @@ public class ResolvedPom {
             }
         }
 
-        private class GroupArtifactScope {
-            final GroupArtifact ga;
-            @Nullable
-            final String type; // Added type field to prevent different types from overwriting each other
-            @Nullable
-            final Scope scope;
-            @Nullable
-            final String classifier;
-
-            GroupArtifactScope(GroupArtifact ga, @Nullable String type, @Nullable Scope scope, @Nullable String classifier) {
-                this.ga = ga;
-                this.type = type;
-                this.scope = scope;
-                this.classifier = classifier;
-            }
-
-            @Override
-            public boolean equals(Object o) {
-                if (this == o) return true;
-                if (!(o instanceof GroupArtifactScope)) return false;
-                GroupArtifactScope that = (GroupArtifactScope) o;
-
-                // Normalize type: null and "jar" are Maven-equivalent for dependency matching
-                String normalizedThisType = this.type == null ? "jar" : this.type;
-                String normalizedThatType = that.type == null ? "jar" : that.type;
-
-                return Objects.equals(ga, that.ga) &&
-                       Objects.equals(normalizedThisType, normalizedThatType) &&
-                       Objects.equals(scope, that.scope) &&
-                       Objects.equals(classifier, that.classifier);
-            }
-
-            @Override
-            public int hashCode() {
-                // Ensure consistent hashing with type normalization to maintain equals/hashCode contract
-                String normalizedType = this.type == null ? "jar" : this.type;
-                return Objects.hash(ga, normalizedType, scope, classifier);
-            }
-        }
-
         @Value
         private class ResolvedManagedDependencyDepth {
             ResolvedManagedDependency dependency;
