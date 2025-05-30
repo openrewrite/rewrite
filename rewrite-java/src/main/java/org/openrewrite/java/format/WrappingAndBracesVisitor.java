@@ -16,6 +16,7 @@
 package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -62,8 +63,26 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
         J.VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
         if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Block) {
+            Cursor possiblyClassDecl = getCursor().getParent(2);
+            WrappingAndBracesStyle.Annotations annotationsStyle;
+            if (possiblyClassDecl != null && possiblyClassDecl.getValue() instanceof J.ClassDeclaration) {
+                annotationsStyle = style.getFieldAnnotations();
+            }else {
+                annotationsStyle = style.getLocalVariableAnnotations();
+            }
 
-            variableDeclarations = variableDeclarations.withLeadingAnnotations(withNewlines(variableDeclarations.getLeadingAnnotations()));
+            Space prefix = variableDeclarations.getPrefix();
+            switch (annotationsStyle.getWrap()) {
+                case DO_NOT_WRAP: break;
+                case WRAP_ALWAYS:
+                    variableDeclarations = variableDeclarations.withLeadingAnnotations(ListUtils.map(variableDeclarations.getLeadingAnnotations(), (index, ann) -> {
+                        if (index == 0) {
+                            ann = ann.withPrefix(prefix);
+                        }
+                        ann = ann.withPrefix(Space.format("\n" + prefix.getWhitespace()));
+                        return ann;
+                    }));
+            }
 
             if (!variableDeclarations.getLeadingAnnotations().isEmpty()) {
                 if (!variableDeclarations.getModifiers().isEmpty()) {
@@ -82,8 +101,18 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
-        // TODO make annotation wrapping configurable
-        m = m.withLeadingAnnotations(withNewlines(m.getLeadingAnnotations()));
+        Space prefix = m.getPrefix();
+        switch (style.getMethodAnnotations().getWrap()) {
+            case DO_NOT_WRAP: break;
+            case WRAP_ALWAYS:
+                m = m.withLeadingAnnotations(ListUtils.map(m.getLeadingAnnotations(), (index, ann) -> {
+                if (index == 0) {
+                    ann = ann.withPrefix(prefix);
+                }
+                ann = ann.withPrefix(Space.format("\n" + prefix.getWhitespace()));
+                return ann;
+            }));
+        }
         if (!m.getLeadingAnnotations().isEmpty()) {
             if (!m.getModifiers().isEmpty()) {
                 m = m.withModifiers(withNewline(m.getModifiers()));
@@ -113,6 +142,21 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 }
             }
         }
+        m = m.withParameters(ListUtils.map(m.getParameters(), (param) -> {
+            Space pref = param.getPrefix();
+            switch (style.getMethodAnnotations().getWrap()) {
+                case DO_NOT_WRAP: break;
+                case WRAP_ALWAYS:
+                    param = param.withLeadingAnnotations(ListUtils.map(param.getLeadingAnnotations(), (index, ann) -> {
+                        if (index == 0) {
+                            ann = ann.withPrefix(prefix);
+                        }
+                        ann = ann.withPrefix(Space.format("\n" + prefix.getWhitespace()));
+                        return ann;
+                    }));
+            }
+            return param;
+        }));
         return m;
     }
 
@@ -135,7 +179,18 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
         // TODO make annotation wrapping configurable
-        j = j.withLeadingAnnotations(withNewlines(j.getLeadingAnnotations()));
+        Space prefix = j.getPrefix();
+        switch (style.getClassAnnotations().getWrap()) {
+            case DO_NOT_WRAP: break;
+            case WRAP_ALWAYS:
+                j = j.withLeadingAnnotations(ListUtils.map(j.getLeadingAnnotations(), (index, ann) -> {
+                    if (index == 0) {
+                        ann = ann.withPrefix(prefix);
+                    }
+                    ann = ann.withPrefix(Space.format("\n" + prefix.getWhitespace()));
+                    return ann;
+                }));
+        }
         if (!j.getLeadingAnnotations().isEmpty()) {
             if (!j.getModifiers().isEmpty()) {
                 j = j.withModifiers(withNewline(j.getModifiers()));

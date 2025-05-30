@@ -15,8 +15,11 @@
  */
 package org.openrewrite.java.style;
 
+import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaStyle;
 
 @Value
@@ -24,6 +27,12 @@ import org.openrewrite.java.JavaStyle;
 public class WrappingAndBracesStyle implements JavaStyle {
 
     IfStatement ifStatement;
+    Annotations classAnnotations;
+    Annotations methodAnnotations;
+    Annotations fieldAnnotations;
+    Annotations parameterAnnotations;
+    Annotations localVariableAnnotations;
+    Annotations enumFieldAnnotations;
 
     public IfStatement getIfStatement() {
         //noinspection ConstantConditions
@@ -34,5 +43,26 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @With
     public static class IfStatement {
         Boolean elseOnNewLine;
+    }
+    public enum Wrap {
+        DO_NOT_WRAP,
+        // TODO implement hard wrap limits before we can implement the `IF_LONG` options
+        WRAP_IF_LONG,
+        CHOP_DOWN_IF_LONG,
+        WRAP_ALWAYS
+    }
+
+    @Value
+    @With
+    @AllArgsConstructor
+    public static class Annotations {
+        Wrap wrap;
+        @Nullable
+        Boolean doNotWrapAfterSingleAnnotation;
+
+        public Annotations(Wrap wrap) {
+            this.wrap = wrap;
+            this.doNotWrapAfterSingleAnnotation = null;
+        }
     }
 }

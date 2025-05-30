@@ -24,6 +24,7 @@ import java.util.Collection;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.style.WrappingAndBracesStyle.Wrap.WRAP_ALWAYS;
 
 public class IntelliJ extends NamedStyles {
     private static final IntelliJ INSTANCE = new IntelliJ();
@@ -95,7 +96,7 @@ public class IntelliJ extends NamedStyles {
     }
 
     public static WrappingAndBracesStyle wrappingAndBraces() {
-        return new WrappingAndBracesStyle(new WrappingAndBracesStyle.IfStatement(false));
+        return new WrappingAndBracesStyle(new WrappingAndBracesStyle.IfStatement(false), new WrappingAndBracesStyle.Annotations(WRAP_ALWAYS), new WrappingAndBracesStyle.Annotations(WRAP_ALWAYS), new WrappingAndBracesStyle.Annotations(WRAP_ALWAYS, false), new WrappingAndBracesStyle.Annotations(WRAP_ALWAYS, false), new WrappingAndBracesStyle.Annotations(WRAP_ALWAYS), new WrappingAndBracesStyle.Annotations(WRAP_ALWAYS));
     }
 
 }
