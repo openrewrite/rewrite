@@ -4386,6 +4386,7 @@ class MavenParserTest implements RewriteTest {
                 pomXml(
                   """
                     <project>
+                      <modelVersion>4.0.0</modelVersion>
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-bom</artifactId>
                       <version>1</version>
