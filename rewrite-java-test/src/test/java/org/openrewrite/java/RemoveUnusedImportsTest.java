@@ -2098,6 +2098,25 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   Map.Entry<String, String> favoriteEntry;
               }
               """
+          ),
+          java(
+            """
+              import java.util.*;
+
+              public class WithoutMap {
+                  Optional<String> optional;
+                  Map.Entry<String, String> favoriteEntry;
+              }
+              """,
+            """
+              import java.util.Map;
+              import java.util.Optional;
+                      
+              public class WithoutMap {
+                  Optional<String> optional;
+                  Map.Entry<String, String> favoriteEntry;
+              }
+              """
           )
         );
     }
