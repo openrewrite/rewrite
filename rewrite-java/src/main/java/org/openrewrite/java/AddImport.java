@@ -213,12 +213,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     return ImportStatus.IMPORT_AMBIGUITY;
                 }
             } else {
-                if (imp.getPackageName().equals(packageName)) {
-                    if (typeName.equals(ending)) {
-                        return ImportStatus.EXPLICITLY_IMPORTED;
-                    } else if ("*".equals(ending)) {
-                        return ImportStatus.IMPLICITLY_IMPORTED;
-                    }
+                String impTypeName = imp.getTypeName().replace('$', '.');
+                if (fullyQualifiedName.equals(impTypeName)) {
+                    return ImportStatus.EXPLICITLY_IMPORTED;
+                } else if ("*".equals(ending) && fullyQualifiedName.startsWith(impTypeName.substring(0, impTypeName.length() - 1))) {
+                    return ImportStatus.IMPLICITLY_IMPORTED;
                 }
                 if (!"*".equals(ending) && ending.equals(typeName)) {
                     return ImportStatus.IMPORT_AMBIGUITY;

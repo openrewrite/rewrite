@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
@@ -1601,4 +1602,57 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void importWithNestedClass() {
+        final String auxSource = """
+          package com.example;
+          
+          public interface A {
+              enum DataType {
+                  TYPE_1,
+                  TYPE_2
+              }
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                    JavaTemplate template = JavaTemplate.builder(
+                        "DataType d = DataType.TYPE_2;")
+                      .javaParser(JavaParser.fromJavaVersion().dependsOn(auxSource))
+                      .imports("com.example.A.DataType")
+                      .build();
+                    maybeAddImport("com.example.A.DataType");
+                    return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+                }
+            }).withMaxCycles(1))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              auxSource
+            )),
+          java(
+            """
+              import com.example.A;
+              import com.example.A.DataType;
+
+              class Test {
+                  DataType d = DataType.TYPE_1;
+                  A a;
+              }
+              """,
+            """
+            import com.example.A;
+            import com.example.A.DataType;
+
+            class Test {
+                DataType d = DataType.TYPE_2;
+                DataType d = DataType.TYPE_1;
+                A a;
+            }
+            """
+          )
+        );
+    }
+
 }
