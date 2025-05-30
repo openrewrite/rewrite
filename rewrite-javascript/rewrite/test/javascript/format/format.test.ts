@@ -171,4 +171,13 @@ describe('AutoformatVisitor', () => {
             `)
             // @formatter:on
         )});
+
+    test('import', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`import { delta,gamma} from 'delta.js'`,
+                 `import {delta, gamma} from 'delta.js'`)
+            // @formatter:on
+        )});
 });
