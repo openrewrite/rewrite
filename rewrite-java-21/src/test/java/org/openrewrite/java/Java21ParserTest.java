@@ -54,7 +54,6 @@ class Java21ParserTest implements RewriteTest {
           import lombok.Builder;
           
           @Builder
-          @JsonDeserialize(builder = Clazz.ClazzBuilder.class)
           public class Clazz {
           
               private final String accountID;
@@ -66,7 +65,7 @@ class Java21ParserTest implements RewriteTest {
           """;
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         ReloadableJava21Parser build = ReloadableJava21Parser.builder()
-          .classpath("lombok")
+          .classpath("lombok", "jackson")
           .build();
         Stream<SourceFile> sourceFileStream = build.parseInputs(List.of(Parser.Input.fromString(src)), null, ctx);
         Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
