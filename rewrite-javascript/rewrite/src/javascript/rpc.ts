@@ -679,7 +679,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitImportSpecifier(jsImportSpecifier: JS.ImportSpecifier, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(jsImportSpecifier);
         draft.importType = await q.receive(draft.importType, el => this.visitLeftPadded(el, q));
-        draft.specifier = await q.receive(draft.specifier, el => this.visitDefined<Expression>(el, q));
+        draft.specifier = await q.receive(draft.specifier, el => this.visitDefined<JS.Alias | J.Identifier>(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }

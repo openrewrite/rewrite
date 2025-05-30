@@ -394,4 +394,46 @@ class JavaParserTest implements RewriteTest {
           ));
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5445")
+    void parseSwitchBlock() {
+        rewriteRun(
+          java(
+            """
+            public class Foo {
+              private String foo(final int i) {
+                return switch (i) {
+                  case 200:
+                    {
+                      yield "I'm in a block";
+                    }
+                  case 250, 300 -> {
+                      yield "another block";
+                  }
+                  case 400:
+                    yield "single line yield";
+                  default:
+                    yield "default";
+                };
+              }
+              private String mapFoo(final int i) {
+                String temp;
+                switch (i) {
+                  case 100: {
+                    temp = "value in block";
+                    break;
+                  }
+                  case 200, 300-> {
+                    temp = "another value in block";
+                  }
+                  default: temp = "default value";
+                }
+                return temp;
+              }
+            }
+            """
+          )
+        );
+    }
+
 }

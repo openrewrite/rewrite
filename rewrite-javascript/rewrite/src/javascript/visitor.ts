@@ -313,7 +313,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.ImportSpecifier>(importSpecifier, p, async draft => {
             draft.importType = await this.visitLeftPadded(importSpecifier.importType, p);
-            draft.specifier = await this.visitDefined<Expression>(importSpecifier.specifier, p);
+            draft.specifier = await this.visitDefined<JS.Alias | J.Identifier>(importSpecifier.specifier, p);
             draft.type = importSpecifier.type && await this.visitType(importSpecifier.type, p);
         });
     }
