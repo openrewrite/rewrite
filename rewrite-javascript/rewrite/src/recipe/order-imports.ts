@@ -18,9 +18,8 @@ import {Recipe} from "../recipe";
 import {produceAsync, TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor, JS} from "../javascript";
-import {Expression, J} from "../java";
+import {J} from "../java";
 import {Draft, produce} from "immer";
-import {mapAsync} from "../util";
 import {AutoformatVisitor} from "../javascript/format";
 
 export class OrderImports extends Recipe {
@@ -33,38 +32,40 @@ export class OrderImports extends Recipe {
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
             protected async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {
-                return produceAsync(cu, async draft => {
-                    const importCount = this.countImports(cu);
-                    const imports = draft.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
-                    const restStatements = cu.statements.slice(importCount);
-                    const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.element.id, i]));
-                    this.sortNamesWithinEachLine(imports);
-                    imports.sort((aPadded, bPadded) => {
-                        const a = aPadded.element;
-                        const b = bPadded.element;
+                const importCount = this.countImports(cu);
+                const imports = cu.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
+                const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.element.id, i]));
+                const restStatements = cu.statements.slice(importCount);
+                const sortedImports = await this.sortNamesWithinEachLine(imports);
+                sortedImports.sort((aPadded, bPadded) => {
+                    const a = aPadded.element;
+                    const b = bPadded.element;
 
-                        const noSpecifier = (a.importClause == undefined ? 1 : 0) - (b.importClause == undefined ? 1 : 0);
-                        if (noSpecifier != 0) {
-                            return -noSpecifier;
-                        }
-                        const asterisk = this.isAsteriskImport(a) - this.isAsteriskImport(b);
-                        if (asterisk != 0) {
-                            return -asterisk;
-                        }
-                        const multipleImport = this.isMultipleImport(a) - this.isMultipleImport(b);
-                        if (multipleImport != 0) {
-                            return -multipleImport;
-                        }
-                        const comparedSpecifiers = this.compareStringArrays(this.extractImportSpecifierNames(a), this.extractImportSpecifierNames(b));
-                        if (comparedSpecifiers != 0) {
-                            return comparedSpecifiers;
-                        }
-                        // Tiebreaker, keep the sort stable
-                        return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
-                    });
-                    draft.statements = [...imports, ...restStatements];
-                    for (let i = 0; i < imports.length; i++) {
-                        draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
+                    const noSpecifier = (a.importClause == undefined ? 1 : 0) - (b.importClause == undefined ? 1 : 0);
+                    if (noSpecifier != 0) {
+                        return -noSpecifier;
+                    }
+                    const asterisk = this.isAsteriskImport(a) - this.isAsteriskImport(b);
+                    if (asterisk != 0) {
+                        return -asterisk;
+                    }
+                    const multipleImport = this.isMultipleImport(a) - this.isMultipleImport(b);
+                    if (multipleImport != 0) {
+                        return -multipleImport;
+                    }
+                    const comparedSpecifiers = this.compareStringArrays(this.extractImportSpecifierNames(a), this.extractImportSpecifierNames(b));
+                    if (comparedSpecifiers != 0) {
+                        return comparedSpecifiers;
+                    }
+                    // Tiebreaker, keep the sort stable
+                    return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
+                });
+                const cuWithImportsSorted = await produceAsync(cu, async draft => {
+                    draft.statements = [...sortedImports, ...restStatements];
+                });
+                return produce(cuWithImportsSorted, draft => {
+                    for (let i = 0; i < importCount; i++) {
+                       draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
                     }
                     // TODO deal with comments in the whitespace around imports
                 });
@@ -154,27 +155,35 @@ export class OrderImports extends Recipe {
                 return i;
             }
 
-            private async sortNamesWithinEachLine(imports: Draft<J.RightPadded<JS.Import>>[]) {
-                imports.map(async importPadded => {
+            private async sortNamesWithinEachLine(imports: J.RightPadded<JS.Import>[]): Promise<J.RightPadded<JS.Import>[]> {
+                const ret = [];
+                for (const importPadded of imports) {
                     const import_ = importPadded.element;
                     if (this.isMultipleImport(import_) == 1) {
-                        const namedImports = import_.importClause!.namedBindings as Draft<JS.NamedImports>;
-                        namedImports.elements.elements.sort((a, b) => {
-                            const namesExtracted: string[] = [a.element, b.element].map(expr => {
-                                const is = expr as JS.ImportSpecifier;
-                                if (is.specifier.kind == JS.Kind.Alias) {
-                                    return (is.specifier as JS.Alias).propertyName.element.simpleName;
-                                } else if (is.specifier.kind == J.Kind.Identifier) {
-                                    return (is.specifier as J.Identifier).simpleName;
-                                } else {
-                                    throw new Error("Unsupported kind " + expr.kind);
-                                }
+                        const importSorted = produce(import_, draft => {
+                            (draft.importClause!.namedBindings as Draft<JS.NamedImports>).elements.elements.sort((a, b) => {
+                                const namesExtracted: string[] = [a.element, b.element].map(expr => {
+                                    const is = expr as JS.ImportSpecifier;
+                                    if (is.specifier.kind == JS.Kind.Alias) {
+                                        return (is.specifier as JS.Alias).propertyName.element.simpleName;
+                                    } else if (is.specifier.kind == J.Kind.Identifier) {
+                                        return (is.specifier as J.Identifier).simpleName;
+                                    } else {
+                                        throw new Error("Unsupported kind " + expr.kind);
+                                    }
+                                });
+                                return namesExtracted[0].localeCompare(namesExtracted[1]);
                             });
-                            return namesExtracted[0].localeCompare(namesExtracted[1]);
                         });
-                        import_.importClause!.namedBindings = await new AutoformatVisitor().visit(namedImports, {});
+                        const formatted = await new AutoformatVisitor().visit(importSorted, {}) as JS.Import;
+                        ret.push(produce(importPadded, draft => {
+                           draft.element = formatted;
+                        }));
+                    } else {
+                        ret.push(importPadded);
                     }
-                });
+                }
+                return ret;
             }
         }
     }
