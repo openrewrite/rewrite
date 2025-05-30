@@ -105,14 +105,11 @@ export class OrderImports extends Recipe {
                             if (namedImports.elements.kind == J.Kind.Container) {
                                 const elements = namedImports.elements.elements;
                                 for (let i = 0; i < elements.length; i++) {
-                                    if (elements[i].element.kind == JS.Kind.Alias) {
-                                        const alias = elements[i].element as JS.Alias;
-                                        names.push(alias.propertyName.element.simpleName);
-                                    } else if (elements[i].element.kind == JS.Kind.ImportSpecifier) {
-                                        const importSpecifier = elements[i].element as JS.ImportSpecifier;
-                                        if (importSpecifier.specifier.kind == J.Kind.Identifier) {
-                                            names.push((importSpecifier.specifier as J.Identifier).simpleName);
-                                        }
+                                    const importSpecifier = elements[i].element as JS.ImportSpecifier;
+                                    if (importSpecifier.specifier.kind == J.Kind.Identifier) {
+                                        names.push((importSpecifier.specifier as J.Identifier).simpleName);
+                                    } else if (importSpecifier.specifier.kind == JS.Kind.Alias) {
+                                        names.push((importSpecifier.specifier as JS.Alias).propertyName.element.simpleName);
                                     } else {
                                         throw new Error("Unknown kind " + elements[i].kind);
                                     }
