@@ -19,6 +19,7 @@ export * from "./assertions";
 export * from "./parser";
 export * from "./style";
 export * from "./markers";
+export * from "./templating";
 
 import "./print";
 import "./rpc";

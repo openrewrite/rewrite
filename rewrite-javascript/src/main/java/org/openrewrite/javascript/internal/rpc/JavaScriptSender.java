@@ -22,6 +22,7 @@ import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.javascript.tree.JSX;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import static org.openrewrite.rpc.Reference.asRef;
@@ -59,7 +60,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(cu, JS.CompilationUnit::isCharsetBomMarked);
         q.getAndSend(cu, JS.CompilationUnit::getChecksum);
         q.getAndSend(cu, JS.CompilationUnit::getFileAttributes);
-        q.getAndSendList(cu, c -> c.getPadding().getImports(), imp -> imp.getElement().getId(), imp -> visitRightPadded(imp, q));
         q.getAndSendList(cu, c -> c.getPadding().getStatements(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
         q.getAndSend(cu, JS.CompilationUnit::getEof, space -> visitSpace(space, q));
 
@@ -77,22 +77,16 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitArrowFunction(JS.ArrowFunction arrowFunction, RpcSendQueue q) {
         q.getAndSendList(arrowFunction, JS.ArrowFunction::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
         q.getAndSendList(arrowFunction, JS.ArrowFunction::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        if (arrowFunction.getTypeParameters() != null) {
-            q.getAndSend(arrowFunction, JS.ArrowFunction::getTypeParameters, el -> visit(el, q));
-        }
+        q.getAndSend(arrowFunction, JS.ArrowFunction::getTypeParameters, el -> visit(el, q));
         q.getAndSend(arrowFunction, JS.ArrowFunction::getLambda, el -> visit(el, q));
-        if (arrowFunction.getReturnTypeExpression() != null) {
-            q.getAndSend(arrowFunction, JS.ArrowFunction::getReturnTypeExpression, el -> visit(el, q));
-        }
+        q.getAndSend(arrowFunction, JS.ArrowFunction::getReturnTypeExpression, el -> visit(el, q));
         return arrowFunction;
     }
 
     @Override
     public J visitAwait(JS.Await await, RpcSendQueue q) {
         q.getAndSend(await, JS.Await::getExpression, el -> visit(el, q));
-        if (await.getType() != null) {
-            q.getAndSend(await, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(await, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return await;
     }
 
@@ -100,9 +94,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitConditionalType(JS.ConditionalType conditionalType, RpcSendQueue q) {
         q.getAndSend(conditionalType, JS.ConditionalType::getCheckType, el -> visit(el, q));
         q.getAndSend(conditionalType, el -> el.getPadding().getCondition(), el -> visitLeftPadded(el, q));
-        if (conditionalType.getType() != null) {
-            q.getAndSend(conditionalType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(conditionalType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return conditionalType;
     }
 
@@ -121,12 +113,8 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitExpressionWithTypeArguments(JS.ExpressionWithTypeArguments expressionWithTypeArguments, RpcSendQueue q) {
         q.getAndSend(expressionWithTypeArguments, JS.ExpressionWithTypeArguments::getClazz, el -> visit(el, q));
-        if (expressionWithTypeArguments.getPadding().getTypeArguments() != null) {
-            q.getAndSend(expressionWithTypeArguments, el -> el.getPadding().getTypeArguments(), el -> visitContainer(el, q));
-        }
-        if (expressionWithTypeArguments.getType() != null) {
-            q.getAndSend(expressionWithTypeArguments, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(expressionWithTypeArguments, el -> el.getPadding().getTypeArguments(), el -> visitContainer(el, q));
+        q.getAndSend(expressionWithTypeArguments, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return expressionWithTypeArguments;
     }
 
@@ -134,9 +122,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitFunctionType(JS.FunctionType functionType, RpcSendQueue q) {
         q.getAndSendList(functionType, JS.FunctionType::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSend(functionType, el -> el.getPadding().getConstructorType(), el -> visitLeftPadded(el, q));
-        if (functionType.getTypeParameters() != null) {
-            q.getAndSend(functionType, JS.FunctionType::getTypeParameters, el -> visit(el, q));
-        }
+        q.getAndSend(functionType, JS.FunctionType::getTypeParameters, el -> visit(el, q));
         q.getAndSend(functionType, el -> el.getPadding().getParameters(), el -> visitContainer(el, q));
         q.getAndSend(functionType, el -> el.getPadding().getReturnType(), el -> visitLeftPadded(el, q));
         return functionType;
@@ -145,9 +131,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitInferType(JS.InferType inferType, RpcSendQueue q) {
         q.getAndSend(inferType, el -> el.getPadding().getTypeParameter(), el -> visitLeftPadded(el, q));
-        if (inferType.getType() != null) {
-            q.getAndSend(inferType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(inferType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return inferType;
     }
 
@@ -155,48 +139,32 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitImportType(JS.ImportType importType, RpcSendQueue q) {
         q.getAndSend(importType, el -> el.getPadding().getHasTypeof(), el -> visitRightPadded(el, q));
         q.getAndSend(importType, el -> el.getPadding().getArgumentAndAttributes(), el -> visitContainer(el, q));
-        if (importType.getPadding().getQualifier() != null) {
-            q.getAndSend(importType, el -> el.getPadding().getQualifier(), el -> visitLeftPadded(el, q));
-        }
-        if (importType.getPadding().getTypeArguments() != null) {
-            q.getAndSend(importType, el -> el.getPadding().getTypeArguments(), el -> visitContainer(el, q));
-        }
-        if (importType.getType() != null) {
-            q.getAndSend(importType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(importType, el -> el.getPadding().getQualifier(), el -> visitLeftPadded(el, q));
+        q.getAndSend(importType, el -> el.getPadding().getTypeArguments(), el -> visitContainer(el, q));
+        q.getAndSend(importType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return importType;
     }
 
     @Override
     public J visitImport(JS.Import jsImport, RpcSendQueue q) {
-        if (jsImport.getImportClause() != null) {
-            q.getAndSend(jsImport, JS.Import::getImportClause, el -> visit(el, q));
-        }
+        q.getAndSend(jsImport, JS.Import::getImportClause, el -> visit(el, q));
         q.getAndSend(jsImport, el -> el.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q));
-        if (jsImport.getAttributes() != null) {
-            q.getAndSend(jsImport, JS.Import::getAttributes, el -> visit(el, q));
-        }
+        q.getAndSend(jsImport, JS.Import::getAttributes, el -> visit(el, q));
         return jsImport;
     }
 
     @Override
     public J visitImportClause(JS.ImportClause importClause, RpcSendQueue q) {
         q.getAndSend(importClause, JS.ImportClause::isTypeOnly);
-        if (importClause.getPadding().getName() != null) {
-            q.getAndSend(importClause, el -> el.getPadding().getName(), el -> visitRightPadded(el, q));
-        }
-        if (importClause.getNamedBindings() != null) {
-            q.getAndSend(importClause, JS.ImportClause::getNamedBindings, el -> visit(el, q));
-        }
+        q.getAndSend(importClause, el -> el.getPadding().getName(), el -> visitRightPadded(el, q));
+        q.getAndSend(importClause, JS.ImportClause::getNamedBindings, el -> visit(el, q));
         return importClause;
     }
 
     @Override
     public J visitNamedImports(JS.NamedImports namedImports, RpcSendQueue q) {
         q.getAndSend(namedImports, el -> el.getPadding().getElements(), el -> visitContainer(el, q));
-        if (namedImports.getType() != null) {
-            q.getAndSend(namedImports, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(namedImports, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return namedImports;
     }
 
@@ -204,9 +172,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitImportSpecifier(JS.ImportSpecifier importSpecifier, RpcSendQueue q) {
         q.getAndSend(importSpecifier, el -> el.getPadding().getImportType(), el -> visitLeftPadded(el, q));
         q.getAndSend(importSpecifier, JS.ImportSpecifier::getSpecifier, el -> visit(el, q));
-        if (importSpecifier.getType() != null) {
-            q.getAndSend(importSpecifier, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(importSpecifier, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return importSpecifier;
     }
 
@@ -237,9 +203,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(binary, JS.Binary::getLeft, el -> visit(el, q));
         q.getAndSend(binary, el -> el.getPadding().getOperator(), el -> visitLeftPadded(el, q));
         q.getAndSend(binary, JS.Binary::getRight, el -> visit(el, q));
-        if (binary.getType() != null) {
-            q.getAndSend(binary, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(binary, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return binary;
     }
 
@@ -252,28 +216,20 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitMappedType(JS.MappedType mappedType, RpcSendQueue q) {
-        if (mappedType.getPadding().getPrefixToken() != null) {
-            q.getAndSend(mappedType, el -> el.getPadding().getPrefixToken(), el -> visitLeftPadded(el, q));
-        }
+        q.getAndSend(mappedType, el -> el.getPadding().getPrefixToken(), el -> visitLeftPadded(el, q));
         q.getAndSend(mappedType, el -> el.getPadding().getHasReadonly(), el -> visitLeftPadded(el, q));
         q.getAndSend(mappedType, JS.MappedType::getKeysRemapping, el -> visit(el, q));
-        if (mappedType.getPadding().getSuffixToken() != null) {
-            q.getAndSend(mappedType, el -> el.getPadding().getSuffixToken(), el -> visitLeftPadded(el, q));
-        }
+        q.getAndSend(mappedType, el -> el.getPadding().getSuffixToken(), el -> visitLeftPadded(el, q));
         q.getAndSend(mappedType, el -> el.getPadding().getHasQuestionToken(), el -> visitLeftPadded(el, q));
         q.getAndSend(mappedType, el -> el.getPadding().getValueType(), el -> visitContainer(el, q));
-        if (mappedType.getType() != null) {
-            q.getAndSend(mappedType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(mappedType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return mappedType;
     }
 
     @Override
     public J visitMappedTypeKeysRemapping(JS.MappedType.KeysRemapping keysRemapping, RpcSendQueue q) {
         q.getAndSend(keysRemapping, el -> el.getPadding().getTypeParameter(), el -> visitRightPadded(el, q));
-        if (keysRemapping.getPadding().getNameType() != null) {
-            q.getAndSend(keysRemapping, el -> el.getPadding().getNameType(), el -> visitRightPadded(el, q));
-        }
+        q.getAndSend(keysRemapping, el -> el.getPadding().getNameType(), el -> visitRightPadded(el, q));
         return keysRemapping;
     }
 
@@ -288,13 +244,9 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, RpcSendQueue q) {
         q.getAndSendList(objectBindingDeclarations, JS.ObjectBindingDeclarations::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
         q.getAndSendList(objectBindingDeclarations, JS.ObjectBindingDeclarations::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        if (objectBindingDeclarations.getTypeExpression() != null) {
-            q.getAndSend(objectBindingDeclarations, JS.ObjectBindingDeclarations::getTypeExpression, el -> visit(el, q));
-        }
+        q.getAndSend(objectBindingDeclarations, JS.ObjectBindingDeclarations::getTypeExpression, el -> visit(el, q));
         q.getAndSend(objectBindingDeclarations, el -> el.getPadding().getBindings(), el -> visitContainer(el, q));
-        if (objectBindingDeclarations.getPadding().getInitializer() != null) {
-            q.getAndSend(objectBindingDeclarations, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
-        }
+        q.getAndSend(objectBindingDeclarations, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
         return objectBindingDeclarations;
     }
 
@@ -302,9 +254,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitPropertyAssignment(JS.PropertyAssignment propertyAssignment, RpcSendQueue q) {
         q.getAndSend(propertyAssignment, el -> el.getPadding().getName(), el -> visitRightPadded(el, q));
         q.getAndSend(propertyAssignment, JS.PropertyAssignment::getAssigmentToken);
-        if (propertyAssignment.getInitializer() != null) {
-            q.getAndSend(propertyAssignment, JS.PropertyAssignment::getInitializer, el -> visit(el, q));
-        }
+        q.getAndSend(propertyAssignment, JS.PropertyAssignment::getInitializer, el -> visit(el, q));
         return propertyAssignment;
     }
 
@@ -312,18 +262,14 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitSatisfiesExpression(JS.SatisfiesExpression satisfiesExpression, RpcSendQueue q) {
         q.getAndSend(satisfiesExpression, JS.SatisfiesExpression::getExpression, el -> visit(el, q));
         q.getAndSend(satisfiesExpression, el -> el.getPadding().getSatisfiesType(), el -> visitLeftPadded(el, q));
-        if (satisfiesExpression.getType() != null) {
-            q.getAndSend(satisfiesExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(satisfiesExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return satisfiesExpression;
     }
 
     @Override
     public J visitScopedVariableDeclarations(JS.ScopedVariableDeclarations scopedVariableDeclarations, RpcSendQueue q) {
         q.getAndSendList(scopedVariableDeclarations, JS.ScopedVariableDeclarations::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        if (scopedVariableDeclarations.getPadding().getScope() != null) {
-            q.getAndSend(scopedVariableDeclarations, el -> el.getPadding().getScope(), el -> visitLeftPadded(el, q));
-        }
+        q.getAndSend(scopedVariableDeclarations, el -> el.getPadding().getScope(), el -> visitLeftPadded(el, q));
         q.getAndSendList(scopedVariableDeclarations, el -> el.getPadding().getVariables(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return scopedVariableDeclarations;
     }
@@ -336,16 +282,10 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitTaggedTemplateExpression(JS.TaggedTemplateExpression taggedTemplateExpression, RpcSendQueue q) {
-        if (taggedTemplateExpression.getPadding().getTag() != null) {
-            q.getAndSend(taggedTemplateExpression, el -> el.getPadding().getTag(), el -> visitRightPadded(el, q));
-        }
-        if (taggedTemplateExpression.getPadding().getTypeArguments() != null) {
-            q.getAndSend(taggedTemplateExpression, el -> el.getPadding().getTypeArguments(), el -> visitContainer(el, q));
-        }
+        q.getAndSend(taggedTemplateExpression, el -> el.getPadding().getTag(), el -> visitRightPadded(el, q));
+        q.getAndSend(taggedTemplateExpression, el -> el.getPadding().getTypeArguments(), el -> visitContainer(el, q));
         q.getAndSend(taggedTemplateExpression, JS.TaggedTemplateExpression::getTemplateExpression, el -> visit(el, q));
-        if (taggedTemplateExpression.getType() != null) {
-            q.getAndSend(taggedTemplateExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(taggedTemplateExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return taggedTemplateExpression;
     }
 
@@ -353,9 +293,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitTemplateExpression(JS.TemplateExpression templateExpression, RpcSendQueue q) {
         q.getAndSend(templateExpression, JS.TemplateExpression::getHead, el -> visit(el, q));
         q.getAndSendList(templateExpression, el -> el.getPadding().getSpans(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
-        if (templateExpression.getType() != null) {
-            q.getAndSend(templateExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(templateExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return templateExpression;
     }
 
@@ -369,18 +307,14 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitTrailingTokenStatement(JS.TrailingTokenStatement trailingTokenStatement, RpcSendQueue q) {
         q.getAndSend(trailingTokenStatement, el -> el.getPadding().getExpression(), el -> visitRightPadded(el, q));
-        if (trailingTokenStatement.getType() != null) {
-            q.getAndSend(trailingTokenStatement, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(trailingTokenStatement, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return trailingTokenStatement;
     }
 
     @Override
     public J visitTuple(JS.Tuple tuple, RpcSendQueue q) {
         q.getAndSend(tuple, el -> el.getPadding().getElements(), el -> visitContainer(el, q));
-        if (tuple.getType() != null) {
-            q.getAndSend(tuple, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(tuple, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return tuple;
     }
 
@@ -388,22 +322,16 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitTypeDeclaration(JS.TypeDeclaration typeDeclaration, RpcSendQueue q) {
         q.getAndSendList(typeDeclaration, JS.TypeDeclaration::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSend(typeDeclaration, el -> el.getPadding().getName(), el -> visitLeftPadded(el, q));
-        if (typeDeclaration.getTypeParameters() != null) {
-            q.getAndSend(typeDeclaration, JS.TypeDeclaration::getTypeParameters, el -> visit(el, q));
-        }
+        q.getAndSend(typeDeclaration, JS.TypeDeclaration::getTypeParameters, el -> visit(el, q));
         q.getAndSend(typeDeclaration, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
-        if (typeDeclaration.getType() != null) {
-            q.getAndSend(typeDeclaration, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(typeDeclaration, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return typeDeclaration;
     }
 
     @Override
     public J visitTypeOf(JS.TypeOf typeOf, RpcSendQueue q) {
         q.getAndSend(typeOf, JS.TypeOf::getExpression, el -> visit(el, q));
-        if (typeOf.getType() != null) {
-            q.getAndSend(typeOf, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(typeOf, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return typeOf;
     }
 
@@ -418,9 +346,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(assignmentOperation, JS.AssignmentOperation::getVariable, el -> visit(el, q));
         q.getAndSend(assignmentOperation, el -> el.getPadding().getOperator(), el -> visitLeftPadded(el, q));
         q.getAndSend(assignmentOperation, JS.AssignmentOperation::getAssignment, el -> visit(el, q));
-        if (assignmentOperation.getType() != null) {
-            q.getAndSend(assignmentOperation, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(assignmentOperation, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return assignmentOperation;
     }
 
@@ -428,30 +354,22 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitIndexedAccessType(JS.IndexedAccessType indexedAccessType, RpcSendQueue q) {
         q.getAndSend(indexedAccessType, JS.IndexedAccessType::getObjectType, el -> visit(el, q));
         q.getAndSend(indexedAccessType, JS.IndexedAccessType::getIndexType, el -> visit(el, q));
-        if (indexedAccessType.getType() != null) {
-            q.getAndSend(indexedAccessType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(indexedAccessType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return indexedAccessType;
     }
 
     @Override
     public J visitIndexedAccessTypeIndexType(JS.IndexedAccessType.IndexType indexType, RpcSendQueue q) {
         q.getAndSend(indexType, el -> el.getPadding().getElement(), el -> visitRightPadded(el, q));
-        if (indexType.getType() != null) {
-            q.getAndSend(indexType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(indexType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return indexType;
     }
 
     @Override
     public J visitTypeQuery(JS.TypeQuery typeQuery, RpcSendQueue q) {
         q.getAndSend(typeQuery, JS.TypeQuery::getTypeExpression, el -> visit(el, q));
-        if (typeQuery.getPadding().getTypeArguments() != null) {
-            q.getAndSend(typeQuery, el -> el.getPadding().getTypeArguments(), el -> visitContainer(el, q));
-        }
-        if (typeQuery.getType() != null) {
-            q.getAndSend(typeQuery, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(typeQuery, el -> el.getPadding().getTypeArguments(), el -> visitContainer(el, q));
+        q.getAndSend(typeQuery, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return typeQuery;
     }
 
@@ -478,30 +396,22 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitTypePredicate(JS.TypePredicate typePredicate, RpcSendQueue q) {
         q.getAndSend(typePredicate, el -> el.getPadding().getAsserts(), el -> visitLeftPadded(el, q));
         q.getAndSend(typePredicate, JS.TypePredicate::getParameterName, el -> visit(el, q));
-        if (typePredicate.getPadding().getExpression() != null) {
-            q.getAndSend(typePredicate, el -> el.getPadding().getExpression(), el -> visitLeftPadded(el, q));
-        }
-        if (typePredicate.getType() != null) {
-            q.getAndSend(typePredicate, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(typePredicate, el -> el.getPadding().getExpression(), el -> visitLeftPadded(el, q));
+        q.getAndSend(typePredicate, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return typePredicate;
     }
 
     @Override
     public J visitUnion(JS.Union union, RpcSendQueue q) {
         q.getAndSendList(union, el -> el.getPadding().getTypes(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
-        if (union.getType() != null) {
-            q.getAndSend(union, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(union, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return union;
     }
 
     @Override
     public J visitIntersection(JS.Intersection intersection, RpcSendQueue q) {
         q.getAndSendList(intersection, el -> el.getPadding().getTypes(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
-        if (intersection.getType() != null) {
-            q.getAndSend(intersection, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(intersection, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return intersection;
     }
 
@@ -519,13 +429,52 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitJsxTag(JSX.Tag tag, RpcSendQueue q) {
+        q.getAndSend(tag, el -> el.getPadding().getOpenName(), el -> visitLeftPadded(el, q));
+        q.getAndSend(tag, JSX.Tag::getAfterName, space -> visitSpace(space, q));
+        q.getAndSendList(tag, el -> el.getPadding().getAttributes(), attr -> attr.getElement().getId(), attr -> visitRightPadded(attr, q));
+
+        q.getAndSend(tag, JSX.Tag::getSelfClosing, space -> visitSpace(space, q));
+        q.getAndSendList(tag, JSX.Tag::getChildren, Tree::getId, child -> visit(child, q));
+        q.getAndSend(tag, el -> el.getPadding().getClosingName(), el -> visitLeftPadded(el, q));
+        q.getAndSend(tag, JSX.Tag::getAfterClosingName, space -> visitSpace(space, q));
+
+        return tag;
+    }
+
+    @Override
+    public J visitJsxAttribute(JSX.Attribute attribute, RpcSendQueue q) {
+        q.getAndSend(attribute, JSX.Attribute::getKey, el -> visit(el, q));
+        q.getAndSend(attribute, el -> el.getPadding().getValue(), el -> visitLeftPadded(el, q));
+        return attribute;
+    }
+
+    @Override
+    public J visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, RpcSendQueue q) {
+        q.getAndSend(spreadAttribute, JSX.SpreadAttribute::getDots, space -> visitSpace(space, q));
+        q.getAndSend(spreadAttribute, el -> el.getPadding().getExpression(), el -> visitRightPadded(el, q));
+        return spreadAttribute;
+    }
+
+    @Override
+    public J visitJsxEmbeddedExpression(JSX.EmbeddedExpression embeddedExpression, RpcSendQueue q) {
+        q.getAndSend(embeddedExpression, el -> el.getPadding().getExpression(), el -> visitRightPadded(el, q));
+        return embeddedExpression;
+    }
+
+    @Override
+    public J visitJsxNamespacedName(JSX.NamespacedName namespacedName, RpcSendQueue q) {
+        q.getAndSend(namespacedName, JSX.NamespacedName::getNamespace, el -> visit(el, q));
+        q.getAndSend(namespacedName, el -> el.getPadding().getName(), el -> visitLeftPadded(el, q));
+        return namespacedName;
+    }
+
+    @Override
     public J visitIndexSignatureDeclaration(JS.IndexSignatureDeclaration indexSignatureDeclaration, RpcSendQueue q) {
         q.getAndSendList(indexSignatureDeclaration, JS.IndexSignatureDeclaration::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSend(indexSignatureDeclaration, el -> el.getPadding().getParameters(), el -> visitContainer(el, q));
         q.getAndSend(indexSignatureDeclaration, el -> el.getPadding().getTypeExpression(), el -> visitLeftPadded(el, q));
-        if (indexSignatureDeclaration.getType() != null) {
-            q.getAndSend(indexSignatureDeclaration, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(indexSignatureDeclaration, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return indexSignatureDeclaration;
     }
 
@@ -533,20 +482,12 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitComputedPropertyMethodDeclaration(JS.ComputedPropertyMethodDeclaration computedPropMethod, RpcSendQueue q) {
         q.getAndSendList(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
         q.getAndSendList(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        if (computedPropMethod.getTypeParameters() != null) {
-            q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getTypeParameters, el -> visit(el, q));
-        }
-        if (computedPropMethod.getReturnTypeExpression() != null) {
-            q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getReturnTypeExpression, el -> visit(el, q));
-        }
+        q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getTypeParameters, el -> visit(el, q));
+        q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getReturnTypeExpression, el -> visit(el, q));
         q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getName, el -> visit(el, q));
         q.getAndSend(computedPropMethod, el -> el.getPadding().getParameters(), el -> visitContainer(el, q));
-        if (computedPropMethod.getBody() != null) {
-            q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getBody, el -> visit(el, q));
-        }
-        if (computedPropMethod.getMethodType() != null) {
-            q.getAndSend(computedPropMethod, el -> asRef(el.getMethodType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(computedPropMethod, JS.ComputedPropertyMethodDeclaration::getBody, el -> visit(el, q));
+        q.getAndSend(computedPropMethod, el -> asRef(el.getMethodType()), el -> visitType(getValueNonNull(el), q));
         return computedPropMethod;
     }
 
@@ -569,42 +510,30 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSendList(namespaceDeclaration, JS.NamespaceDeclaration::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSend(namespaceDeclaration, el -> el.getPadding().getKeywordType(), el -> visitLeftPadded(el, q));
         q.getAndSend(namespaceDeclaration, el -> el.getPadding().getName(), el -> visitRightPadded(el, q));
-        if (namespaceDeclaration.getBody() != null) {
-            q.getAndSend(namespaceDeclaration, JS.NamespaceDeclaration::getBody, el -> visit(el, q));
-        }
+        q.getAndSend(namespaceDeclaration, JS.NamespaceDeclaration::getBody, el -> visit(el, q));
         return namespaceDeclaration;
     }
 
     @Override
     public J visitTypeLiteral(JS.TypeLiteral typeLiteral, RpcSendQueue q) {
         q.getAndSend(typeLiteral, JS.TypeLiteral::getMembers, el -> visit(el, q));
-        if (typeLiteral.getType() != null) {
-            q.getAndSend(typeLiteral, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(typeLiteral, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return typeLiteral;
     }
 
     @Override
     public J visitArrayBindingPattern(JS.ArrayBindingPattern arrayBindingPattern, RpcSendQueue q) {
         q.getAndSend(arrayBindingPattern, el -> el.getPadding().getElements(), el -> visitContainer(el, q));
-        if (arrayBindingPattern.getType() != null) {
-            q.getAndSend(arrayBindingPattern, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(arrayBindingPattern, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return arrayBindingPattern;
     }
 
     @Override
     public J visitBindingElement(JS.BindingElement bindingElement, RpcSendQueue q) {
-        if (bindingElement.getPadding().getPropertyName() != null) {
-            q.getAndSend(bindingElement, el -> el.getPadding().getPropertyName(), el -> visitRightPadded(el, q));
-        }
+        q.getAndSend(bindingElement, el -> el.getPadding().getPropertyName(), el -> visitRightPadded(el, q));
         q.getAndSend(bindingElement, JS.BindingElement::getName, el -> visit(el, q));
-        if (bindingElement.getPadding().getInitializer() != null) {
-            q.getAndSend(bindingElement, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
-        }
-        if (bindingElement.getVariableType() != null) {
-            q.getAndSend(bindingElement, el -> asRef(el.getVariableType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(bindingElement, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
+        q.getAndSend(bindingElement, el -> asRef(el.getVariableType()), el -> visitType(getValueNonNull(el), q));
         return bindingElement;
     }
 
@@ -612,15 +541,9 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitExportDeclaration(JS.ExportDeclaration exportDeclaration, RpcSendQueue q) {
         q.getAndSendList(exportDeclaration, JS.ExportDeclaration::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSend(exportDeclaration, el -> el.getPadding().getTypeOnly(), el -> visitLeftPadded(el, q));
-        if (exportDeclaration.getExportClause() != null) {
-            q.getAndSend(exportDeclaration, JS.ExportDeclaration::getExportClause, el -> visit(el, q));
-        }
-        if (exportDeclaration.getPadding().getModuleSpecifier() != null) {
-            q.getAndSend(exportDeclaration, el -> el.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q));
-        }
-        if (exportDeclaration.getAttributes() != null) {
-            q.getAndSend(exportDeclaration, JS.ExportDeclaration::getAttributes, el -> visit(el, q));
-        }
+        q.getAndSend(exportDeclaration, JS.ExportDeclaration::getExportClause, el -> visit(el, q));
+        q.getAndSend(exportDeclaration, el -> el.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q));
+        q.getAndSend(exportDeclaration, JS.ExportDeclaration::getAttributes, el -> visit(el, q));
         return exportDeclaration;
     }
 
@@ -634,9 +557,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitNamedExports(JS.NamedExports namedExports, RpcSendQueue q) {
         q.getAndSend(namedExports, el -> el.getPadding().getElements(), el -> visitContainer(el, q));
-        if (namedExports.getType() != null) {
-            q.getAndSend(namedExports, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(namedExports, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return namedExports;
     }
 
@@ -644,9 +565,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitExportSpecifier(JS.ExportSpecifier exportSpecifier, RpcSendQueue q) {
         q.getAndSend(exportSpecifier, el -> el.getPadding().getTypeOnly(), el -> visitLeftPadded(el, q));
         q.getAndSend(exportSpecifier, JS.ExportSpecifier::getSpecifier, el -> visit(el, q));
-        if (exportSpecifier.getType() != null) {
-            q.getAndSend(exportSpecifier, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        }
+        q.getAndSend(exportSpecifier, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return exportSpecifier;
     }
 

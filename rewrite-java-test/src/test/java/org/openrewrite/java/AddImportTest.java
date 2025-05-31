@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
@@ -223,19 +224,19 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package com.acme.bank;
-              
+
               import com.acme.bank.*;
-              
+
               class Foo {
               }
               """,
             """
               package com.acme.bank;
-              
+
               import com.acme.bank.*;
-              
+
               import com.acme.bank.Record;
-              
+
               class Foo {
               }
               """,
@@ -262,6 +263,7 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void dontImportJavaLang() {
         rewriteRun(
@@ -1492,7 +1494,7 @@ class AddImportTest implements RewriteTest {
                   Date date = new Date(System.currentTimeMillis());
               }
               """,
-              """
+            """
               import java.util.Date;
 
               class Ambiguous {
@@ -1508,27 +1510,27 @@ class AddImportTest implements RewriteTest {
     void fullyQualifyOnAmbiguousStaticFieldImport() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
-                  maybeAddImport("java.awt.Color", "RED", true);
-                  maybeAddImport("java.awt.Color", true);
-                  JavaTemplate template = JavaTemplate.builder(
-                      "Color color = RED;")
-                    .imports("java.awt.Color")
-                    .staticImports("java.awt.Color.RED")
-                    .build();
-                  return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
-              }
-          }).withMaxCycles(1))
-          .parser(JavaParser.fromJavaVersion().dependsOn(
+                @Override
+                public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                    maybeAddImport("java.awt.Color", "RED", true);
+                    maybeAddImport("java.awt.Color", true);
+                    JavaTemplate template = JavaTemplate.builder(
+                        "Color color = RED;")
+                      .imports("java.awt.Color")
+                      .staticImports("java.awt.Color.RED")
+                      .build();
+                    return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+                }
+            }).withMaxCycles(1))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
               """
-              package com.example;
+                package com.example;
 
-              public class CustomColor {
-                  public static final String RED = "red";
-              }
-              """
-          )),
+                public class CustomColor {
+                    public static final String RED = "red";
+                }
+                """
+            )),
           java(
             """
               import static com.example.CustomColor.RED;
@@ -1540,9 +1542,9 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """,
-              """
+            """
               import java.awt.Color;
-              
+
               import static com.example.CustomColor.RED;
 
               class Ambiguous {
@@ -1576,7 +1578,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               import static java.util.Collections.sort;
-              
+
               import java.util.ArrayList;
 
               class Ambiguous {
@@ -1585,12 +1587,12 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """,
-              """
+            """
               import static java.util.Collections.sort;
-              
+
               import java.util.ArrayList;
               import java.util.List;
-              
+
               class Ambiguous {
                   List<Integer> list = java.util.Arrays.sort(new int[]{1, 2, 3});
                   void method() {
@@ -1601,4 +1603,56 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5530")
+    @Test
+    void importWithNestedClass() {
+        @Language("java") final String auxSource = """
+          package com.example;
+          
+          public interface A {
+              enum DataType {
+                  TYPE_1,
+                  TYPE_2
+              }
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                    JavaTemplate template = JavaTemplate.builder(
+                        "DataType d2 = DataType.TYPE_2;")
+                      .javaParser(JavaParser.fromJavaVersion().dependsOn(auxSource))
+                      .imports("com.example.A.DataType")
+                      .build();
+                    maybeAddImport("com.example.A.DataType");
+                    return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+                }
+            }).withMaxCycles(1))
+            .parser(JavaParser.fromJavaVersion().dependsOn(auxSource)),
+          java(
+            """
+              import com.example.A;
+              import com.example.A.DataType;
+
+              class Test {
+                  DataType d1 = DataType.TYPE_1;
+                  A a;
+              }
+              """,
+            """
+              import com.example.A;
+              import com.example.A.DataType;
+
+              class Test {
+                  DataType d2 = DataType.TYPE_2;
+                  DataType d1 = DataType.TYPE_1;
+                  A a;
+              }
+              """
+          )
+        );
+    }
+
 }

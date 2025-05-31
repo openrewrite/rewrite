@@ -24,10 +24,13 @@ describe('AutoformatVisitor', () => {
 
     test('everything', () => {
         return spec.rewriteRun(
+            // TODO there should be no newline after the default case in switch
             // @formatter:off
             //language=typescript
             typescript(`
-                    class L {}
+                     type T1=string;
+                     export   type   T2   =   string;
+                    abstract class L {}
                     class K extends L{
                         constructor  ( ){
                             super();
@@ -65,7 +68,10 @@ describe('AutoformatVisitor', () => {
                     }
                 `,
                 `
-                    class L {
+                    type T1 = string;
+                    export type T2 = string;
+
+                    abstract class L {
                     }
 
                     class K extends L {
@@ -86,6 +92,7 @@ describe('AutoformatVisitor', () => {
                                     return 1;
                                 default:
                                     return 0;
+                            
                             }
                         }
                     }
@@ -111,4 +118,66 @@ describe('AutoformatVisitor', () => {
             // @formatter:on
         )
     });
+
+    test('types', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            type Values={[key:string]:string;}
+            `,
+            `
+            type Values = {
+                [key: string]: string;
+            }
+            `)
+            // @formatter:on
+        )});
+
+    test('a statement following an if', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            if (1>0) {
+            }
+            let i = 1;
+            `,
+            `
+            if (1 > 0) {
+            }
+            let i = 1;
+            `)
+            // @formatter:on
+        )});
+
+    test('try catch-all', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            try {
+                m();
+            } catch {
+                console.log("It failed", e);
+            }
+            `,
+                `
+            try {
+                m();
+            } catch {
+                console.log("It failed", e);
+            }
+            `)
+            // @formatter:on
+        )});
+
+    test('import', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`import { delta,gamma} from 'delta.js'`,
+                 `import {delta, gamma} from 'delta.js'`)
+            // @formatter:on
+        )});
 });

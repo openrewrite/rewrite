@@ -99,4 +99,63 @@ describe('SpacesVisitor', () => {
                 // @formatter:on
             ));
     });
+
+    test('await', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                async function fetchData(): Promise<string> {
+                    const response = await fetch('https://api.example.com/data');
+                    return response.json().name;
+                }
+                `
+                // @formatter:on
+            ));
+    });
+
+    test('types', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            type Values={
+                [key:string]:string;
+            }
+            `,
+                `
+            type Values = {
+                [key: string]: string;
+            }
+            `)
+            // @formatter:on
+        )});
+
+    test('space around assignment operator: true', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.aroundOperators.assignment = true;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`const x=3; class A {m() { this.x=4; }}`,
+                `const x = 3; class A {m() { this.x = 4; }}`)
+            // @formatter:on
+        )});
+
+    test('space around assignment operator: false', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.aroundOperators.assignment = false;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`const x = 3; class A {m() { this.x = 4; }}`,
+                `const x=3; class A {m() { this.x=4; }}`)
+            // @formatter:on
+        )});
 });
