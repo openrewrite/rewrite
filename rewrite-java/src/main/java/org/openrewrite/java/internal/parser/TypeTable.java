@@ -44,7 +44,8 @@ import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
-import static org.objectweb.asm.ClassReader.SKIP_CODE;
+import static java.util.Objects.requireNonNull;
+import static org.objectweb.asm.ClassReader.SKIP_DEBUG;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
@@ -66,6 +67,8 @@ import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
  *     <li>signature</li>
  *     <li>parameterNames</li>
  *     <li>exceptions[]</li>
+ *     <li>annotations[]</li>
+ *     <li>annotationDefaultValue</li>
  * </ul>
  * <p>
  * Descriptor and signature are in <a href="https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.3">JVMS 4.3</a> format.
@@ -208,7 +211,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         name,
                                         fields[5].isEmpty() ? null : fields[5],
                                         fields[6].isEmpty() ? null : fields[6],
-                                        fields[7].isEmpty() ? null : fields[7].split("\\|")
+                                        fields[7].isEmpty() ? null : fields[7].split("\\|"),
+                                        fields.length > 14 && !fields[14].isEmpty() ? fields[14].split("\\|") : null,
+                                        fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null
                                 ));
                         int lastIndexOf$ = className.lastIndexOf('$');
                         if (lastIndexOf$ != -1) {
@@ -225,7 +230,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     fields[10],
                                     fields[11].isEmpty() ? null : fields[11],
                                     fields[12].isEmpty() ? null : fields[12].split("\\|"),
-                                    fields[13].isEmpty() ? null : fields[13].split("\\|")
+                                    fields[13].isEmpty() ? null : fields[13].split("\\|"),
+                                    fields.length > 14 && !fields[14].isEmpty() ? fields[14].split("\\|") : null,
+                                    fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null
                             ));
                         }
                     }
@@ -267,6 +274,13 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classDef.getSuperinterfaceSignatures()
                     );
 
+                    // Apply annotations to the class
+                    if (classDef.getAnnotations() != null) {
+                        for (String annotation : classDef.getAnnotations()) {
+                            AnnotationApplier.applyAnnotation(annotation, classWriter::visitAnnotation);
+                        }
+                    }
+
                     for (ClassDefinition innerClassDef : nestedTypesByOwner.getOrDefault(classDef.getName(), emptyList())) {
                         classWriter.visitInnerClass(
                                 innerClassDef.getName(),
@@ -277,7 +291,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                     }
 
                     for (Member member : classDef.getMembers()) {
-                        if (member.getDescriptor().contains("(")) {
+                        if (member.getDescriptor().startsWith("(")) {
                             MethodVisitor mv = classWriter
                                     .visitMethod(
                                             member.getAccess(),
@@ -286,24 +300,64 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             member.getSignature(),
                                             member.getExceptions()
                                     );
+
+                            // Apply annotations to the method
+                            if (member.getAnnotations() != null) {
+                                for (String annotation : member.getAnnotations()) {
+                                    AnnotationApplier.applyAnnotation(annotation, mv::visitAnnotation);
+                                }
+                            }
+
                             String[] parameterNames = member.getParameterNames();
                             if (parameterNames != null) {
                                 for (String parameterName : parameterNames) {
                                     mv.visitParameter(parameterName, 0);
                                 }
                             }
+
+                            if (member.getAnnotationDefaultValue() != null) {
+                                AnnotationVisitor annotationDefaultVisitor = mv.visitAnnotationDefault();
+                                if (annotationDefaultVisitor != null) {
+                                    Object value = AnnotationDeserializer.parseValue(member.getAnnotationDefaultValue());
+                                    if (value.getClass().isArray()) {
+                                        for (Object v : ((Object[]) value)) {
+                                            annotationDefaultVisitor.visit(null, v);
+                                        }
+                                    } else if (value instanceof AnnotationDeserializer.ClassConstant) {
+                                        annotationDefaultVisitor.visit(null, Type.getType(((AnnotationDeserializer.ClassConstant) value).getDescriptor()));
+                                    } else if (value instanceof AnnotationDeserializer.EnumConstant) {
+                                        AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) value;
+                                        annotationDefaultVisitor.visitEnum(null, enumConstant.getEnumDescriptor(), enumConstant.getConstantName());
+                                    } else if (value instanceof AnnotationDeserializer.FieldConstant) {
+                                        AnnotationDeserializer.FieldConstant fieldConstant = (AnnotationDeserializer.FieldConstant) value;
+                                        annotationDefaultVisitor.visitEnum(null, fieldConstant.getClassName(), fieldConstant.getFieldName());
+                                    } else {
+                                        annotationDefaultVisitor.visit(null, value);
+                                    }
+                                    annotationDefaultVisitor.visitEnd();
+                                }
+                            }
+
                             writeMethodBody(member, mv);
                             mv.visitEnd();
                         } else {
-                            classWriter
+                            FieldVisitor fv = classWriter
                                     .visitField(
                                             member.getAccess(),
                                             member.getName(),
                                             member.getDescriptor(),
                                             member.getSignature(),
                                             null
-                                    )
-                                    .visitEnd();
+                                    );
+
+                            // Apply annotations to the field
+                            if (member.getAnnotations() != null) {
+                                for (String annotation : member.getAnnotations()) {
+                                    AnnotationApplier.applyAnnotation(annotation, fv::visitAnnotation);
+                                }
+                            }
+
+                            fv.visitEnd();
                         }
                     }
 
@@ -314,9 +368,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                     }
                 });
                 future.complete(classesDir);
-            } catch (Exception e) {
+            } catch (
+                    Exception e) {
                 future.completeExceptionally(e);
-                classesDirByArtifact.remove(gav);
             }
         }
 
@@ -423,7 +477,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         public Writer(OutputStream out) throws IOException {
             this.deflater = new GZIPOutputStream(out);
             this.out = new PrintStream(deflater);
-            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions");
+            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\tannotations\tannotationDefaultValue");
         }
 
         public Jar jar(String groupId, String artifactId, String version) {
@@ -434,6 +488,25 @@ public class TypeTable implements JavaParserClasspathLoader {
         public void close() throws IOException {
             deflater.flush();
             out.close();
+        }
+
+        private static String convertAnnotationValueToString(Object value) {
+            if (value == null) {
+                return "null";
+            } else if (value instanceof String) {
+                return "\"" + value.toString().replace("\"", "\\\"") + "\"";
+            } else if (value instanceof Type) {
+                return ((Type) value).getDescriptor();
+            } else if (value.getClass().isArray()) {
+                Object[] array = (Object[]) value;
+                List<String> elements = new ArrayList<>(array.length);
+                for (Object element : array) {
+                    elements.add(convertAnnotationValueToString(element));
+                }
+                return "{" + String.join(",", elements) + "}";
+            } else {
+                return value.toString();
+            }
         }
 
         @Value
@@ -453,9 +526,6 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     @Nullable
                                     ClassDefinition classDefinition;
 
-                                    boolean wroteFieldOrMethod;
-                                    final List<String> collectedParameterNames = new ArrayList<>();
-
                                     @Override
                                     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
                                         int lastIndexOf$ = name.lastIndexOf('$');
@@ -463,21 +533,44 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             // skip anonymous subclasses
                                             classDefinition = null;
                                         } else {
-                                            classDefinition = new ClassDefinition(Jar.this, access, name, signature, superName, interfaces);
-                                            wroteFieldOrMethod = false;
+                                            classDefinition = new ClassDefinition(
+                                                    Jar.this,
+                                                    access,
+                                                    name,
+                                                    signature,
+                                                    superName,
+                                                    interfaces
+                                            );
                                             super.visit(version, access, name, signature, superName, interfaces);
-                                            if (!wroteFieldOrMethod && !"module-info".equals(name)) {
-                                                // No fields or methods, which can happen for marker annotations for example
-                                                classDefinition.writeClass();
-                                            }
                                         }
+                                    }
+
+                                    @Override
+                                    public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                        if (visible && classDefinition != null) {
+                                            return AnnotationCollectorHelper.createCollector(descriptor, requireNonNull(classDefinition).classAnnotations);
+                                        }
+                                        return null;
                                     }
 
                                     @Override
                                     public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
                                         if (classDefinition != null) {
-                                            wroteFieldOrMethod |= classDefinition
-                                                    .writeField(access, name, descriptor, signature);
+                                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, null, null);
+                                            return new FieldVisitor(Opcodes.ASM9) {
+                                                @Override
+                                                public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                                    if (visible) {
+                                                        return AnnotationCollectorHelper.createCollector(descriptor, member.annotations);
+                                                    }
+                                                    return null;
+                                                }
+
+                                                @Override
+                                                public void visitEnd() {
+                                                    classDefinition.addField(member);
+                                                }
+                                            };
                                         }
 
                                         return null;
@@ -485,29 +578,77 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                     @Override
                                     public @Nullable MethodVisitor visitMethod(int access, @Nullable String name, String descriptor,
-                                                                               String signature, String[] exceptions) {
+                                                                               @Nullable String signature, String @Nullable [] exceptions) {
                                         // Repeating check from `writeMethod()` for performance reasons
                                         if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
                                                 name != null && !"<clinit>".equals(name)) {
+                                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, exceptions, null);
                                             return new MethodVisitor(Opcodes.ASM9) {
                                                 @Override
                                                 public void visitParameter(@Nullable String name, int access) {
                                                     if (name != null) {
-                                                        collectedParameterNames.add(name);
+                                                        member.parameterNames.add(name);
                                                     }
                                                 }
 
                                                 @Override
+                                                public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                                    if (visible) {
+                                                        return AnnotationCollectorHelper.createCollector(descriptor, member.annotations);
+                                                    }
+                                                    return null;
+                                                }
+
+                                                @Override
+                                                public AnnotationVisitor visitAnnotationDefault() {
+                                                    // Collect default values for annotation methods
+                                                    return new AnnotationVisitor(Opcodes.ASM9) {
+                                                        @Override
+                                                        public void visit(String name, Object value) {
+                                                            member.annotationDefaultValue = convertAnnotationValueToString(value);
+                                                        }
+
+                                                        @Override
+                                                        public AnnotationVisitor visitArray(String name) {
+                                                            return new AnnotationVisitor(Opcodes.ASM9) {
+                                                                final List<String> arrayValues = new ArrayList<>();
+
+                                                                @Override
+                                                                public void visit(String name, Object value) {
+                                                                    arrayValues.add(convertAnnotationValueToString(value));
+                                                                }
+
+                                                                @Override
+                                                                public void visitEnd() {
+                                                                    member.annotationDefaultValue = "{" + String.join(",", arrayValues) + "}";
+                                                                }
+                                                            };
+                                                        }
+
+                                                        @Override
+                                                        public void visitEnum(String name, String descriptor, String value) {
+                                                            member.annotationDefaultValue = descriptor + "." + value;
+                                                        }
+                                                    };
+                                                }
+
+                                                @Override
                                                 public void visitEnd() {
-                                                    wroteFieldOrMethod |= classDefinition
-                                                            .writeMethod(access, name, descriptor, signature, collectedParameterNames.isEmpty() ? null : collectedParameterNames, exceptions);
-                                                    collectedParameterNames.clear();
+                                                    classDefinition.addMethod(member);
                                                 }
                                             };
                                         }
                                         return null;
                                     }
-                                }, SKIP_CODE);
+
+                                    @Override
+                                    public void visitEnd() {
+                                        if (classDefinition != null && !"module-info".equals(classDefinition.className)) {
+                                            // No fields or methods, which can happen for marker annotations for example
+                                            classDefinition.writeClass();
+                                        }
+                                    }
+                                }, SKIP_DEBUG);
                             }
                         }
                     }
@@ -518,7 +659,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
 
         @Value
-        public class ClassDefinition {
+        class ClassDefinition {
             Jar jar;
             int classAccess;
             String className;
@@ -526,47 +667,76 @@ public class TypeTable implements JavaParserClasspathLoader {
             @Nullable
             String classSignature;
 
+            @Nullable
             String classSuperclassName;
+
             String @Nullable [] classSuperinterfaceSignatures;
+
+            List<String> classAnnotations = new ArrayList<>(4);
+            List<Writer.Member> members = new ArrayList<>();
 
             public void writeClass() {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & classAccess) == 0) {
                     out.printf(
-                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s%n",
+                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
                             classAccess, className,
                             classSignature == null ? "" : classSignature,
                             classSuperclassName,
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
-                            -1, "", "", "", "", "");
+                            -1, "", "", "", "", "",
+                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations),
+                            ""); // Empty annotation default values for class row
+
+                    for (Writer.Member member : members) {
+                        member.writeMember(jar, this);
+                    }
                 }
             }
 
-            public boolean writeMethod(int access, @Nullable String name, String descriptor,
-                                       @Nullable String signature,
-                                       @Nullable List<String> parameterNames,
-                                       String @Nullable [] exceptions) {
-                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 && name != null && !name.equals("<clinit>")) {
+            void addMethod(Writer.Member member) {
+                members.add(member);
+            }
+
+            void addField(Writer.Member member) {
+                members.add(member);
+            }
+        }
+
+        @Value
+        private class Member {
+            int access;
+            String name;
+            String descriptor;
+
+            @Nullable
+            String signature;
+
+            String @Nullable [] exceptions;
+            List<String> parameterNames = new ArrayList<>(4);
+            List<String> annotations = new ArrayList<>(4);
+
+            @Nullable
+            @NonFinal
+            String annotationDefaultValue;
+
+            private void writeMember(Jar jar, ClassDefinition classDefinition) {
+                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
                     out.printf(
-                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s%n",
+                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
-                            classAccess, className,
-                            classSignature == null ? "" : classSignature,
-                            classSuperclassName,
-                            classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
+                            classDefinition.classAccess, classDefinition.className,
+                            classDefinition.classSignature == null ? "" : classDefinition.classSignature,
+                            classDefinition.classSuperclassName,
+                            classDefinition.classSuperinterfaceSignatures == null ? "" : String.join("|", classDefinition.classSuperinterfaceSignatures),
                             access, name, descriptor,
                             signature == null ? "" : signature,
-                            parameterNames == null ? "" : String.join("|", parameterNames),
-                            exceptions == null ? "" : String.join("|", exceptions)
+                            parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
+                            exceptions == null ? "" : String.join("|", exceptions),
+                            annotations.isEmpty() ? "" : String.join("|", annotations),
+                            annotationDefaultValue
                     );
-                    return true;
                 }
-                return false;
-            }
-
-            public boolean writeField(int access, String name, String descriptor, @Nullable String signature) {
-                // Fits into the same table structure
-                return writeMethod(access, name, descriptor, signature, null, null);
             }
         }
     }
@@ -591,6 +761,11 @@ public class TypeTable implements JavaParserClasspathLoader {
         String superclassSignature;
 
         String @Nullable [] superinterfaceSignatures;
+
+        String @Nullable [] annotations;
+
+        @Nullable
+        String annotationDefaultValue;
 
         @NonFinal
         @Nullable
@@ -621,5 +796,9 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         String @Nullable [] parameterNames;
         String @Nullable [] exceptions;
+        String @Nullable [] annotations;
+
+        @Nullable
+        String annotationDefaultValue;
     }
 }
