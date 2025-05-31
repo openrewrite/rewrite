@@ -16,11 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.NameTree;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;

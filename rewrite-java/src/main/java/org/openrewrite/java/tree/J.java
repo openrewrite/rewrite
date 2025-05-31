@@ -3718,10 +3718,10 @@ public interface J extends Tree, RpcCodec<J> {
          * @return {@code true} if the given {@link Expression} is a {@link Literal} with the given value.
          */
         @Incubating(since = "7.25.0")
-        public static boolean isLiteralValue(@Nullable Expression maybeLiteral, Object value) {
+        public static boolean isLiteralValue(@Nullable Expression maybeLiteral, @Nullable Object value) {
             if (maybeLiteral instanceof Literal) {
                 Literal literal = (Literal) maybeLiteral;
-                return literal.getValue() != null && literal.getValue().equals(value);
+                return literal.getValue() == null ? value == null : literal.getValue().equals(value);
             }
             return false;
         }
@@ -4012,7 +4012,7 @@ public interface J extends Tree, RpcCodec<J> {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return methodType == null ? null : methodType.getReturnType();
         }
 
@@ -5100,7 +5100,7 @@ public interface J extends Tree, RpcCodec<J> {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return tree.getElement() instanceof Expression ? ((Expression) tree.getElement()).getType() :
                     tree.getElement() instanceof NameTree ? ((NameTree) tree.getElement()).getType() :
                             null;

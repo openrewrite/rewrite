@@ -435,7 +435,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSendList(tag, el -> el.getPadding().getAttributes(), attr -> attr.getElement().getId(), attr -> visitRightPadded(attr, q));
 
         q.getAndSend(tag, JSX.Tag::getSelfClosing, space -> visitSpace(space, q));
-        q.getAndSendList(tag, el -> el.getPadding().getChildren(), child -> child.getElement().getId(), child -> visitRightPadded(child, q));
+        q.getAndSendList(tag, JSX.Tag::getChildren, Tree::getId, child -> visit(child, q));
         q.getAndSend(tag, el -> el.getPadding().getClosingName(), el -> visitLeftPadded(el, q));
         q.getAndSend(tag, JSX.Tag::getAfterClosingName, space -> visitSpace(space, q));
 

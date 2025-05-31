@@ -290,8 +290,10 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             if (!(docTree instanceof DCTree.DCText && i > 0)) {
                 body.addAll(whitespaceBefore());
             }
-            if (docTree instanceof DCTree.DCText) {
-                body.addAll(visitText(((DCTree.DCText) docTree).getBody()));
+            if (docTree instanceof DCTree.DCText textNode) {
+                body.addAll(visitText(textNode.getBody()));
+            } else if (docTree instanceof DCTree.DCComment commentNode) {
+                body.addAll(visitText(commentNode.getBody()));
             } else {
                 body.add((Javadoc) scan(docTree, body));
             }

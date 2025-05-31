@@ -67,7 +67,8 @@ public class XmlParser implements Parser {
             // .NET project files
             "csproj",
             "vbproj",
-            "fsproj"));
+            "fsproj",
+            "props"));
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {

@@ -2052,4 +2052,25 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5411")
+    void multilineHtmlCommentInJavadoc() {
+        rewriteRun(
+          java(
+            """
+              /** 
+              * First line of comment
+              * <!-- comment 
+              *   Second line of comment
+              * -->
+              * <!-- another comment -->
+              * Final comment line
+              */
+              class Test {
+              }
+              """
+          )
+        );
+    }
 }

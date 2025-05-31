@@ -22,6 +22,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 class FindDependencyTest implements RewriteTest {
 
@@ -54,6 +55,38 @@ class FindDependencyTest implements RewriteTest {
           
           dependencies {
               /*~~>*/api "org.openrewrite:rewrite-core:latest.release"
+          }
+          """ ));
+    }
+
+    @Test
+    void findDependencyKotlin() {
+        rewriteRun(spec -> spec.recipe(new FindDependency("org.openrewrite", "rewrite-core", "api")), buildGradleKts(
+          //language=gradle
+          """
+          plugins {
+              'java-library'
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencies {
+              api("org.openrewrite:rewrite-core:latest.release")
+          }
+          """,
+          """
+          plugins {
+              'java-library'
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencies {
+              /*~~>*/api("org.openrewrite:rewrite-core:latest.release")
           }
           """ ));
     }

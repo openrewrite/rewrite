@@ -22,8 +22,8 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.Traits;
-import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -49,7 +49,7 @@ public class DependencyUseStringNotation extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
@@ -101,6 +101,32 @@ public class DependencyUseStringNotation extends Recipe {
                                 if (key.getType() == JavaType.Primitive.String) {
                                     mapNotation.put((String) key.getValue(), entry.getValue());
                                 }
+                            }
+                        }
+                    }
+
+                    J.Literal stringNotation = toLiteral(prefix, markers, mapNotation);
+                    if (stringNotation == null) {
+                        return m;
+                    }
+
+                    Expression lastArg = m.getArguments().get(m.getArguments().size() - 1);
+                    if (lastArg instanceof J.Lambda) {
+                        m = m.withArguments(Arrays.asList(stringNotation, lastArg));
+                    } else {
+                        m = m.withArguments(Collections.singletonList(stringNotation));
+                    }
+                } else if (m.getArguments().get(0) instanceof J.Assignment) {
+                    J.Assignment firstEntry = (J.Assignment) m.getArguments().get(0);
+                    Space prefix = firstEntry.getPrefix();
+                    Markers markers = firstEntry.getMarkers();
+
+                    for (Expression e : m.getArguments()) {
+                        if (e instanceof J.Assignment) {
+                            J.Assignment assignment = (J.Assignment) e;
+                            if (assignment.getVariable() instanceof J.Identifier) {
+                                J.Identifier key = (J.Identifier) assignment.getVariable();
+                                mapNotation.put(key.getSimpleName(), assignment.getAssignment());
                             }
                         }
                     }

@@ -122,7 +122,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.afterName = await this.visitSpace(element.afterName, p);
             draft.attributes = await mapAsync(element.attributes, attr => this.visitRightPadded(attr, p));
             draft.selfClosing = element.selfClosing && await this.visitSpace(element.selfClosing, p);
-            draft.children = element.children && await mapAsync(element.children, child => this.visitRightPadded(child, p));
+            draft.children = element.children && await mapAsync(element.children, child => this.visit(child, p));
             draft.closingName = element.closingName && await this.visitLeftPadded(element.closingName, p);
             draft.afterClosingName = element.afterClosingName && await this.visitSpace(element.afterClosingName, p);
         });
@@ -313,7 +313,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.ImportSpecifier>(importSpecifier, p, async draft => {
             draft.importType = await this.visitLeftPadded(importSpecifier.importType, p);
-            draft.specifier = await this.visitDefined<Expression>(importSpecifier.specifier, p);
+            draft.specifier = await this.visitDefined<JS.Alias | J.Identifier>(importSpecifier.specifier, p);
             draft.type = importSpecifier.type && await this.visitType(importSpecifier.type, p);
         });
     }

@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
@@ -28,6 +29,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class FullyQualifyMemberReferenceTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void fullyQualifyStaticMethod() {
         // Create a method type for java.util.Collections.emptyList()
