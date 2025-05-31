@@ -2070,7 +2070,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
-
     @Test
     void lombokValInLambda() {
         rewriteRun(
@@ -2082,9 +2081,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
             import java.util.stream.Collectors;
             
             public class Foo {
-                
+
                 List<String> names = new ArrayList<>();
-                
+
                 public String method() {
                     return names.stream()
                     .map(n -> {
@@ -2139,8 +2138,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
-    @Disabled("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. This is indicative of a bug in the parser.")
-    @DocumentExample
     @Test
     void removeUnusedImportsImportUsageEnum() {
         rewriteRun(
@@ -2156,7 +2153,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import a.A;
 
-              public enum SomeEnum { 
+              public enum SomeEnum {;
                   private A a;
               }
               """
@@ -2183,7 +2180,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import java.util.HashMap;
               import java.util.Map;
               import java.util.Optional;
-                      
+
               public class Usages {
                   HashMap<String, String> hashMap;
                   Map<String, String> map;
@@ -2204,7 +2201,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.Map;
               import java.util.Optional;
-                      
+
               public class WithoutMap {
                   Optional<String> optional;
                   Map.Entry<String, String> favoriteEntry;
