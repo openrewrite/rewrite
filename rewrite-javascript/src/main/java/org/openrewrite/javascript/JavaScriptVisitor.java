@@ -1045,4 +1045,81 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         w = w.getPadding().withBody(requireNonNull(visitRightPadded(w.getPadding().getBody(), JsRightPadded.Location.WITH_BODY, p)));
         return w;
     }
+
+    public J visitJsxTag(JSX.Tag tag, P p) {
+        JSX.Tag t = tag;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+
+        Expression temp = (Expression) visitExpression(t, p);
+        if (!(temp instanceof JSX.Tag)) {
+            return temp;
+        } else {
+            t = (JSX.Tag) temp;
+        }
+
+        t = t.getPadding().withOpenName(requireNonNull(visitLeftPadded(t.getPadding().getOpenName(), JLeftPadded.Location.LANGUAGE_EXTENSION, p)));
+        t = t.withAfterName(visitSpace(t.getAfterName(), Space.Location.LANGUAGE_EXTENSION, p));
+        t = t.getPadding().withAttributes(requireNonNull(ListUtils.map(t.getPadding().getAttributes(), attr -> visitRightPadded(attr, JRightPadded.Location.LANGUAGE_EXTENSION, p))));
+
+        if (t.isSelfClosing()) {
+            t = t.withSelfClosing(visitSpace(requireNonNull(t.getSelfClosing()), Space.Location.LANGUAGE_EXTENSION, p));
+        } else if (t.hasChildren()) {
+            t = t.withChildren(ListUtils.map(t.getChildren(), child -> visitAndCast(child, p)));
+            t = t.getPadding().withClosingName(requireNonNull(visitLeftPadded(t.getPadding().getClosingName(), JLeftPadded.Location.LANGUAGE_EXTENSION, p)));
+            t = t.withAfterClosingName(visitSpace(requireNonNull(t.getAfterClosingName()), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+
+        t = t.withType(visitType(t.getType(), p));
+        return t;
+    }
+
+    public J visitJsxAttribute(JSX.Attribute attribute, P p) {
+        JSX.Attribute a = attribute;
+        a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withKey(requireNonNull(visitAndCast(a.getKey(), p)));
+        if (a.getPadding().getValue() != null) {
+            a = a.getPadding().withValue(visitLeftPadded(a.getPadding().getValue(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+
+        return a;
+    }
+
+    public J visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, P p) {
+        JSX.SpreadAttribute s = spreadAttribute;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withDots(visitSpace(s.getDots(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.getPadding().withExpression(requireNonNull(visitRightPadded(s.getPadding().getExpression(), JRightPadded.Location.LANGUAGE_EXTENSION, p)));
+
+        return s;
+    }
+
+    public J visitJsxEmbeddedExpression(JSX.EmbeddedExpression embeddedExpression, P p) {
+        JSX.EmbeddedExpression e = embeddedExpression;
+        e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+
+        Expression temp = (Expression) visitExpression(e, p);
+        if (!(temp instanceof JSX.EmbeddedExpression)) {
+            return temp;
+        } else {
+            e = (JSX.EmbeddedExpression) temp;
+        }
+
+        e = e.getPadding().withExpression(requireNonNull(visitRightPadded(e.getPadding().getExpression(), JRightPadded.Location.LANGUAGE_EXTENSION, p)));
+
+        return e;
+    }
+
+    public J visitJsxNamespacedName(JSX.NamespacedName namespacedName, P p) {
+        JSX.NamespacedName n = namespacedName;
+        n = n.withPrefix(visitSpace(n.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        n = n.withMarkers(visitMarkers(n.getMarkers(), p));
+        n = n.withNamespace(requireNonNull(visitAndCast(n.getNamespace(), p)));
+        n = n.getPadding().withName(requireNonNull(visitLeftPadded(n.getPadding().getName(), JLeftPadded.Location.LANGUAGE_EXTENSION, p)));
+
+        return n;
+    }
 }

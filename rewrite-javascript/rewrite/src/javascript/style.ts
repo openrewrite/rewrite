@@ -25,8 +25,9 @@ export const JavaScriptStyles = {
 
 export const StyleKind = {
     SpacesStyle: "org.openrewrite.javascript.style.SpacesStyle",
-    WrappingAndBracesStyle: "org.openrewrite.java.style.WrappingAndBracesStyle",
-    BlankLinesStyle: "org.openrewrite.javascript.style.BlankLinesStyle"
+    WrappingAndBracesStyle: "org.openrewrite.javascript.style.WrappingAndBracesStyle",
+    BlankLinesStyle: "org.openrewrite.javascript.style.BlankLinesStyle",
+    TabsAndIndentsStyle: "org.openrewrite.javascript.style.TabsAndIndentsStyle"
 } as const;
 
 export const SpacesStyleDetailKind = {
@@ -156,6 +157,13 @@ export interface WrappingAndBracesStyle extends Style {
     readonly ifStatement: WrappingAndBracesStyle.IfStatement;
 }
 
+export namespace WrappingAndBracesStyle {
+    export interface IfStatement {
+        readonly kind: typeof WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement;
+        readonly elseOnNewLine: boolean;
+    }
+}
+
 export interface BlankLinesStyle extends Style {
     readonly kind: "org.openrewrite.javascript.style.BlankLinesStyle";
     readonly keepMaximum: BlankLinesStyle.KeepMaximum;
@@ -178,11 +186,15 @@ export namespace BlankLinesStyle {
     }
 }
 
-export namespace WrappingAndBracesStyle {
-    export interface IfStatement {
-        readonly kind: typeof WrappingAndBracesStyleDetailKind.WrappingAndBracesStyleIfStatement;
-        readonly elseOnNewLine: boolean;
-    }
+export interface TabsAndIndentsStyle extends Style {
+    readonly kind: typeof StyleKind.TabsAndIndentsStyle;
+    readonly useTabCharacter: boolean;
+    readonly tabSize: number;
+    readonly indentSize: number;
+    readonly continuationIndent: number;
+    readonly keepIndentsOnEmptyLines: boolean;
+    readonly indentChainedMethods: boolean;
+    readonly indentAllChainedCallsInAGroup: boolean;
 }
 
 export namespace IntelliJ {
@@ -194,7 +206,7 @@ export namespace IntelliJ {
             displayName: "IntelliJ IDEA",
             description: "Default IntelliJ IDEA code style.",
             tags: [],
-            styles: [spaces(), wrappingAndBraces(), blankLines()],
+            styles: [spaces(), wrappingAndBraces(), blankLines(), tabsAndIndents()],
         }
 
         export function spaces(): SpacesStyle {
@@ -315,6 +327,19 @@ export namespace IntelliJ {
                 }
             };
         }
+
+        export function tabsAndIndents(): TabsAndIndentsStyle {
+            return {
+                kind: StyleKind.TabsAndIndentsStyle,
+                useTabCharacter: false,
+                tabSize: 4,
+                indentSize: 4,
+                continuationIndent: 4,
+                keepIndentsOnEmptyLines: false,
+                indentChainedMethods: true,
+                indentAllChainedCallsInAGroup: false
+            };
+        }
     }
 
     export namespace TypeScript {
@@ -325,7 +350,7 @@ export namespace IntelliJ {
             displayName: "IntelliJ IDEA",
             description: "Default IntelliJ IDEA code style.",
             tags: [],
-            styles: [spaces(), wrappingAndBraces(), blankLines()],
+            styles: [spaces(), wrappingAndBraces(), blankLines(), tabsAndIndents()],
         }
 
         export function spaces(): SpacesStyle {
@@ -446,6 +471,19 @@ export namespace IntelliJ {
                     aroundMethod: 1,
                     aroundFunction: 1
                 }
+            };
+        }
+
+        export function tabsAndIndents(): TabsAndIndentsStyle {
+            return {
+                kind: StyleKind.TabsAndIndentsStyle,
+                useTabCharacter: false,
+                tabSize: 4,
+                indentSize: 4,
+                continuationIndent: 4,
+                keepIndentsOnEmptyLines: false,
+                indentChainedMethods: true,
+                indentAllChainedCallsInAGroup: false
             };
         }
     }

@@ -566,6 +566,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitMethodDeclaration(methodDecl: J.MethodDeclaration, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(methodDecl, p);
+        if (!statement?.kind || statement.kind !== J.Kind.MethodDeclaration) {
+            return statement;
+        }
+        methodDecl = statement as J.MethodDeclaration;
+
         return this.produceJava<J.MethodDeclaration>(methodDecl, p, async draft => {
             draft.leadingAnnotations = await mapAsync(methodDecl.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.modifiers = await mapAsync(methodDecl.modifiers, m => this.visitDefined<J.Modifier>(m, p));
@@ -594,6 +600,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             return expression;
         }
         methodInv = expression as J.MethodInvocation;
+
+        const statement = await this.visitStatement(methodInv, p);
+        if (!statement?.kind || statement.kind !== J.Kind.MethodInvocation) {
+            return statement;
+        }
+        methodInv = statement as J.MethodInvocation;
 
         return this.produceJava<J.MethodInvocation>(methodInv, p, async draft => {
             draft.select = await this.visitOptionalRightPadded(methodInv.select, p);

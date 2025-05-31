@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -26,6 +27,7 @@ import static org.openrewrite.java.Assertions.java;
 
 class SwitchEnhancementsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void addSwitchGuard() {
         rewriteRun(
