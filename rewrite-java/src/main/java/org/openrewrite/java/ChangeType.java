@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.VariableNameUtils.GenerationStrategy;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -385,6 +386,26 @@ public class ChangeType extends Recipe {
             }
             ident = ident.withType(updateType(ident.getType()));
             return visitAndCast(ident, ctx, super::visitIdentifier);
+        }
+
+        @Override
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+            J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
+            if (v != variable) {
+                if (v.getSimpleName().equals(decapitalize(originalType.getClassName()))) {
+                    if (targetType instanceof JavaType.FullyQualified) {
+                        if (v.getVariableType() != null && TypeUtils.isOfType(targetType, v.getVariableType().getType())) {
+                            String newName = VariableNameUtils.generateVariableName(
+                                    decapitalize(((JavaType.FullyQualified) targetType).getClassName()),
+                                    updateCursor(v),
+                                    GenerationStrategy.INCREMENT_NUMBER
+                            );
+                            doAfterVisit(new RenameVariable<>(v, newName));
+                        }
+                    }
+                }
+            }
+            return v;
         }
 
         @Override
@@ -777,5 +798,12 @@ public class ChangeType extends Recipe {
         String curFqn = curType != null ? curType.getFullyQualifiedName() : null;
 
         return fqn != null && fqn.equals(curFqn);
+    }
+
+    private static String decapitalize(@Nullable String string) {
+        if (string != null && !string.isEmpty()) {
+            return Character.toLowerCase(string.charAt(0)) + string.substring(1);
+        }
+        return "";
     }
 }
