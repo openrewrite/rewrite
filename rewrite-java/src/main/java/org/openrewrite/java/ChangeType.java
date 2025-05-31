@@ -369,23 +369,6 @@ public class ChangeType extends Recipe {
                     }
                 }
 
-                // Rename variable if it matches class name (starting with a lowercase character)
-                if (ident.getSimpleName().equals(decapitalize(className))) {
-                    if (targetType instanceof JavaType.FullyQualified) {
-                        String newName = VariableNameUtils.generateVariableName(
-                                decapitalize(((JavaType.FullyQualified) targetType).getClassName()),
-                                getCursor(),
-                                GenerationStrategy.INCREMENT_NUMBER
-                        );
-
-                        ident = ident.withSimpleName(newName);
-
-                        if (ident.getFieldType() != null) {
-                            ident = ident.withFieldType(ident.getFieldType().withName(newName));
-                        }
-                    }
-                }
-
                 // Recreate any static imports as needed
                 if (sf != null) {
                     for (J.Import anImport : sf.getImports()) {
@@ -408,8 +391,17 @@ public class ChangeType extends Recipe {
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
-            if (v.getVariableType() != null && !v.getSimpleName().equals(v.getVariableType().getName())) {
-                return v.withVariableType(v.getVariableType().withName(v.getSimpleName()));
+            if (v.getSimpleName().equals(decapitalize(originalType.getClassName()))) {
+                if (v.getVariableType() != null && TypeUtils.isOfType(targetType, v.getVariableType().getType())) {
+                    if (targetType instanceof JavaType.FullyQualified) {
+                        String newName = VariableNameUtils.generateVariableName(
+                                decapitalize(((JavaType.FullyQualified) targetType).getClassName()),
+                                getCursor(),
+                                GenerationStrategy.INCREMENT_NUMBER
+                        );
+                        doAfterVisit(new RenameVariable<>(v, newName));
+                    }
+                }
             }
             return v;
         }
