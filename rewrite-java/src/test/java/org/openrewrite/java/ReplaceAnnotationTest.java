@@ -171,7 +171,8 @@ class ReplaceAnnotationTest implements RewriteTest {
                                         }
     
                                     }
-                                    """)
+                                    """
+                    )
             );
         }
 
@@ -195,7 +196,8 @@ class ReplaceAnnotationTest implements RewriteTest {
                         @NonNull String firstName,
                         @NonNull String lastName
                     ) {}
-                    """));
+                    """
+                    ));
         }
 
         @Test
@@ -218,8 +220,8 @@ class ReplaceAnnotationTest implements RewriteTest {
                         @NonNull String firstName="";
                         @NonNull String lastName="";
                     }
-                    """));
-        }
+                    """
+                    ));
     }
 
     @Nested

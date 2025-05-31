@@ -87,7 +87,8 @@ class JavaTemplateAnnotationRecordTest implements RewriteTest {
                     @NonNull String firstName,
                     @NonNull String lastName
                 ) {}
-                """));
+                """
+                ));
     }
 
 }
