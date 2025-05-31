@@ -66,7 +66,12 @@ class JavaTemplateAnnotationRecordTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
                   if (annotation.getSimpleName().equals("NotNull")) {
-                      return JavaTemplate.apply("@NonNull", getCursor(), annotation.getCoordinates().replace());
+                      return JavaTemplate.builder("@NonNull")
+                        .imports("lombok.NonNull")
+                        .javaParser(JavaParser.fromJavaVersion().classpath("lombok"))
+                        .doBeforeParseTemplate(System.out::println)
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replace());
                   }
                   return annotation;
               }
