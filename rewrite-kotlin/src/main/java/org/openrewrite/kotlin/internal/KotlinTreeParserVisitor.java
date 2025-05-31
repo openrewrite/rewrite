@@ -3641,15 +3641,51 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private JavaType.@Nullable Variable variableType(PsiElement psi, @Nullable FirElement parent) {
-        return psiElementAssociations.variableType(psi, parent);
+        JavaType.Variable psiType = psiElementAssociations.variableType(psi, parent);
+        return psiType == null ? null : psiType.withType(mapPrimitiveType(psiType.getType()));
     }
 
     private JavaType.@Nullable Method methodDeclarationType(PsiElement psi) {
-        return psiElementAssociations.methodDeclarationType(psi);
+        JavaType.Method psiType = psiElementAssociations.methodDeclarationType(psi);
+        return psiType == null ? null : psiType.withParameterTypes(mapPrimitiveTypes(psiType.getParameterTypes()));
     }
 
     private JavaType.@Nullable Method methodInvocationType(PsiElement psi) {
-        return psiElementAssociations.methodInvocationType(psi);
+        JavaType.Method psiType = psiElementAssociations.methodInvocationType(psi);
+        return psiType == null ? null : psiType.withParameterTypes(mapPrimitiveTypes(psiType.getParameterTypes()));
+    }
+
+    private static List<JavaType> mapPrimitiveTypes(List<JavaType> types) {
+        return ListUtils.map(types, KotlinTreeParserVisitor::mapPrimitiveType);
+    }
+
+    private static JavaType mapPrimitiveType(JavaType type) {
+        if (type instanceof JavaType.Class) {
+            String fullyQualifiedName = ((JavaType.Class) type).getFullyQualifiedName();
+            switch (fullyQualifiedName) {
+                case "kotlin.Boolean":
+                    return JavaType.Primitive.Boolean;
+                case "kotlin.Byte":
+                    return JavaType.Primitive.Byte;
+                case "kotlin.Char":
+                    return JavaType.Primitive.Char;
+                case "kotlin.Double":
+                    return JavaType.Primitive.Double;
+                case "kotlin.Float":
+                    return JavaType.Primitive.Float;
+                case "kotlin.Int":
+                    return JavaType.Primitive.Int;
+                case "kotlin.Long":
+                    return JavaType.Primitive.Long;
+                case "kotlin.Short":
+                    return JavaType.Primitive.Short;
+                case "kotlin.String":
+                    return JavaType.Primitive.String;
+                case "kotlin.Void":
+                    return JavaType.Primitive.Void;
+            }
+        }
+        return type;
     }
 
     /*====================================================================
