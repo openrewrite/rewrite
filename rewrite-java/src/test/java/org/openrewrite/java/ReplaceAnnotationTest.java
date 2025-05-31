@@ -37,7 +37,7 @@ class ReplaceAnnotationTest implements RewriteTest {
               java(
                 """
                   import org.jetbrains.annotations.NotNull;
-                  
+
                   class A {
                       @NotNull("Test")
                       String testMethod() {}
@@ -45,7 +45,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                   """,
                 """
                   import lombok.NonNull;
-                  
+
                   class A {
                       @NonNull
                       String testMethod() {}
@@ -62,7 +62,7 @@ class ReplaceAnnotationTest implements RewriteTest {
               java(
                 """
                   import org.jetbrains.annotations.NotNull;
-                  
+
                   class A {
                       @NotNull
                       String testMethod() {}
@@ -70,7 +70,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                   """,
                 """
                   import lombok.NonNull;
-                  
+
                   class A {
                       @NonNull
                       String testMethod() {}
@@ -87,7 +87,7 @@ class ReplaceAnnotationTest implements RewriteTest {
               java(
                 """
                   import lombok.NonNull;
-                  
+
                   class A {
                       @NonNull
                       String testMethod() {}
@@ -95,7 +95,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                   """,
                 """
                   import org.jetbrains.annotations.NotNull;
-                  
+
                   class A {
                       @NotNull("Test")
                       String testMethod() {}
@@ -114,7 +114,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                 """
                   import org.jetbrains.annotations.NotNull;
                   import org.jetbrains.annotations.Nullable;
-                  
+
                   class A {
                       void methodName(
                           @Nullable final boolean valueVar) {
@@ -125,7 +125,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                 """
                   import lombok.NonNull;
                   import org.jetbrains.annotations.Nullable;
-                  
+
                   class A {
                       void methodName(
                           @Nullable final boolean valueVar) {
