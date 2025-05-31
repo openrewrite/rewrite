@@ -121,9 +121,9 @@ public class ChangeMethodName extends Recipe {
             private final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
 
             @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                 if (IS_VALID_METHOD_NAME.test(newMethodName)) {
-                    return super.isAcceptable(sourceFile, executionContext);
+                    return super.isAcceptable(sourceFile, ctx);
                 }
                 return false;
             }

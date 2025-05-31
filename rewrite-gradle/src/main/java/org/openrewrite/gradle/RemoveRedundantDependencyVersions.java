@@ -26,19 +26,19 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.Traits;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestIntegration;
@@ -80,169 +80,235 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Nullable
     Comparator onlyIfManagedVersionIs;
 
-    @Option(displayName = "Except",
-            description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe." +
-                    " GAV versions are ignored if provided.",
-            example = "com.jcraft:jsch",
-            required = false)
-    @Nullable
-    List<String> except;
-
-    public enum Comparator { ANY, EQ, LT, LTE, GT, GTE }
+    public enum Comparator {ANY, EQ, LT, LTE, GT, GTE}
 
     @Override
     public String getDisplayName() {
-        return "Remove redundant explicit dependency versions";
+        return "Remove redundant explicit dependencies and versions";
     }
 
     @Override
     public String getDescription() {
-        return "Remove explicitly-specified dependency versions that are managed by a Gradle `platform`/`enforcedPlatform`.";
+        return "Remove explicitly-specified dependencies and dependency versions that are managed by a Gradle `platform`/`enforcedPlatform`.";
     }
 
-    private static final MethodMatcher CONSTRAINTS_MATCHER = new MethodMatcher("DependencyHandlerSpec constraints(..)");
-    private static final MethodMatcher INDIVIDUAL_CONSTRAINTS_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
+    private static final List<String> DEPENDENCY_MANAGEMENT_METHODS = Arrays.asList(
+            "api",
+            "implementation",
+            "compileOnly",
+            "runtimeOnly",
+            "testImplementation",
+            "testCompileOnly",
+            "testRuntimeOnly",
+            "debugImplementation",
+            "releaseImplementation",
+            "androidTestImplementation",
+            "featureImplementation",
+            "annotationProcessor",
+            "kapt",
+            "ksp",
+            "compile", // deprecated
+            "runtime", // deprecated
+            "testCompile", // deprecated
+            "testRuntime" // deprecated
+    );
     private static final VersionComparator VERSION_COMPARATOR = requireNonNull(Semver.validate("latest.release", null).getValue());
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
                     GradleProject gp;
                     final Map<String, List<ResolvedPom>> platforms = new HashMap<>();
+                    final List<ResolvedDependency> directDependencies = new ArrayList<>();
+
 
                     @Override
-                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                        Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
-                        if (!maybeGp.isPresent()) {
-                            return cu;
-                        }
+                    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (tree instanceof JavaSourceFile) {
+                            Optional<GradleProject> maybeGp = tree.getMarkers().findFirst(GradleProject.class);
+                            if (!maybeGp.isPresent()) {
+                                return (J) tree;
+                            }
 
-                        gp = maybeGp.get();
-                        new GroovyIsoVisitor<ExecutionContext>() {
-                            final MethodMatcher platformMatcher = new MethodMatcher("org.gradle.api.artifacts.dsl.DependencyHandler platform(..)");
-                            final MethodMatcher enforcedPlatformMatcher = new MethodMatcher("org.gradle.api.artifacts.dsl.DependencyHandler enforcedPlatform(..)");
+                            gp = maybeGp.get();
+                            new JavaIsoVisitor<ExecutionContext>() {
+                                @Override
+                                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                    J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                            @Override
-                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                                if (!platformMatcher.matches(m) && !enforcedPlatformMatcher.matches(m)) {
+                                    new GradleDependency.Matcher()
+                                            .groupId(groupPattern)
+                                            .artifactId(artifactPattern)
+                                            .get(getCursor())
+                                            .ifPresent(it ->
+                                                directDependencies.add(it.getResolvedDependency()));
+
+                                    if (!m.getSimpleName().equals("platform") && !m.getSimpleName().equals("enforcedPlatform")) {
+                                        return m;
+                                    }
+
+                                    GroupArtifactVersion gav = null;
+                                    if (m.getArguments().get(0) instanceof J.Literal) {
+                                        J.Literal l = (J.Literal) m.getArguments().get(0);
+                                        if (l.getType() == JavaType.Primitive.String) {
+                                            Dependency dependency = DependencyStringNotationConverter.parse((String) l.getValue());
+                                            gav = new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
+                                        }
+                                    } else if (m.getArguments().get(0) instanceof G.MapEntry) {
+                                        String groupId = null;
+                                        String artifactId = null;
+                                        String version = null;
+
+                                        for (Expression arg : m.getArguments()) {
+                                            if (!(arg instanceof G.MapEntry &&
+                                                    ((G.MapEntry) arg).getKey().getType() == JavaType.Primitive.String &&
+                                                    ((G.MapEntry) arg).getValue().getType() == JavaType.Primitive.String)) {
+                                                continue;
+                                            }
+
+                                            Object key = ((J.Literal) ((G.MapEntry) arg).getKey()).getValue();
+                                            if ("group".equals(key)) {
+                                                groupId = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
+                                            } else if ("name".equals(key)) {
+                                                artifactId = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
+                                            } else if ("version".equals(key)) {
+                                                version = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
+                                            }
+                                        }
+
+                                        if (groupId != null && artifactId != null && version != null) {
+                                            gav = new GroupArtifactVersion(groupId, artifactId, version);
+                                        }
+                                    }
+                                    if (gav != null) {
+                                        MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                                        try {
+                                            ResolvedPom platformPom = mpd.download(gav, null, null, gp.getMavenRepositories())
+                                                    .resolve(emptyList(), mpd, ctx);
+                                            platforms.computeIfAbsent(getCursor().getParentOrThrow(1).firstEnclosingOrThrow(J.MethodInvocation.class).getSimpleName(), k -> new ArrayList<>()).add(platformPom);
+                                        } catch (MavenDownloadingException ignored) {
+                                        }
+                                    }
+                                    return m;
+                                }
+                            }.visit(tree, ctx);
+                            tree = new JavaIsoVisitor<ExecutionContext>() {
+
+                                @Override
+                                public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                    J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                                    if (m.getSimpleName().equals("constraints")) {
+                                        if (m.getArguments().isEmpty() ||
+                                                !(m.getArguments().get(0) instanceof J.Lambda) ||
+                                                !(((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block)) {
+                                            return m;
+                                        }
+                                        if (((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
+                                            return null;
+                                        }
+                                        return m;
+                                    } else {
+                                        if (!isDependencyManagmentMethod(m.getSimpleName()) ||
+                                                m.getArguments().isEmpty() ||
+                                                m.getArguments().get(0).getType() != JavaType.Primitive.String) {
+                                            return m;
+                                        }
+                                        //noinspection DataFlowIssue
+                                        String value = (String) ((J.Literal) m.getArguments().get(0)).getValue();
+                                        Dependency dependency = DependencyStringNotationConverter.parse(value);
+                                        try {
+                                            Object parent = getCursor().dropParentUntil(obj -> obj instanceof J.MethodInvocation && ((J.MethodInvocation) obj).getSimpleName().equals("constraints")).getValue();
+                                            if (parent != null && shouldRemoveRedundantConstraint(dependency, gp.getConfiguration(m.getSimpleName()))) {
+                                                return null;
+                                            }
+                                            return m;
+                                        } catch (Exception ignore) {
+                                        }
+
+                                        if (shouldRemoveRedundantDependency(dependency, m.getSimpleName())) {
+                                            return null;
+                                        }
+                                    }
                                     return m;
                                 }
 
-                                GroupArtifactVersion gav = null;
-                                if (m.getArguments().get(0) instanceof J.Literal) {
-                                    J.Literal l = (J.Literal) m.getArguments().get(0);
-                                    if (l.getType() == JavaType.Primitive.String) {
-                                        Dependency dependency = DependencyStringNotationConverter.parse((String) l.getValue());
-                                        gav = new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
+                                @Override
+                                public J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
+                                    J.Return r = super.visitReturn(_return, ctx);
+                                    if (r.getExpression() == null) {
+                                        return null;
                                     }
-                                } else if (m.getArguments().get(0) instanceof G.MapEntry) {
-                                    String groupId = null;
-                                    String artifactId = null;
-                                    String version = null;
+                                    return r;
+                                }
 
-                                    for (Expression arg : m.getArguments()) {
-                                        if (!(arg instanceof G.MapEntry &&
-                                                ((G.MapEntry) arg).getKey().getType() == JavaType.Primitive.String &&
-                                                ((G.MapEntry) arg).getValue().getType() == JavaType.Primitive.String)) {
+                                private boolean isDependencyManagmentMethod(String methodName) {
+                                    return DEPENDENCY_MANAGEMENT_METHODS.contains(methodName);
+                                }
+
+                                private boolean shouldRemoveRedundantDependency(Dependency dependency, String configurationName) {
+                                    if (platforms == null || platforms.get(configurationName) == null || platforms.get(configurationName).isEmpty()) {
+                                        return false;
+                                    }
+
+                                    if ((groupPattern != null && !StringUtils.matchesGlob(dependency.getGroupId(), groupPattern)) ||
+                                            (artifactPattern != null && !StringUtils.matchesGlob(dependency.getArtifactId(), artifactPattern))) {
+                                        return false;
+                                    }
+
+                                    String dependencyManagedVersion = platforms.get(configurationName)
+                                            .stream()
+                                            .flatMap(e -> e.getDependencyManagement().stream())
+                                            .filter(e -> e.getGroupId().equals(dependency.getGroupId()))
+                                            .filter(e -> e.getArtifactId().equals(dependency.getArtifactId()))
+                                            .map(ResolvedManagedDependency::getVersion)
+                                            .max(VERSION_COMPARATOR)
+                                            .orElse(null);
+
+                                    for (ResolvedDependency d : directDependencies) {
+                                        //ignore self
+                                        if (d.getGroupId().equals(dependency.getGroupId()) && d.getArtifactId().equals(dependency.getArtifactId())) {
                                             continue;
                                         }
 
-                                        Object key = ((J.Literal) ((G.MapEntry) arg).getKey()).getValue();
-                                        if ("group".equals(key)) {
-                                            groupId = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
-                                        } else if ("name".equals(key)) {
-                                            artifactId = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
-                                        } else if ("version".equals(key)) {
-                                            version = (String) ((J.Literal) ((G.MapEntry) arg).getValue()).getValue();
+                                        if (d.getDependencies() == null) {
+                                            continue;
+                                        }
+
+
+                                        ResolvedDependency resolvedDependency = d.findDependency(dependency.getGroupId(), dependency.getArtifactId());
+                                        if (resolvedDependency != null && (dependency.getVersion() == null || VERSION_COMPARATOR.compare(dependency.getVersion(), dependencyManagedVersion) <= 0)) {
+                                            return true;
                                         }
                                     }
-
-                                    if (groupId != null && artifactId != null && version != null) {
-                                        gav = new GroupArtifactVersion(groupId, artifactId, version);
-                                    }
-                                }
-                                if (gav != null) {
-                                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                                    try {
-                                        ResolvedPom platformPom = mpd.download(gav, null, null, gp.getMavenRepositories())
-                                                .resolve(emptyList(), mpd, ctx);
-                                        platforms.computeIfAbsent(getCursor().getParentOrThrow(1).firstEnclosingOrThrow(J.MethodInvocation.class).getSimpleName(), k -> new ArrayList<>()).add(platformPom);
-                                    } catch (MavenDownloadingException ignored) {
-                                    }
-                                }
-                                return m;
-                            }
-                        }.visit(cu, ctx);
-                        cu = (G.CompilationUnit) new GroovyIsoVisitor<ExecutionContext>() {
-
-                            @Override
-                            public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                                if (CONSTRAINTS_MATCHER.matches(m)) {
-                                    if (m.getArguments().isEmpty() ||
-                                            !(m.getArguments().get(0) instanceof J.Lambda) ||
-                                            !(((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block)) {
-                                        return m;
-                                    }
-                                    if (((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
-                                        return null;
-                                    }
-                                    return m;
-                                } else if (INDIVIDUAL_CONSTRAINTS_MATCHER.matches(m)) {
-                                    if (!TypeUtils.isAssignableTo("org.gradle.api.artifacts.Dependency", requireNonNull(m.getMethodType()).getReturnType()) ||
-                                            m.getArguments().isEmpty() ||
-                                            m.getArguments().get(0).getType() != JavaType.Primitive.String) {
-                                        return m;
-                                    }
-                                    //noinspection DataFlowIssue
-                                    if (shouldRemoveRedundantConstraint((String) ((J.Literal) m.getArguments().get(0)).getValue(), m.getSimpleName())) {
-                                        return null;
-                                    }
-                                }
-                                return m;
-                            }
-
-                            @Override
-                            public J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
-                                J.Return r = super.visitReturn(_return, ctx);
-                                if (r.getExpression() == null) {
-                                    return null;
-                                }
-                                return r;
-                            }
-
-                            boolean shouldRemoveRedundantConstraint(String dependencyNotation, String configurationName) {
-                                return shouldRemoveRedundantConstraint(
-                                        DependencyStringNotationConverter.parse(dependencyNotation),
-                                        gp.getConfiguration(configurationName));
-                            }
-
-                            boolean shouldRemoveRedundantConstraint(@Nullable Dependency constraint, @Nullable GradleDependencyConfiguration c) {
-                                if (c == null || constraint == null || constraint.getVersion() == null) {
                                     return false;
                                 }
-                                if (constraint.getVersion().contains("[") || constraint.getVersion().contains("!!")) {
-                                    // https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
-                                    return false;
-                                }
-                                if ((groupPattern != null && !StringUtils.matchesGlob(constraint.getGroupId(), groupPattern)) ||
-                                        (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
-                                    return false;
-                                }
-                                return Stream.concat(
-                                                Stream.of(c),
-                                                gp.configurationsExtendingFrom(c, true).stream()
-                                        )
-                                        .filter(GradleDependencyConfiguration::isCanBeResolved)
-                                        .distinct()
-                                        .map(conf -> conf.findResolvedDependency(requireNonNull(constraint.getGroupId()), constraint.getArtifactId()))
-                                        .filter(Objects::nonNull)
-                                        .anyMatch(resolvedDependency -> VERSION_COMPARATOR.compare(null, resolvedDependency.getVersion(), constraint.getVersion()) > 0);
-                            }
-                        }.visitNonNull(cu, ctx);
 
-                        return super.visitCompilationUnit(cu, ctx);
+                                boolean shouldRemoveRedundantConstraint(@Nullable Dependency constraint, @Nullable GradleDependencyConfiguration c) {
+                                    if (c == null || constraint == null || constraint.getVersion() == null) {
+                                        return false;
+                                    }
+                                    if (constraint.getVersion().contains("[") || constraint.getVersion().contains("!!")) {
+                                        // https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
+                                        return false;
+                                    }
+                                    if ((groupPattern != null && !StringUtils.matchesGlob(constraint.getGroupId(), groupPattern)) ||
+                                            (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
+                                        return false;
+                                    }
+
+                                    return Stream.concat(
+                                                    Stream.of(c),
+                                                    gp.configurationsExtendingFrom(c, true).stream()
+                                            )
+                                            .filter(GradleDependencyConfiguration::isCanBeResolved)
+                                            .distinct()
+                                            .map(conf -> conf.findResolvedDependency(requireNonNull(constraint.getGroupId()), constraint.getArtifactId()))
+                                            .filter(Objects::nonNull)
+                                            .anyMatch(resolvedDependency -> VERSION_COMPARATOR.compare(null, resolvedDependency.getVersion(), constraint.getVersion()) > 0);
+                                }
+                            }.visitNonNull(tree, ctx);
+                        }
+                        return super.visit(tree, ctx);
                     }
 
                     @Override

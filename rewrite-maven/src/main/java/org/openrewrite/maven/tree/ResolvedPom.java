@@ -445,7 +445,7 @@ public class ResolvedPom {
             }
             Map<GroupArtifactScope, ResolvedManagedDependencyDepth> gaToNearest = dependencyManagement.stream()
                     .collect(Collectors.toMap(
-                            d -> new GroupArtifactScope(d.getGav().asGroupArtifact(), d.getScope(), d.getClassifier()),
+                            d -> new GroupArtifactScope(d.getGav().asGroupArtifact(), d.getType(), d.getScope(), d.getClassifier()),
                             d -> new ResolvedManagedDependencyDepth(d, 0),
                             (x, y) -> y,
                             LinkedHashMap::new));
@@ -835,13 +835,44 @@ public class ResolvedPom {
             }
         }
 
-        @Value
         private class GroupArtifactScope {
-            GroupArtifact ga;
+            final GroupArtifact ga;
             @Nullable
-            Scope scope;
+            final String type; // Added type field to prevent different types from overwriting each other
             @Nullable
-            String classifier;
+            final Scope scope;
+            @Nullable
+            final String classifier;
+            
+            GroupArtifactScope(GroupArtifact ga, @Nullable String type, @Nullable Scope scope, @Nullable String classifier) {
+                this.ga = ga;
+                this.type = type;
+                this.scope = scope;
+                this.classifier = classifier;
+            }
+            
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) return true;
+                if (!(o instanceof GroupArtifactScope)) return false;
+                GroupArtifactScope that = (GroupArtifactScope) o;
+                
+                // Normalize type: null and "jar" are Maven-equivalent for dependency matching
+                String normalizedThisType = this.type == null ? "jar" : this.type;
+                String normalizedThatType = that.type == null ? "jar" : that.type;
+                
+                return Objects.equals(ga, that.ga) &&
+                       Objects.equals(normalizedThisType, normalizedThatType) &&
+                       Objects.equals(scope, that.scope) &&
+                       Objects.equals(classifier, that.classifier);
+            }
+            
+            @Override
+            public int hashCode() {
+                // Ensure consistent hashing with type normalization to maintain equals/hashCode contract
+                String normalizedType = this.type == null ? "jar" : this.type;
+                return Objects.hash(ga, normalizedType, scope, classifier);
+            }
         }
 
         @Value
@@ -871,13 +902,12 @@ public class ResolvedPom {
                             .withRequestedBom(d)
                             .withBomGav(bom.getGav()));
                     for (ResolvedManagedDependency managed : bomManaged) {
-                        gaToNearest.compute(new GroupArtifactScope(managed.getGav().asGroupArtifact(), managed.getScope(), managed.getClassifier()), (ga, existing) -> {
+                        gaToNearest.compute(new GroupArtifactScope(managed.getGav().asGroupArtifact(), managed.getType(), managed.getScope(), managed.getClassifier()), (ga, existing) -> {
                             // Add one to the depth to account for the BOM which brings it in
                             int depthPlusBom = depth + 1;
-                            if (existing == null || existing.depth > depthPlusBom ||
-                                    // If they have the same depth prefer the explicitly defined one
-                                    (existing.depth == depthPlusBom && existing.getDependency().getBomGav() != null && managed.getBomGav() == null)) {
-
+                            if (existing == null || existing.depth > depthPlusBom) {
+                                // New BOM entry wins if no existing entry or if it's closer (smaller depth).
+                                // At same depth: existing entry wins (direct DM beats BOM, first BOM beats later BOM).
                                 return new ResolvedManagedDependencyDepth(managed, depthPlusBom);
                             }
                             return existing;
@@ -888,8 +918,10 @@ public class ResolvedPom {
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()
                             .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
-                    gaToNearest.compute(new GroupArtifactScope(defined.getGav().asGroupArtifact(), defined.getScope() == null ? null : Scope.fromName(defined.getScope()), defined.getClassifier()), (ga, existing) -> {
+                    gaToNearest.compute(new GroupArtifactScope(defined.getGav().asGroupArtifact(), getValue(defined.getType()), defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())), getValue(defined.getClassifier())), (ga, existing) -> {
                         if (existing == null || existing.depth > depth || (existing.depth == depth && existing.getDependency().getBomGav() != null)) {
+                            // Direct DM entry wins over BOM entry at same depth (implements "Parent Nearer Than BOM" rule).
+                            // This ensures parent POM's direct DM beats child POM's imported BOM DM.
                             return new ResolvedManagedDependencyDepth(new ResolvedManagedDependency(
                                     getValues(defined.getGav()),
                                     defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),

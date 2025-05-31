@@ -73,14 +73,13 @@ export class TreePrinters {
     private static _registry =
         new Map<string, TreePrinter>();
 
-    static register(kind: string, printer: TreeVisitor<any, PrintOutputCapture>): void {
+    static register(kind: string, printer: () => TreeVisitor<any, PrintOutputCapture>): void {
         this._registry.set(kind, {
             async print(tree: Tree, out?: PrintOutputCapture): Promise<string> {
                 const p = out || new PrintOutputCapture();
-                await printer.visit(tree, p);
+                await printer().visit(tree, p);
                 return p.out;
-            }
-        });
+            }})
     }
 
     /**

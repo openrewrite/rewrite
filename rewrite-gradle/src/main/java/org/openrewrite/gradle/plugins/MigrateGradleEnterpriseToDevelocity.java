@@ -97,7 +97,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
                         G.CompilationUnit g = cu;
                         g = (G.CompilationUnit) new ChangePlugin("com.gradle.enterprise", "com.gradle.develocity", version).getVisitor()
                                 .visitNonNull(g, ctx);
-                        g = (G.CompilationUnit) new ChangePluginVersion("com.gradle.common-custom-user-data-gradle-plugin", "2.x", null).getVisitor()
+                        g = (G.CompilationUnit) new UpgradePluginVersion("com.gradle.common-custom-user-data-gradle-plugin", "2.x", null).getVisitor()
                                 .visitNonNull(g, ctx);
                         g = (G.CompilationUnit) new MigrateConfigurationVisitor().visitNonNull(g, ctx);
                         return g;

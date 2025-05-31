@@ -435,8 +435,8 @@ class ChangeMethodNameTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J visit(Tree tree, ExecutionContext executionContext) {
-                  return (J) new ChangeMethodName("com.abc.B static1(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, executionContext);
+              public J visit(Tree tree, ExecutionContext ctx) {
+                  return (J) new ChangeMethodName("com.abc.B static1(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, ctx);
               }
           })),
           java(b, SourceSpec::skip),
