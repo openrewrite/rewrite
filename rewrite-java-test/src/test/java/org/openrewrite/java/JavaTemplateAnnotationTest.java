@@ -132,7 +132,6 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                       return JavaTemplate.builder("@NonNull")
                         .imports("lombok.NonNull")
                         .javaParser(JavaParser.fromJavaVersion().classpath("lombok"))
-                        .doBeforeParseTemplate(System.out::println)
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replace());
                   }
