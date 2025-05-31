@@ -195,7 +195,7 @@ class ChangeTypeTest implements RewriteTest {
 
               import x.y.Target
 
-              fun test(original: Target<String>) { }
+              fun test(target: Target<String>) { }
               """
           )
         );
@@ -231,7 +231,7 @@ class ChangeTypeTest implements RewriteTest {
 
               import x.y.Target as MyAlias
 
-              fun test(original: MyAlias<String>) { }
+              fun test(target: MyAlias<String>) { }
               """
           )
         );
@@ -263,7 +263,7 @@ class ChangeTypeTest implements RewriteTest {
 
               import x.y.Target
 
-              fun test(original: Target<String>) { }
+              fun test(target: Target<String>) { }
               """
           )
         );
