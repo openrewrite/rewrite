@@ -392,8 +392,8 @@ public class ChangeType extends Recipe {
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
             if (v.getSimpleName().equals(decapitalize(originalType.getClassName()))) {
-                if (v.getVariableType() != null && TypeUtils.isOfType(targetType, v.getVariableType().getType())) {
-                    if (targetType instanceof JavaType.FullyQualified) {
+                if (targetType instanceof JavaType.FullyQualified) {
+                    if (v.getVariableType() != null && TypeUtils.isOfType(targetType, v.getVariableType().getType())) {
                         String newName = VariableNameUtils.generateVariableName(
                                 decapitalize(((JavaType.FullyQualified) targetType).getClassName()),
                                 getCursor(),
