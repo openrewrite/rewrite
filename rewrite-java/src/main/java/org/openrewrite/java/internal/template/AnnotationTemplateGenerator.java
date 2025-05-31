@@ -230,7 +230,11 @@ public class AnnotationTemplateGenerator {
                 }
             }
         }
-        c = c.withBody(J.Block.createEmptyBlock()).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
+        c = c.withBody(J.Block.createEmptyBlock())
+                .withLeadingAnnotations(null)
+                .withPrefix(Space.EMPTY)
+                .withKind(J.ClassDeclaration.Kind.Type.Class)
+                .withPrimaryConstructor(null);
         String printed = c.printTrimmed(cursor);
         int braceIndex = printed.lastIndexOf('{');
         if (annotated) {
