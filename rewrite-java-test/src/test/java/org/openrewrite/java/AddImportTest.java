@@ -1621,7 +1621,7 @@ class AddImportTest implements RewriteTest {
                 @Override
                 public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
                     JavaTemplate template = JavaTemplate.builder(
-                        "DataType d = DataType.TYPE_2;")
+                        "DataType d2 = DataType.TYPE_2;")
                       .javaParser(JavaParser.fromJavaVersion().dependsOn(auxSource))
                       .imports("com.example.A.DataType")
                       .build();
@@ -1636,7 +1636,7 @@ class AddImportTest implements RewriteTest {
               import com.example.A.DataType;
 
               class Test {
-                  DataType d = DataType.TYPE_1;
+                  DataType d1 = DataType.TYPE_1;
                   A a;
               }
               """,
@@ -1645,8 +1645,8 @@ class AddImportTest implements RewriteTest {
               import com.example.A.DataType;
 
               class Test {
-                  DataType d = DataType.TYPE_2;
-                  DataType d = DataType.TYPE_1;
+                  DataType d2 = DataType.TYPE_2;
+                  DataType d1 = DataType.TYPE_1;
                   A a;
               }
               """
