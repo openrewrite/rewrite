@@ -1604,6 +1604,7 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/5530")
     @Test
     void importWithNestedClass() {
         @Language("java") final String auxSource = """
