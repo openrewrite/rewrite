@@ -397,7 +397,7 @@ public class ChangeType extends Recipe {
                         if (v.getVariableType() != null && TypeUtils.isOfType(targetType, v.getVariableType().getType())) {
                             String newName = VariableNameUtils.generateVariableName(
                                     decapitalize(((JavaType.FullyQualified) targetType).getClassName()),
-                                    getCursor(),
+                                    updateCursor(v),
                                     GenerationStrategy.INCREMENT_NUMBER
                             );
                             doAfterVisit(new RenameVariable<>(v, newName));
