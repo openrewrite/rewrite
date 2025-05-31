@@ -37,7 +37,7 @@ class ReplaceAnnotationTest implements RewriteTest {
               java(
                 """
                   import org.jetbrains.annotations.NotNull;
-                 
+                  
                   class A {
                       @NotNull("Test")
                       String testMethod() {}
@@ -54,6 +54,7 @@ class ReplaceAnnotationTest implements RewriteTest {
               )
             );
         }
+
         @Test
         void matchNoPrams() {
             rewriteRun(
@@ -140,124 +141,123 @@ class ReplaceAnnotationTest implements RewriteTest {
         void enumWithParameter() {
 
             rewriteRun(
-                    spec -> spec.recipe(new ReplaceAnnotation("@lombok.NonNull", "@org.jetbrains.annotations.NotNull", null)),
-                    java(
-                            """
-                                    import lombok.NonNull;
-    
-                                    public enum NullableRecipeValidationEnum {
-                                        INVALID("invalid"),
-                                        CLICKED("clicked");
-    
-                                        private final String value;
-    
-                                        NullableRecipeValidationEnum(@NonNull final String value){
-                                            this.value = value;
-                                        }
-    
-                                    }
-                                    """,
-                            """
-                                    import org.jetbrains.annotations.NotNull;
-    
-                                    public enum NullableRecipeValidationEnum {
-                                        INVALID("invalid"),
-                                        CLICKED("clicked");
-    
-                                        private final String value;
-    
-                                        NullableRecipeValidationEnum(@NotNull final String value){
-                                            this.value = value;
-                                        }
-    
-                                    }
-                                    """
-                    )
+              spec -> spec.recipe(new ReplaceAnnotation("@lombok.NonNull", "@org.jetbrains.annotations.NotNull", null)),
+              java(
+                """
+                  import lombok.NonNull;
+
+                  public enum NullableRecipeValidationEnum {
+                      INVALID("invalid"),
+                      CLICKED("clicked");
+
+                      private final String value;
+
+                      NullableRecipeValidationEnum(@NonNull final String value){
+                          this.value = value;
+                      }
+                  }
+                  """,
+                """
+                  import org.jetbrains.annotations.NotNull;
+
+                  public enum NullableRecipeValidationEnum {
+                      INVALID("invalid"),
+                      CLICKED("clicked");
+
+                      private final String value;
+
+                      NullableRecipeValidationEnum(@NotNull final String value){
+                          this.value = value;
+                      }
+                  }
+                  """
+              )
             );
         }
 
         @Test
         void recordWithAttibutesAnnotated() {
             rewriteRun(
-                    spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
-                    java(
-                            """
-                    import org.jetbrains.annotations.NotNull;
-        
-                    public record Person(
-                        @NotNull String firstName,
-                        @NotNull String lastName
-                    ) {}
-                    """,
-                            """
-                    import lombok.NonNull;
-        
-                    public record Person(
-                        @NonNull String firstName,
-                        @NonNull String lastName
-                    ) {}
-                    """
-                    ));
+              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+              java(
+                """
+                  import org.jetbrains.annotations.NotNull;
+
+                  public record Person(
+                      @NotNull String firstName,
+                      @NotNull String lastName
+                  ) {}
+                  """,
+                """
+                  import lombok.NonNull;
+
+                  public record Person(
+                      @NonNull String firstName,
+                      @NonNull String lastName
+                  ) {}
+                  """
+              ));
         }
 
         @Test
         void attributesInClass() {
             rewriteRun(
-                    spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
-                    java(
-                            """
-                    import org.jetbrains.annotations.NotNull;
-        
-                    public class Person {
-                        @NotNull String firstName="";
-                        @NotNull String lastName="";
-                    }
-                    """,
-                            """
-                    import lombok.NonNull;
-        
-                    public class Person {
-                        @NonNull String firstName="";
-                        @NonNull String lastName="";
-                    }
-                    """
-                    ));
-    }
-
-    @Nested
-    class NoMatch {
-        @Test
-        void noMatchOtherType() {
-            rewriteRun(
               spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
               java(
                 """
-                  import org.jetbrains.annotations.Nullable;
-                  
-                  class A {
-                      @Nullable("Test")
-                      String testMethod() {}
+                  import org.jetbrains.annotations.NotNull;
+
+                  public class Person {
+                      @NotNull String firstName="";
+                      @NotNull String lastName="";
+                  }
+                  """,
+                """
+                  import lombok.NonNull;
+
+                  public class Person {
+                      @NonNull String firstName="";
+                      @NonNull String lastName="";
                   }
                   """
-              )
-            );
+              ));
         }
 
-        @Test
-        void noMatchParameter() {
-            rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull(\"Test\")", "@lombok.NonNull", null)),
-              java(
-                """
-                  import org.jetbrains.annotations.Nullable;
-                  
-                  class A {
-                      @Nullable("Other")
-                      String testMethod() {}
-                  }
-                  """
-              )
-            );
+        @Nested
+        class NoMatch {
+            @Test
+            void noMatchOtherType() {
+                rewriteRun(
+                  spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+                  java(
+                    """
+                      import org.jetbrains.annotations.Nullable;
+                      
+                      class A {
+                          @Nullable("Test")
+                          String testMethod() {}
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void noMatchParameter() {
+                rewriteRun(
+                  spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull(\"Test\")", "@lombok.NonNull", null)),
+                  java(
+                    """
+                      import org.jetbrains.annotations.Nullable;
+                      
+                      class A {
+                          @Nullable("Other")
+                          String testMethod() {}
+                      }
+                      """
+                  )
+                );
+            }
         }
     }
 }

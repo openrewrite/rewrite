@@ -49,7 +49,7 @@ class JavaTemplateAnnotationRecordTest implements RewriteTest {
               @Deprecated(since = "1.0", forRemoval = true)
               class A {
               }
-                """,
+              """,
             """
               @Deprecated(since = "2.0", forRemoval = true)
               class A {
@@ -62,33 +62,34 @@ class JavaTemplateAnnotationRecordTest implements RewriteTest {
     @Test
     void replacesInRecordVisitor() {
         rewriteRun(
-                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                    @Override
-                    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
-                        if (annotation.getSimpleName().equals("NotNull")) {
-                            return JavaTemplate.apply("@NonNull", getCursor(), annotation.getCoordinates().replace());
-                        }
-                        return annotation;
-                    }
-                })),
-                java(
-                        """
-                import org.jetbrains.annotations.NotNull;
-    
-                public record Person(
-                    @NotNull String firstName,
-                    @NotNull String lastName
-                ) {}
-                """,
-                        """
-                import lombok.NonNull;
-    
-                public record Person(
-                    @NonNull String firstName,
-                    @NonNull String lastName
-                ) {}
-                """
-                ));
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
+                  if (annotation.getSimpleName().equals("NotNull")) {
+                      return JavaTemplate.apply("@NonNull", getCursor(), annotation.getCoordinates().replace());
+                  }
+                  return annotation;
+              }
+          })),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              public record Person(
+                  @NotNull String firstName,
+                  @NotNull String lastName
+              ) {}
+              """,
+            """
+              import lombok.NonNull;
+
+              public record Person(
+                  @NonNull String firstName,
+                  @NonNull String lastName
+              ) {}
+              """
+          )
+        );
     }
 
 }
