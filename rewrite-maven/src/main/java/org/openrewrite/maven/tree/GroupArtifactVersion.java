@@ -34,6 +34,12 @@ public class GroupArtifactVersion implements Serializable {
     @Nullable
     String version;
 
+    public GroupArtifactVersion(@Nullable String groupId, String artifactId, @Nullable String version) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+    }
+
     @Override
     public String toString() {
         return (groupId == null ? "" : groupId) + ':' + artifactId +
