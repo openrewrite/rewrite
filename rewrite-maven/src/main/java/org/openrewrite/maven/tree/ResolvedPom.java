@@ -142,21 +142,15 @@ public class ResolvedPom {
     List<String> subprojects = emptyList();
 
     /**
-     * Deduplicate dependencies and dependency management dependencies
+     * Deduplicate dependencies.
      *
      * @return This POM after deduplication.
      */
     public ResolvedPom deduplicate() {
-        Set<UniqueDependencyKey> uniqueManagedDependencies = new HashSet<>(dependencyManagement.size());
-        //noinspection DataFlowIssue
-        dependencyManagement = ListUtils.map(dependencyManagement,
-                dm -> uniqueManagedDependencies.add(
-                        new UniqueDependencyKey(dm.getGav(), dm.getType(), dm.getClassifier(), dm.getScope())) ? dm : null);
-
-        uniqueManagedDependencies.clear();
+        Set<UniqueDependencyKey> uniqueDependencies = new LinkedHashSet<>(dependencyManagement.size());
         //noinspection DataFlowIssue
         requestedDependencies = ListUtils.map(requestedDependencies,
-                d -> uniqueManagedDependencies.add(
+                d -> uniqueDependencies.add(
                         new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())) ? d : null);
         return this;
     }
@@ -460,33 +454,32 @@ public class ResolvedPom {
             if (pomAncestry.isEmpty()) {
                 return;
             }
-            Map<GroupArtifactClassifierType, ResolvedManagedDependencyDepth> managedDependencyMap = dependencyManagement.stream()
+            Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap = dependencyManagement.stream()
                     .collect(Collectors.toMap(
                             this::createDependencyManagementKey,
-                            d -> new ResolvedManagedDependencyDepth(d, 0),
+                            d -> d,
                             (x, y) -> y, // Keep first (child wins)
                             LinkedHashMap::new));
 
-            resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap, 1);
+            resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap);
             if (!managedDependencyMap.isEmpty()) {
                 dependencyManagement = managedDependencyMap.values().stream()
-                        .map(ResolvedManagedDependencyDepth::getDependency)
                         .sorted(MANAGED_DEPENDENCY_COMPARATOR)
                         .collect(Collectors.toList());
             }
         }
 
-        private void resolveParentDependenciesRecursively(List<Pom> pomAncestry, Map<GroupArtifactClassifierType, ResolvedManagedDependencyDepth> managedDependencyMap, int depth) throws MavenDownloadingException {
+        private void resolveParentDependenciesRecursively(List<Pom> pomAncestry, Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
             List<Profile> effectiveProfiles = pom.effectiveProfiles(activeProfiles);
 
             for (Profile profile : effectiveProfiles) {
-                mergeDependencyManagement(profile.getDependencyManagement(), managedDependencyMap, pomAncestry, depth);
+                mergeDependencyManagement(profile.getDependencyManagement(), managedDependencyMap, pomAncestry);
                 mergeRequestedDependencies(profile.getDependencies());
             }
 
-            mergeDependencyManagement(pom.getDependencyManagement(), managedDependencyMap, pomAncestry, depth);
+            mergeDependencyManagement(pom.getDependencyManagement(), managedDependencyMap, pomAncestry);
             mergeRequestedDependencies(pom.getDependencies());
 
             if (pom.getParent() != null) {
@@ -504,7 +497,7 @@ public class ResolvedPom {
                 }
 
                 pomAncestry.add(0, parentPom);
-                resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap, depth + 1);
+                resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap);
             }
         }
 
@@ -853,14 +846,7 @@ public class ResolvedPom {
             }
         }
 
-        @Value
-        private class ResolvedManagedDependencyDepth {
-            ResolvedManagedDependency dependency;
-            int depth;
-        }
-
         private GroupArtifactClassifierType createDependencyManagementKey(ResolvedManagedDependency dependency) {
-            dependency.getType();
             return new GroupArtifactClassifierType(
                     dependency.getGroupId(),
                     dependency.getArtifactId(),
@@ -904,9 +890,8 @@ public class ResolvedPom {
 
         private void mergeDependencyManagement(
                 List<ManagedDependency> incomingDependencyManagement,
-                Map<GroupArtifactClassifierType, ResolvedManagedDependencyDepth> managedDependencyMap,
-                List<Pom> pomAncestry,
-                int depth) throws MavenDownloadingException {
+                Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap,
+                List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
             for (ManagedDependency d : incomingDependencyManagement) {
                 if (d instanceof Imported) {
@@ -924,12 +909,10 @@ public class ResolvedPom {
                             .withBomGav(bom.getGav()));
                     for (ResolvedManagedDependency managed : bomManaged) {
                         managedDependencyMap.compute(createDependencyManagementKey(managed), (key, existing) -> {
-                            int depthPlusBom = depth + 1;
-                            if (existing == null || existing.getDepth() > depthPlusBom) {
-                                return new ResolvedManagedDependencyDepth(managed, depthPlusBom);
+                            if (existing == null) {
+                                return managed;
                             }
-                            ResolvedManagedDependency merged = mergeProperties(existing.getDependency(), managed);
-                            return new ResolvedManagedDependencyDepth(merged, depth);
+                            return mergeProperties(existing, managed);
                         });
                     }
                 } else if (d instanceof Defined) {
@@ -949,11 +932,10 @@ public class ResolvedPom {
                             null
                     );
                     managedDependencyMap.compute(createDependencyManagementKey(defined), (key, existing) -> {
-                        if (existing == null || existing.getDepth() > depth || (existing.getDepth() == depth && existing.getDependency().getBomGav() != null)) {
-                            return new ResolvedManagedDependencyDepth(resolvedDefined, depth);
+                        if (existing == null || existing.getBomGav() != null) {
+                            return resolvedDefined;
                         }
-                        ResolvedManagedDependency merged = mergeProperties(existing.getDependency(), resolvedDefined);
-                        return new ResolvedManagedDependencyDepth(merged, depth);
+                        return mergeProperties(existing, resolvedDefined);
                     });
                 }
             }
