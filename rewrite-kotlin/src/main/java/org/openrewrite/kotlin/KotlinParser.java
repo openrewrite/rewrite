@@ -22,7 +22,9 @@ import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
+import org.jetbrains.kotlin.cli.common.SessionConstructionUtils;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
@@ -51,14 +53,15 @@ import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
 import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
-import org.jetbrains.kotlin.fir.session.FirJvmSessionFactory;
-import org.jetbrains.kotlin.fir.session.FirSessionConfigurator;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
 import org.jetbrains.kotlin.load.kotlin.PackagePartProvider;
 import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.name.Name;
+import org.jetbrains.kotlin.platform.TargetPlatform;
+import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
+import org.jetbrains.kotlin.psi.KtCommonFile;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.utils.PathUtil;
 import org.jspecify.annotations.Nullable;
@@ -136,21 +139,22 @@ public class KotlinParser implements Parser {
 
         return parseInputs(
                 Arrays.stream(sources)
-                        .map(sourceFile -> {
-                            Matcher packageMatcher = packagePattern.matcher(sourceFile);
-                            String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
+                      .map(sourceFile -> {
+                          Matcher packageMatcher = packagePattern.matcher(sourceFile);
+                          String pkg = packageMatcher.find() ? packageMatcher.group(1)
+                                                                             .replace('.', '/') + "/" : "";
 
-                            String className = Optional.ofNullable(simpleName.apply(sourceFile))
-                                                       .orElse(Long.toString(System.nanoTime())) + ".kt";
+                          String className = Optional.ofNullable(simpleName.apply(sourceFile))
+                                                     .orElse(Long.toString(System.nanoTime())) + ".kt";
 
-                            Path path = Paths.get(pkg + className);
-                            return new Input(
-                                    path, null,
-                                    () -> new ByteArrayInputStream(sourceFile.getBytes(StandardCharsets.UTF_8)),
-                                    true
-                            );
-                        })
-                        .collect(toList()),
+                          Path path = Paths.get(pkg + className);
+                          return new Input(
+                                  path, null,
+                                  () -> new ByteArrayInputStream(sourceFile.getBytes(StandardCharsets.UTF_8)),
+                                  true
+                          );
+                      })
+                      .collect(toList()),
                 null,
                 new InMemoryExecutionContext()
         );
@@ -168,44 +172,52 @@ public class KotlinParser implements Parser {
         try {
             compilerCus = parse(acceptedInputs, disposable, pctx);
         } catch (Exception e) {
-            return acceptedInputs.stream().map(input -> ParseError.build(this, input, relativeTo, ctx, e));
+            return acceptedInputs.stream()
+                                 .map(input -> ParseError.build(this, input, relativeTo, ctx, e));
         }
 
         FirSession firSession = compilerCus.getFirSession();
         return Stream.concat(
-                        compilerCus.getSources().stream()
-                                .map(kotlinSource -> {
-                                    try {
-                                        assert kotlinSource.getFirFile() != null;
-                                        assert kotlinSource.getFirFile().getSource() != null;
-                                        PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
-                                        AnalyzerWithCompilerReport.SyntaxErrorReport report =
-                                                AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true));
-                                        if (report.isHasErrors()) {
-                                            return ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException());
-                                        }
+                             compilerCus.getSources()
+                                        .stream()
+                                        .map(kotlinSource -> {
+                                            try {
+                                                assert kotlinSource.getFirFile() != null;
+                                                assert kotlinSource.getFirFile()
+                                                                   .getSource() != null;
+                                                PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile()
+                                                                                                       .getSource()).getPsi();
+                                                AnalyzerWithCompilerReport.SyntaxErrorReport report =
+                                                        AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true));
+                                                if (report.isHasErrors()) {
+                                                    return ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException());
+                                                }
 
-                                        KotlinTypeMapping typeMapping = new KotlinTypeMapping(typeCache, firSession, kotlinSource.getFirFile());
-                                        PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
-                                        associations.initialize();
-                                        KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
-                                        SourceFile cu = psiParser.parse();
+                                                KotlinTypeMapping typeMapping = new KotlinTypeMapping(typeCache, firSession, kotlinSource.getFirFile());
+                                                PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
+                                                associations.initialize();
+                                                KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
+                                                SourceFile cu = psiParser.parse();
 
-                                        parsingListener.parsed(kotlinSource.getInput(), cu);
-                                        return requirePrintEqualsInput(cu, kotlinSource.getInput(), relativeTo, ctx);
-                                    } catch (Throwable t) {
-                                        ctx.getOnError().accept(t);
-                                        return ParseError.build(this, kotlinSource.getInput(), relativeTo, ctx, t);
-                                    }
-                                }),
-                        Stream.generate(() -> {
-                                    // The disposable should be disposed of exactly once after all sources have been parsed
-                                    Disposer.dispose(disposable);
-                                    return (SourceFile) null;
-                                })
-                                .limit(1))
-                .filter(Objects::nonNull)
-                .filter(source -> !source.getSourcePath().getFileName().toString().startsWith("dependsOn-"));
+                                                parsingListener.parsed(kotlinSource.getInput(), cu);
+                                                return requirePrintEqualsInput(cu, kotlinSource.getInput(), relativeTo, ctx);
+                                            } catch (Throwable t) {
+                                                ctx.getOnError()
+                                                   .accept(t);
+                                                return ParseError.build(this, kotlinSource.getInput(), relativeTo, ctx, t);
+                                            }
+                                        }),
+                             Stream.generate(() -> {
+                                       // The disposable should be disposed of exactly once after all sources have been parsed
+                                       Disposer.dispose(disposable);
+                                       return (SourceFile) null;
+                                   })
+                                   .limit(1))
+                     .filter(Objects::nonNull)
+                     .filter(source -> !source.getSourcePath()
+                                              .getFileName()
+                                              .toString()
+                                              .startsWith("dependsOn-"));
     }
 
     @Override
@@ -265,7 +277,7 @@ public class KotlinParser implements Parser {
         private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
-        private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_1_9;
+        private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_2_1;
         private boolean isKotlinScript = false;
 
         public Builder() {
@@ -324,8 +336,8 @@ public class KotlinParser implements Parser {
 
         public Builder dependsOn(@Language("kotlin") String... inputsAsStrings) {
             this.dependsOn = Arrays.stream(inputsAsStrings)
-                    .map(input -> Input.fromString(determinePath("dependsOn-", input), input))
-                    .collect(toList());
+                                   .map(input -> Input.fromString(determinePath("dependsOn-", input), input))
+                                   .collect(toList());
             return this;
         }
 
@@ -401,7 +413,8 @@ public class KotlinParser implements Parser {
         configureJdkClasspathRoots(compilerConfiguration);
         configureBaseRoots(compilerConfiguration, arguments);
 
-        Module module = configureModuleChunk(compilerConfiguration, arguments, null).getModules().get(0);
+        Module module = configureModuleChunk(compilerConfiguration, arguments, null).getModules()
+                                                                                    .get(0);
 
         KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
                 disposable,
@@ -409,21 +422,14 @@ public class KotlinParser implements Parser {
                 EnvironmentConfigFiles.JVM_CONFIG_FILES);
 
         List<KtFile> ktFiles = new ArrayList<>(sources.size());
-
         List<KotlinSource> kotlinSources = new ArrayList<>(sources.size());
+
         for (int i = 0; i < sources.size(); i++) {
             Parser.Input source = sources.get(i);
-            String fileName;
+            String fileName = buildFilename(source, i);
 
-            if ("openRewriteFile.kt".equals(source.getPath().toString())) {
-                fileName = "openRewriteFile" + i + ".kt";
-            } else if ("openRewriteFile.kts".equals(source.getPath().toString())) {
-                fileName = "openRewriteFile" + i + ".kts";
-            } else {
-                fileName = source.getPath().toString();
-            }
-
-            String sourceText = source.getSource(ctx).readFully();
+            String sourceText = source.getSource(ctx)
+                                      .readFully();
             List<Integer> cRLFLocations = getCRLFLocations(sourceText);
 
             VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, StringUtilRt.convertLineSeparators(sourceText));
@@ -440,7 +446,8 @@ public class KotlinParser implements Parser {
         Function1<? super GlobalSearchScope, PackagePartProvider> providerFunction1 = environment::createPackagePartProvider;
         VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(
                 environment.getProject(),
-                VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
+                VirtualFileManager.getInstance()
+                                  .getFileSystem(StandardFileSystems.FILE_PROTOCOL),
                 providerFunction1);
 
         AbstractProjectFileSearchScope sourceScope = projectEnvironment.getSearchScopeByPsiFiles(ktFiles);
@@ -468,19 +475,28 @@ public class KotlinParser implements Parser {
             return Unit.INSTANCE;
         };
 
-        Function1<FirSessionConfigurator, Unit> sessionConfigurator = session -> Unit.INSTANCE;
+        Name name = Name.identifier(module.getModuleName());
+        TargetPlatform jvmPlatform = JvmPlatforms.INSTANCE.getDefaultJvmPlatform();
 
-        FirSession firSession = FirJvmSessionFactory.INSTANCE.createLibrarySession(
-                Name.identifier(module.getModuleName()),
-                sessionProvider,
-                null,
-                projectEnvironment,
-                null,
-                sourceScope.plus(libraryScope),
-                null,
-                languageVersionSettings,
-                null
-        );
+        FirSession firSession = SessionConstructionUtils.INSTANCE
+                .prepareSessions(
+                        ktFiles,
+                        compilerConfiguration,
+                        name,
+                        jvmPlatform,
+                        false,
+                        null,
+                        ktFile -> true,
+                        KtCommonFile::isScript,
+                        null,
+                        null,
+                        null
+                )
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Unable to create FirSession"))
+                .getSession();
+
 
         //TODO build session with dependencies
 
@@ -505,9 +521,12 @@ public class KotlinParser implements Parser {
 
         List<FirFile> rawFir = FirUtilsKt.buildFirFromKtFiles(firSession, ktFiles);
         Pair<ScopeSession, List<FirFile>> result = AnalyseKt.runResolution(firSession, rawFir);
-        assert kotlinSources.size() == result.getSecond().size();
+        assert kotlinSources.size() == result.getSecond()
+                                             .size();
         for (int i = 0; i < kotlinSources.size(); i++) {
-            kotlinSources.get(i).setFirFile(result.getSecond().get(i));
+            kotlinSources.get(i)
+                         .setFirFile(result.getSecond()
+                                           .get(i));
         }
         // IR generation.
 //        BaseDiagnosticsCollector diagnosticsReporter = DiagnosticReporterFactory.INSTANCE.createReporter(false);
@@ -541,6 +560,19 @@ public class KotlinParser implements Parser {
         return new CompiledSource(firSession, kotlinSources);
     }
 
+    private static @NotNull String buildFilename(Input source, int index) {
+        Path path = source.getPath();
+        String pathName = path.toString();
+
+        if ("openRewriteFile.kt".equals(pathName)) {
+            return "openRewriteFile" + index + ".kt";
+        } else if ("openRewriteFile.kts".equals(pathName)) {
+            return "openRewriteFile" + index + ".kts";
+        } else {
+            return pathName;
+        }
+    }
+
     public enum KotlinLanguageLevel {
         KOTLIN_1_0,
         KOTLIN_1_1,
@@ -551,7 +583,9 @@ public class KotlinParser implements Parser {
         KOTLIN_1_6,
         KOTLIN_1_7,
         KOTLIN_1_8,
-        KOTLIN_1_9
+        KOTLIN_1_9,
+        KOTLIN_2_0,
+        KOTLIN_2_1,
     }
 
     private CompilerConfiguration compilerConfiguration() {
@@ -597,6 +631,10 @@ public class KotlinParser implements Parser {
                 return LanguageVersion.KOTLIN_1_8;
             case KOTLIN_1_9:
                 return LanguageVersion.KOTLIN_1_9;
+            case KOTLIN_2_0:
+                return LanguageVersion.KOTLIN_2_0;
+            case KOTLIN_2_1:
+                return LanguageVersion.KOTLIN_2_1;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
@@ -624,6 +662,10 @@ public class KotlinParser implements Parser {
                 return ApiVersion.KOTLIN_1_8;
             case KOTLIN_1_9:
                 return ApiVersion.KOTLIN_1_9;
+            case KOTLIN_2_0:
+                return ApiVersion.KOTLIN_2_0;
+            case KOTLIN_2_1:
+                return ApiVersion.KOTLIN_2_1;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
@@ -668,7 +710,8 @@ public class KotlinParser implements Parser {
                     .orElseGet(() -> matchClassPattern(classPattern, sourceCode)
                             .orElse(Long.toString(System.nanoTime())));
             Matcher packageMatcher = packagePattern.matcher(sourceCode);
-            String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
+            String pkg = packageMatcher.find() ? packageMatcher.group(1)
+                                                               .replace('.', '/') + "/" : "";
             return Paths.get(pkg, prefix + className + ".kt");
         }
     }

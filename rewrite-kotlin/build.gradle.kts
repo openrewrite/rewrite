@@ -5,7 +5,7 @@ plugins {
     kotlin("jvm") version "2.1.20"
 }
 
-val kotlinVersion = "2.1.20"
+val kotlinVersion = "2.1.21"
 
 dependencies {
     compileOnly(project(":rewrite-core"))
