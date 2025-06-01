@@ -2073,4 +2073,24 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5443")
+    @Test
+    void parsingIncorrectJavadocValueReference() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+            public class Foo {
+                private static final String BAR = "bar";
+
+                /**
+                This is an incorrect reference {@value BAR}
+                */
+                public void foo() {}
+            }
+            """
+          )
+        );
+    }
 }
