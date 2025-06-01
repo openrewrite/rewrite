@@ -152,8 +152,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       <my.java.version>17</my.java.version>
                   </properties>
               </project>
-              """)
-        );
+              """
+          )
     }
 
     @Test
