@@ -1,0 +1,461 @@
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.AddCommentToXmlTag
+examples:
+- description: ''
+  parameters:
+  - /project/dependencies/
+  - ' Comment text '
+  sources:
+  - before: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>29.0-jre</version>
+          </dependency>
+          <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.1</version>
+            <scope>test</scope>
+          </dependency>
+        </dependencies>
+      </project>
+    after: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <dependencies>
+          <!-- Comment text -->
+          <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>29.0-jre</version>
+          </dependency>
+          <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.1</version>
+            <scope>test</scope>
+          </dependency>
+        </dependencies>
+      </project>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.ChangeNamespaceValue
+examples:
+- description: ''
+  parameters:
+  - web-app
+  - 'null'
+  - http://java.sun.com/xml/ns/j2ee
+  - '2.4'
+  - 'false'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.4"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd"
+          id="WebApp_ID">
+          <display-name>testWebDDNamespace</display-name>
+      </web-app>
+    after: |
+      <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="2.4"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd"
+          id="WebApp_ID">
+          <display-name>testWebDDNamespace</display-name>
+      </web-app>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.ChangeTagAttribute
+examples:
+- description: ''
+  parameters:
+  - bean
+  - id
+  - myBean2.subpackage
+  - myBean.subpackage
+  - 'null'
+  sources:
+  - before: |
+      <beans>
+          <bean id='myBean.subpackage.subpackage2'/>
+          <other id='myBean.subpackage.subpackage2'/>
+      </beans>
+    after: |
+      <beans>
+          <bean id='myBean2.subpackage.subpackage2'/>
+          <other id='myBean.subpackage.subpackage2'/>
+      </beans>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.ChangeTagName
+examples:
+- description: ''
+  parameters:
+  - /virtual-patches/enhanced-virtual-patch/whitelist-pattern
+  - allowlist-pattern
+  sources:
+  - before: |
+      <virtual-patches>
+          <enhanced-virtual-patch id="evp-name" path="/[request-path]" variable="request.parameters.[paramName]" message="alphabet validation failed" enableAntisamy="false">
+              <whitelist-pattern>^[a-zA-Z]+${'$'}</whitelist-pattern>
+          </enhanced-virtual-patch>
+      </virtual-patches>
+    after: |
+      <virtual-patches>
+          <enhanced-virtual-patch id="evp-name" path="/[request-path]" variable="request.parameters.[paramName]" message="alphabet validation failed" enableAntisamy="false">
+              <allowlist-pattern>^[a-zA-Z]+${'$'}</allowlist-pattern>
+          </enhanced-virtual-patch>
+      </virtual-patches>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.ChangeTagValue
+examples:
+- description: ''
+  parameters:
+  - /dependency/version
+  - 'null'
+  - '2.0'
+  - 'null'
+  sources:
+  - before: |
+      <dependency>
+          <version/>
+      </dependency>
+    after: |
+      <dependency>
+          <version>2.0</version>
+      </dependency>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.CreateXmlFile
+examples:
+- description: ''
+  parameters:
+  - test/test.xml
+  - fileContents
+  - 'true'
+  sources:
+  - before: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <before/>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.RemoveEmptyXmlTags
+examples:
+- description: ''
+  sources:
+  - before: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.example</groupId>
+          <artifactId>sample-app</artifactId>
+          <version>1.0-SNAPSHOT</version>
+          <pluginRepositories>
+          </pluginRepositories>
+      </project>
+    after: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.example</groupId>
+          <artifactId>sample-app</artifactId>
+          <version>1.0-SNAPSHOT</version>
+      </project>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.RemoveXmlTag
+examples:
+- description: ''
+  parameters:
+  - //bean
+  - '**/beans.xml'
+  sources:
+  - before: |
+      <beans>
+          <bean id='myBean.subpackage.subpackage2'/>
+          <other id='myBean.subpackage.subpackage2'/>
+      </beans>
+    after: |
+      <beans>
+          <other id='myBean.subpackage.subpackage2'/>
+      </beans>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.XsltTransformation
+examples:
+- description: ''
+  parameters:
+  - xslt
+  - 'null'
+  - '**/*.xml'
+  sources:
+  - before: |
+      <configuration>
+          <activeRecipes>
+              <recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>
+          </activeRecipes>
+      </configuration>
+    after: |
+      <configuration>
+          <activeRecipes>
+              <activeRecipe>org.openrewrite.java.cleanup.UnnecessaryThrows</activeRecipe>
+          </activeRecipes>
+      </configuration>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.format.AutoFormat
+examples:
+- description: ''
+  sources:
+  - before: |
+      <project>
+        <dependencies>
+          <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+              <exclusion>
+        <groupId>org.junit.vintage</groupId>
+        <artifactId>junit-vintage-engine</artifactId>
+      </exclusion>
+            </exclusions>
+          </dependency>
+        </dependencies>
+      </project>
+    after: |
+      <project>
+        <dependencies>
+          <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+              <exclusion>
+                <groupId>org.junit.vintage</groupId>
+                <artifactId>junit-vintage-engine</artifactId>
+              </exclusion>
+            </exclusions>
+          </dependency>
+        </dependencies>
+      </project>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.format.LineBreaks
+examples:
+- description: ''
+  sources:
+  - before: |
+      <project>
+        <dependencies><dependency></dependency><dependency/>
+        </dependencies>
+      </project>
+    after: |
+      <project>
+        <dependencies>
+      <dependency></dependency>
+      <dependency/>
+        </dependencies>
+      </project>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.search.FindNamespacePrefix
+examples:
+- description: ''
+  parameters:
+  - xsi
+  - 'null'
+  sources:
+  - after: |
+      <!--~~>--><beans xmlns="http://www.springframework.org/schema/beans"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="
+              http://cxf.apache.org/jaxws http://cxf.apache.org/schemas/jaxws.xsd
+              http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+          <jaxws:client name="{http://cxf.apache.org/hello_world_soap_http}SoapPort" createdFromAPI="true" xmlns:jaxws="http://cxf.apache.org/jaxws">
+              <jaxws:conduitSelector>
+                  <bean class="org.apache.cxf.endpoint.DeferredConduitSelector"/>
+              </jaxws:conduitSelector>
+          </jaxws:client>
+      </beans>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.search.FindTags
+examples:
+- description: ''
+  parameters:
+  - /dependencies/dependency
+  sources:
+  - before: |
+      <dependencies>
+          <dependency>
+              <artifactId scope="compile">org.openrewrite</artifactId>
+          </dependency>
+      </dependencies>
+    after: |
+      <dependencies>
+          <!--~~>--><dependency>
+              <artifactId scope="compile">org.openrewrite</artifactId>
+          </dependency>
+      </dependencies>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.search.HasNamespaceUri
+examples:
+- description: ''
+  parameters:
+  - http://www.w3.org/2001/XMLSchema-instance
+  - 'null'
+  sources:
+  - after: |
+      <!--~~>--><beans xmlns="http://www.springframework.org/schema/beans"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="
+              http://cxf.apache.org/jaxws http://cxf.apache.org/schemas/jaxws.xsd
+              http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+          <jaxws:client name="{http://cxf.apache.org/hello_world_soap_http}SoapPort" createdFromAPI="true" xmlns:jaxws="http://cxf.apache.org/jaxws">
+              <jaxws:conduitSelector>
+                  <bean class="org.apache.cxf.endpoint.DeferredConduitSelector"/>
+              </jaxws:conduitSelector>
+          </jaxws:client>
+      </beans>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.security.AddOwaspDateBoundSuppressions
+examples:
+- description: ''
+  parameters:
+  - '2020-01-01'
+  sources:
+  - before: |-
+      <?xml version="1.0" encoding="UTF-8" ?>
+      <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+          <suppress>
+              <notes>
+              </notes>
+          </suppress>
+      </suppressions>
+    after: |-
+      <?xml version="1.0" encoding="UTF-8" ?>
+      <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+          <suppress until="2020-01-01Z">
+              <notes>
+              </notes>
+          </suppress>
+      </suppressions>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.security.IsOwaspSuppressionsFile
+examples:
+- description: ''
+  sources:
+  - before: |-
+      <?xml version="1.0" encoding="UTF-8" ?>
+      <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+          <suppress>
+              <notes>
+              </notes>
+          </suppress>
+      </suppressions>
+    after: |
+      <?xml version="1.0" encoding="UTF-8" ?>
+      <!--~~>--><suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+          <suppress>
+              <notes>
+              </notes>
+          </suppress>
+      </suppressions>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.security.RemoveOwaspSuppressions
+examples:
+- description: ''
+  parameters:
+  - '2023-02-01'
+  sources:
+  - before: |-
+      <?xml version="1.0" encoding="UTF-8" ?>
+      <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+          <suppress until="2023-01-01">
+              <notes>
+              </notes>
+          </suppress>
+      </suppressions>
+    after: |-
+      <?xml version="1.0" encoding="UTF-8" ?>
+      <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+      </suppressions>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.security.UpdateOwaspSuppressionDate
+examples:
+- description: ''
+  parameters:
+  - Collections.singletonList("CVE-2022-1234")
+  - '2020-02-01'
+  sources:
+  - before: |-
+      <?xml version="1.0" encoding="UTF-8" ?>
+      <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+          <suppress until="2020-01-01Z">
+              <notes>
+              </notes>
+              <cve>CVE-2019-5678</cve>
+              <cve>CVE-2022-1234</cve>
+          </suppress>
+      </suppressions>
+    after: |-
+      <?xml version="1.0" encoding="UTF-8" ?>
+      <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+          <suppress until="2020-02-01Z">
+              <notes>
+              </notes>
+              <cve>CVE-2019-5678</cve>
+              <cve>CVE-2022-1234</cve>
+          </suppress>
+      </suppressions>
+    language: xml

@@ -17,6 +17,7 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -33,6 +34,9 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void methodDeclarationDeclaringType() {
         rewriteRun(
+          // Avoid type information in the usual groovy parser type cache leaking and affecting this test
+          // In the real world you don't parse a bunch of classes all named "A" all at once
+          spec -> spec.parser(GroovyParser.builder()),
           groovy(
             """
               class A {
@@ -40,7 +44,7 @@ class MethodDeclarationTest implements RewriteTest {
               }
               """,
             spec -> spec.beforeRecipe(cu -> {
-                var method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                var method = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
                 JavaType.Method methodType = method.getMethodType();
                 assertThat(methodType).isNotNull();
                 assertThat(methodType.getName()).isEqualTo("method");
@@ -190,16 +194,17 @@ class MethodDeclarationTest implements RewriteTest {
           groovy(
             """
               def foo(String[][] s) {}
-              """, spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
-                    if (arrayType.getElementType() instanceof J.ArrayType) {
-                        assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
-                        assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
+              """,
+                spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                        if (arrayType.getElementType() instanceof J.ArrayType) {
+                            assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
+                            assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
+                        }
+                        return super.visitArrayType(arrayType, o);
                     }
-                    return super.visitArrayType(arrayType, o);
-                }
-            }.visit(cu, 0))
+                }.visit(cu, 0))
           )
         );
     }
@@ -236,7 +241,7 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              class A {
+              class B {
                   def /*int*/ int one() { 1 }
                   @Foo def /*Object*/ Object two() { 2 }
               }
@@ -255,7 +260,7 @@ class MethodDeclarationTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(1);
-                J.VariableDeclarations m = (J.VariableDeclarations) accept.getParameters().get(0);
+                J.VariableDeclarations m = (J.VariableDeclarations) accept.getParameters().getFirst();
                 assertThat(m.getModifiers()).satisfiesExactly(
                   mod -> assertThat(mod.getType()).isEqualTo(J.Modifier.Type.Final),
                   mod -> assertThat(mod.getKeyword()).isEqualTo("def")
@@ -274,7 +279,7 @@ class MethodDeclarationTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(0);
+                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().getFirst();
                 assertThat(accept.getReturnTypeExpression()).isNull();
             })
           )

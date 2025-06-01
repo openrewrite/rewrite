@@ -37,7 +37,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                   if (method.getSimpleName().equals("test")) {
-                      var s = method.getBody().getStatements().get(0);
+                      var s = method.getBody().getStatements().getFirst();
                       return JavaTemplate.builder("test(#{any()})")
                         .contextSensitive()
                         .build()
@@ -81,7 +81,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                   if (method.getSimpleName().equals("test")) {
-                      var s = method.getBody().getStatements().get(0);
+                      var s = method.getBody().getStatements().getFirst();
                       return JavaTemplate.builder("test(#{anyArray()})")
                         .contextSensitive()
                         .build()
@@ -125,9 +125,8 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                   if (method.getSimpleName().equals("test")) {
                       return JavaTemplate.builder("#{} void test2() {}")
-                        .contextSensitive()
                         .build()
-                        .apply(getCursor(), method.getCoordinates().replace(), method.getLeadingAnnotations().get(0));
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getLeadingAnnotations().getFirst());
                   }
                   return method;
               }
@@ -158,12 +157,12 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  var s = method.getBody().getStatements().get(0);
+                  var s = method.getBody().getStatements().getFirst();
                   return JavaTemplate.builder("test(#{any(java.util.Collection)}, #{any(int)})")
                     .contextSensitive()
                     .build()
                     .apply(getCursor(), s.getCoordinates().replace(), s,
-                      ((J.VariableDeclarations) method.getParameters().get(1)).getVariables().get(0).getName());
+                      ((J.VariableDeclarations) method.getParameters().get(1)).getVariables().getFirst().getName());
               }
           }).withMaxCycles(1)),
           java(
@@ -194,9 +193,8 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  var s = method.getBody().getStatements().get(0);
+                  var s = method.getBody().getStatements().getFirst();
                   return JavaTemplate.builder("if(true) #{}")
-                    .contextSensitive()
                     .build()
                     .apply(getCursor(), s.getCoordinates().replace(), method.getBody());
               }
@@ -229,7 +227,6 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               @Override
               public J visitArrayAccess(J.ArrayAccess arrayAccess, ExecutionContext executionContext) {
                   return JavaTemplate.builder("Some.method()")
-                    .contextSensitive()
                     .javaParser(JavaParser.fromJavaVersion()
                       .dependsOn(
                         """
@@ -271,7 +268,6 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               public J visitBinary(J.Binary binary, ExecutionContext executionContext) {
                   if (binary.getOperator() == J.Binary.Type.Equal) {
                       return JavaTemplate.builder("Some.method()")
-                        .contextSensitive()
                         .javaParser(JavaParser.fromJavaVersion()
                           .dependsOn(
                             """
@@ -312,7 +308,6 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                   if (literal.getValue().equals("literal")) {
                       return JavaTemplate.builder("Some.method()")
-                        .contextSensitive()
                         .javaParser(JavaParser.fromJavaVersion()
                           .dependsOn(
                             """
@@ -352,9 +347,8 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitNewArray(J.NewArray newArray, ExecutionContext executionContext) {
-                  if (((J.Literal) newArray.getDimensions().get(0).getIndex()).getValue().equals(1)) {
+                  if (((J.Literal) newArray.getDimensions().getFirst().getIndex()).getValue().equals(1)) {
                       return JavaTemplate.builder("Some.method()")
-                        .contextSensitive()
                         .javaParser(JavaParser.fromJavaVersion()
                           .logCompilationWarningsAndErrors(true)
                           .dependsOn("""
@@ -432,7 +426,6 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   return JavaTemplate.builder("System.out.println(#{any()})")
-                    .contextSensitive()
                     .build()
                     .apply(getCursor(), method.getCoordinates().replace(), method);
               }
@@ -550,10 +543,9 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                 if (secondArgument.getName().getSimpleName().equals("ROUND_DOWN")) {
                     maybeAddImport("java.math.RoundingMode");
                     return JavaTemplate.builder("#{any(int)}, #{}")
-                      .contextSensitive()
                       .imports("java.math.RoundingMode")
                       .build()
-                      .apply(updateCursor(m), m.getCoordinates().replaceArguments(), m.getArguments().get(0), "RoundingMode.DOWN");
+                      .apply(updateCursor(m), m.getCoordinates().replaceArguments(), m.getArguments().getFirst(), "RoundingMode.DOWN");
                 }
             }
             return m;

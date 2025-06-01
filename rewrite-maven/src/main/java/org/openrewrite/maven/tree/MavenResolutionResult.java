@@ -16,6 +16,7 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
@@ -46,6 +47,7 @@ public class MavenResolutionResult implements Marker {
     UUID id;
 
     @Nullable
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     Integer managedReference;
 
     @With

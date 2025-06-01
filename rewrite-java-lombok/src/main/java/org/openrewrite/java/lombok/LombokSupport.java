@@ -34,8 +34,7 @@ public class LombokSupport {
         // https://projectlombok.org/contributing/lombok-execution-path
         List<String> overrideClasspath = new ArrayList<>();
         for (Path entry : ReflectionUtils.findClassPathEntriesFor("lombok/Getter.class", parserClassLoader)) {
-            // FIXME remove hardcoded version once Lombok proper 1.18.37 is released
-            if (entry.getFileName().toString().contains("lombok-1.18.37") && !overrideClasspath.contains(entry.toString())) {
+            if (entry.getFileName().toString().contains("lombok") && !overrideClasspath.contains(entry.toString())) {
                 overrideClasspath.add(entry.toString());
             }
         }
@@ -60,8 +59,16 @@ public class LombokSupport {
         }
 
         String oldValue = System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
+
         try {
-            Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, parserClassLoader);
+            // Attempt to carefully load the `lombok.launch.ShadowClassLoader` present in `rewrite-java-lombok`
+            // but as a fallback attempt to load it through the parent class loader
+            Class<?> shadowLoaderClass;
+            try {
+                shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, parserClassLoader);
+            } catch (Exception e) {
+                shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, parserClassLoader.getParent());
+            }
             Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
                     Class.forName("java.lang.ClassLoader"),
                     Class.forName("java.lang.String"),

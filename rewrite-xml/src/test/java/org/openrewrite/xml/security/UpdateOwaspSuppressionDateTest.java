@@ -30,24 +30,6 @@ import static org.openrewrite.xml.Assertions.xml;
 
 class UpdateOwaspSuppressionDateTest implements RewriteTest {
 
-    @Test
-    void noUpdateIfCveDoesNotExist() {
-        rewriteRun(
-                spec -> spec.recipe(new UpdateOwaspSuppressionDate(Collections.singletonList("CVE-2022-5678"), "2020-02-01")),
-                xml("""
-                    <?xml version="1.0" encoding="UTF-8" ?>
-                    <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                        <suppress until="2020-01-01Z">
-                            <notes>
-                            </notes>
-                            <cve>CVE-2019-10321</cve>
-                            <cve>CVE-2022-1234</cve>
-                        </suppress>
-                    </suppressions>""",
-                spec -> spec.path("suppressions.xml"))
-        );
-    }
-
     @DocumentExample
     @Test
     void updatesUntilIfCveExists() {
@@ -69,6 +51,24 @@ class UpdateOwaspSuppressionDateTest implements RewriteTest {
                             <notes>
                             </notes>
                             <cve>CVE-2019-5678</cve>
+                            <cve>CVE-2022-1234</cve>
+                        </suppress>
+                    </suppressions>""",
+                spec -> spec.path("suppressions.xml"))
+        );
+    }
+
+    @Test
+    void noUpdateIfCveDoesNotExist() {
+        rewriteRun(
+                spec -> spec.recipe(new UpdateOwaspSuppressionDate(Collections.singletonList("CVE-2022-5678"), "2020-02-01")),
+                xml("""
+                    <?xml version="1.0" encoding="UTF-8" ?>
+                    <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                        <suppress until="2020-01-01Z">
+                            <notes>
+                            </notes>
+                            <cve>CVE-2019-10321</cve>
                             <cve>CVE-2022-1234</cve>
                         </suppress>
                     </suppressions>""",

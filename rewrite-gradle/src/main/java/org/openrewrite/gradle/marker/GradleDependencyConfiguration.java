@@ -21,7 +21,9 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Version;
 
 import java.io.Serializable;
 import java.util.*;
@@ -70,8 +72,9 @@ public class GradleDependencyConfiguration implements Serializable {
      */
     public List<ResolvedDependency> getResolved() {
         List<ResolvedDependency> resolved = new ArrayList<>(getDirectResolved());
-        Set<ResolvedDependency> alreadyResolved = new LinkedHashSet<>();
-        return resolveTransitiveDependencies(resolved, alreadyResolved);
+        Map<GroupArtifact, ResolvedDependency> alreadyResolved = new HashMap<>();
+        resolveTransitiveDependencies(resolved, alreadyResolved);
+        return new ArrayList<>(alreadyResolved.values());
     }
 
     /**
@@ -133,12 +136,20 @@ public class GradleDependencyConfiguration implements Serializable {
         this.extendsFrom = extendsFrom;
     }
 
-    private static List<ResolvedDependency> resolveTransitiveDependencies(List<ResolvedDependency> resolved, Set<ResolvedDependency> alreadyResolved) {
+    private static void resolveTransitiveDependencies(List<ResolvedDependency> resolved, Map<GroupArtifact, ResolvedDependency> alreadyResolved) {
         for (ResolvedDependency dependency : resolved) {
-            if (alreadyResolved.add(dependency)) {
-                alreadyResolved.addAll(resolveTransitiveDependencies(dependency.getDependencies(), alreadyResolved));
+            GroupArtifact ga = dependency.getGav().asGroupArtifact();
+            if (alreadyResolved.containsKey(ga)) {
+                ResolvedDependency alreadyPresent = alreadyResolved.get(ga);
+                Version newVersion = new Version(dependency.getVersion());
+                Version presentVersion = new Version(alreadyPresent.getVersion());
+                int compared = presentVersion.compareTo(newVersion);
+                if (compared > 0 || (compared == 0 && alreadyPresent.getDependencies().size() == dependency.getDependencies().size())) {
+                    continue;
+                }
             }
+            alreadyResolved.put(ga, dependency);
+            resolveTransitiveDependencies(dependency.getDependencies(), alreadyResolved);
         }
-        return new ArrayList<>(alreadyResolved);
     }
 }

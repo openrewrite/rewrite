@@ -20,7 +20,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.DeclaresMethod;
-import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
 @Value

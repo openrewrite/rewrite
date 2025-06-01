@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
@@ -43,33 +44,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("rawtypes")
 class AddImportTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/2155")
-    @Test
-    void addImportBeforeImportWithSameInsertIndex() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertFalse", false))),
-          java(
-            """
-              import static org.junit.jupiter.api.Assertions.assertTrue;
-
-              import org.junit.Test;
-
-              public class MyTest {
-              }
-              """,
-            """
-              import static org.junit.jupiter.api.Assertions.assertFalse;
-              import static org.junit.jupiter.api.Assertions.assertTrue;
-
-              import org.junit.Test;
-
-              public class MyTest {
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void importIsAddedToCorrectBlock() {
@@ -91,6 +65,33 @@ class AddImportTest implements RewriteTest {
               import org.junit.jupiter.api.extension.ExtendWith;
               import org.mockito.Mock;
               import org.mockito.junit.jupiter.MockitoExtension;
+
+              public class MyTest {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2155")
+    @Test
+    void addImportBeforeImportWithSameInsertIndex() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertFalse", false))),
+          java(
+            """
+              import static org.junit.jupiter.api.Assertions.assertTrue;
+
+              import org.junit.Test;
+
+              public class MyTest {
+              }
+              """,
+            """
+              import static org.junit.jupiter.api.Assertions.assertFalse;
+              import static org.junit.jupiter.api.Assertions.assertTrue;
+
+              import org.junit.Test;
 
               public class MyTest {
               }
@@ -223,19 +224,19 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package com.acme.bank;
-              
+
               import com.acme.bank.*;
-              
+
               class Foo {
               }
               """,
             """
               package com.acme.bank;
-              
+
               import com.acme.bank.*;
-              
+
               import com.acme.bank.Record;
-              
+
               class Foo {
               }
               """,
@@ -262,6 +263,7 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void dontImportJavaLang() {
         rewriteRun(
@@ -592,18 +594,18 @@ class AddImportTest implements RewriteTest {
               java(
                 """
                   package a;
-    
+                  
                   import c.C0;
                   import c.c.C1;
                   import c.c.c.C2;
-    
+                  
                   class A {}
                   """,
                 String.format("""
                     package a;
-      
+
                     %s
-      
+
                     class A {}
                     """,
                   expectedImports.stream().map(i -> "import " + i + ";").collect(Collectors.joining("\n"))
@@ -1031,7 +1033,7 @@ class AddImportTest implements RewriteTest {
                   Map<String, String> map = new HashMap<>();
                   Set<String> set = new HashSet<>();
                   List<String> test = Collections.singletonList("test");
-                  List<String> test2 = new java.util.ArrayList<>();
+                  List<String> test2 = new ArrayList<>();
               }
               """
           )
@@ -1100,7 +1102,7 @@ class AddImportTest implements RewriteTest {
                 import java.util.Collections;
                 import java.util.Map;
                 import java.util.Set;
-  
+
                 @SuppressWarnings("ALL")
                 class Test {
                     List list;
@@ -1113,7 +1115,7 @@ class AddImportTest implements RewriteTest {
                 import java.util.List;
                 import java.util.Map;
                 import java.util.Set;
-  
+
                 @SuppressWarnings("ALL")
                 class Test {
                     List list;
@@ -1469,4 +1471,188 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void fullyQualifyOnAmbiguousImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                  maybeAddImport("java.sql.Date");
+                  JavaTemplate template = JavaTemplate.builder(
+                      "Date sqlDate = new Date(System.currentTimeMillis());")
+                    .imports("java.sql.Date")
+                    .build();
+                  return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)),
+          java(
+            """
+              import java.util.Date;
+
+              class Ambiguous {
+                  Date date = new Date(System.currentTimeMillis());
+              }
+              """,
+            """
+              import java.util.Date;
+
+              class Ambiguous {
+                  java.sql.Date sqlDate = new java.sql.Date(System.currentTimeMillis());
+                  Date date = new Date(System.currentTimeMillis());
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyOnAmbiguousStaticFieldImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                    maybeAddImport("java.awt.Color", "RED", true);
+                    maybeAddImport("java.awt.Color", true);
+                    JavaTemplate template = JavaTemplate.builder(
+                        "Color color = RED;")
+                      .imports("java.awt.Color")
+                      .staticImports("java.awt.Color.RED")
+                      .build();
+                    return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+                }
+            }).withMaxCycles(1))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package com.example;
+
+                public class CustomColor {
+                    public static final String RED = "red";
+                }
+                """
+            )),
+          java(
+            """
+              import static com.example.CustomColor.RED;
+
+              class Ambiguous {
+                  void method() {
+                      // RED is from com.example.CustomColor
+                      System.out.println(RED);
+                  }
+              }
+              """,
+            """
+              import java.awt.Color;
+
+              import static com.example.CustomColor.RED;
+
+              class Ambiguous {
+                  Color color = Color.RED;
+                  void method() {
+                      // RED is from com.example.CustomColor
+                      System.out.println(RED);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyOnAmbiguousStaticMethodImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                  maybeAddImport("java.util.Arrays", "sort", true);
+                  maybeAddImport("java.util.List", true);
+                  JavaTemplate template = JavaTemplate.builder(
+                      "List<Integer> list = sort(new int[]{1, 2, 3});")
+                    .imports("java.util.List")
+                    .staticImports("java.util.Arrays.sort")
+                    .build();
+                  return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)),
+          java(
+            """
+              import static java.util.Collections.sort;
+
+              import java.util.ArrayList;
+
+              class Ambiguous {
+                  void method() {
+                      sort(new ArrayList<String>());
+                  }
+              }
+              """,
+            """
+              import static java.util.Collections.sort;
+
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class Ambiguous {
+                  List<Integer> list = java.util.Arrays.sort(new int[]{1, 2, 3});
+                  void method() {
+                      sort(new ArrayList<String>());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5530")
+    @Test
+    void importWithNestedClass() {
+        @Language("java") final String auxSource = """
+          package com.example;
+          
+          public interface A {
+              enum DataType {
+                  TYPE_1,
+                  TYPE_2
+              }
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                    JavaTemplate template = JavaTemplate.builder(
+                        "DataType d2 = DataType.TYPE_2;")
+                      .javaParser(JavaParser.fromJavaVersion().dependsOn(auxSource))
+                      .imports("com.example.A.DataType")
+                      .build();
+                    maybeAddImport("com.example.A.DataType");
+                    return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+                }
+            }).withMaxCycles(1))
+            .parser(JavaParser.fromJavaVersion().dependsOn(auxSource)),
+          java(
+            """
+              import com.example.A;
+              import com.example.A.DataType;
+
+              class Test {
+                  DataType d1 = DataType.TYPE_1;
+                  A a;
+              }
+              """,
+            """
+              import com.example.A;
+              import com.example.A.DataType;
+
+              class Test {
+                  DataType d2 = DataType.TYPE_2;
+                  DataType d1 = DataType.TYPE_1;
+                  A a;
+              }
+              """
+          )
+        );
+    }
+
 }

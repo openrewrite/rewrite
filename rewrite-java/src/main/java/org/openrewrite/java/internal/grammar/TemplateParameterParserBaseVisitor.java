@@ -40,6 +40,13 @@ public class TemplateParameterParserBaseVisitor<T> extends AbstractParseTreeVisi
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
+	@Override public T visitGenericPattern(TemplateParameterParser.GenericPatternContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
 	@Override public T visitTypedPattern(TemplateParameterParser.TypedPatternContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
@@ -83,6 +90,13 @@ public class TemplateParameterParserBaseVisitor<T> extends AbstractParseTreeVisi
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
 	@Override public T visitParameterName(TemplateParameterParser.ParameterNameContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitGenericName(TemplateParameterParser.GenericNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *

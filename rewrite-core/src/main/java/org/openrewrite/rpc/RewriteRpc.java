@@ -19,7 +19,6 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.internal.SnowflakeId;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -27,21 +26,30 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
 
+import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
+@SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
 
-    private int batchSize = 10;
+    private final AtomicInteger batchSize = new AtomicInteger(10);
     private Duration timeout = Duration.ofMinutes(1);
+    private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
+    private @Nullable PrintStream logFile;
 
     /**
      * Keeps track of the local and remote state of objects that are used in
@@ -56,8 +64,17 @@ public class RewriteRpc {
     /* A reverse map of the objects back to their IDs */
     final Map<Object, String> localObjectIds = new IdentityHashMap<>();
 
-    private final Map<Integer, Object> remoteRefs = new IdentityHashMap<>();
+    private final Map<Integer, Object> remoteRefs = new HashMap<>();
 
+    /**
+     * Creates a new RPC interface that can be used to communicate with a remote.
+     *
+     * @param jsonRpc     The JSON-RPC connection to the remote peer.
+     * @param marketplace The marketplace of recipes that this peer makes available.
+     *                    Even if this peer is the host process, configuring this
+     *                    marketplace allows the remote peer to discover what recipes
+     *                    the host process has available for its use in composite recipes.
+     */
     public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
         this.jsonRpc = jsonRpc;
 
@@ -68,7 +85,7 @@ public class RewriteRpc {
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject));
-        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects));
+        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, traceSendPackets));
         jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
@@ -89,7 +106,17 @@ public class RewriteRpc {
     }
 
     public RewriteRpc batchSize(int batchSize) {
-        this.batchSize = batchSize;
+        this.batchSize.set(batchSize);
+        return this;
+    }
+
+    public RewriteRpc traceGetObjectOutput() {
+        this.traceSendPackets.set(true);
+        return this;
+    }
+
+    public RewriteRpc traceGetObjectInput(PrintStream log) {
+        this.logFile = log;
         return this;
     }
 
@@ -106,24 +133,25 @@ public class RewriteRpc {
         return visit(sourceFile, visitorName, p, null);
     }
 
-    public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p, @Nullable Cursor cursor) {
-        VisitResponse response = scan(sourceFile, visitorName, p, cursor);
+    public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
+        VisitResponse response = scan(tree, visitorName, p, cursor);
         return response.isModified() ?
-                getObject(sourceFile.getId().toString()) :
-                sourceFile;
+                getObject(tree.getId().toString()) :
+                tree;
     }
 
     public <P> VisitResponse scan(SourceFile sourceFile, String visitorName, P p) {
         return scan(sourceFile, visitorName, p, null);
     }
 
-    public <P> VisitResponse scan(SourceFile sourceFile, String visitorName, P p,
+    public <P> VisitResponse scan(Tree sourceFile, String visitorName, P p,
                                   @Nullable Cursor cursor) {
         // Set the local state of this tree, so that when the remote
         // asks for it, we know what to send.
         localObjects.put(sourceFile.getId().toString(), sourceFile);
 
         String pId = maybeUnwrapExecutionContext(p);
+
         List<String> cursorIds = getCursorIds(cursor);
 
         return send("Visit", new Visit(visitorName, null, sourceFile.getId().toString(), pId, cursorIds),
@@ -167,9 +195,32 @@ public class RewriteRpc {
         return send("GetRecipes", null, GetRecipesResponse.class);
     }
 
+    public Recipe prepareRecipe(String id) {
+        return prepareRecipe(id, emptyMap());
+    }
+
     public Recipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
+    }
+
+    public List<SourceFile> parse(String parser, Iterable<Parser.Input> inputs, @Nullable Path relativeTo) {
+        List<Parse.Input> mappedInputs = new ArrayList<>();
+        for (Parser.Input input : inputs) {
+            if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
+                mappedInputs.add(new Parse.StringInput(input.getSource(new InMemoryExecutionContext()).readFully(), input.getPath()));
+            } else {
+                mappedInputs.add(new Parse.PathInput(input.getPath()));
+            }
+        }
+
+        List<String> parsed = send("Parse", new Parse(parser, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+        if (!parsed.isEmpty()) {
+            return parsed.stream()
+                    .map(this::<SourceFile>getObject)
+                    .collect(Collectors.toList());
+        }
+        return emptyList();
     }
 
     public String print(SourceFile tree) {
@@ -188,8 +239,8 @@ public class RewriteRpc {
         if (cursor != null) {
             cursorIds = cursor.getPathAsStream().map(c -> {
                 String id = c instanceof Tree ?
-                        ((Tree) c).getId().toString()
-                        : localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
+                        ((Tree) c).getId().toString() :
+                        localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
                 localObjects.put(id, c);
                 return id;
             }).collect(Collectors.toList());
@@ -199,15 +250,9 @@ public class RewriteRpc {
 
     @VisibleForTesting
     public <T> T getObject(String id) {
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, () -> send("GetObject",
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
                 new GetObject(id), GetObjectResponse.class));
-        Object remoteObject = q.receive(localObjects.get(id), before -> {
-            if (before instanceof RpcCodec) {
-                //noinspection unchecked
-                return ((RpcCodec<Object>) before).rpcReceive(before, q);
-            }
-            return before;
-        });
+        Object remoteObject = q.receive(localObjects.get(id), null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
@@ -219,7 +264,7 @@ public class RewriteRpc {
         return (T) remoteObject;
     }
 
-    private <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
+    protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
         try {
             // TODO handle error
             return jsonRpc

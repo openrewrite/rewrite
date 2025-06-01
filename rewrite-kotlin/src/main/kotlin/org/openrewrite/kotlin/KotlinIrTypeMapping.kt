@@ -42,13 +42,8 @@ import org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*
 import org.openrewrite.java.tree.TypeUtils
 
 @Suppress("unused", "UNUSED_PARAMETER")
-class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
+class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
     private val signatureBuilder: KotlinTypeIrSignatureBuilder = KotlinTypeIrSignatureBuilder()
-    private val typeCache: JavaTypeCache
-
-    init {
-        this.typeCache = typeCache
-    }
 
     // TEMP: method to map types in an IrFile.
     fun type(irFile: IrFile) {
@@ -159,9 +154,11 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             is IrVariable -> {
                 return variableType(baseType, signature)
             }
-        }
 
-        throw UnsupportedOperationException("Unsupported type: ${type.javaClass}")
+            else -> {
+                throw UnsupportedOperationException("Unsupported type: ${type.javaClass}")
+            }
+        }
     }
 
     private fun externalPackageFragment(signature: String): JavaType {
@@ -190,7 +187,7 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
         if (type !is IrSimpleType && type !is IrClass) {
             throw UnsupportedOperationException("Unexpected classType: " + type.javaClass)
         }
-        val irClass = if (type is IrClass) type else (type as IrSimpleType).classifier.owner as IrClass
+        val irClass = type as? IrClass ?: (type as IrSimpleType).classifier.owner as IrClass
         val fqn: String = signatureBuilder.classSignature(irClass)
         val fq: JavaType.FullyQualified? = typeCache.get(fqn)
         var clazz: JavaType.Class? = (if (fq is JavaType.Parameterized) fq.type else fq) as JavaType.Class?
@@ -363,7 +360,8 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
         }
         val method = JavaType.Method(
             null,
-            mapToFlagsBitmap(function.visibility,
+            mapToFlagsBitmap(
+                function.visibility,
                 when (function) {
                     is IrFunctionImpl -> function.modality
                     is IrFunctionWithLateBindingImpl -> function.modality
@@ -376,7 +374,11 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             if (function is IrConstructor) "<constructor>" else function.name.asString(),
             null,
             paramNames,
-            null, null, null, null
+            null,
+            null,
+            null,
+            null,
+            null
         )
         typeCache.put(signature, method)
         var declaringType = when (val irParent = function.parent) {
@@ -434,7 +436,13 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             null,
             type.symbol.owner.name.asString(),
             null,
-            paramNames, null, null, null)
+            paramNames,
+            null,
+            null,
+            null,
+            null,
+            null
+        )
         typeCache.put(signature, method)
         var declaringType = TypeUtils.asFullyQualified(type(type.symbol.owner.parent))
         if (declaringType is JavaType.Parameterized) {
@@ -472,7 +480,13 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             null,
             "<constructor>",
             null,
-            paramNames, null, null, null)
+            paramNames,
+            null,
+            null,
+            null,
+            null,
+            null
+        )
         typeCache.put(signature, method)
         var declaringType = TypeUtils.asFullyQualified(type(type.symbol.owner.parent))
         if (declaringType is JavaType.Parameterized) {
@@ -510,7 +524,13 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             null,
             "<constructor>",
             null,
-            paramNames, null, null, null)
+            paramNames,
+            null,
+            null,
+            null,
+            null,
+            null
+        )
         return method
     }
 

@@ -1,8 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import org.gradle.internal.impldep.org.junit.platform.launcher.TagFilter.excludeTags
-
-
 plugins {
     id("org.openrewrite.build.language-library")
     id("jvm-test-suite")
@@ -11,6 +8,7 @@ plugins {
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
@@ -24,6 +22,12 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     "javaTck"(project(":rewrite-java-tck"))
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
 }
 
 tasks.withType<JavaCompile> {
@@ -71,9 +75,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        useJUnitPlatform {
-                            excludeTags("java21")
-                        }
+                        useJUnitPlatform()
                         testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)

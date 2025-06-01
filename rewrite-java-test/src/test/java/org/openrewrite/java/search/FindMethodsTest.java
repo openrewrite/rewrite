@@ -39,6 +39,33 @@ class FindMethodsTest implements RewriteTest {
         return Stream.of(null, JavaType.Unknown.getInstance());
     }
 
+    @DocumentExample
+    @Test
+    void findConstructors() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("A <constructor>(String)", false)),
+          java(
+            """
+              class Test {
+                  A a = new A("test");
+              }
+              """,
+            """
+              class Test {
+                  A a = /*~~>*/new A("test");
+              }
+              """
+          ),
+          java(
+            """
+              class A {
+                  public A(String s) {}
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void incorrectMethodPattern() {
         assertThat(new FindMethods("com.google.common.collect.*", false)
@@ -76,33 +103,6 @@ class FindMethodsTest implements RewriteTest {
                       javaType;
                 }
             }.visitNonNull(cu, 0))
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void findConstructors() {
-        rewriteRun(
-          spec -> spec.recipe(new FindMethods("A <constructor>(String)", false)),
-          java(
-            """
-              class Test {
-                  A a = new A("test");
-              }
-              """,
-            """
-              class Test {
-                  A a = /*~~>*/new A("test");
-              }
-              """
-          ),
-          java(
-            """
-              class A {
-                  public A(String s) {}
-              }
-              """
           )
         );
     }

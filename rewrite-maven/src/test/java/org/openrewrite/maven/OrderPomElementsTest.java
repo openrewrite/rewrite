@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -27,6 +28,57 @@ class OrderPomElementsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new OrderPomElements());
+    }
+
+    @DocumentExample
+    @Test
+    void updatePluginChildTagOrder() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <artifactId>my-project</artifactId>
+                  <groupId>my.org.project</groupId>
+                  <version>4.3.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <configuration>
+                                  <source>1.8</source>
+                                  <target>1.8</target>
+                              </configuration>
+                              <version>3.8.1</version>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <groupId>org.apache.maven.plugins</groupId>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>my.org.project</groupId>
+                  <artifactId>my-project</artifactId>
+                  <version>4.3.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.8.1</version>
+                              <configuration>
+                                  <source>1.8</source>
+                                  <target>1.8</target>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
     }
 
     @Test
@@ -71,7 +123,7 @@ class OrderPomElementsTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1228")
     @Test
-    void updateOrder() {
+    void updateDependencyChildTagOrder() {
         rewriteRun(
           pomXml(
             """

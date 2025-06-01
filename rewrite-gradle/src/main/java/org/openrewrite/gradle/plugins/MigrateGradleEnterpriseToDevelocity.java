@@ -31,6 +31,7 @@ import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.style.Style;
 
@@ -44,6 +45,10 @@ import static java.util.Collections.singletonList;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class MigrateGradleEnterpriseToDevelocity extends Recipe {
+
+    @EqualsAndHashCode.Exclude
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
     @Option(displayName = "Plugin version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
                           "You can also use `latest.release` for the latest available version and `latest.patch` if " +
@@ -57,6 +62,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
 
     @Override
     public String getDisplayName() {
+        //noinspection DialogTitleCapitalization
         return "Migrate from Gradle Enterprise to Develocity";
     }
 
@@ -78,7 +84,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
                         }
 
                         try {
-                            String newVersion = new DependencyVersionSelector(null, null, maybeGs.get())
+                            String newVersion = new DependencyVersionSelector(metadataFailures, null, maybeGs.get())
                                     .select(new GroupArtifact("com.gradle.develocity", "com.gradle.develocity.gradle.plugin"), "classpath", version, null, ctx);
                             if (newVersion == null) {
                                 // The develocity plugin was first published as of 3.17
@@ -91,7 +97,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
                         G.CompilationUnit g = cu;
                         g = (G.CompilationUnit) new ChangePlugin("com.gradle.enterprise", "com.gradle.develocity", version).getVisitor()
                                 .visitNonNull(g, ctx);
-                        g = (G.CompilationUnit) new ChangePluginVersion("com.gradle.common-custom-user-data-gradle-plugin", "2.x", null).getVisitor()
+                        g = (G.CompilationUnit) new UpgradePluginVersion("com.gradle.common-custom-user-data-gradle-plugin", "2.x", null).getVisitor()
                                 .visitNonNull(g, ctx);
                         g = (G.CompilationUnit) new MigrateConfigurationVisitor().visitNonNull(g, ctx);
                         return g;

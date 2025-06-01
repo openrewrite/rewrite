@@ -42,12 +42,30 @@ import java.util.Properties;
 import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.Recipe.noop;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class RecipeLifecycleTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void generateFile() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe()
+              .withGenerator(() -> List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build()))
+              .withName("test.GeneratingRecipe")
+              .withMaxCycles(1)
+            )
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
+              .map(r -> r.getRecipeDescriptorsThatMadeChanges().getFirst().getName()))
+              .containsOnly("test.GeneratingRecipe")),
+          text(null, "test", spec -> spec.path("test.txt"))
+        );
+    }
 
     @Test
     void panic() {
@@ -64,23 +82,6 @@ class RecipeLifecycleTest implements RewriteTest {
               }
           })).executionContext(ctx),
           text("hello")
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void generateFile() {
-        rewriteRun(
-          spec -> spec
-            .recipe(toRecipe()
-              .withGenerator(() -> List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build()))
-              .withName("test.GeneratingRecipe")
-              .withMaxCycles(1)
-            )
-            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
-              .map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
-              .containsOnly("test.GeneratingRecipe")),
-          text(null, "test", spec -> spec.path("test.txt"))
         );
     }
 
@@ -118,7 +119,7 @@ class RecipeLifecycleTest implements RewriteTest {
               .isNotEmpty()
               .get()
               .as("Exception thrown in the scanning phase should record the responsible recipe")
-              .matches(m -> "org.openrewrite.RecipeLifecycleTest$ErrorDuringScanningPhase".equals(m.getRecipes().iterator().next().get(0).getDescriptor().getName()))
+              .matches(m -> "org.openrewrite.RecipeLifecycleTest$ErrorDuringScanningPhase".equals(m.getRecipes().iterator().next().getFirst().getDescriptor().getName()))
             )
           ));
     }
@@ -301,6 +302,26 @@ class RecipeLifecycleTest implements RewriteTest {
         }
     }
 
+    @DocumentExample
+    @Test
+    void accurateReportingOfRecipesMakingChanges() {
+        rewriteRun(
+          spec -> spec
+            .recipes(testRecipe("Change1"), noop(), testRecipe("Change2"))
+            .validateRecipeSerialization(false)
+            .afterRecipe(run -> {
+                var changes = run.getChangeset().getAllResults();
+                assertThat(changes).hasSize(1);
+                assertThat(changes.getFirst().getRecipeDescriptorsThatMadeChanges().stream().map(RecipeDescriptor::getName))
+                  .containsExactlyInAnyOrder("Change1", "Change2");
+            }),
+          text(
+            "Hello",
+            "Change2Change1Hello"
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/389")
     @Test
     void sourceFilesAcceptOnlyApplicableVisitors() {
@@ -313,26 +334,6 @@ class RecipeLifecycleTest implements RewriteTest {
             fooVisitor.visit(source, ctx);
             textVisitor.visit(source, ctx);
         }
-    }
-
-    @DocumentExample
-    @Test
-    void accurateReportingOfRecipesMakingChanges() {
-        rewriteRun(
-          spec -> spec
-            .recipes(testRecipe("Change1"), noop(), testRecipe("Change2"))
-            .validateRecipeSerialization(false)
-            .afterRecipe(run -> {
-                var changes = run.getChangeset().getAllResults();
-                assertThat(changes).hasSize(1);
-                assertThat(changes.get(0).getRecipeDescriptorsThatMadeChanges().stream().map(RecipeDescriptor::getName))
-                  .containsExactlyInAnyOrder("Change1", "Change2");
-            }),
-          text(
-            "Hello",
-            "Change2Change1Hello"
-          )
-        );
     }
 
     private Recipe testRecipe(@Language("markdown") String name) {
@@ -474,8 +475,8 @@ class RecipeLifecycleTest implements RewriteTest {
     @Test
     void declarativeRecipeChainFromResourcesIncludesImperativeRecipesInDescriptors() {
         rewriteRun(spec -> spec.recipeFromResources("test.declarative.sample.a")
-            .afterRecipe(recipeRun -> assertThat(recipeRun.getChangeset().getAllResults().get(0)
-              .getRecipeDescriptorsThatMadeChanges().get(0).getRecipeList().get(0)
+            .afterRecipe(recipeRun -> assertThat(recipeRun.getChangeset().getAllResults().getFirst()
+              .getRecipeDescriptorsThatMadeChanges().getFirst().getRecipeList().getFirst()
               .getDisplayName()).isEqualTo("Change text")),
           text("Hi", "after"));
     }

@@ -29,7 +29,10 @@ import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.StringJoiner;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -121,7 +124,9 @@ public class MethodMatcher {
                     targetTypePattern = Pattern.compile(StringUtils.aspectjNameToPattern(pattern));
                 }
 
-                if (isPlainIdentifier(ctx.simpleNamePattern())) {
+                if (ctx.simpleNamePattern().CONSTRUCTOR() != null) {
+                    methodName = "<constructor>";
+                } else if (isPlainIdentifier(ctx.simpleNamePattern())) {
                     StringBuilder builder = new StringBuilder();
                     for (ParseTree child : ctx.simpleNamePattern().children) {
                         builder.append(child.getText());
@@ -254,11 +259,10 @@ public class MethodMatcher {
         if (type == null) {
             return false;
         }
-        if (!matchesTargetType(type.getDeclaringType())) {
+        if (!matchesMethodName(type.getName())) {
             return false;
         }
-
-        if (!matchesMethodName(type.getName())) {
+        if (!matchesTargetType(type.getDeclaringType())) {
             return false;
         }
 

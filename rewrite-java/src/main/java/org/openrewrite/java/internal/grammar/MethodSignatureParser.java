@@ -15,6 +15,7 @@
  */
 // Generated from ~/git/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
+
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNDeserializer;
@@ -54,8 +55,8 @@ public class MethodSignatureParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "'<constructor>'", "'('", "')'", "'['", "']'", "','", "'.'", "'!'",
-			"'*'", "'&&'", "'||'", "'...'", "'..'", "'#'", "' '"
+			null, null, "'('", "')'", "'['", "']'", "','", "'.'", "'!'", "'*'", "'&&'",
+			"'||'", "'...'", "'..'", "'#'", "' '"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();

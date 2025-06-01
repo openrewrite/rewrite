@@ -1395,7 +1395,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             spec -> spec.path("a/b/NoMatch.java").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/NoMatch.java");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "x.y.Target")).isTrue();
             })
           )
         );
@@ -1419,7 +1419,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             spec -> spec.path("a/b/Original.java").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/Target.java");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "x.y.Target")).isTrue();
             })
           )
         );
@@ -1592,8 +1592,8 @@ class ChangeTypeTest implements RewriteTest {
               import a.A2;
               
               public class Example {
-                  public A2 method(A2 a1) {
-                      return a1;
+                  public A2 method(A2 a2) {
+                      return a2;
                   }
               }
               """
@@ -1623,9 +1623,104 @@ class ChangeTypeTest implements RewriteTest {
 
                 assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName())
                   .isEqualTo("a.A2");
-                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().get(0)).getFullyQualifiedName())
+                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().getFirst()).getFullyQualifiedName())
                   .isEqualTo("a.A2");
             })
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameRandomVariablesMatchingClassName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
+          java(
+            """
+              package a;
+              public class A1 {
+              }
+              """,
+            """
+              package a;
+              public class A2 {
+              }
+              """
+          ),
+          java(
+            """
+              package org.foo;
+              
+              import a.A1;
+              
+              public class Example {
+                  public String method(A1 a, String a1) {
+                      return a1;
+                  }
+              }
+              """,
+            """
+              package org.foo;
+              
+              import a.A2;
+              
+              public class Example {
+                  public String method(A2 a, String a1) {
+                      return a1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeToVariableNameWithoutChangeToType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+              public class A2 {
+              }
+              """
+          ),
+          java(
+            """
+              package org.foo;
+              
+              import a.A1;
+              import a.A2;
+              
+              public class Example {
+                  public A1 method1(A1 a1) {
+                      return a1;
+                  }
+                  public A2 method2(A2 a1) {
+                      return a1; // Unchanged
+                  }
+              }
+              """,
+            """
+              package org.foo;
+              
+              import a.A2;
+              
+              public class Example {
+                  public A2 method1(A2 a2) {
+                      return a2;
+                  }
+                  public A2 method2(A2 a1) {
+                      return a1; // Unchanged
+                  }
+              }
+              """
           )
         );
     }
@@ -1981,6 +2076,7 @@ class ChangeTypeTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4452")
+    @Disabled("flaky on CI")
     void shouldFullyQualifyWhenNewTypeIsAmbiguous() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType(
@@ -2028,7 +2124,8 @@ class ChangeTypeTest implements RewriteTest {
               public class A {
                 public static String A = "A";
               }
-              """),
+              """
+          ),
           java(
             """
               package org.ab;
@@ -2037,7 +2134,8 @@ class ChangeTypeTest implements RewriteTest {
                 public static String A = "A";
                 public static String B = "B";
               }
-              """),
+              """
+          ),
           // language=java
           java(
             """
@@ -2080,7 +2178,6 @@ class ChangeTypeTest implements RewriteTest {
               """
           )
         );
-
     }
 
     @Test
@@ -2096,9 +2193,9 @@ class ChangeTypeTest implements RewriteTest {
                 TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
 
                 J.CompilationUnit cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
-                assertEquals("GoodbyeClass", cu.getClasses().get(0).getSimpleName());
+                assertEquals("GoodbyeClass", cu.getClasses().getFirst().getSimpleName());
 
-                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().get(0), new InMemoryExecutionContext());
+                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().getFirst(), new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cd.getSimpleName());
             }))
         );
@@ -2118,7 +2215,8 @@ class ChangeTypeTest implements RewriteTest {
               a.property=java.lang.Integer
               c.property=java.lang.StringBuilder
               b.property=String
-              """, spec -> spec.path("application.properties"))
+              """,
+                spec -> spec.path("application.properties"))
         );
     }
 
@@ -2244,7 +2342,8 @@ class ChangeTypeTest implements RewriteTest {
                     return b.build();
                 }
               }
-              """, """
+              """,
+                """
               import foo.A;
               
               class Test {

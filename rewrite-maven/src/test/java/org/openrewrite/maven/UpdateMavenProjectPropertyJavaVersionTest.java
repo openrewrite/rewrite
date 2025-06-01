@@ -1,11 +1,11 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Moderne Source Available License (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://docs.moderne.io/licensing/moderne-source-available-license
+ * https://www.apache.org/licenses/LICENSE-2.0
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -117,7 +117,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       <release.version>17</release.version>
                   </properties>
               </project>
-              """)
+              """
+          )
         );
     }
 
@@ -195,7 +196,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                         <release.version>17</release.version>
                     </properties>
                 </project>
-                """),
+                """
+            ),
             mavenProject("example-child",
                 //language=xml
                 pomXml(
@@ -242,7 +244,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       </plugins>
                   </build>
               </project>
-              """),
+              """
+          ),
           mavenProject("example-child",
             //language=xml
             pomXml(

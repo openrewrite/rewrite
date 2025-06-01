@@ -32,6 +32,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
@@ -102,10 +103,11 @@ public class MavenParser implements Parser {
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()
                 .withServers(null);
+        List<String> effectivelyActiveProfiles = Stream.concat(mavenCtx.getActiveProfiles().stream(), activeProfiles.stream()).collect(Collectors.toList());
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             try {
-                ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
+                ResolvedPom resolvedPom = docToPom.getValue().resolve(effectivelyActiveProfiles, downloader, ctx);
                 MavenResolutionResult model = new MavenResolutionResult(randomId(),
                         null,
                         resolvedPom,
@@ -113,7 +115,7 @@ public class MavenParser implements Parser {
                         null,
                         emptyMap(),
                         sanitizedSettings,
-                        mavenCtx.getActiveProfiles(),
+                        effectivelyActiveProfiles,
                         properties);
                 if (!skipDependencyResolution) {
                     model = model.resolveDependencies(downloader, ctx);
@@ -207,7 +209,7 @@ public class MavenParser implements Parser {
             return this;
         }
 
-        public Builder property(@Nullable String key, String value) {
+        public Builder property(@Nullable String key, @Nullable String value) {
             //noinspection ConstantConditions
             if (key != null && value != null) {
                 this.properties.put(key, value);

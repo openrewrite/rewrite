@@ -24,18 +24,19 @@ import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.config.DataTableDescriptor;
-import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.config.RecipeExample;
+import org.openrewrite.config.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
@@ -263,6 +264,43 @@ public abstract class Recipe implements Cloneable {
                         value));
             }
         }
+        // Option annotations can be placed on fields, bean-style getters, or on the primary constructor
+        for (Method method : recipe.getClass().getDeclaredMethods()) {
+            if (method.getName().startsWith("get") && method.getParameterCount() == 0) {
+                Option option = method.getAnnotation(Option.class);
+                //noinspection ConstantValue
+                if (option != null) {
+                    options.add(new OptionDescriptor(StringUtils.uncapitalize(method.getName().substring(3)),
+                            method.getReturnType().getSimpleName(),
+                            option.displayName(),
+                            option.description(),
+                            option.example().isEmpty() ? null : option.example(),
+                            option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                            option.required(),
+                            null));
+                }
+            }
+        }
+        try {
+            Constructor<?> c = RecipeIntrospectionUtils.getPrimaryConstructor(getClass());
+            for (Parameter parameter : c.getParameters()) {
+                Option option = parameter.getAnnotation(Option.class);
+                //noinspection ConstantValue
+                if (option != null) {
+                    options.add(new OptionDescriptor(parameter.getName(),
+                            parameter.getType().getSimpleName(),
+                            option.displayName(),
+                            option.description(),
+                            option.example().isEmpty() ? null : option.example(),
+                            option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                            option.required(),
+                            null));
+                }
+            }
+        } catch (RecipeIntrospectionException ignored) {
+            // Some exotic form of recipe
+        }
+
         options.trimToSize();
         return options;
     }
@@ -326,6 +364,9 @@ public abstract class Recipe implements Cloneable {
      */
     @Incubating(since = "8.48.0")
     public void onComplete(ExecutionContext ctx) {
+        if (this instanceof DelegatingRecipe) {
+            ((DelegatingRecipe) this).getDelegate().onComplete(ctx);
+        }
     }
 
     /**
@@ -379,6 +420,7 @@ public abstract class Recipe implements Cloneable {
         return TreeVisitor.noop();
     }
 
+    @SuppressWarnings("UnusedReturnValue")
     public <D extends DataTable<?>> D addDataTable(D dataTable) {
         if (dataTables == null) {
             dataTables = new ArrayList<>();

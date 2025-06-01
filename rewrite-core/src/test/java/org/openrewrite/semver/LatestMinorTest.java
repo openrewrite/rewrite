@@ -35,4 +35,9 @@ public class LatestMinorTest {
         assertThat(latestMinor.isValid("1.0.0", "1.1.0")).isTrue();
         assertThat(latestMinor.isValid("1.0.0", "2.0.0")).isFalse();
     }
+
+    @Test
+    void noSnapshots() {
+        assertThat(latestMinor.isValid("1.0.0", "1.1.0-SNAPSHOT")).isFalse();
+    }
 }

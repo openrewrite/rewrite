@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven.utilities;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Checksum;
@@ -27,6 +29,7 @@ import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.remote.RemoteFile;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -78,6 +81,8 @@ public class MavenWrapper {
     String distributionVersion;
     String distributionUri;
     Checksum distributionChecksum;
+
+    private final static Cache<URI, Checksum> artifactChecksumCache = Caffeine.newBuilder().maximumSize(20).build();
 
     public static MavenWrapper create(
             @Nullable String wrapperVersion,
@@ -131,25 +136,31 @@ public class MavenWrapper {
                     .orElseThrow(() -> new IllegalStateException("Expected to find at least one Maven distribution version to select from."));
             String resolvedDistributionUri = getDownloadUriFor(repository, distributionGroupArtifact, resolvedDistributionVersion, "bin", "zip");
 
-            Remote wrapperJar = (Remote) Checksum.sha256(
-                    Remote.builder(WRAPPER_JAR_LOCATION).build(URI.create(resolvedWrapperUri)), ctx);
-
-            Remote mavenDistribution = (Remote) Checksum.sha256(Remote.builder(Paths.get(""))
-                    .build(URI.create(resolvedDistributionUri)), ctx);
-
+            Checksum wrapperJarChecksum = retrieveChecksumUsingCache(Remote.builder(WRAPPER_JAR_LOCATION).build(URI.create(resolvedWrapperUri)), ctx);
+            Checksum mavenDistributionChecksum = retrieveChecksumUsingCache(Remote.builder(Paths.get("")).build(URI.create(resolvedDistributionUri)), ctx);
             return new MavenWrapper(
                     resolvedWrapperVersion,
                     resolvedWrapperUri,
-                    requireNonNull(wrapperJar.getChecksum()),
+                    requireNonNull(wrapperJarChecksum),
                     resolvedWrapperDistributionUri,
                     wrapperDistributionType,
                     resolvedDistributionVersion,
                     resolvedDistributionUri,
-                    requireNonNull(mavenDistribution.getChecksum())
+                    requireNonNull(mavenDistributionChecksum)
             );
         } catch (MavenDownloadingException e) {
             throw new RuntimeException("Could not get Maven versions at: " + repository.getUri(), e);
         }
+    }
+
+    private static Checksum retrieveChecksumUsingCache(RemoteFile remote, ExecutionContext ctx) {
+        Checksum ret = artifactChecksumCache.getIfPresent(remote.getUri());
+        if (ret != null) {
+            return ret;
+        }
+        ret = Checksum.sha256(remote, ctx).getChecksum();
+        artifactChecksumCache.put(remote.getUri(), ret);
+        return ret;
     }
 
     public String getWrapperUrl() {

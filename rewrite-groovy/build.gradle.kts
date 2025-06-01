@@ -1,6 +1,38 @@
 plugins {
     id("org.openrewrite.build.language-library")
+    id("jvm-test-suite")
 }
+
+testing {
+    suites {
+        val test by getting(JvmTestSuite::class) {
+            useJUnitJupiter()
+        }
+
+        register<JvmTestSuite>("groovy2Test") {
+            configurations.getByName("groovy2TestRuntimeClasspath") {
+                resolutionStrategy {
+                    force("org.codehaus.groovy:groovy:2.5.22")
+                }
+            }
+
+            dependencies {
+                implementation(project())
+                implementation(project(":rewrite-test"))
+                implementation("org.assertj:assertj-core:latest.release")
+            }
+
+            targets {
+                all {
+                    testTask.configure {
+                        shouldRunAfter(test)
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 dependencies {
     api(project(":rewrite-java"))
@@ -21,15 +53,9 @@ dependencies {
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
     testRuntimeOnly("org.codehaus.groovy:groovy-all:latest.release")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
 }
 
-//val testJava8 = tasks.register<Test>("testJava8") {
-//    javaLauncher.set(javaToolchains.launcherFor {
-//        languageVersion.set(JavaLanguageVersion.of(8))
-//    })
-//}
-//tasks.named("check").configure {
-//    // Enable once the java8 tests are passing
-//    // dependsOn(testJava8)
-//}
+tasks.named("check") {
+    dependsOn(testing.suites.named("groovy2Test"))
+}

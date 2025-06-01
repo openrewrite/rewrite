@@ -98,7 +98,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             "import   createInstance /*C1*/",
             spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getImports().get(0).getPackageName()).isEmpty();
+                assertThat(cu.getImports().getFirst().getPackageName()).isEmpty();
             })
           )
         );
@@ -113,7 +113,8 @@ class ImportTest implements RewriteTest {
               import kotlin.collections.Set as S
               
               class T
-              """)
+              """
+          )
         );
     }
 
@@ -153,7 +154,8 @@ class ImportTest implements RewriteTest {
               import Foo as Bar
               
               class Test
-              """)
+              """
+          )
         );
     }
 
@@ -164,7 +166,8 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import org.`should be equal to`
-              """)
+              """
+          )
         );
     }
 

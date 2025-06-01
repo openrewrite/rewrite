@@ -178,7 +178,7 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"a.A <constructor>()", "a.A *()"})
+    @ValueSource(strings = {"a.A <constructor>()", "a.A <init>()", "a.A *()"})
     void matchesConstructorUsage(String methodPattern) {
         rewriteRun(
           java(
@@ -419,9 +419,9 @@ class MethodMatcherTest implements RewriteTest {
           .findFirst()
           .map(J.CompilationUnit.class::cast)
           .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
-        var classDecl = cu.getClasses().get(0);
-        J.MethodDeclaration testMethod = (J.MethodDeclaration) classDecl.getBody().getStatements().get(0);
-        return (J.MethodInvocation) testMethod.getBody().getStatements().get(0);
+        var classDecl = cu.getClasses().getFirst();
+        J.MethodDeclaration testMethod = (J.MethodDeclaration) classDecl.getBody().getStatements().getFirst();
+        return (J.MethodInvocation) testMethod.getBody().getStatements().getFirst();
     }
 
     @Test

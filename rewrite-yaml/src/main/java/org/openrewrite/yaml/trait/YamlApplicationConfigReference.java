@@ -16,7 +16,6 @@
 package org.openrewrite.yaml.trait;
 
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -31,7 +30,6 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = false)
 public class YamlApplicationConfigReference extends YamlReference {
     Cursor cursor;
-    @Getter
     Kind kind;
 
     public static class Provider extends YamlProvider {

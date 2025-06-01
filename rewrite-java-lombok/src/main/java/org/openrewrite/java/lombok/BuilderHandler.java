@@ -57,6 +57,7 @@ public class BuilderHandler extends JavacAnnotationHandler<Builder> {
             // which is unlikely to be called in original code. Therefore, it is safe to temporarily remove the
             // @Builder.Default annotation during processing.
             for (JavacNode fieldNode : HandleConstructor.findAllFields(parent, true)) {
+                @SuppressWarnings("unchecked") // if the cast fails the resulting parser error is clear enough
                 LombokImmutableList<JavacNode> children = (LombokImmutableList<JavacNode>) childrenField.get(fieldNode);
                 nodeToChildrenMap.put(fieldNode, children);
                 LombokImmutableList<JavacNode> filtered = children;

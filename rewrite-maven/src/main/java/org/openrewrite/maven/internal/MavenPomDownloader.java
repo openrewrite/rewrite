@@ -68,6 +68,9 @@ public class MavenPomDownloader {
     private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
 
     private static final String SNAPSHOT = "SNAPSHOT";
+    private static final String LATEST = "LATEST";
+    private static final String RELEASE = "RELEASE";
+    private static final List<String> NAMED_VERSIONS = Arrays.asList(LATEST, RELEASE);
 
 
     private final MavenPomCache mavenCache;
@@ -131,10 +134,8 @@ public class MavenPomDownloader {
      * @param projectPoms Project poms on disk.
      * @param httpSender  The HTTP sender.
      * @param ctx         The execution context.
-     * @deprecated Use {@link #MavenPomDownloader(Map, ExecutionContext)} instead.
      */
-    @Deprecated
-    public MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
+    private MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
         this.projectPoms = projectPoms;
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
@@ -243,9 +244,9 @@ public class MavenPomDownloader {
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "metadata");
 
         MavenMetadata mavenMetadata = null;
-        Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
-        List<String> attemptedUris = new ArrayList<>(normalizedRepos.size());
+        List<String> attemptedUris = new ArrayList<>();
         for (MavenRepository repo : normalizedRepos) {
             ctx.getResolutionListener().repository(repo, containingPom);
             if (gav.getVersion() != null && !repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
@@ -261,7 +262,7 @@ public class MavenPomDownloader {
                     String baseUri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
                                      requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
                                      gav.getArtifactId() + '/' +
-                                     (gav.getVersion() == null ? "" : gav.getVersion() + '/');
+                                     (gav.getVersion() == null || NAMED_VERSIONS.contains(gav.getVersion().toUpperCase()) ? "" : gav.getVersion() + '/');
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
@@ -530,14 +531,15 @@ public class MavenPomDownloader {
             }
         }
 
-        Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
 
         Timer.Sample sample = Timer.start();
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "pom");
 
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
-        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         GroupArtifactVersion originalGav = gav;
+        gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
+        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         gav = handleSnapshotTimestampVersion(gav);
         List<String> uris = new ArrayList<>();
 
@@ -620,13 +622,33 @@ public class MavenPomDownloader {
                 } else {
                     try {
                         try {
-                            byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
+                            byte[] pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
 
                             Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
                             RawPom rawPom = RawPom.parse(
-                                    new ByteArrayInputStream(responseBody),
+                                    new ByteArrayInputStream(pomResponseBody),
                                     Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
                             );
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(pomResponseBody)))) {
+                                String line;
+                                while ((line = reader.readLine()) != null) {
+                                    if (line.contains("published-with-gradle-metadata")) {
+                                        // as some artifacts do not have the bom as dependency listed, we need to add it by fetching the gradle metadata module.
+                                        pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString().replaceFirst(".pom$", ".module"));
+                                        RawGradleModule module = RawGradleModule.parse(new ByteArrayInputStream(pomResponseBody));
+                                        for (Dependency dependency : module.getDependencies("apiElements", "platform")) {
+                                            rawPom.getDependencies().getDependencies().add(
+                                                    new RawPom.Dependency(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), null, "bom", null, null, null)
+                                            );
+                                        }
+                                        break;
+                                    }
+                                }
+                            } catch (HttpSenderResponseException e) {
+                                if (e.getResponseCode() != 404) {
+                                    throw e;
+                                }
+                            }
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
@@ -669,6 +691,7 @@ public class MavenPomDownloader {
                 repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
         }
+
         if (foundJarInRepo != null && foundResolvedGav != null) {
             // IF JAR has been found return the artificially created POM not to throw exception
             RawPom rawPom = rawPomFromGav(gav);
@@ -756,7 +779,30 @@ public class MavenPomDownloader {
         return gav.getVersion();
     }
 
-    Collection<MavenRepository> distinctNormalizedRepositories(
+    private GroupArtifactVersion resolveNamedVersion(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories, ExecutionContext ctx) {
+        if (gav.getVersion() == null) {
+            return gav;
+        }
+        String version = gav.getVersion().toUpperCase();
+        if (NAMED_VERSIONS.contains(version)) {
+            MavenMetadata mavenMetadata;
+            try {
+                mavenMetadata = downloadMetadata(gav, containingPom, repositories);
+            } catch (MavenDownloadingException e) {
+                //This can happen if the artifact only exists in the local maven cache. In this case, just return the original
+                return gav;
+            }
+
+            if (RELEASE.equals(version)) {
+                return gav.withVersion(mavenMetadata.getVersioning().getRelease());
+            } else if (LATEST.equals(version)) {
+                return gav.withVersion(mavenMetadata.getVersioning().getLatest());
+            }
+        }
+        return gav;
+    }
+
+    Iterable<MavenRepository> distinctNormalizedRepositories(
             List<MavenRepository> repositories,
             @Nullable ResolvedPom containingPom,
             @Nullable String acceptsVersion) {
@@ -767,35 +813,67 @@ public class MavenPomDownloader {
             repositories = emptyList();
         }
 
-        LinkedHashMap<String, MavenRepository> normalizedRepositories = new LinkedHashMap<>();
+        // Create a list of raw repository suppliers in the correct order
+        Map<@Nullable String, MavenRepository> repositoriesById = new LinkedHashMap<>();
 
+        // Add local repository if needed
         if (addLocalRepository) {
-            normalizedRepositories.put(ctx.getLocalRepository().getId(), ctx.getLocalRepository());
+            repositoriesById.put("local", ctx.getLocalRepository());
         }
 
-        // repositories from maven settings
+        // Add repositories from maven settings
         for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+            repositoriesById.put(repo.getId(), repo);
         }
 
+        // Add repositories passed as parameter
         for (MavenRepository repo : repositories) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+            repositoriesById.put(repo.getId(), repo);
         }
 
-        if (!normalizedRepositories.containsKey(MavenRepository.MAVEN_CENTRAL.getId()) && addCentralRepository) {
-            MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, ctx, containingPom);
-            if (normalizedRepo != null) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+        // Add Maven Central if needed
+        if (addCentralRepository && !repositoriesById.containsKey("central")) {
+            repositoriesById.put("central", MavenRepository.MAVEN_CENTRAL);
         }
 
-        return normalizedRepositories.values();
+        // Return lazy iterable
+        return () -> new Iterator<MavenRepository>() {
+            private final Iterator<MavenRepository> repoIterator = repositoriesById.values().iterator();
+            private final Map<@Nullable String, MavenRepository> seen = new LinkedHashMap<>();
+            private @Nullable MavenRepository next;
+
+            private @Nullable MavenRepository findNext() {
+                while (repoIterator.hasNext()) {
+                    MavenRepository repo = repoIterator.next();
+                    MavenRepository normalized = normalizeRepository(repo, ctx, containingPom);
+
+                    if (normalized != null &&
+                        (acceptsVersion == null || repositoryAcceptsVersion(normalized, acceptsVersion, containingPom)) &&
+                        seen.put(normalized.getId(), normalized) == null) {
+                        return normalized;
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public boolean hasNext() {
+                if (next != null) {
+                    return true;
+                }
+                return (next = findNext()) != null;
+            }
+
+            @Override
+            public MavenRepository next() {
+                MavenRepository result = next;
+                if (result == null) {
+                    throw new NoSuchElementException();
+                }
+                next = null;
+                return result;
+            }
+        };
     }
 
     public @Nullable MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
@@ -1078,8 +1156,9 @@ public class MavenPomDownloader {
         }
 
         // Any response code below 100 implies that no connection was made. Sometimes 0 or -1 is used for connection failures.
+        // 408 is sometimes used for connection timeouts as well. So we cannot assume that a 408 means the server is reached
         public boolean isServerReached() {
-            return responseCode != null && responseCode >= 100;
+            return responseCode != null && responseCode >= 100 && responseCode != 408;
         }
     }
 
@@ -1133,5 +1212,4 @@ public class MavenPomDownloader {
         }
         return null;
     }
-
 }

@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.*;
+import com.fasterxml.jackson.annotation.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.Value;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -359,6 +359,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With(AccessLevel.NONE)
@@ -780,6 +781,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With
@@ -926,6 +928,7 @@ public interface JavaType {
         @Getter
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With
@@ -1020,6 +1023,7 @@ public interface JavaType {
         @Getter
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @NonFinal
@@ -1052,7 +1056,7 @@ public interface JavaType {
             if (Arrays.equals(annotationsArray, this.annotations)) {
                 return this;
             }
-            return new Array(this.managedReference, this.elemType, this.annotations);
+            return new Array(this.managedReference, this.elemType, annotationsArray);
         }
 
         @Override
@@ -1227,6 +1231,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With(AccessLevel.PRIVATE)
@@ -1287,24 +1292,6 @@ public interface JavaType {
         @With
         @NonFinal
         String @Nullable [] declaredFormalTypeNames;
-
-        @Deprecated
-        public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
-                      @Nullable JavaType returnType, @Nullable List<String> parameterNames,
-                      @Nullable List<JavaType> parameterTypes, @Nullable List<JavaType> thrownExceptions,
-                      @Nullable List<FullyQualified> annotations) {
-            this(managedReference, flagsBitMap, declaringType, name, returnType, parameterNames, parameterTypes,
-                    thrownExceptions, annotations, null);
-        }
-
-        @Deprecated
-        public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
-                      @Nullable JavaType returnType, @Nullable List<String> parameterNames,
-                      @Nullable List<JavaType> parameterTypes, @Nullable List<JavaType> thrownExceptions,
-                      @Nullable List<FullyQualified> annotations, @Nullable List<String> defaultValue) {
-            this(managedReference, flagsBitMap, declaringType, name, returnType, parameterNames, parameterTypes,
-                    thrownExceptions, annotations, defaultValue, null);
-        }
 
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
@@ -1405,6 +1392,11 @@ public interface JavaType {
 
             Stack<FullyQualified> interfaces = new Stack<>();
             interfaces.addAll(declaringType.getInterfaces());
+            FullyQualified supertype = declaringType.getSupertype();
+            while (supertype != null) {
+                interfaces.add(supertype);
+                supertype = supertype.getSupertype();
+            }
 
             while (!interfaces.isEmpty()) {
                 FullyQualified declaring = interfaces.pop();
@@ -1578,6 +1570,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With(AccessLevel.PRIVATE)

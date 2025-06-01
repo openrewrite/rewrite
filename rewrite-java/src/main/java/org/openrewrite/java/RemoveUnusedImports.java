@@ -219,7 +219,12 @@ public class RemoveUnusedImports extends Recipe {
                     String target = qualid.getTarget().toString();
                     Set<JavaType.FullyQualified> types = typesByPackage.getOrDefault(target, new HashSet<>());
                     Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath = typesByPackage.getOrDefault(toFullyQualifiedName(target), new HashSet<>());
+                    Set<String> topLevelTypeNames = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
+                            .filter(fq -> fq.getOwningClass() == null)
+                            .map(JavaType.FullyQualified::getFullyQualifiedName)
+                            .collect(Collectors.toSet());
                     Set<JavaType.FullyQualified> combinedTypes = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
+                            .filter(fq -> fq.getOwningClass() == null || !topLevelTypeNames.contains(fq.getOwningClass().getFullyQualifiedName()))
                             .collect(Collectors.toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
                     if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {

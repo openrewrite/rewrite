@@ -60,24 +60,6 @@ class ChangePackageTest implements RewriteTest {
       }
       """;
 
-    @Test
-    void renamePackageNonRecursive() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangePackage(
-            "org.openrewrite",
-            "org.openrewrite.test",
-            false
-          )),
-          java(
-            """
-              package org.openrewrite.internal;
-              class Test {
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void renameUsingSimplePackageName() {
@@ -95,6 +77,24 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import openrewrite.Foo;
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamePackageNonRecursive() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.openrewrite",
+            "org.openrewrite.test",
+            false
+          )),
+          java(
+            """
+              package org.openrewrite.internal;
               class Test {
               }
               """
@@ -140,7 +140,7 @@ class ChangePackageTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.Import imported = cu.getImports().get(0);
+                J.Import imported = cu.getImports().getFirst();
                 assertThat(imported.getPackageName()).isEqualTo("org.openrewrite.test");
             })
           )
@@ -272,7 +272,7 @@ class ChangePackageTest implements RewriteTest {
                 JavaType.Method methodType = cu.getTypesInUse().getUsedMethods().iterator().next();
                 assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName())
                   .isEqualTo("org.openrewrite.test.Test");
-                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().get(0)).getFullyQualifiedName())
+                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().getFirst()).getFullyQualifiedName())
                   .isEqualTo("org.openrewrite.test.Test");
             })
           )
