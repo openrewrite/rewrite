@@ -148,15 +148,16 @@ public class ResolvedPom {
      */
     public ResolvedPom deduplicate() {
         Set<UniqueDependencyKey> uniqueManagedDependencies = new HashSet<>(dependencyManagement.size());
-
-        List<ResolvedManagedDependency> dedupMd = ListUtils.map(dependencyManagement, dm -> uniqueManagedDependencies.add(new UniqueDependencyKey(dm.getGav(), dm.getType(), dm.getClassifier(), dm.getScope())) ?
-                dm : null);
-        dependencyManagement = dedupMd;
+        //noinspection DataFlowIssue
+        dependencyManagement = ListUtils.map(dependencyManagement,
+                dm -> uniqueManagedDependencies.add(
+                        new UniqueDependencyKey(dm.getGav(), dm.getType(), dm.getClassifier(), dm.getScope())) ? dm : null);
 
         uniqueManagedDependencies.clear();
-        List<Dependency> dedupD = ListUtils.map(requestedDependencies, d -> uniqueManagedDependencies.add(new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())) ?
-                d : null);
-        requestedDependencies = dedupD;
+        //noinspection DataFlowIssue
+        requestedDependencies = ListUtils.map(requestedDependencies,
+                d -> uniqueManagedDependencies.add(
+                        new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())) ? d : null);
         return this;
     }
 
@@ -355,7 +356,7 @@ public class ResolvedPom {
         return dependency != null ? dependency.getScope() : null;
     }
 
-    public @Nullable ResolvedManagedDependency getManagedDependency(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
+    public @Nullable ResolvedManagedDependency getManagedDependency(@Nullable String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
         if (dependencyManagement.isEmpty()) {
             return null;
         }
@@ -365,7 +366,7 @@ public class ResolvedPom {
         return index >= 0 ? dependencyManagement.get(index) : null;
     }
 
-    private static ResolvedManagedDependency createSearchKey(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
+    private static ResolvedManagedDependency createSearchKey(@Nullable String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
         return new ResolvedManagedDependency(
                 new GroupArtifactVersion(groupId, artifactId, null),
                 null, type, classifier, null, null, null, null
