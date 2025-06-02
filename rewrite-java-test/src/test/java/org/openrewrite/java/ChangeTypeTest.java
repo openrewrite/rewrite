@@ -1630,6 +1630,39 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/582")
+    @Test
+    void renameWhenInitializerTypeMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", false)),
+          //language=java
+          java(
+            """
+              import java.util.*;
+
+              class Test {
+                  void test() {
+                      List<Integer> arrayList = new ArrayList<>();
+                      arrayList.add(1);
+                      arrayList.add(2);
+                  }
+              }
+              """,
+            """
+              import java.util.*;
+
+              class Test {
+                  void test() {
+                      List<Integer> linkedList = new LinkedList<>();
+                      linkedList.add(1);
+                      linkedList.add(2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void doNotRenameRandomVariablesMatchingClassName() {
         rewriteRun(
