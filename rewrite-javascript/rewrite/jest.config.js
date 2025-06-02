@@ -7,6 +7,7 @@ module.exports = {
   moduleNameMapper: {
     '^@openrewrite/rewrite/(.*)$': '<rootDir>/dist/src/$1'
   },
+
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.test.json', // Adjust if your tsconfig file is named or located differently
@@ -15,9 +16,9 @@ module.exports = {
   testMatch: ['**/?(*.)+(spec|test).+(ts|tsx|js)'],
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts'],
   reporters: [
-    'default', // Keeps the default console reporter
+    'default', // default console reporter
     ['jest-junit', {
-      outputDirectory: './build/test-results/jest',
+      outputDirectory: '../build/test-results/jest',
       outputName: 'junit.xml',
       // Optional additional configuration
       classNameTemplate: '{classname}',
