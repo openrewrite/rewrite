@@ -147,51 +147,6 @@ class ExcludeDependencyTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("This test appears to be invalid, as JUnit is declared as a test dependency")
-    void excludeJUnitInCompileScope() {
-        rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("junit", "junit", "compile")),
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.neo4j</groupId>
-                          <artifactId>neo4j-ogm-core</artifactId>
-                          <version>3.2.21</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.neo4j</groupId>
-                          <artifactId>neo4j-ogm-core</artifactId>
-                          <version>3.2.21</version>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>junit</groupId>
-                                  <artifactId>junit</artifactId>
-                              </exclusion>
-                          </exclusions>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
     void dontExcludeJUnitWhenItIsTransitiveTestDependency() {
         rewriteRun(
           spec -> spec.recipe(new ExcludeDependency("junit", "junit", null)),
