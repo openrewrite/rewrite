@@ -33,34 +33,34 @@ export class OrderImports extends Recipe {
 
             protected async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {
                 const importCount = this.countImports(cu);
-                const imports = cu.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
-                const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.element.id, i]));
-                const restStatements = cu.statements.slice(importCount);
-                const sortedImports = await this.sortNamesWithinEachLine(imports);
-                sortedImports.sort((aPadded, bPadded) => {
-                    const a = aPadded.element;
-                    const b = bPadded.element;
-
-                    const noSpecifier = (a.importClause == undefined ? 1 : 0) - (b.importClause == undefined ? 1 : 0);
-                    if (noSpecifier != 0) {
-                        return -noSpecifier;
-                    }
-                    const asterisk = this.isAsteriskImport(a) - this.isAsteriskImport(b);
-                    if (asterisk != 0) {
-                        return -asterisk;
-                    }
-                    const multipleImport = this.isMultipleImport(a) - this.isMultipleImport(b);
-                    if (multipleImport != 0) {
-                        return -multipleImport;
-                    }
-                    const comparedSpecifiers = this.compareStringArrays(this.extractImportSpecifierNames(a), this.extractImportSpecifierNames(b));
-                    if (comparedSpecifiers != 0) {
-                        return comparedSpecifiers;
-                    }
-                    // Tiebreaker, keep the sort stable
-                    return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
-                });
                 const cuWithImportsSorted = await produceAsync(cu, async draft => {
+                    const imports = draft.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
+                    const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.element.id, i]));
+                    const restStatements = cu.statements.slice(importCount);
+                    const sortedImports = await this.sortNamesWithinEachLine(imports);
+                    sortedImports.sort((aPadded, bPadded) => {
+                        const a = aPadded.element;
+                        const b = bPadded.element;
+
+                        const noSpecifier = (a.importClause == undefined ? 1 : 0) - (b.importClause == undefined ? 1 : 0);
+                        if (noSpecifier != 0) {
+                            return -noSpecifier;
+                        }
+                        const asterisk = this.isAsteriskImport(a) - this.isAsteriskImport(b);
+                        if (asterisk != 0) {
+                            return -asterisk;
+                        }
+                        const multipleImport = this.isMultipleImport(a) - this.isMultipleImport(b);
+                        if (multipleImport != 0) {
+                            return -multipleImport;
+                        }
+                        const comparedSpecifiers = this.compareStringArrays(this.extractImportSpecifierNames(a), this.extractImportSpecifierNames(b));
+                        if (comparedSpecifiers != 0) {
+                            return comparedSpecifiers;
+                        }
+                        // Tiebreaker, keep the sort stable
+                        return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
+                    });
                     draft.statements = [...sortedImports, ...restStatements];
                 });
                 return produce(cuWithImportsSorted, draft => {
