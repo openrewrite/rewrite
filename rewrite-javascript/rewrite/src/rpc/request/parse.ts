@@ -27,7 +27,7 @@ export class Parse {
     static handle(connection: rpc.MessageConnection,
                   localObjects: Map<string, any>): void {
         connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), async (request) => {
-            let parser: Parser | undefined = Parsers.createParser(request.parser, new ExecutionContext(), request.relativeTo);
+            let parser: Parser | undefined = Parsers.createParser(request.parser, {ctx: new ExecutionContext(), relativeTo: request.relativeTo});
 
             if (parser) {
                 const parsed = await parser.parse(...request.inputs);

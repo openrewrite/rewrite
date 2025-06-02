@@ -29,7 +29,7 @@ describe('MinimumViableSpacingVisitor', () => {
         const ret = typescript(before, after);
         class JavaScriptParserWithSpacesRemoved extends JavaScriptParser {
             constructor() {
-                super(undefined, undefined);
+                super({});
             }
 
             static RemoveSpaces = class <P> extends JavaScriptVisitor<P> {

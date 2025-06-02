@@ -127,9 +127,9 @@ export namespace J {
         WhileLoop: "org.openrewrite.java.tree.J$WhileLoop",
         Wildcard: "org.openrewrite.java.tree.J$Wildcard",
         Yield: "org.openrewrite.java.tree.J$Yield",
-        Container: "org.openrewrite.java.tree.Container",
-        LeftPadded: "org.openrewrite.java.tree.LeftPadded",
-        RightPadded: "org.openrewrite.java.tree.RightPadded",
+        Container: "org.openrewrite.java.tree.JContainer",
+        LeftPadded: "org.openrewrite.java.tree.JLeftPadded",
+        RightPadded: "org.openrewrite.java.tree.JRightPadded",
         Space: "org.openrewrite.java.tree.Space",
     } as const;
 
