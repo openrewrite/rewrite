@@ -2078,6 +2078,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void parsingIncorrectJavadocValueReference() {
         rewriteRun(
+          spec-> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           // language=java
           java(
             """
