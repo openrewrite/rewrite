@@ -4377,6 +4377,7 @@ class MavenParserTest implements RewriteTest {
               )
             );
         }
+
         @Issue("https://github.com/openrewrite/rewrite/issues/5402")
         @Test
         void allDependencyManagementEntryVariants_allDependencyVariants() {

@@ -257,9 +257,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
                                     String dependencyManagedVersion = platforms.get(configurationName)
                                             .stream()
-                                            .flatMap(e -> e.getDependencyManagement().stream())
-                                            .filter(e -> e.getGroupId().equals(dependency.getGroupId()))
-                                            .filter(e -> e.getArtifactId().equals(dependency.getArtifactId()))
+                                            .map(e -> e.getManagedDependency(dependency.getGroupId(), dependency.getArtifactId(), null, null))
+                                            .filter(Objects::nonNull)
                                             .map(ResolvedManagedDependency::getVersion)
                                             .max(VERSION_COMPARATOR)
                                             .orElse(null);

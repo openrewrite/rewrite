@@ -479,6 +479,74 @@ class ResolvedPomTest implements RewriteTest {
         }
     }
 
+    @Test
+    void ignoreScopeInDependencyManagement(@TempDir Path localRepository) throws IOException {
+        MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
+        createJarFile(localRepository, "com.some", "some-artifact", "1");
+
+        MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setRepositories(List.of(mavenLocal));
+
+        rewriteRun(
+          spec -> spec.executionContext(ctx),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.some</groupId>
+                          <artifactId>some-artifact</artifactId>
+                          <version>1</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <relativePath>../pom.xml</relativePath>
+                </parent>
+                <artifactId>child</artifactId>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.some</groupId>
+                            <artifactId>some-artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.some</groupId>
+                    <artifactId>some-artifact</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+              .afterRecipe(doc -> {
+                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).get().getPom();
+                  assertThat(pom.getDependencyManagement()).hasSize(1);
+              })
+          )
+        );
+    }
+
     private static void createJarFile(Path localRepository1) throws IOException {
         createJarFile(localRepository1, "com/some", "some-artifact", "1");
     }
