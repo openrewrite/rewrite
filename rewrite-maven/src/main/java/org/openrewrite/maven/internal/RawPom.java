@@ -98,7 +98,6 @@ public class RawPom {
     @Nullable
     String packaging;
 
-    @Nullable
     Dependencies dependencies;
 
     @Nullable
@@ -114,6 +113,9 @@ public class RawPom {
     RawRepositories repositories;
 
     @Nullable
+    RawPluginRepositories pluginRepositories;
+
+    @Nullable
     Licenses licenses;
 
     @Nullable
@@ -124,6 +126,29 @@ public class RawPom {
 
     @Nullable
     SubProjects subprojects;
+
+    public RawPom(@Nullable String pomVersion, @Nullable Parent parent, @Nullable String groupId, String artifactId, @Nullable String version, @Nullable String currentVersion, @Nullable String name, @Nullable String description, @Nullable Prerequisites prerequisites, @Nullable String packaging, @Nullable Dependencies dependencies, @Nullable DependencyManagement dependencyManagement, @Nullable Map<String, String> properties, @Nullable Build build, @Nullable RawRepositories repositories, @Nullable RawPluginRepositories pluginRepositories, @Nullable Licenses licenses, @Nullable Profiles profiles, @Nullable Modules modules, @Nullable SubProjects subprojects) {
+        this.pomVersion = pomVersion;
+        this.parent = parent;
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.currentVersion = currentVersion;
+        this.name = name;
+        this.description = description;
+        this.prerequisites = prerequisites;
+        this.packaging = packaging;
+        this.dependencies = dependencies == null ? new Dependencies() : dependencies;
+        this.dependencyManagement = dependencyManagement;
+        this.properties = properties;
+        this.build = build;
+        this.repositories = repositories;
+        this.pluginRepositories = pluginRepositories;
+        this.licenses = licenses;
+        this.profiles = profiles;
+        this.modules = modules;
+        this.subprojects = subprojects;
+    }
 
     public static RawPom parse(InputStream inputStream, @Nullable String snapshotVersion) {
         try {
@@ -182,7 +207,7 @@ public class RawPom {
         private final List<Dependency> dependencies;
 
         public Dependencies() {
-            this.dependencies = emptyList();
+            this.dependencies = new ArrayList<>();
         }
 
         public Dependencies(@JacksonXmlProperty(localName = "dependency") List<Dependency> dependencies) {
@@ -372,6 +397,9 @@ public class RawPom {
 
         @Nullable
         RawRepositories repositories;
+
+        @Nullable
+        RawPluginRepositories pluginRepositories;
     }
 
     public @Nullable String getGroupId() {
@@ -421,6 +449,7 @@ public class RawPom {
             builder.dependencies(mapRequestedDependencies(getDependencies()))
                     .dependencyManagement(mapDependencyManagement(getDependencyManagement()))
                     .repositories(mapRepositories(getRepositories()))
+                    .pluginRepositories(mapPluginRepositories(getPluginRepositories()))
                     .plugins(mapPlugins((build != null) ? build.getPlugins() : null))
                     .pluginManagement(mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null));
         }
@@ -458,6 +487,7 @@ public class RawPom {
                             mapRequestedDependencies(p.getDependencies()),
                             mapDependencyManagement(p.getDependencyManagement()),
                             mapRepositories(p.getRepositories()),
+                            mapPluginRepositories(p.getPluginRepositories()),
                             mapPlugins((build != null) ? build.getPlugins() : null),
                             mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
                     ));
@@ -476,6 +506,25 @@ public class RawPom {
             if (unmappedRepos != null) {
                 pomRepositories = new ArrayList<>(unmappedRepos.size());
                 for (RawRepositories.Repository r : unmappedRepos) {
+                    pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
+                            r.getReleases() == null ? null : r.getReleases().getEnabled(),
+                            r.getSnapshots() == null ? null : r.getSnapshots().getEnabled(),
+                            false, null, null, null, null));
+                }
+
+            }
+        }
+        return pomRepositories;
+    }
+
+    @NonNull
+    private List<MavenRepository> mapPluginRepositories(@Nullable RawPluginRepositories rawRepositories) {
+        List<MavenRepository> pomRepositories = emptyList();
+        if (rawRepositories != null) {
+            List<RawPluginRepositories.PluginRepository> unmappedRepos = rawRepositories.getPluginRepositories();
+            if (unmappedRepos != null) {
+                pomRepositories = new ArrayList<>(unmappedRepos.size());
+                for (RawPluginRepositories.PluginRepository r : unmappedRepos) {
                     pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
                             r.getReleases() == null ? null : r.getReleases().getEnabled(),
                             r.getSnapshots() == null ? null : r.getSnapshots().getEnabled(),
@@ -593,5 +642,4 @@ public class RawPom {
         }
         return emptyList();
     }
-
 }

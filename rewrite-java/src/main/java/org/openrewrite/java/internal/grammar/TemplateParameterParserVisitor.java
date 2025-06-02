@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -31,6 +31,12 @@ public interface TemplateParameterParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitMatcherPattern(TemplateParameterParser.MatcherPatternContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#genericPattern}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitGenericPattern(TemplateParameterParser.GenericPatternContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link TemplateParameterParser#typedPattern}.
 	 * @param ctx the parse tree
@@ -62,11 +68,23 @@ public interface TemplateParameterParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitVariance(TemplateParameterParser.VarianceContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#typeArray}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTypeArray(TemplateParameterParser.TypeArrayContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link TemplateParameterParser#parameterName}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitParameterName(TemplateParameterParser.ParameterNameContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#genericName}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitGenericName(TemplateParameterParser.GenericNameContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link TemplateParameterParser#typeName}.
 	 * @param ctx the parse tree

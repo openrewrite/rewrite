@@ -27,7 +27,7 @@ class NullUtilsTest {
     void packageNonNullDefault() {
         var results = NullUtils.findNonNullFields(DefaultNonNullTest.class);
         assertThat(results).hasSize(4);
-        assertThat(results.get(0).getName()).isEqualTo("aCoolNonNullName");
+        assertThat(results.getFirst().getName()).isEqualTo("aCoolNonNullName");
         assertThat(results.get(1).getName()).isEqualTo("beCoolNonNullName");
         assertThat(results.get(2).getName()).isEqualTo("coolNonNullName");
         assertThat(results.get(3).getName()).isEqualTo("yourCoolNonNullName");
@@ -37,7 +37,7 @@ class NullUtilsTest {
     void nonNulls() {
         var results = NullUtils.findNonNullFields(NonNullTest.class);
         assertThat(results).hasSize(4);
-        assertThat(results.get(0).getName()).isEqualTo("aCoolNonNullName");
+        assertThat(results.getFirst().getName()).isEqualTo("aCoolNonNullName");
         assertThat(results.get(1).getName()).isEqualTo("beCoolNonNullName");
         assertThat(results.get(2).getName()).isEqualTo("coolNonNullName");
         assertThat(results.get(3).getName()).isEqualTo("yourCoolNonNullName");

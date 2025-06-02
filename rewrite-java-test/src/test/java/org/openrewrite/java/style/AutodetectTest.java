@@ -20,12 +20,9 @@ import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
-import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored", "PointlessBooleanExpression"})
@@ -438,7 +435,7 @@ class AutodetectTest implements RewriteTest {
         var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
 
 
-        assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
+        assertThat(importLayout.getLayout().getFirst()).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
         assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(2))
@@ -496,7 +493,7 @@ class AutodetectTest implements RewriteTest {
         cus.forEach(detector::sample);
         var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
 
-        assertThat(importLayout.getLayout().get(0))
+        assertThat(importLayout.getLayout().getFirst())
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
           .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("com\\.example\\..+"));

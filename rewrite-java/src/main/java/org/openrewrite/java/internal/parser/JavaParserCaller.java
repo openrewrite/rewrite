@@ -59,7 +59,10 @@ class JavaParserCaller {
                         @Override
                         public boolean test(Class<?> c1) {
                             if (c1.getName().equals(JavaParser.class.getName()) ||
-                                c1.getName().equals(JavaParser.Builder.class.getName())) {
+                                c1.getName().equals(JavaParser.Builder.class.getName()) ||
+                                // FIXME this is a hack
+                                c1.getName().equals("org.openrewrite.gradle.GradleParser") ||
+                                c1.getName().equals("org.openrewrite.gradle.GradleParser$Builder")) {
                                 parserOrBuilderFound = true;
                                 return false;
                             }

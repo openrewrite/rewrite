@@ -160,7 +160,7 @@ class NewClassTest implements RewriteTest {
               
               class Test {
                   List<Integer> l = new ArrayList<Integer>() {
-                      /** Javadoc */
+                      /* Javadoc */
                       @Override
                       public boolean isEmpty() {
                           return false;
@@ -187,7 +187,7 @@ class NewClassTest implements RewriteTest {
                   void method() {
                       Arrays.sort(new ArrayList[]{new ArrayList<File>()}, new Comparator<Object>() {
                           long time1, time2;
-                  
+              
                           @Override
                           public int compare(Object o1, Object o2) {
                               time1 = ((File) o1).lastModified();
@@ -196,6 +196,82 @@ class NewClassTest implements RewriteTest {
                           }
                       });
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody1() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  Object o = new Object() {;;;;;
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      }
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody1WithComment() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  Object o = new Object() {    /*~~>*/    ; /*<~~*/
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      }
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody2() {
+        rewriteRun(
+          java(
+            """
+              class B {
+                  Object o = new Object() {
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      };;;;
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody2WithComment() {
+        rewriteRun(
+          java(
+            """
+              class B {
+                  Object o = new Object() {
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      }     /*~~>*/    ; /*<~~*/
+                  };
               }
               """
           )

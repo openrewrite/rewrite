@@ -26,9 +26,7 @@ import org.openrewrite.Recipe;
 public class DependenciesInUse extends DataTable<DependenciesInUse.Row> {
 
     public DependenciesInUse(Recipe recipe) {
-        super(recipe, Row.class,
-                DependenciesInUse.class.getName(),
-                "Dependencies in use", "Direct and transitive dependencies in use.");
+        super(recipe, "Dependencies in use", "Direct and transitive dependencies in use.");
     }
 
     @Value

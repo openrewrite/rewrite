@@ -30,31 +30,6 @@ class AddManagedDependencyVisitorTest implements RewriteTest {
           "import","pom",null)));
     }
 
-    @Test
-    void alreadyExists() {
-        rewriteRun(
-          pomXml(
-            """
-            <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.apache.logging.log4j</groupId>
-                            <artifactId>log4j-bom</artifactId>
-                            <version>2.17.0</version>
-                            <type>pom</type>
-                        </dependency>
-                    </dependencies>
-                </dependencyManagement>
-            </project>
-            """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void newDependencyManagementTag() {
@@ -80,6 +55,31 @@ class AddManagedDependencyVisitorTest implements RewriteTest {
                             <version>2.17.2</version>
                             <type>pom</type>
                             <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
+    void alreadyExists() {
+        rewriteRun(
+          pomXml(
+            """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-bom</artifactId>
+                            <version>2.17.0</version>
+                            <type>pom</type>
                         </dependency>
                     </dependencies>
                 </dependencyManagement>

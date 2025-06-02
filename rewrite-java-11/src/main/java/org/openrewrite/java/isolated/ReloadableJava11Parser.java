@@ -35,10 +35,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.lombok.LombokSupport;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
@@ -48,17 +48,11 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.processing.Processor;
-import javax.tools.JavaFileManager;
-import javax.tools.JavaFileObject;
-import javax.tools.SimpleJavaFileObject;
-import javax.tools.StandardLocation;
+import javax.tools.*;
 import java.io.*;
-import java.lang.reflect.Constructor;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -66,7 +60,6 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -123,63 +116,17 @@ public class ReloadableJava11Parser implements JavaParser {
         // for all other source files and unaffected nodes within the same file.
         Options.instance(context).put("should-stop.ifError", "GENERATE");
 
-        LOMBOK:
-        if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
-                classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
-            Processor lombokProcessor = null;
+        annotationProcessors = new ArrayList<>(1);
+        if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             try {
-                // https://projectlombok.org/contributing/lombok-execution-path
-                List<String> overrideClasspath = new ArrayList<>();
-                for (Path part : classpath) {
-                    if (part.toString().contains("lombok")) {
-                        overrideClasspath.add(part.toString());
-                    }
+                Processor lombokProcessor = LombokSupport.createLombokProcessor(getClass().getClassLoader());
+                if (lombokProcessor != null) {
+                    Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
+                    annotationProcessors.add(lombokProcessor);
                 }
-                // make sure the rewrite-java-lombok dependency comes first
-                boolean found = false;
-                for (int i = 0; i < overrideClasspath.size(); i++) {
-                    if (overrideClasspath.get(i).contains("rewrite-java-lombok")) {
-                        overrideClasspath.add(0, overrideClasspath.remove(i));
-                        found = true;
-                    }
-                }
-                if (!found) {
-                    // try to find `rewrite-java-lombok` using class loader
-                    URL resource = getClass().getClassLoader().getResource("org/openrewrite/java/lombok/OpenRewriteConfigurationKeysLoader.class");
-                    if (resource != null && resource.getProtocol().equals("jar") && resource.getPath().startsWith("file:")) {
-                        String path = Paths.get(URI.create(resource.getPath().substring(0, resource.getPath().indexOf("!")))).toString();
-                        overrideClasspath.add(0, path);
-                    } else {
-                        break LOMBOK;
-                    }
-                }
-                System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
-
-                Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, getClass().getClassLoader());
-                Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
-                        Class.forName("java.lang.ClassLoader"),
-                        Class.forName("java.lang.String"),
-                        Class.forName("java.lang.String"),
-                        Class.forName("java.util.List"),
-                        Class.forName("java.util.List"));
-                shadowLoaderConstructor.setAccessible(true);
-
-                ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
-                        getClass().getClassLoader(),
-                        "lombok",
-                        null,
-                        emptyList(),
-                        singletonList("lombok.patcher.Symbols")
-                );
-                lombokProcessor = (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
-                Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
             } catch (ReflectiveOperationException ignore) {
                 // Lombok was not found or could not be initialized
-            } finally {
-                annotationProcessors = lombokProcessor != null ? singletonList(lombokProcessor) : emptyList();
             }
-        } else {
-            annotationProcessors = emptyList();
         }
 
         // MUST be created ahead of compiler construction
@@ -255,7 +202,8 @@ public class ReloadableJava11Parser implements JavaParser {
 
     LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
         if (classpath != null) { // override classpath
-            if (context.get(JavaFileManager.class) != pfm) {
+            // Lombok is expected to replace the file manager with its own, so we need to check for that
+            if (context.get(JavaFileManager.class) != pfm && (annotationProcessors.isEmpty() || !(context.get(JavaFileManager.class) instanceof ForwardingJavaFileManager))) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
             }
 
@@ -292,11 +240,16 @@ public class ReloadableJava11Parser implements JavaParser {
                 if (!annotationProcessors.isEmpty()) {
                     compiler.processAnnotations(jcCompilationUnits, emptyList());
                 }
-                compiler.attribute(compiler.todo);
             } catch (Throwable t) {
-                // when symbol entering fails on problems like missing types, attribution can often times proceed
-                // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
-                ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
+                handleParsingException(ctx, t);
+            }
+
+            while (!compiler.todo.isEmpty()) {
+                try {
+                    compiler.attribute(compiler.todo);
+                } catch (Throwable t) {
+                    handleParsingException(ctx, t);
+                }
             }
         } catch (IllegalStateException e) {
             if ("endPosTable already set".equals(e.getMessage())) {
@@ -307,6 +260,12 @@ public class ReloadableJava11Parser implements JavaParser {
             throw e;
         }
         return cus;
+    }
+
+    private void handleParsingException(ExecutionContext ctx, Throwable t) {
+        // when symbol entering fails on problems like missing types, attribution can often times proceed
+        // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
+        ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
     }
 
     @Override

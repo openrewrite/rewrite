@@ -1,11 +1,11 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Moderne Source Available License (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://docs.moderne.io/licensing/moderne-source-available-license
+ * https://www.apache.org/licenses/LICENSE-2.0
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,7 +24,6 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-@Deprecated(forRemoval = true)
 class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
 
     @Override
@@ -118,7 +117,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       <release.version>17</release.version>
                   </properties>
               </project>
-              """)
+              """
+          )
         );
     }
 
@@ -162,7 +162,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                         <release.version>17</release.version>
                     </properties>
                 </project>
-                """),
+                """
+            ),
             mavenProject("example-child",
                 //language=xml
                 pomXml(
@@ -181,6 +182,153 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       """
                 )
             )
+        );
+    }
+
+
+    @Test
+    void updateChildProperty() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>example-parent</artifactId>
+                  <version>1.0.0</version>
+                  <modelVersion>4.0</modelVersion>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.8.0</version>
+                              <configuration>
+                                  <source>${java.version}</source>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          ),
+          mavenProject("example-child",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>example-parent</artifactId>
+                        <version>1.0.0</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>example-child</artifactId>
+                    <version>1.0.0</version>
+                    <modelVersion>4.0</modelVersion>
+                    <properties>
+                        <java.version>11</java.version>
+                    </properties>
+                </project>
+                """,
+              """
+                <project>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>example-parent</artifactId>
+                        <version>1.0.0</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>example-child</artifactId>
+                    <version>1.0.0</version>
+                    <modelVersion>4.0</modelVersion>
+                    <properties>
+                        <java.version>17</java.version>
+                    </properties>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doNotCrashOnImplicitVersion() {
+        rewriteRun(
+          mavenProject("spring-cloud-kubernetes",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <parent>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-build</artifactId>
+                        <version>4.1.5</version>
+                        <relativePath/>
+                    </parent>
+                
+                    <artifactId>spring-cloud-kubernetes</artifactId>
+                    <version>3.1.5</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>spring-cloud-kubernetes-integration-tests</module>
+                    </modules>
+                
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-compiler-plugin</artifactId>
+                                <inherited>true</inherited>
+                                <configuration>
+                                    <source>17</source>
+                                    <target>17</target>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>""")
+          ),
+          mavenProject("spring-cloud-kubernetes-integration-tests",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-kubernetes</artifactId>
+                        <version>3.1.5</version>
+                    </parent>
+                
+                    <artifactId>spring-cloud-kubernetes-integration-tests</artifactId>
+                    <packaging>pom</packaging>
+                
+                    <name>Spring Cloud Kubernetes :: Integration Tests</name>
+                    <description>Integration tests where SCK applications are run inside a Kubernetes cluster</description>
+                
+                    <modules>
+                        <module>spring-cloud-kubernetes-k8s-client-discovery-server</module>
+                    </modules>
+                </project>""")
+          ),
+          mavenProject("spring-cloud-kubernetes-k8s-client-discovery-server",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <artifactId>spring-cloud-kubernetes-integration-tests</artifactId>
+                        <groupId>org.springframework.cloud</groupId>
+                        <version>3.1.5</version>
+                    </parent>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <artifactId>spring-cloud-kubernetes-k8s-client-discovery-server</artifactId>
+                
+                </project>"""
+            )
+          )
         );
     }
 

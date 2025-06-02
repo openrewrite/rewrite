@@ -73,7 +73,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                     </dependency>
                 </dependencies>
             </project>
-            """)
+            """
+          )
         );
     }
 
@@ -95,7 +96,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                     </dependency>
                 </dependencies>
             </project>
-            """)
+            """
+          )
         );
     }
 }

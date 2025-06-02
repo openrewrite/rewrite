@@ -18,10 +18,13 @@ package org.openrewrite;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.marker.BuildMetadata;
 import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.table.ParseFailures;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Objects;
 
 @Value
@@ -48,6 +51,13 @@ public class FindParseFailures extends Recipe {
     @Nullable
     String stackTrace;
 
+    @Option(displayName = "Created after",
+            description = "Only report on source files that were created after this date.",
+            example = "2025-01-01",
+            required = false)
+    @Nullable
+    String createdAfter;
+
     transient ParseFailures failures = new ParseFailures(this);
 
     @Override
@@ -62,8 +72,35 @@ public class FindParseFailures extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(Validated.test("createdAfter", "Must be empty or a valid date of format yyyy-MM-dd", createdAfter, date -> {
+            if (date != null && !date.isEmpty()) {
+                try {
+                    LocalDate.parse(date);
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+            return true;
+        }));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new TreeVisitor<Tree, ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> precondition = new TreeVisitor<Tree, ExecutionContext>() {
+            final long createdAfterEpoch = createdAfter == null ? -1L : LocalDate.parse(createdAfter).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli();
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                return createdAfterEpoch == -1L || tree != null && tree.getMarkers().findFirst(BuildMetadata.class)
+                        .map(BuildMetadata::getMetadata)
+                        .map(m -> m.get("createdAt"))
+                        .map(Long::parseLong)
+                        .map(t -> t >= createdAfterEpoch)
+                        .orElse(false) ? null : tree;
+            }
+        };
+        return Preconditions.check(precondition, new TreeVisitor<Tree, ExecutionContext>() {
 
             @Override
             public Tree postVisit(Tree tree, ExecutionContext ctx) {
@@ -117,6 +154,6 @@ public class FindParseFailures extends Recipe {
 
                 return Markup.info(tree, exceptionResult.getMessage());
             }
-        };
+        });
     }
 }

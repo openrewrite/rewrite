@@ -192,7 +192,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              foo(String.class)
+              foo(String    .class)
               """
           )
         );
@@ -225,6 +225,18 @@ class MethodInvocationTest implements RewriteTest {
               
               new Test().child.acceptsClosure {}
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4116")
+    @Test
+    void closureWithGString() {
+        rewriteRun(
+          groovy(
+            """
+            { x -> "${x.y}" }
+            """
           )
         );
     }
@@ -453,6 +465,21 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void topLevelCallWithoutReceiver() {
+        rewriteRun(
+          groovy(
+            """
+              from('timer:groovy?period=1000')
+                  .setBody()
+                      .constant('Hello Camel K')
+                  .setBody()
+                      .simple('body - header.RandomValue')
+              """
+          )
+        );
+    }
+
+    @Test
     void insideParenthesesWithNewline() {
         rewriteRun(
           groovy(
@@ -486,6 +513,21 @@ class MethodInvocationTest implements RewriteTest {
             """
               ((((
                 something(a)
+              ))))
+              """
+          )
+        );
+    }
+
+    @Test
+    void insideFourParenthesesAndEntersWithCommentWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              ((/* comment :-) ((
+              */((
+                // :-((
+                /*)*/something(a)
               ))))
               """
           )

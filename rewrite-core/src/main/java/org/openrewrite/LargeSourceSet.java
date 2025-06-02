@@ -68,7 +68,7 @@ public interface LargeSourceSet {
      * @param map A transformation on T
      * @return A new source set if the map function results in any changes, otherwise this source set is returned.
      */
-    LargeSourceSet edit(UnaryOperator<SourceFile> map);
+    LargeSourceSet edit(UnaryOperator<@Nullable SourceFile> map);
 
     /**
      * Concatenate new items. Where possible, implementations should not iterate the entire source set in order

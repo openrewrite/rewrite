@@ -16,18 +16,20 @@
 package org.openrewrite.java.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
+import lombok.Setter;
 import lombok.Value;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 
 @JsonIgnoreType
+@Setter
 public class MethodCalls extends DataTable<MethodCalls.Row> {
+    private transient boolean enabled = true;
 
     public MethodCalls(Recipe recipe) {
-        super(recipe,
-                "Method calls",
-                "The text of matching method invocations.");
+        super(recipe, "Method calls", "The text of matching method invocations.");
     }
 
     @Value
@@ -51,5 +53,12 @@ public class MethodCalls extends DataTable<MethodCalls.Row> {
         @Column(displayName = "Argument types",
                 description = "The argument types of the method call.")
         String argumentTypes;
+    }
+
+    @Override
+    public void insertRow(ExecutionContext ctx, Row row) {
+        if (enabled) {
+            super.insertRow(ctx, row);
+        }
     }
 }

@@ -88,6 +88,6 @@ class LocalMavenArtifactCacheTest {
         MavenResolutionResult mavenModel = parsed.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
         assertThat(mavenModel.getDependencies()).isNotEmpty();
         List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
-        return runtimeDependencies.get(0);
+        return runtimeDependencies.getFirst();
     }
 }

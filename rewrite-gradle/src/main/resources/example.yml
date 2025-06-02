@@ -1,0 +1,1254 @@
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.AddJUnitPlatformLauncher
+examples:
+  - description: ''
+    sources:
+      - before: |
+          import org.junit.jupiter.api.Test;
+          public class A {
+              @Test
+              void foo() {
+              }
+          }
+        language: java
+      - before: |
+          plugins {
+              id "java-library"
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+        path: build.gradle
+        language: groovy
+      - before: project
+        language: mavenProject
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeDependency
+examples:
+  - description: ''
+    parameters:
+      - commons-lang
+      - commons-lang
+      - org.apache.commons
+      - commons-lang3
+      - 3.11.x
+      - 'null'
+      - 'null'
+    sources:
+      - before: |
+          plugins {
+              id "java-library"
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              implementation "commons-lang:commons-lang:2.6"
+              implementation group: "commons-lang", name: "commons-lang", version: "2.6"
+          }
+        after: |
+          plugins {
+              id "java-library"
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              implementation "org.apache.commons:commons-lang3:3.11"
+              implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeDependencyArtifactId
+examples:
+  - description: ''
+    parameters:
+      - org.springframework.boot
+      - spring-boot-starter
+      - new-starter
+      - ''
+    sources:
+      - before: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              implementation 'org.springframework.boot:spring-boot-starter:2.5.4'
+          }
+        after: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              implementation 'org.springframework.boot:new-starter:2.5.4'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeDependencyClassifier
+examples:
+  - description: ''
+    parameters:
+      - org.openrewrite
+      - '*'
+      - classified
+      - ''
+    sources:
+      - before: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              api 'org.openrewrite:rewrite-gradle:latest.release:javadoc'
+          }
+        after: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              api 'org.openrewrite:rewrite-gradle:latest.release:classified'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeDependencyConfiguration
+examples:
+  - description: ''
+    parameters:
+      - org.openrewrite
+      - '*'
+      - implementation
+      - ''
+    sources:
+      - before: |
+          plugins {
+              id 'java-library'
+          }
+          repositories {
+              mavenCentral()
+          }
+          dependencies {
+              api 'org.openrewrite:rewrite-gradle:latest.release'
+          }
+        after: |
+          plugins {
+              id 'java-library'
+          }
+          repositories {
+              mavenCentral()
+          }
+          dependencies {
+              implementation 'org.openrewrite:rewrite-gradle:latest.release'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeDependencyExtension
+examples:
+  - description: ''
+    parameters:
+      - org.openrewrite
+      - '*'
+      - war
+      - ''
+    sources:
+      - before: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              api 'org.openrewrite:rewrite-gradle:latest.integration@jar'
+          }
+        after: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              api 'org.openrewrite:rewrite-gradle:latest.integration@war'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeDependencyGroupId
+examples:
+  - description: ''
+    parameters:
+      - org.springframework.boot
+      - spring-boot-starter
+      - org.newboot
+      - ''
+    sources:
+      - before: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              implementation 'org.springframework.boot:spring-boot-starter:2.5.4'
+          }
+        after: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              implementation 'org.newboot:spring-boot-starter:2.5.4'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeExtraProperty
+examples:
+  - description: ''
+    parameters:
+      - foo
+      - baz
+    sources:
+      - before: |
+          buildscript {
+              ext {
+                  foo = "bar"
+              }
+          }
+          ext {
+              foo = "bar"
+          }
+        after: |
+          buildscript {
+              ext {
+                  foo = "baz"
+              }
+          }
+          ext {
+              foo = "baz"
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.DependencyConstraintToRule
+examples:
+  - description: ''
+    sources:
+      - before: |
+          plugins {
+              id 'java'
+          }
+          repositories { mavenCentral() }
+          dependencies {
+              constraints {
+                  implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                      because 'CVE-2024-BAD'
+                  }
+              }
+              implementation 'org.openrewrite:rewrite-java:7.0.0'
+          }
+        after: |
+          plugins {
+              id 'java'
+          }
+          repositories { mavenCentral() }
+          configurations.all {
+              resolutionStrategy.eachDependency { details ->
+                  if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
+                      details.useVersion('2.12.5')
+                      details.because('CVE-2024-BAD')
+                  }
+              }
+          }
+          dependencies {
+              implementation 'org.openrewrite:rewrite-java:7.0.0'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.DependencyUseMapNotation
+examples:
+  - description: ''
+    sources:
+      - before: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              api('org.openrewrite:rewrite-core:latest.release')
+              implementation "org.openrewrite:rewrite-core:latest.release"
+          }
+        after: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
+              implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.DependencyUseStringNotation
+examples:
+  - description: ''
+    sources:
+      - before: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
+              implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
+          }
+        after: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              api("org.openrewrite:rewrite-core:latest.release")
+              implementation "org.openrewrite:rewrite-core:latest.release"
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.EnableDevelocityBuildCache
+examples:
+  - description: ''
+    parameters:
+      - 'true'
+      - System.getenv("CI") != null
+    sources:
+      - before: |
+          plugins {
+              id 'com.gradle.develocity' version '3.17.6'
+          }
+          develocity {
+              server = 'https://dev.example.com/'
+          }
+        after: |
+          plugins {
+              id 'com.gradle.develocity' version '3.17.6'
+          }
+          develocity {
+              server = 'https://dev.example.com/'
+              buildCache {
+                  remote(develocity.buildCache) {
+                      enabled = true
+                      push = System.getenv("CI") != null
+                  }
+              }
+          }
+        language: settingsGradle
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.RemoveDependency
+examples:
+  - description: ''
+    parameters:
+      - org.springframework.boot
+      - spring-boot*
+      - 'null'
+    sources:
+      - before: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
+              testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+          }
+        after: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.RemoveEnableFeaturePreview
+examples:
+  - description: ''
+    parameters:
+      - ONE_LOCKFILE_PER_PROJECT
+    sources:
+      - before: |
+          pluginManagement {
+              repositories {
+                  gradlePluginPortal()
+              }
+          }
+          
+          rootProject.name = 'merge-service'
+          enableFeaturePreview('ONE_LOCKFILE_PER_PROJECT')
+        after: |
+          pluginManagement {
+              repositories {
+                  gradlePluginPortal()
+              }
+          }
+          
+          rootProject.name = 'merge-service'
+        language: settingsGradle
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.RemoveRedundantDependencyVersions
+examples:
+  - description: ''
+    parameters:
+      - 'null'
+      - 'null'
+      - 'null'
+      - 'null'
+    sources:
+      - before: |
+          plugins {
+              id "java"
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+              implementation("org.apache.commons:commons-lang3:3.14.0")
+          }
+        after: |
+          plugins {
+              id "java"
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+              implementation("org.apache.commons:commons-lang3")
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.RemoveRepository
+examples:
+  - description: ''
+    parameters:
+      - jcenter
+    sources:
+      - before: |
+          repositories {
+              jcenter()
+          }
+        after: "repositories {\n    \n}\n"
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.UpdateGradleWrapper
+examples:
+  - description: Update existing Gradle wrapper
+    parameters:
+      - 7.4.2
+      - 'null'
+      - 'null'
+      - 'null'
+      - 'null'
+    sources:
+      - before: |
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-7.4-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+        after: |
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+        language: properties
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.UpdateJavaCompatibility
+examples:
+  - description: ''
+    parameters:
+      - '11'
+      - UpdateJavaCompatibility.CompatibilityType.source
+      - 'null'
+      - 'null'
+      - 'null'
+    sources:
+      - before: |
+          plugins {
+              id "java"
+          }
+          
+          sourceCompatibility = 1.8
+          targetCompatibility = 1.8
+        after: |
+          plugins {
+              id "java"
+          }
+          
+          sourceCompatibility = 11
+          targetCompatibility = 1.8
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.UpgradeDependencyVersion
+examples:
+  - description: ''
+    parameters:
+      - com.google.guava
+      - guava
+      - 30.x
+      - -jre
+    sources:
+      - before: |
+          plugins {
+            id 'java-library'
+          }
+          
+          repositories {
+            mavenCentral()
+          }
+          
+          dependencies {
+            compileOnly 'com.google.guava:guava:29.0-jre'
+            runtimeOnly ('com.google.guava:guava:29.0-jre')
+          }
+        after: |
+          plugins {
+            id 'java-library'
+          }
+          
+          repositories {
+            mavenCentral()
+          }
+          
+          dependencies {
+            compileOnly 'com.google.guava:guava:30.1.1-jre'
+            runtimeOnly ('com.google.guava:guava:30.1.1-jre')
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.UpgradeTransitiveDependencyVersion
+examples:
+  - description: ''
+    parameters:
+      - com.fasterxml*
+      - jackson-core
+      - 2.12.5
+      - 'null'
+      - CVE-2024-BAD
+      - 'null'
+    sources:
+      - before: |
+          plugins {
+            id 'java'
+          }
+          repositories { mavenCentral() }
+          
+          dependencies {
+              implementation 'org.openrewrite:rewrite-java:7.0.0'
+          }
+        after: |
+          plugins {
+            id 'java'
+          }
+          repositories { mavenCentral() }
+          
+          dependencies {
+              constraints {
+                  implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                      because 'CVE-2024-BAD'
+                  }
+              }
+          
+              implementation 'org.openrewrite:rewrite-java:7.0.0'
+          }
+        path: build.gradle
+        language: groovy
+  - description: ''
+    parameters:
+      - org.apache.commons
+      - commons-lang3
+      - 3.14.0
+      - 'null'
+      - 'null'
+      - List.of("implementation", "runtimeOnly")
+    sources:
+      - before: |
+          plugins {
+              id 'info.solidsoft.pitest' version '1.15.0'
+              id 'java'
+          }
+          repositories { mavenCentral() }
+          dependencies {
+              compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+          }
+        after: |
+          plugins {
+              id 'info.solidsoft.pitest' version '1.15.0'
+              id 'java'
+          }
+          repositories { mavenCentral() }
+          dependencies {
+              constraints {
+                  implementation('org.apache.commons:commons-lang3:3.14.0')
+              }
+          
+              compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle8.JacocoReportDeprecations
+examples:
+  - description: ''
+    sources:
+      - before: |+
+          plugins {
+              id "java"
+              id "jacoco"
+          }
+          
+          jacocoTestReport {
+              reports {
+                  xml.enabled = false
+                  csv.enabled = true
+                  html.enabled = false
+              }
+          }
+
+        after: |+
+          plugins {
+              id "java"
+              id "jacoco"
+          }
+          
+          jacocoTestReport {
+              reports {
+                  xml.required = false
+                  csv.required = true
+                  html.required = false
+              }
+          }
+
+        path: build.gradle
+        language: groovy
+  - description: ''
+    sources:
+      - before: |+
+          plugins {
+              id "java"
+              id "jacoco"
+          }
+          
+          jacocoTestReport {
+              reports {
+                  xml.destination = layout.buildDirectory.dir('jacocoXml')
+                  csv.destination = layout.buildDirectory.dir('jacocoCsv')
+                  html.destination = layout.buildDirectory.dir('jacocoHtml')
+              }
+          }
+
+        after: |+
+          plugins {
+              id "java"
+              id "jacoco"
+          }
+          
+          jacocoTestReport {
+              reports {
+                  xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
+                  csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
+                  html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
+              }
+          }
+
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.plugins.AddBuildPlugin
+examples:
+  - description: ''
+    parameters:
+      - java-library
+      - 'null'
+      - 'null'
+      - 'null'
+      - 'null'
+    sources:
+      - after: |
+          plugins {
+              id 'java-library'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.plugins.AddSettingsPluginRepository
+examples:
+  - description: ''
+    parameters:
+      - maven
+      - https://repo.example.com/snapshots
+    sources:
+      - after: |
+          pluginManagement {
+              repositories {
+                  maven {
+                      url = "https://repo.example.com/snapshots"
+                  }
+              }
+          }
+        language: settingsGradle
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.plugins.ChangePlugin
+examples:
+  - description: ''
+    parameters:
+      - org.openrewrite.rewrite
+      - io.moderne.rewrite
+      - 0.x
+    sources:
+      - before: |
+          plugins {
+              id "org.openrewrite.rewrite" version "6.0.0"
+          }
+        after: |
+          plugins {
+              id "io.moderne.rewrite" version "0.39.0"
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.plugins.ChangePluginVersion
+examples:
+  - description: ''
+    parameters:
+      - org.openrewrite.rewrite
+      - 5.x
+      - 'null'
+    sources:
+      - before: |
+          pluginManagement {
+              plugins {
+                  String v = '5.40.0'
+                  id 'org.openrewrite.rewrite' version v
+              }
+          }
+        after: |
+          pluginManagement {
+              plugins {
+                  String v = '5.40.0'
+                  id 'org.openrewrite.rewrite' version '5.40.6'
+              }
+          }
+        language: settingsGradle
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.plugins.MigrateGradleEnterpriseToDevelocity
+examples:
+  - description: ''
+    parameters:
+      - 3.17.x
+    sources:
+      - before: |
+          plugins {
+              id 'com.gradle.enterprise' version '3.16'
+          }
+          gradleEnterprise {
+              server = 'https://ge.sam.com/'
+              allowUntrustedServer = true
+              buildScan {
+                  publishAlways()
+                  uploadInBackground = true
+                  capture {
+                      taskInputFiles = true
+                  }
+              }
+              buildCache {
+                  remote(gradleEnterprise.buildCache) {
+                      enabled = true
+                      push = System.getenv("CI") != null
+                  }
+              }
+          }
+        after: |
+          plugins {
+              id 'com.gradle.develocity' version '3.17.6'
+          }
+          develocity {
+              server = 'https://ge.sam.com/'
+              allowUntrustedServer = true
+              buildScan {
+                  uploadInBackground = true
+                  capture {
+                      fileFingerprints = true
+                  }
+              }
+              buildCache {
+                  remote(develocity.buildCache) {
+                      enabled = true
+                      push = System.getenv("CI") != null
+                  }
+              }
+          }
+        language: settingsGradle
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.plugins.RemoveBuildPlugin
+examples:
+  - description: ''
+    parameters:
+      - com.jfrog.bintray
+    sources:
+      - before: |
+          plugins {
+              id "com.jfrog.bintray" version "1.0"
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.plugins.RemoveDevelocity
+examples:
+  - description: ''
+    sources:
+      - before: |
+          plugins {
+              id 'com.gradle.enterprise' version '3.16'
+          }
+          gradleEnterprise {
+              server = 'https://ge.sam.com/'
+              allowUntrustedServer = true
+              buildScan {
+                  publishAlways()
+                  uploadInBackground = true
+                  capture {
+                      taskInputFiles = true
+                  }
+              }
+              buildCache {
+                  remote(gradleEnterprise.buildCache) {
+                      enabled = true
+                      push = System.getenv("CI") != null
+                  }
+              }
+          }
+        language: settingsGradle
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.plugins.RemoveSettingsPlugin
+examples:
+  - description: ''
+    parameters:
+      - com.gradle.enterprise
+    sources:
+      - before: |
+          plugins {
+              id "com.gradle.enterprise" version "3.12.0"
+          }
+        language: settingsGradle
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.plugins.UpgradePluginVersion
+examples:
+  - description: Upgrading a build plugin
+    parameters:
+      - org.openrewrite.rewrite
+      - latest.patch
+      - 'null'
+    sources:
+      - before: |
+          plugins {
+              id 'org.openrewrite.rewrite' version '5.40.0'
+              id 'com.github.johnrengelman.shadow' version '6.1.0'
+          }
+        after: |
+          plugins {
+              id 'org.openrewrite.rewrite' version '5.40.6'
+              id 'com.github.johnrengelman.shadow' version '6.1.0'
+          }
+        path: build.gradle
+        language: groovy
+  - description: Upgrading a settings plugin
+    parameters:
+      - com.gradle.enterprise
+      - 3.10.x
+      - 'null'
+    sources:
+      - before: |
+          plugins {
+              id 'com.gradle.enterprise' version '3.10'
+          }
+        after: |
+          plugins {
+              id 'com.gradle.enterprise' version '3.10.3'
+          }
+        language: settingsGradle
+  - description: Upgrading a build plugin with version in gradle.properties
+    parameters:
+      - org.openrewrite.rewrite
+      - 5.40.x
+      - 'null'
+    sources:
+      - before: |
+          rewriteVersion=5.40.0
+        after: |
+          rewriteVersion=5.40.6
+        language: properties
+      - before: |
+          plugins {
+              id 'org.openrewrite.rewrite' version "$rewriteVersion"
+              id 'com.github.johnrengelman.shadow' version '6.1.0'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.search.DependencyInsight
+examples:
+  - description: ''
+    parameters:
+      - com.google.guava
+      - failureaccess
+      - 'null'
+      - 'null'
+    sources:
+      - before: |
+          plugins {
+              id 'java-library'
+          }
+          repositories {
+              mavenCentral()
+          }
+          dependencies {
+              implementation 'com.google.guava:guava:31.1-jre'
+          }
+        after: |
+          plugins {
+              id 'java-library'
+          }
+          repositories {
+              mavenCentral()
+          }
+          dependencies {
+              /*~~(com.google.guava:failureaccess:1.0.1)~~>*/implementation 'com.google.guava:guava:31.1-jre'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.search.FindDependency
+examples:
+  - description: ''
+    parameters:
+      - org.openrewrite
+      - rewrite-core
+      - api
+    sources:
+      - before: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              api "org.openrewrite:rewrite-core:latest.release"
+          }
+        after: |
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          dependencies {
+              /*~~>*/api "org.openrewrite:rewrite-core:latest.release"
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.search.FindGradleWrapper
+examples:
+  - description: ''
+    parameters:
+      - '[6,)'
+      - 'null'
+      - 'null'
+    sources:
+      - before: |
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-all.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+        after: |
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          ~~>distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-all.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+        language: properties
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.search.FindPlugins
+examples:
+  - description: ''
+    parameters:
+      - org.openrewrite.rewrite
+      - org.openrewrite.gradle.RewritePlugin
+    sources:
+      - before: |
+          plugins {
+              id 'java'
+              id 'org.openrewrite.rewrite' version '6.18.0'
+          }
+        after: |
+          plugins {
+              id 'java'
+              /*~~>*/id 'org.openrewrite.rewrite' version '6.18.0'
+          }
+        path: build.gradle
+        language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.search.FindRepository
+examples:
+  - description: ''
+    parameters:
+      - 'null'
+      - https://oss.sonatype.org/content/repositories/snapshots
+      - 'null'
+    sources:
+      - before: |
+          buildscript {
+            repositories {
+              maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+              maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
+              maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
+              maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+            }
+          }
+          
+          repositories {
+            maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+            maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
+            maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
+            maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+          }
+        after: |
+          buildscript {
+            repositories {
+              /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+              /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
+              /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
+              /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+            }
+          }
+          
+          repositories {
+            /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+            /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
+            /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
+            /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+          }
+        path: build.gradle
+        language: groovy
+      - before: |
+          pluginManagement {
+            repositories {
+              maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+              maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
+              maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
+              maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+            }
+          }
+        after: |
+          pluginManagement {
+            repositories {
+              /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+              /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
+              /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
+              /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+            }
+          }
+        language: settingsGradle
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.search.ModuleHasPlugin
+examples:
+  - description: ''
+    parameters:
+      - org.openrewrite.rewrite
+      - org.openrewrite.gradle.RewritePlugin
+    sources:
+      - before: |
+          include 'project-applies-openrewrite-plugin'
+          include 'other-project'
+        language: settingsGradle
+      - before: |
+          plugins {
+              id 'java'
+              id 'org.openrewrite.rewrite' version '6.18.0'
+          }
+        after: |
+          /*~~(Module has plugin: org.openrewrite.rewrite)~~>*/plugins {
+              id 'java'
+              id 'org.openrewrite.rewrite' version '6.18.0'
+          }
+        path: build.gradle
+        language: groovy
+      - before: |
+          class A {}
+        after: |
+          /*~~(Module has plugin: org.openrewrite.rewrite)~~>*/class A {}
+        language: java
+      - before: project-applies-openrewrite-plugin
+        language: mavenProject
+      - before: |
+          plugins {
+              id 'java'
+          }
+        path: build.gradle
+        language: groovy
+      - before: |
+          class B {}
+        language: java
+      - before: other-project
+        language: mavenProject
+      - before: multi-project-build
+        language: mavenProject
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.security.UseHttpsForRepositories
+examples:
+  - description: ''
+    sources:
+      - before: |
+          repositories {
+              maven { url 'http://repo.spring.example.com/libs-release-local' }
+          }
+        after: |
+          repositories {
+              maven { url 'https://repo.spring.example.com/libs-release-local' }
+          }
+        path: build.gradle
+        language: groovy

@@ -19,13 +19,10 @@ import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.*;
 import okhttp3.tls.HandshakeCertificates;
 import okhttp3.tls.HeldCertificate;
-import org.assertj.core.api.Condition;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -33,12 +30,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
-import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.MavenParser;
-import org.openrewrite.maven.MavenSettings;
+import org.openrewrite.maven.*;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.test.RewriteTest;
+import org.openrewrite.xml.tree.Xml;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
@@ -51,16 +47,19 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 
 @SuppressWarnings({"HttpUrlsUsage"})
-class MavenPomDownloaderTest {
+class MavenPomDownloaderTest implements RewriteTest {
+
     @Test
     void ossSonatype() {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
@@ -93,6 +92,60 @@ class MavenPomDownloaderTest {
         assertThat(normalized.getUri()).isEqualTo(expectedUrl);
     }
 
+    /**
+     * Documented in <a href="https://maven.apache.org/guides/mini/guide-multiple-repositories.html">Maven's guide</a>.
+     * Effective Maven settings take precedence over the local effective build POM.
+     */
+    @Test
+    void repositoryOrder() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+          //language=xml
+          """
+            <settings>
+              <profiles>
+                <profile>
+                    <id>customize-repos</id>
+                    <repositories>
+                        <repository>
+                            <id>settings-provided</id>
+                            <url>https://repo.clojars.org</url>
+                        </repository>
+                    </repositories>
+                </profile>
+              </profiles>
+              <activeProfiles>
+                <activeProfile>customize-repos</activeProfile>
+              </activeProfiles>
+            </settings>
+            """
+        ), ctx));
+
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+                  <groupId>org.openrewrite.test</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>0.1.0-SNAPSHOT</version>
+                  <repositories>
+                      <repository>
+                          <id>local-provided</id>
+                          <url>https://oss.sonatype.org/content/repositories/releases</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            spec -> spec.beforeRecipe(pom -> {
+                MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(StreamSupport.stream(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null).spliterator(), false)
+                  .map(MavenRepository::getId))
+                  .containsExactly("settings-provided", "local-provided");
+            }))
+        );
+    }
+
     @Nested
     class WithNativeHttpURLConnectionAndTLS {
         private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
@@ -102,42 +155,13 @@ class MavenPomDownloaderTest {
         @Test
         void centralIdOverridesDefaultRepository() {
             var ctx = MavenExecutionContextView.view(this.ctx);
-            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                                      https://maven.apache.org/xsd/settings-1.0.0.xsd">
-                  <profiles>
-                    <profile>
-                        <id>central</id>
-                        <repositories>
-                            <repository>
-                                <id>central</id>
-                                <url>https://internalartifactrepository.yourorg.com</url>
-                            </repository>
-                        </repositories>
-                    </profile>
-                  </profiles>
-                  <activeProfiles>
-                    <activeProfile>central</activeProfile>
-                  </activeProfiles>
-                </settings>
-                """
-            ), ctx));
-
-            // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
-            for (MavenRepository repository : ctx.getRepositories()) {
-                repository.setKnownToExist(true);
-            }
-
+            var centralOverride = new MavenRepository("repo", "https://google.com/definitelydoesnotexist/", null, null, true, null, null, null, null);
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
-            Collection<MavenRepository> repos = downloader.distinctNormalizedRepositories(emptyList(), null, null);
-            assertThat(repos).areExactly(1, new Condition<>(repo -> "central".equals(repo.getId()),
-              "id \"central\""));
-            assertThat(repos).areExactly(1, new Condition<>(repo -> "https://internalartifactrepository.yourorg.com".equals(repo.getUri()),
-              "URI https://internalartifactrepository.yourorg.com"));
+            try {
+                downloader.download(new GroupArtifactVersion("org.openrewrite", "nonexistent", "7.0.0"), null, null, List.of(centralOverride));
+                Assertions.fail();
+            } catch (MavenDownloadingException ignore) {
+            }
         }
 
         @Test
@@ -176,6 +200,28 @@ class MavenPomDownloaderTest {
         }
 
         @Test
+        void onlyAccessRequiredRepositories() throws MavenDownloadingException {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
+            for (MavenRepository repository : ctx.getRepositories()) {
+                repository.setKnownToExist(true);
+            }
+
+            MavenRepository nonExistentRepo = new MavenRepository("repo", "https://definitelydoesnotexist2.xyz/", null, null, false, null, null, null, null);
+            List<String> attemptedUris = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repositoryAccessFailed(String uri, Throwable e) {
+                    attemptedUris.add(uri);
+                }
+            });
+
+            new MavenPomDownloader(ctx)
+              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, List.of(MAVEN_CENTRAL, nonExistentRepo));
+            assertThat(attemptedUris).isEmpty();
+        }
+
+        @Test
         void listenerRecordsFailedRepositoryAccess() {
             var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
             // Avoid actually trying to reach a made-up URL
@@ -207,10 +253,7 @@ class MavenPomDownloaderTest {
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
               //language=xml
               """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                                      https://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <settings>
                   <mirrors>
                     <mirror>
                       <id>mirror</id>
@@ -575,52 +618,52 @@ class MavenPomDownloaderTest {
         @Test
         void mergeMetadata() throws IOException {
             @Language("xml") String metadata1 = """
-                  <metadata>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot</artifactId>
-                      <versioning>
-                          <versions>
-                              <version>2.3.3</version>
-                              <version>2.4.1</version>
-                              <version>2.4.2</version>
-                          </versions>
-                          <snapshot>
-                              <timestamp>20220927.033510</timestamp>
-                              <buildNumber>223</buildNumber>
-                          </snapshot>
-                          <snapshotVersions>
-                              <snapshotVersion>
-                                  <extension>pom.asc</extension>
-                                  <value>0.1.0-20220927.033510-223</value>
-                                  <updated>20220927033510</updated>
-                              </snapshotVersion>
-                          </snapshotVersions>
-                      </versioning>
-                  </metadata>
+              <metadata>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot</artifactId>
+                  <versioning>
+                      <versions>
+                          <version>2.3.3</version>
+                          <version>2.4.1</version>
+                          <version>2.4.2</version>
+                      </versions>
+                      <snapshot>
+                          <timestamp>20220927.033510</timestamp>
+                          <buildNumber>223</buildNumber>
+                      </snapshot>
+                      <snapshotVersions>
+                          <snapshotVersion>
+                              <extension>pom.asc</extension>
+                              <value>0.1.0-20220927.033510-223</value>
+                              <updated>20220927033510</updated>
+                          </snapshotVersion>
+                      </snapshotVersions>
+                  </versioning>
+              </metadata>
               """;
 
             @Language("xml") String metadata2 = """
-                  <metadata modelVersion="1.1.0">
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot</artifactId>
-                      <versioning>
-                          <versions>
-                              <version>2.3.2</version>
-                              <version>2.3.3</version>
-                          </versions>
-                          <snapshot>
-                              <timestamp>20210115.042754</timestamp>
-                              <buildNumber>180</buildNumber>
-                          </snapshot>
-                          <snapshotVersions>
-                              <snapshotVersion>
-                                  <extension>pom.asc</extension>
-                                  <value>0.1.0-20210115.042754-180</value>
-                                  <updated>20210115042754</updated>
-                              </snapshotVersion>
-                          </snapshotVersions>
-                      </versioning>
-                  </metadata>
+              <metadata modelVersion="1.1.0">
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot</artifactId>
+                  <versioning>
+                      <versions>
+                          <version>2.3.2</version>
+                          <version>2.3.3</version>
+                      </versions>
+                      <snapshot>
+                          <timestamp>20210115.042754</timestamp>
+                          <buildNumber>180</buildNumber>
+                      </snapshot>
+                      <snapshotVersions>
+                          <snapshotVersion>
+                              <extension>pom.asc</extension>
+                              <value>0.1.0-20210115.042754-180</value>
+                              <updated>20210115042754</updated>
+                          </snapshotVersion>
+                      </snapshotVersions>
+                  </versioning>
+              </metadata>
               """;
 
             var m1 = MavenMetadata.parse(metadata1.getBytes());
@@ -632,9 +675,9 @@ class MavenPomDownloaderTest {
             assertThat(merged.getVersioning().getSnapshot().getBuildNumber()).isEqualTo("223");
             assertThat(merged.getVersioning().getVersions()).hasSize(4).contains("2.3.2", "2.3.3", "2.4.1", "2.4.2");
             assertThat(merged.getVersioning().getSnapshotVersions()).hasSize(2);
-            assertThat(merged.getVersioning().getSnapshotVersions().get(0).getExtension()).isNotNull();
-            assertThat(merged.getVersioning().getSnapshotVersions().get(0).getValue()).isNotNull();
-            assertThat(merged.getVersioning().getSnapshotVersions().get(0).getUpdated()).isNotNull();
+            assertThat(merged.getVersioning().getSnapshotVersions().getFirst().getExtension()).isNotNull();
+            assertThat(merged.getVersioning().getSnapshotVersions().getFirst().getValue()).isNotNull();
+            assertThat(merged.getVersioning().getSnapshotVersions().getFirst().getUpdated()).isNotNull();
         }
 
         @Test
@@ -647,11 +690,11 @@ class MavenPomDownloaderTest {
             Files.writeString(localPom,
               //language=xml
               """
-                 <project>
-                   <groupId>com.bad</groupId>
-                   <artifactId>bad-artifact</artifactId>
-                   <version>1</version>
-                 </project>
+                <project>
+                  <groupId>com.bad</groupId>
+                  <artifactId>bad-artifact</artifactId>
+                  <version>1</version>
+                </project>
                 """
             );
 
@@ -678,11 +721,11 @@ class MavenPomDownloaderTest {
             Files.writeString(localPom,
               //language=xml
               """
-                 <project>
-                   <groupId>com.bad</groupId>
-                   <artifactId>bad-artifact</artifactId>
-                   <version>1</version>
-                 </project>
+                <project>
+                  <groupId>com.bad</groupId>
+                  <artifactId>bad-artifact</artifactId>
+                  <version>1</version>
+                </project>
                 """
             );
             Path localJar = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.jar");
@@ -702,7 +745,7 @@ class MavenPomDownloaderTest {
         }
 
         @Test
-        void dontAllowPomDowloadFailureWithoutJar(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
+        void dontAllowPomDownloadFailureWithoutJar(@TempDir Path localRepository) {
             MavenRepository mavenLocal = MavenRepository.builder()
               .id("local")
               .uri(localRepository.toUri().toString())
@@ -716,7 +759,7 @@ class MavenPomDownloaderTest {
         }
 
         @Test
-        void allowPomDowloadFailureWithJar(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
+        void allowPomDownloadFailureWithJar(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
             MavenRepository mavenLocal = MavenRepository.builder()
               .id("local")
               .uri(localRepository.toUri().toString())
@@ -1217,14 +1260,15 @@ class MavenPomDownloaderTest {
         @Test
         @DisplayName("Don't throw exception if there is no pom and but there is a jar for the artifact")
         @Issue("https://github.com/openrewrite/rewrite/issues/4687")
-        void pomNotFoundWithJarFoundShouldntThrow() throws Exception {
+        void pomNotFoundWithJarFoundShouldNotThrow() throws Exception {
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {
                     @Override
                     public MockResponse dispatch(RecordedRequest recordedRequest) {
                         assert recordedRequest.getPath() != null;
-                        if (recordedRequest.getPath().endsWith("fred/fred/1/fred-1.pom"))
+                        if (recordedRequest.getPath().endsWith("fred/fred/1/fred-1.pom")) {
                             return new MockResponse().setResponseCode(404).setBody("");
+                        }
                         return new MockResponse().setResponseCode(200).setBody("some bytes so the jar isn't empty");
                     }
                 });
@@ -1245,4 +1289,34 @@ class MavenPomDownloaderTest {
             }
         }
     }
+
+    @Test
+    void resolveDependencies() throws MavenDownloadingExceptions {
+        Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
+                  <project>
+                      <parent>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-parent</artifactId>
+                          <version>3.2.0</version>
+                          <relativePath/>
+                      </parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>demo</artifactId>
+                      <version>0.0.1-SNAPSHOT</version>
+                      <name>demo</name>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-web</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+        """).toList().getFirst();
+        MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+        resolutionResult = resolutionResult.resolveDependencies(new MavenPomDownloader(Collections.emptyMap(), new InMemoryExecutionContext(), null, null), new InMemoryExecutionContext());
+        List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
+        assertThat(deps).hasSize(35);
+    }
+
+
 }

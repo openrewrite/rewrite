@@ -35,6 +35,19 @@ import static org.openrewrite.java.Assertions.java;
 
 class EmptyNewlineAtEndOfFileTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void autodetectCRLF() {
+        rewriteRun(
+          generalFormat(null),
+          java(
+            "class Test {\r\n}",
+            "class Test {\r\n}\r\n",
+            SourceSpec::noTrim
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> generalFormat(@Nullable Boolean useCRLF) {
         return spec -> {
             spec.recipe(new EmptyNewlineAtEndOfFile());
@@ -57,19 +70,6 @@ class EmptyNewlineAtEndOfFileTest implements RewriteTest {
           java(
             "class Test {}",
             "class Test {}\r\n",
-            SourceSpec::noTrim
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void autodetectCRLF() {
-        rewriteRun(
-          generalFormat(null),
-          java(
-            "class Test {\r\n}",
-            "class Test {\r\n}\r\n",
             SourceSpec::noTrim
           )
         );

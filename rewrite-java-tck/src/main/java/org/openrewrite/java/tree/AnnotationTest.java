@@ -45,14 +45,15 @@ class AnnotationTest implements RewriteTest {
             """
               @SuppressWarnings("ALL")
               public class A {}
-              """, spec -> spec.afterRecipe(cu -> {
-                  J.ClassDeclaration c = cu.getClasses().get(0);
-                  JavaType.Class type = (JavaType.Class) c.getType();
-                  JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
-                  assertThat(a.getValues()).hasSize(1);
-                  assertThat(a.getValues().get(0).getValue()).isEqualTo(singletonList("ALL"));
-              }
-            )
+              """,
+                spec -> spec.afterRecipe(cu -> {
+                            J.ClassDeclaration c = cu.getClasses().get(0);
+                            JavaType.Class type = (JavaType.Class) c.getType();
+                            JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
+                            assertThat(a.getValues()).hasSize(1);
+                            assertThat(a.getValues().get(0).getValue()).isEqualTo(singletonList("ALL"));
+                        }
+                )
           )
         );
     }
@@ -103,7 +104,7 @@ class AnnotationTest implements RewriteTest {
             """
               import java.lang.annotation.Target;
               import static java.lang.annotation.ElementType.*;
-
+              
               @Target({ FIELD, PARAMETER , })
               public @interface Annotation {}
               """
@@ -359,31 +360,32 @@ class AnnotationTest implements RewriteTest {
                   private @interface A2 {
                   }
               }
-              """, spec -> spec.afterRecipe(cu -> {
-                AtomicBoolean firstDimension = new AtomicBoolean(false);
-                AtomicBoolean secondDimension = new AtomicBoolean(false);
-                new JavaIsoVisitor<>() {
-                    @Override
-                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
-                        if (arrayType.getElementType() instanceof J.ArrayType) {
-                            if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
-                                assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A1");
-                                assertThat(arrayType.toString()).isEqualTo("Integer @A1 [] @A2 [ ]");
-                                firstDimension.set(true);
+              """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean firstDimension = new AtomicBoolean(false);
+                    AtomicBoolean secondDimension = new AtomicBoolean(false);
+                    new JavaIsoVisitor<>() {
+                        @Override
+                        public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                            if (arrayType.getElementType() instanceof J.ArrayType) {
+                                if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
+                                    assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A1");
+                                    assertThat(arrayType.toString()).isEqualTo("Integer @A1 [] @A2 [ ]");
+                                    firstDimension.set(true);
+                                }
+                            } else {
+                                if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
+                                    assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A2");
+                                    assertThat(arrayType.toString()).isEqualTo("Integer @A2 [ ]");
+                                    secondDimension.set(true);
+                                }
                             }
-                        } else {
-                            if (arrayType.getAnnotations() != null && !arrayType.getAnnotations().isEmpty()) {
-                                assertThat(arrayType.getAnnotations().get(0).getAnnotationType().toString()).isEqualTo("A2");
-                                assertThat(arrayType.toString()).isEqualTo("Integer @A2 [ ]");
-                                secondDimension.set(true);
-                            }
+                            return super.visitArrayType(arrayType, o);
                         }
-                        return super.visitArrayType(arrayType, o);
-                    }
-                }.visit(cu, 0);
-                assertThat(firstDimension.get()).isTrue();
-                assertThat(secondDimension.get()).isTrue();
-            })
+                    }.visit(cu, 0);
+                    assertThat(firstDimension.get()).isTrue();
+                    assertThat(secondDimension.get()).isTrue();
+                })
           )
         );
     }
@@ -404,25 +406,26 @@ class AnnotationTest implements RewriteTest {
                   private @interface A1 {
                   }
               }
-              """, spec -> spec.afterRecipe(cu -> {
-                AtomicBoolean firstDimension = new AtomicBoolean(false);
-                AtomicBoolean secondDimension = new AtomicBoolean(false);
-                new JavaIsoVisitor<>() {
-                    @Override
-                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
-                        if (arrayType.getElementType() instanceof J.ArrayType) {
-                            assertThat(arrayType.toString()).isEqualTo("Integer [] @A1 [ ]");
-                            firstDimension.set(true);
-                        } else {
-                            assertThat(arrayType.toString()).isEqualTo("Integer @A1 [ ]");
-                            secondDimension.set(true);
+              """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean firstDimension = new AtomicBoolean(false);
+                    AtomicBoolean secondDimension = new AtomicBoolean(false);
+                    new JavaIsoVisitor<>() {
+                        @Override
+                        public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                            if (arrayType.getElementType() instanceof J.ArrayType) {
+                                assertThat(arrayType.toString()).isEqualTo("Integer [] @A1 [ ]");
+                                firstDimension.set(true);
+                            } else {
+                                assertThat(arrayType.toString()).isEqualTo("Integer @A1 [ ]");
+                                secondDimension.set(true);
+                            }
+                            return super.visitArrayType(arrayType, o);
                         }
-                        return super.visitArrayType(arrayType, o);
-                    }
-                }.visit(cu, 0);
-                assertThat(firstDimension.get()).isTrue();
-                assertThat(secondDimension.get()).isTrue();
-            })
+                    }.visit(cu, 0);
+                    assertThat(firstDimension.get()).isTrue();
+                    assertThat(secondDimension.get()).isTrue();
+                })
           )
         );
     }
@@ -444,26 +447,27 @@ class AnnotationTest implements RewriteTest {
               @A({@A, @A(@A)})
               class TypeAnnotationTest {
               }
-              """, spec -> spec.afterRecipe(cu -> {
-                J.ClassDeclaration c = cu.getClasses().get(1);
-                JavaType.Class type = (JavaType.Class) c.getType();
-                JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
-                assertThat(a.getValues()).satisfiesExactly(
-                  v -> {
-                      assertThat(v.getElement()).isIn(a.getMethods());
-                      assertThat((List<JavaType.Annotation>) (((JavaType.Annotation.ArrayElementValue) v).getValues())).satisfiesExactly(
-                        a1 -> {
-                            assertThat(a1.getType()).isSameAs(a.getType());
-                            assertThat(a1.getValues()).isEmpty();
-                        },
-                        a2 -> {
-                            assertThat(a2.getType()).isSameAs(a.getType());
-                            assertThat(a2.getValues()).hasSize(1);
-                        }
-                      );
-                  }
-                );
-            })
+              """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.ClassDeclaration c = cu.getClasses().get(1);
+                    JavaType.Class type = (JavaType.Class) c.getType();
+                    JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
+                    assertThat(a.getValues()).satisfiesExactly(
+                            v -> {
+                                assertThat(v.getElement()).isIn(a.getMethods());
+                                assertThat((List<JavaType.Annotation>) (((JavaType.Annotation.ArrayElementValue) v).getValues())).satisfiesExactly(
+                                        a1 -> {
+                                            assertThat(a1.getType()).isSameAs(a.getType());
+                                            assertThat(a1.getValues()).isEmpty();
+                                        },
+                                        a2 -> {
+                                            assertThat(a2.getType()).isSameAs(a.getType());
+                                            assertThat(a2.getValues()).hasSize(1);
+                                        }
+                                );
+                            }
+                    );
+                })
           )
         );
     }
@@ -498,7 +502,7 @@ class AnnotationTest implements RewriteTest {
         JavaType.Annotation annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
 
         // Thread.currentThread().stop();
-        assertEquals("java.lang.Deprecated" ,annotation.getType().getFullyQualifiedName());
+        assertEquals("java.lang.Deprecated", annotation.getType().getFullyQualifiedName());
         assertEquals("since", ((JavaType.Method) annotation.getValues().get(0).getElement()).getName());
         assertEquals("1.2", annotation.getValues().get(0).getValue());
         assertEquals("forRemoval", ((JavaType.Method) annotation.getValues().get(1).getElement()).getName());
@@ -507,7 +511,152 @@ class AnnotationTest implements RewriteTest {
         // Thread.currentThread().getContextClassLoader();
         mi = (J.MethodInvocation) md.getBody().getStatements().get(1);
         annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
-        assertEquals("jdk.internal.reflect.CallerSensitive" ,annotation.getType().getFullyQualifiedName());
+        assertEquals("jdk.internal.reflect.CallerSensitive", annotation.getType().getFullyQualifiedName());
         assertTrue(annotation.getValues().isEmpty());
+    }
+
+    @Test
+    void arrayTypeAnnotationElementValues() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              
+              @Annotation(type = int[].class)
+              class Test {
+              }
+              
+              @Target(ElementType.TYPE)
+              @interface Annotation {
+                  Class<?> type();
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration c = cu.getClasses().get(0);
+                JavaType.Class type = (JavaType.Class) c.getType();
+                JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
+                assertThat(a.getValues()).hasSize(1);
+                JavaType.Annotation.SingleElementValue v = (JavaType.Annotation.SingleElementValue) a.getValues().get(0);
+                assertThat(v.getElement()).isSameAs(a.getMethods().get(0));
+                assertThat(v.getValue()).isInstanceOf(JavaType.Array.class);
+                JavaType.Array array = (JavaType.Array) v.getValue();
+                assertThat(array.getElemType()).isInstanceOf(JavaType.Primitive.class);
+                assertThat(((JavaType.Primitive) array.getElemType()).getKeyword()).isEqualTo("int");
+            })
+          )
+        );
+    }
+
+    @Test
+    void modifierNoSpaceThenAnnotation() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public@jdk.jfr.Name("A") void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierWithMultipleSpaceThenAnnotation() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public   @jdk.jfr.Name("A") void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierWithMultipleSpaceThenAnnotationScenario2() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public    @jdk.jfr.Name("A") static   @jdk.jfr.Label("2nd") void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierNoSpaceThenAnnotationScenario2() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public@jdk.jfr.Name("A") static@jdk.jfr.Label("2nd") void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierNoSpaceThenAnnotationScenario3() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public@jdk.jfr.Name("A")   static  @jdk.jfr.Label("2nd") void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierNoSpaceThenMultipleAnnotation() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public@jdk.jfr.Name("A")@jdk.jfr.Label("test") void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleModifiersNoSpaceThenAnnotation() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public static@jdk.jfr.Name("A") void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierWithSpaceThenAnnotation() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public static @jdk.jfr.Name("A") void test() {
+                  }
+              }
+              """
+          )
+        );
     }
 }

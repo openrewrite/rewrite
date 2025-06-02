@@ -23,6 +23,7 @@ import org.openrewrite.test.MockHttpSender;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.util.concurrent.*;
@@ -43,11 +44,8 @@ class RemoteFileTest {
           .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
         RemoteFile remoteFile = Remote
-          .builder(
-            Paths.get("gradle/wrapper/gradle-wrapper.properties"),
-            distributionUrl.toURI()
-          )
-          .build();
+          .builder(Paths.get("gradle/wrapper/gradle-wrapper.properties"))
+          .build(distributionUrl.toURI());
 
         long actual = getInputStreamSize(remoteFile.getInputStream(ctx));
         assertThat(actual).isGreaterThan(800);
@@ -55,17 +53,14 @@ class RemoteFileTest {
 
     @Test
     void gradleWrapperDownloadFails() throws Exception {
-        URL distributionUrl = new URL("http://example.com");
+        URL distributionUrl = URI.create("http://example.com").toURL();
         ExecutionContext ctx = new InMemoryExecutionContext();
         HttpSenderExecutionContextView.view(ctx)
           .setLargeFileHttpSender(new MockHttpSender(408));
 
         RemoteArchive remoteFile = Remote
-          .builder(
-            Paths.get("gradle/wrapper/gradle-wrapper.properties"),
-            distributionUrl.toURI()
-          )
-          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+          .builder(Paths.get("gradle/wrapper/gradle-wrapper.properties"))
+          .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
 
         assertThatThrownBy(() -> getInputStreamSize(remoteFile.getInputStream(ctx)))
@@ -90,11 +85,8 @@ class RemoteFileTest {
                   .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
                 RemoteFile remoteFile = Remote
-                  .builder(
-                    Paths.get("gradle/wrapper/gradle-wrapper.properties"),
-                    distributionUrl.toURI()
-                  )
-                  .build();
+                  .builder(Paths.get("gradle/wrapper/gradle-wrapper.properties"))
+                  .build(distributionUrl.toURI());
 
                 return getInputStreamSize(remoteFile.getInputStream(ctx));
             });

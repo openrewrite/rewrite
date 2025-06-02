@@ -38,6 +38,28 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
         spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
     }
 
+    @DocumentExample
+    @Test
+    void changeDefinition() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
+          groovy(
+            """
+              class file {
+              }
+              """,
+            """
+              class newFile {
+              }
+              """,
+            spec -> spec.path("file.groovy").afterRecipe(cu -> {
+                assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "newFile")).isTrue();
+            })
+          )
+        );
+    }
+
     @SuppressWarnings("GrPackage")
     @Test
     void changeImport() {
@@ -96,28 +118,6 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void changeDefinition() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
-          groovy(
-            """
-              class file {
-              }
-              """,
-            """
-              class newFile {
-              }
-              """,
-            spec -> spec.path("file.groovy").afterRecipe(cu -> {
-                assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
-            })
-          )
-        );
-    }
-
     @SuppressWarnings("DataFlowIssue")
     @ExpectedToFail("fails because there's a reference change but no content diff but that's the point; would need to adjust RewriteTest")
     @Issue("https://github.com/openrewrite/rewrite/issues/3058")
@@ -134,8 +134,8 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
-                J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().get(0).getInitializer();
+                J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().getFirst().getInitializer();
                 assertThat(TypeUtils.isOfClassType(sizeMi.getMethodType().getDeclaringType(),
                   "java.util.ArrayList")).isTrue();
                 J.MethodInvocation emptyListMi = (J.MethodInvocation) sizeMi.getSelect();

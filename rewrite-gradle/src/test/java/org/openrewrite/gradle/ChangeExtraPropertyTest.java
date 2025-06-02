@@ -54,7 +54,8 @@ class ChangeExtraPropertyTest implements RewriteTest {
               ext {
                   foo = "baz"
               }
-              """)
+              """
+          )
         );
     }
 
@@ -69,7 +70,8 @@ class ChangeExtraPropertyTest implements RewriteTest {
             """
               project.ext.foo = "baz"
               ext.foo = "baz"
-              """)
+              """
+          )
         );
     }
 
@@ -86,7 +88,8 @@ class ChangeExtraPropertyTest implements RewriteTest {
               ext {
                 foo = 'baz'
               }
-              """)
+              """
+          )
         );
     }
 }

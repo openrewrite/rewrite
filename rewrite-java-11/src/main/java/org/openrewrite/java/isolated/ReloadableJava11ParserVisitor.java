@@ -26,7 +26,6 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
-import lombok.Generated;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -49,7 +48,6 @@ import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -143,17 +141,17 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
             args = JContainer.build(argsPrefix, expressions, Markers.EMPTY);
         } else {
-            String remaining = source.substring(cursor, endPos(node));
-
-            // TODO: technically, if there is code like this, we have a bug, but seems exceedingly unlikely:
-            // @MyAnnotation /* Comment () that contains parentheses */ ()
-
-            if (remaining.contains("(") && remaining.contains(")")) {
+            int saveCursor = cursor;
+            Space prefix = whitespace();
+            if (source.charAt(cursor) == '(') {
+                skip("(");
                 args = JContainer.build(
-                        sourceBefore("("),
+                        prefix,
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)),
                         Markers.EMPTY
                 );
+            } else {
+                cursor = saveCursor;
             }
         }
 
@@ -460,6 +458,12 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                     ),
                     EMPTY
             );
+        } else if (kind.getType() == J.ClassDeclaration.Kind.Type.Enum) {
+            int nextSemicolonPosition = positionOfNext(";", null);
+            int nextClosingBracePosition = positionOfNext("}", null);
+            if (nextSemicolonPosition >= 0 && nextSemicolonPosition < nextClosingBracePosition) {
+                enumSet = padRight(new J.EnumValueSet(randomId(), sourceBefore(";"), Markers.EMPTY, emptyList(), true), EMPTY);
+            }
         }
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
@@ -480,6 +484,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             members.add(enumSet);
         }
         members.addAll(convertStatements(membersMultiVariablesSeparated));
+        addPossibleEmptyStatementsBeforeClosingBrace(members);
 
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
@@ -1083,8 +1088,11 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 }
             }
 
+            List<JRightPadded<Statement>> converted = convertStatements(members);
+            addPossibleEmptyStatementsBeforeClosingBrace(converted);
+
             body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                    convertStatements(members), sourceBefore("}"));
+                    converted, sourceBefore("}"));
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;
@@ -1657,7 +1665,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix = source.substring(cursor, max(cursor, getActualStartPosition((JCTree) t)));
+            // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
+            String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
             @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
             return j;
@@ -1687,12 +1696,12 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         }
     }
 
-    private static int getActualStartPosition(JCTree t) {
-        // The variable's start position in the source is wrongly after lombok's `@val` annotation
-        if (t instanceof JCVariableDecl && isLombokGenerated(t)) {
-            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
+    private boolean isEnum(Tree t) {
+        if (t instanceof JCNewClass) {
+            JCNewClass newClass = (JCNewClass) t;
+            return newClass.type != null && newClass.type.tsym != null && hasFlag(newClass.type.tsym.flags(), Flags.ENUM);
         }
-        return t.getStartPosition();
+        return false;
     }
 
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
@@ -1841,9 +1850,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         if (t instanceof JCMethodDecl) {
             JCMethodDecl m = (JCMethodDecl) t;
             if (m.body == null || m.defaultValue != null) {
-                String suffix = source.substring(cursor, positionOfNext(";", null));
-                int idx = findFirstNonWhitespaceChar(suffix);
-                return sourceBefore(idx >= 0 ? "" : ";");
+                return sourceBefore(";");
             } else {
                 return sourceBefore("");
             }
@@ -1860,7 +1867,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees,
                                                             Function<Tree, Space> suffix) {
         if (trees == null || trees.isEmpty()) {
-            return emptyList();
+            return new ArrayList<>();
         }
 
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
@@ -1878,6 +1885,19 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 int startPosition = ((JCTree) t).getStartPosition();
                 if (cursor > startPosition)
                     continue;
+                if (!(t instanceof JCSkip)) {
+                    while (cursor < startPosition) {
+                        int nonWhitespaceIndex = indexOfNextNonWhitespace(cursor, source);
+                        int semicolonIndex = source.charAt(nonWhitespaceIndex) == ';' ? nonWhitespaceIndex : -1;
+                        if (semicolonIndex > -1) {
+                            Space prefix = Space.format(source, cursor, semicolonIndex);
+                            converted.add(new JRightPadded<>(new J.Empty(randomId(), prefix, Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
+                            cursor = semicolonIndex + 1;
+                        } else {
+                            break;
+                        }
+                    }
+                }
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
@@ -1913,7 +1933,10 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         //noinspection ConstantConditions
-        return sym != null && ("lombok.val".equals(sym.getQualifiedName().toString()) || sym.getAnnotation(Generated.class) != null);
+        return sym != null && (
+                "lombok.val".equals(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.Generated".equals(a.type.toString()))
+        );
     }
 
     /**
@@ -1977,7 +2000,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                         case '/':
                             switch (c2) {
                                 case '/':
-                                    inSingleLineComment = true;
+                                    inSingleLineComment = !inMultiLineComment;
                                     delimIndex++;
                                     break;
                                 case '*':
@@ -2042,7 +2065,11 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private boolean hasFlag(ModifiersTree modifiers, long flag) {
-        return (((JCModifiers) modifiers).flags & flag) != 0L;
+        return hasFlag(((JCModifiers) modifiers).flags, flag);
+    }
+
+    private boolean hasFlag(long flags, long flag) {
+        return (flags & flag) != 0L;
     }
 
     @SuppressWarnings("unused")
@@ -2090,6 +2117,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         final AtomicReference<String> word = new AtomicReference<>("");
         int afterLastModifierPosition = cursor;
         int lastAnnotationPosition = cursor;
+        boolean noSpace = false;
+
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
@@ -2121,7 +2150,12 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             } else if (inComment && c == '\n' || c == '\r') {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
-                if (Character.isWhitespace(c)) {
+                // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
+                if (Character.isWhitespace(c) || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
+                    if (noSpace) {
+                        word.getAndUpdate(w -> w + c);
+                        noSpace = false;
+                    }
                     if (!word.get().isEmpty()) {
                         Modifier matching = null;
                         for (Modifier modifier : modifiers.getFlags()) {
@@ -2221,7 +2255,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                     continue;
                 }
                 annotations.add(convert(jcAnnotation));
-                i = cursor;
+                // Adjusting the index by subtracting 1 to account for the case where annotations are not separated by a space
+                i = cursor - 1;
                 continue;
             }
             char c = source.charAt(i);
@@ -2260,20 +2295,16 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             }
 
             AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
-            int commentCursor = cursor - prefix.length() + fmt.getWhitespace().length();
             for (int j = 0; j < comments.size(); j++) {
-                Comment comment = comments.get(j);
                 if (i == j) {
                     javadoc.set((Javadoc.DocComment) new ReloadableJava11JavadocVisitor(
                             context,
                             getCurrentPath(),
                             typeMapping,
-                            source.substring(commentCursor, source.indexOf("*/", commentCursor + 1)),
+                            "/*" + ((TextComment) comments.get(j)).getText(),
                             tree
                     ).scan(commentTree, new ArrayList<>(1)));
                     break;
-                } else {
-                    commentCursor += comment.printComment(new Cursor(null, "root")).length() + comment.getSuffix().length();
                 }
             }
 
@@ -2283,5 +2314,19 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         return fmt;
+    }
+
+    private void addPossibleEmptyStatementsBeforeClosingBrace(List<JRightPadded<Statement>> converted) {
+        while (true) {
+            int closingBracePosition = positionOfNext("}", null);
+            int semicolonPosition = positionOfNext(";", null);
+
+            if (semicolonPosition > -1 && semicolonPosition < closingBracePosition) {
+                converted.add(new JRightPadded<>(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
+                cursor = semicolonPosition + 1;
+            } else {
+                break;
+            }
+        }
     }
 }

@@ -40,6 +40,7 @@ public class Profile {
     List<Dependency> dependencies;
     List<ManagedDependency> dependencyManagement;
     List<MavenRepository> repositories;
+    List<MavenRepository> pluginRepositories;
 
     List<Plugin> plugins;
     List<Plugin> pluginManagement;

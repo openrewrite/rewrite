@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.VariableNameUtils.GenerationStrategy;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -61,6 +62,14 @@ public class ChangeType extends Recipe {
 
     @Override
     public String getInstanceNameSuffix() {
+        // Defensively guard against null values when recipes are first classloaded. This
+        // is a temporary workaround until releases of workers/CLI that include the defensive
+        // coding in Recipe.
+        //noinspection ConstantValue
+        if (oldFullyQualifiedTypeName == null || newFullyQualifiedTypeName == null) {
+            return getDisplayName();
+        }
+
         String oldShort = oldFullyQualifiedTypeName.substring(oldFullyQualifiedTypeName.lastIndexOf('.') + 1);
         String newShort = newFullyQualifiedTypeName.substring(newFullyQualifiedTypeName.lastIndexOf('.') + 1);
         if (oldShort.equals(newShort)) {
@@ -256,7 +265,15 @@ public class ChangeType extends Recipe {
                     }
                 }
 
-                j = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
+                j = sf.withImports(ListUtils.map(sf.getImports(), i -> {
+                    Cursor cursor = getCursor();
+                    setCursor(new Cursor(cursor, i));
+                    try {
+                        return visitAndCast(i, ctx, super::visitImport);
+                    } finally {
+                        setCursor(cursor);
+                    }
+                }));
             }
 
             return j;
@@ -266,8 +283,14 @@ public class ChangeType extends Recipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             if (fieldAccess.isFullyQualifiedClassReference(originalType.getFullyQualifiedName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
-                    return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                    J.FieldAccess fa = (J.FieldAccess) updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
                             .withPrefix(fieldAccess.getPrefix()));
+                    if (getCursor().firstEnclosing(J.Import.class) == null) {
+                        // don't shorten qualified names in imports
+                        fa = fa.withName(fa.getName().withType(targetType));
+                        doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(fa));
+                    }
+                    return fa;
                 } else if (targetType instanceof JavaType.Primitive) {
                     return new J.Primitive(
                             fieldAccess.getId(),
@@ -366,6 +389,27 @@ public class ChangeType extends Recipe {
         }
 
         @Override
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+            J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
+            if (v != variable) {
+                if (v.getSimpleName().equals(decapitalize(originalType.getClassName()))) {
+                    if (targetType instanceof JavaType.FullyQualified) {
+                        if ((v.getVariableType() != null && TypeUtils.isAssignableTo(targetType, v.getVariableType().getType())) ||
+                            (v.getInitializer() != null && TypeUtils.isAssignableTo(targetType, v.getInitializer().getType()))) {
+                            String newName = VariableNameUtils.generateVariableName(
+                                    decapitalize(((JavaType.FullyQualified) targetType).getClassName()),
+                                    updateCursor(v),
+                                    GenerationStrategy.INCREMENT_NUMBER
+                            );
+                            doAfterVisit(new RenameVariable<>(v, newName));
+                        }
+                    }
+                }
+            }
+            return v;
+        }
+
+        @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             if (method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
                 if (method.getMethodType().getDeclaringType().isAssignableFrom(originalType)) {
@@ -395,7 +439,7 @@ public class ChangeType extends Recipe {
 
                 if (type.getOwningClass() == null) {
                     // just a performance shortcut when this isn't an inner class
-                    typeTree.withType(updateType(targetType));
+                    return typeTree.withType(updateType(targetType));
                 }
 
                 Stack<Expression> typeStack = new Stack<>();
@@ -755,5 +799,12 @@ public class ChangeType extends Recipe {
         String curFqn = curType != null ? curType.getFullyQualifiedName() : null;
 
         return fqn != null && fqn.equals(curFqn);
+    }
+
+    private static String decapitalize(@Nullable String string) {
+        if (string != null && !string.isEmpty()) {
+            return Character.toLowerCase(string.charAt(0)) + string.substring(1);
+        }
+        return "";
     }
 }

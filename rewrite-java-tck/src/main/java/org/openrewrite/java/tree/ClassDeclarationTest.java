@@ -17,6 +17,8 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MinimumJava17;
@@ -231,6 +233,46 @@ class ClassDeclarationTest implements RewriteTest {
                     return classDecl;
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  int i = 0;;
+                  int j = 0;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      ";",
+      ";;;",
+      "; // comment",
+      "; // comment;with;semicolons",
+      "; /* comment;with;semicolons */",
+      "; /* comment\n*/",
+      "; // comment1\n// comment2\n;",
+      "static String method() { return null; };"
+    })
+    void unnecessaryLeadingOrEndingSemicolons(String suffix) {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  /*@@*/
+                  int i = 0;
+                  /*@@*/
+              }
+            """.replaceAll("/[*]@@[*]/", suffix)
           )
         );
     }

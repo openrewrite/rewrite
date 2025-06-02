@@ -40,6 +40,50 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class MavenDependencyFailuresTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
+            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setRepositories(List.of(
+                MavenRepository.builder().id("central").uri("https://repo1.maven.org/maven2").knownToExist(true).build(),
+                MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build()
+              )))
+            .recipeExecutionContext(new InMemoryExecutionContext())
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          pomXml(
+            """
+              <project>
+                <parent>
+                    <groupId>org.jenkins-ci.plugins</groupId>
+                    <artifactId>credentials</artifactId>
+                    <version>2.3.0</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            """
+              <project>
+                <!--~~(org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:
+              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><parent>
+                    <groupId>org.jenkins-ci.plugins</groupId>
+                    <artifactId>credentials</artifactId>
+                    <version>2.3.0</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void unresolvableMavenMetadata() {
         rewriteRun(
@@ -77,47 +121,6 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 assertThat(after.split("Unable to download metadata")).hasSize(3);
                 return after;
             })
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
-        rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build())))
-            .recipeExecutionContext(new InMemoryExecutionContext())
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
-          pomXml(
-            """
-              <project>
-                <parent>
-                    <groupId>org.jenkins-ci.plugins</groupId>
-                    <artifactId>credentials</artifactId>
-                    <version>2.3.0</version>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """,
-            """
-              <project>
-                <!--~~(org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><parent>
-                    <groupId>org.jenkins-ci.plugins</groupId>
-                    <artifactId>credentials</artifactId>
-                    <version>2.3.0</version>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """
           )
         );
     }
@@ -308,7 +311,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """)
+              """
+          )
         );
     }
 
@@ -337,7 +341,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 .get()
                 .extracting(mrr -> mrr.getDependencies().get(Scope.Compile))
                 .matches(deps -> deps.size() == 1)
-                .extracting(deps -> deps.get(0))
+                .extracting(deps -> deps.getFirst())
                 .matches(dep -> dep.getGroupId().equals("org.jvnet.staxex") &&
                   dep.getArtifactId().equals("stax-ex") &&
                   dep.getVersion().equals("1.0"))))

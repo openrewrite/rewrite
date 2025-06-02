@@ -26,6 +26,32 @@ import static org.openrewrite.gradle.Assertions.buildGradle;
 
 @SuppressWarnings("GroovyUnusedAssignment")
 class UpdateJavaCompatibilityTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void sourceOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              sourceCompatibility = 1.8
+              targetCompatibility = 1.8
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              sourceCompatibility = 11
+              targetCompatibility = 1.8
+              """
+          )
+        );
+    }
     @ParameterizedTest
     @CsvSource(textBlock = """
       1.8,1.8,11,11
@@ -55,32 +81,6 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(afterSourceCompatibility, afterTargetCompatibility)
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void sourceOnly() {
-        rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, null)),
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-              }
-
-              sourceCompatibility = 1.8
-              targetCompatibility = 1.8
-              """,
-            """
-              plugins {
-                  id "java"
-              }
-
-              sourceCompatibility = 11
-              targetCompatibility = 1.8
-              """
           )
         );
     }
@@ -422,6 +422,54 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               }
               targetCompatibility = 11
               
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://docs.gradle.org/current/userguide/building_java_projects.html#sec:compiling_with_release")
+    void releaseValueGetsUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              tasks.withType(JavaCompile) {
+                  options.release = 8
+              }
+              
+              tasks.withType(JavaCompile).configureEach {
+                  options.release = 8
+              }
+              
+              compileJava {
+                  options.release = 8
+              }
+              
+              compileJava.options.release = 8
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              tasks.withType(JavaCompile) {
+                  options.release = 11
+              }
+              
+              tasks.withType(JavaCompile).configureEach {
+                  options.release = 11
+              }
+              
+              compileJava {
+                  options.release = 11
+              }
+              
+              compileJava.options.release = 11
               """
           )
         );

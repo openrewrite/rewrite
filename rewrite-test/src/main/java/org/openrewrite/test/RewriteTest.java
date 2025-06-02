@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings("unused")
@@ -139,6 +140,15 @@ public interface RewriteTest extends SourceSpecs {
         RecipeSpec testMethodSpec = RecipeSpec.defaults();
         spec.accept(testMethodSpec);
 
+        ExecutionContext ctx;
+        if (testMethodSpec.getExecutionContext() != null) {
+            ctx = testMethodSpec.getExecutionContext();
+        } else if (testClassSpec.getExecutionContext() != null) {
+            ctx = testClassSpec.getExecutionContext();
+        } else {
+            ctx = defaultExecutionContext(sourceSpecs);
+        }
+
         PrintOutputCapture.MarkerPrinter markerPrinter;
         if (testMethodSpec.getMarkerPrinter() != null) {
             markerPrinter = testMethodSpec.getMarkerPrinter();
@@ -148,7 +158,7 @@ public interface RewriteTest extends SourceSpecs {
             markerPrinter = PrintOutputCapture.MarkerPrinter.DEFAULT;
         }
 
-        PrintOutputCapture<Integer> out = new PrintOutputCapture<>(0, markerPrinter);
+        PrintOutputCapture<ExecutionContext> out = new PrintOutputCapture<>(ctx, markerPrinter);
 
         Recipe recipe = testMethodSpec.recipe == null ?
                 testClassSpec.recipe == null ? Recipe.noop() : testClassSpec.recipe :
@@ -202,14 +212,6 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        ExecutionContext ctx;
-        if (testMethodSpec.getExecutionContext() != null) {
-            ctx = testMethodSpec.getExecutionContext();
-        } else if (testClassSpec.getExecutionContext() != null) {
-            ctx = testClassSpec.getExecutionContext();
-        } else {
-            ctx = defaultExecutionContext(sourceSpecs);
-        }
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(ctx);
         }
@@ -297,7 +299,9 @@ public interface RewriteTest extends SourceSpecs {
                 sourceFile = sourceFile.withMarkers(markers);
 
                 // Validate before source
-                nextSpec.validateSource.accept(sourceFile, TypeValidation.before(testMethodSpec, testClassSpec));
+                TypeValidation beforeValidations = TypeValidation.before(testMethodSpec, testClassSpec);
+                nextSpec.validateSource.accept(sourceFile, beforeValidations);
+                ctx.putMessage(SCANNING_MUTATION_VALIDATION, beforeValidations.immutableScanning());
 
                 // Validate that printing the LST yields the same source text
                 // Validate that the LST whitespace do not contain any non-whitespace characters
@@ -311,12 +315,12 @@ public interface RewriteTest extends SourceSpecs {
                                 "When parsing and printing the source code back to text without modifications, " +
                                 "the printed source didn't match the original source code. This means there is a bug in the " +
                                 "parser implementation itself. Please open an issue to report this, providing a sample of the " +
-                                "code that generated this error for"
+                                "code that generated this error."
                         );
                         try {
                             WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
                             SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
-                            if(whitespaceValidated != null && whitespaceValidated != sourceFile) {
+                            if (whitespaceValidated != null && whitespaceValidated != sourceFile) {
                                 fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
                                      "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
                             }
@@ -412,7 +416,7 @@ public interface RewriteTest extends SourceSpecs {
                         expectedNewResults.add(result);
                         assertThat(result.getBefore())
                                 .as("Expected a new file for the source path but there was an existing file already present: " +
-                                        sourceSpec.getSourcePath())
+                                    sourceSpec.getSourcePath())
                                 .isNull();
                         String actual = result.getAfter().printAll(out.clone());
                         actual = sourceSpec.noTrim ? actual : actual.trim();
@@ -481,19 +485,20 @@ public interface RewriteTest extends SourceSpecs {
             SourceFile source = specForSourceFile.getKey();
             if (source instanceof ParseError) {
                 ParseError parseError = (ParseError) source;
-                if (parseError.getErroneous() != null) {
-                    assertContentEquals(
-                            parseError,
-                            parseError.getText(),
-                            parseError.getErroneous().printAll(),
-                            "Bug in source parser or printer resulted in the following difference for"
-                    );
+                if (parseError.getErroneous() == null) {
+                    throw parseError.toException();
                 }
+                assertContentEquals(
+                        parseError,
+                        parseError.getText(),
+                        parseError.getErroneous().printAll(),
+                        "Bug in source parser or printer resulted in the following difference for"
+                );
             }
 
             for (Result result : allResults) {
                 if ((result.getBefore() == null && source == null) ||
-                        (result.getBefore() != null && result.getBefore().getId().equals(source.getId()))) {
+                    (result.getBefore() != null && result.getBefore().getId().equals(source.getId()))) {
                     if (result.getAfter() != null) {
                         String before = result.getBefore() == null ? null : result.getBefore().printAll(out.clone());
                         String actualAfter = result.getAfter().printAll(out.clone());
@@ -508,7 +513,7 @@ public interface RewriteTest extends SourceSpecs {
                         } else {
                             boolean isRemote = result.getAfter() instanceof Remote;
                             if (!isRemote && Objects.equals(result.getBefore().getSourcePath(), result.getAfter().getSourcePath()) &&
-                                    Objects.equals(before, actualAfter)) {
+                                Objects.equals(before, actualAfter)) {
                                 fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
                             }
 
@@ -631,7 +636,7 @@ public interface RewriteTest extends SourceSpecs {
 
     default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
-            if (t instanceof RecipeRunException){
+            if (t instanceof RecipeRunException) {
                 fail("Failed to run recipe at " + ((RecipeRunException) t).getCursor(), t);
             }
             fail("Failed to parse sources or run recipe", t);

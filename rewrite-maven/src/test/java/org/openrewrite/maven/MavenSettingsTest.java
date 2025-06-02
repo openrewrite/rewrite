@@ -334,7 +334,7 @@ class MavenSettingsTest {
 
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
-        assertThat(settings.getServers().getServers().get(0))
+        assertThat(settings.getServers().getServers().getFirst())
           .matches(repo -> repo.getId().equals("server001"))
           .matches(repo -> repo.getUsername().equals("my_login"))
           .matches(repo -> repo.getPassword().equals("my_password"));
@@ -364,7 +364,7 @@ class MavenSettingsTest {
 
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
-        assertThat(settings.getServers().getServers().get(0))
+        assertThat(settings.getServers().getServers().getFirst())
           .matches(repo -> repo.getId().equals("server001"))
           .matches(repo -> repo.getConfiguration().getTimeout().equals(40000L));
     }
@@ -506,8 +506,8 @@ class MavenSettingsTest {
 
             assertThat(settings.getLocalRepository())
               .isEqualTo("${custom.location.zz}/maven/local/repository/");
-            assertThat(settings.getServers().getServers().get(0).getUsername()).isEqualTo("${env.PRIVATE_REPO_USERNAME_ZZ}");
-            assertThat(settings.getServers().getServers().get(0).getPassword()).isEqualTo("${env.PRIVATE_REPO_PASSWORD_ZZ}");
+            assertThat(settings.getServers().getServers().getFirst().getUsername()).isEqualTo("${env.PRIVATE_REPO_USERNAME_ZZ}");
+            assertThat(settings.getServers().getServers().getFirst().getPassword()).isEqualTo("${env.PRIVATE_REPO_PASSWORD_ZZ}");
         }
 
         @Test
@@ -552,8 +552,8 @@ class MavenSettingsTest {
 
             assertThat(settings.getServers()).isNotNull();
             assertThat(settings.getServers().getServers()).hasSize(1);
-            assertThat(settings.getServers().getServers().get(0).getUsername()).isEqualTo("user");
-            assertThat(settings.getServers().getServers().get(0).getPassword()).isEqualTo("pass");
+            assertThat(settings.getServers().getServers().getFirst().getUsername()).isEqualTo("user");
+            assertThat(settings.getServers().getServers().getFirst().getPassword()).isEqualTo("pass");
         }
 
         /**
@@ -578,9 +578,7 @@ class MavenSettingsTest {
     class MergingTest {
         @Language("xml")
         private final String installationSettings = """
-              <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+              <settings>
                   <servers>
                        <server>
                            <id>private-repo</id>
@@ -677,6 +675,54 @@ class MavenSettingsTest {
         }
 
         @Test
+        void mergedOrderingPutsFirstSettingsFirst() {
+            MavenSettings baseSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <profiles>
+                        <profile>
+                            <id>first-profile</id>
+                            <repositories>
+                                <repository>
+                                    <id>first-repo</id>
+                                    <name>Private First Repo</name>
+                                    <url>https://repo.company1.net/maven</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                </settings>
+                """
+            ), ctx);
+            MavenSettings userSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <profiles>
+                        <profile>
+                            <id>second-profile</id>
+                            <repositories>
+                                <repository>
+                                    <id>second-repo</id>
+                                    <name>Private Second Repo</name>
+                                    <url>https://repo.company2.net/maven</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                </settings>
+                """
+            ), ctx);
+
+            MavenSettings mergedSettings = baseSettings.merge(userSettings);
+            assertThat(mergedSettings.getProfiles().getProfiles().getFirst().getId()).isEqualTo("first-profile");
+            assertThat(mergedSettings.getProfiles().getProfiles().get(1).getId()).isEqualTo("second-profile");
+            assertThat(mergedSettings.getProfiles().getProfiles().getFirst().getRepositories().getRepositories().getFirst().getId()).isEqualTo("first-repo");
+            assertThat(mergedSettings.getProfiles().getProfiles().get(1).getRepositories().getRepositories().getFirst().getId()).isEqualTo("second-repo");
+        }
+
+        @Test
         void replacesElementsWithMatchingIds() {
             Path path = Paths.get("settings.xml");
             var baseSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"), installationSettings), ctx);
@@ -719,15 +765,15 @@ class MavenSettingsTest {
             var mergedSettings = userSettings.merge(baseSettings);
 
             assertThat(mergedSettings.getProfiles().getProfiles()).hasSize(1);
-            assertThat(mergedSettings.getProfiles().getProfiles().get(0).getRepositories().getRepositories().get(0).getSnapshots()).isNull();
+            assertThat(mergedSettings.getProfiles().getProfiles().getFirst().getRepositories().getRepositories().getFirst().getSnapshots()).isNull();
             assertThat(mergedSettings.getActiveProfiles().getActiveProfiles()).hasSize(1);
             assertThat(mergedSettings.getMirrors().getMirrors()).hasSize(1);
 
-            assertThat(mergedSettings.getMirrors().getMirrors().get(0).getUrl())
+            assertThat(mergedSettings.getMirrors().getMirrors().getFirst().getUrl())
               .isEqualTo("http://downloads.planetmirror.com/pub/maven3000");
 
             assertThat(mergedSettings.getServers().getServers()).hasSize(1);
-            assertThat(mergedSettings.getServers().getServers().get(0))
+            assertThat(mergedSettings.getServers().getServers().getFirst())
               .hasFieldOrPropertyWithValue("username", "foo")
               .hasFieldOrPropertyWithValue("password", null);
         }
@@ -772,8 +818,8 @@ class MavenSettingsTest {
             """
         ), ctx);
 
-        MavenSettings.Server server = settings.getServers().getServers().get(0);
-        assertThat(server.getConfiguration().getHttpHeaders().get(0).getName()).isEqualTo("X-JFrog-Art-Api");
+        MavenSettings.Server server = settings.getServers().getServers().getFirst();
+        assertThat(server.getConfiguration().getHttpHeaders().getFirst().getName()).isEqualTo("X-JFrog-Art-Api");
     }
 
     @Test

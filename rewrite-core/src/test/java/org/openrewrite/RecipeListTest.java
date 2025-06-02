@@ -83,8 +83,8 @@ class FormalHello extends Recipe {
     }
 
     @Override
-    public void buildRecipeList(RecipeList list) {
-        list
+    public void buildRecipeList(RecipeList recipes) {
+        recipes
           // TODO would these large option-set recipes
           //  benefit from builders?
           .recipe(new FindAndReplace(
