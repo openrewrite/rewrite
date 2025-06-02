@@ -60,7 +60,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
-
         J.VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
         if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Block) {
             Cursor possiblyClassDecl = getCursor().getParent(2);
@@ -73,7 +72,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             variableDeclarations = variableDeclarations.withLeadingAnnotations(wrapAnnotations(variableDeclarations.getLeadingAnnotations(), variableDeclarations.getPrefix(), annotationsStyle));
             if (!variableDeclarations.getLeadingAnnotations().isEmpty()) {
                 if (!variableDeclarations.getModifiers().isEmpty()) {
-                    variableDeclarations = variableDeclarations.withModifiers(withNewline(variableDeclarations.getModifiers()));
+                    variableDeclarations = variableDeclarations.withModifiers(withNewline(variableDeclarations.getModifiers(), variableDeclarations.getPrefix()));
                 } else if (variableDeclarations.getTypeExpression() != null &&
                         !variableDeclarations.getTypeExpression().getPrefix().getWhitespace().contains("\n")) {
                     variableDeclarations = variableDeclarations.withTypeExpression(
@@ -91,45 +90,40 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         m = m.withLeadingAnnotations(wrapAnnotations(m.getLeadingAnnotations(), m.getPrefix(), style.getMethodAnnotations()));
         if (!m.getLeadingAnnotations().isEmpty()) {
             if (!m.getModifiers().isEmpty()) {
-                m = m.withModifiers(withNewline(m.getModifiers()));
+                m = m.withModifiers(withNewline(m.getModifiers(), m.getPrefix()));
             } else if (m.getAnnotations().getTypeParameters() != null) {
-                if (!m.getAnnotations().getTypeParameters().getPrefix().getWhitespace().contains("\n")) {
-                    m = m.getAnnotations().withTypeParameters(
-                            m.getAnnotations().getTypeParameters().withPrefix(
-                                    withNewline(m.getAnnotations().getTypeParameters().getPrefix())
-                            )
-                    );
-                }
+                m = m.getAnnotations().withTypeParameters(
+                        m.getAnnotations().getTypeParameters().withPrefix(
+                                withNewline(m.getPrefix())
+                        )
+                );
             } else if (m.getReturnTypeExpression() != null) {
-                if (!m.getReturnTypeExpression().getPrefix().getWhitespace().contains("\n")) {
-                    m = m.withReturnTypeExpression(
-                            m.getReturnTypeExpression().withPrefix(
-                                    withNewline(m.getReturnTypeExpression().getPrefix())
-                            )
-                    );
-                }
+                m = m.withReturnTypeExpression(
+                        m.getReturnTypeExpression().withPrefix(
+                                withNewline(m.getPrefix())
+                        )
+                );
             } else {
-                if (!m.getName().getPrefix().getWhitespace().contains("\n")) {
-                    m = m.withName(
-                            m.getName().withPrefix(
-                                    withNewline(m.getName().getPrefix())
-                            )
-                    );
-                }
+                m = m.withName(
+                        m.getName().withPrefix(
+                                withNewline(m.getPrefix())
+                        )
+                );
             }
         }
         m = m.withParameters(ListUtils.map(m.getParameters(), (param) -> {
+            WrappingAndBracesStyle.Annotations annotationsStyle = style.getParameterAnnotations();
             if (param instanceof J.ClassDeclaration) {
                 param = ((J.ClassDeclaration) param).withLeadingAnnotations(
-                        wrapAnnotations(((J.ClassDeclaration) param).getLeadingAnnotations(), param.getPrefix(), style.getParameterAnnotations())
+                        wrapAnnotations(((J.ClassDeclaration) param).getLeadingAnnotations(), param.getPrefix(), annotationsStyle)
                 );
             } else if (param instanceof J.MethodDeclaration) {
                 param = ((J.MethodDeclaration) param).withLeadingAnnotations(
-                        wrapAnnotations(((J.MethodDeclaration) param).getLeadingAnnotations(), param.getPrefix(), style.getParameterAnnotations())
+                        wrapAnnotations(((J.MethodDeclaration) param).getLeadingAnnotations(), param.getPrefix(), annotationsStyle)
                 );
             } else if (param instanceof J.VariableDeclarations) {
                 param = ((J.VariableDeclarations) param).withLeadingAnnotations(
-                        wrapAnnotations(((J.VariableDeclarations) param).getLeadingAnnotations(), param.getPrefix(), style.getParameterAnnotations())
+                        wrapAnnotations(((J.VariableDeclarations) param).getLeadingAnnotations(), param.getPrefix(), annotationsStyle)
                 );
             }
             return param;
@@ -155,11 +149,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
-        // TODO make annotation wrapping configurable
         j = j.withLeadingAnnotations(wrapAnnotations(j.getLeadingAnnotations(), j.getPrefix(), style.getClassAnnotations()));
         if (!j.getLeadingAnnotations().isEmpty()) {
             if (!j.getModifiers().isEmpty()) {
-                j = j.withModifiers(withNewline(j.getModifiers()));
+                j = j.withModifiers(withNewline(j.getModifiers(), j.getPrefix()));
             } else {
                 J.ClassDeclaration.Kind kind = j.getPadding().getKind();
                 if (!kind.getPrefix().getWhitespace().contains("\n")) {
@@ -173,51 +166,20 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return j;
     }
 
-    private List<J.Annotation> wrapAnnotations(List<J.Annotation> annotations, Space prefix, WrappingAndBracesStyle.Annotations annotationsStyle) {
-        return ListUtils.map(annotations, (index, ann) -> {
-            switch (annotationsStyle.getWrap()) {
-                case DoNotWrap:
-                    break;
-                case WrapAlways:
-                    if (index == 0) {
-                        ann = ann.withPrefix(prefix);
-                    }
-                    ann = ann.withPrefix(Space.format("\n" + prefix.getWhitespace()));
-                    break;
-            }
-            return ann;
-        });
+    @Override
+    public J.EnumValue visitEnumValue(J.EnumValue _enum, P p) {
+        J.EnumValue enumValue = super.visitEnumValue(_enum, p);
+        enumValue = enumValue.withAnnotations(wrapAnnotations(enumValue.getAnnotations(), enumValue.getPrefix(), style.getEnumFieldAnnotations()));
+        return enumValue;
     }
 
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
-        if(!b.getEnd().getWhitespace().contains("\n")) {
+        if (!b.getEnd().getWhitespace().contains("\n")) {
             b = b.withEnd(withNewline(b.getEnd()));
         }
         return b;
-    }
-
-    private Space withNewline(Space space) {
-        if (space.getComments().isEmpty()) {
-            space = space.withWhitespace("\n" + space.getWhitespace());
-        } else if (space.getComments().get(space.getComments().size()-1).isMultiline()) {
-            space = space.withComments(ListUtils.mapLast(space.getComments(), c -> c.withSuffix("\n")));
-        }
-
-        return space;
-    }
-
-    private List<J.Modifier> withNewline(List<J.Modifier> modifiers) {
-        J.Modifier firstModifier = modifiers.iterator().next();
-        if (!firstModifier.getPrefix().getWhitespace().contains("\n")) {
-            return ListUtils.mapFirst(modifiers,
-                    mod -> mod.withPrefix(
-                            withNewline(mod.getPrefix())
-                    )
-            );
-        }
-        return modifiers;
     }
 
     @Override
@@ -234,5 +196,37 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             return (J) tree;
         }
         return super.visit(tree, p);
+    }
+
+    private List<J.Annotation> wrapAnnotations(List<J.Annotation> annotations, Space prefix, WrappingAndBracesStyle.Annotations annotationsStyle) {
+        return ListUtils.map(annotations, (index, ann) -> {
+            switch (annotationsStyle.getWrap()) {
+                case DoNotWrap:
+                    break;
+                case WrapAlways:
+                    if (index == 0) {
+                        ann = ann.withPrefix(prefix.withWhitespace(""));
+                        break;
+                    }
+                    ann = ann.withPrefix(prefix.withWhitespace((prefix.getWhitespace().contains("\n") ? "" : "\n") + prefix.getWhitespace()));
+                    break;
+            }
+            return ann;
+        });
+    }
+
+    private Space withNewline(Space prefix) {
+        if (prefix.getComments().isEmpty()) {
+            return prefix.withWhitespace((prefix.getWhitespace().contains("\n") ? "" : "\n") + prefix.getWhitespace());
+        } else if (prefix.getComments().get(prefix.getComments().size()-1).isMultiline()) {
+            return prefix.withComments(ListUtils.mapLast(prefix.getComments(), c -> c.withSuffix("\n")));
+        }
+        return prefix;
+    }
+
+    private List<J.Modifier> withNewline(List<J.Modifier> modifiers, Space prefix) {
+        return ListUtils.mapFirst(modifiers,
+                mod -> mod.withPrefix(prefix.withWhitespace(((prefix.getWhitespace().contains("\n") ? "" : "\n") + prefix.getWhitespace())))
+        );
     }
 }

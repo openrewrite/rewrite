@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -41,7 +42,7 @@ class WrappingAndBracesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
-          new WrappingAndBracesStyle.IfStatement(false)))));
+          new WrappingAndBracesStyle.IfStatement(false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways, false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap, false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap), new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap)))));
     }
 
     @DocumentExample
@@ -152,7 +153,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               Object method() {
+                  Object method() {
                       return new Object();
                   }
               }
@@ -175,7 +176,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               public Object method() {
+                  public Object method() {
                       return new Object();
                   }
               }
@@ -198,7 +199,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               public final Object method() {
+                  public final Object method() {
                       return new Object();
                   }
               }
@@ -221,7 +222,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               <T> T method() {
+                  <T> T method() {
                       return null;
                   }
               }
@@ -244,8 +245,8 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               @Deprecated
-               Object method() {
+                  @Deprecated
+                  Object method() {
                       return new Object();
                   }
               }
@@ -267,8 +268,8 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               @Deprecated
-               Test() {
+                  @Deprecated
+                  Test() {
                   }
               }
               """
@@ -316,7 +317,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               @SuppressWarnings({"ALL"})
-               public class Test {
+              public class Test {
               }
               """
           )
@@ -374,7 +375,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings("ALL")
-               private int foo;        
+                  private int foo;        
               }
               """
           )

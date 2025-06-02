@@ -96,7 +96,7 @@ public class IntelliJ extends NamedStyles {
     }
 
     public static WrappingAndBracesStyle wrappingAndBraces() {
-        return new WrappingAndBracesStyle(new WrappingAndBracesStyle.IfStatement(false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways, false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways, false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways));
+        return new WrappingAndBracesStyle(new WrappingAndBracesStyle.IfStatement(false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways, false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap, false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap), new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap));
     }
 
 }

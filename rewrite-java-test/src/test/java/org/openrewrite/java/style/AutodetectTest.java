@@ -1125,4 +1125,43 @@ class AutodetectTest implements RewriteTest {
               .isEqualTo(3);
         }
     }
+
+    @Test
+    void annotationWrapping() {
+        var cus = jp().parse(
+          """
+            
+                  import java.lang.annotation.Repeatable;
+            
+            @Repeatable(Foo.Foos.class)
+            @interface Foo {
+                @interface Foos {
+                    Foo[] value();
+                }
+            }
+            
+            @Foo
+            @Foo
+            class Test {
+                String text(@Foo String bla) {
+                    return bla;
+                }
+            }
+            
+            enum FooToo {
+                @Foo @Foo bar,
+                @Foo
+                @Foo
+                baz
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+
+//        assertThat(wrapsAndBraces.getIndentSize()).isEqualTo(4);
+//        assertThat(wrapsAndBraces.getContinuationIndent()).isEqualTo(3);
+    }
 }
