@@ -56,10 +56,40 @@ extensions.configure<NodeExtension> {
 }
 
 val npmTest = tasks.named("npm_test")
+npmTest.configure {
+    inputs.files(fileTree("rewrite") {
+        include("*.json")
+        include("jest.config.js")
+    })
+    inputs.files(fileTree("rewrite/src"))
+    inputs.files(fileTree("rewrite/test"))
+    outputs.files("rewrite/build/test-results/jest/junit.xml")
+
+    dependsOn(tasks.named("npmInstall"))
+}
+
+tasks.register<Test>("npmTestReporting") {
+    description = "Makes Jest test results visible to Develocity"
+
+    // Don't run any JVM tests
+    enabled = true
+    testClassesDirs = files()
+    classpath = files()
+
+    // Configure where to find the Jest test results
+    reports.junitXml.outputLocation.set(file("rewrite/build/test-results/jest"))
+
+    // Always run
+    outputs.upToDateWhen { false }
+
+    // This runs after npmTest completes
+    dependsOn(npmTest)
+}
+
 tasks.check {
     dependsOn(
         tasks.named("npmInstall"),
-        npmTest
+        tasks.named("npmTestReporting"),
     )
 }
 
