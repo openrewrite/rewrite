@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
@@ -44,7 +45,8 @@ class Java21ParserTest implements RewriteTest {
     }
 
     @Test
-    void stringIndexOutOfBoundsException() throws IOException {
+    void stringIndexOutOfBoundsException() {
+        @Language("java")
         String src = """
           package nl.issue.test;
           
