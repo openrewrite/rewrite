@@ -43,7 +43,7 @@ public class JavaScriptParser implements Parser {
                 "--enable-source-maps",
                 // Uncomment this to debug the server
 //                "--inspect-brk",
-                installationDir.resolve("server.js").toString()
+                installationDir.resolve("rpc/server.js").toString()
         );
     }
 
@@ -53,8 +53,8 @@ public class JavaScriptParser implements Parser {
     }
 
     private final static List<String> EXTENSIONS = Collections.unmodifiableList(Arrays.asList(
-            ".js", /*".jsx",*/ ".mjs", ".cjs",
-            ".ts", /*".tsx",*/ ".mts", ".cts"
+            ".js", ".jsx", ".mjs", ".cjs",
+            ".ts", ".tsx", ".mts", ".cts"
     ));
 
     // Exclude Yarn's Plug'n'Play loader files (https://yarnpkg.com/features/pnp)
@@ -80,7 +80,7 @@ public class JavaScriptParser implements Parser {
 
     @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
-        return prefix.resolve("source.js");
+        return prefix.resolve("source.ts");
     }
 
     public static Builder builder() {
