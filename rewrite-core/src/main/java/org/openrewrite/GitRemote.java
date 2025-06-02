@@ -95,7 +95,8 @@ public class GitRemote {
 
     public static class Parser {
         private final List<RemoteServer> servers;
-        final Map<String, RemoteServerMatch> baseUrlRemoteServerCache =
+        // LRU cache for base URLs to avoid repeated matching
+        private final Map<String, RemoteServerMatch> baseUrlRemoteServerCache =
                 Collections.synchronizedMap(new LinkedHashMap<String, RemoteServerMatch>(16, 0.75f, true) {
                     private static final int MAX_ENTRIES = 100;
 

@@ -22,7 +22,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
@@ -373,14 +372,16 @@ public class GitRemoteTest {
     void maybeCache(String originalUrl, String expectedBaseUrl) {
         GitRemote.Parser parser = new GitRemote.Parser();
         URI normalized = GitRemote.Parser.normalize(originalUrl);
-        GitRemote.Parser.RemoteServerMatch match = new GitRemote.Parser.RemoteServerMatch(GitRemote.Service.GitHub, "doesnotmatter", URI.create("https://github.com"));
+        GitRemote.Parser.RemoteServerMatch match = new GitRemote.Parser.RemoteServerMatch(GitRemote.Service.GitHub, "origin", URI.create("https://github.com"));
 
         assertThat(parser.maybeCache(originalUrl, normalized, match)).isTrue();
 
-        assertThat(parser.baseUrlRemoteServerCache)
-          .containsKey(expectedBaseUrl);
-
-        assertThat(parser.baseUrlRemoteServerCache.get(expectedBaseUrl.toLowerCase(Locale.ENGLISH)))
-          .isEqualTo(match);
+        GitRemote cached = parser.findCached(expectedBaseUrl + "/something/else/than/was/in/the/original");
+        assertThat(cached)
+          .isNotNull()
+          .satisfies(it -> {
+              assertThat(it.getOrigin()).isEqualTo(match.getOrigin());
+              assertThat(it.getService()).isEqualTo(match.getService());
+          });
     }
 }
