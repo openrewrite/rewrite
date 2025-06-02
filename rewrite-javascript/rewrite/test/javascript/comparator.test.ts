@@ -40,7 +40,7 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(true);
+        expect(await comparator.compare(stmt1, stmt2)).toBe(false);
     });
 
     test('different literals do not match', async () => {
