@@ -21,6 +21,7 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.style.LineWrapSetting;
 
 @Value
 @With
@@ -44,25 +45,17 @@ public class WrappingAndBracesStyle implements JavaStyle {
     public static class IfStatement {
         Boolean elseOnNewLine;
     }
-    public enum Wrap {
-        DO_NOT_WRAP,
-        // TODO implement hard wrap limits before we can implement the `IF_LONG` options
-        WRAP_IF_LONG,
-        CHOP_DOWN_IF_LONG,
-        WRAP_ALWAYS
-    }
 
     @Value
     @With
     @AllArgsConstructor
     public static class Annotations {
-        Wrap wrap;
-        @Nullable
+        LineWrapSetting wrap;
         Boolean doNotWrapAfterSingleAnnotation;
 
-        public Annotations(Wrap wrap) {
+        public Annotations(LineWrapSetting wrap) {
             this.wrap = wrap;
-            this.doNotWrapAfterSingleAnnotation = null;
+            this.doNotWrapAfterSingleAnnotation = false;
         }
     }
 }

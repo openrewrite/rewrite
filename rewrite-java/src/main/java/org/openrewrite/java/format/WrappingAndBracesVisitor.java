@@ -67,23 +67,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             WrappingAndBracesStyle.Annotations annotationsStyle;
             if (possiblyClassDecl != null && possiblyClassDecl.getValue() instanceof J.ClassDeclaration) {
                 annotationsStyle = style.getFieldAnnotations();
-            }else {
+            } else {
                 annotationsStyle = style.getLocalVariableAnnotations();
             }
-
-            Space prefix = variableDeclarations.getPrefix();
-            switch (annotationsStyle.getWrap()) {
-                case DO_NOT_WRAP: break;
-                case WRAP_ALWAYS:
-                    variableDeclarations = variableDeclarations.withLeadingAnnotations(ListUtils.map(variableDeclarations.getLeadingAnnotations(), (index, ann) -> {
-                        if (index == 0) {
-                            ann = ann.withPrefix(prefix);
-                        }
-                        ann = ann.withPrefix(Space.format("\n" + prefix.getWhitespace()));
-                        return ann;
-                    }));
-            }
-
+            variableDeclarations = variableDeclarations.withLeadingAnnotations(wrapAnnotations(variableDeclarations.getLeadingAnnotations(), variableDeclarations.getPrefix(), annotationsStyle));
             if (!variableDeclarations.getLeadingAnnotations().isEmpty()) {
                 if (!variableDeclarations.getModifiers().isEmpty()) {
                     variableDeclarations = variableDeclarations.withModifiers(withNewline(variableDeclarations.getModifiers()));
@@ -101,18 +88,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
-        Space prefix = m.getPrefix();
-        switch (style.getMethodAnnotations().getWrap()) {
-            case DO_NOT_WRAP: break;
-            case WRAP_ALWAYS:
-                m = m.withLeadingAnnotations(ListUtils.map(m.getLeadingAnnotations(), (index, ann) -> {
-                if (index == 0) {
-                    ann = ann.withPrefix(prefix);
-                }
-                ann = ann.withPrefix(Space.format("\n" + prefix.getWhitespace()));
-                return ann;
-            }));
-        }
+        m = m.withLeadingAnnotations(wrapAnnotations(m.getLeadingAnnotations(), m.getPrefix(), style.getMethodAnnotations()));
         if (!m.getLeadingAnnotations().isEmpty()) {
             if (!m.getModifiers().isEmpty()) {
                 m = m.withModifiers(withNewline(m.getModifiers()));
@@ -143,17 +119,18 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
         m = m.withParameters(ListUtils.map(m.getParameters(), (param) -> {
-            Space pref = param.getPrefix();
-            switch (style.getMethodAnnotations().getWrap()) {
-                case DO_NOT_WRAP: break;
-                case WRAP_ALWAYS:
-                    param = param.withLeadingAnnotations(ListUtils.map(param.getLeadingAnnotations(), (index, ann) -> {
-                        if (index == 0) {
-                            ann = ann.withPrefix(prefix);
-                        }
-                        ann = ann.withPrefix(Space.format("\n" + prefix.getWhitespace()));
-                        return ann;
-                    }));
+            if (param instanceof J.ClassDeclaration) {
+                param = ((J.ClassDeclaration) param).withLeadingAnnotations(
+                        wrapAnnotations(((J.ClassDeclaration) param).getLeadingAnnotations(), param.getPrefix(), style.getParameterAnnotations())
+                );
+            } else if (param instanceof J.MethodDeclaration) {
+                param = ((J.MethodDeclaration) param).withLeadingAnnotations(
+                        wrapAnnotations(((J.MethodDeclaration) param).getLeadingAnnotations(), param.getPrefix(), style.getParameterAnnotations())
+                );
+            } else if (param instanceof J.VariableDeclarations) {
+                param = ((J.VariableDeclarations) param).withLeadingAnnotations(
+                        wrapAnnotations(((J.VariableDeclarations) param).getLeadingAnnotations(), param.getPrefix(), style.getParameterAnnotations())
+                );
             }
             return param;
         }));
@@ -179,18 +156,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
         // TODO make annotation wrapping configurable
-        Space prefix = j.getPrefix();
-        switch (style.getClassAnnotations().getWrap()) {
-            case DO_NOT_WRAP: break;
-            case WRAP_ALWAYS:
-                j = j.withLeadingAnnotations(ListUtils.map(j.getLeadingAnnotations(), (index, ann) -> {
-                    if (index == 0) {
-                        ann = ann.withPrefix(prefix);
-                    }
-                    ann = ann.withPrefix(Space.format("\n" + prefix.getWhitespace()));
-                    return ann;
-                }));
-        }
+        j = j.withLeadingAnnotations(wrapAnnotations(j.getLeadingAnnotations(), j.getPrefix(), style.getClassAnnotations()));
         if (!j.getLeadingAnnotations().isEmpty()) {
             if (!j.getModifiers().isEmpty()) {
                 j = j.withModifiers(withNewline(j.getModifiers()));
@@ -207,15 +173,19 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return j;
     }
 
-    private List<J.Annotation> withNewlines(List<J.Annotation> annotations) {
-        if (annotations.isEmpty()) {
-            return annotations;
-        }
-        return ListUtils.map(annotations, (index, a) -> {
-            if (index != 0 && !a.getPrefix().getWhitespace().contains("\n")) {
-                a = a.withPrefix(withNewline(a.getPrefix()));
+    private List<J.Annotation> wrapAnnotations(List<J.Annotation> annotations, Space prefix, WrappingAndBracesStyle.Annotations annotationsStyle) {
+        return ListUtils.map(annotations, (index, ann) -> {
+            switch (annotationsStyle.getWrap()) {
+                case DoNotWrap:
+                    break;
+                case WrapAlways:
+                    if (index == 0) {
+                        ann = ann.withPrefix(prefix);
+                    }
+                    ann = ann.withPrefix(Space.format("\n" + prefix.getWhitespace()));
+                    break;
             }
-            return a;
+            return ann;
         });
     }
 
