@@ -55,19 +55,6 @@ extensions.configure<NodeExtension> {
     nodeProjectDir.set(projectDir.resolve("rewrite"))
 }
 
-val npmTest = tasks.named("npm_test")
-npmTest.configure {
-    inputs.files(fileTree("rewrite") {
-        include("*.json")
-        include("jest.config.js")
-    })
-    inputs.files(fileTree("rewrite/src"))
-    inputs.files(fileTree("rewrite/test"))
-    outputs.files("rewrite/build/test-results/jest/junit.xml")
-
-    dependsOn(tasks.named("npmInstall"))
-}
-
 tasks.register<Test>("npmTestReporting") {
     description = "Makes Jest test results visible to Develocity"
 
@@ -81,15 +68,29 @@ tasks.register<Test>("npmTestReporting") {
 
     // Always run
     outputs.upToDateWhen { false }
+}
 
-    // This runs after npmTest completes
-    dependsOn(npmTest)
+val npmTest = tasks.named<NpmTask>("npm_test")
+npmTest.configure {
+    args.set(listOf("test", "--maxWorkers=50%"))
+    inputs.files(fileTree("rewrite") {
+        include("*.json")
+        include("jest.config.js")
+    })
+    inputs.files(fileTree("rewrite/src"))
+    inputs.files(fileTree("rewrite/test"))
+    outputs.files("rewrite/build/test-results/jest/junit.xml")
+
+    dependsOn(tasks.named("npmInstall"))
+
+    // Make npmTest call npmTestReporting even if the tests fail
+    finalizedBy(tasks.named("npmTestReporting"))
 }
 
 tasks.check {
     dependsOn(
         tasks.named("npmInstall"),
-        tasks.named("npmTestReporting"),
+        npmTest,
     )
 }
 
