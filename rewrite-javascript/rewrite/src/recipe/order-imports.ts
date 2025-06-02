@@ -19,7 +19,7 @@ import {produceAsync, TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor, JS} from "../javascript";
 import {J} from "../java";
-import {Draft, produce} from "immer";
+import {createDraft, Draft, finishDraft, produce} from "immer";
 import {AutoformatVisitor} from "../javascript/format";
 
 export class OrderImports extends Recipe {
@@ -33,42 +33,43 @@ export class OrderImports extends Recipe {
 
             protected async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {
                 const importCount = this.countImports(cu);
-                const cuWithImportsSorted = await produceAsync(cu, async draft => {
-                    const imports = draft.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
-                    const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.element.id, i]));
-                    const restStatements = cu.statements.slice(importCount);
-                    const sortedImports = await this.sortNamesWithinEachLine(imports);
-                    sortedImports.sort((aPadded, bPadded) => {
-                        const a = aPadded.element;
-                        const b = bPadded.element;
+                const draft = createDraft(cu);
+                const imports = draft.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
+                const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.element.id, i]));
+                const restStatements = cu.statements.slice(importCount);
+                const sortedImports = await this.sortNamesWithinEachLine(imports);
+                sortedImports.sort((aPadded, bPadded) => {
+                    const a = aPadded.element;
+                    const b = bPadded.element;
 
-                        const noSpecifier = (a.importClause == undefined ? 1 : 0) - (b.importClause == undefined ? 1 : 0);
-                        if (noSpecifier != 0) {
-                            return -noSpecifier;
-                        }
-                        const asterisk = this.isAsteriskImport(a) - this.isAsteriskImport(b);
-                        if (asterisk != 0) {
-                            return -asterisk;
-                        }
-                        const multipleImport = this.isMultipleImport(a) - this.isMultipleImport(b);
-                        if (multipleImport != 0) {
-                            return -multipleImport;
-                        }
-                        const comparedSpecifiers = this.compareStringArrays(this.extractImportSpecifierNames(a), this.extractImportSpecifierNames(b));
-                        if (comparedSpecifiers != 0) {
-                            return comparedSpecifiers;
-                        }
-                        // Tiebreaker, keep the sort stable
-                        return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
-                    });
-                    draft.statements = [...sortedImports, ...restStatements];
-                });
-                return produce(cuWithImportsSorted, draft => {
-                    for (let i = 0; i < importCount; i++) {
-                       draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
+                    const noSpecifier = (a.importClause == undefined ? 1 : 0) - (b.importClause == undefined ? 1 : 0);
+                    if (noSpecifier != 0) {
+                        return -noSpecifier;
                     }
-                    // TODO deal with comments in the whitespace around imports
+                    const asterisk = this.isAsteriskImport(a) - this.isAsteriskImport(b);
+                    if (asterisk != 0) {
+                        return -asterisk;
+                    }
+                    const multipleImport = this.isMultipleImport(a) - this.isMultipleImport(b);
+                    if (multipleImport != 0) {
+                        return -multipleImport;
+                    }
+                    const comparedSpecifiers = this.compareStringArrays(this.extractImportSpecifierNames(a), this.extractImportSpecifierNames(b));
+                    if (comparedSpecifiers != 0) {
+                        return comparedSpecifiers;
+                    }
+                    // Tiebreaker, keep the sort stable
+                    return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
                 });
+                draft.statements = [...sortedImports, ...restStatements];
+                const cuWithImportsSorted = finishDraft(draft);
+
+                const draft2 = createDraft(cuWithImportsSorted);
+                for (let i = 0; i < importCount; i++) {
+                   draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
+                }
+                // TODO deal with comments in the whitespace around imports
+                return finishDraft(draft2);
             }
 
             private isAsteriskImport(import_: JS.Import): 0 | 1 {
