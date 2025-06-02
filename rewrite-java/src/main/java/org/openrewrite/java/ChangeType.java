@@ -394,14 +394,17 @@ public class ChangeType extends Recipe {
             if (v != variable) {
                 if (v.getSimpleName().equals(decapitalize(originalType.getClassName()))) {
                     if (targetType instanceof JavaType.FullyQualified) {
-                        if ((v.getVariableType() != null && TypeUtils.isAssignableTo(targetType, v.getVariableType().getType())) ||
-                            (v.getInitializer() != null && TypeUtils.isAssignableTo(targetType, v.getInitializer().getType()))) {
-                            String newName = VariableNameUtils.generateVariableName(
-                                    decapitalize(((JavaType.FullyQualified) targetType).getClassName()),
-                                    updateCursor(v),
-                                    GenerationStrategy.INCREMENT_NUMBER
-                            );
-                            doAfterVisit(new RenameVariable<>(v, newName));
+                        String newClassName = decapitalize(((JavaType.FullyQualified) targetType).getClassName());
+                        if (!v.getSimpleName().equals(newClassName)) {
+                            if ((v.getVariableType() != null && TypeUtils.isAssignableTo(targetType, v.getVariableType().getType())) ||
+                                (v.getInitializer() != null && TypeUtils.isAssignableTo(targetType, v.getInitializer().getType()))) {
+                                String newName = VariableNameUtils.generateVariableName(
+                                        newClassName,
+                                        updateCursor(v),
+                                        GenerationStrategy.INCREMENT_NUMBER
+                                );
+                                doAfterVisit(new RenameVariable<>(v, newName));
+                            }
                         }
                     }
                 }

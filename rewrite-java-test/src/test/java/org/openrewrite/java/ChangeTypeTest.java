@@ -1759,6 +1759,35 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void doNotRenameVariableNeedlessly() {
+        // Comparison to java.util.Optional: this method is equivalent to Java 8's Optional.orElse(null).
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.awt.List", "java.util.List", false)),
+          //language=java
+          java(
+            """
+              import java.awt.List;
+              
+              class A {
+                  List foo(List list) {
+                      return list;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              class A {
+                  List foo(List list) {
+                      return list;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void updateVariableType() {
         rewriteRun(
           java(a1),
