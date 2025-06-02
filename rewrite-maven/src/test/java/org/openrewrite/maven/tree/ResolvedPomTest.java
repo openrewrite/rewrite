@@ -547,6 +547,52 @@ class ResolvedPomTest implements RewriteTest {
         );
     }
 
+    @Test
+    void firstUniqueManagedDependencyWins() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.16.1</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.18.1</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec
+              .afterRecipe(doc -> {
+                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).get().getPom();
+                  assertThat(pom.getManagedVersion("com.fasterxml.jackson.core", "jackson-core", null, null)).isEqualTo("2.16.1");
+              })
+          )
+        );
+    }
+
     private static void createJarFile(Path localRepository1) throws IOException {
         createJarFile(localRepository1, "com/some", "some-artifact", "1");
     }
