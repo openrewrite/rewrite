@@ -84,24 +84,18 @@ public class ResolvedPom {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
-        this.dependencyManagement = sortDependencyManagement(dependencyManagement);
-        this.initialRepositories = initialRepositories;
+        this.dependencyManagement = dependencyManagement;
+        // TO-BE-REMOVED(2025-09-01): sorting added for backwards compatibility with older LSTs
+        this.dependencyManagement.sort(MANAGED_DEPENDENCY_COMPARATOR);
+        if (initialRepositories != null) {
+            this.initialRepositories = initialRepositories;
+        }
         this.repositories = repositories;
         this.pluginRepositories = pluginRepositories;
         this.requestedDependencies = requestedDependencies;
         this.plugins = plugins;
         this.pluginManagement = pluginManagement;
         this.subprojects = subprojects;
-    }
-
-    private static List<ResolvedManagedDependency> sortDependencyManagement(List<ResolvedManagedDependency> sorted) {
-        if (sorted.isEmpty()) {
-            return sorted;
-        }
-
-        // TimSort is O(n) for already sorted data
-        sorted.sort(MANAGED_DEPENDENCY_COMPARATOR);
-        return sorted;
     }
 
     @NonFinal
