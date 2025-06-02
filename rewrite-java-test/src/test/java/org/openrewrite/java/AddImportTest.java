@@ -1711,7 +1711,8 @@ class AddImportTest implements RewriteTest {
                       this.e = e;
                   }
               }
-              """, """
+              """,
+                """
               package sample;
               
               import com.ex.app.config.NewA;
