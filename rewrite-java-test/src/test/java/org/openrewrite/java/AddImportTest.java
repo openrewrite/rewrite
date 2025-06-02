@@ -1660,25 +1660,25 @@ class AddImportTest implements RewriteTest {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
             """
-                package com.ex.app.config;
-                public class OldA {}
-                """,
-                """
-                package com.ex.app.task;
-                public class OldB {}
-                """,
-                """
-                package com.ex.app.task;
-                public class OldC {}
-                """,
-                """
-                package com.ex.app.task;
-                public class OldD {}
-                """,
-                """
-                package com.ex.app.task;
-                public class OldE {}
-                """
+              package com.ex.app.config;
+              public class OldA {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldB {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldC {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldD {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldE {}
+              """
           )).recipes(
             new ChangeType("com.ex.app.config.OldA", "com.ex.app.config.NewA", null),
             new ChangeType("com.ex.app.task.OldB", "com.ex.app.task.NewB", null),
@@ -1686,55 +1686,56 @@ class AddImportTest implements RewriteTest {
             new ChangeType("com.ex.app.task.OldD", "com.ex.app.task.NewD", null),
             new ChangeType("com.ex.app.task.OldE", "com.ex.app.task.NewE", null)
           ),
-          java("""
-                                            package sample;
-                                            
-                                            import com.ex.app.config.OldA;
-                                            import com.ex.app.task.OldB;
-                                            import com.ex.app.task.OldC;
-                                            import com.ex.app.task.OldD;
-                                            import com.ex.app.task.OldE;
-                                            
-                                            public class A {
-                                                private final OldA a;
-                                                private final OldB b;
-                                                private final OldC c;
-                                                private final OldD d;
-                                                private final OldE e;
-                                            
-                                                public A(OldA a, OldB b, OldC c, OldD d, OldE e) {
-                                                    this.a = a;
-                                                    this.b = b;
-                                                    this.c = c;
-                                                    this.d = d;
-                                                    this.e = e;
-                                                }
-                                            }
-                                        """, """
-                                            package sample;
-                                            
-                                            import com.ex.app.config.NewA;
-                                            import com.ex.app.task.NewB;
-                                            import com.ex.app.task.NewC;
-                                            import com.ex.app.task.NewD;
-                                            import com.ex.app.task.NewE;
-                                            
-                                            public class A {
-                                                private final NewA a;
-                                                private final NewB b;
-                                                private final NewC c;
-                                                private final NewD d;
-                                                private final NewE e;
-                                            
-                                                public A(NewA a, NewB b, NewC c, NewD d, NewE e) {
-                                                    this.a = a;
-                                                    this.b = b;
-                                                    this.c = c;
-                                                    this.d = d;
-                                                    this.e = e;
-                                                }
-                                            }
-                                        """
+          java(
+            """
+              package sample;
+              
+              import com.ex.app.config.OldA;
+              import com.ex.app.task.OldB;
+              import com.ex.app.task.OldC;
+              import com.ex.app.task.OldD;
+              import com.ex.app.task.OldE;
+              
+              public class A {
+                  private final OldA a;
+                  private final OldB b;
+                  private final OldC c;
+                  private final OldD d;
+                  private final OldE e;
+              
+                  public A(OldA a, OldB b, OldC c, OldD d, OldE e) {
+                      this.a = a;
+                      this.b = b;
+                      this.c = c;
+                      this.d = d;
+                      this.e = e;
+                  }
+              }
+              """, """
+              package sample;
+              
+              import com.ex.app.config.NewA;
+              import com.ex.app.task.NewB;
+              import com.ex.app.task.NewC;
+              import com.ex.app.task.NewD;
+              import com.ex.app.task.NewE;
+              
+              public class A {
+                  private final NewA a;
+                  private final NewB b;
+                  private final NewC c;
+                  private final NewD d;
+                  private final NewE e;
+              
+                  public A(NewA a, NewB b, NewC c, NewD d, NewE e) {
+                      this.a = a;
+                      this.b = b;
+                      this.c = c;
+                      this.d = d;
+                      this.e = e;
+                  }
+              }
+              """
           )
         );
     }
