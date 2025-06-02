@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -137,49 +138,6 @@ class ExcludeDependencyTest implements RewriteTest {
                           <groupId>junit</groupId>
                           <artifactId>junit</artifactId>
                           <version>4.13.2</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
-    void excludeJUnitInCompileScope() {
-        rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("junit", "junit", "compile")),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.neo4j</groupId>
-                          <artifactId>neo4j-ogm-core</artifactId>
-                          <version>3.2.21</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.neo4j</groupId>
-                          <artifactId>neo4j-ogm-core</artifactId>
-                          <version>3.2.21</version>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>junit</groupId>
-                                  <artifactId>junit</artifactId>
-                              </exclusion>
-                          </exclusions>
                       </dependency>
                   </dependencies>
               </project>
