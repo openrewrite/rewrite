@@ -1493,15 +1493,95 @@ class RenameVariableTest implements RewriteTest {
         }
 
         @Test
-        void replacingTheNameAsAnEffectOfChangeTypeFails() {
+        void replacingTheNameAsAnEffectOfChangeTypeSucceedsWhenCalledFromCU() {
             rewriteRun(
               spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+
                   @Override
-                  public J visit(Tree tree, ExecutionContext ctx) {
-                      J t = super.visit(tree, ctx);
-                      Tree visited = new ChangeType("java.util.Stack", "java.util.ArrayDeque", false)
-                        .getVisitor().visit(t, ctx, getCursor());
-                      return (J) visited;
+                  public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                      Tree tree = new ChangeType("java.util.Stack", "java.util.ArrayDeque", false)
+                        .getVisitor().visit(cu, ctx, getCursor().getParent());
+                      return super.visitCompilationUnit((J.CompilationUnit) tree, ctx);
+                  }
+              })),
+              //language=java
+              java(
+                """
+                  import java.util.Stack;
+    
+                  class Test {
+                      void test() {
+                          Stack<Integer> stack = new Stack<>();
+                          stack.add(1);
+                          stack.add(2);
+                      }
+                  }
+                  """,
+                """
+                  import java.util.ArrayDeque;
+    
+                  class Test {
+                      void test() {
+                          ArrayDeque<Integer> arrayDeque = new ArrayDeque<>();
+                          arrayDeque.add(1);
+                          arrayDeque.add(2);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void replacingTheNameAsAnEffectOfChangeTypeFailsWhenCalledFromCD() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+
+                  @Override
+                  public J visitClassDeclaration(J.ClassDeclaration cd, ExecutionContext ctx) {
+                      Tree tree = new ChangeType("java.util.Stack", "java.util.ArrayDeque", false)
+                        .getVisitor().visit(cd, ctx, getCursor().getParent());
+                      return super.visitClassDeclaration((J.ClassDeclaration) tree, ctx);
+                  }
+              })),
+              //language=java
+              java(
+                """
+                  import java.util.Stack;
+    
+                  class Test {
+                      void test() {
+                          Stack<Integer> stack = new Stack<>();
+                          stack.add(1);
+                          stack.add(2);
+                      }
+                  }
+                  """,
+                """
+                  import java.util.ArrayDeque;
+    
+                  class Test {
+                      void test() {
+                          ArrayDeque<Integer> arrayDeque = new ArrayDeque<>();
+                          arrayDeque.add(1);
+                          arrayDeque.add(2);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void replacingTheNameAsAnEffectOfChangeTypeFailsWhenCalledFromVD() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+
+                  @Override
+                  public J visitVariableDeclarations(J.VariableDeclarations mv, ExecutionContext ctx) {
+                      Tree tree = new ChangeType("java.util.Stack", "java.util.ArrayDeque", false)
+                        .getVisitor().visit(mv, ctx, getCursor().getParent());
+                      return super.visitVariableDeclarations((J.VariableDeclarations) tree, ctx);
                   }
               })),
               //language=java
