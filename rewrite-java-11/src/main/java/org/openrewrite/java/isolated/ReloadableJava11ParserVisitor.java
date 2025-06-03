@@ -468,6 +468,11 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
         for (Tree m : node.getMembers()) {
+            // skip lomobok generated trees
+            if (isLombokGenerated(m)) {
+                continue;
+            }
+
             // we don't care about the compiler-inserted default constructor,
             // since it will never be subject to refactoring
             if (m instanceof JCMethodDecl && hasFlag(((JCMethodDecl) m).getModifiers(), Flags.GENERATEDCONSTR)) {
@@ -1920,7 +1925,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     private static boolean isLombokGenerated(Tree t) {
         Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
 
-        Symbol sym = null;
+        Symbol sym;
         if (tree instanceof JCIdent) {
             sym = ((JCIdent) tree).sym;
         } else if (tree instanceof JCTree.JCMethodDecl) {
@@ -1929,14 +1934,16 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             sym = ((JCClassDecl) tree).sym;
         } else if (tree instanceof JCTree.JCVariableDecl) {
             sym = ((JCVariableDecl) tree).sym;
-            return sym != null && sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString()));
+        } else {
+            // no need to further look into these
+            return false;
         }
 
-        //noinspection ConstantConditions
-        return sym != null && (
-                "lombok.val".equals(sym.getQualifiedName().toString()) ||
-                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.Generated".equals(a.type.toString()))
-        );
+        return "lombok.val".equals(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream()
+                        .map(a -> a.type.toString())
+                        .anyMatch(a -> "lombok.val".equals(a) || "lombok.Generated".equals(a));
+    }
     }
 
     /**
