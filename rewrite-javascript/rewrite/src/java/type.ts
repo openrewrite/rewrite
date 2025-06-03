@@ -146,11 +146,6 @@ export namespace JavaType {
         }
     }
 
-    export interface Primitive extends JavaType {
-        readonly kind: typeof Kind.Primitive;
-        readonly keyword: string;
-    }
-
     export interface Union extends JavaType {
         readonly kind: typeof Kind.Union;
         readonly bounds: JavaType[];
