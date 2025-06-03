@@ -27,6 +27,7 @@ import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import java.util.Arrays;
 import java.util.function.Consumer;
@@ -506,6 +507,71 @@ class WrappingAndBracesTest implements RewriteTest {
                   STARTED
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrapping() {
+        rewriteRun(
+          java("""
+          import java.lang.annotation.Repeatable;
+          
+          @Repeatable(Foo.Foos.class)
+          @interface Foo {
+              @interface Foos {
+                  Foo[] value();
+              }
+          }
+          """,
+            SourceSpec::skip),
+          java(
+            """
+              @Foo @Foo class Test {
+                  @Foo @Foo private int field;
+              
+                  @Foo @Foo void method(
+                          @Foo
+                          @Foo
+                          int param) {
+                      @Foo
+                      @Foo
+                      int localVar;
+                  }
+              }
+              
+              enum MyEnum {
+                  @Foo
+                  @Foo
+                  VALUE
+              }
+              
+              record someRecord(
+                      @Foo
+                      @Foo
+                      String name) {
+              }""",
+            """
+              @Foo
+              @Foo
+              class Test {
+                  @Foo
+                  @Foo
+                  private int field;
+              
+                  @Foo
+                  @Foo
+                  void method(@Foo @Foo int param) {
+                      @Foo @Foo int localVar;
+                  }
+              }
+              
+              enum MyEnum {
+                  @Foo @Foo VALUE
+              }
+              
+              record someRecord(@Foo @Foo String name) {
+              }"""
           )
         );
     }

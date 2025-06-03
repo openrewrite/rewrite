@@ -1305,11 +1305,14 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
             for (int i = 0; i < classDecl.getLeadingAnnotations().size(); i++) {
-                J.Annotation ann = classDecl.getLeadingAnnotations().get(i);
-                if (i == 0 && ann.getPrefix().isEmpty()) {
-                    wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getPrefix());
+                if (classDecl.getLeadingAnnotations().size() == 1 || i == classDecl.getLeadingAnnotations().size() -1) {
+                    if (!classDecl.getModifiers().isEmpty()) {
+                        wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getModifiers().get(i).getPrefix());
+                    } else {
+                        wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getPadding().getKind().getPrefix());
+                    }
                 } else {
-                    wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(ann.getPrefix());
+                    wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getLeadingAnnotations().get(i+1).getPrefix());
                 }
             }
             return super.visitClassDeclaration(classDecl, wrappingAndBracesStatistics);
@@ -1318,11 +1321,18 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
             for (int i = 0; i < method.getLeadingAnnotations().size(); i++) {
-                J.Annotation ann = method.getLeadingAnnotations().get(i);
-                if (i == 0 && ann.getPrefix().isEmpty()) {
-                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getPrefix());
+                if (method.getLeadingAnnotations().size() == 1 || i == method.getLeadingAnnotations().size() -1) {
+                    if (!method.getModifiers().isEmpty()) {
+                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getModifiers().get(i).getPrefix());
+                    } else if (method.getTypeParameters() != null) {
+                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getTypeParameters().get(i).getPrefix());
+                    } else if (method.getReturnTypeExpression() != null){
+                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getReturnTypeExpression().getPrefix());
+                    } else {
+                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getName().getPrefix());
+                    }
                 } else {
-                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(ann.getPrefix());
+                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getLeadingAnnotations().get(i+1).getPrefix());
                 }
             }
             method.getParameters().forEach(param -> {
@@ -1340,14 +1350,19 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
             if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Block) {
-                Cursor possiblyClassDecl = getCursor().getParent(2);
+                Cursor possiblyClassDecl = getCursor().dropParentUntil(J.class::isInstance).getParent();
                 if (possiblyClassDecl != null && possiblyClassDecl.getValue() instanceof J.ClassDeclaration) {
                     for (int i = 0; i < multiVariable.getLeadingAnnotations().size(); i++) {
-                        J.Annotation ann = multiVariable.getLeadingAnnotations().get(i);
-                        if (i == 0 && ann.getPrefix().isEmpty()) {
-                            wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(multiVariable.getPrefix());
+                        if (multiVariable.getLeadingAnnotations().size() == 1 || i == multiVariable.getLeadingAnnotations().size() - 1) {
+                            if (!multiVariable.getModifiers().isEmpty()) {
+                                wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(multiVariable.getModifiers().get(0).getPrefix());
+                            } else if (multiVariable.getTypeExpression() != null) {
+                                wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(multiVariable.getTypeExpression().getPrefix());
+                            } else {
+                                wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(multiVariable.getVariables().get(0).getPrefix());
+                            }
                         } else {
-                            wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(ann.getPrefix());
+                            wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(multiVariable.getLeadingAnnotations().get(i+1).getPrefix());
                         }
                     }
                 } else {
@@ -1356,6 +1371,8 @@ public class Autodetect extends NamedStyles {
                         wrappingAndBracesStatistics.localVariableAnnotationsWrapped += hasNewLine(ann.getPrefix());
                     }
                 }
+            } else if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.ClassDeclaration) {
+                multiVariable.getLeadingAnnotations().forEach(ann -> wrappingAndBracesStatistics.parameterAnnotationsWrapped += hasNewLine(ann.getPrefix()));
             }
             return super.visitVariableDeclarations(multiVariable, wrappingAndBracesStatistics);
         }

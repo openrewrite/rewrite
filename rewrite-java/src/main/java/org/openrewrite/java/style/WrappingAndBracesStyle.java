@@ -16,10 +16,8 @@
 package org.openrewrite.java.style;
 
 import lombok.AllArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.style.LineWrapSetting;
 
