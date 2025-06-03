@@ -224,12 +224,16 @@ public class RewriteRpc {
     }
 
     public String print(SourceFile tree) {
-        return print(tree, new Cursor(null, Cursor.ROOT_VALUE));
+        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), null);
     }
 
-    public String print(Tree tree, Cursor parent) {
+    public String print(SourceFile tree, Print.MarkerPrinter markerPrinter) {
+        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
+    }
+
+    public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
         localObjects.put(tree.getId().toString(), tree);
-        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent)), String.class);
+        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent), markerPrinter), String.class);
     }
 
     @VisibleForTesting

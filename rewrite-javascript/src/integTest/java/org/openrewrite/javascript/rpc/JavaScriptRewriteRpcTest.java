@@ -21,15 +21,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -182,6 +180,20 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             "Hello Jon!",
             spec -> spec.beforeRecipe(text ->
               assertThat(client.print(text)).isEqualTo("Hello Jon!"))
+          )
+        );
+    }
+
+    @Test
+    void printFencedMarker() {
+        rewriteRun(
+          text(
+            "Hello Jon!",
+            spec -> spec.beforeRecipe(text -> {
+                text = Markup.info(text, "INFO", null);
+                String fence = "{{" + text.getMarkers().getMarkers().get(0).getId() + "}}";
+                assertThat(client.print(text, Print.MarkerPrinter.FENCED)).isEqualTo(fence + "Hello Jon!" + fence);
+            })
           )
         );
     }

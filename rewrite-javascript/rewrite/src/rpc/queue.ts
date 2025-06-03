@@ -264,7 +264,7 @@ export class RpcReceiveQueue {
                     } else if ((codec = RpcCodecs.forInstance(before))) {
                         after = codec.rpcReceive(before, this);
                     } else if (message.value !== undefined) {
-                        after = message.value;
+                        after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
                     } else {
                         after = before;
                     }

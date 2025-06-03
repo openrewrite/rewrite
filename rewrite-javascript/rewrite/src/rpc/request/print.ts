@@ -15,11 +15,17 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {Cursor, isSourceFile, Tree} from "../../tree";
-import {printer} from "../../print";
+import {MarkerPrinter as PrintMarkerPrinter, printer, PrintOutputCapture} from "../../print";
 import {UUID} from "../../uuid";
 
+export const enum MarkerPrinter {
+    DEFAULT = "DEFAULT",
+    FENCED = "FENCED",
+    SANITIZED = "SANITIZED"
+}
+
 export class Print {
-    constructor(private readonly treeId: UUID, private readonly cursor?: string[]) {
+    constructor(private readonly treeId: UUID, private readonly cursor?: string[], readonly markerPrinter?: MarkerPrinter) {
     }
 
     static handle(connection: rpc.MessageConnection,
@@ -28,11 +34,13 @@ export class Print {
         connection.onRequest(new rpc.RequestType<Print, string, Error>("Print"), async request => {
             try {
                 const tree: Tree = await getObject(request.treeId.toString());
+                const out = new PrintOutputCapture(request.markerPrinter ? PrintMarkerPrinter[request.markerPrinter] ??
+                    PrintMarkerPrinter.DEFAULT : PrintMarkerPrinter.DEFAULT);
                 if (isSourceFile(tree)) {
-                    return printer(tree).print(tree);
+                    return printer(tree).print(tree, out);
                 } else {
                     const cursor = await getCursor(request.cursor);
-                    return printer(cursor).print(tree)
+                    return printer(cursor).print(tree, out)
                 }
             } catch (e: any) {
                 console.log(e.stack);

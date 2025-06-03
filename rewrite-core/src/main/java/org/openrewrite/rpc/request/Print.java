@@ -30,4 +30,13 @@ public class Print implements RpcRequest {
      */
     @Nullable
     List<String> cursor;
+
+    @Nullable
+    MarkerPrinter markerPrinter;
+
+    public enum MarkerPrinter {
+        DEFAULT,
+        FENCED,
+        SANITIZED,
+    }
 }
