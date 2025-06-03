@@ -25,6 +25,7 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
@@ -156,8 +157,9 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         // language=javascript
         String source = "const two = 1 + 1";
 
-        SourceFile cu = client.parse("javascript", List.of(Parser.Input.fromString(
-          Paths.get("test.js"), source)), null).getFirst();
+        SourceFile cu = JavaScriptParser.builder().rewriteRpc(client).build()
+          .parseInputs(List.of(Parser.Input.fromString(
+          Paths.get("test.js"), source)), null, new InMemoryExecutionContext()).findFirst().get();
 
         new JavaIsoVisitor<Integer>() {
             @Override

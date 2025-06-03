@@ -40,7 +40,7 @@ public class JavaScriptParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        return rewriteRpc.parse("javascript", sources, relativeTo).stream();
+        return rewriteRpc.parse(this, "javascript", sources, relativeTo, ctx).stream();
     }
 
     private final static List<String> EXTENSIONS = Collections.unmodifiableList(Arrays.asList(

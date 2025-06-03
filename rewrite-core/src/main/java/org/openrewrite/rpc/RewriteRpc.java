@@ -25,6 +25,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
+import org.openrewrite.tree.ParseError;
 
 import java.io.PrintStream;
 import java.lang.ref.WeakReference;
@@ -229,21 +230,30 @@ public class RewriteRpc {
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
     }
 
-    public List<SourceFile> parse(String parser, Iterable<Parser.Input> inputs, @Nullable Path relativeTo) {
+    public List<SourceFile> parse(Parser parser, String language, Iterable<Parser.Input> inputs, @Nullable Path relativeTo, ExecutionContext ctx) {
+        List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
+            inputList.add(input);
             if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
-                mappedInputs.add(new Parse.StringInput(input.getSource(new InMemoryExecutionContext()).readFully(), input.getPath()));
+                mappedInputs.add(new Parse.StringInput(input.getSource(ctx).readFully(), input.getPath()));
             } else {
                 mappedInputs.add(new Parse.PathInput(input.getPath()));
             }
         }
 
-        List<String> parsed = send("Parse", new Parse(parser, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+        List<String> parsed = send("Parse", new Parse(language, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
         if (!parsed.isEmpty()) {
-            return parsed.stream()
-                    .map(this::<SourceFile>getObject)
-                    .collect(Collectors.toList());
+            List<SourceFile> list = new ArrayList<>(parsed.size());
+            for (int i = 0; i < parsed.size(); i++) {
+                String s = parsed.get(i);
+                try {
+                    list.add(getObject(s));
+                } catch (Exception e) {
+                    list.add(ParseError.build(parser, inputList.get(i), relativeTo, ctx, e));
+                }
+            }
+            return list;
         }
         return emptyList();
     }
