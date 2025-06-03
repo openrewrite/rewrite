@@ -1944,7 +1944,6 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                         .map(a -> a.type.toString())
                         .anyMatch(a -> "lombok.val".equals(a) || "lombok.Generated".equals(a));
     }
-    }
 
     /**
      * --------------
