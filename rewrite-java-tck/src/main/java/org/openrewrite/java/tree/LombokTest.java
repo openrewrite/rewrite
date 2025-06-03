@@ -201,7 +201,8 @@ class LombokTest implements RewriteTest {
         void predefinedBuilderWithMultipleFields() {
             rewriteRun(
               spec -> spec.parser(JavaParser.fromJavaVersion().classpath("lombok")),
-              java("""
+              java(
+                    """
                 import lombok.Builder;
 
                 @Builder
@@ -212,7 +213,8 @@ class LombokTest implements RewriteTest {
 
                     public static class ClazzBuilder {}
                 }
-                """)
+                """
+              )
             );
         }
     }
