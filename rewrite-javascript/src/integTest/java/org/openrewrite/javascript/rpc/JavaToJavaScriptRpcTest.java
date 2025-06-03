@@ -20,7 +20,6 @@ import org.junit.platform.suite.api.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
-import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
@@ -29,6 +28,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.nio.file.Path;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,14 +53,11 @@ public class JavaToJavaScriptRpcTest {
           .recipe(toRecipe(() -> {
               try {
                   PrintStream log = new PrintStream(new FileOutputStream("rpc.java.log"));
-                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.start(
-                    Environment.builder().build(),
-                    "node",
-                    "--enable-source-maps",
-                    // Uncomment this to debug the server
-//                  "--inspect-brk",
-                    "./rewrite/dist/src/rpc/server.js"
-                  );
+                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder()
+                    .nodePath(Path.of("node"))
+                    .installationDirectory(Path.of("./rewrite/dist/src"))
+//                    .socket(12345)
+                    .build();
 
                   client.batchSize(20)
                     .timeout(Duration.ofMinutes(10))
