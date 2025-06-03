@@ -30,21 +30,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static java.util.Objects.requireNonNull;
-
 public class JavaScriptParser implements Parser {
 
     private final JavaScriptRewriteRpc client;
 
-    private JavaScriptParser(Path nodePath, Path installationDir) {
-        this.client = JavaScriptRewriteRpc.start(
-                Environment.builder().build(),
-                nodePath.toString(),
-                "--enable-source-maps",
-                // Uncomment this to debug the server
-//                "--inspect-brk",
-                installationDir.resolve("rpc/server.js").toString()
-        );
+    private JavaScriptParser(JavaScriptRewriteRpc client) {
+        this.client = client;
     }
 
     @Override
@@ -90,6 +81,7 @@ public class JavaScriptParser implements Parser {
     public static class Builder extends org.openrewrite.Parser.Builder {
         private Path nodePath = Paths.get("node");
         private @Nullable Path installationDir;
+        private int port;
 
         Builder() {
             super(JS.CompilationUnit.class);
@@ -105,9 +97,28 @@ public class JavaScriptParser implements Parser {
             return this;
         }
 
+        public Builder socket(int port) {
+            this.port = port;
+            return this;
+        }
+
         @Override
         public JavaScriptParser build() {
-            return new JavaScriptParser(nodePath, requireNonNull(installationDir));
+            if (port != 0) {
+                return new JavaScriptParser(JavaScriptRewriteRpc.connect(
+                        Environment.builder().build(),
+                        port
+                ));
+            }
+
+            return new JavaScriptParser(JavaScriptRewriteRpc.start(
+                    Environment.builder().build(),
+                    nodePath.toString(),
+                    "--enable-source-maps",
+                    // Uncomment this to debug the server
+//                "--inspect-brk",
+                    installationDir.resolve("rpc/server.js").toString()
+            ));
         }
 
         @Override

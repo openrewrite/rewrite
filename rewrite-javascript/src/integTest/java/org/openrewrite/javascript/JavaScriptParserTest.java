@@ -44,6 +44,7 @@ class JavaScriptParserTest {
         this.parser = JavaScriptParser.builder()
           .nodePath(Path.of("node"))
           .installationDir(Path.of("./rewrite/dist/src"))
+//          .socket(12345)
           .build();
     }
 
