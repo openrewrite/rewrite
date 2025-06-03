@@ -27,6 +27,7 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
 
 import java.io.PrintStream;
+import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -40,10 +41,34 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
+
+    private static class Registry {
+        private static final ThreadLocal<Map<Class<? extends SourceFile>, WeakReference<RewriteRpc>>> INSTANCE =
+                ThreadLocal.withInitial(HashMap::new);
+
+        static <T extends SourceFile> void register(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
+            INSTANCE.get().put(sourceFileClass, new WeakReference<>(rewriteRpc));
+        }
+
+        static <T extends SourceFile> RewriteRpc get(Class<T> sourceFileClass) {
+            WeakReference<RewriteRpc> ref = INSTANCE.get().get(sourceFileClass);
+            return requireNonNull(ref != null ? ref.get() : null);
+        }
+    }
+
+    public static <T extends SourceFile> RewriteRpc forSourceType(Class<T> sourceFileClass) {
+        return Registry.get(sourceFileClass);
+    }
+
+    public static <T extends SourceFile> void register(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
+        Registry.register(sourceFileClass, rewriteRpc);
+    }
+
     private final JsonRpc jsonRpc;
 
     private final AtomicInteger batchSize = new AtomicInteger(10);

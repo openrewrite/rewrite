@@ -29,8 +29,10 @@ import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.internal.rpc.JavaScriptReceiver;
 import org.openrewrite.javascript.internal.rpc.JavaScriptSender;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
+import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -172,7 +174,7 @@ public interface JS extends J {
 
         @Override
         @Transient
-        public @NonNull List<ClassDeclaration> getClasses() {
+        public List<ClassDeclaration> getClasses() {
             return statements.stream()
                     .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
@@ -181,7 +183,6 @@ public interface JS extends J {
         }
 
         @Override
-        @NonNull
         public JavaSourceFile withClasses(List<ClassDeclaration> classes) {
             // FIXME unsupported
             return this;
@@ -194,12 +195,17 @@ public interface JS extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            // FIXME decide how we will instantiate the JavaScriptRewriteRPC process to call print
-            throw new UnsupportedOperationException("TODO decide how we will instantiate the JavaScriptRewriteRPC process");
+            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
+                @Override
+                public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
+                    RewriteRpc rpc = RewriteRpc.forSourceType(JS.CompilationUnit.class);
+                    p.append(rpc.print(tree, cursor, Print.MarkerPrinter.DEFAULT));
+                    return tree;
+                }
+            };
         }
 
         @Transient
-        @NonNull
         @Override
         public TypesInUse getTypesInUse() {
             TypesInUse cache;

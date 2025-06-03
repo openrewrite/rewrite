@@ -23,6 +23,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.rpc.RewriteRpc;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -46,6 +47,7 @@ class JavaScriptParserTest {
           .installationDir(Path.of("./rewrite/dist/src"))
 //          .socket(12345)
           .build();
+        RewriteRpc.register(JS.CompilationUnit.class, parser.getClient());
     }
 
     @Test
@@ -58,7 +60,7 @@ class JavaScriptParserTest {
         Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
         assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(javascript.get()).satisfies(cu -> {
-//            assertThat(cu.printAll()).isEqualTo(helloWorld);
+            assertThat(cu.printAll()).isEqualTo(helloWorld);
             assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
         });
     }

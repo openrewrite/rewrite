@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
@@ -32,6 +33,7 @@ import java.util.stream.Stream;
 
 public class JavaScriptParser implements Parser {
 
+    @Getter
     private final JavaScriptRewriteRpc client;
 
     private JavaScriptParser(JavaScriptRewriteRpc client) {
