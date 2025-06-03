@@ -37,10 +37,10 @@ export class Print {
                 const out = new PrintOutputCapture(request.markerPrinter ? PrintMarkerPrinter[request.markerPrinter] ??
                     PrintMarkerPrinter.DEFAULT : PrintMarkerPrinter.DEFAULT);
                 if (isSourceFile(tree)) {
-                    return printer(tree).print(tree, out);
+                    return await printer(tree).print(tree, out);
                 } else {
                     const cursor = await getCursor(request.cursor);
-                    return printer(cursor).print(tree, out)
+                    return await printer(cursor).print(tree, out)
                 }
             } catch (e: any) {
                 console.log(e.stack);
