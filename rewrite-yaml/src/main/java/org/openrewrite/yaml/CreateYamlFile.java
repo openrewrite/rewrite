@@ -24,7 +24,11 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -132,9 +136,18 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
     private String getYamlContents(ExecutionContext ctx) {
         @Language("yml") String yamlContents = fileContents;
         if (yamlContents == null && fileContentsUrl != null) {
-            yamlContents = Remote.builder(Paths.get(relativeFileName))
-                    .build(URI.create(fileContentsUrl))
-                    .printAll(ctx);
+            URI contentsUri = URI.create(fileContentsUrl);
+            if ("file".equals(contentsUri.getScheme())) {
+                try {
+                    yamlContents = new String(Files.readAllBytes(Paths.get(contentsUri)));
+                } catch (IOException e) {
+                    throw new IllegalArgumentException("Invalid YAML contents file specified", e);
+                }
+            } else {
+                yamlContents = Remote.builder(Paths.get(relativeFileName))
+                        .build(contentsUri)
+                        .printAll(ctx);
+            }
         }
         return yamlContents == null ? "" : yamlContents;
     }
