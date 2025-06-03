@@ -95,6 +95,9 @@ public class PrintOutputCapture<P> implements Cloneable {
             }
         };
 
+        MarkerPrinter SANITIZED = new MarkerPrinter() {
+        };
+
         default String beforePrefix(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
             return "";
         }
