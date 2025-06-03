@@ -260,7 +260,7 @@ class DeleteKeyTest implements RewriteTest {
                       - name: b2-value
               """,
             """
-                  a: a-value
+              a: a-value
               """
           )
         );
