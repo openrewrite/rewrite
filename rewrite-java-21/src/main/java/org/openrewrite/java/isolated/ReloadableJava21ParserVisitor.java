@@ -528,6 +528,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
         for (Tree m : node.getMembers()) {
+            // skip lombok generated code
+            if (isLombokGenerated(m)) {
+                continue;
+            }
+
             // we don't care about the compiler-inserted default constructor,
             // since it will never be subject to refactoring
             if (m instanceof JCMethodDecl md && (
@@ -1724,6 +1729,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private List<JLeftPadded<Space>> arrayDimensions() {
+        // source is the wrong thing to work on here as it does not include lombok generated stuff
         List<JLeftPadded<Space>> dims = null;
         while (true) {
             int beginBracket = indexOfNextNonWhitespace(cursor, source);
@@ -2048,7 +2054,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             sym = ((JCClassDecl) tree).sym;
         } else if (tree instanceof JCTree.JCVariableDecl) {
             sym = ((JCVariableDecl) tree).sym;
-            return sym != null && sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString()));
+            return sym != null && sym.getDeclarationAttributes().stream()
+                    .anyMatch(a -> "lombok.val".equals(a.type.toString()) || "lombok.Generated".equals(a.type.toString()));
         }
 
         //noinspection ConstantConditions
