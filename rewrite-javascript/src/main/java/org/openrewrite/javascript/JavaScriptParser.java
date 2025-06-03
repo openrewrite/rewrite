@@ -15,34 +15,32 @@
  */
 package org.openrewrite.javascript;
 
-import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.config.Environment;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
+
 public class JavaScriptParser implements Parser {
 
-    @Getter
-    private final JavaScriptRewriteRpc client;
+    private final JavaScriptRewriteRpc rewriteRpc;
 
-    private JavaScriptParser(JavaScriptRewriteRpc client) {
-        this.client = client;
+    private JavaScriptParser(JavaScriptRewriteRpc rewriteRpc) {
+        this.rewriteRpc = rewriteRpc;
     }
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        return client.parse("javascript", sources, relativeTo).stream();
+        return rewriteRpc.parse("javascript", sources, relativeTo).stream();
     }
 
     private final static List<String> EXTENSIONS = Collections.unmodifiableList(Arrays.asList(
@@ -81,46 +79,20 @@ public class JavaScriptParser implements Parser {
     }
 
     public static class Builder extends org.openrewrite.Parser.Builder {
-        private Path nodePath = Paths.get("node");
-        private @Nullable Path installationDir;
-        private int port;
+        private @Nullable JavaScriptRewriteRpc client;
 
         Builder() {
             super(JS.CompilationUnit.class);
         }
 
-        public Builder nodePath(Path path) {
-            this.nodePath = path;
-            return this;
-        }
-
-        public Builder installationDir(Path installationDir) {
-            this.installationDir = installationDir;
-            return this;
-        }
-
-        public Builder socket(int port) {
-            this.port = port;
+        public Builder rewriteRpc(JavaScriptRewriteRpc rewriteRpc) {
+            this.client = rewriteRpc;
             return this;
         }
 
         @Override
         public JavaScriptParser build() {
-            if (port != 0) {
-                return new JavaScriptParser(JavaScriptRewriteRpc.connect(
-                        Environment.builder().build(),
-                        port
-                ));
-            }
-
-            return new JavaScriptParser(JavaScriptRewriteRpc.start(
-                    Environment.builder().build(),
-                    nodePath.toString(),
-                    "--enable-source-maps",
-                    // Uncomment this to debug the server
-//                "--inspect-brk",
-                    installationDir.resolve("rpc/server.js").toString()
-            ));
+            return new JavaScriptParser(requireNonNull(client));
         }
 
         @Override
