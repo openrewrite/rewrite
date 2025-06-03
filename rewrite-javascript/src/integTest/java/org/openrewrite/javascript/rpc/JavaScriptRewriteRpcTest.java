@@ -199,6 +199,32 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void printSanitizedMarker() {
+        rewriteRun(
+          text(
+            "Hello Jon!",
+            spec -> spec.beforeRecipe(text -> {
+                text = Markup.info(text, "INFO", null);
+                assertThat(client.print(text, Print.MarkerPrinter.SANITIZED)).isEqualTo("Hello Jon!");
+            })
+          )
+        );
+    }
+
+    @Test
+    void printDefaultMarker() {
+        rewriteRun(
+          text(
+            "Hello Jon!",
+            spec -> spec.beforeRecipe(text -> {
+                text = Markup.info(text, "INFO", null);
+                assertThat(client.print(text, Print.MarkerPrinter.DEFAULT)).isEqualTo("~~(INFO)~~>Hello Jon!");
+            })
+          )
+        );
+    }
+
+    @Test
     void printJson() {
         @Language("json")
         String packageJson = """
