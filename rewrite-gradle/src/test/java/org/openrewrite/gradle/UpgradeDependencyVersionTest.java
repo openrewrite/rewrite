@@ -1210,7 +1210,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     void dependenciesBlockInFreestandingScript() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.17.0-2.17.2", null)),
-          buildGradle(
+          dependenciesGradle(
             """
               repositories {
                   mavenLocal()
@@ -1234,8 +1234,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                   implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
               }
-              """,
-            spec -> spec.path("dependencies.gradle")
+              """
           ),
           buildGradle(
             """
@@ -1868,6 +1867,108 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       }
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateVersionDefinedInBuildScriptWithInlineReferenceInDependenciesGradle() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-gradle-plugin", "3.4.4", null)),
+          dependenciesGradle(
+            """
+              dependencies {
+                  implementation "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+              }
+              """
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = "3.4.2"
+                  }
+              
+                  repositories {
+                    mavenCentral()
+                  }
+              }
+              
+              plugins {
+                  id("java")
+              }
+              
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = "3.4.4"
+                  }
+              
+                  repositories {
+                    mavenCentral()
+                  }
+              }
+              
+              plugins {
+                  id("java")
+              }
+              
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateVersionDefinedInBuildScriptWithConcatenatedReferenceInDependenciesGradle() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-gradle-plugin", "3.4.4", null)),
+          dependenciesGradle(
+            """
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-gradle-plugin' + springBootVersion
+              }
+              """
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = "3.4.2"
+                  }
+              
+                  repositories {
+                    mavenCentral()
+                  }
+              }
+              
+              plugins {
+                  id("java")
+              }
+              
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = "3.4.4"
+                  }
+              
+                  repositories {
+                    mavenCentral()
+                  }
+              }
+              
+              plugins {
+                  id("java")
+              }
+              
+              apply from: 'dependencies.gradle'
               """
           )
         );

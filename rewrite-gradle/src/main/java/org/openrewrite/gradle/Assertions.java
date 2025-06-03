@@ -181,6 +181,52 @@ public class Assertions {
         return gradle;
     }
 
+    public static SourceSpecs dependenciesGradle(@Language("groovy") @Nullable String before) {
+        return dependenciesGradle(before, s -> {});
+    }
+
+    public static SourceSpecs dependenciesGradle(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, null);
+        gradle.path(Paths.get("dependencies.gradle"));
+        spec.accept(gradle);
+        return gradle;
+    }
+
+    public static SourceSpecs dependenciesGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after) {
+        return dependenciesGradle(before, after, s -> {});
+    }
+
+    public static SourceSpecs dependenciesGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
+                                             Consumer<SourceSpec<G.CompilationUnit>> spec) {
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
+        gradle.path("dependencies.gradle");
+        spec.accept(gradle);
+        return gradle;
+    }
+
+    public static SourceSpecs dependenciesGradleKts(@Language("kotlin") @Nullable String before) {
+        return dependenciesGradleKts(before, s -> {});
+    }
+
+    public static SourceSpecs dependenciesGradleKts(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, null);
+        gradle.path(Paths.get("dependencies.gradle.kts"));
+        spec.accept(gradle);
+        return gradle;
+    }
+
+    public static SourceSpecs dependenciesGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after) {
+        return settingsGradleKts(before, after, s -> {});
+    }
+
+    public static SourceSpecs dependenciesGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after,
+                                                Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
+        gradle.path("dependencies.gradle.kts");
+        spec.accept(gradle);
+        return gradle;
+    }
+
     public static SourceSpecs lockfile(@Nullable String before) {
         return lockfile(before, s -> {
         });
