@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -113,6 +114,46 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               @Deprecated(since = "2.0", forRemoval = true)
               class A {
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4634")
+    @Test
+    void replacesInRecordVisitor() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
+                  if (annotation.getSimpleName().equals("NotNull")) {
+                      maybeRemoveImport("org.jetbrains.annotations.NotNull");
+                      maybeAddImport("lombok.NonNull");
+                      return JavaTemplate.builder("@NonNull")
+                        .imports("lombok.NonNull")
+                        .javaParser(JavaParser.fromJavaVersion().classpath("lombok"))
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replace());
+                  }
+                  return annotation;
+              }
+          })),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              public record Person(
+                  @NotNull String firstName,
+                  @NotNull String lastName
+              ) {}
+              """,
+            """
+              import lombok.NonNull;
+
+              public record Person(
+                  @NonNull String firstName,
+                  @NonNull String lastName
+              ) {}
               """
           )
         );

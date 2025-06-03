@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class DependencyUseStringNotationTest implements RewriteTest {
@@ -62,6 +63,47 @@ class DependencyUseStringNotationTest implements RewriteTest {
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release")
                   implementation "org.openrewrite:rewrite-core:latest.release"
+              }
+              """
+          )
+        );
+    }
+
+    @DocumentExample
+    @Test
+    void kotlinSupport() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              val version = "latest.release"
+              
+              dependencies {
+                  api(group = "org.openrewrite", name = "rewrite-core", version = "latest.release")
+                  implementation(group = "org.openrewrite", name = "rewrite-core", version = version, classifier = "sources")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              val version = "latest.release"
+              
+              dependencies {
+                  api("org.openrewrite:rewrite-core:latest.release")
+                  implementation("org.openrewrite:rewrite-core:$version:sources")
               }
               """
           )

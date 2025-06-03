@@ -244,7 +244,7 @@ export namespace JS {
      */
     export interface NamedImports extends JS, Expression {
         readonly kind: typeof Kind.NamedImports;
-        readonly elements: J.Container<Expression>;
+        readonly elements: J.Container<ImportSpecifier>;
         readonly type?: JavaType;
     }
 
@@ -255,7 +255,7 @@ export namespace JS {
     export interface ImportSpecifier extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.ImportSpecifier;
         readonly importType: J.LeftPadded<boolean>;
-        readonly specifier: Expression;
+        readonly specifier: J.Identifier | Alias;
         readonly type?: JavaType;
     }
 
@@ -841,7 +841,7 @@ export namespace JSX {
         }) |
         (BaseTag & {
             readonly selfClosing?: undefined;
-            readonly children: J.RightPadded<EmbeddedExpression | Tag | J.Identifier | J.Literal | J.Empty>[];
+            readonly children: (EmbeddedExpression | Tag | J.Identifier | J.Literal | J.Empty)[];
             readonly closingName: J.LeftPadded<J.Identifier | J.FieldAccess | NamespacedName | J.Empty>;
             readonly afterClosingName: J.Space;
         });

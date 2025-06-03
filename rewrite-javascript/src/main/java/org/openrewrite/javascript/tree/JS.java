@@ -1317,13 +1317,13 @@ public interface JS extends J {
         @Getter
         Markers markers;
 
-        JContainer<Expression> elements;
+        JContainer<ImportSpecifier> elements;
 
-        public List<Expression> getElements() {
+        public List<ImportSpecifier> getElements() {
             return elements.getElements();
         }
 
-        public NamedImports withElements(List<Expression> elements) {
+        public NamedImports withElements(List<ImportSpecifier> elements) {
             return getPadding().withElements(JContainer.withElements(this.elements, elements));
         }
 
@@ -1361,11 +1361,11 @@ public interface JS extends J {
         public static class Padding {
             private final NamedImports t;
 
-            public JContainer<Expression> getElements() {
+            public JContainer<ImportSpecifier> getElements() {
                 return t.elements;
             }
 
-            public NamedImports withElements(JContainer<Expression> elements) {
+            public NamedImports withElements(JContainer<ImportSpecifier> elements) {
                 return t.elements == elements ? t : new NamedImports(t.id, t.prefix, t.markers, elements, t.type);
             }
         }

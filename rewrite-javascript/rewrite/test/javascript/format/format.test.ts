@@ -150,4 +150,34 @@ describe('AutoformatVisitor', () => {
             `)
             // @formatter:on
         )});
+
+    test('try catch-all', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            try {
+                m();
+            } catch {
+                console.log("It failed", e);
+            }
+            `,
+                `
+            try {
+                m();
+            } catch {
+                console.log("It failed", e);
+            }
+            `)
+            // @formatter:on
+        )});
+
+    test('import', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`import { delta,gamma} from 'delta.js'`,
+                 `import {delta, gamma} from 'delta.js'`)
+            // @formatter:on
+        )});
 });

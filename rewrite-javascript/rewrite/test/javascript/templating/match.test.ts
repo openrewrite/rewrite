@@ -34,9 +34,7 @@ describe('match extraction', () => {
                 if (binary.operator.element === J.Binary.Type.Addition) {
 
                     // Create a pattern that matches "a + b"
-                    let a = capture();
-                    let b = capture();
-                    const m = await pattern`${"left"} + ${"right"}`.match(binary);
+                    const m = await pattern`${{name: "left"}} + ${"right"}`.match(binary);
                     if (m) {
                         // Extract the captured parts
                         // Create a new binary expression with the swapped operands

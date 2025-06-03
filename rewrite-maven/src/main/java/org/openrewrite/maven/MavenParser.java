@@ -209,7 +209,7 @@ public class MavenParser implements Parser {
             return this;
         }
 
-        public Builder property(@Nullable String key, String value) {
+        public Builder property(@Nullable String key, @Nullable String value) {
             //noinspection ConstantConditions
             if (key != null && value != null) {
                 this.properties.put(key, value);
