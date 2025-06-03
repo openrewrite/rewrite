@@ -253,15 +253,15 @@ class DeleteKeyTest implements RewriteTest {
           spec -> spec.recipe(new DeleteKey("$.b.c[?(@.name =~ '.*-value')]", null)),
           yaml(
             """
-                  a: a-value
-                  b:
-                    c:
-                      - name: b1-value
-                      - name: b2-value
-              """,
+            a: a-value
+            b:
+              c:
+                - name: b1-value
+                - name: b2-value
+            """,
             """
-              a: a-value
-              """
+            a: a-value
+            """
           )
         );
     }
