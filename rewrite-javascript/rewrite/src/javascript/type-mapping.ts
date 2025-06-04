@@ -151,7 +151,15 @@ export class JavaScriptTypeMapping {
                     methods: [] // TODO
                 } as Draft<JavaType.Class>;
                 this.typeCache.set(signature, result);
-                result.members = objectType.getProperties().map(symbol => this.getType(this.checker.getTypeOfSymbol(symbol)) as JavaType.Variable);
+                result.members = objectType.getProperties().map(symbol => {
+                    return {
+                        kind: JavaType.Kind.Variable,
+                        name: symbol.getName(),
+                        owner: undefined, // TODO
+                        type: this.getType(this.checker.getTypeOfSymbol(symbol)),
+                        annotations: [] // TODO
+                    } as JavaType.Variable;
+                });
                 return result;
             }
         }

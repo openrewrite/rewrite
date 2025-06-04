@@ -392,7 +392,7 @@ describe('interface mapping', () => {
         const source = typescript(`
                 interface ColumnDescriptor {
                     displayName: string,
-                    description: string
+                    number: number
                 }
                 let columnDescriptor: ColumnDescriptor;
                 `)
@@ -404,6 +404,12 @@ describe('interface mapping', () => {
             expect(ident.type!.kind).toEqual(JavaType.Kind.Class);
             const type = ident.type! as JavaType.Class
             expect(type.members).toHaveLength(2);
+            expect(type.members[0].kind).toEqual(JavaType.Kind.Variable);
+            expect((type.members[0] as JavaType.Variable).name).toEqual("displayName");
+            expect(type.members[0].type.kind).toEqual(JavaType.Kind.Primitive);
+            expect(type.members[1].kind).toEqual(JavaType.Kind.Variable);
+            expect((type.members[1] as JavaType.Variable).name).toEqual("number");
+            expect(type.members[1].type.kind).toEqual(JavaType.Kind.Primitive);
         }
         await spec.rewriteRun(source);
     })
