@@ -47,7 +47,7 @@ import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
 import static org.openrewrite.marker.GitProvenance.EOL.Native;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RecipeEstimatedEffortTest implements RewriteTest {
+class RecipeEstimatedEffortTest implements RewriteTest {
     private static final Long EXPECTED_DEFAULT_ESTIMATED_EFFORT = 300L;
     private static final Long EXPECTED_CUSTOM_ESTIMATED_EFFORT = 900L;
 
@@ -91,7 +91,8 @@ public class RecipeEstimatedEffortTest implements RewriteTest {
               """,
             """
               replacement
-              """));
+              """
+          ));
     }
 
     @Test
@@ -105,7 +106,8 @@ public class RecipeEstimatedEffortTest implements RewriteTest {
               """,
             """
               beforeafter
-              """));
+              """
+          ));
     }
 
     @Test
