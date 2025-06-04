@@ -1959,12 +1959,12 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   }
               }
               
-              repositories {
-                  mavenCentral()
-              }
-              
               plugins {
                   id("java")
+              }
+              
+              repositories {
+                  mavenCentral()
               }
               
               apply from: 'dependencies.gradle'

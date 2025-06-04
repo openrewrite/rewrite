@@ -358,6 +358,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 }
                                 dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
                                 versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
+                            } else if (depArg instanceof J.Binary && ((J.Binary) depArg).getLeft() instanceof J.Literal && ((J.Binary) depArg).getRight() instanceof J.Identifier) {
+                                dep = DependencyStringNotationConverter.parse((String) ((J.Literal) ((J.Binary) depArg).getLeft()).getValue());
+                                versionVariableName = ((J.Identifier) ((J.Binary) depArg).getRight()).getSimpleName();
                             }
                             if (dep == null || versionVariableName == null) {
                                 continue;
