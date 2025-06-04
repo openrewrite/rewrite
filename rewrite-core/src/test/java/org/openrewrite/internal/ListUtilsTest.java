@@ -101,4 +101,41 @@ class ListUtilsTest {
             assertThat(ListUtils.map(l, (i, e) -> i == 4 ? null : e)).isEqualTo(List.of(0, 1, 2, 5));
         }
     }
+
+    @Nested
+    class Transform {
+        @Test
+        void stringify() {
+            List<Integer> ints = List.of(1, 2, 3);
+            assertThat(ListUtils.transform(ints, Object::toString)).containsExactly("1", "2", "3");
+        }
+
+        @Test
+        void idempotence() {
+            List<Integer> ints = List.of(1, 2, 3);
+            assertThat(ListUtils.transform(ListUtils.transform(ints, Object::toString), s -> Integer.parseInt(s)))
+              .containsExactlyElementsOf(ints);
+        }
+
+        @Test
+        void removeNulls() {
+            List<Integer> ints = List.of(1, 2, 3);
+            assertThat(ListUtils.transform(ints, e -> e == 2 ? 5 : null)).containsExactly(5);
+        }
+    }
+
+    @Nested
+    class Distinct {
+        @Test
+        void ints() {
+            List<Integer> ints = List.of(1, 2, 2, 3, 3, 3);
+            assertThat(ListUtils.distinct(ints)).containsExactly(1, 2, 3);
+        }
+
+        @Test
+        void strings() {
+            List<String> strings = List.of("a", "b", "b", "c", "c", "c");
+            assertThat(ListUtils.distinct(strings)).containsExactly("a", "b", "c");
+        }
+    }
 }
