@@ -302,7 +302,7 @@ public class Environment {
 
     public Set<License> getRequiredLicenses() {
         return resourceLoaders.stream()
-                .map(ResourceLoader::getRequiredLicenses)
+                .map(ResourceLoader::listLicenses)
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());
     }

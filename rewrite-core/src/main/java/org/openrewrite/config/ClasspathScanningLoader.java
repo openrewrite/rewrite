@@ -290,7 +290,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     @Override
-    public Set<License> getRequiredLicenses() {
+    public Set<License> listLicenses() {
         ensureScanned();
         return licenses;
     }

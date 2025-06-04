@@ -592,10 +592,10 @@ public class YamlResourceLoader implements ResourceLoader {
     }
 
     @Override
-    public Set<License> getRequiredLicenses() {
+    public Set<License> listLicenses() {
         return dependencyResourceLoaders.stream()
                 .filter(loader -> this != loader)
-                .map(ResourceLoader::getRequiredLicenses)
+                .map(ResourceLoader::listLicenses)
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());
     }

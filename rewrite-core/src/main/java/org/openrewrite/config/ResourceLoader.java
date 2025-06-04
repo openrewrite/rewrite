@@ -66,5 +66,5 @@ public interface ResourceLoader {
 
     Map<String, List<RecipeExample>> listRecipeExamples();
 
-    Set<License> getRequiredLicenses();
+    Set<License> listLicenses();
 }
