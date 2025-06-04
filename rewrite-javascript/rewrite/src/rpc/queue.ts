@@ -41,7 +41,7 @@ export function asRef<T extends {}>(obj: T | undefined): T & Reference | undefin
 }
 
 function isRef(obj?: any): obj is Reference {
-    return obj !== undefined && obj[REFERENCE_KEY] === true;
+    return obj !== undefined && obj !== null && obj[REFERENCE_KEY] === true;
 }
 
 export class RpcSendQueue {
@@ -201,7 +201,7 @@ export class RpcSendQueue {
     }
 
     private getValueType(after?: any): string | undefined {
-        if (after !== undefined && typeof after === "object" && "kind" in after) {
+        if (after !== undefined && after !== null && typeof after === "object" && "kind" in after) {
             return after["kind"];
         }
     }

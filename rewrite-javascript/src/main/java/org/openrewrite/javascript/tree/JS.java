@@ -569,7 +569,7 @@ public interface JS extends J {
         @SuppressWarnings("unchecked")
         @Override
         public Delete withType(@Nullable JavaType type) {
-            return expression.withType(type);
+            return withExpression(expression.withType(type));
         }
 
         @Override

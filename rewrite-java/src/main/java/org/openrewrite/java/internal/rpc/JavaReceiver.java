@@ -29,10 +29,11 @@ import java.util.function.Function;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
+@SuppressWarnings("DataFlowIssue")
 public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
-    public J preVisit(@NonNull J j, RpcReceiveQueue q) {
+    public J preVisit(J j, RpcReceiveQueue q) {
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
@@ -352,6 +353,12 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitMethodDeclaration(J.MethodDeclaration method, RpcReceiveQueue q) {
+        //noinspection ConstantValue
+        if (method.getAnnotations().getName() == null) {
+            // this workaround is here for the case when a new object is received and the `J.MethodDeclaration` was
+            // instantiated using Objenesis, in which case the `name` property will be `null`.
+            method = method.getAnnotations().withName(new J.MethodDeclaration.IdentifierWithAnnotations(null, null));
+        }
         return method
                 .withLeadingAnnotations(q.receiveList(method.getLeadingAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .withModifiers(q.receiveList(method.getModifiers(), m -> (J.Modifier) visitNonNull(m, q)))
@@ -549,7 +556,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitUnary(J.Unary unary, RpcReceiveQueue q) {
         return unary
-                .withOperator(q.receiveAndGet(unary.getOperator(), toEnum(J.Unary.Type.class)))
+                .getPadding().withOperator(q.receive(unary.getPadding().getOperator(), op -> visitLeftPadded(op, q, toEnum(J.Unary.Type.class))))
                 .withExpression(q.receive(unary.getExpression(), e -> (Expression) visitNonNull(e, q)))
                 .withType(q.receive(unary.getType(), t -> visitType(t, q)));
     }
