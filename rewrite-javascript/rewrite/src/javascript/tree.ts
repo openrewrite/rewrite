@@ -742,10 +742,10 @@ export namespace JS {
     }
 
     export namespace NamespaceDeclaration {
-        export enum KeywordType {
-            Namespace,
-            Module,
-            Empty,
+        export const enum KeywordType {
+            Namespace = "Namespace",
+            Module = "Module",
+            Empty = "Empty"
         }
     }
 

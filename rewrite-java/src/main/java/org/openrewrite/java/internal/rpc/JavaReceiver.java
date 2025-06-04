@@ -362,7 +362,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return method
                 .withLeadingAnnotations(q.receiveList(method.getLeadingAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .withModifiers(q.receiveList(method.getModifiers(), m -> (J.Modifier) visitNonNull(m, q)))
-                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitTypeParameters(tp, q)))
+                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> (J.TypeParameters) visitNonNull(tp, q)))
                 .withReturnTypeExpression(q.receive(method.getReturnTypeExpression(), rt -> (TypeTree) visitNonNull(rt, q)))
                 .getAnnotations().withName(method.getAnnotations().getName().withAnnotations(q.receiveList(method.getAnnotations().getName().getAnnotations(), a -> (J.Annotation) visitNonNull(a, q))))
                 .withName(q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q)))

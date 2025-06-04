@@ -176,9 +176,9 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitForLoopControl(control: J.ForLoop.Control, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(control, c => c.init, init => this.visitRightPadded(init, q));
-        await q.getAndSend(control, c => c.condition, cond => this.visitRightPadded(cond, q));
-        await q.getAndSendList(control, c => c.update, update => this.visitRightPadded(update, q));
+        await q.getAndSendList(control, c => c.init, i => i.element.id, i => this.visitRightPadded(i, q));
+        await q.getAndSend(control, c => c.condition, c => this.visitRightPadded(c, q));
+        await q.getAndSendList(control, c => c.update, u => u.element.id, u => this.visitRightPadded(u, q));
         return control;
     }
 
@@ -493,7 +493,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSendList(method, m => m.modifiers, mod => mod.id, mod => this.visit(mod, q));
         await q.getAndSend(method, m => m.typeParameters, params => this.visit(params, q));
         await q.getAndSend(method, m => m.returnTypeExpression, type => this.visit(type, q));
-        await q.getAndSendList(method, m => m.nameAnnotations, name => this.visit(name, q));
+        await q.getAndSendList(method, m => m.nameAnnotations, a => a.id, name => this.visit(name, q));
         await q.getAndSend(method, m => m.name, name => this.visit(name, q));
         await q.getAndSend(method, m => m.parameters, params => this.visitContainer(params, q));
         await q.getAndSend(method, m => m.throws, throws => this.visitContainer(throws, q));
