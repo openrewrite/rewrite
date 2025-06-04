@@ -562,7 +562,8 @@ class WrappingAndBracesTest implements RewriteTest {
               
                   @Foo
                   @Foo
-                  void method(@Foo @Foo int param) {
+                  void method(
+                          @Foo @Foo int param) {
                       @Foo @Foo int localVar;
                   }
               }
@@ -571,7 +572,8 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo @Foo VALUE
               }
               
-              record someRecord(@Foo @Foo String name) {
+              record someRecord(
+                      @Foo @Foo String name) {
               }"""
           )
         );
