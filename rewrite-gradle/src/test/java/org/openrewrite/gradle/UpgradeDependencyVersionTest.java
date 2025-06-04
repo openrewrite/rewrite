@@ -1210,7 +1210,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     void dependenciesBlockInFreestandingScript() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.17.0-2.17.2", null)),
-          dependenciesGradle(
+          buildGradle(
             """
               repositories {
                   mavenLocal()
@@ -1234,7 +1234,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                   implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
               }
-              """
+              """,
+            spec -> spec.path("dependencies.gradle")
           ),
           buildGradle(
             """
@@ -1873,14 +1874,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void updateVersionDefinedInBuildScriptWithInlineReferenceInDependenciesGradle() {
+    void updateVersionDefinedInExtraPropertiesWithInlineReferenceInDependenciesGradle() {
         rewriteRun(
-          dependenciesGradle(
+          buildGradle(
             """
               dependencies {
                   implementation "com.google.guava:guava:${guavaVersion}"
               }
-              """
+              """,
+            spec -> spec.path("dependencies.gradle")
           ),
           buildGradle(
             """
@@ -1922,14 +1924,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void updateVersionDefinedInBuildScriptWithConcatenatedReferenceInDependenciesGradle() {
+    void updateVersionDefinedInExtraPropertiesWithConcatenatedReferenceInDependenciesGradle() {
         rewriteRun(
-          dependenciesGradle(
+          buildGradle(
             """
               dependencies {
                   implementation 'com.google.guava:guava:' + guavaVersion
               }
-              """
+              """,
+            spec -> spec.path("dependencies.gradle")
           ),
           buildGradle(
             """
