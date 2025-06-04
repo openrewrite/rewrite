@@ -1922,36 +1922,46 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
+    /**
+     * --------------
+     * Other convenience utilities
+     * --------------
+     */
+
     private static boolean isLombokGenerated(Tree t) {
         Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
 
-        Symbol sym = null;
-        if (tree instanceof JCIdent) {
-            sym = ((JCIdent) tree).sym;
-        } else if (tree instanceof JCMethodDecl) {
-            sym = ((JCMethodDecl) tree).sym;
-        } else if (tree instanceof JCClassDecl) {
-            sym = ((JCClassDecl) tree).sym;
-        } else if (tree instanceof JCVariableDecl) {
-            sym = ((JCVariableDecl) tree).sym;
-        }
+        Symbol sym = extractSymbol(tree);
 
         if (sym == null) {
             // not a symbol we can check
             return false;
         }
 
-        return "lombok.val".equals(sym.getQualifiedName().toString()) ||
+        return isLombokAnnotationType(sym.getQualifiedName().toString()) ||
                 sym.getDeclarationAttributes().stream()
                         .map(a -> a.type.toString())
-                        .anyMatch(a -> "lombok.val".equals(a) || "lombok.Generated".equals(a));
+                        .anyMatch(ReloadableJava11ParserVisitor::isLombokAnnotationType);
     }
 
-    /**
-     * --------------
-     * Other convenience utilities
-     * --------------
-     */
+    private static boolean isLombokAnnotationType(String name) {
+        return "lombok.val".equals(name) ||
+                "lombok.var".equals(name) ||
+                "lombok.Generated".equals(name);
+    }
+
+    private static @Nullable Symbol extractSymbol(Tree tree) {
+        if (tree instanceof JCIdent) {
+            return ((JCIdent) tree).sym;
+        } else if (tree instanceof JCTree.JCMethodDecl) {
+            return ((JCTree.JCMethodDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            return ((JCTree.JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCVariableDecl) {
+            return ((JCTree.JCVariableDecl) tree).sym;
+        }
+        return null;
+    }
 
     private int endPos(Tree t) {
         return ((JCTree) t).getEndPosition(endPosTable);

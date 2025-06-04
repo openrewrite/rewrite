@@ -26,6 +26,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -2040,36 +2041,45 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    private static boolean isLombokGenerated(Tree t) {
-        Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
-
-        Symbol sym = null;
-        if (tree instanceof JCIdent) {
-            sym = ((JCIdent) tree).sym;
-        } else if (tree instanceof JCMethodDecl) {
-            sym = ((JCMethodDecl) tree).sym;
-        } else if (tree instanceof JCClassDecl) {
-            sym = ((JCClassDecl) tree).sym;
-        } else if (tree instanceof JCVariableDecl) {
-            sym = ((JCVariableDecl) tree).sym;
-        }
-
-        if (sym == null) {
-            // not a symbol we can check
-            return false;
-        }
-
-        return "lombok.val".equals(sym.getQualifiedName().toString()) ||
-                sym.getDeclarationAttributes().stream()
-                        .map(a -> a.type.toString())
-                        .anyMatch(a -> "lombok.val".equals(a) || "lombok.Generated".equals(a));
-    }
-
     /**
      * --------------
      * Other convenience utilities
      * --------------
      */
+
+    private static boolean isLombokGenerated(Tree t) {
+        Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
+
+        Symbol sym = extractSymbol(tree);
+        if (sym == null) {
+            // not a symbol we can check
+            return false;
+        }
+
+        return isLombokAnnotationType(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream()
+                        .map(a -> a.type.toString())
+                        .anyMatch(ReloadableJava21ParserVisitor::isLombokAnnotationType);
+    }
+
+    private static boolean isLombokAnnotationType(String name) {
+        return "lombok.val".equals(name) ||
+                "lombok.var".equals(name) ||
+                "lombok.Generated".equals(name);
+    }
+
+    private static @Nullable Symbol extractSymbol(Tree tree) {
+        if (tree instanceof JCIdent) {
+            return ((JCIdent) tree).sym;
+        } else if (tree instanceof JCTree.JCMethodDecl) {
+            return ((JCTree.JCMethodDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            return ((JCTree.JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCVariableDecl) {
+            return ((JCTree.JCVariableDecl) tree).sym;
+        }
+        return null;
+    }
 
     private int endPos(Tree t) {
         return ((JCTree) t).getEndPosition(endPosTable);
