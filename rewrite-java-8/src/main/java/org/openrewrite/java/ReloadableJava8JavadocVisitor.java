@@ -625,7 +625,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         randomId(),
                         qualifier == null ? Space.EMPTY : qualifier.getPrefix(),
                         Markers.EMPTY,
-                        qualifier == null ? null : JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
+                        JRightPadded.build(qualifier == null ? null : qualifier.withPrefix(Space.EMPTY)),
                         JContainer.empty(),
                         JLeftPadded.build(name),
                         null,

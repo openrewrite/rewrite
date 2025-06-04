@@ -14,4 +14,16 @@ module.exports = {
   },
   testMatch: ['**/?(*.)+(spec|test).+(ts|tsx|js)'],
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts'],
+  reporters: [
+    'default', // Keeps the default console reporter
+    ['jest-junit', {
+      outputDirectory: './build/test-results/jest',
+      outputName: 'junit.xml',
+      // Optional additional configuration
+      classNameTemplate: '{classname}',
+      titleTemplate: '{title}',
+      ancestorSeparator: ' › ', // Used to generate the classname attribute
+      suiteNameTemplate: '{filename}'
+    }]
+  ],
 };

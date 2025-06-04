@@ -15,6 +15,13 @@
  */
 package org.openrewrite.javascript.rpc;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
@@ -25,16 +32,26 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.Environment;
 import org.openrewrite.rpc.RewriteRpc;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
+import java.io.*;
+import java.net.Socket;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class JavaScriptRewriteRpc extends RewriteRpc {
-    private final JavaScriptRewriteRpcProcess process;
+
+    private final @Nullable JavaScriptRewriteRpcProcess process;
+    private final @Nullable Closeable closeable;
 
     private JavaScriptRewriteRpc(JavaScriptRewriteRpcProcess process, Environment marketplace) {
         super(process.getRpcClient(), marketplace);
         this.process = process;
+        this.closeable = null;
+    }
+
+    private JavaScriptRewriteRpc(JsonRpc rpc, Closeable closeable, Environment marketplace) {
+        super(rpc, marketplace);
+        this.process = null;
+        this.closeable = closeable;
     }
 
     public static JavaScriptRewriteRpc start(Environment marketplace, String... command) {
@@ -43,14 +60,34 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         return new JavaScriptRewriteRpc(process, marketplace);
     }
 
+    public static JavaScriptRewriteRpc connect(Environment marketplace, int port) {
+        Socket socket;
+        JsonRpc rpc;
+        try {
+            socket = new Socket("127.0.0.1", port);
+            rpc = createRpcClient(socket.getInputStream(), socket.getOutputStream());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return new JavaScriptRewriteRpc(rpc, socket, marketplace);
+    }
+
     @Override
     public void shutdown() {
         super.shutdown();
-        process.interrupt();
-        try {
-            process.join();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+        if (process != null) {
+            process.interrupt();
+            try {
+                process.join();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (IOException ignore) {
+            }
         }
     }
 
@@ -110,14 +147,35 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                     throw new RuntimeException(e);
                 }
             }
-            MessageHandler handler = new HeaderDelimitedMessageHandler(
-                    new JsonMessageFormatter(),
-                    this.process.getInputStream(),
-                    this.process.getOutputStream());
 
-            // FIXME provide an option to make tracing optional
-            handler = new TraceMessageHandler("client", handler);
-            this.rpcClient = new JsonRpc(handler);
+            this.rpcClient = createRpcClient(this.process.getInputStream(), this.process.getOutputStream());
+        }
+    }
+
+    private static JsonRpc createRpcClient(InputStream inputStream, OutputStream outputStream) {
+        SimpleModule module = new SimpleModule();
+        module.addSerializer(Path.class, new PathSerializer());
+        module.addDeserializer(Path.class, new PathDeserializer());
+        JsonMessageFormatter formatter = new JsonMessageFormatter(module);
+        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter, inputStream, outputStream);
+
+        // FIXME provide an option to make tracing optional
+        handler = new TraceMessageHandler("client", handler);
+        return new JsonRpc(handler);
+    }
+
+    private static class PathSerializer extends JsonSerializer<Path> {
+        @Override
+        public void serialize(Path path, JsonGenerator g, SerializerProvider serializerProvider) throws IOException {
+            g.writeString(path.toString());
+        }
+    }
+
+    private static class PathDeserializer extends JsonDeserializer<Path> {
+        @Override
+        public Path deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            String pathString = p.getValueAsString();
+            return Paths.get(pathString);
         }
     }
 }

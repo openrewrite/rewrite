@@ -65,7 +65,8 @@ import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
 
 export interface JavaScriptParserOptions extends ParserOptions {
-    styles?: NamedStyles[]
+    styles?: NamedStyles[],
+    sourceFileCache?: Map<string, ts.SourceFile>
 }
 
 export class JavaScriptParser extends Parser {
@@ -73,14 +74,15 @@ export class JavaScriptParser extends Parser {
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
+    private sourceFileCache: Map<string, ts.SourceFile>;
 
     constructor(
         {
             ctx,
             relativeTo,
-            styles
+            styles,
+            sourceFileCache
         }: JavaScriptParserOptions = {},
-        private readonly sourceFileCache: Map<String, ts.SourceFile> = new Map()
     ) {
         super({ctx, relativeTo});
         this.compilerOptions = {
@@ -93,6 +95,7 @@ export class JavaScriptParser extends Parser {
             jsx: ts.JsxEmit.Preserve
         };
         this.styles = styles;
+        this.sourceFileCache = sourceFileCache || new Map();
     }
 
     // noinspection JSUnusedGlobalSymbols
@@ -102,7 +105,7 @@ export class JavaScriptParser extends Parser {
         return this;
     }
 
-    async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
+    override async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
         const inputFiles = new Map<SourcePath, ParserInput>();
 
         // Populate inputFiles map and remove from cache if necessary
