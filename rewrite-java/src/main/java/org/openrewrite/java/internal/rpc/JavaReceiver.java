@@ -352,6 +352,9 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitMethodDeclaration(J.MethodDeclaration method, RpcReceiveQueue q) {
+        if (method.getAnnotations().getName() == null) {
+            method = method.getAnnotations().withName(new J.MethodDeclaration.IdentifierWithAnnotations(null, null));
+        }
         return method
                 .withLeadingAnnotations(q.receiveList(method.getLeadingAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .withModifiers(q.receiveList(method.getModifiers(), m -> (J.Modifier) visitNonNull(m, q)))
@@ -549,7 +552,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitUnary(J.Unary unary, RpcReceiveQueue q) {
         return unary
-                .withOperator(q.receiveAndGet(unary.getOperator(), toEnum(J.Unary.Type.class)))
+                .getPadding().withOperator(q.receive(unary.getPadding().getOperator(), op -> visitLeftPadded(op, q, toEnum(J.Unary.Type.class))))
                 .withExpression(q.receive(unary.getExpression(), e -> (Expression) visitNonNull(e, q)))
                 .withType(q.receive(unary.getType(), t -> visitType(t, q)));
     }

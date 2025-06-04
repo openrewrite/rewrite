@@ -400,7 +400,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitUnary(unary: J.Unary, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(unary, u => u.operator);
+        await q.getAndSend(unary, u => u.operator, op => this.visitLeftPadded(op, q));
         await q.getAndSend(unary, u => u.expression, expr => this.visit(expr, q));
         await q.getAndSend(unary, u => asRef(u.type), type => this.visitType(type, q));
         return unary;
@@ -499,6 +499,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(method, m => m.throws, throws => this.visitContainer(throws, q));
         await q.getAndSend(method, m => m.body, body => this.visit(body, q));
         await q.getAndSend(method, m => m.defaultValue, def => this.visitLeftPadded(def, q));
+        await q.getAndSend(method, m => asRef(m.methodType), type => this.visitType(type, q));
         return method;
     }
 
@@ -1086,7 +1087,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitUnary(unary: J.Unary, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(unary);
 
-        draft.operator = await q.receive(unary.operator);
+        draft.operator = await q.receive(unary.operator, op => this.visitLeftPadded(op, q));
         draft.expression = await q.receive(unary.expression, expr => this.visit(expr, q));
         draft.type = await q.receive(unary.type, type => this.visitType(type, q));
 
@@ -1267,6 +1268,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         draft.throws = await q.receive(method.throws, throws => this.visitContainer(throws, q));
         draft.body = await q.receive(method.body, body => this.visit(body, q));
         draft.defaultValue = await q.receive(method.defaultValue, def => this.visitLeftPadded(def, q));
+        draft.methodType = await q.receive(method.methodType, type => this.visitType(type, q) as unknown as JavaType.Method);
 
         return finishDraft(draft);
     }

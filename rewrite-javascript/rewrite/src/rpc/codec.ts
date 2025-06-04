@@ -71,7 +71,7 @@ export class RpcCodecs {
      * @returns The corresponding `RpcCodec`, or `undefined` if no matching codec is found.
      */
     static forInstance(before: any): RpcCodec<any> | undefined {
-        if (before !== undefined && typeof before === "object" && "kind" in before) {
+        if (before !== undefined && before !== null && typeof before === "object" && "kind" in before) {
             return RpcCodecs.forType(before["kind"] as string);
         }
     }

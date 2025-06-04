@@ -357,6 +357,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(method, m -> m.getPadding().getThrows(), thr -> visitContainer(thr, q));
         q.getAndSend(method, J.MethodDeclaration::getBody, body -> visit(body, q));
         q.getAndSend(method, m -> m.getPadding().getDefaultValue(), def -> visitLeftPadded(def, q));
+        q.getAndSend(method, a -> asRef(a.getMethodType()), type -> visitType(getValueNonNull(type), q));
         return method;
     }
 
@@ -537,7 +538,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     @Override
     public J visitUnary(J.Unary unary, RpcSendQueue q) {
-        q.getAndSend(unary, J.Unary::getOperator);
+        q.getAndSend(unary, u -> u.getPadding().getOperator(), op -> visitLeftPadded(op, q));
         q.getAndSend(unary, J.Unary::getExpression, expr -> visit(expr, q));
         q.getAndSend(unary, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return unary;

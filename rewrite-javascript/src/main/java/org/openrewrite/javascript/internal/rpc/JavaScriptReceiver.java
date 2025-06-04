@@ -50,6 +50,9 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
+        if (j instanceof JS.ExpressionStatement || j instanceof JS.StatementExpression) {
+            return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)));
+        }
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
