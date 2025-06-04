@@ -41,6 +41,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
         if (j.kind !== JS.Kind.ExpressionStatement && j.kind !== JS.Kind.StatementExpression) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
             await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
             await q.sendMarkers(j, j2 => j2.markers);
         }
@@ -557,6 +558,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
         draft.id = await q.receive(j.id);
         if (j.kind !== JS.Kind.ExpressionStatement && j.kind !== JS.Kind.StatementExpression) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
             draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
             draft.markers = await q.receiveMarkers(j.markers);
         }

@@ -51,6 +51,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
         if (j instanceof JS.ExpressionStatement || j instanceof JS.StatementExpression) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
             return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)));
         }
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
