@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
@@ -223,19 +224,19 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package com.acme.bank;
-              
+
               import com.acme.bank.*;
-              
+
               class Foo {
               }
               """,
             """
               package com.acme.bank;
-              
+
               import com.acme.bank.*;
-              
+
               import com.acme.bank.Record;
-              
+
               class Foo {
               }
               """,
@@ -262,6 +263,7 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void dontImportJavaLang() {
         rewriteRun(
@@ -1492,7 +1494,7 @@ class AddImportTest implements RewriteTest {
                   Date date = new Date(System.currentTimeMillis());
               }
               """,
-              """
+            """
               import java.util.Date;
 
               class Ambiguous {
@@ -1508,27 +1510,27 @@ class AddImportTest implements RewriteTest {
     void fullyQualifyOnAmbiguousStaticFieldImport() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
-                  maybeAddImport("java.awt.Color", "RED", true);
-                  maybeAddImport("java.awt.Color", true);
-                  JavaTemplate template = JavaTemplate.builder(
-                      "Color color = RED;")
-                    .imports("java.awt.Color")
-                    .staticImports("java.awt.Color.RED")
-                    .build();
-                  return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
-              }
-          }).withMaxCycles(1))
-          .parser(JavaParser.fromJavaVersion().dependsOn(
+                @Override
+                public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                    maybeAddImport("java.awt.Color", "RED", true);
+                    maybeAddImport("java.awt.Color", true);
+                    JavaTemplate template = JavaTemplate.builder(
+                        "Color color = RED;")
+                      .imports("java.awt.Color")
+                      .staticImports("java.awt.Color.RED")
+                      .build();
+                    return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+                }
+            }).withMaxCycles(1))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
               """
-              package com.example;
+                package com.example;
 
-              public class CustomColor {
-                  public static final String RED = "red";
-              }
-              """
-          )),
+                public class CustomColor {
+                    public static final String RED = "red";
+                }
+                """
+            )),
           java(
             """
               import static com.example.CustomColor.RED;
@@ -1540,9 +1542,9 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """,
-              """
+            """
               import java.awt.Color;
-              
+
               import static com.example.CustomColor.RED;
 
               class Ambiguous {
@@ -1576,7 +1578,7 @@ class AddImportTest implements RewriteTest {
           java(
             """
               import static java.util.Collections.sort;
-              
+
               import java.util.ArrayList;
 
               class Ambiguous {
@@ -1585,12 +1587,12 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """,
-              """
+            """
               import static java.util.Collections.sort;
-              
+
               import java.util.ArrayList;
               import java.util.List;
-              
+
               class Ambiguous {
                   List<Integer> list = java.util.Arrays.sort(new int[]{1, 2, 3});
                   void method() {
@@ -1601,4 +1603,142 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5530")
+    @Test
+    void importWithNestedClass() {
+        @Language("java") final String auxSource = """
+          package com.example;
+          
+          public interface A {
+              enum DataType {
+                  TYPE_1,
+                  TYPE_2
+              }
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.Block visitBlock(J.Block body, ExecutionContext ctx) {
+                    JavaTemplate template = JavaTemplate.builder(
+                        "DataType d2 = DataType.TYPE_2;")
+                      .javaParser(JavaParser.fromJavaVersion().dependsOn(auxSource))
+                      .imports("com.example.A.DataType")
+                      .build();
+                    maybeAddImport("com.example.A.DataType");
+                    return template.apply(updateCursor(body), body.getCoordinates().firstStatement());
+                }
+            }).withMaxCycles(1))
+            .parser(JavaParser.fromJavaVersion().dependsOn(auxSource)),
+          java(
+            """
+              import com.example.A;
+              import com.example.A.DataType;
+
+              class Test {
+                  DataType d1 = DataType.TYPE_1;
+                  A a;
+              }
+              """,
+            """
+              import com.example.A;
+              import com.example.A.DataType;
+
+              class Test {
+                  DataType d2 = DataType.TYPE_2;
+                  DataType d1 = DataType.TYPE_1;
+                  A a;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void codeSanityCheck() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
+            """
+              package com.ex.app.config;
+              public class OldA {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldB {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldC {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldD {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldE {}
+              """
+          )).recipes(
+            new ChangeType("com.ex.app.config.OldA", "com.ex.app.config.NewA", null),
+            new ChangeType("com.ex.app.task.OldB", "com.ex.app.task.NewB", null),
+            new ChangeType("com.ex.app.task.OldC", "com.ex.app.task.NewC", null),
+            new ChangeType("com.ex.app.task.OldD", "com.ex.app.task.NewD", null),
+            new ChangeType("com.ex.app.task.OldE", "com.ex.app.task.NewE", null)
+          ),
+          java(
+            """
+              package sample;
+              
+              import com.ex.app.config.OldA;
+              import com.ex.app.task.OldB;
+              import com.ex.app.task.OldC;
+              import com.ex.app.task.OldD;
+              import com.ex.app.task.OldE;
+              
+              public class A {
+                  private final OldA a;
+                  private final OldB b;
+                  private final OldC c;
+                  private final OldD d;
+                  private final OldE e;
+              
+                  public A(OldA a, OldB b, OldC c, OldD d, OldE e) {
+                      this.a = a;
+                      this.b = b;
+                      this.c = c;
+                      this.d = d;
+                      this.e = e;
+                  }
+              }
+              """,
+            """
+          package sample;
+          
+          import com.ex.app.config.NewA;
+          import com.ex.app.task.NewB;
+          import com.ex.app.task.NewC;
+          import com.ex.app.task.NewD;
+          import com.ex.app.task.NewE;
+          
+          public class A {
+              private final NewA a;
+              private final NewB b;
+              private final NewC c;
+              private final NewD d;
+              private final NewE e;
+          
+              public A(NewA a, NewB b, NewC c, NewD d, NewE e) {
+                  this.a = a;
+                  this.b = b;
+                  this.c = c;
+                  this.d = d;
+                  this.e = e;
+              }
+          }
+          """
+          )
+        );
+    }
+
 }

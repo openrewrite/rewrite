@@ -259,11 +259,10 @@ public class MethodMatcher {
         if (type == null) {
             return false;
         }
-        if (!matchesTargetType(type.getDeclaringType())) {
+        if (!matchesMethodName(type.getName())) {
             return false;
         }
-
-        if (!matchesMethodName(type.getName())) {
+        if (!matchesTargetType(type.getDeclaringType())) {
             return false;
         }
 

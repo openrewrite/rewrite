@@ -2029,4 +2029,69 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5444")
+    void whitespaceInGenericTypesInJavadocTags() {
+        rewriteRun(
+          java(
+            """
+            import java.util.Optional;
+
+            public class Foo {
+                private void bar(Optional<String> b) {}
+
+                /**
+                 * This has an extra whitespace {@link #bar(Optional <String>)}
+                 * This has 3 extra whitespaces {@link #bar(Optional   <String>)}
+                 * This has no extra whitespace {@link #bar(Optional<String>)}
+                 */
+                public void foo() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5411")
+    void multilineHtmlCommentInJavadoc() {
+        rewriteRun(
+          java(
+            """
+              /** 
+              * First line of comment
+              * <!-- comment 
+              *   Second line of comment
+              * -->
+              * <!-- another comment -->
+              * Final comment line
+              */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5443")
+    @Test
+    void parsingIncorrectJavadocValueReference() {
+        rewriteRun(
+          spec-> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          // language=java
+          java(
+            """
+            public class Foo {
+                private static final String BAR = "bar";
+
+                /**
+                This is an incorrect reference {@value BAR}
+                */
+                public void foo() {}
+            }
+            """
+          )
+        );
+    }
 }

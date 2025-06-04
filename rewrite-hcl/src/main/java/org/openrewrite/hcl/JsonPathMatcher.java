@@ -384,7 +384,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
+        public @Nullable Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
             String s = null;
             if (ctx.StringLiteral() != null) {
                 s = ctx.StringLiteral().getText();

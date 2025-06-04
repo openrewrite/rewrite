@@ -15,7 +15,7 @@
  */
 import {JavaScriptVisitor} from "./visitor";
 import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {isJavaScript, JS} from "./tree";
+import {isJavaScript, JS, JSX} from "./tree";
 import {Expression, J, JavaType, Statement, TypedTree, TypeTree} from "../java";
 import {createDraft, finishDraft} from "immer";
 import {JavaReceiver, JavaSender} from "../java/rpc";
@@ -371,6 +371,42 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return withStatement;
     }
 
+    override async visitJsxTag(tag: JSX.Tag, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(tag, el => el.openName, el => this.visitLeftPadded(el, q));
+        await q.getAndSend(tag, el => el.afterName, space => this.visitSpace(space, q));
+        await q.getAndSendList(tag, el => el.attributes, attr => attr.element.id, attr => this.visitRightPadded(attr, q));
+
+        await q.getAndSend(tag, el => el.selfClosing, space => this.visitSpace(space, q));
+        await q.getAndSendList(tag, el => el.children!, child => child.id, child => this.visit(child, q));
+        await q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
+        await q.getAndSend(tag, el => el.afterClosingName, el => this.visitSpace(el, q));
+
+        return tag;
+    }
+
+    override async visitJsxAttribute(attribute: JSX.Attribute, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(attribute, el => el.key, el => this.visit(el, q));
+        await q.getAndSend(attribute, el => el.value, el => this.visitLeftPadded(el, q));
+        return attribute;
+    }
+
+    override async visitJsxSpreadAttribute(spreadAttribute: JSX.SpreadAttribute, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(spreadAttribute, el => el.dots, space => this.visitSpace(space, q));
+        await q.getAndSend(spreadAttribute, el => el.expression, el => this.visitRightPadded(el, q));
+        return spreadAttribute;
+    }
+
+    override async visitJsxExpression(embeddedExpression: JSX.EmbeddedExpression, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(embeddedExpression, el => el.expression, el => this.visitRightPadded(el, q));
+        return embeddedExpression;
+    }
+
+    override async visitJsxNamespacedName(namespacedName: JSX.NamespacedName, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(namespacedName, el => el.namespace, el => this.visit(el, q));
+        await q.getAndSend(namespacedName, el => el.name, el => this.visitLeftPadded(el, q));
+        return namespacedName;
+    }
+
     override async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(indexSignatureDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
         await q.getAndSend(indexSignatureDeclaration, el => el.parameters, el => this.visitContainer(el, q));
@@ -643,7 +679,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitImportSpecifier(jsImportSpecifier: JS.ImportSpecifier, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(jsImportSpecifier);
         draft.importType = await q.receive(draft.importType, el => this.visitLeftPadded(el, q));
-        draft.specifier = await q.receive(draft.specifier, el => this.visitDefined<Expression>(el, q));
+        draft.specifier = await q.receive(draft.specifier, el => this.visitDefined<JS.Alias | J.Identifier>(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
@@ -897,6 +933,47 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         const draft = createDraft(withStatement);
         draft.expression = await q.receive(draft.expression, el => this.visitDefined<J.ControlParentheses<Expression>>(el, q));
         draft.body = await q.receive(draft.body, el => this.visitRightPadded(el, q));
+        return finishDraft(draft);
+    }
+
+    override async visitJsxTag(tag: JSX.Tag, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(tag);
+        draft.openName = await q.receive(draft.openName, el => this.visitLeftPadded(el, q));
+        draft.afterName = await q.receive(draft.afterName, space => this.visitSpace(space, q));
+        draft.attributes = await q.receiveListDefined(draft.attributes, attr => this.visitRightPadded(attr, q));
+
+        draft.selfClosing = await q.receive(draft.selfClosing, space => this.visitSpace(space, q));
+        draft.children = await q.receiveListDefined(draft.children, child => this.visit(child, q));
+        draft.closingName = await q.receive(draft.closingName, el => this.visitLeftPadded(el, q));
+        draft.afterClosingName = await q.receive(draft.afterClosingName, el => this.visitSpace(el, q));
+
+        return finishDraft(draft);
+    }
+
+    override async visitJsxAttribute(attribute: JSX.Attribute, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(attribute);
+        draft.key = await q.receive(draft.key, el => this.visitDefined<J.Identifier | JSX.NamespacedName>(el, q));
+        draft.value = await q.receive(draft.value, el => this.visitLeftPadded(el, q));
+        return finishDraft(draft);
+    }
+
+    override async visitJsxSpreadAttribute(spreadAttribute: JSX.SpreadAttribute, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(spreadAttribute);
+        draft.dots = await q.receive(draft.dots, space => this.visitSpace(space, q));
+        draft.expression = await q.receive(draft.expression, el => this.visitRightPadded(el, q));
+        return finishDraft(draft);
+    }
+
+    override async visitJsxExpression(embeddedExpression: JSX.EmbeddedExpression, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(embeddedExpression);
+        draft.expression = await q.receive(draft.expression, el => this.visitRightPadded(el, q));
+        return finishDraft(draft);
+    }
+
+    override async visitJsxNamespacedName(namespacedName: JSX.NamespacedName, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(namespacedName);
+        draft.namespace = await q.receive(draft.namespace, el => this.visitDefined<J.Identifier>(el, q));
+        draft.name = await q.receive(draft.name, el => this.visitLeftPadded(el, q));
         return finishDraft(draft);
     }
 

@@ -8,4 +8,4 @@ class JavaPrinter extends JavaVisitor<PrintOutputCapture> {
     }
 }
 
-TreePrinters.register(J.Kind.CompilationUnit, new JavaPrinter());
+TreePrinters.register(J.Kind.CompilationUnit, () => new JavaPrinter());

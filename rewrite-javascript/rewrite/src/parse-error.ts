@@ -46,7 +46,7 @@ export class ParseErrorVisitor<P> extends TreeVisitor<Tree, P> {
     }
 }
 
-TreePrinters.register(ParseErrorKind, new class extends ParseErrorVisitor<PrintOutputCapture> {
+TreePrinters.register(ParseErrorKind, () => new class extends ParseErrorVisitor<PrintOutputCapture> {
     protected async visitParseError(e: ParseError, p: PrintOutputCapture): Promise<ParseError | undefined> {
         for (let marker of e.markers.markers) {
             p.append(p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), it => it))
