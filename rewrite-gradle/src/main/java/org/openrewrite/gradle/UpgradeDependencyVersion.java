@@ -33,10 +33,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -125,7 +122,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Value
     public static class DependencyVersionState {
-        Map<String, GroupArtifact> versionPropNameToGA = new HashMap<>();
+        Map<String, Map<GroupArtifact, Set<String>>> versionPropNameToGA = new HashMap<>();
 
         /**
          * The value is either a String representing the resolved version
@@ -239,7 +236,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         try {
                             String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                     .select(new GroupArtifact(declaredGroupId, declaredArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
-                            acc.versionPropNameToGA.put(versionVariableName, ga);
+                            //acc.versionPropNameToGA.put(versionVariableName, ga);
+                            acc.versionPropNameToGA
+                                    .computeIfAbsent(versionVariableName, k -> new HashMap<>())
+                                    .computeIfAbsent(ga, k -> new HashSet<>())
+                                    .add(m.getSimpleName());
                             // It is fine for this value to be null, record it in the map to avoid future lookups
                             //noinspection DataFlowIssue
                             acc.gaToNewVersion.put(ga, resolvedVersion);
@@ -309,7 +310,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         try {
                             String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                     .select(new GroupArtifact(declaredGroupId, declaredArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
-                            acc.versionPropNameToGA.put(versionVariableName, ga);
+                            //acc.versionPropNameToGA.put(versionVariableName, ga);
+                            acc.versionPropNameToGA
+                                    .computeIfAbsent(versionVariableName, k -> new HashMap<>())
+                                    .computeIfAbsent(ga, k -> new HashSet<>())
+                                    .add(m.getSimpleName());
                             // It is fine for this value to be null, record it in the map to avoid future lookups
                             //noinspection DataFlowIssue
                             acc.gaToNewVersion.put(ga, resolvedVersion);
@@ -370,7 +375,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                         .select(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 if (resolvedVersion != null) {
-                                    acc.versionPropNameToGA.put(versionVariableName, ga);
+                                    //acc.versionPropNameToGA.put(versionVariableName, ga);
+                                    acc.versionPropNameToGA
+                                            .computeIfAbsent(versionVariableName, k -> new HashMap<>())
+                                            .computeIfAbsent(ga, k -> new HashSet<>())
+                                            .add(m.getSimpleName());
                                     acc.gaToNewVersion.put(ga, resolvedVersion);
                                 }
                             } catch (MavenDownloadingException e) {
@@ -471,7 +480,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         @Override
         public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if (acc.versionPropNameToGA.containsKey(entry.getKey())) {
-                GroupArtifact ga = acc.versionPropNameToGA.get(entry.getKey());
+                GroupArtifact ga = acc.versionPropNameToGA.get(entry.getKey()).keySet().stream().findFirst().orElse(null);
                 if (ga == null || !dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
                     return entry;
                 }
@@ -543,6 +552,19 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
+            } else if (m.getSimpleName().equals("ext")) {
+                Cursor cursor = getCursor();
+                return m.withArguments(ListUtils.map(m.getArguments(), arg -> (Expression) new JavaIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
+                        if(assignment.getVariable() instanceof J.Identifier &&  acc.versionPropNameToGA.containsKey(((J.Identifier) assignment.getVariable()).getSimpleName())) {
+                            cursor.dropParentUntil(p -> p instanceof SourceFile)
+                                    .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
+                                    .computeIfAbsent(((J.Identifier) assignment.getVariable()).getSimpleName(), it -> acc.versionPropNameToGA.get(((J.Identifier) assignment.getVariable()).getSimpleName()));
+                        }
+                        return super.visitAssignment(assignment, executionContext);
+                    }
+                }.visit(arg, ctx)));
             }
             return m;
         }

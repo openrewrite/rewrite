@@ -1875,12 +1875,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void updateVersionDefinedInBuildScriptWithInlineReferenceInDependenciesGradle() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi())
-            .recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-gradle-plugin", "3.4.4", null)),
           dependenciesGradle(
             """
               dependencies {
-                  implementation "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+                  implementation "com.google.guava:guava:${guavaVersion}"
               }
               """
           ),
@@ -1888,16 +1886,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             """
               buildscript {
                   ext {
-                      springBootVersion = "3.4.2"
-                  }
-              
-                  repositories {
-                    mavenCentral()
+                      guavaVersion = "29.0-jre"
                   }
               }
               
               plugins {
                   id("java")
+              }
+              
+              repositories {
+                  mavenCentral()
               }
               
               apply from: 'dependencies.gradle'
@@ -1905,16 +1903,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             """
               buildscript {
                   ext {
-                      springBootVersion = "3.4.4"
-                  }
-              
-                  repositories {
-                    mavenCentral()
+                      guavaVersion = "30.1.1-jre"
                   }
               }
               
               plugins {
                   id("java")
+              }
+              
+              repositories {
+                  mavenCentral()
               }
               
               apply from: 'dependencies.gradle'
@@ -1926,12 +1924,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void updateVersionDefinedInBuildScriptWithConcatenatedReferenceInDependenciesGradle() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi())
-            .recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-gradle-plugin", "3.4.4", null)),
           dependenciesGradle(
             """
               dependencies {
-                  implementation 'org.springframework.boot:spring-boot-gradle-plugin' + springBootVersion
+                  implementation 'com.google.guava:guava:' + guavaVersion
               }
               """
           ),
@@ -1939,11 +1935,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             """
               buildscript {
                   ext {
-                      springBootVersion = "3.4.2"
-                  }
-              
-                  repositories {
-                    mavenCentral()
+                      guavaVersion = "29.0-jre"
                   }
               }
               
@@ -1951,17 +1943,21 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   id("java")
               }
               
+              repositories {
+                  mavenCentral()
+              }
+              
               apply from: 'dependencies.gradle'
               """,
             """
               buildscript {
                   ext {
-                      springBootVersion = "3.4.4"
+                      guavaVersion = "30.1.1-jre"
                   }
+              }
               
-                  repositories {
-                    mavenCentral()
-                  }
+              repositories {
+                  mavenCentral()
               }
               
               plugins {
