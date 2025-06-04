@@ -300,7 +300,7 @@ public class Environment {
         return activateStyles(Arrays.asList(activeStyles));
     }
 
-    public Set<License> getRequiredLicenses() {
+    public Set<License> listLicenses() {
         return resourceLoaders.stream()
                 .map(ResourceLoader::listLicenses)
                 .flatMap(Collection::stream)

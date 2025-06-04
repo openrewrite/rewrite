@@ -24,7 +24,7 @@ class EnvironmentTest {
     @Test
     void listYamlLicenses() {
         var env = Environment.builder().scanYamlResources().build();
-        var licenses = env.getRequiredLicenses();
+        var licenses = env.listLicenses();
         assertThat(licenses).containsExactlyInAnyOrder(
           new License("Apache License Version 2.0", "https://www.apache.org/licenses/LICENSE-2.0")
         );
@@ -34,7 +34,7 @@ class EnvironmentTest {
     void listDependencyDetectedLicenses() {
         // Detect the hibernate license here.
         var env = Environment.builder().scanRuntimeClasspath().build();
-        var licenses = env.getRequiredLicenses();
+        var licenses = env.listLicenses();
         assertThat(licenses).containsExactlyInAnyOrder(
           new License("Apache License Version 2.0", "https://www.apache.org/licenses/LICENSE-2.0")
         );
