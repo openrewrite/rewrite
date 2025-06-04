@@ -137,6 +137,23 @@ export class JavaScriptTypeMapping {
             } as JavaType.UniqueSymbol;
             this.typeCache.set(signature, result);
             return result;
+        } else if (type.flags & ts.TypeFlags.Object) {
+            const objectType = type as ts.ObjectType;
+            if (objectType.objectFlags & ts.ObjectFlags.Interface) {
+                let result = {
+                    kind: JavaType.Kind.Class,
+                    classKind: JavaType.Class.Kind.Interface,
+                    fullyQualifiedName: "missing", // TODO
+                    typeParameters: [], // TODO
+                    annotations: [], // TODO
+                    interfaces: [], // TODO
+                    members: [],
+                    methods: [] // TODO
+                } as Draft<JavaType.Class>;
+                this.typeCache.set(signature, result);
+                result.members = objectType.getProperties().map(symbol => this.getType(this.checker.getTypeOfSymbol(symbol)) as JavaType.Variable);
+                return result;
+            }
         }
 
         // if (ts.isRegularExpressionLiteral(node)) {
