@@ -37,7 +37,7 @@ import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.*;
 import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 import static org.openrewrite.yaml.MergeYaml.InsertMode;
-import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
+import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
 /**
  * Visitor class to merge two yaml files.
