@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -111,10 +112,16 @@ class ListUtilsTest {
         }
 
         @Test
-        void idempotence() {
+        void invertible() {
             List<Integer> ints = List.of(1, 2, 3);
             assertThat(ListUtils.transform(ListUtils.transform(ints, Object::toString), s -> Integer.parseInt(s)))
               .containsExactlyElementsOf(ints);
+        }
+
+        @Test
+        void notIdempotent() {
+            List<Integer> ints = List.of(1, 2, 3);
+            assertThat(ListUtils.transform(ints, Function.identity())).isNotSameAs(ints);
         }
 
         @Test
