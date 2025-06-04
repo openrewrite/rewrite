@@ -17,6 +17,7 @@ package org.openrewrite.config;
 
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
+import io.github.classgraph.Resource;
 import io.github.classgraph.ScanResult;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
@@ -29,6 +30,9 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.style.NamedStyles;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.nio.file.Path;
@@ -41,6 +45,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private final LinkedHashMap<String, Recipe> recipes = new LinkedHashMap<>();
     private final List<NamedStyles> styles = new ArrayList<>();
+    private final Set<License> licenses = new LinkedHashSet<>();
 
     private final LinkedHashSet<RecipeDescriptor> recipeDescriptors = new LinkedHashSet<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
@@ -65,6 +70,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     properties,
                     emptyList(),
                     null);
+            scanLicenses(new ClassGraph().acceptPathsNonRecursive("META-INF"));
         };
     }
 
@@ -88,6 +94,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     properties,
                     emptyList(),
                     classLoader);
+            scanLicenses(new ClassGraph().acceptPathsNonRecursive("META-INF").overrideClassLoaders(classLoader));
         };
     }
 
@@ -106,6 +113,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     .ignoreParentClassLoaders()
                     .overrideClassLoaders(classLoader)
                     .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
+            scanLicenses(new ClassGraph().acceptPathsNonRecursive("META-INF").overrideClassLoaders(classLoader));
         };
     }
 
@@ -113,6 +121,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
         ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
         classpathScanningLoader.scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
                 properties, emptyList(), null);
+        classpathScanningLoader.scanLicenses(new ClassGraph().acceptPathsNonRecursive("META-INF"));
         return classpathScanningLoader;
     }
 
@@ -170,6 +179,38 @@ public class ClasspathScanningLoader implements ResourceLoader {
                         }
                     }
 
+            }
+        }
+    }
+
+    private void scanLicenses(ClassGraph classGraph) {
+        try (ScanResult result = classGraph.scan()) {
+            for (Resource resource : result.getResourcesWithLeafName("MANIFEST.MF")) {
+                try (Resource resToClose = resource; BufferedReader reader = new BufferedReader(new InputStreamReader(resource.open()))) {
+                    StringBuilder licenseName = new StringBuilder();
+                    StringBuilder licenseUrl = new StringBuilder();
+                    String previousLine = "";
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (line.toLowerCase().startsWith("license-name:")) {
+                            licenseName = new StringBuilder(line.substring("license-name:".length()).trim());
+                        } else if (line.toLowerCase().startsWith("license-url:")) {
+                            licenseUrl = new StringBuilder(line.substring("license-url:".length()).trim());
+                        }
+                        if (line.startsWith(" ")) {
+                            if (previousLine.toLowerCase().startsWith("license-name:")) {
+                                licenseName.append(line.trim());
+                            } else if (previousLine.toLowerCase().startsWith("license-url:")) {
+                                licenseUrl.append(line.trim());
+                            }
+                        } else {
+                            previousLine = line;
+                        }
+                    }
+                    if (licenseName.length() > 0 && licenseUrl.length() > 0) {
+                        licenses.add(new License(licenseName.toString(), licenseUrl.toString()));
+                    }
+                } catch (IOException ignored) {}
             }
         }
     }
@@ -246,6 +287,12 @@ public class ClasspathScanningLoader implements ResourceLoader {
     public Map<String, List<RecipeExample>> listRecipeExamples() {
         ensureScanned();
         return recipeExamples;
+    }
+
+    @Override
+    public Set<License> listLicenses() {
+        ensureScanned();
+        return licenses;
     }
 
     @Override
