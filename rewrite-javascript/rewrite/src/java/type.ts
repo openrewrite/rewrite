@@ -15,6 +15,7 @@ export namespace JavaType {
         Primitive: "org.openrewrite.java.tree.JavaType$Primitive",
         ShallowClass: "org.openrewrite.java.tree.JavaType$ShallowClass",
         Union: "org.openrewrite.java.tree.JavaType$MultiCatch",
+        UniqueSymbol: "org.openrewrite.java.tree.JavaType$UniqueSymbol",
         Unknown: "org.openrewrite.java.tree.JavaType$Unknown",
         Variable: "org.openrewrite.java.tree.JavaType$Variable",
     }
@@ -146,11 +147,6 @@ export namespace JavaType {
         }
     }
 
-    export interface Primitive extends JavaType {
-        readonly kind: typeof Kind.Primitive;
-        readonly keyword: string;
-    }
-
     export interface Union extends JavaType {
         readonly kind: typeof Kind.Union;
         readonly bounds: JavaType[];
@@ -163,6 +159,10 @@ export namespace JavaType {
 
     export interface ShallowClass extends JavaType.Class {
         readonly kind: typeof Kind.ShallowClass;
+    }
+
+    export interface UniqueSymbol extends JavaType {
+        readonly kind: typeof Kind.UniqueSymbol;
     }
 
     export const unknownType: JavaType = {

@@ -144,7 +144,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             d = (JS.Delete) temp;
         }
-        d = d.withType(visitType(d.getType(), p));
         return d;
     }
 
