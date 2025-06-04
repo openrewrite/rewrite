@@ -514,7 +514,8 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationWrapping() {
         rewriteRun(
-          java("""
+          java(
+                """
           import java.lang.annotation.Repeatable;
           
           @Repeatable(Foo.Foos.class)
