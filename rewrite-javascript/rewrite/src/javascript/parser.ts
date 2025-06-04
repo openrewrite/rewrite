@@ -2491,7 +2491,9 @@ export class JavaScriptParserVisitor {
 
     visitVariableStatement(node: ts.VariableStatement) {
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
-            draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            if (node.modifiers) {
+                draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            }
             draft.prefix = this.prefix(node);
         });
     }
