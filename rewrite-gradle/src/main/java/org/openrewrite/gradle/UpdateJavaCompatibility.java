@@ -20,21 +20,22 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinParser;
-import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.lang.Boolean.TRUE;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
@@ -99,29 +100,81 @@ public class UpdateJavaCompatibility extends Recipe {
             final MethodMatcher sourceCompatibilityDsl = new MethodMatcher("RewriteGradleProject setSourceCompatibility(..)");
             final MethodMatcher targetCompatibilityDsl = new MethodMatcher("RewriteGradleProject setTargetCompatibility(..)");
 
+            boolean isGroovy = false;
+            boolean isKotlin = false;
+
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                Tree t = super.visit(tree, ctx);
-                if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
-                    t = addCompatibilityTypeToSourceFile(t, "source", ctx);
+                if (tree instanceof G.CompilationUnit) {
+                    isGroovy = true;
+                } else if (tree instanceof K.CompilationUnit) {
+                    isKotlin = true;
                 }
-                if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
-                    t = addCompatibilityTypeToSourceFile(t, "target", ctx);
+
+                Tree t = super.visit(tree, ctx);
+
+                if (tree instanceof G.CompilationUnit) {
+                    t = new GroovyIsoVisitor<ExecutionContext>() {
+                        @Override
+                        public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                            G.CompilationUnit c = super.visitCompilationUnit(cu, ctx);
+                            if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
+                                c = addCompatibilityTypeToSourceFile(c, "source", ctx);
+                            }
+                            if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
+                                c = addCompatibilityTypeToSourceFile(c, "target", ctx);
+                            }
+                            return c;
+                        }
+
+                        @Override
+                        public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+                            return visitAssignmentX(assignment, getCursor(), ctx);
+                        }
+
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                            return visitMethodInvocationX(method, getCursor(), ctx);
+                        }
+                    }.visit(tree, ctx);
+                } else if (getCursor().getValue() instanceof K.CompilationUnit) {
+                    doAfterVisit(new KotlinIsoVisitor<ExecutionContext>() {
+                        @Override
+                        public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                            K.CompilationUnit c = super.visitCompilationUnit(cu, ctx);
+                            if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
+                                c = addCompatibilityTypeToSourceFile(c, "source", ctx);
+                            }
+                            if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
+                                c = addCompatibilityTypeToSourceFile(c, "target", ctx);
+                            }
+                            return super.visitCompilationUnit(c, ctx);
+                        }
+
+                        @Override
+                        public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+                            return visitAssignmentX(assignment, getCursor(), ctx);
+                        }
+
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                            return visitMethodInvocationX(method, getCursor(), ctx);
+                        }
+                    });
                 }
                 return (J) t;
             }
 
-            @Override
-            public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+            public J.Assignment visitAssignmentX(J.Assignment assignment, Cursor c, ExecutionContext ctx) {
                 J.Assignment a = super.visitAssignment(assignment, ctx);
 
                 if (a.getVariable() instanceof J.Identifier) {
                     J.Identifier variable = (J.Identifier) a.getVariable();
                     if ("sourceCompatibility".equals(variable.getSimpleName())) {
-                        getCursor().getRoot().putMessage(SOURCE_COMPATIBILITY_FOUND, a.getAssignment());
+                        c.putMessageOnFirstEnclosing(isGroovy ? G.CompilationUnit.class : K.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, a.getAssignment());
                     }
                     if ("targetCompatibility".equals(variable.getSimpleName())) {
-                        getCursor().getRoot().putMessage(TARGET_COMPATIBILITY_FOUND, a.getAssignment());
+                        c.putMessageOnFirstEnclosing(isGroovy ? G.CompilationUnit.class : K.CompilationUnit.class, TARGET_COMPATIBILITY_FOUND, a.getAssignment());
                     }
 
                     if (compatibilityType == null) {
@@ -158,21 +211,20 @@ public class UpdateJavaCompatibility extends Recipe {
             }
 
             private boolean shouldUpdateVersion(int currentMajor) {
-                return currentMajor < version || currentMajor > version && Boolean.TRUE.equals(allowDowngrade);
+                return currentMajor < version || currentMajor > version && TRUE.equals(allowDowngrade);
             }
 
             private boolean shouldUpdateStyle(@Nullable DeclarationStyle currentStyle) {
                 return declarationStyle != null && declarationStyle != currentStyle;
             }
 
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            public J.MethodInvocation visitMethodInvocationX(J.MethodInvocation method, Cursor c, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if ("sourceCompatibility".equals(m.getSimpleName())) {
-                    getCursor().getRoot().putMessage(SOURCE_COMPATIBILITY_FOUND, true);
+                    c.putMessageOnFirstEnclosing(isGroovy ? G.CompilationUnit.class : K.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, true);
                 }
                 if ("targetCompatibility".equals(m.getSimpleName())) {
-                    getCursor().getRoot().putMessage(TARGET_COMPATIBILITY_FOUND, true);
+                    c.putMessageOnFirstEnclosing(isGroovy ? G.CompilationUnit.class : K.CompilationUnit.class, TARGET_COMPATIBILITY_FOUND, true);
                 }
                 if (isMethodInvocation(m, "JavaLanguageVersion", "of")) {
                     List<Expression> args = m.getArguments();
@@ -397,19 +449,9 @@ public class UpdateJavaCompatibility extends Recipe {
         });
     }
 
-    private J addCompatibilityTypeToSourceFile(Tree t, String compatibilityType, ExecutionContext ctx) {
-        if (t instanceof G.CompilationUnit) {
-            return addCompatibilityTypeToSourceFile((G.CompilationUnit) t, compatibilityType, ctx);
-        }
-        if (t instanceof K.CompilationUnit) {
-            return addCompatibilityTypeToSourceFile((K.CompilationUnit) t, compatibilityType, ctx);
-        }
-        return (J) t;
-    }
-
     private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
-        if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
-            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse(ctx, "\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
+        if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
+            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse(ctx, "\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
             c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
@@ -418,7 +460,7 @@ public class UpdateJavaCompatibility extends Recipe {
     }
 
     private K.CompilationUnit addCompatibilityTypeToSourceFile(K.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
-        if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
+        if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
             J withExistingJavaMethod = maybeAddToExistingJavaMethod(c, compatibilityType, ctx);
             if (withExistingJavaMethod != c) {
                 return (K.CompilationUnit) withExistingJavaMethod;
@@ -459,10 +501,6 @@ public class UpdateJavaCompatibility extends Recipe {
         }.visit(c, ctx);
     }
 
-    private String styleMissingCompatibilityVersion() {
-        return styleMissingCompatibilityVersion(declarationStyle);
-    }
-
     private String styleMissingCompatibilityVersion(DeclarationStyle declarationStyle) {
         if (declarationStyle == DeclarationStyle.String) {
             return version <= 8 ? "'1." + version + "'" : "'" + version + "'";
@@ -473,7 +511,6 @@ public class UpdateJavaCompatibility extends Recipe {
         }
         return String.valueOf(version);
     }
-
 
     public enum CompatibilityType {
         source, target
