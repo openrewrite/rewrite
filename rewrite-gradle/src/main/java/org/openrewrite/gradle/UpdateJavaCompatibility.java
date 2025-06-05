@@ -271,9 +271,8 @@ public class UpdateJavaCompatibility extends Recipe {
                         return m.withArguments(
                                 Collections.singletonList(versionArg.withValue(version)
                                         .withValueSource(version.toString())));
-                    } else {
-                        return m;
                     }
+                    return m;
                 }
             }
 
@@ -295,9 +294,8 @@ public class UpdateJavaCompatibility extends Recipe {
                     DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
                     //noinspection DataFlowIssue
                     return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeJavaVersion(arg, actualStyle)));
-                } else {
-                    return m;
                 }
+                return m;
             }
 
             return SearchResult.found(m, "Attempted to update to Java version to " + version +
@@ -374,12 +372,11 @@ public class UpdateJavaCompatibility extends Recipe {
             String removePrefix = version.substring(version.indexOf("_") + 1);
             if (removePrefix.startsWith("1_")) {
                 return removePrefix.substring(removePrefix.indexOf("_") + 1);
-            } else {
-                return removePrefix;
             }
-        } else {
-            return version.substring(version.indexOf(".") + 1);
+            return removePrefix;
         }
+
+        return version.substring(version.indexOf(".") + 1);
     }
 
     private Expression changeJavaVersion(Expression expression, @Nullable DeclarationStyle style) {
