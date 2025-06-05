@@ -534,7 +534,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return typeParam
                 .withAnnotations(q.receiveList(typeParam.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .withModifiers(q.receiveList(typeParam.getModifiers(), a -> (J.Modifier) visitNonNull(a, q)))
-                .withName(q.receive(typeParam.getName(), n -> (J.Identifier) visitNonNull(n, q)))
+                .withName(q.receive(typeParam.getName(), n -> (Expression) visitNonNull(n, q)))
                 .getPadding().withBounds(q.receive(typeParam.getPadding().getBounds(), b -> visitContainer(b, q)));
     }
 
