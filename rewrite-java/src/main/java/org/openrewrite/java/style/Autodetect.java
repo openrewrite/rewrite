@@ -1307,7 +1307,7 @@ public class Autodetect extends NamedStyles {
             for (int i = 0; i < classDecl.getLeadingAnnotations().size(); i++) {
                 if (classDecl.getLeadingAnnotations().size() == 1 || i == classDecl.getLeadingAnnotations().size() -1) {
                     if (!classDecl.getModifiers().isEmpty()) {
-                        wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getModifiers().get(i).getPrefix());
+                        wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getModifiers().get(0).getPrefix());
                     } else {
                         wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getPadding().getKind().getPrefix());
                     }
@@ -1323,9 +1323,9 @@ public class Autodetect extends NamedStyles {
             for (int i = 0; i < method.getLeadingAnnotations().size(); i++) {
                 if (method.getLeadingAnnotations().size() == 1 || i == method.getLeadingAnnotations().size() -1) {
                     if (!method.getModifiers().isEmpty()) {
-                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getModifiers().get(i).getPrefix());
+                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getModifiers().get(0).getPrefix());
                     } else if (method.getTypeParameters() != null) {
-                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getTypeParameters().get(i).getPrefix());
+                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getTypeParameters().get(0).getPrefix());
                     } else if (method.getReturnTypeExpression() != null){
                         wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getReturnTypeExpression().getPrefix());
                     } else {

@@ -288,7 +288,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               @SuppressWarnings({"ALL"})
-               class Test {
+              class Test {
               }
               """
           )
@@ -332,15 +332,15 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   public void doSomething() {
-                      @SuppressWarnings("ALL") int foo;
+                      @SuppressWarnings("ALL")
+                      int foo;        
                   }
               }
               """,
-            """
+              """
               public class Test {
                   public void doSomething() {
-                      @SuppressWarnings("ALL")
-               int foo;        
+                      @SuppressWarnings("ALL") int foo;
                   }
               }
               """
@@ -355,8 +355,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   public void doSomething() {
-                      @SuppressWarnings("ALL")
-                      int foo;        
+                      @SuppressWarnings("ALL") int foo;        
                   }
               }
               """
