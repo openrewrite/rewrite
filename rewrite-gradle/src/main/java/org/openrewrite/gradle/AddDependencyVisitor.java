@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -101,10 +102,11 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                     .visitNonNull(sourceFile, ctx);
 
             if (sourceFile != tree) {
+                String versionWithPattern = StringUtils.isBlank(resolvedVersion) || resolvedVersion.startsWith("$") ? null : resolvedVersion;
                 sourceFile = org.openrewrite.gradle.internal.AddDependencyVisitor.addDependency(
                         sourceFile,
                         gradleProject.getConfiguration(configuration),
-                        new GroupArtifactVersion(groupId, artifactId, resolvedVersion),
+                        new GroupArtifactVersion(groupId, artifactId, versionWithPattern),
                         classifier,
                         ctx
                 );

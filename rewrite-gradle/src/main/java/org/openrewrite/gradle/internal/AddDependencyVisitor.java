@@ -88,7 +88,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
         J j = super.visit(tree, ctx);
 
-        if (tree instanceof JavaSourceFile) {
+        if (j instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) j;
 
             if (j == tree && insertPredicate != null && insertPredicate.test(new Cursor(getCursor(), j))) {
@@ -136,6 +136,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             }
 
             Optional<GradleDependency> maybeDependency = gradleDependency()
+                    .configuration(configuration)
                     .groupId(groupId)
                     .artifactId(artifactId)
                     .lower(getCursor())
