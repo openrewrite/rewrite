@@ -95,6 +95,9 @@ public class LicenseVerifier {
         if (APACHE_LICENSE.equals(licenseName)) {
             return true;
         }
+        if ((MSAL_LICENSE.equals(licenseName) || MPL_LICENSE.equals(licenseName)) && LicenseKey.ofModerneCli().isPresent()) {
+            return true;
+        }
         return acceptedLicenses.containsKey(licenseName);
     }
 
