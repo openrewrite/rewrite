@@ -16,8 +16,7 @@
 import {Cursor, SourceFile, Tree} from "./tree";
 import {TreeVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "./print";
-import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
-import {PlainText} from "./text";
+import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
 import {createDraft, Draft, finishDraft} from "immer";
 
 export const ParseErrorKind = "org.openrewrite.tree.ParseError";
@@ -66,7 +65,7 @@ TreePrinters.register(ParseErrorKind, () => new class extends ParseErrorVisitor<
     }
 })
 
-const parseErrorCodec: RpcCodec<ParseError> = {
+RpcCodecs.registerCodec(ParseErrorKind, {
     async rpcReceive(before: ParseError, q: RpcReceiveQueue): Promise<ParseError> {
         const draft: Draft<ParseError> = createDraft(before);
         draft.id = await q.receive(before.id);
@@ -90,6 +89,4 @@ const parseErrorCodec: RpcCodec<ParseError> = {
         await q.getAndSend(after, p => p.fileAttributes);
         await q.getAndSend(after, p => p.text);
     }
-}
-
-RpcCodecs.registerCodec(ParseErrorKind, parseErrorCodec);
+});
