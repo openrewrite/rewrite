@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.GitProvenance;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.table.DistinctGitProvenance;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileResults;
@@ -35,10 +34,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
@@ -52,7 +51,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
     @Test
     void zeroEstimatedEffortForRecipeThatDoesNotGenerateSourcesFileResults() {
         rewriteRun(
-          recipeSpec -> recipeSpec.recipe(new NoChangeRecipe())
+          recipeSpec -> recipeSpec.recipe(Recipe.noop())
             .afterRecipe(recipeRun -> assertThat(recipeRun.getDataTables()).isEmpty())
         );
     }
@@ -139,20 +138,6 @@ class RecipeEstimatedEffortTest implements RewriteTest {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class NoChangeRecipe extends Recipe {
-        @Override
-        public String getDisplayName() {
-            return "No change recipe";
-        }
-
-        @Override
-        public String getDescription() {
-            return "No change recipe.";
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false)
     private static class CustomEstimatedEffortAppendToTextRecipe extends Recipe {
         @Option(displayName = "Search term",
           example = "before",
@@ -179,16 +164,17 @@ class RecipeEstimatedEffortTest implements RewriteTest {
             return new PlainTextVisitor<>() {
                 @Override
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                    for (Marker marker : text.getMarkers().getMarkers()) {
-                        if (marker instanceof AlreadyReplaced alreadyReplaced) {
-                            if (Objects.equals(searchTerm, alreadyReplaced.getFind()) && Objects.equals(appendText, alreadyReplaced.getReplace())) {
-                                return text;
-                            }
+                    for (AlreadyReplaced alreadyReplaced : text.getMarkers().findAll(AlreadyReplaced.class)) {
+                        if (Objects.equals(searchTerm, alreadyReplaced.getFind()) &&
+                          Objects.equals(appendText, alreadyReplaced.getReplace())) {
+                            return text;
                         }
                     }
 
                     if (text.getText().contains(searchTerm)) {
-                        return text.withText(text.getText() + appendText).withMarkers(text.getMarkers().add(new AlreadyReplaced(randomId(), searchTerm, appendText)));
+                        return text
+                          .withText(text.getText() + appendText)
+                          .withMarkers(text.getMarkers().add(new AlreadyReplaced(randomId(), searchTerm, appendText)));
                     }
                     return super.visitText(text, ctx);
                 }
@@ -196,7 +182,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         }
 
         @Override
-        public @Nullable Duration getEstimatedEffortPerOccurrence() {
+        public Duration getEstimatedEffortPerOccurrence() {
             return Duration.ofMinutes(15);
         }
     }
@@ -219,8 +205,6 @@ class RecipeEstimatedEffortTest implements RewriteTest {
           required = false)
         @Nullable
         Boolean overwriteExisting;
-
-        Duration effort = Duration.ofHours(1);
 
         @Override
         public String getDisplayName() {
@@ -247,7 +231,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
             if (shouldCreate.get()) {
                 return PlainTextParser.builder().build().parse(fileContents)
                   .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
-                  .collect(Collectors.toList());
+                  .collect(toList());
             }
             return emptyList();
         }
@@ -281,9 +265,8 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         }
 
         @Override
-        public @Nullable Duration getEstimatedEffortPerOccurrence() {
+        public Duration getEstimatedEffortPerOccurrence() {
             return Duration.ofMinutes(15);
         }
-
     }
 }
