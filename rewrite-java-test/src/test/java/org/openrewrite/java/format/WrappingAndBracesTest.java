@@ -43,7 +43,13 @@ class WrappingAndBracesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
-          new WrappingAndBracesStyle.IfStatement(false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways), new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways, false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap, false), new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap), new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap)))));
+          new WrappingAndBracesStyle.IfStatement(false),
+          new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways),
+          new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways),
+          new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways, false),
+          new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap, false),
+          new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap),
+          new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap)))));
     }
 
     @DocumentExample
@@ -631,7 +637,7 @@ class WrappingAndBracesTest implements RewriteTest {
     }
 
     @Test
-    void annotationWrappingOther() {
+    void annotationWrappingGenerics() {
         rewriteRun(
           java(
             """
