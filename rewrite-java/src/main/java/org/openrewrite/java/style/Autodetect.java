@@ -423,8 +423,8 @@ public class Autodetect extends NamedStyles {
         public Statement visitStatement(Statement statement, IndentStatistics stats) {
             boolean isInParentheses = getCursor().dropParentUntil(
                     p -> p instanceof J.Block ||
-                            p instanceof JContainer ||
-                            p instanceof SourceFile).getValue() instanceof JContainer;
+                                p instanceof JContainer ||
+                                p instanceof SourceFile).getValue() instanceof JContainer;
             if (isInParentheses) {
                 // ignore statements in parentheses.
                 return statement;
@@ -445,7 +445,7 @@ public class Autodetect extends NamedStyles {
             boolean isContinuation = !(expression instanceof J.Annotation && !(
                     // ...but annotations which are *arguments* to other annotations can be continuations
                     getCursor().getParentTreeCursor().getValue() instanceof J.Annotation ||
-                            getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
+                    getCursor().getParentTreeCursor().getValue() instanceof J.NewArray
             ));
             countIndents(expression.getPrefix().getWhitespace(), isContinuation, stats);
 
@@ -720,7 +720,7 @@ public class Autodetect extends NamedStyles {
                                 }
 
                                 if (!(i - 1 >= 0 && "javax.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
-                                        i + 1 < nonStaticBlocks.size() && "javax.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
+                                    i + 1 < nonStaticBlocks.size() && "javax.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
                                     if (isJavaxBeforeJava()) {
                                         builder = builder.importPackage("javax.*");
                                         builder = builder.importPackage("java.*");
@@ -740,7 +740,7 @@ public class Autodetect extends NamedStyles {
                                 }
 
                                 if (!(i - 1 >= 0 && "java.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
-                                        i + 1 < nonStaticBlocks.size() - 1 && "java.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
+                                    i + 1 < nonStaticBlocks.size() - 1 && "java.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
                                     if (isJavaxBeforeJava()) {
                                         builder = builder.importPackage("javax.*");
                                         builder = builder.importPackage("java.*");
@@ -908,9 +908,9 @@ public class Autodetect extends NamedStyles {
                 Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
 
                 importLayoutStatistics.staticAtBotCount += (!imports.isEmpty() &&
-                        imports.get(imports.size() - 1).isStatic()) ? 1 : 0;
+                                                            imports.get(imports.size() - 1).isStatic()) ? 1 : 0;
                 importLayoutStatistics.staticAtTopCount += (!imports.isEmpty() &&
-                        imports.get(0).isStatic()) ? 1 : 0;
+                                                            imports.get(0).isStatic()) ? 1 : 0;
 
                 boolean staticBlock = false;
                 int blockStart = 0;
@@ -924,8 +924,8 @@ public class Autodetect extends NamedStyles {
                     previousPkgCount += previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
                     boolean containsNewLine = anImport.getPrefix().contains("\n\n") || anImport.getPrefix().contains("\r\n\r\n");
                     if (containsNewLine ||
-                            i > 0 && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
-                                    !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + "."))) {
+                        i > 0 && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
+                        !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + "."))) {
                         if (i - blockStart > 0) {
                             ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
                                     staticBlock ?
