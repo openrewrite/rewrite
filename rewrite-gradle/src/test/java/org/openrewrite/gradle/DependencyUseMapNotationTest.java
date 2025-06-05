@@ -70,7 +70,6 @@ class DependencyUseMapNotationTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void kotlinSupport() {
         rewriteRun(
