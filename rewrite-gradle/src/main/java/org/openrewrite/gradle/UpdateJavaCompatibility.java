@@ -477,14 +477,14 @@ public class UpdateJavaCompatibility extends Recipe {
 
                 return expression;
             }
-
-            private boolean isMethodInvocation(J expression, String clazz, String method) {
-                return expression instanceof J.MethodInvocation &&
-                                ((J.MethodInvocation) expression).getSimpleName().equals(method) &&
-                                ((J.MethodInvocation) expression).getSelect() instanceof J.Identifier &&
-                                ((J.Identifier) ((J.MethodInvocation) expression).getSelect()).getSimpleName().equals(clazz);
-            }
         });
+    }
+
+    private static boolean isMethodInvocation(J expression, String clazz, String method) {
+        return expression instanceof J.MethodInvocation &&
+                ((J.MethodInvocation) expression).getSimpleName().equals(method) &&
+                ((J.MethodInvocation) expression).getSelect() instanceof J.Identifier &&
+                ((J.Identifier) ((J.MethodInvocation) expression).getSelect()).getSimpleName().equals(clazz);
     }
 
     private String styleMissingCompatibilityVersion(@Nullable DeclarationStyle declarationStyle) {
