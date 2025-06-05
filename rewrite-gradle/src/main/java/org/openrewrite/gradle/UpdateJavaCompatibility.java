@@ -103,7 +103,7 @@ public class UpdateJavaCompatibility extends Recipe {
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 Tree t = super.visit(tree, ctx);
-                if (tree instanceof G.CompilationUnit) {
+                if (t instanceof G.CompilationUnit) {
                     t = new GroovyIsoVisitor<ExecutionContext>() {
                         @Override
                         public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
@@ -137,8 +137,8 @@ public class UpdateJavaCompatibility extends Recipe {
                             }
                             return c;
                         }
-                    }.visit(tree, ctx);
-                } else if (tree instanceof K.CompilationUnit) {
+                    }.visit(t, ctx);
+                } else if (t instanceof K.CompilationUnit) {
                     t = new KotlinIsoVisitor<ExecutionContext>() {
                         @Override
                         public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
@@ -202,7 +202,7 @@ public class UpdateJavaCompatibility extends Recipe {
                                 }
                             }.visitNonNull(c, ctx);
                         }
-                    }.visit(tree, ctx);
+                    }.visit(t, ctx);
                 }
                 return (J) t;
             }
