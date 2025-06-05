@@ -239,7 +239,7 @@ public class UpdateJavaCompatibility extends Recipe {
         int currentMajor = getMajorVersion(a.getAssignment());
         if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(currentStyle)) {
             DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
-            return a.withAssignment(changeExpression(a.getAssignment(), actualStyle));
+            return a.withAssignment(changeJavaVersion(a.getAssignment(), actualStyle));
         }
 
         return a;
@@ -294,7 +294,7 @@ public class UpdateJavaCompatibility extends Recipe {
                 if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
                     DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
                     //noinspection DataFlowIssue
-                    return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeExpression(arg, actualStyle)));
+                    return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeJavaVersion(arg, actualStyle)));
                 } else {
                     return m;
                 }
@@ -382,30 +382,24 @@ public class UpdateJavaCompatibility extends Recipe {
         }
     }
 
-    private Expression changeExpression(Expression expression, @Nullable DeclarationStyle style) {
+    private Expression changeJavaVersion(Expression expression, @Nullable DeclarationStyle style) {
+        String newJavaVersion = version <= 8 ? "1." + version : String.valueOf(version);
+        String newJavaVersionEnum = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
+        double newJavaVersionDouble = Double.parseDouble("1." + version);
+
         if (expression instanceof J.Literal) {
             J.Literal literal = (J.Literal) expression;
             if (style == DeclarationStyle.String) {
-                String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
                 if (literal.getType() == JavaType.Primitive.String) {
-                    expression = ChangeStringLiteral.withStringValue(literal, newVersion);
+                    expression = ChangeStringLiteral.withStringValue(literal, newJavaVersion);
                 } else {
-                    expression = literal.withType(JavaType.Primitive.String).withValue(newVersion).withValueSource("'" + newVersion + "'");
+                    expression = literal.withType(JavaType.Primitive.String).withValue(newJavaVersion).withValueSource("'" + newJavaVersion + "'");
                 }
             } else if (style == DeclarationStyle.Enum) {
-                String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
-                expression = new J.FieldAccess(
-                        randomId(),
-                        literal.getPrefix(),
-                        literal.getMarkers(),
-                        new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "JavaVersion", JavaType.ShallowClass.build("org.gradle.api.JavaVersion"), null),
-                        new JLeftPadded<>(Space.EMPTY, new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, null, null), Markers.EMPTY),
-                        JavaType.ShallowClass.build("org.gradle.api.JavaVersion")
-                );
+                expression = changeJavaVersion(newJavaVersionEnum, literal.getPrefix(), literal.getMarkers());
             } else if (style == DeclarationStyle.Number) {
                 if (version <= 8) {
-                    double doubleValue = Double.parseDouble("1." + version);
-                    expression = literal.withType(JavaType.Primitive.Double).withValue(doubleValue).withValueSource("1." + version);
+                    expression = literal.withType(JavaType.Primitive.Double).withValue(newJavaVersionDouble).withValueSource("1." + version);
                 } else {
                     expression = literal.withType(JavaType.Primitive.Int).withValue(version).withValueSource(String.valueOf(version));
                 }
@@ -413,18 +407,11 @@ public class UpdateJavaCompatibility extends Recipe {
         } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess fieldAccess = (J.FieldAccess) expression;
             if (style == DeclarationStyle.String) {
-                String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
-                expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newVersion, "'" + newVersion + "'", emptyList(), JavaType.Primitive.String);
+                expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newJavaVersion, "'" + newJavaVersion + "'", emptyList(), JavaType.Primitive.String);
             } else if (style == DeclarationStyle.Enum) {
-                String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
-                expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(name));
+                expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(newJavaVersionEnum));
             } else if (style == DeclarationStyle.Number) {
-                if (version <= 8) {
-                    double doubleValue = Double.parseDouble("1." + version);
-                    expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), doubleValue, String.valueOf(doubleValue), emptyList(), JavaType.Primitive.Double);
-                } else {
-                    expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
-                }
+                expression = changeJavaVersion(newJavaVersionDouble, fieldAccess.getPrefix(), fieldAccess.getMarkers());
             }
         } else if (isMethodInvocation(expression, "JavaVersion", "toVersion")) {
             J.MethodInvocation m = (J.MethodInvocation) expression;
@@ -432,45 +419,41 @@ public class UpdateJavaCompatibility extends Recipe {
                 expression = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                     if (arg instanceof J.Literal) {
                         if (arg.getType() == JavaType.Primitive.String) {
-                            String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
-                            return ChangeStringLiteral.withStringValue((J.Literal) arg, newVersion);
-                        } else if (arg.getType() == JavaType.Primitive.Int) {
-                            return ((J.Literal) arg).withValue(version).withValueSource(String.valueOf(version));
-                        } else if (arg.getType() == JavaType.Primitive.Double) {
-                            if (version <= 8) {
-                                double doubleValue = Double.parseDouble("1." + version);
-                                return ((J.Literal) arg).withValue(doubleValue).withValueSource(String.valueOf(doubleValue));
-                            } else {
-                                return ((J.Literal) arg).withType(JavaType.Primitive.Int).withValue(version).withValueSource(String.valueOf(version));
-                            }
+                            return changeJavaVersion(arg, DeclarationStyle.String);
+                        } else if (arg.getType() == JavaType.Primitive.Int || arg.getType() == JavaType.Primitive.Double) {
+                            return changeJavaVersion(arg, DeclarationStyle.Number);
                         }
                     }
                     return arg;
                 }));
             } else if (style == DeclarationStyle.String) {
-                String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
-                expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), newVersion, "'" + newVersion + "'", emptyList(), JavaType.Primitive.String);
+                expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), newJavaVersion, "'" + newJavaVersion + "'", emptyList(), JavaType.Primitive.String);
             } else if (style == DeclarationStyle.Enum) {
-                String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
-                expression = new J.FieldAccess(
-                        randomId(),
-                        m.getPrefix(),
-                        m.getMarkers(),
-                        new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "JavaVersion", JavaType.ShallowClass.build("org.gradle.api.JavaVersion"), null),
-                        new JLeftPadded<>(Space.EMPTY, new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, null, null), Markers.EMPTY),
-                        JavaType.ShallowClass.build("org.gradle.api.JavaVersion")
-                );
+                expression = changeJavaVersion(newJavaVersionEnum, m.getPrefix(), m.getMarkers());
             } else if (style == DeclarationStyle.Number) {
-                if (version <= 8) {
-                    double doubleValue = Double.parseDouble("1." + version);
-                    expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), doubleValue, String.valueOf(doubleValue), emptyList(), JavaType.Primitive.Double);
-                } else {
-                    expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
-                }
+                expression = changeJavaVersion(newJavaVersionDouble, m.getPrefix(), m.getMarkers());
             }
         }
 
         return expression;
+    }
+
+    private Expression changeJavaVersion(String newJavaVersionEnum, Space prefix, Markers markers) {
+        return new J.FieldAccess(
+                randomId(),
+                prefix,
+                markers,
+                new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "JavaVersion", JavaType.ShallowClass.build("org.gradle.api.JavaVersion"), null),
+                new JLeftPadded<>(Space.EMPTY, new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), newJavaVersionEnum, null, null), Markers.EMPTY),
+                JavaType.ShallowClass.build("org.gradle.api.JavaVersion")
+        );
+    }
+
+    private Expression changeJavaVersion(double newJavaVersionDouble, Space prefix, Markers markers) {
+        if (version <= 8) {
+            return new J.Literal(randomId(), prefix, markers, newJavaVersionDouble, String.valueOf(newJavaVersionDouble), emptyList(), JavaType.Primitive.Double);
+        }
+        return new J.Literal(randomId(), prefix, markers, version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
     }
 
     private static boolean isMethodInvocation(J expression, String clazz, String method) {
