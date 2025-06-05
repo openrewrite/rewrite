@@ -129,7 +129,8 @@ public class UpdateJavaCompatibility extends Recipe {
 
                         private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
                             if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
-                                G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse(ctx, "\n" + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
+                                G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build()
+                                        .parse(ctx, "\n" + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
                                         .findFirst()
                                         .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
                                 c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
@@ -257,58 +258,58 @@ public class UpdateJavaCompatibility extends Recipe {
                 return declarationStyle != null && declarationStyle != currentStyle;
             }
 
-            public J.MethodInvocation handleMethodInvocation(J.MethodInvocation method, Cursor c, Class<?> enclosing) {
-                if ("sourceCompatibility".equals(method.getSimpleName())) {
+            public J.MethodInvocation handleMethodInvocation(J.MethodInvocation m, Cursor c, Class<?> enclosing) {
+                if ("sourceCompatibility".equals(m.getSimpleName())) {
                     c.putMessageOnFirstEnclosing(enclosing, SOURCE_COMPATIBILITY_FOUND, true);
                 }
-                if ("targetCompatibility".equals(method.getSimpleName())) {
+                if ("targetCompatibility".equals(m.getSimpleName())) {
                     c.putMessageOnFirstEnclosing(enclosing, TARGET_COMPATIBILITY_FOUND, true);
                 }
-                if (isMethodInvocation(method, "JavaLanguageVersion", "of")) {
-                    List<Expression> args = method.getArguments();
+                if (isMethodInvocation(m, "JavaLanguageVersion", "of")) {
+                    List<Expression> args = m.getArguments();
 
                     if (args.size() == 1 && args.get(0) instanceof J.Literal) {
                         J.Literal versionArg = (J.Literal) args.get(0);
                         if (versionArg.getValue() instanceof Integer) {
                             Integer versionNumber = (Integer) versionArg.getValue();
                             if (shouldUpdateVersion(versionNumber)) {
-                                return method.withArguments(
+                                return m.withArguments(
                                         Collections.singletonList(versionArg.withValue(version)
                                                 .withValueSource(version.toString())));
                             } else {
-                                return method;
+                                return m;
                             }
                         }
                     }
 
-                    return SearchResult.found(method, "Attempted to update to Java version to " + version +
+                    return SearchResult.found(m, "Attempted to update to Java version to " + version +
                             "  but was unsuccessful, please update manually");
                 }
 
-                if (sourceCompatibilityDsl.matches(method) || targetCompatibilityDsl.matches(method)) {
+                if (sourceCompatibilityDsl.matches(m) || targetCompatibilityDsl.matches(m)) {
                     if (compatibilityType != null && (
-                            (compatibilityType == CompatibilityType.source && !sourceCompatibilityDsl.matches(method)) ||
-                                    (compatibilityType == CompatibilityType.target && !targetCompatibilityDsl.matches(method)))) {
-                        return method;
+                            (compatibilityType == CompatibilityType.source && !sourceCompatibilityDsl.matches(m)) ||
+                                    (compatibilityType == CompatibilityType.target && !targetCompatibilityDsl.matches(m)))) {
+                        return m;
                     }
 
-                    if (method.getArguments().size() == 1 && (method.getArguments().get(0) instanceof J.Literal || method.getArguments().get(0) instanceof J.FieldAccess)) {
-                        DeclarationStyle currentStyle = getCurrentStyle(method.getArguments().get(0));
-                        int currentMajor = getMajorVersion(method.getArguments().get(0));
+                    if (m.getArguments().size() == 1 && (m.getArguments().get(0) instanceof J.Literal || m.getArguments().get(0) instanceof J.FieldAccess)) {
+                        DeclarationStyle currentStyle = getCurrentStyle(m.getArguments().get(0));
+                        int currentMajor = getMajorVersion(m.getArguments().get(0));
                         if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
                             DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
                             //noinspection DataFlowIssue
-                            return method.withArguments(ListUtils.mapFirst(method.getArguments(), arg -> changeExpression(arg, actualStyle)));
+                            return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeExpression(arg, actualStyle)));
                         } else {
-                            return method;
+                            return m;
                         }
                     }
 
-                    return SearchResult.found(method, "Attempted to update to Java version to " + version +
+                    return SearchResult.found(m, "Attempted to update to Java version to " + version +
                             "  but was unsuccessful, please update manually");
                 }
 
-                return method;
+                return m;
             }
 
             private int getMajorVersion(@Nullable String version) {
