@@ -53,9 +53,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
     void zeroEstimatedEffortForRecipeThatDoesNotGenerateSourcesFileResults() {
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(new NoChangeRecipe())
-            .afterRecipe(recipeRun ->
-              assertThat(recipeRun.getDataTables().isEmpty()).isTrue()
-            )
+            .afterRecipe(recipeRun -> assertThat(recipeRun.getDataTables()).isEmpty())
         );
     }
 
@@ -64,7 +62,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(new FindGitProvenance())
             .afterRecipe(recipeRun -> {
-                  assertThat(recipeRun.getDataTables().size()).isEqualTo(2);
+                  assertThat(recipeRun.getDataTables()).hasSize(2);
                   assertThat(recipeRun.getDataTable(DistinctGitProvenance.class.getName())).isNotNull();
                   assertThat(recipeRun.getDataTable(RecipeRunStats.class.getName())).isNotNull();
                   assertThat(recipeRun.getDataTable(SourcesFileResults.class.getName())).isNull();
@@ -132,6 +130,13 @@ class RecipeEstimatedEffortTest implements RewriteTest {
           ));
     }
 
+    private static void assertEstimatedEffortInFirstRowOfSourceFileResults(List<SourcesFileResults.Row> rows, Long expectedEstimatedEffort) {
+        assertThat(rows)
+          .first()
+          .extracting(SourcesFileResults.Row::getEstimatedTimeSaving)
+          .isEqualTo(expectedEstimatedEffort);
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class NoChangeRecipe extends Recipe {
@@ -175,8 +180,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
                 @Override
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     for (Marker marker : text.getMarkers().getMarkers()) {
-                        if (marker instanceof AlreadyReplaced) {
-                            AlreadyReplaced alreadyReplaced = (AlreadyReplaced) marker;
+                        if (marker instanceof AlreadyReplaced alreadyReplaced) {
                             if (Objects.equals(searchTerm, alreadyReplaced.getFind()) && Objects.equals(appendText, alreadyReplaced.getReplace())) {
                                 return text;
                             }
@@ -216,7 +220,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         @Nullable
         Boolean overwriteExisting;
 
-        private Duration effort = Duration.ofHours(1);
+        Duration effort = Duration.ofHours(1);
 
         @Override
         public String getDisplayName() {
@@ -280,11 +284,6 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         public @Nullable Duration getEstimatedEffortPerOccurrence() {
             return Duration.ofMinutes(15);
         }
-    }
 
-    private static void assertEstimatedEffortInFirstRowOfSourceFileResults(List<SourcesFileResults.Row> rows, Long expectedEstimatedEffort) {
-        assertThat(rows).isNotEmpty();
-        SourcesFileResults.Row row = rows.getFirst();
-        assertThat(row.getEstimatedTimeSaving()).isEqualTo(expectedEstimatedEffort);
     }
 }
