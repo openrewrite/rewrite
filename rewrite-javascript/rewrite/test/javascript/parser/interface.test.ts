@@ -404,6 +404,7 @@ describe('interface mapping', () => {
             const ident = varDecl.variables[0].element.name as J.Identifier;
             expect(ident.simpleName).toEqual("columnDescriptor");
             expect(ident.type!.kind).toEqual(JavaType.Kind.Class);
+            expect((ident.type! as JavaType.Class).classKind).toEqual(JavaType.Class.Kind.Interface);
             const type = ident.type! as JavaType.Class
             expect(type.members).toHaveLength(2);
             tap(type.members[0], mem => {

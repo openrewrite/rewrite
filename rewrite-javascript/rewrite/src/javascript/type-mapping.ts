@@ -121,16 +121,6 @@ export class JavaScriptTypeMapping {
 
             result.bounds = type.types.map(t => this.getType(t));
             return result;
-        } else if (type.isClass()) {
-            // FIXME flags
-            let result = {
-                kind: JavaType.Kind.Class,
-                flags: 0,
-                name: type.symbol.name
-            };
-            this.typeCache.set(signature, result);
-            // FIXME unsafeSet
-            return result;
         } else if (type.flags & ts.TypeFlags.UniqueESSymbol) {
             let result = {
                 kind: JavaType.Kind.UniqueSymbol,
@@ -139,10 +129,10 @@ export class JavaScriptTypeMapping {
             return result;
         } else if (type.flags & ts.TypeFlags.Object) {
             const objectType = type as ts.ObjectType;
-            if (objectType.objectFlags & ts.ObjectFlags.Interface) {
+            if (objectType.isClassOrInterface()) {
                 let result = {
                     kind: JavaType.Kind.Class,
-                    classKind: JavaType.Class.Kind.Interface,
+                    classKind: type.isClass() ? JavaType.Class.Kind.Class : JavaType.Class.Kind.Interface, // TODO there are other options, no?
                     fullyQualifiedName: "missing", // TODO
                     typeParameters: [], // TODO
                     annotations: [], // TODO
