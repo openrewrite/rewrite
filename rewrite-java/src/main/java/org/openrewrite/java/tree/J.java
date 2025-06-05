@@ -3640,7 +3640,7 @@ public interface J extends Tree, RpcCodec<J> {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class Literal implements J, Expression, TypedTree {
+    final class Literal implements J, Expression, TypedTree, VariableDeclarator {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -3724,6 +3724,11 @@ public interface J extends Tree, RpcCodec<J> {
                 return literal.getValue() == null ? value == null : literal.getValue().equals(value);
             }
             return false;
+        }
+
+        @Override
+        public List<Identifier> getNames() {
+            return Collections.emptyList();
         }
 
         @Override
