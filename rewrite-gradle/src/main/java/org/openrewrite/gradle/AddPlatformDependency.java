@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
+import org.openrewrite.gradle.trait.JvmTestSuite;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
@@ -32,7 +33,6 @@ import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
-import java.util.function.Predicate;
 
 import static java.util.Collections.singletonList;
 
@@ -112,7 +112,6 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
 
     public static class Scanned {
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
-        Map<JavaProject, Set<String>> customJvmTestSuitesWithDependencies = new HashMap<>();
     }
 
     @Override
@@ -131,10 +130,6 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
                 }
                 SourceFile sourceFile = (SourceFile) tree;
                 sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
-                    acc.customJvmTestSuitesWithDependencies
-                            .computeIfAbsent(javaProject, ignored -> new HashSet<>())
-                            .addAll(FindJVMTestSuites.jvmTestSuiteNames(tree, true));
-
                     Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
                     sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
                             configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
@@ -172,7 +167,9 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
 
                         GradleProject gp = maybeGp.get();
 
-                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ? acc.configurationsByProject.getOrDefault(jp, new HashSet<>()) : new HashSet<>(singletonList(configuration));
+                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ?
+                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>()) :
+                                new HashSet<>(singletonList(configuration));
                         if (resolvedConfigurations.isEmpty()) {
                             resolvedConfigurations.add("implementation");
                         }
@@ -191,9 +188,12 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
                             modifier = AddDependencyVisitor.DependencyModifier.ENFORCED_PLATFORM;
                         }
 
+                        Set<JvmTestSuite> jvmTestSuites = FindJVMTestSuites.jvmTestSuites(s);
                         for (String resolvedConfiguration : resolvedConfigurations) {
-                            if (targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
-                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, GradleConfigurationNames.purgeSourceSet(configuration), null, null, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration), modifier).visitNonNull(s, ctx);
+                            JvmTestSuite jvmTestSuite = maybeJvmTestSuite(resolvedConfiguration, jvmTestSuites);
+                            if (jvmTestSuite != null) {
+                                s = (JavaSourceFile) jvmTestSuite.addDependency(resolvedConfiguration, groupId, artifactId, version, versionPattern, null, null, metadataFailures, modifier, ctx)
+                                        .visitNonNull(s, ctx);
                             } else {
                                 s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration, null, null, metadataFailures, this::isTopLevel, modifier).visitNonNull(s, ctx);
                             }
@@ -206,23 +206,14 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
                         return cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class) == null;
                     }
 
-                    private Predicate<Cursor> isMatchingJVMTestSuite(String resolvedConfiguration) {
-                        String sourceSet = GradleConfigurationNames.purgeConfigurationSuffix(resolvedConfiguration);
-                        return cursor -> {
-                            J.MethodInvocation methodInvocation = cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
-                            return methodInvocation != null && sourceSet.equals(methodInvocation.getSimpleName());
-                        };
-                    }
-
-                    boolean targetsCustomJVMTestSuite(String configuration, Set<String> customJvmTestSuites) {
-                        if (GradleConfigurationNames.isStandardConfiguration(configuration)) {
-                            return false;
+                    private @Nullable JvmTestSuite maybeJvmTestSuite(String configuration, Set<JvmTestSuite> jvmTestSuites) {
+                        for (JvmTestSuite jvmTestSuite : jvmTestSuites) {
+                            if (jvmTestSuite.isAcceptable(configuration)) {
+                                return jvmTestSuite;
+                            }
                         }
-
-                        String sourceSet = GradleConfigurationNames.purgeConfigurationSuffix(configuration);
-                        return customJvmTestSuites.contains(sourceSet);
+                        return null;
                     }
-
                 }));
     }
 }

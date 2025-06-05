@@ -321,8 +321,6 @@ class AddPlatformDependencyTest implements RewriteTest {
                 testing {
                     suites {
                         integrationTest(JvmTestSuite) {
-                            dependencies {
-                            }
                         }
                     }
                 }
@@ -386,8 +384,6 @@ class AddPlatformDependencyTest implements RewriteTest {
                 testing {
                     suites {
                         integrationTest(JvmTestSuite) {
-                            dependencies {
-                            }
                         }
                     }
                 }

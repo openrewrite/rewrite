@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
+import org.openrewrite.gradle.trait.JvmTestSuite;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
@@ -33,7 +34,6 @@ import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
-import java.util.function.Predicate;
 
 import static java.util.Collections.singletonList;
 
@@ -143,7 +143,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public static class Scanned {
         Map<JavaProject, Boolean> usingType = new HashMap<>();
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
-        Map<JavaProject, Set<String>> customJvmTestSuitesWithDependencies = new HashMap<>();
     }
 
     @Override
@@ -176,9 +175,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 SourceFile sourceFile = (SourceFile) tree;
                 sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
                     acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || usesType(sourceFile, ctx));
-                    acc.customJvmTestSuitesWithDependencies
-                            .computeIfAbsent(javaProject, ignored -> new HashSet<>())
-                            .addAll(FindJVMTestSuites.jvmTestSuiteNames(tree, true));
 
                     Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
                     sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
@@ -234,10 +230,12 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return s;
                         }
 
+                        Set<JvmTestSuite> jvmTestSuites = FindJVMTestSuites.jvmTestSuites(s);
                         for (String resolvedConfiguration : resolvedConfigurations) {
-                            if (targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
-                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, GradleConfigurationNames.purgeSourceSet(configuration),
-                                        classifier, extension, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration), null).visitNonNull(s, ctx);
+                            JvmTestSuite jvmTestSuite = maybeJvmTestSuite(resolvedConfiguration, jvmTestSuites);
+                            if (jvmTestSuite != null) {
+                                s = (JavaSourceFile) jvmTestSuite.addDependency(resolvedConfiguration, groupId, artifactId, version, versionPattern, classifier, extension, metadataFailures, null, ctx)
+                                        .visitNonNull(s, ctx);
                             } else {
                                 s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
                                         classifier, extension, metadataFailures, this::isTopLevel, null).visitNonNull(s, ctx);
@@ -251,21 +249,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         return cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class) == null;
                     }
 
-                    private Predicate<Cursor> isMatchingJVMTestSuite(String resolvedConfiguration) {
-                        String sourceSet = GradleConfigurationNames.purgeConfigurationSuffix(resolvedConfiguration);
-                        return cursor -> {
-                            J.MethodInvocation methodInvocation = cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
-                            return methodInvocation != null && sourceSet.equals(methodInvocation.getSimpleName());
-                        };
-                    }
-
-                    boolean targetsCustomJVMTestSuite(String configuration, Set<String> customJvmTestSuites) {
-                        if (GradleConfigurationNames.isStandardConfiguration(configuration)) {
-                            return false;
+                    private @Nullable JvmTestSuite maybeJvmTestSuite(String configuration, Set<JvmTestSuite> jvmTestSuites) {
+                        for (JvmTestSuite jvmTestSuite : jvmTestSuites) {
+                            if (jvmTestSuite.isAcceptable(configuration)) {
+                                return jvmTestSuite;
+                            }
                         }
-
-                        String sourceSet = GradleConfigurationNames.purgeConfigurationSuffix(configuration);
-                        return customJvmTestSuites.contains(sourceSet);
+                        return null;
                     }
                 })
         );
