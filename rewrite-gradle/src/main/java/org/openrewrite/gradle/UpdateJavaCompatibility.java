@@ -137,8 +137,8 @@ public class UpdateJavaCompatibility extends Recipe {
                             return c;
                         }
                     }.visit(tree, ctx);
-                } else if (getCursor().getValue() instanceof K.CompilationUnit) {
-                    doAfterVisit(new KotlinIsoVisitor<ExecutionContext>() {
+                } else if (tree instanceof K.CompilationUnit) {
+                    t = new KotlinIsoVisitor<ExecutionContext>() {
                         @Override
                         public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
                             K.CompilationUnit c = super.visitCompilationUnit(cu, ctx);
@@ -201,7 +201,7 @@ public class UpdateJavaCompatibility extends Recipe {
                                 }
                             }.visitNonNull(c, ctx);
                         }
-                    });
+                    }.visit(tree, ctx);
                 }
                 return (J) t;
             }
