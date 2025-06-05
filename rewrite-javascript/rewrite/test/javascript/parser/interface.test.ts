@@ -393,7 +393,7 @@ describe('interface mapping', () => {
                 interface ColumnDescriptor {
                     displayName: string,
                     number: number,
-                    print(): string
+                    print(prefix: string): string
                 }
                 let columnDescriptor: ColumnDescriptor;
                 `)
@@ -416,6 +416,8 @@ describe('interface mapping', () => {
             expect(type.methods[0].kind).toEqual(JavaType.Kind.Method);
             expect((type.methods[0] as JavaType.Method).name).toEqual("print");
             expect(type.methods[0].returnType.kind).toEqual(JavaType.Kind.Primitive);
+            expect(type.methods[0].parameterNames[0]).toEqual("prefix");
+            expect(type.methods[0].parameterTypes[0].kind).toEqual(JavaType.Kind.Primitive);
         }
         await spec.rewriteRun(source);
     })

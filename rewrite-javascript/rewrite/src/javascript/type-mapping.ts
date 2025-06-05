@@ -155,15 +155,16 @@ export class JavaScriptTypeMapping {
                     const memberType = this.checker.getTypeOfSymbol(symbol);
                     const callSignatures = memberType.getCallSignatures();
                     if ((memberType.flags & ts.TypeFlags.Object) && callSignatures.length > 0) {
+                        const signature = callSignatures[0]; // TODO understand multiple signatures, maybe all signatures should be added as separate methods?
                         result.methods.push({
                             kind: JavaType.Kind.Method,
                             declaringType: result,
                             name: symbol.getName(),
-                            returnType: this.getType(callSignatures[0].getReturnType()),
-                            parameterNames: [], // TODO
-                            parameterTypes: [], // TODO
+                            returnType: this.getType(signature.getReturnType()),
+                            parameterNames: signature.parameters.map(s => s.getName()),
+                            parameterTypes: signature.parameters.map(s => this.getType(this.checker.getTypeOfSymbol(s))),
                             thrownExceptions: [],
-                            annotations: [], // TODO
+                            annotations: [],
                             defaultValue: [], // TODO
                             declaredFormalTypeNames: [] // TODO
                         } as JavaType.Method);
@@ -171,9 +172,9 @@ export class JavaScriptTypeMapping {
                         result.members.push({
                             kind: JavaType.Kind.Variable,
                             name: symbol.getName(),
-                            owner: undefined, // TODO
+                            owner: result,
                             type: this.getType(memberType),
-                            annotations: [] // TODO
+                            annotations: []
                         } as JavaType.Variable);
                     }
                 });
