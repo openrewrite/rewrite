@@ -63,15 +63,15 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         J.VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
         String whitespace = variableDeclarations.getPrefix().getWhitespace().replaceFirst("^\\n+", "\n");
         WrappingAndBracesStyle.Annotations annotationsStyle = null;
-        if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Block) {
-            Cursor possiblyClassDecl = getCursor().dropParentUntil(J.class::isInstance).getParent();
-            if (possiblyClassDecl != null && possiblyClassDecl.getValue() instanceof J.ClassDeclaration) {
+        Cursor possiblyBlock = getCursor().dropParentUntil(J.class::isInstance);
+        if (possiblyBlock.getValue() instanceof J.Block) {
+            if (possiblyBlock.getParent() != null && possiblyBlock.getParent().getValue() instanceof J.ClassDeclaration) {
                 annotationsStyle = style.getFieldAnnotations();
             } else {
                 annotationsStyle = style.getLocalVariableAnnotations();
             }
             variableDeclarations = variableDeclarations.withLeadingAnnotations(wrapAnnotations(variableDeclarations.getLeadingAnnotations(), whitespace, annotationsStyle));
-        } else if (getCursor().getParent() != null && (getCursor().getParent().firstEnclosing(J.class) instanceof J.ClassDeclaration || getCursor().getParent().firstEnclosing(J.class) instanceof J.MethodDeclaration)) {
+        } else if (getCursor().firstEnclosing(J.class) instanceof J.ClassDeclaration || getCursor().firstEnclosing(J.class) instanceof J.MethodDeclaration) {
             annotationsStyle = style.getParameterAnnotations();
             variableDeclarations = variableDeclarations.withLeadingAnnotations(wrapAnnotations(variableDeclarations.getLeadingAnnotations(), whitespace, annotationsStyle));
         }
