@@ -36,6 +36,7 @@ import java.io.*;
 import java.net.Socket;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -110,6 +111,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private int port;
         private boolean trace;
         private @Nullable Path logFile;
+        private @Nullable Duration timeout;
 
         public Builder marketplace(Environment marketplace) {
             this.marketplace = marketplace;
@@ -136,12 +138,18 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        public Builder timeout(Duration timeout) {
+            this.timeout = timeout;
+            return this;
+        }
+
         public Builder logFile(Path logFile) {
             this.logFile = logFile;
             return this;
         }
 
         public JavaScriptRewriteRpc build() {
+            JavaScriptRewriteRpc rewriteRpc;
             if (port != 0) {
                 Socket socket;
                 JsonRpc rpc;
@@ -151,7 +159,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
-                return new JavaScriptRewriteRpc(rpc, socket, marketplace);
+                rewriteRpc = new JavaScriptRewriteRpc(rpc, socket, marketplace);
             } else {
                 List<String> command = new ArrayList<>(Arrays.asList(
                         nodePath.toString(),
@@ -167,8 +175,13 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
                 JavaScriptRewriteRpcProcess process = new JavaScriptRewriteRpcProcess(trace, command.toArray(new String[0]));
                 process.start();
-                return new JavaScriptRewriteRpc(process, marketplace);
+                rewriteRpc = new JavaScriptRewriteRpc(process, marketplace);
             }
+
+            if (timeout != null) {
+                rewriteRpc.timeout(timeout);
+            }
+            return rewriteRpc;
         }
     }
 
