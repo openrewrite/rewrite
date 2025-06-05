@@ -423,8 +423,8 @@ public class Autodetect extends NamedStyles {
         public Statement visitStatement(Statement statement, IndentStatistics stats) {
             boolean isInParentheses = getCursor().dropParentUntil(
                     p -> p instanceof J.Block ||
-                                p instanceof JContainer ||
-                                p instanceof SourceFile).getValue() instanceof JContainer;
+                        p instanceof JContainer ||
+                        p instanceof SourceFile).getValue() instanceof JContainer;
             if (isInParentheses) {
                 // ignore statements in parentheses.
                 return statement;
@@ -720,7 +720,7 @@ public class Autodetect extends NamedStyles {
                                 }
 
                                 if (!(i - 1 >= 0 && "javax.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
-                                    i + 1 < nonStaticBlocks.size() && "javax.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
+                                      i + 1 < nonStaticBlocks.size() && "javax.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
                                     if (isJavaxBeforeJava()) {
                                         builder = builder.importPackage("javax.*");
                                         builder = builder.importPackage("java.*");
@@ -740,7 +740,7 @@ public class Autodetect extends NamedStyles {
                                 }
 
                                 if (!(i - 1 >= 0 && "java.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
-                                    i + 1 < nonStaticBlocks.size() - 1 && "java.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
+                                      i + 1 < nonStaticBlocks.size() - 1 && "java.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
                                     if (isJavaxBeforeJava()) {
                                         builder = builder.importPackage("javax.*");
                                         builder = builder.importPackage("java.*");
