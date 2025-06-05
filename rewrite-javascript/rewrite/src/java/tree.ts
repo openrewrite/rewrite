@@ -447,7 +447,7 @@ export namespace J {
         }
     }
 
-    export interface Literal extends J, TypedTree, Expression {
+    export interface Literal extends J, TypedTree, Expression, VariableDeclarator {
         readonly kind: typeof Kind.Literal;
         readonly value?: Object;
         readonly valueSource?: string;
