@@ -423,8 +423,8 @@ public class Autodetect extends NamedStyles {
         public Statement visitStatement(Statement statement, IndentStatistics stats) {
             boolean isInParentheses = getCursor().dropParentUntil(
                     p -> p instanceof J.Block ||
-                        p instanceof JContainer ||
-                        p instanceof SourceFile).getValue() instanceof JContainer;
+                         p instanceof JContainer ||
+                         p instanceof SourceFile).getValue() instanceof JContainer;
             if (isInParentheses) {
                 // ignore statements in parentheses.
                 return statement;
