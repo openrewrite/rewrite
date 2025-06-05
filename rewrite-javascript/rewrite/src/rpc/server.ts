@@ -31,6 +31,9 @@ interface ProgramOptions {
     port?: number;
     logFile?: string;
     verbose?: boolean;
+    batchSize?: number;
+    traceGetObjectOutput?: boolean;
+    traceGetObjectInput?: boolean;
 }
 
 const program = new Command();
@@ -38,6 +41,9 @@ program
     .option('--port <number>', 'port number')
     .option('--log-file <path>', 'log file path')
     .option('-v, --verbose', 'enable verbose output')
+    .option('--batch-size [size]', 'sets the batch size (default is 100)', parseInt, 100)
+    .option('--trace-get-object-output', 'enable `GetObject` output tracing')
+    .option('--trace-get-object-input', 'enable `GetObject` input tracing')
     .parse();
 
 const options = program.opts() as ProgramOptions;
@@ -77,7 +83,11 @@ if (!options.port) {
         log.write(`[js-rewrite-rpc] connection disposed\n\n`);
     });
 
-    new RewriteRpc(connection, {traceGetObjectInput: log, traceGetObjectOutput: true});
+    new RewriteRpc(connection, {
+        batchSize: options.batchSize,
+        traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
+        traceGetObjectOutput: options.traceGetObjectOutput,
+    });
 } else {
 // Create a TCP server
     const server: net.Server = net.createServer((socket: net.Socket) => {
@@ -116,7 +126,11 @@ if (!options.port) {
         });
 
         // Initialize the RPC mechanism
-        new RewriteRpc(connection, {traceGetObjectInput: log, traceGetObjectOutput: true});
+        new RewriteRpc(connection, {
+            batchSize: options.batchSize,
+            traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
+            traceGetObjectOutput: options.traceGetObjectOutput,
+        });
     });
 
 // Handle server errors
