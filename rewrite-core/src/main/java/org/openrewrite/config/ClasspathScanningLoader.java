@@ -31,6 +31,7 @@ import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
@@ -45,7 +46,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private final LinkedHashMap<String, Recipe> recipes = new LinkedHashMap<>();
     private final List<NamedStyles> styles = new ArrayList<>();
-    private final Set<License> licenses = new LinkedHashSet<>();
+    private final HashMap<String, License> licenses = new HashMap<>();
 
     private final LinkedHashSet<RecipeDescriptor> recipeDescriptors = new LinkedHashSet<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
@@ -207,8 +208,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
                             previousLine = line;
                         }
                     }
-                    if (licenseName.length() > 0 && licenseUrl.length() > 0) {
-                        licenses.add(new License(licenseName.toString(), licenseUrl.toString()));
+                    if (licenseName.length() > 0) {
+                        String url = licenseUrl.length() == 0 ? null : licenseUrl.toString();
+                        licenses.computeIfAbsent(licenseName.toString(), name -> new License(name, url)).addModule(getModuleFromManifestMf(resource));
                     }
                 } catch (IOException ignored) {}
             }
@@ -292,12 +294,25 @@ public class ClasspathScanningLoader implements ResourceLoader {
     @Override
     public Set<License> listLicenses() {
         ensureScanned();
-        return licenses;
+        return new HashSet<>(licenses.values());
     }
 
     @Override
     public Map<String, List<Contributor>> listContributors() {
         ensureScanned();
         return recipeAttributions;
+    }
+
+    private static String getModuleFromManifestMf(Resource manifest) {
+        File jar = manifest.getClasspathElementFile();
+        if (jar.exists()) {
+            String name = jar.getName();
+            if (name.endsWith(".jar")) {
+                return name.substring(0, name.length() - ".jar".length());
+            }
+            return name;
+        }
+
+        return manifest.toString();
     }
 }
