@@ -16,6 +16,9 @@
 import {Cursor, SourceFile, Tree} from "./tree";
 import {TreeVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "./print";
+import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
+import {PlainText} from "./text";
+import {createDraft, Draft, finishDraft} from "immer";
 
 export const ParseErrorKind = "org.openrewrite.tree.ParseError";
 
@@ -62,3 +65,31 @@ TreePrinters.register(ParseErrorKind, () => new class extends ParseErrorVisitor<
         return e;
     }
 })
+
+const parseErrorCodec: RpcCodec<ParseError> = {
+    async rpcReceive(before: ParseError, q: RpcReceiveQueue): Promise<ParseError> {
+        const draft: Draft<ParseError> = createDraft(before);
+        draft.id = await q.receive(before.id);
+        draft.markers = await q.receiveMarkers(before.markers);
+        draft.sourcePath = await q.receive(before.sourcePath);
+        draft.charsetName = await q.receive(before.charsetName);
+        draft.charsetBomMarked = await q.receive(before.charsetBomMarked);
+        draft.checksum = await q.receive(before.checksum);
+        draft.fileAttributes = await q.receive(before.fileAttributes);
+        draft.text = await q.receive(before.text);
+        return finishDraft(draft);
+    },
+
+    async rpcSend(after: ParseError, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, p => p.id);
+        await q.sendMarkers(after, p => p.markers);
+        await q.getAndSend(after, p => p.sourcePath);
+        await q.getAndSend(after, p => p.charsetName);
+        await q.getAndSend(after, p => p.charsetBomMarked);
+        await q.getAndSend(after, p => p.checksum);
+        await q.getAndSend(after, p => p.fileAttributes);
+        await q.getAndSend(after, p => p.text);
+    }
+}
+
+RpcCodecs.registerCodec(ParseErrorKind, parseErrorCodec);
