@@ -197,20 +197,14 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
                         Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
-                        if (!maybeJp.isPresent()) {
+                        Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
+                        if (!maybeJp.isPresent() ||
+                                (onlyIfUsing != null && !acc.usingType.getOrDefault(maybeJp.get(), false)) || !acc.configurationsByProject.containsKey(maybeJp.get()) ||
+                                !maybeGp.isPresent()) {
                             return s;
                         }
 
                         JavaProject jp = maybeJp.get();
-                        if ((onlyIfUsing != null && !acc.usingType.getOrDefault(jp, false)) || !acc.configurationsByProject.containsKey(jp)) {
-                            return s;
-                        }
-
-                        Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
-                        if (!maybeGp.isPresent()) {
-                            return s;
-                        }
-
                         GradleProject gp = maybeGp.get();
 
                         Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ?

@@ -34,7 +34,10 @@ import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
+import static java.lang.Boolean.TRUE;
 import static java.util.Collections.singletonList;
+import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.ENFORCED_PLATFORM;
+import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.PLATFORM;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -151,20 +154,12 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
                         Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
-                        if (!maybeJp.isPresent()) {
+                        Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
+                        if (!maybeJp.isPresent() || !acc.configurationsByProject.containsKey(maybeJp.get()) || !maybeGp.isPresent()) {
                             return s;
                         }
 
                         JavaProject jp = maybeJp.get();
-                        if (!acc.configurationsByProject.containsKey(jp)) {
-                            return s;
-                        }
-
-                        Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
-                        if (!maybeGp.isPresent()) {
-                            return s;
-                        }
-
                         GradleProject gp = maybeGp.get();
 
                         Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ?
@@ -183,19 +178,16 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
                             return s;
                         }
 
-                        AddDependencyVisitor.DependencyModifier modifier = AddDependencyVisitor.DependencyModifier.PLATFORM;
-                        if (Boolean.TRUE.equals(enforced)) {
-                            modifier = AddDependencyVisitor.DependencyModifier.ENFORCED_PLATFORM;
-                        }
-
                         Set<JvmTestSuite> jvmTestSuites = FindJVMTestSuites.jvmTestSuites(s);
+                        AddDependencyVisitor.DependencyModifier modifier = TRUE.equals(enforced) ? ENFORCED_PLATFORM : PLATFORM;
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             JvmTestSuite jvmTestSuite = maybeJvmTestSuite(resolvedConfiguration, jvmTestSuites);
                             if (jvmTestSuite != null) {
-                                s = (JavaSourceFile) jvmTestSuite.addDependency(resolvedConfiguration, groupId, artifactId, version, versionPattern, null, null, metadataFailures, modifier, ctx)
-                                        .visitNonNull(s, ctx);
+                                s = (JavaSourceFile) jvmTestSuite.addDependency(resolvedConfiguration, groupId, artifactId, version, versionPattern,
+                                                null, null, metadataFailures, modifier, ctx).visitNonNull(s, ctx);
                             } else {
-                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration, null, null, metadataFailures, this::isTopLevel, modifier).visitNonNull(s, ctx);
+                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
+                                        null, null, metadataFailures, this::isTopLevel, modifier).visitNonNull(s, ctx);
                             }
                         }
 

@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -25,16 +26,12 @@ import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
+@RequiredArgsConstructor
 class GradleConfigurationFilter {
     private final GradleProject gradleProject;
 
     @Getter
     private final Set<String> filteredConfigurations;
-
-    public GradleConfigurationFilter(GradleProject gradleProject, Set<String> configurations) {
-        this.gradleProject = gradleProject;
-        this.filteredConfigurations = new HashSet<>(configurations);
-    }
 
     public void removeTransitiveConfigurations() {
         Set<String> tmpConfigurations = new HashSet<>(filteredConfigurations);
