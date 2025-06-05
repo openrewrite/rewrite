@@ -73,9 +73,6 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile sourceFile = (JavaSourceFile) tree;
-            if (sourceFile == null) {
-                return null;
-            }
             gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class).orElse(null);
             if (gradleProject == null) {
                 return sourceFile;
@@ -99,12 +96,6 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                     }
                 }
             }
-        }
-
-        J j = super.visit(tree, ctx);
-
-        if (j instanceof JavaSourceFile) {
-            JavaSourceFile sourceFile = (JavaSourceFile) j;
 
             sourceFile = (JavaSourceFile) new org.openrewrite.gradle.internal.AddDependencyVisitor(configuration, groupId, artifactId, resolvedVersion, classifier, extension, insertPredicate, dependencyModifier, isKotlinDsl)
                     .visitNonNull(sourceFile, ctx);
@@ -121,7 +112,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
 
             return sourceFile;
         }
-        return j;
+        return (J) tree;
     }
 
     public enum DependencyModifier {
