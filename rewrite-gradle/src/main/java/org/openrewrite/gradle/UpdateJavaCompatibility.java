@@ -97,6 +97,7 @@ public class UpdateJavaCompatibility extends Recipe {
         return super.validate().and(Validated.test("version", "Version must be > 0.", version, v -> v > 0));
     }
 
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), Preconditions.or(new GroovyScriptVisitor(), new KotlinScriptVisitor()));
     }
