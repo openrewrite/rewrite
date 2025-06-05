@@ -148,17 +148,34 @@ export class JavaScriptTypeMapping {
                     annotations: [], // TODO
                     interfaces: [], // TODO
                     members: [],
-                    methods: [] // TODO
+                    methods: []
                 } as Draft<JavaType.Class>;
                 this.typeCache.set(signature, result);
-                result.members = objectType.getProperties().map(symbol => {
-                    return {
-                        kind: JavaType.Kind.Variable,
-                        name: symbol.getName(),
-                        owner: undefined, // TODO
-                        type: this.getType(this.checker.getTypeOfSymbol(symbol)),
-                        annotations: [] // TODO
-                    } as JavaType.Variable;
+                objectType.getProperties().forEach(symbol => {
+                    const memberType = this.checker.getTypeOfSymbol(symbol);
+                    const callSignatures = memberType.getCallSignatures();
+                    if ((memberType.flags & ts.TypeFlags.Object) && callSignatures.length > 0) {
+                        result.methods.push({
+                            kind: JavaType.Kind.Method,
+                            declaringType: result,
+                            name: symbol.getName(),
+                            returnType: this.getType(callSignatures[0].getReturnType()),
+                            parameterNames: [], // TODO
+                            parameterTypes: [], // TODO
+                            thrownExceptions: [],
+                            annotations: [], // TODO
+                            defaultValue: [], // TODO
+                            declaredFormalTypeNames: [] // TODO
+                        } as JavaType.Method);
+                    } else {
+                        result.members.push({
+                            kind: JavaType.Kind.Variable,
+                            name: symbol.getName(),
+                            owner: undefined, // TODO
+                            type: this.getType(memberType),
+                            annotations: [] // TODO
+                        } as JavaType.Variable);
+                    }
                 });
                 return result;
             }
