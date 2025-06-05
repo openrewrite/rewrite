@@ -18,6 +18,7 @@
 import {RecipeSpec} from "../../../src/test";
 import {JS, typescript} from "../../../src/javascript";
 import {J, JavaType} from "../../../src/java";
+import {tap} from "../../test-util";
 
 describe('interface mapping', () => {
     const spec = new RecipeSpec();
@@ -405,19 +406,24 @@ describe('interface mapping', () => {
             expect(ident.type!.kind).toEqual(JavaType.Kind.Class);
             const type = ident.type! as JavaType.Class
             expect(type.members).toHaveLength(2);
-            expect(type.members[0].kind).toEqual(JavaType.Kind.Variable);
-            expect((type.members[0] as JavaType.Variable).name).toEqual("displayName");
-            expect(type.members[0].type.kind).toEqual(JavaType.Kind.Primitive);
-            expect(type.members[1].kind).toEqual(JavaType.Kind.Variable);
-            expect((type.members[1] as JavaType.Variable).name).toEqual("number");
-            expect(type.members[1].type.kind).toEqual(JavaType.Kind.Primitive);
-
+            tap(type.members[0], mem => {
+                expect(mem.kind).toEqual(JavaType.Kind.Variable);
+                expect((mem as JavaType.Variable).name).toEqual("displayName");
+                expect(mem.type.kind).toEqual(JavaType.Kind.Primitive);
+            });
+            tap(type.members[1], mem => {
+                expect(mem.kind).toEqual(JavaType.Kind.Variable);
+                expect((mem as JavaType.Variable).name).toEqual("number");
+                expect(mem.type.kind).toEqual(JavaType.Kind.Primitive);
+            });
             expect(type.methods).toHaveLength(1);
-            expect(type.methods[0].kind).toEqual(JavaType.Kind.Method);
-            expect((type.methods[0] as JavaType.Method).name).toEqual("print");
-            expect(type.methods[0].returnType.kind).toEqual(JavaType.Kind.Primitive);
-            expect(type.methods[0].parameterNames[0]).toEqual("prefix");
-            expect(type.methods[0].parameterTypes[0].kind).toEqual(JavaType.Kind.Primitive);
+            tap(type.methods[0], method => {
+                expect(method.kind).toEqual(JavaType.Kind.Method);
+                expect((method as JavaType.Method).name).toEqual("print");
+                expect(method.returnType.kind).toEqual(JavaType.Kind.Primitive);
+                expect(method.parameterNames[0]).toEqual("prefix");
+                expect(method.parameterTypes[0].kind).toEqual(JavaType.Kind.Primitive);
+            });
         }
         await spec.rewriteRun(source);
     })
