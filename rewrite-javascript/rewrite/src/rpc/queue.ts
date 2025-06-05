@@ -222,13 +222,13 @@ export class RpcReceiveQueue {
         return this.batch.shift()!;
     }
 
-    receiveMarkers(markers?: Markers): Promise<any> {
+    receiveMarkers(markers?: Markers): Promise<Markers> {
         if (markers === undefined) {
-            markers = {kind: MarkersKind.Markers, id: randomId(), markers: []};
+            markers = {kind: MarkersKind.Markers, id: randomId(), markers: []} as Markers;
         }
-        return this.receive(markers, m => {
+        return this.receive(markers, async m => {
             return saveTrace(this.logFile, async () => {
-                const draft = createDraft(markers);
+                const draft = createDraft(markers!);
                 draft.id = await this.receive(m.id);
                 draft.markers = (await this.receiveList(m.markers))!;
                 return finishDraft(draft);
