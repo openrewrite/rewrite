@@ -211,10 +211,10 @@ public class UpdateJavaCompatibility extends Recipe {
                 if (a.getVariable() instanceof J.Identifier) {
                     J.Identifier variable = (J.Identifier) a.getVariable();
                     if ("sourceCompatibility".equals(variable.getSimpleName())) {
-                        c.putMessageOnFirstEnclosing(enclosing, SOURCE_COMPATIBILITY_FOUND, a.getAssignment());
+                        c.putMessageOnFirstEnclosing(enclosing, SOURCE_COMPATIBILITY_FOUND, true);
                     }
                     if ("targetCompatibility".equals(variable.getSimpleName())) {
-                        c.putMessageOnFirstEnclosing(enclosing, TARGET_COMPATIBILITY_FOUND, a.getAssignment());
+                        c.putMessageOnFirstEnclosing(enclosing, TARGET_COMPATIBILITY_FOUND, true);
                     }
 
                     if (compatibilityType == null) {
