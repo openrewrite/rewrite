@@ -15,8 +15,6 @@
  */
 package org.openrewrite;
 
-import com.opencsv.CSVReaderHeaderAware;
-import com.opencsv.exceptions.CsvValidationException;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -30,18 +28,18 @@ import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.*;
 
-import java.io.IOException;
-import java.io.StringReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
 import static org.openrewrite.marker.GitProvenance.EOL.Native;
@@ -84,7 +82,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
     void defaultEstimatedEffortForRecipeThatChangesSourceFiles() {
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(new FindAndReplace("replace_me", "replacement", null, null, null, null, null, null))
-            .afterRecipe(recipeRun -> assertEstimatedEffort(recipeRun, 1, EXPECTED_DEFAULT_ESTIMATED_EFFORT)),
+            .dataTable(SourcesFileResults.Row.class, rows -> assertEstimatedEffortInFirstRowOfSourceFileResults(rows, EXPECTED_DEFAULT_ESTIMATED_EFFORT)),
           text(
             """
               replace_me
@@ -99,7 +97,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
     void customEstimatedEffortForRecipeThatChangesSourceFiles() {
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(new CustomEstimatedEffortAppendToTextRecipe("before", "after"))
-            .afterRecipe(recipeRun -> assertEstimatedEffort(recipeRun, 1, EXPECTED_CUSTOM_ESTIMATED_EFFORT)),
+            .dataTable(SourcesFileResults.Row.class, rows -> assertEstimatedEffortInFirstRowOfSourceFileResults(rows, EXPECTED_CUSTOM_ESTIMATED_EFFORT)),
           text(
             """
               before
@@ -114,7 +112,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
     void defaultEstimatedEffortForRecipeThatGeneratesSourceFiles() {
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(new CreateTextFile("foo", "manifest.txt", false))
-            .afterRecipe(recipeRun -> assertEstimatedEffort(recipeRun, 1, EXPECTED_DEFAULT_ESTIMATED_EFFORT)),
+            .dataTable(SourcesFileResults.Row.class, rows -> assertEstimatedEffortInFirstRowOfSourceFileResults(rows, EXPECTED_DEFAULT_ESTIMATED_EFFORT)),
           text(
             null,
             "foo",
@@ -126,7 +124,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
     void customEstimatedEffortForRecipeThatGeneratesSourceFiles() {
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(new CustomEstimatedEffortCreateTextFile("foo", "manifest.txt", false))
-            .afterRecipe(recipeRun -> assertEstimatedEffort(recipeRun, 1, EXPECTED_CUSTOM_ESTIMATED_EFFORT)),
+            .dataTable(SourcesFileResults.Row.class, rows -> assertEstimatedEffortInFirstRowOfSourceFileResults(rows, EXPECTED_CUSTOM_ESTIMATED_EFFORT)),
           text(
             null,
             "foo",
@@ -284,41 +282,9 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         }
     }
 
-    private void assertEstimatedEffort(RecipeRun recipeRun, int rowIndex, long expectedEffort) {
-        String sourceFileResultsCSV = readCSVContentFromSourceFileResults(recipeRun);
-        Long estimatedEffort = readEstimatedEffortFromCSV(sourceFileResultsCSV, rowIndex);
-        assertThat(estimatedEffort).isEqualTo(expectedEffort);
-    }
-
-    private String readCSVContentFromSourceFileResults(RecipeRun recipeRun) {
-        StringBuilder output = new StringBuilder();
-        final String dataTableName = SourcesFileResults.class.getName();
-        RecipeRun.exportCsv(new InMemoryExecutionContext(), recipeRun.getDataTable(dataTableName),
-          s -> output.append(s).append("\n"), recipeRun.getDataTableRows(dataTableName));
-        return output.toString();
-    }
-
-    private Long readEstimatedEffortFromCSV(String csvContent, int rowIndex) {
-        String estimatedEffort = readColumnValueFromCSV(csvContent, rowIndex, 4);
-        return Long.parseLong(estimatedEffort);
-    }
-
-    private String readColumnValueFromCSV(String csvContent, int rowIndex, int columnIndex) {
-        try {
-            List<List<String>> dataRows = readSourcesFileResultsFromCSV(csvContent);
-            return dataRows.get(rowIndex).get(columnIndex);
-        } catch (IOException | CsvValidationException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private List<List<String>> readSourcesFileResultsFromCSV(String csvContent) throws IOException, CsvValidationException {
-        CSVReaderHeaderAware csvReader = new CSVReaderHeaderAware(new StringReader(csvContent));
-        List<List<String>> dataRows = new ArrayList<>();
-        String[] nextRecord;
-        while ((nextRecord = csvReader.readNext()) != null) {
-            dataRows.add(Arrays.asList(nextRecord));
-        }
-        return dataRows;
+    private static void assertEstimatedEffortInFirstRowOfSourceFileResults(List<SourcesFileResults.Row> rows, Long expectedEstimatedEffort) {
+        assertThat(rows).isNotEmpty();
+        SourcesFileResults.Row row = rows.getFirst();
+        assertThat(row.getEstimatedTimeSaving()).isEqualTo(expectedEstimatedEffort);
     }
 }

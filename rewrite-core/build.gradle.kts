@@ -26,5 +26,4 @@ dependencies {
 
     testImplementation("org.assertj:assertj-core:latest.release")
     testImplementation(project(":rewrite-test"))
-    testImplementation("com.opencsv:opencsv:5.11.1")
 }
