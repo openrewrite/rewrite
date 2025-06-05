@@ -831,7 +831,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitPropertySignature(node: ts.PropertySignature) {
+    visitPropertySignature(node: ts.PropertySignature): J.VariableDeclarations {
         // FIXME We are mapping the literals in things like type ascii = { " ": 32; "!": 33; } to
         //  named variables, which is not a good use of this construct.
         return {
@@ -1562,7 +1562,7 @@ export class JavaScriptParserVisitor {
     // FIXME these should not be mapped as VariableDeclarations since the names can never be accessed
     //  and this would potentially just trip up flow analyses. The names exist purely for documentation purposes,
     //  they has no semantics. See https://stackoverflow.com/questions/63629315/what-are-named-or-labeled-tuples-in-typescript.
-    visitNamedTupleMember(node: ts.NamedTupleMember) {
+    visitNamedTupleMember(node: ts.NamedTupleMember): J.VariableDeclarations {
         return {
             kind: J.Kind.VariableDeclarations,
             id: randomId(),
@@ -2314,19 +2314,25 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitYieldExpression(node: ts.YieldExpression): J.Yield {
+    visitYieldExpression(node: ts.YieldExpression): JS.StatementExpression {
         return {
-            kind: J.Kind.Yield,
+            kind: JS.Kind.StatementExpression,
             id: randomId(),
-            prefix: this.prefix(node),
-            markers: node.asteriskToken ?
-                markers({
-                    kind: JS.Markers.DelegatedYield,
-                    id: randomId(),
-                    prefix: this.prefix(node.asteriskToken)
-                } as DelegatedYield) : emptyMarkers,
-            value: node.expression && this.visit(node.expression),
-            implicit: false
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            statement: {
+                kind: J.Kind.Yield,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: node.asteriskToken ?
+                    markers({
+                        kind: JS.Markers.DelegatedYield,
+                        id: randomId(),
+                        prefix: this.prefix(node.asteriskToken)
+                    } as DelegatedYield) : emptyMarkers,
+                value: node.expression && this.visit(node.expression),
+                implicit: false
+            } as J.Yield
         };
     }
 
@@ -2391,7 +2397,7 @@ export class JavaScriptParserVisitor {
         return this.newEmpty(this.prefix(node));
     }
 
-    visitExpressionWithTypeArguments(node: ts.ExpressionWithTypeArguments) {
+    visitExpressionWithTypeArguments(node: ts.ExpressionWithTypeArguments): JS.ExpressionWithTypeArguments | Expression {
         if (node.typeArguments) {
             return {
                 kind: JS.Kind.ExpressionWithTypeArguments,
@@ -2489,7 +2495,7 @@ export class JavaScriptParserVisitor {
         return this.newEmpty(this.prefix(node));
     }
 
-    visitVariableStatement(node: ts.VariableStatement) {
+    visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations {
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
             draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
             draft.prefix = this.prefix(node);
@@ -3174,7 +3180,7 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitNamespaceExportDeclaration(node: ts.NamespaceExportDeclaration) {
+    visitNamespaceExportDeclaration(node: ts.NamespaceExportDeclaration): JS.NamespaceDeclaration {
         return {
             kind: JS.Kind.NamespaceDeclaration,
             id: randomId(),
@@ -3399,7 +3405,7 @@ export class JavaScriptParserVisitor {
         return this.visitUnknown(node);
     }
 
-    visitExternalModuleReference(node: ts.ExternalModuleReference) {
+    visitExternalModuleReference(node: ts.ExternalModuleReference): J.MethodInvocation {
         return {
             kind: J.Kind.MethodInvocation,
             id: randomId(),
@@ -3700,7 +3706,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitEnumMember(node: ts.EnumMember) {
+    visitEnumMember(node: ts.EnumMember): J.EnumValue {
         return {
             kind: J.Kind.EnumValue,
             id: randomId(),
