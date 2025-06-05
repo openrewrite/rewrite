@@ -41,7 +41,7 @@ program
     .option('--port <number>', 'port number')
     .option('--log-file <path>', 'log file path')
     .option('-v, --verbose', 'enable verbose output')
-    .option('--batch-size [size]', 'sets the batch size (default is 100)', parseInt, 100)
+    .option('--batch-size [size]', 'sets the batch size (default is 100)', s => parseInt(s, 10), 100)
     .option('--trace-get-object-output', 'enable `GetObject` output tracing')
     .option('--trace-get-object-input', 'enable `GetObject` input tracing')
     .parse();
