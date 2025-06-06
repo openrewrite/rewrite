@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 class ChangeTaskToTasksRegisterTest implements RewriteTest {
 
@@ -31,180 +32,245 @@ class ChangeTaskToTasksRegisterTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void basicTaskToTasksRegister() {
+    void groovyTaskWithClosure() {
         rewriteRun(
           buildGradle(
             """
-            task myCopyTask(type: Copy)
-            """,
+              task taskName(type: Copy) {
+                  from 'src/main/resources'
+                  into 'build/generated-resources'
+              }
+              """,
             """
-            tasks.register("myCopyTask", Copy)
-            """
+              tasks.register("taskName", Copy) {
+                  from 'src/main/resources'
+                  into 'build/generated-resources'
+              }
+              """
           )
         );
     }
 
     @Test
-    void taskNameAsLiteralString() {
+    void groovyTaskWithoutClosure() {
         rewriteRun(
           buildGradle(
             """
-            task "literalTask"(type: Jar) {
-                archiveFileName = "my-app.jar"
-            }
-            """,
+              task taskName(type: Copy)
+              """,
             """
-            tasks.register("literalTask", Jar) {
-                archiveFileName = "my-app.jar"
-            }
-            """
+              tasks.register("taskName", Copy)
+              """
           )
         );
     }
 
     @Test
-    void shouldNotChangeExistingTasksRegister() {
+    void groovyTaskWithoutType() {
         rewriteRun(
           buildGradle(
             """
-            tasks.register("alreadyLazy", Copy) {
-            }
+              task taskName {
+                  doLast {
+                      println "simple print"
+                  }
+              }
+              """,
             """
+              tasks.register("taskName") {
+                  doLast {
+                      println "simple print"
+                  }
+              }
+              """
           )
         );
     }
 
     @Test
-    void shouldNotChangeTaskWithoutType() {
+    void alreadyGroovyTasks() {
         rewriteRun(
           buildGradle(
             """
-            task "simpleStringArgument"
-            """
+              tasks.register("taskName", Copy)
+              """
           )
         );
     }
 
     @Test
-    void taskWithConfigurationClosure() {
+    void groovyTaskWithImport() {
         rewriteRun(
           buildGradle(
             """
-            import org.gradle.api.tasks.Delete
-            
-            task closureTask(type: Delete) {
-                description = 'Deletes the build directory.'
-                delete rootProject.buildDir
-            }
-            """,
+              import org.gradle.api.tasks.Delete
+              
+              task taskName(type: Delete) {
+                  description = 'Deletes the build directory.'
+                  delete rootProject.buildDir
+              }
+              """,
             """
-            import org.gradle.api.tasks.Delete
-            
-            tasks.register("closureTask", Delete) {
-                description = 'Deletes the build directory.'
-                delete rootProject.buildDir
-            }
-            """
+              import org.gradle.api.tasks.Delete
+              
+              tasks.register("taskName", Delete) {
+                  description = 'Deletes the build directory.'
+                  delete rootProject.buildDir
+              }
+              """
           )
         );
     }
 
     @Test
-    void taskTypeIsFullyQualified() {
+    void groovyTaskWithFullyQualifiedType() {
         rewriteRun(
           buildGradle(
             """
-            task fullQualifiedTask(type: org.gradle.api.tasks.Copy) {
-                from 'src/main/resources'
-                into 'build/generated-resources'
-            }
-            """,
+              task taskName(type: org.gradle.api.tasks.Copy) {
+                  from 'src/main/resources'
+                  into 'build/generated-resources'
+              }
+              """,
             """
-            tasks.register("fullQualifiedTask", org.gradle.api.tasks.Copy) {
-                from 'src/main/resources'
-                into 'build/generated-resources'
-            }
-            """
+              tasks.register("taskName", org.gradle.api.tasks.Copy) {
+                  from 'src/main/resources'
+                  into 'build/generated-resources'
+              }
+              """
           )
         );
     }
 
     @Test
-    void taskTypeIsSimpleNameWithLocalClass() {
+    void groovyTaskWithLocalClassType() {
         rewriteRun(
           buildGradle(
             """
-            class MyCustomTaskType extends DefaultTask {
-            }
-            
-            task custom(type: MyCustomTaskType) {
-                group = 'custom'
-            }
-            """,
+              class MyCustomTaskType extends DefaultTask {
+              }
+              
+              task taskName(type: MyCustomTaskType) {
+                  group = 'custom'
+              }
+              """,
             """
-            class MyCustomTaskType extends DefaultTask {
-            }
-            
-            tasks.register("custom", MyCustomTaskType) {
-                group = 'custom'
-            }
-            """
+              class MyCustomTaskType extends DefaultTask {
+              }
+              
+              tasks.register("taskName", MyCustomTaskType) {
+                  group = 'custom'
+              }
+              """
           )
         );
     }
 
     @Test
-    void shouldNotChangeOtherMethodsNamedTask() {
+    void groovyTaskInSelect() {
         rewriteRun(
           buildGradle(
             """
-            class TaskHelper {
-                void task(Map params, Closure cl) { /* ... */ }
-            }
-            def helper = new TaskHelper()
-            helper.task(type: Copy) {
-                // This is not a standard Gradle task definition
-            }
-            
-            task realGradleTask(type: Delete)
-            """,
-            """
-            class TaskHelper {
-                void task(Map params, Closure cl) { /* ... */ }
-            }
-            def helper = new TaskHelper()
-            helper.task(type: Copy) {
-                // This is not a standard Gradle task definition
-            }
-            
-            tasks.register("realGradleTask", Delete)
-            """
+              class TaskHelper {
+                  void task(Map params, Closure cl) { /* ... */ }
+              }
+              def helper = new TaskHelper()
+              helper.task(type: Copy) {
+                  // This is not a standard Gradle task definition
+              }
+              """
           )
         );
     }
 
     @Test
-    void preserveFormatting() {
+    void groovyTaskWithCommentsAndBlankLine() {
         rewriteRun(
           buildGradle(
             """
-            task "format preservation"(type: Exec) {
-                group = "verification"
-                description = "Runs tests and checks."
-            
-                // comments
-                commandLine 'echo', "Formatted"
-            }
-            """,
+              task taskName(type: Exec) {
+                  group = "verification"
+                  description = "Runs tests and checks."
+              
+                  // comments
+                  commandLine 'echo', "Formatted"
+              }
+              """,
             """
-            tasks.register("format preservation", Exec) {
-                group = "verification"
-                description = "Runs tests and checks."
-            
-                // comments
-                commandLine 'echo', "Formatted"
-            }
+              tasks.register("taskName", Exec) {
+                  group = "verification"
+                  description = "Runs tests and checks."
+              
+                  // comments
+                  commandLine 'echo', "Formatted"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinTaskWithClosure() {
+        rewriteRun(
+          buildGradleKts(
             """
+              task<Copy>("taskName") {
+                  from("src")
+                  into("dest")
+              }
+              """,
+            """
+              tasks.register<Copy>("taskName") {
+                  from("src")
+                  into("dest")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinTaskWithoutClosure() {
+        rewriteRun(
+          buildGradleKts(
+            """
+               task<Copy>("taskName")
+              """,
+            """
+              tasks.register<Copy>("taskName")
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinTaskWithoutType() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              task("taskName") {
+                  // simple task
+              }
+              """,
+            """
+              tasks.register("taskName") {
+                  // simple task
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alreadyKotlinTasks() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              tasks.register<Copy>("taskName") {
+                    from("src")
+                    into("dest")
+              }
+              """
           )
         );
     }

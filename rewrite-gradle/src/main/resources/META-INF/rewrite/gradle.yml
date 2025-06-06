@@ -54,6 +54,13 @@ recipeList:
       filePattern: gradle.properties
 ---
 type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.GradleBestPractices
+displayName: Apply Gradle Best Practices
+description: Applies a curated set of best practices for Gradle projects.
+recipeList:
+  - org.openrewrite.gradle.ChangeTaskToTasksRegister
+---
+type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.plugins.RemoveDevelocity
 displayName: Remove Develocity
 description: Remove the Develocity plugin and configuration from the Gradle build and settings files.
