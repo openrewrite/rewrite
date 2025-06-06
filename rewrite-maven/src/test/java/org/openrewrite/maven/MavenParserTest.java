@@ -4377,6 +4377,7 @@ class MavenParserTest implements RewriteTest {
               )
             );
         }
+
         @Issue("https://github.com/openrewrite/rewrite/issues/5402")
         @Test
         void allDependencyManagementEntryVariants_allDependencyVariants() {
@@ -4386,6 +4387,7 @@ class MavenParserTest implements RewriteTest {
                 pomXml(
                   """
                     <project>
+                      <modelVersion>4.0.0</modelVersion>
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-bom</artifactId>
                       <version>1</version>

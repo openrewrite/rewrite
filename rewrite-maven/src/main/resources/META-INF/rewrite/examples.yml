@@ -1529,6 +1529,54 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.OrderPomElements
+examples:
+- description: ''
+  sources:
+  - before: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <artifactId>my-project</artifactId>
+          <groupId>my.org.project</groupId>
+          <version>4.3.0</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <configuration>
+                          <source>1.8</source>
+                          <target>1.8</target>
+                      </configuration>
+                      <version>3.8.1</version>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <groupId>org.apache.maven.plugins</groupId>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    after: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>my.org.project</groupId>
+          <artifactId>my-project</artifactId>
+          <version>4.3.0</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                      <configuration>
+                          <source>1.8</source>
+                          <target>1.8</target>
+                      </configuration>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemoveDependency
 examples:
 - description: ''

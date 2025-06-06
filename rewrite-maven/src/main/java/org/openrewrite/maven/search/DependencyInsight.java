@@ -156,7 +156,8 @@ public class DependencyInsight extends Recipe {
                         match.getDatedSnapshotVersion(),
                         StringUtils.isBlank(match.getRequested().getScope()) ? "compile" :
                                 match.getRequested().getScope(),
-                        match.getDepth()
+                        match.getDepth(),
+                        null
                 ));
 
                 return t;

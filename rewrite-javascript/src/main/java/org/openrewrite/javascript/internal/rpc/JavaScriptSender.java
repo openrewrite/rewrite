@@ -47,8 +47,11 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
-        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.sendMarkers(j, Tree::getMarkers);
+        if (!(j instanceof JS.ExpressionStatement) && !(j instanceof JS.StatementExpression)) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
+            q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
+            q.sendMarkers(j, Tree::getMarkers);
+        }
 
         return j;
     }
