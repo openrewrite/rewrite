@@ -2875,6 +2875,7 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: this.prefix(kind),
                 markers: emptyMarkers,
+                annotations: [],
                 keyword: kind.kind === ts.SyntaxKind.VarKeyword ? 'var' :
                     kind.kind === ts.SyntaxKind.LetKeyword ? 'let' :
                         kind.kind === ts.SyntaxKind.ConstKeyword ? 'const' : 'using',
