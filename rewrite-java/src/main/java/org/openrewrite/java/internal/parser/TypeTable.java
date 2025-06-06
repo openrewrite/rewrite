@@ -48,7 +48,7 @@ import static java.util.Objects.requireNonNull;
 import static org.objectweb.asm.ClassReader.SKIP_DEBUG;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
-import static org.openrewrite.java.internal.parser.AnnotationSerializer.convertAnnotationValueToString;
+import static org.openrewrite.java.internal.parser.AnnotationSerializer.*;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
 
 /**
@@ -160,9 +160,9 @@ public class TypeTable implements JavaParserClasspathLoader {
     @RequiredArgsConstructor
     static class Reader {
         private static final int NESTED_TYPE_ACCESS_MASK = Opcodes.ACC_PUBLIC | Opcodes.ACC_PRIVATE | Opcodes.ACC_PROTECTED |
-                Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_INTERFACE |
-                Opcodes.ACC_ABSTRACT | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_ANNOTATION |
-                Opcodes.ACC_ENUM;
+                                                           Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_INTERFACE |
+                                                           Opcodes.ACC_ABSTRACT | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_ANNOTATION |
+                                                           Opcodes.ACC_ENUM;
 
         private final ExecutionContext ctx;
 
@@ -330,25 +330,11 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                             if (member.getAnnotationDefaultValue() != null) {
                                 AnnotationVisitor annotationDefaultVisitor = mv.visitAnnotationDefault();
-                                if (annotationDefaultVisitor != null) {
-                                    Object value = AnnotationDeserializer.parseValue(member.getAnnotationDefaultValue());
-                                    if (value.getClass().isArray()) {
-                                        for (Object v : ((Object[]) value)) {
-                                            annotationDefaultVisitor.visit(null, v);
-                                        }
-                                    } else if (value instanceof AnnotationDeserializer.ClassConstant) {
-                                        annotationDefaultVisitor.visit(null, Type.getType(((AnnotationDeserializer.ClassConstant) value).getDescriptor()));
-                                    } else if (value instanceof AnnotationDeserializer.EnumConstant) {
-                                        AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) value;
-                                        annotationDefaultVisitor.visitEnum(null, enumConstant.getEnumDescriptor(), enumConstant.getConstantName());
-                                    } else if (value instanceof AnnotationDeserializer.FieldConstant) {
-                                        AnnotationDeserializer.FieldConstant fieldConstant = (AnnotationDeserializer.FieldConstant) value;
-                                        annotationDefaultVisitor.visitEnum(null, fieldConstant.getClassName(), fieldConstant.getFieldName());
-                                    } else {
-                                        annotationDefaultVisitor.visit(null, value);
-                                    }
-                                    annotationDefaultVisitor.visitEnd();
-                                }
+                                AnnotationSerializer.processAnnotationDefaultValue(
+                                        annotationDefaultVisitor,
+                                        AnnotationDeserializer.parseValue(member.getAnnotationDefaultValue())
+                                );
+                                annotationDefaultVisitor.visitEnd();
                             }
 
                             writeMethodBody(member, mv);
@@ -576,7 +562,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                                                @Nullable String signature, String @Nullable [] exceptions) {
                                         // Repeating check from `writeMethod()` for performance reasons
                                         if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
-                                                name != null && !"<clinit>".equals(name)) {
+                                            name != null && !"<clinit>".equals(name)) {
                                             Writer.Member member = new Writer.Member(access, name, descriptor, signature, exceptions, null);
                                             return new MethodVisitor(Opcodes.ASM9) {
                                                 @Override
@@ -596,6 +582,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                                 @Override
                                                 public AnnotationVisitor visitAnnotationDefault() {
+                                                    List<String> nested = new ArrayList<>();
                                                     // Collect default values for annotation methods
                                                     return new AnnotationVisitor(Opcodes.ASM9) {
                                                         @Override
@@ -623,6 +610,18 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                         @Override
                                                         public void visitEnum(String name, String descriptor, String value) {
                                                             member.annotationDefaultValue = descriptor + "." + value;
+                                                        }
+
+                                                        @Override
+                                                        public AnnotationVisitor visitAnnotation(String name, String descriptor) {
+                                                            return AnnotationCollectorHelper.createCollector(descriptor, nested);
+                                                        }
+
+                                                        @Override
+                                                        public void visitEnd() {
+                                                            if (!nested.isEmpty()) {
+                                                                member.annotationDefaultValue = serializeArray(nested.toArray(new String[0]));
+                                                            }
                                                         }
                                                     };
                                                 }

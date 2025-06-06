@@ -19,7 +19,6 @@ import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.openrewrite.java.tree.JavaType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -48,9 +47,6 @@ class AnnotationApplier {
         AnnotationDeserializer.AnnotationInfo annotationInfo = AnnotationDeserializer.parseAnnotation(annotationStr);
         String annotationName = annotationInfo.getName();
 
-        // Create a JavaType.Class for the annotation with annotations
-        createAnnotationType(annotationName);
-
         String annotationDescriptor = "L" + annotationName.replace('.', '/') + ";";
         AnnotationVisitor av = visitAnnotation.create(annotationDescriptor, true);
         if (av != null) {
@@ -76,7 +72,7 @@ class AnnotationApplier {
                         av.visit(attributeName, stringValue);
                     } else if (parsedValue instanceof AnnotationDeserializer.ClassConstant) {
                         String className = ((AnnotationDeserializer.ClassConstant) parsedValue).getDescriptor();
-                        av.visit(attributeName, org.objectweb.asm.Type.getObjectType(className.replace('.', '/')));
+                        av.visit(attributeName, org.objectweb.asm.Type.getType(className.replace('.', '/')));
                     } else if (parsedValue instanceof AnnotationDeserializer.EnumConstant) {
                         AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) parsedValue;
                         String enumDescriptor = enumConstant.getEnumDescriptor();
@@ -172,23 +168,6 @@ class AnnotationApplier {
         AnnotationVisitor create(String descriptor, boolean visible);
     }
 
-    /**
-     * Creates a JavaType.FullyQualified for an annotation.
-     *
-     * @param annotationName The fully qualified name of the annotation
-     * @return A JavaType.FullyQualified for the annotation
-     */
-    public static JavaType.FullyQualified createAnnotationType(String annotationName) {
-        // Create a simple JavaType.Class for the annotation
-        JavaType.Class annotationType = JavaType.ShallowClass.build(annotationName);
-
-        // Add a self-annotation to the annotation type
-        // This is a workaround to make the test pass
-        // In a real implementation, we would need to extract the annotations from the bytecode
-        List<JavaType.FullyQualified> annotations = new ArrayList<>();
-        annotations.add(JavaType.ShallowClass.build("java.lang.annotation.Retention"));
-        return annotationType.withAnnotations(annotations);
-    }
 }
 
 /**
@@ -497,6 +476,16 @@ class AnnotationDeserializer {
         if (value.startsWith("L")) {
             int semicolonIndex = value.indexOf(';');
             return new EnumConstant(value.substring(0, semicolonIndex + 1), value.substring(semicolonIndex + 1));
+        }
+
+        // primitive types
+        if (value.length() == 1 && "VZCBSIFJD".contains(value)) {
+            return new ClassConstant(value);
+        }
+
+        // array types
+        if (value.startsWith("[")) {
+            return new ClassConstant(value);
         }
 
         // Nested annotation
@@ -907,7 +896,7 @@ class AnnotationSerializer {
         sb.append("{");
         for (int i = 0; i < values.length; i++) {
             if (i > 0) {
-                sb.append(", ");
+                sb.append(",");
             }
             sb.append(values[i]);
         }
@@ -1039,5 +1028,47 @@ class AnnotationSerializer {
         return value.replace("\\", "\\\\")  // Escape backslashes first
                 .replace("|", "\\|")    // Escape pipes
                 .replace("\"", "\\\""); // Escape quotes
+    }
+
+    /**
+     * Processes an annotation default value and applies it to the provided annotation visitor.
+     * This method handles different types of annotation values including arrays, class constants,
+     * enum constants, and field constants.
+     *
+     * @param annotationDefaultVisitor The annotation visitor to apply the default value to
+     * @param defaultValueStr The string representation of the default value
+     */
+    public static void processAnnotationDefaultValue(AnnotationVisitor annotationDefaultVisitor, Object value) {
+        if (annotationDefaultVisitor == null || value == null) {
+            return;
+        }
+
+        if (value.getClass().isArray()) {
+            AnnotationVisitor annotationVisitor = annotationDefaultVisitor.visitArray(null);
+            for (Object v : ((Object[]) value)) {
+                processAnnotationDefaultValue(annotationVisitor, v);
+            }
+            annotationVisitor.visitEnd();
+        } else if (value instanceof AnnotationDeserializer.ClassConstant) {
+            annotationDefaultVisitor.visit(null, Type.getType(((AnnotationDeserializer.ClassConstant) value).getDescriptor()));
+        } else if (value instanceof AnnotationDeserializer.EnumConstant) {
+            AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) value;
+            annotationDefaultVisitor.visitEnum(null, enumConstant.getEnumDescriptor(), enumConstant.getConstantName());
+        } else if (value instanceof AnnotationDeserializer.FieldConstant) {
+            AnnotationDeserializer.FieldConstant fieldConstant = (AnnotationDeserializer.FieldConstant) value;
+            annotationDefaultVisitor.visitEnum(null, fieldConstant.getClassName(), fieldConstant.getFieldName());
+        } else if (value instanceof AnnotationDeserializer.AnnotationInfo) {
+            AnnotationDeserializer.AnnotationInfo annotationInfo = (AnnotationDeserializer.AnnotationInfo) value;
+            AnnotationVisitor annotationVisitor = annotationDefaultVisitor.visitAnnotation(null, 'L' + annotationInfo.getName().replace('.', '/') + ';');
+            if (annotationInfo.getAttributes() != null) {
+                annotationInfo.getAttributes().forEach(attribute -> {
+                    // FIXME call correct visit method
+                    annotationVisitor.visit(attribute.getName(), attribute.getValue());
+                });
+            }
+            annotationVisitor.visitEnd();
+        } else {
+            annotationDefaultVisitor.visit(null, value);
+        }
     }
 }
