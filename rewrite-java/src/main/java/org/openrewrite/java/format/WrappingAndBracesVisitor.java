@@ -76,7 +76,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 annotationsStyle = style.getLocalVariableAnnotations();
             }
             variableDeclarations = variableDeclarations.withLeadingAnnotations(wrapAnnotations(variableDeclarations.getLeadingAnnotations(), whitespace, annotationsStyle));
-        } else if (getCursor().firstEnclosing(J.class) instanceof J.ClassDeclaration || getCursor().firstEnclosing(J.class) instanceof J.MethodDeclaration) {
+        } else if (getCursor().getParent(3) != null && (getCursor().getParent(3).getValue() instanceof J.ClassDeclaration || getCursor().getParent(3).getValue() instanceof J.MethodDeclaration)) {
             annotationsStyle = style.getParameterAnnotations();
             variableDeclarations = variableDeclarations.withLeadingAnnotations(wrapAnnotations(variableDeclarations.getLeadingAnnotations(), whitespace, annotationsStyle));
         }

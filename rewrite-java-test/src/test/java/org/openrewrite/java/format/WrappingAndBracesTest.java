@@ -589,6 +589,49 @@ class WrappingAndBracesTest implements RewriteTest {
     }
 
     @Test
+    void annotationWrappingAlreadyCorrect() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              @Foo
+              @Foo
+              class Test {
+                  @Foo
+                  @Foo
+                  int field;
+              
+                  @Foo
+                  @Foo
+                  void method(@Foo @Foo int param) {
+                      @Foo @Foo int localVar;
+                  }
+              }
+              
+              enum MyEnum {
+                  @Foo @Foo VALUE
+              }
+              
+              record someRecord(
+                      @Foo @Foo String name) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void annotationWrappingModifiers() {
         rewriteRun(
           java(
@@ -618,6 +661,43 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """,
+            """
+              @Foo
+              @Foo
+              final class Test {
+                  @Foo
+                  @Foo
+                  private int field;
+              
+                  @Foo
+                  @Foo
+                  public void method(
+                          @Foo @Foo final int param) {
+                      @Foo @Foo final int localVar;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingModifiersAlreadyCorrect() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+
             """
               @Foo
               @Foo
@@ -673,6 +753,49 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """,
+            """
+              @Foo
+              @Foo
+              class Test<T> {
+                  @Foo
+                  @Foo
+                  private int field;
+              
+                  @Foo
+                  @Foo
+                  Test(int field) {
+                      this.field = field;
+                  }
+              
+                  @Foo
+                  @Foo
+                  T method(
+                          @Foo @Foo T param) {
+                      @Foo @Foo T localVar;
+                      return param;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingGenericsAlreadyCorrect() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
             """
               @Foo
               @Foo
