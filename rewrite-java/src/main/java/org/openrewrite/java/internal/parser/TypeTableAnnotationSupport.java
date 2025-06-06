@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.java.internal.parser.AnnotationSerializer.*;
 
 /**
  * Helper class for applying annotations to classes, methods, and fields using ASM.
@@ -204,13 +205,13 @@ class AnnotationCollectorHelper {
      */
     static AnnotationVisitor createCollector(String descriptor, List<String> collectedAnnotations) {
         String annotationName = Type.getType(descriptor).getClassName();
-        String baseAnnotation = AnnotationSerializer.serializeSimpleAnnotation(annotationName);
+        String baseAnnotation = serializeSimpleAnnotation(annotationName);
 
         return new AnnotationValueCollector(annotationName, null, result -> {
             if (result.isEmpty()) {
                 collectedAnnotations.add(baseAnnotation);
             } else {
-                String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
+                String annotationWithAttributes = serializeAnnotationWithAttributes(
                         annotationName,
                         result.toArray(new String[0])
                 );
@@ -246,13 +247,13 @@ class AnnotationCollectorHelper {
 
         @Override
         public void visit(@Nullable String name, Object value) {
-            String attributeValue = AnnotationSerializer.serializeValue(value);
+            String attributeValue = serializeValue(value);
             if (attributeName == null && name ==  null) {
                 // This is an array element
                 collectedValues.add(attributeValue);
             } else {
                 // This is a named attribute
-                collectedValues.add(AnnotationSerializer.serializeAttribute(
+                collectedValues.add(serializeAttribute(
                         name != null ? name : attributeName,
                         attributeValue
                 ));
@@ -261,13 +262,13 @@ class AnnotationCollectorHelper {
 
         @Override
         public void visitEnum(@Nullable String name, String descriptor, String value) {
-            String attributeValue = AnnotationSerializer.serializeEnumConstant(descriptor, value);
+            String attributeValue = serializeEnumConstant(descriptor, value);
             if (name == null && attributeName == null) {
                 // This is an array element
                 collectedValues.add(attributeValue);
             } else {
                 // This is a named attribute
-                collectedValues.add(AnnotationSerializer.serializeAttribute(
+                collectedValues.add(serializeAttribute(
                         name != null ? name : attributeName,
                         attributeValue
                 ));
@@ -282,9 +283,9 @@ class AnnotationCollectorHelper {
             return new AnnotationValueCollector(nestedAnnotationName, name, result -> {
                 String nestedAnnotation;
                 if (result.isEmpty()) {
-                    nestedAnnotation = AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationName);
+                    nestedAnnotation = serializeSimpleAnnotation(nestedAnnotationName);
                 } else {
-                    nestedAnnotation = AnnotationSerializer.serializeAnnotationWithAttributes(
+                    nestedAnnotation = serializeAnnotationWithAttributes(
                             nestedAnnotationName,
                             result.toArray(new String[0])
                     );
@@ -295,7 +296,7 @@ class AnnotationCollectorHelper {
                     collectedValues.add(nestedAnnotation);
                 } else {
                     // This is a named attribute
-                    collectedValues.add(AnnotationSerializer.serializeAttribute(
+                    collectedValues.add(serializeAttribute(
                             name != null ? name : attributeName,
                             nestedAnnotation
                     ));
@@ -307,8 +308,8 @@ class AnnotationCollectorHelper {
         public AnnotationVisitor visitArray(@Nullable String name) {
             // Create a new collector for the array elements
             return new AnnotationValueCollector(annotationName, null, result -> {
-                String arrayValue = AnnotationSerializer.serializeArray(result.toArray(new String[0]));
-                collectedValues.add(AnnotationSerializer.serializeAttribute(
+                String arrayValue = serializeArray(result.toArray(new String[0]));
+                collectedValues.add(serializeAttribute(
                         name != null ? name : requireNonNull(attributeName),
                         arrayValue
                 ));
@@ -949,10 +950,64 @@ class AnnotationSerializer {
     }
 
     static String serializeValue(Object value) {
-        if (value instanceof String) {
-            return serializeString((String) value);
+        return serializeValueInternal(value, false);
+    }
+
+    /**
+     * Converts annotation values to their string representation for TypeTable serialization.
+     * This method handles the specific format requirements for TypeTable, including
+     * delimiter escaping and compact array formatting.
+     *
+     * @param value The annotation value to convert
+     * @return The serialized string representation
+     */
+    public static String convertAnnotationValueToString(Object value) {
+        return serializeValueInternal(value, true);
+    }
+
+    /**
+     * Internal method for serializing values with options for different formatting styles.
+     *
+     * @param value The value to serialize
+     * @param typeTableFormat If true, uses TypeTable format (delimiter escaping, compact arrays)
+     * @return The serialized string representation
+     */
+    private static String serializeValueInternal(Object value, boolean typeTableFormat) {
+        if (value == null) {
+            return "null";
+        } else if (value instanceof String) {
+            if (typeTableFormat) {
+                return "\"" + escapeDelimiters(value.toString()) + "\"";
+            } else {
+                return serializeString((String) value);
+            }
         } else if (value instanceof Type) {
-            return serializeClassConstant((Type) value);
+            if (typeTableFormat) {
+                return ((Type) value).getDescriptor();
+            } else {
+                return serializeClassConstant((Type) value);
+            }
+        } else if (value.getClass().isArray()) {
+            // Handle primitive arrays and object arrays
+            List<String> elements = new ArrayList<>();
+            if (value instanceof Object[]) {
+                Object[] array = (Object[]) value;
+                for (Object element : array) {
+                    elements.add(serializeValueInternal(element, typeTableFormat));
+                }
+            } else {
+                // Handle primitive arrays
+                int length = java.lang.reflect.Array.getLength(value);
+                for (int i = 0; i < length; i++) {
+                    Object element = java.lang.reflect.Array.get(value, i);
+                    elements.add(serializeValueInternal(element, typeTableFormat));
+                }
+            }
+            if (typeTableFormat) {
+                return "{" + String.join(",", elements) + "}";
+            } else {
+                return serializeArray(elements.toArray(new String[0]));
+            }
         } else if (value instanceof Boolean) {
             return serializeBoolean((Boolean) value);
         } else if (value instanceof Character) {
@@ -970,5 +1025,19 @@ class AnnotationSerializer {
         } else {
             return String.valueOf(value);
         }
+    }
+
+    /**
+     * Escapes delimiter characters for TypeTable serialization.
+     * This is specifically used for string values in annotation default values.
+     *
+     * @param value The string value to escape
+     * @return The escaped string value, or null if input is null
+     */
+    public static String escapeDelimiters(String value) {
+        if (value == null) return null;
+        return value.replace("\\", "\\\\")  // Escape backslashes first
+                .replace("|", "\\|")    // Escape pipes
+                .replace("\"", "\\\""); // Escape quotes
     }
 }

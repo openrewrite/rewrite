@@ -48,6 +48,7 @@ import static java.util.Objects.requireNonNull;
 import static org.objectweb.asm.ClassReader.SKIP_DEBUG;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
+import static org.openrewrite.java.internal.parser.AnnotationSerializer.convertAnnotationValueToString;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
 
 /**
@@ -502,31 +503,6 @@ public class TypeTable implements JavaParserClasspathLoader {
             out.close();
         }
 
-        private static String convertAnnotationValueToString(Object value) {
-            if (value == null) {
-                return "null";
-            } else if (value instanceof String) {
-                return "\"" + escapeDelimiters(value.toString()) + "\"";
-            } else if (value instanceof Type) {
-                return ((Type) value).getDescriptor();
-            } else if (value.getClass().isArray()) {
-                Object[] array = (Object[]) value;
-                List<String> elements = new ArrayList<>(array.length);
-                for (Object element : array) {
-                    elements.add(convertAnnotationValueToString(element));
-                }
-                return "{" + String.join(",", elements) + "}";
-            } else {
-                return value.toString();
-            }
-        }
-
-        private static String escapeDelimiters(String value) {
-            if (value == null) return null;
-            return value.replace("\\", "\\\\")  // Escape backslashes first
-                    .replace("|", "\\|")    // Escape pipes
-                    .replace("\"", "\\\""); // Escape quotes
-        }
 
         @Value
         public class Jar {
@@ -704,7 +680,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classSuperclassName,
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
                             -1, "", "", "", "", "",
-                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations.stream().map(Writer::escapeDelimiters).toArray(String[]::new)),
+                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations.stream().map(AnnotationSerializer::escapeDelimiters).toArray(String[]::new)),
                             ""); // Empty annotation default values for class row
 
                     for (Writer.Member member : members) {
@@ -752,8 +728,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                             signature == null ? "" : signature,
                             parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
-                            annotations.isEmpty() ? "" : String.join("|", annotations.stream().map(Writer::escapeDelimiters).toArray(String[]::new)),
-                            annotationDefaultValue == null ? "" : escapeDelimiters(annotationDefaultValue)
+                            annotations.isEmpty() ? "" : String.join("|", annotations.stream().map(AnnotationSerializer::escapeDelimiters).toArray(String[]::new)),
+                            annotationDefaultValue == null ? "" : annotationDefaultValue
                     );
                 }
             }
