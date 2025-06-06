@@ -307,6 +307,37 @@ class UpgradePluginVersionTest implements RewriteTest {
           buildGradle(
             """
               buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath "org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:5.40.0"
+                  }
+              }
+              apply plugin: "org.openrewrite.rewrite"
+              """,
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath "org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:5.40.7"
+                  }
+              }
+              apply plugin: "org.openrewrite.rewrite"
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradePluginVersionInBuildScriptWithExtVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.7", null)),
+          buildGradle(
+            """
+              buildscript {
                   ext {
                       rewriteVersion = '5.40.0'
                   }
