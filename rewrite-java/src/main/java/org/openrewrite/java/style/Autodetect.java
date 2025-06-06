@@ -1298,7 +1298,7 @@ public class Autodetect extends NamedStyles {
                 );
             }
             if (fieldAnnotationsWrapped != 0) {
-                wrappingAndBracesStyle = wrappingAndBracesStyle.withEnumFieldAnnotations(
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withFieldAnnotations(
                         wrappingAndBracesStyle.getFieldAnnotations()
                                 .withWrap(determineWrapping(fieldAnnotationsWrapped, wrappingAndBracesStyle.getFieldAnnotations().getWrap()))
                 );
@@ -1347,14 +1347,14 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
             for (int i = 0; i < classDecl.getLeadingAnnotations().size(); i++) {
-                if (classDecl.getLeadingAnnotations().size() == 1 || i == classDecl.getLeadingAnnotations().size() - 1) {
-                    if (!classDecl.getModifiers().isEmpty()) {
-                        wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getModifiers().get(0).getPrefix());
-                    } else {
-                        wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getPadding().getKind().getPrefix());
-                    }
+                J.Annotation ann = classDecl.getLeadingAnnotations().get(i);
+                wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(ann.getPrefix());
+            }
+            if (!classDecl.getLeadingAnnotations().isEmpty()) {
+                if (!classDecl.getModifiers().isEmpty()) {
+                    wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getModifiers().get(0).getPrefix());
                 } else {
-                    wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getLeadingAnnotations().get(i + 1).getPrefix());
+                    wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getPadding().getKind().getPrefix());
                 }
             }
             return super.visitClassDeclaration(classDecl, wrappingAndBracesStatistics);
@@ -1363,65 +1363,81 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
             for (int i = 0; i < method.getLeadingAnnotations().size(); i++) {
-                if (method.getLeadingAnnotations().size() == 1 || i == method.getLeadingAnnotations().size() - 1) {
-                    if (!method.getModifiers().isEmpty()) {
-                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getModifiers().get(0).getPrefix());
-                    } else if (method.getTypeParameters() != null) {
-                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getTypeParameters().get(0).getPrefix());
-                    } else if (method.getReturnTypeExpression() != null) {
-                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getReturnTypeExpression().getPrefix());
-                    } else {
-                        wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getName().getPrefix());
-                    }
+                J.Annotation ann = method.getLeadingAnnotations().get(i);
+                wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(ann.getPrefix());
+            }
+            if (!method.getLeadingAnnotations().isEmpty()) {
+                if (!method.getModifiers().isEmpty()) {
+                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getModifiers().get(0).getPrefix());
+                } else if (method.getTypeParameters() != null) {
+                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getTypeParameters().get(0).getPrefix());
+                } else if (method.getReturnTypeExpression() != null) {
+                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getReturnTypeExpression().getPrefix());
                 } else {
-                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getLeadingAnnotations().get(i + 1).getPrefix());
+                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getName().getPrefix());
                 }
             }
-            method.getParameters().forEach(param -> {
-                if (param instanceof J.ClassDeclaration) {
-                    ((J.ClassDeclaration) param).getLeadingAnnotations().forEach(ann -> wrappingAndBracesStatistics.parameterAnnotationsWrapped += hasNewLine(ann.getPrefix()));
-                } else if (param instanceof J.MethodDeclaration) {
-                    ((J.MethodDeclaration) param).getLeadingAnnotations().forEach(ann -> wrappingAndBracesStatistics.parameterAnnotationsWrapped += hasNewLine(ann.getPrefix()));
-                } else if (param instanceof J.VariableDeclarations) {
-                    ((J.VariableDeclarations) param).getLeadingAnnotations().forEach(ann -> wrappingAndBracesStatistics.parameterAnnotationsWrapped += hasNewLine(ann.getPrefix()));
-                }
-            });
             return super.visitMethodDeclaration(method, wrappingAndBracesStatistics);
         }
 
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
-            if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Block) {
-                Cursor possiblyClassDecl = getCursor().dropParentUntil(J.class::isInstance).getParent();
-                if (possiblyClassDecl != null && possiblyClassDecl.getValue() instanceof J.ClassDeclaration) {
+            Cursor possiblyBlock = getCursor().dropParentUntil(J.class::isInstance);
+            AnnotationType annotationType = null;
+            if (possiblyBlock.getValue() instanceof J.Block) {
+                if (possiblyBlock.getParent() != null && possiblyBlock.getParent().getValue() instanceof J.ClassDeclaration) {
+                    annotationType = AnnotationType.field;
                     for (int i = 0; i < multiVariable.getLeadingAnnotations().size(); i++) {
-                        if (multiVariable.getLeadingAnnotations().size() == 1 || i == multiVariable.getLeadingAnnotations().size() - 1) {
-                            if (!multiVariable.getModifiers().isEmpty()) {
-                                wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(multiVariable.getModifiers().get(0).getPrefix());
-                            } else if (multiVariable.getTypeExpression() != null) {
-                                wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(multiVariable.getTypeExpression().getPrefix());
-                            } else {
-                                wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(multiVariable.getVariables().get(0).getPrefix());
-                            }
-                        } else {
-                            wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(multiVariable.getLeadingAnnotations().get(i + 1).getPrefix());
-                        }
+                        J.Annotation ann = multiVariable.getLeadingAnnotations().get(i);
+                        wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(ann.getPrefix());
                     }
                 } else {
+                    annotationType = AnnotationType.local;
                     for (int i = 0; i < multiVariable.getLeadingAnnotations().size(); i++) {
                         J.Annotation ann = multiVariable.getLeadingAnnotations().get(i);
                         wrappingAndBracesStatistics.localVariableAnnotationsWrapped += hasNewLine(ann.getPrefix());
                     }
                 }
-            } else if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.ClassDeclaration) {
+            } else if (getCursor().getParent(3) != null && (getCursor().getParent(3).getValue() instanceof J.ClassDeclaration || getCursor().getParent(3).getValue() instanceof J.MethodDeclaration)) {
+                annotationType = AnnotationType.param;
                 multiVariable.getLeadingAnnotations().forEach(ann -> wrappingAndBracesStatistics.parameterAnnotationsWrapped += hasNewLine(ann.getPrefix()));
             }
+            if (!multiVariable.getLeadingAnnotations().isEmpty() && annotationType != null) {
+                if (!multiVariable.getModifiers().isEmpty()) {
+                    appendWrapping(wrappingAndBracesStatistics, annotationType, hasNewLine(multiVariable.getModifiers().get(0).getPrefix()));
+                } else if (multiVariable.getTypeExpression() != null) {
+                    appendWrapping(wrappingAndBracesStatistics, annotationType, hasNewLine(multiVariable.getTypeExpression().getPrefix()));
+                } else {
+                    appendWrapping(wrappingAndBracesStatistics, annotationType, hasNewLine(multiVariable.getVariables().get(0).getPrefix()));
+                }
+            }
             return super.visitVariableDeclarations(multiVariable, wrappingAndBracesStatistics);
+        }
+
+        private enum AnnotationType {
+            field, local, param
+        }
+
+        private void appendWrapping(WrappingAndBracesStatistics wrappingAndBracesStatistics, AnnotationType annotationType, int value) {
+            switch (annotationType) {
+                case field:
+                    wrappingAndBracesStatistics.fieldAnnotationsWrapped += value;
+                    break;
+                case local:
+                    wrappingAndBracesStatistics.localVariableAnnotationsWrapped += value;
+                    break;
+                case param:
+                    wrappingAndBracesStatistics.parameterAnnotationsWrapped += value;
+                    break;
+            }
         }
 
         @Override
         public J.EnumValue visitEnumValue(J.EnumValue _enum, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
             _enum.getAnnotations().forEach(ann -> wrappingAndBracesStatistics.enumFieldAnnotationsWrapped += hasNewLine(ann.getPrefix()));
+            if (!_enum.getAnnotations().isEmpty()) {
+                wrappingAndBracesStatistics.enumFieldAnnotationsWrapped += hasNewLine(_enum.getName().getPrefix());
+            }
             return super.visitEnumValue(_enum, wrappingAndBracesStatistics);
         }
 

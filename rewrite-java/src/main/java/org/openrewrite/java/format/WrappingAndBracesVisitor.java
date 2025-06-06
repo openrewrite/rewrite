@@ -150,7 +150,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     j = j.getPadding().withKind(kind.withPrefix(wrapElement(kind.getPrefix(), whitespace, style.getClassAnnotations())));
                 }
             }
-
         }
         return j;
     }
