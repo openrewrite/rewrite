@@ -109,7 +109,16 @@ public class JvmTestSuite implements Trait<Statement> {
                 }
             };
         } catch (MavenDownloadingException e) {
-            return TreeVisitor.noop();
+            return new JavaVisitor<ExecutionContext>() {
+                @Override
+                public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    if (tree == null) {
+                        return null;
+                    }
+
+                    return (J) e.warn(tree);
+                }
+            };
         }
     }
 
