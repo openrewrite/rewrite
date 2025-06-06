@@ -1370,8 +1370,6 @@ class AddDependencyTest implements RewriteTest {
                     testing {
                         suites {
                             integrationTest(JvmTestSuite) {
-                                dependencies {
-                                }
                             }
                         }
                     }
@@ -1428,10 +1426,7 @@ class AddDependencyTest implements RewriteTest {
                     
                     testing {
                         suites {
-                            integrationTest(JvmTestSuite) {
-                                dependencies {
-                                }
-                            }
+                            integrationTest(JvmTestSuite)
                         }
                     }
                     """,
@@ -1453,61 +1448,8 @@ class AddDependencyTest implements RewriteTest {
                     
                     testing {
                         suites {
-                            integrationTest(JvmTestSuite) {
-                                dependencies {
-                                }
-                            }
+                            integrationTest(JvmTestSuite)
                         }
-                    }
-                    """
-                )));
-        }
-
-        @Test
-        void actNormalForSuiteWithoutDependencyBlock() {
-            rewriteRun(
-              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
-              mavenProject("project",
-                srcMainJava(
-                  java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest"))),
-                buildGradle(
-                  //language=groovy
-                  """
-                    plugins {
-                        id "java-library"
-                        id 'jvm-test-suite'
-                    }
-                    
-                    repositories {
-                        mavenCentral()
-                    }
-                    
-                    testing {
-                        suites {
-                            integrationTest(JvmTestSuite) {
-                            }
-                        }
-                    }
-                    """,
-                  """
-                    plugins {
-                        id "java-library"
-                        id 'jvm-test-suite'
-                    }
-                    
-                    repositories {
-                        mavenCentral()
-                    }
-                    
-                    testing {
-                        suites {
-                            integrationTest(JvmTestSuite) {
-                            }
-                        }
-                    }
-                    
-                    dependencies {
-                        integrationTestImplementation "com.google.guava:guava:29.0-jre"
                     }
                     """
                 )));
