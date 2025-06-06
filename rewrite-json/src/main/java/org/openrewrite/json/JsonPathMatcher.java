@@ -282,7 +282,7 @@ public class JsonPathMatcher {
             List<Object> indexes = new ArrayList<>();
             for (TerminalNode terminalNode : ctx.PositiveNumber()) {
                 for (int i = 0; i < results.size(); i++) {
-                    if (terminalNode.getText().contains(String.valueOf(i))) {
+                    if (terminalNode.getText().equals(String.valueOf(i))) {
                         indexes.add(results.get(i));
                     }
                 }
@@ -415,7 +415,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
+        public @Nullable Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
             String s = null;
             if (ctx.StringLiteral() != null) {
                 s = ctx.StringLiteral().getText();

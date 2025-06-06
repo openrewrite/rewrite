@@ -62,10 +62,11 @@ dependencies {
     testImplementation("org.yaml:snakeyaml:latest.release")
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("io.moderne:jsonrpc:latest.integration")
 
     // For use in ClassGraphTypeMappingTest
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# 
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.AddLiteralMethodArgument
@@ -40,6 +39,38 @@ examples:
   sources:
   - before: class A {{ B.foo(0, 1); }}
     after: class A {{ B.foo(0, null, 1); }}
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.AddOrUpdateAnnotationAttribute
+examples:
+- description: ''
+  parameters:
+  - org.example.Foo
+  - 'null'
+  - hello
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      import org.example.Foo;
+
+      @Foo
+      public class A {
+      }
+    after: |
+      import org.example.Foo;
+
+      @Foo("hello")
+      public class A {
+      }
+    language: java
+  - before: |
+      package org.example;
+      public @interface Foo {
+          String value() default "";
+      }
     language: java
 ---
 type: specs.openrewrite.org/v1beta/example
@@ -223,6 +254,14 @@ recipeName: org.openrewrite.java.ExtractInterfaceTest$ExtractTestInterface
 examples:
 - description: ''
   sources:
+  - after: |
+      package org.openrewrite.interfaces;
+
+      interface ITest {
+
+          int test();
+      }
+    language: java
   - before: |
       package org.openrewrite;
 
@@ -263,14 +302,6 @@ examples:
 
           public static int staticTest() {
           }
-      }
-    language: java
-  - after: |
-      package org.openrewrite.interfaces;
-
-      interface ITest {
-
-          int test();
       }
     language: java
 ---
@@ -700,21 +731,6 @@ examples:
 - description: ''
   sources:
   - before: |
-      class Test {
-          @Deprecated
-          public void method(Test t) {
-          }
-      }
-    after: |
-      class Test {
-
-          public void method(Test t) {
-          }
-      }
-    language: java
-- description: ''
-  sources:
-  - before: |
       class Test {{
           if (true == false)
           doTheThing();
@@ -743,6 +759,21 @@ examples:
           public static void doTheOtherThing() {}
           public static void somethingElseEntirely() {}
           public static void foo() {}
+      }
+    language: java
+- description: ''
+  sources:
+  - before: |
+      class Test {
+          @Deprecated
+          public void method(Test t) {
+          }
+      }
+    after: |
+      class Test {
+
+          public void method(Test t) {
+          }
       }
     language: java
 ---
@@ -829,21 +860,6 @@ examples:
   sources:
   - before: |
       package com.example.demo;
-      class Foo {
-          /pet
-          public void test() {
-          }
-      }
-    after: |
-      package com.example.demo;
-      class Foo {
-          /*~~>*///*~~>*/pet
-          public void test() {
-          }
-      }
-    language: java
-  - before: |
-      package com.example.demo;
       class Bar {
           pet
           public void test() {
@@ -868,6 +884,21 @@ examples:
       package com.example.demo;
       class Baz {
           /*~~>*/-/*~~>*/pet
+          public void test() {
+          }
+      }
+    language: java
+  - before: |
+      package com.example.demo;
+      class Foo {
+          /pet
+          public void test() {
+          }
+      }
+    after: |
+      package com.example.demo;
+      class Foo {
+          /*~~>*///*~~>*/pet
           public void test() {
           }
       }
@@ -1115,17 +1146,17 @@ examples:
   - 'false'
   sources:
   - before: |
+      class A {
+          public A(String s) {}
+      }
+    language: java
+  - before: |
       class Test {
           A a = new A("test");
       }
     after: |
       class Test {
           A a = /*~~>*/new A("test");
-      }
-    language: java
-  - before: |
-      class A {
-          public A(String s) {}
       }
     language: java
 ---
@@ -1243,14 +1274,14 @@ examples:
   - 'false'
   sources:
   - before: |
+      class Higher {
+      }
+    language: java
+  - before: |
       class Test {
       }
     after: |
       /*~~(Java version 8)~~>*/class Test {
-      }
-    language: java
-  - before: |
-      class Higher {
       }
     language: java
 ---

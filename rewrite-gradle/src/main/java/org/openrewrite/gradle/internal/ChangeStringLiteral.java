@@ -16,6 +16,8 @@
 package org.openrewrite.gradle.internal;
 
 import org.openrewrite.Incubating;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 /**
@@ -23,6 +25,15 @@ import org.openrewrite.java.tree.J;
  */
 @Incubating(since = "7.22.0")
 public class ChangeStringLiteral {
+    public static Expression withStringValue(Expression e, String newValue) {
+        return (Expression) new JavaVisitor<Integer>() {
+            @Override
+            public J visitLiteral(J.Literal literal, Integer integer) {
+                return withStringValue(literal, newValue);
+            }
+        }.visitNonNull(e, 0);
+    }
+
     public static J.Literal withStringValue(J.Literal l, String newValue) {
         String oldValue = (String) l.getValue();
         if (oldValue == null || oldValue.equals(newValue)) {

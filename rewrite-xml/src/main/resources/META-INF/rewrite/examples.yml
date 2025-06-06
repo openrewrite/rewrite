@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# 
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.AddCommentToXmlTag
@@ -293,6 +292,28 @@ examples:
       <dependency/>
         </dependencies>
       </project>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.search.DoesNotUseNamespaceUri
+examples:
+- description: ''
+  parameters:
+  - http://example.com/dummy
+  sources:
+  - after: |
+      <!--~~>--><beans xmlns="http://www.springframework.org/schema/beans"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="
+              http://cxf.apache.org/jaxws http://cxf.apache.org/schemas/jaxws.xsd
+              http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+          <jaxws:client name="{http://cxf.apache.org/hello_world_soap_http}SoapPort" createdFromAPI="true" xmlns:jaxws="http://cxf.apache.org/jaxws">
+              <jaxws:conduitSelector>
+                  <bean class="org.apache.cxf.endpoint.DeferredConduitSelector"/>
+              </jaxws:conduitSelector>
+          </jaxws:client>
+      </beans>
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example

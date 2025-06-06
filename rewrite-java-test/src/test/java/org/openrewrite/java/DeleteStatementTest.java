@@ -259,8 +259,8 @@ class DeleteStatementTest implements RewriteTest {
               @Override
               public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
                   J.ForLoop f = super.visitForLoop(forLoop, ctx);
-                  doAfterVisit(new DeleteStatement<>(f.getControl().getInit().get(0)));
-                  doAfterVisit(new DeleteStatement<>(f.getControl().getUpdate().get(0)));
+                  doAfterVisit(new DeleteStatement<>(f.getControl().getInit().getFirst()));
+                  doAfterVisit(new DeleteStatement<>(f.getControl().getUpdate().getFirst()));
                   return f;
               }
           })),

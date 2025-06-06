@@ -258,7 +258,7 @@ class SpacesTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(c -> {
               assertThat(c.getPrefix().getComments().size()).isEqualTo(1);
-              assertThat(c.getPrefix().getComments().get(0).getStyle()).isEqualTo(Comment.Style.LINE_HASH);
+              assertThat(c.getPrefix().getComments().getFirst().getStyle()).isEqualTo(Comment.Style.LINE_HASH);
             })
           )
         );
@@ -279,7 +279,7 @@ class SpacesTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(c -> {
               assertThat(c.getPrefix().getComments().size()).isEqualTo(1);
-              assertThat(c.getPrefix().getComments().get(0).getStyle()).isEqualTo(Comment.Style.LINE_SLASH);
+              assertThat(c.getPrefix().getComments().getFirst().getStyle()).isEqualTo(Comment.Style.LINE_SLASH);
             })
           )
         );

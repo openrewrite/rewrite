@@ -192,11 +192,11 @@ class RawPomTest {
             if ("maven-surefire-plugin".equals(plugin.getArtifactId())) {
                 assertThat(plugin.getExtensions()).isEqualTo("${allowExtensions}");
                 assertThat(plugin.getInherited()).isEqualTo("${isInherited}");
-                assertThat(plugin.getExecutions().get(0).getInherited()).isEqualTo("${isInherited}");
+                assertThat(plugin.getExecutions().getFirst().getInherited()).isEqualTo("${isInherited}");
             } else {
                 assertThat(plugin.getExtensions()).isEqualTo("false");
                 assertThat(plugin.getInherited()).isEqualTo("false");
-                assertThat(plugin.getExecutions().get(0).getInherited()).isEqualTo("false");
+                assertThat(plugin.getExecutions().getFirst().getInherited()).isEqualTo("false");
             }
         }
     }
@@ -430,10 +430,10 @@ class RawPomTest {
 
         assertThat(model.getParent().getGroupId()).isEqualTo("org.springframework.boot");
         assertThat(model.getPackaging()).isEqualTo("jar");
-        assertThat(model.getDependencies().get(0).getGroupId()).isEqualTo("org.junit.jupiter");
-        assertThat(model.getDependencies().get(0).getExclusions().get(0).getGroupId())
+        assertThat(model.getDependencies().getFirst().getGroupId()).isEqualTo("org.junit.jupiter");
+        assertThat(model.getDependencies().getFirst().getExclusions().getFirst().getGroupId())
           .isEqualTo("com.google.guava");
-        assertThat(model.getDependencyManagement().get(0).getGroupId())
+        assertThat(model.getDependencyManagement().getFirst().getGroupId())
           .isEqualTo("org.springframework.cloud");
         assertThat(model.getPlugins()).hasSize(2);
 
@@ -464,10 +464,10 @@ class RawPomTest {
           .orElseThrow();
 
         assertThat(rewritePlugin.getDependencies()).hasSize(1);
-        assertThat(rewritePlugin.getDependencies().get(0).getGroupId()).isEqualTo("org.openrewrite.recipe");
-        assertThat(rewritePlugin.getDependencies().get(0).getArtifactId()).isEqualTo("rewrite-spring");
-        assertThat(rewritePlugin.getDependencies().get(0).getArtifactId()).isEqualTo("rewrite-spring");
-        assertThat(rewritePlugin.getDependencies().get(0).getVersion()).isEqualTo("4.19.3");
+        assertThat(rewritePlugin.getDependencies().getFirst().getGroupId()).isEqualTo("org.openrewrite.recipe");
+        assertThat(rewritePlugin.getDependencies().getFirst().getArtifactId()).isEqualTo("rewrite-spring");
+        assertThat(rewritePlugin.getDependencies().getFirst().getArtifactId()).isEqualTo("rewrite-spring");
+        assertThat(rewritePlugin.getDependencies().getFirst().getVersion()).isEqualTo("4.19.3");
 
         var activeRecipes = rewritePlugin.getConfigurationList("activeRecipes.recipe", String.class);
         assertThat(activeRecipes).contains(
@@ -476,10 +476,10 @@ class RawPomTest {
           "org.openrewrite.java.spring.boot2.SpringBoot2JUnit4to5Migration"
         );
 
-        assertThat(model.getLicenses().get(0).getName())
+        assertThat(model.getLicenses().getFirst().getName())
           .isEqualTo("Apache License, Version 2.0");
 
-        assertThat(model.getRepositories().get(0).getUri())
+        assertThat(model.getRepositories().getFirst().getUri())
           .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
 
         Profile java9Profile = model.getProfiles().stream()
@@ -491,7 +491,7 @@ class RawPomTest {
           .filter(p -> "java11+".equals(p.getId()))
           .findAny()
           .orElseThrow();
-        assertThat(java9Profile.getDependencies().get(0).getGroupId()).isEqualTo("javax.xml.bind");
+        assertThat(java9Profile.getDependencies().getFirst().getGroupId()).isEqualTo("javax.xml.bind");
         assertThat(java11Profile.getDependencies()).isEmpty();
 
         Profile rewriteProfile = model.getProfiles().stream()
@@ -513,10 +513,10 @@ class RawPomTest {
           .orElseThrow();
 
         assertThat(rewritePlugin.getDependencies()).hasSize(1);
-        assertThat(rewritePlugin.getDependencies().get(0).getGroupId()).isEqualTo("org.openrewrite.recipe");
-        assertThat(rewritePlugin.getDependencies().get(0).getArtifactId()).isEqualTo("rewrite-spring");
-        assertThat(rewritePlugin.getDependencies().get(0).getArtifactId()).isEqualTo("rewrite-spring");
-        assertThat(rewritePlugin.getDependencies().get(0).getVersion()).isEqualTo("4.19.3");
+        assertThat(rewritePlugin.getDependencies().getFirst().getGroupId()).isEqualTo("org.openrewrite.recipe");
+        assertThat(rewritePlugin.getDependencies().getFirst().getArtifactId()).isEqualTo("rewrite-spring");
+        assertThat(rewritePlugin.getDependencies().getFirst().getArtifactId()).isEqualTo("rewrite-spring");
+        assertThat(rewritePlugin.getDependencies().getFirst().getVersion()).isEqualTo("4.19.3");
 
         activeRecipes = rewritePlugin.getConfigurationList("activeRecipes", String.class);
         assertThat(activeRecipes).contains(
@@ -577,7 +577,7 @@ class RawPomTest {
           """;
 
         Pom model = MavenXmlMapper.readMapper().readValue(pomString, RawPom.class).toPom(null, null);
-        var plugin = model.getPlugins().get(0);
+        var plugin = model.getPlugins().getFirst();
 
         assertThat(plugin.getConfigurationList("includes", String.class)).hasSize(2).contains("fred", "hello");
         assertThat(plugin.getConfigurationList("activeRecipes", String.class)).hasSize(2)

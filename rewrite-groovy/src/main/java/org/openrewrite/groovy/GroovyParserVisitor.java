@@ -682,6 +682,58 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitArrayExpression(ArrayExpression expression) {
+            Space prefix = whitespace();
+            skip("new");
+            TypeTree typeTree = visitTypeTree(expression.getElementType());
+            List<J.ArrayDimension> dimensions = buildNewArrayDimensions(expression);
+            JContainer<Expression> initializer = buildNewArrayInitializer(expression);
+            queue.add(new J.NewArray(randomId(), prefix, Markers.EMPTY, typeTree, dimensions, initializer, typeMapping.type(expression.getElementType())));
+        }
+
+        private JContainer<Expression> buildNewArrayInitializer(ArrayExpression expression) {
+            if (expression.getSizeExpression() != null) {
+                return null;
+            }
+
+            Space fmt = sourceBefore("{");
+
+            List<JRightPadded<Expression>> expressions;
+            if (expression.getExpressions().isEmpty()) {
+                expressions = singletonList(padRight(new J.Empty(randomId(), sourceBefore("}"), Markers.EMPTY), EMPTY));
+            } else {
+                expressions = convertAll(expression.getExpressions(), n -> sourceBefore(","), n -> whitespace(), n -> {
+                    if (n == expression.getExpression(expression.getExpressions().size() - 1) && source.charAt(cursor) == ',') {
+                        cursor++;
+                        return Markers.build(singletonList(new TrailingComma(randomId(), whitespace())));
+                    }
+                    return Markers.EMPTY;
+                });
+                skip("}");
+            }
+
+            return JContainer.build(fmt, expressions, Markers.EMPTY);
+        }
+
+        private List<J.ArrayDimension> buildNewArrayDimensions(ArrayExpression expression) {
+            List<J.ArrayDimension> dimensions = new ArrayList<>();
+            for (int i = 0; expression.getSizeExpression() != null && i < expression.getSizeExpression().size(); i++) {
+                dimensions.add(new J.ArrayDimension(randomId(), sourceBefore("["), Markers.EMPTY, padRight(visit(expression.getSizeExpression().get(i)), sourceBefore("]"))));
+            }
+            while (true) {
+                int beginBracket = indexOfNextNonWhitespace(cursor, source);
+                if (source.charAt(beginBracket) != '[') {
+                    break;
+                }
+
+                int endBracket = indexOfNextNonWhitespace(beginBracket + 1, source);
+                dimensions.add(new J.ArrayDimension(randomId(), format(source, cursor, beginBracket), Markers.EMPTY, padRight(new J.Empty(randomId(), format(source, beginBracket + 1, endBracket), Markers.EMPTY), EMPTY)));
+                cursor = endBracket + 1;
+            }
+            return dimensions;
+        }
+
+        @Override
         public void visitArgumentlistExpression(ArgumentListExpression expression) {
             List<JRightPadded<Expression>> args = new ArrayList<>(expression.getExpressions().size());
 
@@ -719,7 +771,6 @@ public class GroovyParserVisitor {
                 // If it is wrapped in "[]" then this isn't a named arguments situation, and we should not lift the parameters out of the enclosing MapExpression
                 saveCursor = cursor;
                 whitespace();
-                cursor = saveCursor;
                 if ('[' != source.charAt(cursor)) {
                     // Bring named parameters out of their containing MapExpression so that they can be parsed correctly
                     MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
@@ -729,6 +780,7 @@ public class GroovyParserVisitor {
                                             unparsedArgs.subList(1, unparsedArgs.size()).stream())
                                     .collect(toList());
                 }
+                cursor = saveCursor;
             }
 
             if (unparsedArgs.isEmpty()) {
@@ -1550,6 +1602,9 @@ public class GroovyParserVisitor {
                     String value = sourceSubstring(cursor, delimiter.close);
                     // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
                     int indexNextSign = source.indexOf("$", cursor);
+                    while (indexNextSign > 0 && source.charAt(indexNextSign - 1) == '\\') {
+                        indexNextSign = source.indexOf("$", indexNextSign + 1);
+                    }
                     if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
                         value = source.substring(cursor, indexNextSign);
                     }
@@ -2024,13 +2079,20 @@ public class GroovyParserVisitor {
         }
 
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
+            if (!expression.isDynamicTyped() && expression.getOriginType().isArray()) {
+                return visitTypeTree(expression.getOriginType());
+            }
+
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
             Space prefix = whitespace();
             String typeName = "";
 
             if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
-                typeName = expression.getOriginType().getUnresolvedName();
-                skip(typeName);
+                if (cursor + expression.getOriginType().getUnresolvedName().length() < source.length() &&
+                    !Character.isJavaIdentifierPart(source.charAt(cursor + expression.getOriginType().getUnresolvedName().length()))) {
+                    typeName = expression.getOriginType().getUnresolvedName();
+                    skip(typeName);
+                }
             }
             J.Identifier ident = new J.Identifier(randomId(),
                     EMPTY,
@@ -2077,20 +2139,31 @@ public class GroovyParserVisitor {
 
         private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends ASTNode> nodes,
                                                                  Function<ASTNode, Space> innerSuffix,
-                                                                 Function<ASTNode, Space> suffix) {
+                                                                 Function<ASTNode, Space> suffix,
+                                                                 Function<ASTNode, Markers> markers) {
             if (nodes.isEmpty()) {
                 return emptyList();
             }
             List<JRightPadded<J2>> converted = new ArrayList<>(nodes.size());
             for (int i = 0; i < nodes.size(); i++) {
-                converted.add(convert(nodes.get(i), i == nodes.size() - 1 ? suffix : innerSuffix));
+                converted.add(convert(nodes.get(i), i == nodes.size() - 1 ? suffix : innerSuffix, markers));
             }
             return converted;
         }
 
+        private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends ASTNode> nodes,
+                                                                 Function<ASTNode, Space> innerSuffix,
+                                                                 Function<ASTNode, Space> suffix) {
+            return convertAll(nodes, innerSuffix, suffix, n -> Markers.EMPTY);
+        }
+
         private <J2 extends J> JRightPadded<J2> convert(ASTNode node, Function<ASTNode, Space> suffix) {
+            return convert(node, suffix, n -> Markers.EMPTY);
+        }
+
+        private <J2 extends J> JRightPadded<J2> convert(ASTNode node, Function<ASTNode, Space> suffix, Function<ASTNode, Markers> markers) {
             J2 j = visit(node);
-            return padRight(j, suffix.apply(node));
+            return padRight(j, suffix.apply(node), markers.apply(node));
         }
 
         private List<JRightPadded<Statement>> convertStatements(List<? extends ASTNode> nodes) {
@@ -2249,7 +2322,11 @@ public class GroovyParserVisitor {
     }
 
     private <T> JRightPadded<T> padRight(T tree, Space right) {
-        return new JRightPadded<>(tree, right, Markers.EMPTY);
+        return padRight(tree, right, Markers.EMPTY);
+    }
+
+    private <T> JRightPadded<T> padRight(T tree, Space right, Markers markers) {
+        return new JRightPadded<>(tree, right, markers);
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {

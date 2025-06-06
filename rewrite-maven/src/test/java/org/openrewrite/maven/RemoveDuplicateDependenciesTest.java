@@ -554,4 +554,36 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4868")
+    @Test
+    void retainWithAndWithoutClassifier() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.adobe.aio.cloudmanager</groupId>
+                              <artifactId>aio-lib-cloudmanager</artifactId>
+                              <classifier>java8</classifier>
+                              <version>2.0.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.adobe.aio.cloudmanager</groupId>
+                              <artifactId>aio-lib-cloudmanager</artifactId>
+                              <version>2.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
 }

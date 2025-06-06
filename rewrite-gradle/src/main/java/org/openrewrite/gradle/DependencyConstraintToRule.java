@@ -57,10 +57,10 @@ public class DependencyConstraintToRule extends Recipe {
     @Override
     public String getDescription() {
         return "Gradle [dependency constraints](https://docs.gradle.org/current/userguide/dependency_constraints.html#dependency-constraints) " +
-               "are useful for managing the versions of transitive dependencies. " +
-               "Some plugins, such as the Spring Dependency Management plugin, do not respect these constraints. " +
-               "This recipe converts constraints into [resolution rules](https://docs.gradle.org/current/userguide/resolution_rules.html), " +
-               "which can achieve similar effects to constraints but are harder for plugins to ignore.";
+                "are useful for managing the versions of transitive dependencies. " +
+                "Some plugins, such as the Spring Dependency Management plugin, do not respect these constraints. " +
+                "This recipe converts constraints into [resolution rules](https://docs.gradle.org/current/userguide/resolution_rules.html), " +
+                "which can achieve similar effects to constraints but are harder for plugins to ignore.";
     }
 
     @Override
@@ -78,6 +78,7 @@ public class DependencyConstraintToRule extends Recipe {
                 }
                 cu = (JavaSourceFile) new MaybeAddEachDependency().visitNonNull(cu, ctx);
                 cu = (JavaSourceFile) new UpdateEachDependency(gavs, cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
+                cu = (JavaSourceFile) new MaybeRemoveDependencyBlock(cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
                 return cu;
             }
         });
@@ -134,7 +135,7 @@ public class DependencyConstraintToRule extends Recipe {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                             J.MethodInvocation m1 = super.visitMethodInvocation(method, integer);
-                            if("because".equals(m1.getSimpleName()) && m1.getArguments().get(0) instanceof J.Literal) {
+                            if ("because".equals(m1.getSimpleName()) && m1.getArguments().get(0) instanceof J.Literal) {
                                 because.set(((J.Literal) m1.getArguments().get(0)).getValue().toString());
                             }
                             return m1;
@@ -145,7 +146,7 @@ public class DependencyConstraintToRule extends Recipe {
                     return null;
                 });
                 // If nothing remains in the constraints{} it can be removed entirely
-                if(withoutConvertableConstraints.isEmpty()) {
+                if (withoutConvertableConstraints.isEmpty()) {
                     return null;
                 } else {
                     return m.withArguments(singletonList(closure.withBody(((J.Block) closure.getBody()).withStatements(withoutConvertableConstraints))));
@@ -160,10 +161,11 @@ public class DependencyConstraintToRule extends Recipe {
     static class UpdateEachDependency extends JavaIsoVisitor<ExecutionContext> {
         List<GroupArtifactVersionBecause> groupArtifactVersions;
         boolean isKotlinDsl;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (isEachDependency(m)) {
+            if (isEachDependency(m) && !isInBuildscriptBlock(getCursor())) {
                 Cursor parent = requireNonNull(getCursor().getParent());
                 for (GroupArtifactVersionBecause gav : groupArtifactVersions) {
                     m = (J.MethodInvocation) new MaybeAddIf(gav, isKotlinDsl).visitNonNull(m, ctx, parent);
@@ -209,8 +211,8 @@ public class DependencyConstraintToRule extends Recipe {
             if (!isKotlinDsl) {
                 @SuppressWarnings("GroovyEmptyStatementBody") @Language("groovy")
                 String snippet = "Object " + p + " = null\n" +
-                                 "if (" + p + ".requested.group == '" + groupArtifactVersion.getGroupId() + "' && " +
-                                 p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
+                        "if (" + p + ".requested.group == '" + groupArtifactVersion.getGroupId() + "' && " +
+                        p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
                 newIf = GroovyParser.builder().build()
                         .parse(ctx, snippet)
                         .map(G.CompilationUnit.class::cast)
@@ -220,8 +222,8 @@ public class DependencyConstraintToRule extends Recipe {
                         .orElseThrow(() -> new IllegalStateException("Unable to produce a new if statement"));
             } else {
                 String snippet = "var " + p + ": Any = null\n" +
-                                 "if (" + p + ".requested.group == \"" + groupArtifactVersion.getGroupId() + "\" && " +
-                                 p + ".requested.name == \"" + groupArtifactVersion.getArtifactId() + "\") {\n}";
+                        "if (" + p + ".requested.group == \"" + groupArtifactVersion.getGroupId() + "\" && " +
+                        p + ".requested.name == \"" + groupArtifactVersion.getArtifactId() + "\") {\n}";
                 newIf = KotlinParser.builder().isKotlinScript(true).build()
                         .parse(ctx, snippet)
                         .map(K.CompilationUnit.class::cast)
@@ -293,7 +295,7 @@ public class DependencyConstraintToRule extends Recipe {
                     public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
                         // Comparison will involve "<variable name>.requested.group"
                         J.FieldAccess field = super.visitFieldAccess(fieldAccess, integer);
-                        if(field.getTarget() instanceof J.Identifier) {
+                        if (field.getTarget() instanceof J.Identifier) {
                             variableName.set(((J.Identifier) field.getTarget()).getSimpleName());
                         }
                         return fieldAccess;
@@ -344,7 +346,7 @@ public class DependencyConstraintToRule extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (isEachDependency(m)) {
+            if (isEachDependency(m) && !isInBuildscriptBlock(getCursor())) {
                 alreadyExists = true;
             }
             return m;
@@ -376,10 +378,10 @@ public class DependencyConstraintToRule extends Recipe {
                             .build()
                             .parse(ctx,
                                     "\n" +
-                                    "configurations.all {\n" +
-                                    "    resolutionStrategy.eachDependency { details ->\n" +
-                                    "    }\n" +
-                                    "}")
+                                            "configurations.all {\n" +
+                                            "    resolutionStrategy.eachDependency { details ->\n" +
+                                            "    }\n" +
+                                            "}")
                             .map(G.CompilationUnit.class::cast)
                             .map(G.CompilationUnit::getStatements)
                             .map(it -> it.get(0))
@@ -407,10 +409,10 @@ public class DependencyConstraintToRule extends Recipe {
                                             Paths.get("build.gradle.kts"),
                                             () -> new ByteArrayInputStream(
                                                     ("\n" +
-                                                     "configurations.all {\n" +
-                                                     "    resolutionStrategy.eachDependency { details ->}\n" +
-                                                     "}").getBytes(StandardCharsets.UTF_8)))
-                                    ), null, ctx)
+                                                            "configurations.all {\n" +
+                                                            "    resolutionStrategy.eachDependency { details ->}\n" +
+                                                            "}").getBytes(StandardCharsets.UTF_8)))
+                            ), null, ctx)
                             .map(K.CompilationUnit.class::cast)
                             .map(k -> (J.Block) k.getStatements().get(0))
                             .map(J.Block::getStatements)
@@ -443,26 +445,62 @@ public class DependencyConstraintToRule extends Recipe {
         }
     }
 
+    @Value
+    static class MaybeRemoveDependencyBlock extends JavaIsoVisitor<ExecutionContext> {
+        boolean isKotlinDsl;
+
+        @Override
+        public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            if (isEmptyDependenciesBlock(m)) {
+                return null;
+            }
+            return m;
+        }
+    }
+
+    private static boolean isEmptyDependenciesBlock(J.MethodInvocation m) {
+        if (!m.getSimpleName().equals("dependencies")) {
+            return false;
+        }
+        if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
+            return false;
+        }
+        // `dependencies` should always take a single "closure"
+        if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
+            return false;
+        }
+        J.Lambda l = (J.Lambda) m.getArguments().get(0);
+        if (l.getBody() instanceof J.Block) {
+            J.Block b = (J.Block) l.getBody();
+            if (b.getStatements().size() == 1) {
+                return b.getStatements().get(0) instanceof J.Return && ((J.Return) b.getStatements().get(0)).getExpression() == null;
+            }
+        }
+        return false;
+    }
+
     private static boolean isInDependenciesBlock(Cursor cursor) {
         Cursor c = cursor.dropParentUntil(value ->
                 value == Cursor.ROOT_VALUE ||
-                (value instanceof J.MethodInvocation && ((J.MethodInvocation) value).getSimpleName().equals("dependencies")));
+                        (value instanceof J.MethodInvocation && ((J.MethodInvocation) value).getSimpleName().equals("dependencies")));
         if (!(c.getValue() instanceof J.MethodInvocation)) {
             return false;
         }
         // Exclude "dependencies" blocks inside of buildscripts
         // No plugins can prevent the "constraints" block from working there, as they can for regular dependencies block
-        Cursor maybeBuildscript = c.dropParentUntil(value -> value == Cursor.ROOT_VALUE || value instanceof J.MethodInvocation);
-        if (maybeBuildscript.getValue() instanceof J.MethodInvocation) {
-            return !"buildscript".equals(((J.MethodInvocation) maybeBuildscript.getValue()).getSimpleName());
-        }
-        return true;
+        return !isInBuildscriptBlock(c);
+    }
+
+    private static boolean isInBuildscriptBlock(Cursor c) {
+        Cursor maybeBuildscript = c.dropParentUntil(value -> value == Cursor.ROOT_VALUE || (value instanceof J.MethodInvocation && ((J.MethodInvocation) value).getSimpleName().equals("buildscript")));
+        return maybeBuildscript.getValue() != Cursor.ROOT_VALUE;
     }
 
     private static boolean isEachDependency(J.MethodInvocation m) {
         return "eachDependency".equals(m.getSimpleName()) &&
-               (m.getSelect() instanceof J.Identifier &&
-                   "resolutionStrategy".equals(((J.Identifier) m.getSelect()).getSimpleName()));
+                (m.getSelect() instanceof J.Identifier &&
+                        "resolutionStrategy".equals(((J.Identifier) m.getSelect()).getSimpleName()));
     }
 
     private static boolean predicateRelatesToGav(J.If iff, GroupArtifactVersionBecause groupArtifactVersion) {

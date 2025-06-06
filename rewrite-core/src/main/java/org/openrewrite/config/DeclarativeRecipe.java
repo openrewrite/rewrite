@@ -140,7 +140,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public Accumulator getInitialValue(ExecutionContext ctx) {
         Accumulator acc = new Accumulator();
         for (Recipe precondition : preconditions) {
-            if(precondition instanceof ScanningRecipe) {
+            if (precondition instanceof ScanningRecipe && isScanningRequired(precondition)) {
                 acc.recipeToAccumulator.put(precondition, ((ScanningRecipe<?>) precondition).getInitialValue(ctx));
             }
         }
@@ -155,7 +155,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 for (Recipe precondition : preconditions) {
-                    if (precondition instanceof ScanningRecipe) {
+                    if (precondition instanceof ScanningRecipe && isScanningRequired(precondition)) {
                         ScanningRecipe preconditionRecipe = (ScanningRecipe) precondition;
                         Object preconditionAcc = acc.recipeToAccumulator.get(precondition);
                         preconditionRecipe.getScanner(preconditionAcc)
@@ -184,7 +184,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         @Override
         public String getDescription() {
             return "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
-                   "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends. ";
+                   "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
         }
 
         Supplier<TreeVisitor<?, ExecutionContext>> precondition;
@@ -296,6 +296,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         public boolean causesAnotherCycle() {
             return delegate.causesAnotherCycle();
         }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
+        }
     }
 
     @Override
@@ -339,13 +344,35 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {
         List<Recipe> mappedRecipeList = new ArrayList<>(recipeList.size());
         for (Recipe recipe : recipeList) {
-            if (recipe instanceof ScanningRecipe) {
+            if (recipe instanceof ScanningRecipe && isScanningRequired(recipe)) {
                 mappedRecipeList.add(new BellwetherDecoratedScanningRecipe<>(bellwether, (ScanningRecipe<?>) recipe));
             } else {
                 mappedRecipeList.add(new BellwetherDecoratedRecipe(bellwether, recipe));
             }
         }
         return mappedRecipeList;
+    }
+
+    private static boolean isScanningRequired(Recipe recipe) {
+        if (recipe instanceof ScanningRecipe) {
+            // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
+            // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
+            if(recipe instanceof DeclarativeRecipe) {
+                for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
+                    if (isScanningRequired(precondition)) {
+                        return true;
+                    }
+                }
+            } else {
+                return true;
+            }
+        }
+        for (Recipe r : recipe.getRecipeList()) {
+            if (isScanningRequired(r)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void addUninitialized(Recipe recipe) {
@@ -421,7 +448,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public List<Contributor> getContributors() {
         if (contributors == null) {
             Map<NameEmail, Integer> contributorToLineCount = new HashMap<>();
-            contributors = new ArrayList<>();
+            List<Contributor> combined = new ArrayList<>();
             for (Recipe recipe : getRecipeList()) {
                 for (Contributor contributor : recipe.getContributors()) {
                     NameEmail nameEmail = new NameEmail(contributor.getName(), contributor.getEmail());
@@ -429,9 +456,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 }
             }
             for (Map.Entry<NameEmail, Integer> contributorEntry : contributorToLineCount.entrySet()) {
-                contributors.add(new Contributor(contributorEntry.getKey().getName(), contributorEntry.getKey().getEmail(), contributorEntry.getValue()));
+                combined.add(new Contributor(contributorEntry.getKey().getName(), contributorEntry.getKey().getEmail(), contributorEntry.getValue()));
             }
-            contributors.sort(Comparator.comparing(Contributor::getLineCount).reversed());
+            combined.sort(Comparator.comparing(Contributor::getLineCount).reversed());
+            contributors = combined;
         }
         return contributors;
     }

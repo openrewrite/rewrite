@@ -6,6 +6,7 @@ plugins {
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
@@ -82,9 +83,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        useJUnitPlatform {
-                            excludeTags("java17", "java21")
-                        }
+                        useJUnitPlatform()
                         testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)

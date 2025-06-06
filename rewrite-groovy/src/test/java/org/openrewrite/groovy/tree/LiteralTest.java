@@ -314,8 +314,8 @@ class LiteralTest implements RewriteTest {
                 // Groovy AST represents 1.8 as a BigDecimal
                 // Java AST would represent it as Double
                 // Our AST could reasonably make either choice
-                var initializer = requireNonNull((J.Literal) ((J.VariableDeclarations) cu.getStatements().get(0))
-                  .getVariables().get(0).getInitializer());
+                var initializer = requireNonNull((J.Literal) ((J.VariableDeclarations) cu.getStatements().getFirst())
+                  .getVariables().getFirst().getInitializer());
                 if (initializer.getType() == JavaType.Primitive.Double) {
                     assertThat(initializer.getValue()).isEqualTo(1.8);
                 } else if (TypeUtils.isOfClassType(initializer.getType(), "java.math.BigDecimal")) {

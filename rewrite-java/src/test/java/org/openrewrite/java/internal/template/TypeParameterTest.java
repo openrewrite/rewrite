@@ -15,16 +15,16 @@
  */
 package org.openrewrite.java.internal.template;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -160,10 +160,10 @@ class TypeParameterTest {
         assertThat(b.getBounds()).hasSize(1).first().isSameAs(c);
         assertThat(c.getBounds()).hasSize(2);
 
-        assertThat(TypeUtils.toString(c.getBounds().get(0))).isEqualTo("java.lang.Comparable<? super B>");
+        assertThat(TypeUtils.toString(c.getBounds().getFirst())).isEqualTo("java.lang.Comparable<? super B>");
         assertThat(TypeUtils.toString(c.getBounds().get(1))).isEqualTo("java.io.Serializable");
 
-        JavaType cBound = ((JavaType.Parameterized) c.getBounds().get(0)).getTypeParameters().get(0);
+        JavaType cBound = ((JavaType.Parameterized) c.getBounds().getFirst()).getTypeParameters().getFirst();
         assertThat(cBound).isInstanceOfSatisfying(JavaType.GenericTypeVariable.class, type -> {
             assertThat(type.getName()).isEqualTo("?");
             assertThat(type.getVariance()).isEqualTo(JavaType.GenericTypeVariable.Variance.CONTRAVARIANT);
@@ -191,13 +191,13 @@ class TypeParameterTest {
           });
 
         JavaType.GenericTypeVariable type = result.get("T");
-        JavaType.Parameterized parameterizedType = ((JavaType.Parameterized) type.getBounds().get(0));
+        JavaType.Parameterized parameterizedType = ((JavaType.Parameterized) type.getBounds().getFirst());
         assertThat(TypeUtils.toString(parameterizedType)).isSubstringOf(name);
         if (name.contains("?")) {
-            JavaType.GenericTypeVariable wildcard = (JavaType.GenericTypeVariable) parameterizedType.getTypeParameters().get(0);
-            assertThat(wildcard.getBounds().get(0)).isSameAs(type);
+            JavaType.GenericTypeVariable wildcard = (JavaType.GenericTypeVariable) parameterizedType.getTypeParameters().getFirst();
+            assertThat(wildcard.getBounds().getFirst()).isSameAs(type);
         } else {
-            assertThat(parameterizedType.getTypeParameters().get(0)).isSameAs(type);
+            assertThat(parameterizedType.getTypeParameters().getFirst()).isSameAs(type);
         }
     }
 }

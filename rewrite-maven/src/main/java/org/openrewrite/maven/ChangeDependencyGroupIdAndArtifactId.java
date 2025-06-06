@@ -25,7 +25,6 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -239,16 +238,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                         .anyMatch(rd -> (version == null) || version.equals(rd.getVersion()));
             }
 
-            private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
-                Optional<Xml.Tag> childTag = tag.getChild(childTagName);
-                if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
-                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
-                }
-                return tag;
-            }
-
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
-
                 MavenResolutionResult result = getResolutionResult();
                 for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {

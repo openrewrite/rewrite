@@ -136,7 +136,7 @@ public class KotlinTypeSignatureBuilderTest {
                 .findFirst()
                 .orElseThrow()
                 .getValueParameters()
-                .get(0)
+                .getFirst()
                 .getReturnTypeRef());
     }
 

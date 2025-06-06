@@ -109,7 +109,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             spec -> spec.path("org/foo/internal/Test.kt").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/foo/test/internal/Test.kt");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.foo.test.internal.Test")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "org.foo.test.internal.Test")).isTrue();
             })
           )
         );
@@ -130,7 +130,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             spec -> spec.path("org/foo/Test.kt").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.kt");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "x.y.z.Test")).isTrue();
             })
           )
         );
@@ -161,7 +161,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             spec -> spec.path("org/a/Dog.kt").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/b/Dog.kt");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.b.Animal")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "org.b.Animal")).isTrue();
                 assertThat(TypeUtils.isOfClassType(cu.getClasses().get(1).getType(), "org.b.Dog")).isTrue();
             })
           )

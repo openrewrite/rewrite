@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava17;
@@ -122,74 +124,222 @@ class LombokTest implements RewriteTest {
         );
     }
 
-    @Test
-    void builder() {
-        rewriteRun(
-          java(
-            """
-              import lombok.Builder;
-              
-              @Builder
-              class A {
-                  boolean b;
-                  int n;
-                  String s;
-              
-                  void test() {
-                      A a = A.builder().n(1).b(true).s("foo").build();
+    @Nested
+    class Builder {
+        @Test
+        void simple() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.Builder;
+                  
+                  @Builder
+                  class A {
+                      boolean b;
+                      int n;
+                      String s;
+                  
+                      void test() {
+                          A a = A.builder().n(1).b(true).s("foo").build();
+                      }
                   }
-              }
-              """
-          )
-        );
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withDefault() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.Builder;
+                  
+                  @Builder
+                  class A {
+                      @Builder.Default boolean b = false;
+                      @Builder.Default int n = 0;
+                      @Builder.Default String s = "Hello, Anshuman!";
+                  
+                      void test() {
+                          A x = A.builder().n(1).b(true).s("foo").build();
+                          A y = A.builder().n(1).b(true).build();
+                          A z = A.builder().n(1).build();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withDefaultAndFinal() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.Builder;
+                  
+                  @Builder
+                  class A {
+                      @Builder.Default private final boolean b = false;
+                      @Builder.Default public final int n = 0;
+                      @Builder.Default protected final String s = "Hello, Anshuman!";
+                  
+                      void test() {
+                          A x = A.builder().n(1).b(true).s("foo").build();
+                          A y = A.builder().n(1).b(true).build();
+                          A z = A.builder().n(1).build();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        @Issue("https://github.com/openrewrite/rewrite/pull/5527")
+        void predefinedBuilderWithMultipleFields() {
+            rewriteRun(
+              spec -> spec.parser(JavaParser.fromJavaVersion().classpath("lombok")),
+              java(
+                    """
+                import lombok.Builder;
+
+                @Builder
+                public class Clazz {
+
+                    private final String accountID;
+                    private final String documentNumber;
+
+                    public static class ClazzBuilder {}
+                }
+                """
+              )
+            );
+        }
     }
 
-    @Test
-    void builderWithDefault() {
-        rewriteRun(
-          java(
-            """
-              import lombok.Builder;
-              
-              @Builder
-              class A {
-                  @Builder.Default boolean b = false;
-                  @Builder.Default int n = 0;
-                  @Builder.Default String s = "Hello, Anshuman!";
-              
-                  void test() {
-                      A x = A.builder().n(1).b(true).s("foo").build();
-                      A y = A.builder().n(1).b(true).build();
-                      A z = A.builder().n(1).build();
-                  }
-              }
-              """
-          )
-        );
-    }
+    @Nested
+    class SuperBuilder {
 
-    @Test
-    void builderWithDefaultAndFinal() {
-        rewriteRun(
-          java(
-            """
-              import lombok.Builder;
-              
-              @Builder
-              class A {
-                  @Builder.Default private final boolean b = false;
-                  @Builder.Default public final int n = 0;
-                  @Builder.Default protected final String s = "Hello, Anshuman!";
-              
-                  void test() {
-                      A x = A.builder().n(1).b(true).s("foo").build();
-                      A y = A.builder().n(1).b(true).build();
-                      A z = A.builder().n(1).build();
+        @Test
+        void withHierarchy() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.experimental.SuperBuilder;
+                  
+                  @SuperBuilder
+                  public class Parent {
+                      String lastName;
                   }
-              }
-              """
-          )
-        );
+                  """
+              ),
+              java(
+                """
+                  import lombok.experimental.SuperBuilder;
+                  
+                  @SuperBuilder
+                  public class Child extends Parent {
+                      String firstName;
+                  }
+                  """
+              ),
+              java(
+                """
+                  class Test {
+                      void test() {
+                          Child child = Child.builder()
+                            .firstName("John")
+                            .lastName("Doe")
+                            .build();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withHierarchy2() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.experimental.SuperBuilder;
+                  
+                  @SuperBuilder
+                  class Parent {
+                      String lastName;
+                  }
+                  
+                  @SuperBuilder
+                  class Child extends Parent {
+                      String firstName;
+                  }
+                  
+                  class Test {
+                      void test() {
+                          Child child = Child.builder()
+                            .firstName("John")
+                            .lastName("Doe")
+                            .build();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withDefault() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.Builder;
+                  import lombok.experimental.SuperBuilder;
+                  
+                  @SuperBuilder
+                  class A {
+                      @Builder.Default boolean b = false;
+                      @Builder.Default int n = 0;
+                      @Builder.Default String s = "Hello, Anshuman!";
+                  
+                      void test() {
+                          A x = A.builder().n(1).b(true).s("foo").build();
+                          A y = A.builder().n(1).b(true).build();
+                          A z = A.builder().n(1).build();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withDefaultAndFinal() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.Builder;
+                  import lombok.experimental.SuperBuilder;
+                  
+                  @SuperBuilder
+                  class A {
+                      @Builder.Default private final boolean b = false;
+                      @Builder.Default public final int n = 0;
+                      @Builder.Default protected final String s = "Hello, Anshuman!";
+                  
+                      void test() {
+                          A x = A.builder().n(1).b(true).s("foo").build();
+                          A y = A.builder().n(1).b(true).build();
+                          A z = A.builder().n(1).build();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
     }
 
     @Test
@@ -985,7 +1135,7 @@ class LombokTest implements RewriteTest {
          */
 
         @Test
-        // TODO: Find solution and remove this test
+            // TODO: Find solution and remove this test
         void jacksonizedForJava8() {
             rewriteRun(
               spec -> spec
@@ -995,7 +1145,7 @@ class LombokTest implements RewriteTest {
                     FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
                     // Using the @Jacksonized annotation in java 8 just breaks it all
                     return result.getPath().startsWith("ClassDeclaration->CompilationUnit") ||
-                      result.getPath().startsWith("Identifier->Annotation")||
+                      result.getPath().startsWith("Identifier->Annotation") ||
                       result.getPath().startsWith("Identifier->ParameterizedType");
                 }).build()),
               java(
@@ -1016,7 +1166,7 @@ class LombokTest implements RewriteTest {
         }
 
         @Test
-        // TODO: Find solution and remove this test
+            // TODO: Find solution and remove this test
         void onConstructorForJava8() {
             rewriteRun(
               spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
@@ -1058,7 +1208,7 @@ class LombokTest implements RewriteTest {
         }
 
         @Test
-        // TODO: Find solution and remove this test
+            // TODO: Find solution and remove this test
         void onConstructorNoArgsForJava8() {
             rewriteRun(
               spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {

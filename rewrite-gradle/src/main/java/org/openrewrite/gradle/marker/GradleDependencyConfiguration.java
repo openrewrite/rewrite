@@ -15,25 +15,27 @@
  */
 package org.openrewrite.gradle.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Version;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 
 @SuppressWarnings("unused")
 @Value
 @With
+@AllArgsConstructor(onConstructor_ = {@JsonCreator})
 public class GradleDependencyConfiguration implements Serializable {
     /**
      * The name of the dependency configuration. Unique within a given project.
@@ -45,9 +47,23 @@ public class GradleDependencyConfiguration implements Serializable {
 
     boolean isTransitive;
 
+    /**
+     * Indicates that this configuration is intended for resolving a set of dependencies into a dependency graph. A resolvable configuration should not be declarable or consumable.
+     * See <a href="https://docs.gradle.org/current/userguide/declaring_configurations.html#sec:configuration-flags-roles">Configuration flag roles</a>
+     */
     boolean isCanBeResolved;
 
+    /**
+     *  Indicates that this configuration is intended for exposing artifacts outside this project. A consumable configuration should not be declarable or resolvable.
+     *  See <a href="https://docs.gradle.org/current/userguide/declaring_configurations.html#sec:configuration-flags-roles">Configuration flag roles</a>
+     */
     boolean isCanBeConsumed;
+
+    /**
+     * Indicates that this configuration is intended for declaring dependencies. A declarable configuration should not be resolvable or consumable.
+     * See <a href="https://docs.gradle.org/current/userguide/declaring_configurations.html#sec:configuration-flags-roles">Configuration flag roles</a>
+     */
+    boolean isCanBeDeclared;
 
     /**
      * The list of zero or more configurations this configuration extends from.
@@ -73,8 +89,9 @@ public class GradleDependencyConfiguration implements Serializable {
      */
     public List<ResolvedDependency> getResolved() {
         List<ResolvedDependency> resolved = new ArrayList<>(getDirectResolved());
-        Set<ResolvedDependency> alreadyResolved = new LinkedHashSet<>();
-        return resolveTransitiveDependencies(resolved, alreadyResolved);
+        Map<GroupArtifact, ResolvedDependency> alreadyResolved = new HashMap<>();
+        resolveTransitiveDependencies(resolved, alreadyResolved);
+        return new ArrayList<>(alreadyResolved.values());
     }
 
     /**
@@ -88,6 +105,34 @@ public class GradleDependencyConfiguration implements Serializable {
      */
     @Nullable
     String message;
+
+    @Deprecated
+    public GradleDependencyConfiguration(
+            String name,
+            @Nullable String description,
+            boolean isTransitive,
+            boolean isCanBeResolved,
+            boolean isCanBeConsumed,
+            List<GradleDependencyConfiguration> extendsFrom,
+            List<Dependency> requested,
+            List<ResolvedDependency> directResolved,
+            @Nullable String exceptionType,
+            @Nullable String message
+    ) {
+        this.name = name;
+        this.description = description;
+        this.isTransitive = isTransitive;
+        this.isCanBeResolved = isCanBeResolved;
+        this.isCanBeConsumed = isCanBeConsumed;
+        // Introduced in Gradle 8.2, but the concept is relevant for earlier versions as well.
+        // Most of the time this means excluding "runtimeClasspath" and "compileClasspath", but not just the buildscript's "classpath"
+        this.isCanBeDeclared = !name.endsWith("Classpath");
+        this.extendsFrom = extendsFrom;
+        this.requested = requested;
+        this.directResolved = directResolved;
+        this.exceptionType = exceptionType;
+        this.message = message;
+    }
 
     /**
      * List the configurations which are extended by the given configuration.
@@ -136,12 +181,20 @@ public class GradleDependencyConfiguration implements Serializable {
         this.extendsFrom = extendsFrom;
     }
 
-    private static List<ResolvedDependency> resolveTransitiveDependencies(List<ResolvedDependency> resolved, Set<ResolvedDependency> alreadyResolved) {
+    private static void resolveTransitiveDependencies(List<ResolvedDependency> resolved, Map<GroupArtifact, ResolvedDependency> alreadyResolved) {
         for (ResolvedDependency dependency : resolved) {
-            if (alreadyResolved.add(dependency)) {
-                alreadyResolved.addAll(resolveTransitiveDependencies(dependency.getDependencies(), alreadyResolved));
+            GroupArtifact ga = dependency.getGav().asGroupArtifact();
+            if (alreadyResolved.containsKey(ga)) {
+                ResolvedDependency alreadyPresent = alreadyResolved.get(ga);
+                Version newVersion = new Version(dependency.getVersion());
+                Version presentVersion = new Version(alreadyPresent.getVersion());
+                int compared = presentVersion.compareTo(newVersion);
+                if (compared > 0 || (compared == 0 && alreadyPresent.getDependencies().size() == dependency.getDependencies().size())) {
+                    continue;
+                }
             }
+            alreadyResolved.put(ga, dependency);
+            resolveTransitiveDependencies(dependency.getDependencies(), alreadyResolved);
         }
-        return new ArrayList<>(alreadyResolved);
     }
 }
