@@ -22,11 +22,9 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.table.JVMTestSuitesDefined;
 import org.openrewrite.gradle.trait.JvmTestSuite;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -62,16 +60,6 @@ public class FindJVMTestSuites extends Recipe {
             }
             return SearchResult.found(suite.getTree());
         }));
-    }
-
-    public static Set<String> jvmTestSuiteNames(Tree tree) {
-        return TreeVisitor.collect(new FindJVMTestSuites(false).getVisitor(), tree, new HashSet<>())
-                .stream()
-                .filter(J.MethodInvocation.class::isInstance)
-                .map(J.MethodInvocation.class::cast)
-                .filter(m -> m.getMarkers().findFirst(SearchResult.class).isPresent())
-                .map(J.MethodInvocation::getSimpleName)
-                .collect(Collectors.toSet());
     }
 
     public static Set<JvmTestSuite> jvmTestSuites(SourceFile sourceFile) {
