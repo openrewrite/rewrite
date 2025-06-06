@@ -2495,7 +2495,7 @@ export class JavaScriptParserVisitor {
         return this.newEmpty(this.prefix(node));
     }
 
-    visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations {
+    visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations | J.VariableDeclarations {
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
             draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
             draft.prefix = this.prefix(node);
@@ -2895,7 +2895,15 @@ export class JavaScriptParserVisitor {
                             kind: J.Kind.NamedVariable,
                             id: randomId(),
                             prefix: this.prefix(declaration),
-                            markers: emptyMarkers,
+                            markers: produce(emptyMarkers, draft => {
+                                if (declaration.exclamationToken) {
+                                    draft.markers.push({
+                                        kind: JS.Markers.NonNullAssertion,
+                                        id: randomId(),
+                                        prefix: this.suffix(declaration.name)
+                                    } as NonNullAssertion);
+                                }
+                            }),
                             name: this.visit(declaration.name),
                             dimensionsAfterName: [],
                             initializer: ( () => {
@@ -2908,7 +2916,7 @@ export class JavaScriptParserVisitor {
                                 }
                             })(),
                             variableType: this.mapVariableType(declaration)
-                        } as J.VariableDeclarations.NamedVariable, this.suffix(node))]
+                        } as J.VariableDeclarations.NamedVariable, this.suffix(declaration))]
             } as J.VariableDeclarations});
 
         if (varDecls.length === 1) {
@@ -2921,7 +2929,14 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 modifiers: [],
                 scope: undefined,
-                variables: varDecls.map(v => this.rightPadded(v, emptySpace))
+                variables: varDecls.map((v, idx) => {
+                    const padded = this.rightPadded(v, emptySpace)
+                    return produce(padded, draft => {
+                        if (idx > 0) {
+                            draft.element.modifiers = [];
+                        }
+                    });
+                })
             } as JS.ScopedVariableDeclarations;
         }
     }
