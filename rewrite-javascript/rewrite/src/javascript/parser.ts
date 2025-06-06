@@ -2881,8 +2881,8 @@ export class JavaScriptParserVisitor {
                 type: J.ModifierType.LanguageExtension
             } as J.Modifier);
         }
-
-        const varDecls = node.declarations.map((declaration, idx) => {
+        const isMulti = node.declarations.length > 1;
+        const varDecls = node.declarations.map(declaration => {
             return this.rightPadded({
                 kind: J.Kind.VariableDeclarations,
                 id: randomId(),
@@ -2917,7 +2917,7 @@ export class JavaScriptParserVisitor {
                             })(),
                             variableType: this.mapVariableType(declaration)
                         } as J.VariableDeclarations.NamedVariable, emptySpace)]
-            } as J.VariableDeclarations, idx == 0 ? emptySpace : this.suffix(declaration))});
+            } as J.VariableDeclarations, isMulti ? this.suffix(declaration) : emptySpace)});
 
         if (varDecls.length === 1) {
             return varDecls[0].element;
