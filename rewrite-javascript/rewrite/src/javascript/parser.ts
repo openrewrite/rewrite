@@ -2611,7 +2611,7 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 markers: emptyMarkers,
                 init: [node.initializer ?
-                    (ts.isVariableDeclarationList(node.initializer) ? this.rightPadded(this.visit(node.initializer), emptySpace) :
+                    (ts.isVariableDeclarationList(node.initializer) ? this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)) :
                         this.rightPadded(ts.isStatement(node.initializer) ? this.visit(node.initializer) : {
                             kind: JS.Kind.ExpressionStatement,
                             id: randomId(),
