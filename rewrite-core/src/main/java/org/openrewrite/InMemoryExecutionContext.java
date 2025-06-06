@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.config.LicenseKey;
 
 import java.time.Duration;
 import java.util.Map;
@@ -48,6 +49,7 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
         this.onError = onError;
         this.onTimeout = onTimeout;
         putMessage(ExecutionContext.RUN_TIMEOUT, runTimeout);
+        LicenseKey.ofModerneCli().ifPresent(key -> ModerneLicenseKeyExecutionContextView.view(this).setLicenseKey(key));
     }
 
     @Override

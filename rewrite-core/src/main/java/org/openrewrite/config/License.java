@@ -15,10 +15,30 @@
  */
 package org.openrewrite.config;
 
+import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 @Value
+@EqualsAndHashCode
 public class License {
     String name;
+
+    @Nullable
     String url;
+
+    @EqualsAndHashCode.Exclude
+    Set<String> modules = new HashSet<>();
+
+    void addModule(String module) {
+        this.modules.add(module);
+    }
+
+    public Set<String> getModules() {
+        return Collections.unmodifiableSet(modules);
+    }
 }

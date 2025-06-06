@@ -308,14 +308,27 @@ public class Environment {
     }
 
     public Environment(Collection<? extends ResourceLoader> resourceLoaders) {
-        this.resourceLoaders = resourceLoaders;
-        this.dependencyResourceLoaders = emptyList();
+        this(resourceLoaders, emptyList(), false);
     }
 
     public Environment(Collection<? extends ResourceLoader> resourceLoaders,
                        Collection<? extends ResourceLoader> dependencyResourceLoaders) {
+        this(resourceLoaders, dependencyResourceLoaders, false);
+    }
+
+    private Environment(Collection<? extends ResourceLoader> resourceLoaders,
+                       Collection<? extends ResourceLoader> dependencyResourceLoaders,
+                       boolean acceptLicenses) {
+        this(resourceLoaders, dependencyResourceLoaders, acceptLicenses, emptyList());
+    }
+
+    private Environment(Collection<? extends ResourceLoader> resourceLoaders,
+                       Collection<? extends ResourceLoader> dependencyResourceLoaders,
+                       boolean acceptLicenses,
+                       Collection<String> acceptedLicenses) {
         this.resourceLoaders = resourceLoaders;
         this.dependencyResourceLoaders = dependencyResourceLoaders;
+        LicenseVerifier.verifyAllLicensesAccepted(this, acceptedLicenses);
     }
 
     public static Builder builder(Properties properties) {
@@ -330,6 +343,8 @@ public class Environment {
         private final Properties properties;
         private final Collection<ResourceLoader> resourceLoaders = new ArrayList<>();
         private final Collection<ResourceLoader> dependencyResourceLoaders = new ArrayList<>();
+        private final List<String> additionallyAcceptedLicenses = new ArrayList<>();
+        private boolean acceptAllLicenses = false;
 
         public Builder(Properties properties) {
             this.properties = properties;
@@ -392,6 +407,28 @@ public class Environment {
             return this;
         }
 
+        @SuppressWarnings("unused")
+        public Builder acceptLicense(String license) {
+            additionallyAcceptedLicenses.add(license);
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder acceptLicenses(String... licenses) {
+            return acceptLicenses(Arrays.asList(licenses));
+        }
+
+        public Builder acceptLicenses() {
+            acceptAllLicenses = true;
+            return this;
+        }
+
+        public Builder acceptLicenses(Collection<String> licenses) {
+            additionallyAcceptedLicenses.clear();
+            additionallyAcceptedLicenses.addAll(licenses);
+            return this;
+        }
+
         public Builder load(ResourceLoader resourceLoader, Collection<? extends ResourceLoader> dependencyResourceLoaders) {
             resourceLoaders.add(resourceLoader);
             this.dependencyResourceLoaders.addAll(dependencyResourceLoaders);
@@ -399,7 +436,7 @@ public class Environment {
         }
 
         public Environment build() {
-            return new Environment(resourceLoaders, dependencyResourceLoaders);
+            return new Environment(resourceLoaders, dependencyResourceLoaders, acceptAllLicenses, acceptAllLicenses ? emptyList() : additionallyAcceptedLicenses);
         }
     }
 }

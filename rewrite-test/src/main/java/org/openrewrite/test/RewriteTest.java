@@ -64,6 +64,7 @@ public interface RewriteTest extends SourceSpecs {
 
     static Recipe fromRuntimeClasspath(String recipe) {
         return Environment.builder()
+                .acceptLicenses()
                 .scanRuntimeClasspath()
                 .build()
                 .activateRecipes(recipe);
@@ -80,6 +81,7 @@ public interface RewriteTest extends SourceSpecs {
         // recipe that fails to configure
         SoftAssertions softly = new SoftAssertions();
         for (Recipe recipe : Environment.builder()
+                .acceptLicenses()
                 .scanRuntimeClasspath(packageName)
                 .build()
                 .listRecipes()) {
