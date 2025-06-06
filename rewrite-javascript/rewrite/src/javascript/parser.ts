@@ -2882,8 +2882,8 @@ export class JavaScriptParserVisitor {
             } as J.Modifier);
         }
 
-        const varDecls = node.declarations.map(declaration => {
-            return {
+        const varDecls = node.declarations.map((declaration, idx) => {
+            return this.rightPadded({
                 kind: J.Kind.VariableDeclarations,
                 id: randomId(),
                 prefix: emptySpace,
@@ -2916,11 +2916,11 @@ export class JavaScriptParserVisitor {
                                 }
                             })(),
                             variableType: this.mapVariableType(declaration)
-                        } as J.VariableDeclarations.NamedVariable, this.suffix(declaration))]
-            } as J.VariableDeclarations});
+                        } as J.VariableDeclarations.NamedVariable, emptySpace)]
+            } as J.VariableDeclarations, idx == 0 ? emptySpace : this.suffix(declaration))});
 
         if (varDecls.length === 1) {
-            return varDecls[0];
+            return varDecls[0].element;
         } else {
             return {
                 kind: JS.Kind.ScopedVariableDeclarations,
@@ -2930,8 +2930,7 @@ export class JavaScriptParserVisitor {
                 modifiers: [],
                 scope: undefined,
                 variables: varDecls.map((v, idx) => {
-                    const padded = this.rightPadded(v, emptySpace)
-                    return produce(padded, draft => {
+                    return produce(v, draft => {
                         if (idx > 0) {
                             draft.element.modifiers = [];
                         }
