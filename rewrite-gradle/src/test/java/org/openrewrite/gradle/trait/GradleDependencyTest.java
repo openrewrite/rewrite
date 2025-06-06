@@ -30,8 +30,12 @@ class GradleDependencyTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec
           .beforeRecipe(withToolingApi())
-          .recipe(RewriteTest.toRecipe(() -> gradleDependency().asVisitor(dep ->
-            SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
+          .recipe(RewriteTest.toRecipe(() -> gradleDependency().asVisitor(dep -> {
+            if (dep.getRequestedDependency().getVersion().contains("-jre")) {
+                return dep.withVersion("32.0.0-jre");
+            }
+            return SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString());
+          })));
     }
 
     @DocumentExample
@@ -62,7 +66,7 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:28.2-jre"
+                  implementation "com.google.guava:guava:32.0.0-jre"
               }
               """
           )
@@ -132,7 +136,7 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation group: "com.google.guava", name: "guava", version: "28.2-jre"
+                  implementation group: "com.google.guava", name: "guava", version: "32.0.0-jre"
               }
               """
           )
@@ -166,7 +170,7 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation(platform("com.google.guava:guava:28.2-jre"))
+                  implementation(platform("com.google.guava:guava:32.0.0-jre"))
               }
               """
           )
@@ -200,7 +204,7 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation(enforcedPlatform("com.google.guava:guava:28.2-jre"))
+                  implementation(enforcedPlatform("com.google.guava:guava:32.0.0-jre"))
               }
               """
           )
