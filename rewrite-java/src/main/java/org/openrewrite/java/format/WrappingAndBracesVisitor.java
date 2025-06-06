@@ -194,9 +194,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     private List<J.Annotation> wrapAnnotations(List<J.Annotation> annotations, String whitespace, WrappingAndBracesStyle.Annotations annotationsStyle) {
         return ListUtils.map(annotations, (index, ann) -> {
-            if (annotationsStyle.getWrap().equals(LineWrapSetting.DoNotWrap) && hasLineBreak(ann.getPrefix().getWhitespace())) {
+            if (annotationsStyle.getWrap() == LineWrapSetting.DoNotWrap && hasLineBreak(ann.getPrefix().getWhitespace())) {
                 ann = ann.withPrefix(ann.getPrefix().withWhitespace(Space.SINGLE_SPACE.getWhitespace()));
-            } else if (annotationsStyle.getWrap().equals(LineWrapSetting.WrapAlways) && index > 0) {
+            } else if (annotationsStyle.getWrap() == LineWrapSetting.WrapAlways && index > 0) {
                 ann = ann.withPrefix(ann.getPrefix().withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace));
             }
             return ann;
@@ -204,9 +204,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space wrapElement(Space prefix, String whitespace, WrappingAndBracesStyle.Annotations annotationsStyle) {
-        if (annotationsStyle.getWrap().equals(LineWrapSetting.DoNotWrap) && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
+        if (annotationsStyle.getWrap() == LineWrapSetting.DoNotWrap && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
             return prefix.withWhitespace(Space.SINGLE_SPACE.getWhitespace());
-        } else if (annotationsStyle.getWrap().equals(LineWrapSetting.WrapAlways)) {
+        } else if (annotationsStyle.getWrap() == LineWrapSetting.WrapAlways) {
             return prefix.withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace);
         }
         return prefix;
