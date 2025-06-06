@@ -30,6 +30,8 @@ import org.openrewrite.style.LineWrapSetting;
 import java.util.List;
 
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
+import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 
 public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
@@ -194,9 +196,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     private List<J.Annotation> wrapAnnotations(List<J.Annotation> annotations, String whitespace, WrappingAndBracesStyle.Annotations annotationsStyle) {
         return ListUtils.map(annotations, (index, ann) -> {
-            if (annotationsStyle.getWrap() == LineWrapSetting.DoNotWrap && hasLineBreak(ann.getPrefix().getWhitespace())) {
+            if (annotationsStyle.getWrap() == DoNotWrap && hasLineBreak(ann.getPrefix().getWhitespace())) {
                 ann = ann.withPrefix(ann.getPrefix().withWhitespace(Space.SINGLE_SPACE.getWhitespace()));
-            } else if (annotationsStyle.getWrap() == LineWrapSetting.WrapAlways && index > 0) {
+            } else if (annotationsStyle.getWrap() == WrapAlways && index > 0) {
                 ann = ann.withPrefix(ann.getPrefix().withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace));
             }
             return ann;
@@ -204,9 +206,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space wrapElement(Space prefix, String whitespace, WrappingAndBracesStyle.Annotations annotationsStyle) {
-        if (annotationsStyle.getWrap() == LineWrapSetting.DoNotWrap && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
+        if (annotationsStyle.getWrap() == DoNotWrap && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
             return prefix.withWhitespace(Space.SINGLE_SPACE.getWhitespace());
-        } else if (annotationsStyle.getWrap() == LineWrapSetting.WrapAlways) {
+        } else if (annotationsStyle.getWrap() == WrapAlways) {
             return prefix.withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace);
         }
         return prefix;

@@ -25,6 +25,8 @@ import java.util.Collection;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 
 public class IntelliJ extends NamedStyles {
     private static final IntelliJ INSTANCE = new IntelliJ();
@@ -97,12 +99,12 @@ public class IntelliJ extends NamedStyles {
 
     public static WrappingAndBracesStyle wrappingAndBraces() {
         return new WrappingAndBracesStyle(new WrappingAndBracesStyle.IfStatement(false),
-                new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways),
-                new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways),
-                new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways, false),
-                new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap, false),
-                new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap),
-                new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap));
+                new WrappingAndBracesStyle.Annotations(WrapAlways),
+                new WrappingAndBracesStyle.Annotations(WrapAlways),
+                new WrappingAndBracesStyle.Annotations(WrapAlways, false),
+                new WrappingAndBracesStyle.Annotations(DoNotWrap, false),
+                new WrappingAndBracesStyle.Annotations(DoNotWrap),
+                new WrappingAndBracesStyle.Annotations(DoNotWrap));
     }
 
 }

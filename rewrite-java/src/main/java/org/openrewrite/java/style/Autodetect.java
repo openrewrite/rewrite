@@ -39,6 +39,8 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
+import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 
 public class Autodetect extends NamedStyles {
     @JsonCreator
@@ -1283,16 +1285,55 @@ public class Autodetect extends NamedStyles {
 
         public WrappingAndBracesStyle getWrappingAndBracesStyle() {
             WrappingAndBracesStyle wrappingAndBracesStyle = IntelliJ.wrappingAndBraces();
-            wrappingAndBracesStyle = wrappingAndBracesStyle.withClassAnnotations(wrappingAndBracesStyle.getClassAnnotations().withWrap(classAnnotationsWrapped >= 0 ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap));
-            wrappingAndBracesStyle = wrappingAndBracesStyle.withMethodAnnotations(wrappingAndBracesStyle.getMethodAnnotations().withWrap(methodAnnotationsWrapped >= 0 ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap));
-            wrappingAndBracesStyle = wrappingAndBracesStyle.withFieldAnnotations(wrappingAndBracesStyle.getFieldAnnotations().withWrap(fieldAnnotationsWrapped >= 0 ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap));
-            wrappingAndBracesStyle = wrappingAndBracesStyle.withParameterAnnotations(wrappingAndBracesStyle.getParameterAnnotations().withWrap(parameterAnnotationsWrapped >= 0 ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap));
-            wrappingAndBracesStyle = wrappingAndBracesStyle.withLocalVariableAnnotations(wrappingAndBracesStyle.getLocalVariableAnnotations().withWrap(localVariableAnnotationsWrapped >= 0 ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap));
-            wrappingAndBracesStyle = wrappingAndBracesStyle.withEnumFieldAnnotations(wrappingAndBracesStyle.getEnumFieldAnnotations().withWrap(enumFieldAnnotationsWrapped >= 0 ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap));
+            if (classAnnotationsWrapped != 0) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withClassAnnotations(
+                        wrappingAndBracesStyle.getClassAnnotations()
+                                .withWrap(determineWrapping(classAnnotationsWrapped, wrappingAndBracesStyle.getClassAnnotations().getWrap()))
+                );
+            }
+            if (methodAnnotationsWrapped != 0) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withMethodAnnotations(
+                        wrappingAndBracesStyle.getMethodAnnotations()
+                                .withWrap(determineWrapping(methodAnnotationsWrapped, wrappingAndBracesStyle.getMethodAnnotations().getWrap()))
+                );
+            }
+            if (fieldAnnotationsWrapped != 0) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withEnumFieldAnnotations(
+                        wrappingAndBracesStyle.getFieldAnnotations()
+                                .withWrap(determineWrapping(fieldAnnotationsWrapped, wrappingAndBracesStyle.getFieldAnnotations().getWrap()))
+                );
+            }
+            if (parameterAnnotationsWrapped != 0) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withParameterAnnotations(
+                        wrappingAndBracesStyle.getParameterAnnotations()
+                                .withWrap(determineWrapping(parameterAnnotationsWrapped, wrappingAndBracesStyle.getParameterAnnotations().getWrap()))
+                );
+            }
+            if (localVariableAnnotationsWrapped != 0) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withLocalVariableAnnotations(
+                        wrappingAndBracesStyle.getLocalVariableAnnotations()
+                                .withWrap(determineWrapping(localVariableAnnotationsWrapped, wrappingAndBracesStyle.getLocalVariableAnnotations().getWrap()))
+                );
+            }
+            if (enumFieldAnnotationsWrapped != 0) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withEnumFieldAnnotations(
+                        wrappingAndBracesStyle.getEnumFieldAnnotations()
+                                .withWrap(determineWrapping(enumFieldAnnotationsWrapped, wrappingAndBracesStyle.getEnumFieldAnnotations().getWrap()))
+                );
+            }
             return wrappingAndBracesStyle
                     .withIfStatement(new WrappingAndBracesStyle.IfStatement(
                             elseOnNewLine > 0)
                     );
+        }
+
+        private LineWrapSetting determineWrapping(int wrapsFound, LineWrapSetting defaultSetting) {
+            if (wrapsFound > 0) {
+                return WrapAlways;
+            } else if (wrapsFound < 0) {
+                return DoNotWrap;
+            }
+            return defaultSetting;
         }
     }
 

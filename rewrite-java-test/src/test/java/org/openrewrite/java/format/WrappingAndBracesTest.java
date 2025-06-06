@@ -36,6 +36,8 @@ import java.util.function.UnaryOperator;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class WrappingAndBracesTest implements RewriteTest {
@@ -44,12 +46,12 @@ class WrappingAndBracesTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
           new WrappingAndBracesStyle.IfStatement(false),
-          new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways),
-          new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways),
-          new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways, false),
-          new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap, false),
-          new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap),
-          new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap)))));
+          new WrappingAndBracesStyle.Annotations(WrapAlways),
+          new WrappingAndBracesStyle.Annotations(WrapAlways),
+          new WrappingAndBracesStyle.Annotations(WrapAlways, false),
+          new WrappingAndBracesStyle.Annotations(DoNotWrap, false),
+          new WrappingAndBracesStyle.Annotations(DoNotWrap),
+          new WrappingAndBracesStyle.Annotations(DoNotWrap)))));
     }
 
     @DocumentExample
