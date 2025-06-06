@@ -22,4 +22,8 @@ public class Traits {
     public static GradleDependency.Matcher gradleDependency() {
         return new GradleDependency.Matcher();
     }
+
+    public static GradlePlugin.Matcher plugin() {
+        return new GradlePlugin.Matcher();
+    }
 }
