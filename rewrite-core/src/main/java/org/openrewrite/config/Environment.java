@@ -308,16 +308,23 @@ public class Environment {
     }
 
     public Environment(Collection<? extends ResourceLoader> resourceLoaders) {
-        this(resourceLoaders, emptyList(), emptyList());
+        this(resourceLoaders, emptyList(), false);
     }
 
     public Environment(Collection<? extends ResourceLoader> resourceLoaders,
                        Collection<? extends ResourceLoader> dependencyResourceLoaders) {
-        this(resourceLoaders, dependencyResourceLoaders, emptyList());
+        this(resourceLoaders, dependencyResourceLoaders, false);
     }
 
-    public Environment(Collection<? extends ResourceLoader> resourceLoaders,
+    private Environment(Collection<? extends ResourceLoader> resourceLoaders,
                        Collection<? extends ResourceLoader> dependencyResourceLoaders,
+                       boolean acceptLicenses) {
+        this(resourceLoaders, dependencyResourceLoaders, acceptLicenses, emptyList());
+    }
+
+    private Environment(Collection<? extends ResourceLoader> resourceLoaders,
+                       Collection<? extends ResourceLoader> dependencyResourceLoaders,
+                       boolean acceptLicenses,
                        Collection<String> acceptedLicenses) {
         this.resourceLoaders = resourceLoaders;
         this.dependencyResourceLoaders = dependencyResourceLoaders;
@@ -337,6 +344,7 @@ public class Environment {
         private final Collection<ResourceLoader> resourceLoaders = new ArrayList<>();
         private final Collection<ResourceLoader> dependencyResourceLoaders = new ArrayList<>();
         private final List<String> additionallyAcceptedLicenses = new ArrayList<>();
+        private boolean acceptAllLicenses = false;
 
         public Builder(Properties properties) {
             this.properties = properties;
@@ -410,6 +418,11 @@ public class Environment {
             return acceptLicenses(Arrays.asList(licenses));
         }
 
+        public Builder acceptLicenses() {
+            acceptAllLicenses = true;
+            return this;
+        }
+
         public Builder acceptLicenses(Collection<String> licenses) {
             additionallyAcceptedLicenses.clear();
             additionallyAcceptedLicenses.addAll(licenses);
@@ -423,7 +436,7 @@ public class Environment {
         }
 
         public Environment build() {
-            return new Environment(resourceLoaders, dependencyResourceLoaders, additionallyAcceptedLicenses);
+            return new Environment(resourceLoaders, dependencyResourceLoaders, acceptAllLicenses, acceptAllLicenses ? emptyList() : additionallyAcceptedLicenses);
         }
     }
 }
