@@ -249,4 +249,166 @@ class DependencyInsightTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nestedDependenciesAreTransitivelySearchedForMatchingDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("org.springframework.boot", "*", null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+              assertThat(rows).isNotEmpty();
+              DependenciesInUse.Row row = rows.getFirst();
+              assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-web");
+              assertThat(row.getDepth()).isEqualTo(0);
+              assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
+              row = rows.get(4);
+              assertThat(row.getArtifactId()).isEqualTo("spring-boot");
+              assertThat(row.getDepth()).isEqualTo(4);
+              assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
+          }),
+          buildGradle(
+            """
+              buildscript {
+              	    ext {
+              	    	springBootVersion = '2.6.6'
+              	    }
+              	    dependencies {
+              	        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
+              	    }
+              	    repositories {
+              	        mavenCentral()
+              	    }
+              }
+              repositories {
+                  mavenCentral()
+              }
+    
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+              apply plugin: 'java'
+
+              java {
+                  sourceCompatibility = '11'
+              }
+              
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-web'
+                  implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
+                  implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+              }
+              """,
+            """
+              buildscript {
+              	    ext {
+              	    	springBootVersion = '2.6.6'
+              	    }
+              	    dependencies {
+              	        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
+              	    }
+              	    repositories {
+              	        mavenCentral()
+              	    }
+              }
+              repositories {
+                  mavenCentral()
+              }
+    
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+              apply plugin: 'java'
+
+              java {
+                  sourceCompatibility = '11'
+              }
+              
+              dependencies {
+                  /*~~(org.springframework.boot:spring-boot-starter-web:2.6.6,org.springframework.boot:spring-boot-starter:2.6.6,org.springframework.boot:spring-boot-autoconfigure:2.6.6,org.springframework.boot:spring-boot-starter-json:2.6.6,org.springframework.boot:spring-boot:2.6.6,org.springframework.boot:spring-boot-starter-tomcat:2.6.6,org.springframework.boot:spring-boot-starter-logging:2.6.6)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
+                  /*~~(org.springframework.boot:spring-boot-starter-actuator:2.6.4,org.springframework.boot:spring-boot-starter:2.6.6,org.springframework.boot:spring-boot-autoconfigure:2.6.6,org.springframework.boot:spring-boot:2.6.6,org.springframework.boot:spring-boot-actuator-autoconfigure:2.6.6,org.springframework.boot:spring-boot-starter-logging:2.6.6,org.springframework.boot:spring-boot-actuator:2.6.6)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
+                  /*~~(org.springframework.boot:spring-boot-dependencies:2.6.15,org.springframework.boot:spring-boot:2.6.6)~~>*/implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void jacksonIsFoundInternally() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("com.fasterxml.jackson.*", "*", null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                assertThat(rows).isNotEmpty();
+                DependenciesInUse.Row row = rows.getFirst();
+                assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.datatype");
+                assertThat(row.getArtifactId()).isEqualTo("jackson-datatype-jsr310");
+                assertThat(row.getDepth()).isEqualTo(2);
+                assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
+                row = rows.get(4);
+                assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.core");
+                assertThat(row.getArtifactId()).isEqualTo("jackson-core");
+                assertThat(row.getDepth()).isEqualTo(3);
+                assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
+            }),
+          buildGradle(
+            """
+              buildscript {
+              	    ext {
+              	    	springBootVersion = '2.6.6'
+              	    }
+              	    dependencies {
+              	        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
+              	    }
+              	    repositories {
+              	        mavenCentral()
+              	    }
+              }
+              repositories {
+                  mavenCentral()
+              }
+    
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+              apply plugin: 'java'
+
+              java {
+                  sourceCompatibility = '11'
+              }
+              
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-web'
+                  implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
+                  implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+              }
+              """,
+            """
+              buildscript {
+              	    ext {
+              	    	springBootVersion = '2.6.6'
+              	    }
+              	    dependencies {
+              	        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
+              	    }
+              	    repositories {
+              	        mavenCentral()
+              	    }
+              }
+              repositories {
+                  mavenCentral()
+              }
+    
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+              apply plugin: 'java'
+
+              java {
+                  sourceCompatibility = '11'
+              }
+              
+              dependencies {
+                  /*~~(com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
+                  /*~~(com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
+                  /*~~(com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+              }
+              """
+          )
+        );
+    }
 }
