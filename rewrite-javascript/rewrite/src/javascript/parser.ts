@@ -2848,13 +2848,13 @@ export class JavaScriptParserVisitor {
         } as J.VariableDeclarations.NamedVariable;
     }
 
-    visitVariableDeclarationList(node: ts.VariableDeclarationList): JS.ScopedVariableDeclarations {
+    visitVariableDeclarationList(node: ts.VariableDeclarationList): J.VariableDeclarations | JS.ScopedVariableDeclarations {
         let kind = node.getFirstToken();
 
         // to parse the declaration case: await using db = ...
-        let modifier;
+        let modifiers: J.Modifier[] = [];
         if (kind?.kind === ts.SyntaxKind.AwaitKeyword) {
-            modifier = {
+            modifiers.push({
                 kind: J.Kind.Modifier,
                 id: randomId(),
                 prefix: this.prefix(kind),
@@ -2862,43 +2862,68 @@ export class JavaScriptParserVisitor {
                 keyword: 'await',
                 type: J.ModifierType.LanguageExtension,
                 annotations: []
-            };
+            });
             kind = node.getChildAt(1);
         }
 
-        return {
-            kind: JS.Kind.ScopedVariableDeclarations,
-            id: randomId(),
-            prefix: emptySpace,
-            markers: emptyMarkers,
-            modifiers: modifier ? [modifier] : [],
-            scope: this.leftPadded(
-                kind ? this.prefix(kind) : this.prefix(node),
-                kind?.kind === ts.SyntaxKind.LetKeyword
-                    ? JS.ScopedVariableDeclarations.Scope.Let
-                    : kind?.kind === ts.SyntaxKind.ConstKeyword
-                        ? JS.ScopedVariableDeclarations.Scope.Const
-                        : kind?.kind === ts.SyntaxKind.UsingKeyword
-                            ? JS.ScopedVariableDeclarations.Scope.Using
-                            : JS.ScopedVariableDeclarations.Scope.Var
-            ),
-            variables: node.declarations.map((declaration) => {
-                // FIXME this is suspect... we are creating a whole VariableDeclarations for each declaration?
-                return this.rightPadded(
-                    {
-                        kind: J.Kind.VariableDeclarations,
-                        id: randomId(),
-                        prefix: this.prefix(declaration),
-                        markers: emptyMarkers,
-                        leadingAnnotations: [],
-                        modifiers: [],
-                        typeExpression: this.mapTypeInfo(declaration),
-                        variables: [this.rightPadded(this.visit(declaration), emptySpace)]
-                    },
-                    this.suffix(declaration)
-                );
-            })
-        };
+        if (kind?.kind === ts.SyntaxKind.VarKeyword ||
+            kind?.kind === ts.SyntaxKind.LetKeyword ||
+            kind?.kind === ts.SyntaxKind.ConstKeyword ||
+            kind?.kind === ts.SyntaxKind.UsingKeyword) {
+            modifiers.push({
+                kind: J.Kind.Modifier,
+                id: randomId(),
+                prefix: this.prefix(kind),
+                markers: emptyMarkers,
+                keyword: kind.kind === ts.SyntaxKind.VarKeyword ? 'var' :
+                    kind.kind === ts.SyntaxKind.LetKeyword ? 'let' :
+                        kind.kind === ts.SyntaxKind.ConstKeyword ? 'const' : 'using',
+                type: J.ModifierType.LanguageExtension
+            } as J.Modifier);
+        }
+
+        const varDecls = node.declarations.map(declaration => {
+            return {
+                kind: J.Kind.VariableDeclarations,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                leadingAnnotations: [],
+                modifiers: modifiers,
+                typeExpression: this.mapTypeInfo(declaration),
+                variables: [this.rightPadded({
+                            kind: J.Kind.NamedVariable,
+                            id: randomId(),
+                            prefix: this.prefix(declaration),
+                            markers: emptyMarkers,
+                            name: this.visit(declaration.name),
+                            dimensionsAfterName: [],
+                            initializer: ( () => {
+                                if (declaration.initializer) {
+                                    const equalSign = declaration.getChildren().find(c => c.kind == ts.SyntaxKind.EqualsToken)
+                                    const prefix = equalSign && this.prefix(equalSign);
+                                    return this.leftPadded(prefix ?? emptySpace, this.visit(declaration.initializer) as Expression)
+                                } else {
+                                    return undefined;
+                                }
+                            })(),
+                            variableType: this.mapVariableType(declaration)
+                        } as J.VariableDeclarations.NamedVariable, this.suffix(node))]
+            } as J.VariableDeclarations});
+
+        if (varDecls.length === 1) {
+            return varDecls[0];
+        } else {
+            return {
+                kind: JS.Kind.ScopedVariableDeclarations,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                modifiers: [],
+                scope: undefined,
+                variables: varDecls.map(v => this.rightPadded(v, emptySpace))
+            } as JS.ScopedVariableDeclarations;
+        }
     }
 
     visitFunctionDeclaration(node: ts.FunctionDeclaration): J.MethodDeclaration {
