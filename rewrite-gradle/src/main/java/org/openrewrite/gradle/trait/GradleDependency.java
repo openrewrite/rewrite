@@ -19,10 +19,12 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -45,6 +47,23 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
     @Getter
     ResolvedDependency resolvedDependency;
+
+    @Getter
+    org.openrewrite.gradle.internal.Dependency requestedDependency;
+
+    public J.MethodInvocation withVersion(String version) {
+        J.MethodInvocation m = cursor.getValue();
+        Expression argument = m.getArguments().get(0);
+        if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral || argument instanceof J.Assignment || argument instanceof K.StringTemplate) {
+            return withVersion(m, version);
+        } else if (argument instanceof J.MethodInvocation) {
+            if (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
+                    ((J.MethodInvocation) argument).getSimpleName().equals("enforcedPlatform")) {
+                return m.withArguments(ListUtils.mapFirst(m.getArguments(), method -> withVersion((J.MethodInvocation) method, version)));
+            }
+        }
+        return m;
+    }
 
     public static class Matcher extends GradleTraitMatcher<GradleDependency> {
         private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
@@ -124,7 +143,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                                 Dependency req = resolvedDependency.getRequested();
                                 if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
                                         req.getArtifactId().equals(dependency.getArtifactId())) {
-                                    return new GradleDependency(cursor, resolvedDependency);
+                                    return new GradleDependency(cursor, resolvedDependency, dependency);
                                 }
                             }
                         }
@@ -137,7 +156,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                                         Dependency req = resolvedDependency.getRequested();
                                         if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
                                                 req.getArtifactId().equals(dependency.getArtifactId())) {
-                                            return new GradleDependency(cursor, resolvedDependency);
+                                            return new GradleDependency(cursor, resolvedDependency, dependency);
                                         }
                                     }
                                 }
@@ -161,7 +180,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                                     .classifier(dependency.getClassifier())
                                     .build())
                             .build();
-                    return new GradleDependency(cursor, resolvedDependency);
+                    return new GradleDependency(cursor, resolvedDependency, dependency);
                 }
             }
 
@@ -212,7 +231,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 G.GString gstring = (G.GString) argument;
                 List<J> strings = gstring.getStrings();
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
-                    return DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                    return DependencyStringNotationConverter.parse(parseArgumentString(strings));
                 }
             } else if (argument instanceof G.MapLiteral) {
                 List<Expression> mapEntryExpressions = ((G.MapLiteral) argument).getElements()
@@ -225,6 +244,9 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             } else if (argument instanceof J.Assignment) {
                 String group = null;
                 String artifact = null;
+                String version = null;
+                String classifier = null;
+                String ext = null;
 
                 for (Expression e : arguments) {
                     if (!(e instanceof J.Assignment)) {
@@ -240,10 +262,22 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         continue;
                     }
                     String name = identifier.getSimpleName();
-                    if ("group".equals(name)) {
-                        group = (String) value.getValue();
-                    } else if ("name".equals(name)) {
-                        artifact = (String) value.getValue();
+                    switch (name) {
+                        case "group":
+                            group = (String) value.getValue();
+                            break;
+                        case "name":
+                            artifact = (String) value.getValue();
+                            break;
+                        case "version":
+                            version = (String) value.getValue();
+                            break;
+                        case "classifier":
+                            classifier = (String) value.getValue();
+                            break;
+                        case "ext":
+                            ext = (String) value.getValue();
+                            break;
                     }
                 }
 
@@ -251,12 +285,12 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return null;
                 }
 
-                return new org.openrewrite.gradle.internal.Dependency(group, artifact, null, null, null);
+                return new org.openrewrite.gradle.internal.Dependency(group, artifact, version, classifier, ext);
             } else if (argument instanceof K.StringTemplate) {
                 K.StringTemplate template = (K.StringTemplate) argument;
                 List<J> strings = template.getStrings();
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
-                    return DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                    return DependencyStringNotationConverter.parse(parseArgumentString(strings));
                 }
             }
 
@@ -266,6 +300,9 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         private static org.openrewrite.gradle.internal.@Nullable Dependency getMapEntriesDependency(List<Expression> arguments) {
             String group = null;
             String artifact = null;
+            String version = null;
+            String classifier = null;
+            String ext = null;
 
             for (Expression e : arguments) {
                 if (!(e instanceof G.MapEntry)) {
@@ -280,11 +317,23 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
                     continue;
                 }
-                String keyValue = (String) key.getValue();
-                if ("group".equals(keyValue)) {
-                    group = (String) value.getValue();
-                } else if ("name".equals(keyValue)) {
-                    artifact = (String) value.getValue();
+                String keyValue = ((String) key.getValue()).toLowerCase();
+                switch (keyValue) {
+                    case "group":
+                        group = (String) value.getValue();
+                        break;
+                    case "name":
+                        artifact = (String) value.getValue();
+                        break;
+                    case "version":
+                        version = (String) value.getValue();
+                        break;
+                    case "classifier":
+                        classifier = (String) value.getValue();
+                        break;
+                    case "ext":
+                        ext = (String) value.getValue();
+                        break;
                 }
             }
 
@@ -292,7 +341,85 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 return null;
             }
 
-            return new org.openrewrite.gradle.internal.Dependency(group, artifact, null, null, null);
+            return new org.openrewrite.gradle.internal.Dependency(group, artifact, version, classifier, ext);
         }
+
+        private static String parseArgumentString(List<J> arguments) {
+            StringBuilder builder = new StringBuilder();
+            arguments.forEach(argument -> builder.append(parseTemplateArgument(argument)));
+            return builder.toString();
+        }
+
+        private static String parseTemplateArgument(J argument) {
+            if (argument instanceof J.Literal) {
+                return ((J.Literal) argument).getValue() != null ? ((J.Literal) argument).getValue().toString() : "";
+            } else if (argument instanceof J.Identifier) {
+                return ((J.Identifier) argument).getSimpleName();
+            } else if (argument instanceof G.GString.Value) {
+                return parseTemplateArgument(((G.GString.Value) argument).getTree());
+            } else if (argument instanceof K.StringTemplate.Expression) {
+                return parseTemplateArgument(((K.StringTemplate.Expression) argument).getTree());
+            }
+            return "";
+        }
+    }
+
+    private J.MethodInvocation withVersion(J.MethodInvocation m, String version) {
+        if (requestedDependency.getVersion() == null) {
+            return m;
+        }
+        return m.withArguments(ListUtils.map(m.getArguments(), (ix, argument) -> {
+            if (ix == 0 && argument instanceof J.Literal) {
+                return ChangeStringLiteral.withStringValue((J.Literal) argument, requestedDependency.withVersion(version).toStringNotation());
+            } else if (ix == 0 && argument instanceof G.GString) {
+                G.GString gstring = (G.GString) argument;
+                List<J> strings = gstring.getStrings();
+                // only support parameterized version for now -> no changes need to be made to the template as the version is a variable
+                return argument;
+            } else if (ix == 0 && argument instanceof G.MapLiteral) {
+                return ((G.MapLiteral) argument).withElements(ListUtils.map(((G.MapLiteral) argument).getElements(), mapEntry -> replaceMapArgument(mapEntry, "version", version)));
+            } else if (argument instanceof G.MapEntry) {
+                return replaceMapArgument((G.MapEntry) argument, "version", version);
+            } else if (argument instanceof J.Assignment) {
+                return replaceAssignment((J.Assignment) argument, "version", version);
+            } else if (argument instanceof K.StringTemplate) {
+                K.StringTemplate template = (K.StringTemplate) argument;
+                List<J> strings = template.getStrings();
+                // only support parameterized version for now -> no changes need to be made to the template as the version is a variable
+                return argument;
+            }
+
+            return argument;
+        }));
+    }
+
+    private static G.MapEntry replaceMapArgument(G.MapEntry entry, String key, String newValue) {
+        if (!(entry.getKey() instanceof J.Literal) || !(entry.getValue() instanceof J.Literal)) {
+            return entry;
+        }
+        J.Literal entryKey = (J.Literal) entry.getKey();
+        J.Literal value = (J.Literal) entry.getValue();
+        if (!(entryKey.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+            return entry;
+        }
+        if (key.equalsIgnoreCase((String) entryKey.getValue())) {
+            return entry.withValue(ChangeStringLiteral.withStringValue(value, newValue));
+        }
+        return entry;
+    }
+
+    private static J.Assignment replaceAssignment(J.Assignment arg, String name, String newValue) {
+        if (!(arg.getVariable() instanceof J.Identifier) || !(arg.getAssignment() instanceof J.Literal)) {
+            return arg;
+        }
+        J.Identifier identifier = (J.Identifier) arg.getVariable();
+        J.Literal value = (J.Literal) arg.getAssignment();
+        if (!(value.getValue() instanceof String)) {
+            return arg;
+        }
+        if (name.equals(identifier.getSimpleName())) {
+            arg.withAssignment(ChangeStringLiteral.withStringValue(value, newValue));
+        }
+        return arg;
     }
 }
