@@ -135,6 +135,7 @@ describe('AutoformatVisitor', () => {
         )});
 
     test('a statement following an if', () => {
+        // TODO not sure if there should be a newline after the if
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -146,6 +147,7 @@ describe('AutoformatVisitor', () => {
             `
             if (1 > 0) {
             }
+
             let i = 1;
             `)
             // @formatter:on
