@@ -13,35 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Marker, Markers, MarkersKind} from "../markers";
-import {randomId} from "../uuid";
+import {emptyMarkers, Marker, Markers} from "../markers";
 import {WriteStream} from "fs";
 import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
-
-const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
-
-export interface Reference {
-    [REFERENCE_KEY]: true;
-}
-
-export function asRef<T extends {}>(obj: T | undefined): T & Reference | undefined {
-    if(obj === undefined) {
-        return undefined;
-    }
-    try {
-        // Spread would create a new object. This can be used multiple times on the
-        // same object without changing the reference.
-        Object.assign(obj, {[REFERENCE_KEY]: true});
-        return obj as T & Reference;
-    } catch (Error) {
-        return obj as T & Reference;
-    }
-}
-
-function isRef(obj?: any): obj is Reference {
-    return obj !== undefined && obj !== null && obj[REFERENCE_KEY] === true;
-}
+import {asRef, isRef, Reference, ReferenceMap} from "./reference";
 
 /**
  * Interface representing an RPC codec that defines methods
@@ -108,10 +84,9 @@ export class RpcCodecs {
 export class RpcSendQueue {
     private q: RpcObjectData[] = [];
 
-    private refCount = 1
     private before?: any;
 
-    constructor(private readonly refs: WeakMap<Object, number>, private readonly trace: boolean) {
+    constructor(private readonly refs: ReferenceMap, private readonly trace: boolean) {
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
@@ -224,16 +199,16 @@ export class RpcSendQueue {
     private async add(after: any, onChange: (() => Promise<any>) | undefined): Promise<void> {
         let ref: number | undefined;
         if (isRef(after)) {
-            if (this.refs.has(after)) {
+            ref = this.refs.get(after);
+            if (ref) {
                 this.put({
                     state: RpcObjectState.ADD,
                     valueType: this.getValueType(after),
-                    ref: this.refs.get(after)
+                    ref
                 });
                 return;
             }
-            ref = this.refCount++;
-            this.refs.set(after, ref);
+            ref = this.refs.create(after);
         }
         let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after);
         this.put({
@@ -285,7 +260,7 @@ export class RpcReceiveQueue {
 
     receiveMarkers(markers?: Markers): Promise<Markers> {
         if (markers === undefined) {
-            markers = {kind: MarkersKind.Markers, id: randomId(), markers: []} as Markers;
+            markers = emptyMarkers;
         }
         return this.receive(markers, async m => {
             return saveTrace(this.logFile, async () => {
