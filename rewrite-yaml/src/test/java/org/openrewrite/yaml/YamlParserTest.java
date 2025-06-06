@@ -411,44 +411,55 @@ class YamlParserTest implements RewriteTest {
     }
 
     @Test
-    void printIdempotentyIssueAfterAnchor() {
+    void withAnchorScalar() {
         rewriteRun(
           yaml(
             """
-              type: specs.openrewrite.org/v1beta/example
-              recipeName: org.openrewrite.gradle.UpdateGradleWrapper
-              examples:
-              - description: Add a new Gradle wrapper
-                parameters: &id001
-                - 7.4.2
-                - 'null'
-                - 'null'
-                - 'null'
-                - 'null'
-                sources:
-                - before: |
-                    plugins {
-                        id "java"
-                    }
-                  path: build.gradle
-                  language: groovy
-              - description: Update existing Gradle wrapper
-                parameters: *id001
-                sources:
-                - before: |
-                    distributionBase=GRADLE_USER_HOME
-                    distributionPath=wrapper/dists
-                    distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
-                    zipStoreBase=GRADLE_USER_HOME
-                    zipStorePath=wrapper/dists
-                  after: |
-                    distributionBase=GRADLE_USER_HOME
-                    distributionPath=wrapper/dists
-                    distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
-                    zipStoreBase=GRADLE_USER_HOME
-                    zipStorePath=wrapper/dists
-                    distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
-                  language: properties
+              anchored_content: &anchor_name This string will appear as the value.
+              other_anchor: *anchor_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorMap() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor_name
+                anchor_key: 1
+                another_anchor_key: 2
+              other_anchor: *anchor_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorSequence() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor
+                - item1
+                - item2
+              other_anchor: *anchor
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5553")
+    void withAnchorSequenceOnRootLevel() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor
+              - item1
+              - item2
+              other_anchor: *anchor
               """
           )
         );
