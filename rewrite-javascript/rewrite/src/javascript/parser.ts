@@ -2879,7 +2879,7 @@ export class JavaScriptParserVisitor {
                 keyword: kind.kind === ts.SyntaxKind.VarKeyword ? 'var' :
                     kind.kind === ts.SyntaxKind.LetKeyword ? 'let' :
                         kind.kind === ts.SyntaxKind.ConstKeyword ? 'const' : 'using',
-                type: J.ModifierType.LanguageExtension
+                type: kind.kind == ts.SyntaxKind.ConstKeyword ? J.ModifierType.Final : J.ModifierType.LanguageExtension
             } as J.Modifier);
         }
         const isMulti = node.declarations.length > 1;
