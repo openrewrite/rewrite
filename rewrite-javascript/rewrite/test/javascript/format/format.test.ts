@@ -25,6 +25,7 @@ describe('AutoformatVisitor', () => {
     test('everything', () => {
         return spec.rewriteRun(
             // TODO there should be no newline after the default case in switch
+            // TODO not sure if there should be a newline after the if and after the finally
             // @formatter:off
             //language=typescript
             typescript(`
@@ -99,6 +100,7 @@ describe('AutoformatVisitor', () => {
                     if (1 > 0) {
                         console.log("four", "three", "six");
                     }
+
                     let i = 1;
                     while (i < 4) {
                         i++;
@@ -110,6 +112,7 @@ describe('AutoformatVisitor', () => {
                     } finally {
                         console.log("finally");
                     }
+
                     const isTypeScriptFun = i > 3 ? "yes" : "hell yeah!";
                     for (let j = 1; j <= 5; j++) {
                         console.log(\`Number: \` + j);
