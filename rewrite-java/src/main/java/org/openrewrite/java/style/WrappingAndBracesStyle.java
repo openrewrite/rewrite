@@ -46,14 +46,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
 
     @Value
     @With
-    @AllArgsConstructor
     public static class Annotations {
         LineWrapSetting wrap;
-        Boolean doNotWrapAfterSingleAnnotation;
-
-        public Annotations(LineWrapSetting wrap) {
-            this.wrap = wrap;
-            this.doNotWrapAfterSingleAnnotation = false;
-        }
     }
 }

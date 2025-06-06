@@ -48,8 +48,8 @@ class WrappingAndBracesTest implements RewriteTest {
           new WrappingAndBracesStyle.IfStatement(false),
           new WrappingAndBracesStyle.Annotations(WrapAlways),
           new WrappingAndBracesStyle.Annotations(WrapAlways),
-          new WrappingAndBracesStyle.Annotations(WrapAlways, false),
-          new WrappingAndBracesStyle.Annotations(DoNotWrap, false),
+          new WrappingAndBracesStyle.Annotations(WrapAlways),
+          new WrappingAndBracesStyle.Annotations(DoNotWrap),
           new WrappingAndBracesStyle.Annotations(DoNotWrap),
           new WrappingAndBracesStyle.Annotations(DoNotWrap)))));
     }
