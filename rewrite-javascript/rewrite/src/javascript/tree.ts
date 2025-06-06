@@ -80,7 +80,7 @@ export namespace JS {
         StatementExpression: "org.openrewrite.javascript.tree.JS$StatementExpression",
         TaggedTemplateExpression: "org.openrewrite.javascript.tree.JS$TaggedTemplateExpression",
         TemplateExpression: "org.openrewrite.javascript.tree.JS$TemplateExpression",
-        TemplateExpressionSpan: "org.openrewrite.javascript.tree.JS$TemplateExpression$TemplateSpan",
+        TemplateExpressionSpan: "org.openrewrite.javascript.tree.JS$TemplateExpression$Span",
         TrailingTokenStatement: "org.openrewrite.javascript.tree.JS$TrailingTokenStatement",
         Tuple: "org.openrewrite.javascript.tree.JS$Tuple",
         TypeDeclaration: "org.openrewrite.javascript.tree.JS$TypeDeclaration",
@@ -244,7 +244,7 @@ export namespace JS {
      */
     export interface NamedImports extends JS, Expression {
         readonly kind: typeof Kind.NamedImports;
-        readonly elements: J.Container<Expression>;
+        readonly elements: J.Container<ImportSpecifier>;
         readonly type?: JavaType;
     }
 
@@ -255,7 +255,7 @@ export namespace JS {
     export interface ImportSpecifier extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.ImportSpecifier;
         readonly importType: J.LeftPadded<boolean>;
-        readonly specifier: Expression;
+        readonly specifier: J.Identifier | Alias;
         readonly type?: JavaType;
     }
 
@@ -742,10 +742,10 @@ export namespace JS {
     }
 
     export namespace NamespaceDeclaration {
-        export enum KeywordType {
-            Namespace,
-            Module,
-            Empty,
+        export const enum KeywordType {
+            Namespace = "Namespace",
+            Module = "Module",
+            Empty = "Empty"
         }
     }
 

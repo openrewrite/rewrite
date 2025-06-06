@@ -180,7 +180,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     @SuppressWarnings("unused")
-    public Space visitSpace(Space space, Space.Location loc, P p) {
+    public Space visitSpace(@Nullable Space space, Space.Location loc, P p) {
         //noinspection ConstantValue
         if (space == Space.EMPTY || space == Space.SINGLE_SPACE || space == null) {
             return space;

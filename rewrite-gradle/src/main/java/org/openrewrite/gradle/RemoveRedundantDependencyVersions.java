@@ -92,7 +92,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         return "Remove explicitly-specified dependencies and dependency versions that are managed by a Gradle `platform`/`enforcedPlatform`.";
     }
 
-    public static final List<String> DEPENDENCY_MANAGEMENT_METHODS = new ArrayList<>(Arrays.asList(
+    private static final List<String> DEPENDENCY_MANAGEMENT_METHODS = Arrays.asList(
             "api",
             "implementation",
             "compileOnly",
@@ -111,7 +111,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             "runtime", // deprecated
             "testCompile", // deprecated
             "testRuntime" // deprecated
-    ));
+    );
     private static final VersionComparator VERSION_COMPARATOR = requireNonNull(Semver.validate("latest.release", null).getValue());
 
     @Override
@@ -257,9 +257,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
                                     String dependencyManagedVersion = platforms.get(configurationName)
                                             .stream()
-                                            .flatMap(e -> e.getDependencyManagement().stream())
-                                            .filter(e -> e.getGroupId().equals(dependency.getGroupId()))
-                                            .filter(e -> e.getArtifactId().equals(dependency.getArtifactId()))
+                                            .map(e -> e.getManagedDependency(dependency.getGroupId(), dependency.getArtifactId(), null, null))
+                                            .filter(Objects::nonNull)
                                             .map(ResolvedManagedDependency::getVersion)
                                             .max(VERSION_COMPARATOR)
                                             .orElse(null);

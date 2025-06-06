@@ -668,7 +668,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                         randomId(),
                         qualifier == null ? Space.EMPTY : qualifier.getPrefix(),
                         Markers.EMPTY,
-                        qualifier == null ? null : JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
+                        JRightPadded.build(qualifier == null ? null : qualifier.withPrefix(Space.EMPTY)),
                         JContainer.empty(),
                         JLeftPadded.build(name),
                         null,
@@ -1091,9 +1091,14 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         if (cursor < source.length()) {
             int tempCursor = cursor;
             List<Javadoc> end = whitespaceBefore();
-            if (cursor < source.length() && source.charAt(cursor) == '}') {
-                end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
-                cursor++;
+            if (cursor < source.length()) {
+                boolean containsEndLine = end.stream().anyMatch(p -> p instanceof Javadoc.LineBreak);
+                if (source.charAt(cursor) == '}') {
+                    end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
+                    cursor++;
+                } else if (containsEndLine) {
+                    end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, ""));
+                }
                 return end;
             } else {
                 cursor = tempCursor;

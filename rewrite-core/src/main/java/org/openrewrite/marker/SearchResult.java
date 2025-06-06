@@ -47,7 +47,7 @@ public final class SearchResult implements Marker {
     }
 
     @Contract("null, _ -> null; !null, _ -> !null")
-    public static <T extends @Nullable Tree> @Nullable T found(T t, @Nullable String description) {
+    public static <T extends @Nullable Tree> @Nullable T found(@Nullable T t, @Nullable String description) {
         if (t == null) {
             //noinspection ConstantConditions
             return null;

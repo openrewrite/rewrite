@@ -410,6 +410,7 @@ examples:
 - description: ''
   parameters:
   - List.of("$..[logging.level][?(@property.match(/.*/))]", "$..[enable.process.files]")
+  - 'null'
   sources:
   - before: |
       spring.application.name: my-app

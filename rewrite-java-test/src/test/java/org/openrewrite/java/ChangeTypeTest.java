@@ -1630,6 +1630,163 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/582")
+    @Test
+    void renameWhenInitializerTypeMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", false)),
+          //language=java
+          java(
+            """
+              import java.util.*;
+
+              class Test {
+                  void test() {
+                      List<Integer> list = new ArrayList<>();
+                      list.add(1);
+                      list.add(2);
+                  }
+              }
+              """,
+            """
+              import java.util.*;
+
+              class Test {
+                  void test() {
+                      List<Integer> list = new LinkedList<>();
+                      list.add(1);
+                      list.add(2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameRandomVariablesMatchingClassName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
+          java(
+            """
+              package a;
+              public class A1 {
+              }
+              """,
+            """
+              package a;
+              public class A2 {
+              }
+              """
+          ),
+          java(
+            """
+              package org.foo;
+              
+              import a.A1;
+              
+              public class Example {
+                  public String method(A1 a, String a1) {
+                      return a1;
+                  }
+              }
+              """,
+            """
+              package org.foo;
+              
+              import a.A2;
+              
+              public class Example {
+                  public String method(A2 a, String a1) {
+                      return a1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeToVariableNameWithoutChangeToType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+              public class A2 {
+              }
+              """
+          ),
+          java(
+            """
+              package org.foo;
+              
+              import a.A1;
+              import a.A2;
+              
+              public class Example {
+                  public A1 method1(A1 a1) {
+                      return a1;
+                  }
+                  public A2 method2(A2 a1) {
+                      return a1; // Unchanged
+                  }
+              }
+              """,
+            """
+              package org.foo;
+              
+              import a.A2;
+              
+              public class Example {
+                  public A2 method1(A2 a1) {
+                      return a1;
+                  }
+                  public A2 method2(A2 a1) {
+                      return a1; // Unchanged
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameVariableNeedlessly() {
+        // Comparison to java.util.Optional: this method is equivalent to Java 8's Optional.orElse(null).
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.awt.List", "java.util.List", false)),
+          //language=java
+          java(
+            """
+              import java.awt.List;
+              
+              class A {
+                  List foo(List list) {
+                      return list;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              class A {
+                  List foo(List list) {
+                      return list;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void updateVariableType() {
         rewriteRun(

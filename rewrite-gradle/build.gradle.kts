@@ -88,6 +88,7 @@ tasks.withType<GroovyCompile> {
 tasks.withType<Javadoc> {
     exclude(
         "**/GradleProject**",
+        "**/GradleDependencyConfiguration**",
         "**/GradleSettings**"
     )
 }

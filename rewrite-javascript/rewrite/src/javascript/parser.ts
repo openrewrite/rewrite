@@ -65,7 +65,8 @@ import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
 
 export interface JavaScriptParserOptions extends ParserOptions {
-    styles?: NamedStyles[]
+    styles?: NamedStyles[],
+    sourceFileCache?: Map<string, ts.SourceFile>
 }
 
 export class JavaScriptParser extends Parser {
@@ -73,14 +74,15 @@ export class JavaScriptParser extends Parser {
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
+    private sourceFileCache: Map<string, ts.SourceFile>;
 
     constructor(
         {
             ctx,
             relativeTo,
-            styles
+            styles,
+            sourceFileCache
         }: JavaScriptParserOptions = {},
-        private readonly sourceFileCache: Map<String, ts.SourceFile> = new Map()
     ) {
         super({ctx, relativeTo});
         this.compilerOptions = {
@@ -93,6 +95,7 @@ export class JavaScriptParser extends Parser {
             jsx: ts.JsxEmit.Preserve
         };
         this.styles = styles;
+        this.sourceFileCache = sourceFileCache || new Map();
     }
 
     // noinspection JSUnusedGlobalSymbols
@@ -102,7 +105,7 @@ export class JavaScriptParser extends Parser {
         return this;
     }
 
-    async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
+    override async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
         const inputFiles = new Map<SourcePath, ParserInput>();
 
         // Populate inputFiles map and remove from cache if necessary
@@ -420,7 +423,7 @@ export class JavaScriptParserVisitor {
 
     private rightPadded<T extends J | boolean>(t: T, trailing: J.Space, markers?: Markers): J.RightPadded<T> {
         return {
-            kind: J.Kind.JRightPadded,
+            kind: J.Kind.RightPadded,
             element: t,
             after: trailing,
             markers: markers ?? emptyMarkers
@@ -454,7 +457,7 @@ export class JavaScriptParserVisitor {
 
     private leftPadded<T extends J | J.Space | number | string | boolean>(before: J.Space, t: T, markers?: Markers): J.LeftPadded<T> {
         return {
-            kind: J.Kind.JLeftPadded,
+            kind: J.Kind.LeftPadded,
             before: before,
             element: t,
             markers: markers ?? emptyMarkers
@@ -488,7 +491,7 @@ export class JavaScriptParserVisitor {
                 type: J.ClassDeclaration.Kind.Type.Class
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
-            typeParameters: this.mapTypeParametersAsJContainer(node),
+            typeParameters: this.mapTypeParametersAsContainer(node),
             primaryConstructor: undefined, // FIXME primary constructor
             extends: this.mapExtends(node),
             implements: this.mapImplements(node),
@@ -542,7 +545,7 @@ export class JavaScriptParserVisitor {
                     _extends.push(this.rightPadded(this.visit(type), this.suffix(type)));
                 }
                 return _extends.length > 0 ? {
-                    kind: J.Kind.JContainer,
+                    kind: J.Kind.Container,
                     before: this.prefix(heritageClause.getFirstToken()!),
                     elements: _extends,
                     markers: emptyMarkers
@@ -563,7 +566,7 @@ export class JavaScriptParserVisitor {
                     _implements.push(this.rightPadded(this.visit(type), this.suffix(type)));
                 }
                 return _implements.length > 0 ? {
-                    kind: J.Kind.JContainer,
+                    kind: J.Kind.Container,
                     before: this.prefix(heritageClause.getFirstToken()!),
                     elements: _implements,
                     markers: emptyMarkers
@@ -743,7 +746,7 @@ export class JavaScriptParserVisitor {
             modifiers: this.mapModifiers(node),
             name: this.visit(node.name),
             bounds: (node.constraint || node.default) && {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExtendsKeyword) ?? this.findChildNode(node, ts.SyntaxKind.EqualsToken)!),
                 elements: [
                     node.constraint ? this.rightPadded(this.visit(node.constraint), this.suffix(node.constraint)) : this.rightPadded(this.newEmpty(), emptySpace),
@@ -828,7 +831,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitPropertySignature(node: ts.PropertySignature) {
+    visitPropertySignature(node: ts.PropertySignature): J.VariableDeclarations {
         // FIXME We are mapping the literals in things like type ascii = { " ": 32; "!": 33; } to
         //  named variables, which is not a good use of this construct.
         return {
@@ -1204,7 +1207,7 @@ export class JavaScriptParserVisitor {
             constructorType: this.leftPadded(emptySpace, false),
             typeParameters: this.mapTypeParametersAsObject(node),
             parameters: {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.prefix(node.getChildAt(node.getChildren().findIndex(n => n.pos === node.parameters.pos) - 1)),
                 elements: node.parameters.length == 0 ?
                     [this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))]
@@ -1226,7 +1229,7 @@ export class JavaScriptParserVisitor {
             constructorType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.NewKeyword)!), true),
             typeParameters: this.mapTypeParametersAsObject(node),
             parameters: {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.prefix(node.getChildAt(node.getChildren().findIndex(n => n.pos === node.parameters.pos) - 1)),
                 elements: node.parameters.length == 0 ?
                     [this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))]
@@ -1263,7 +1266,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 static: this.rightPadded(false, emptySpace),
                 statements: node.members.map(te => ({
-                    kind: J.Kind.JRightPadded,
+                    kind: J.Kind.RightPadded,
                     element: this.convert(te),
                     after: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(te.getLastToken()!) : emptySpace,
                     markers: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(te.getLastToken())!) : emptyMarkers
@@ -1293,7 +1296,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             elements: {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: emptySpace,
                 elements: node.elements.length > 0 ?
                     node.elements.map(p => this.rightPadded(this.convert(p), this.suffix(p)))
@@ -1369,7 +1372,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             checkType: this.visit(node.checkType),
             condition: {
-                kind: J.Kind.JLeftPadded,
+                kind: J.Kind.LeftPadded,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExtendsKeyword)!),
                 element: {
                     kind: J.Kind.Ternary,
@@ -1518,7 +1521,7 @@ export class JavaScriptParserVisitor {
             ) : undefined,
             hasQuestionToken: node.questionToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.QuestionToken)!), true) : this.leftPadded(emptySpace, false),
             valueType: node.type ? {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ColonToken)!),
                 elements: [this.rightPadded(this.visit(node.type), this.suffix(node.type)),
                     this.findChildNode(node, ts.SyntaxKind.SemicolonToken) ?
@@ -1530,7 +1533,7 @@ export class JavaScriptParserVisitor {
                 ],
                 markers: emptyMarkers
             } : {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: emptySpace,
                 elements: [this.findChildNode(node, ts.SyntaxKind.SemicolonToken) ?
                     this.rightPadded(this.newEmpty(this.prefix(this.findChildNode(node, ts.SyntaxKind.SemicolonToken)!), markers({
@@ -1559,7 +1562,7 @@ export class JavaScriptParserVisitor {
     // FIXME these should not be mapped as VariableDeclarations since the names can never be accessed
     //  and this would potentially just trip up flow analyses. The names exist purely for documentation purposes,
     //  they has no semantics. See https://stackoverflow.com/questions/63629315/what-are-named-or-labeled-tuples-in-typescript.
-    visitNamedTupleMember(node: ts.NamedTupleMember) {
+    visitNamedTupleMember(node: ts.NamedTupleMember): J.VariableDeclarations {
         return {
             kind: J.Kind.VariableDeclarations,
             id: randomId(),
@@ -1641,7 +1644,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             hasTypeof: node.isTypeOf ? this.rightPadded(true, this.suffix(this.findChildNode(node, ts.SyntaxKind.TypeOfKeyword)!)) : this.rightPadded(false, emptySpace),
             argumentAndAttributes: {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.suffix(this.findChildNode(node, ts.SyntaxKind.ImportKeyword)!),
                 elements: [this.rightPadded(this.visit(node.argument), this.suffix(node.argument))].concat(importTypeAttributes ? [this.rightPadded(importTypeAttributes, this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))] : []),
                 markers: emptyMarkers
@@ -2311,19 +2314,25 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitYieldExpression(node: ts.YieldExpression): J.Yield {
+    visitYieldExpression(node: ts.YieldExpression): JS.StatementExpression {
         return {
-            kind: J.Kind.Yield,
+            kind: JS.Kind.StatementExpression,
             id: randomId(),
-            prefix: this.prefix(node),
-            markers: node.asteriskToken ?
-                markers({
-                    kind: JS.Markers.DelegatedYield,
-                    id: randomId(),
-                    prefix: this.prefix(node.asteriskToken)
-                } as DelegatedYield) : emptyMarkers,
-            value: node.expression && this.visit(node.expression),
-            implicit: false
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            statement: {
+                kind: J.Kind.Yield,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: node.asteriskToken ?
+                    markers({
+                        kind: JS.Markers.DelegatedYield,
+                        id: randomId(),
+                        prefix: this.prefix(node.asteriskToken)
+                    } as DelegatedYield) : emptyMarkers,
+                value: node.expression && this.visit(node.expression),
+                implicit: false
+            } as J.Yield
         };
     }
 
@@ -2359,7 +2368,7 @@ export class JavaScriptParserVisitor {
                     type: J.ClassDeclaration.Kind.Type.Class
                 },
                 name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
-                typeParameters: this.mapTypeParametersAsJContainer(node),
+                typeParameters: this.mapTypeParametersAsContainer(node),
                 extends: this.mapExtends(node),
                 implements: this.mapImplements(node),
                 body: {
@@ -2369,7 +2378,7 @@ export class JavaScriptParserVisitor {
                     markers: emptyMarkers,
                     static: this.rightPadded(false, emptySpace),
                     statements: node.members.map(ce => ({
-                        kind: J.Kind.JRightPadded,
+                        kind: J.Kind.RightPadded,
                         element: this.convert(ce),
                         after: ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
                         markers: ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
@@ -2388,7 +2397,7 @@ export class JavaScriptParserVisitor {
         return this.newEmpty(this.prefix(node));
     }
 
-    visitExpressionWithTypeArguments(node: ts.ExpressionWithTypeArguments) {
+    visitExpressionWithTypeArguments(node: ts.ExpressionWithTypeArguments): JS.ExpressionWithTypeArguments | Expression {
         if (node.typeArguments) {
             return {
                 kind: JS.Kind.ExpressionWithTypeArguments,
@@ -2486,7 +2495,7 @@ export class JavaScriptParserVisitor {
         return this.newEmpty(this.prefix(node));
     }
 
-    visitVariableStatement(node: ts.VariableStatement) {
+    visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations {
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
             draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
             draft.prefix = this.prefix(node);
@@ -2974,7 +2983,7 @@ export class JavaScriptParserVisitor {
                 type: J.ClassDeclaration.Kind.Type.Interface
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
-            typeParameters: this.mapTypeParametersAsJContainer(node),
+            typeParameters: this.mapTypeParametersAsContainer(node),
             implements: this.mapInterfaceExtends(node),
             body: {
                 kind: J.Kind.Block,
@@ -2983,7 +2992,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 static: this.rightPadded(false, emptySpace),
                 statements: node.members.map(te => ({
-                    kind: J.Kind.JRightPadded,
+                    kind: J.Kind.RightPadded,
                     element: this.convert(te),
                     after: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(te.getLastToken()!) : emptySpace,
                     markers: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(te.getLastToken())!) : emptyMarkers
@@ -3080,7 +3089,7 @@ export class JavaScriptParserVisitor {
                             markers: emptyMarkers,
                             target: this.visit(node.name),
                             name: {
-                                kind: J.Kind.JLeftPadded,
+                                kind: J.Kind.LeftPadded,
                                 before: this.suffix(node.name),
                                 element: body.name.element as J.Identifier,
                                 markers: emptyMarkers
@@ -3171,7 +3180,7 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitNamespaceExportDeclaration(node: ts.NamespaceExportDeclaration) {
+    visitNamespaceExportDeclaration(node: ts.NamespaceExportDeclaration): JS.NamespaceDeclaration {
         return {
             kind: JS.Kind.NamespaceDeclaration,
             id: randomId(),
@@ -3316,7 +3325,7 @@ export class JavaScriptParserVisitor {
                     propertyName: this.rightPadded(this.convert(node.propertyName), this.suffix(node.propertyName)),
                     alias: this.convert(node.name)
                 } as JS.Alias
-                : this.convert(node.name),
+                : this.convert(node.name) as J.Identifier,
             type: this.mapType(node),
         };
     }
@@ -3396,7 +3405,7 @@ export class JavaScriptParserVisitor {
         return this.visitUnknown(node);
     }
 
-    visitExternalModuleReference(node: ts.ExternalModuleReference) {
+    visitExternalModuleReference(node: ts.ExternalModuleReference): J.MethodInvocation {
         return {
             kind: J.Kind.MethodInvocation,
             id: randomId(),
@@ -3404,7 +3413,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             name: this.mapIdentifier(node, "require"),
             arguments: {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 elements: [this.rightPadded(this.visit(node.expression), this.suffix(node.expression))],
                 markers: emptyMarkers
@@ -3541,7 +3550,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             type: J.Case.Type.Statement,
             caseLabels: {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.prefix(node.expression),
                 elements: [this.rightPadded(
                     this.visit(node.expression),
@@ -3550,7 +3559,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers
             },
             statements: {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.prefix(node),
                 elements: this.semicolonPaddedStatementList(node.statements),
                 markers: emptyMarkers
@@ -3566,13 +3575,13 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             type: J.Case.Type.Statement,
             caseLabels: {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.prefix(node),
                 elements: [this.rightPadded(this.mapIdentifier(node, 'default'), this.suffix(this.findChildNode(node, ts.SyntaxKind.DefaultKeyword)!))],
                 markers: emptyMarkers
             },
             statements: {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.prefix(node),
                 elements: this.semicolonPaddedStatementList(node.statements),
                 markers: emptyMarkers
@@ -3697,7 +3706,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitEnumMember(node: ts.EnumMember) {
+    visitEnumMember(node: ts.EnumMember): J.EnumValue {
         return {
             kind: J.Kind.EnumValue,
             id: randomId(),
@@ -3712,7 +3721,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 new: emptySpace,
                 arguments: {
-                    kind: J.Kind.JContainer,
+                    kind: J.Kind.Container,
                     before: emptySpace,
                     elements: [this.rightPadded(this.visit(node.initializer), emptySpace)],
                     markers: emptyMarkers
@@ -3979,7 +3988,7 @@ export class JavaScriptParserVisitor {
                 emptyMarkers
             ))
         return {
-            kind: J.Kind.JContainer,
+            kind: J.Kind.Container,
             before: prefix,
             elements: args,
             markers: emptyMarkers
@@ -4002,7 +4011,7 @@ export class JavaScriptParserVisitor {
         const prefix = this.prefix(nodes[0]);
         const args: J.RightPadded<T>[] = this.mapToRightPaddedList(nodes[1].getChildren(this.sourceFile), this.prefix(nodes[2]), markers);
         return {
-            kind: J.Kind.JContainer,
+            kind: J.Kind.Container,
             before: prefix,
             elements: args,
             markers: emptyMarkers
@@ -4073,10 +4082,10 @@ export class JavaScriptParserVisitor {
         return node.modifiers?.filter(ts.isDecorator)?.map(this.convert<J.Annotation>) ?? [];
     }
 
-    private mapTypeParametersAsJContainer(node: ts.ClassDeclaration | ts.InterfaceDeclaration | ts.ClassExpression): J.Container<J.TypeParameter> | undefined {
+    private mapTypeParametersAsContainer(node: ts.ClassDeclaration | ts.InterfaceDeclaration | ts.ClassExpression): J.Container<J.TypeParameter> | undefined {
         return node.typeParameters &&
             {
-                kind: J.Kind.JContainer,
+                kind: J.Kind.Container,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!),
                 elements: this.mapTypeParametersList(node.typeParameters)
                     .concat(node.typeParameters.hasTrailingComma ? this.rightPadded<J.TypeParameter>(

@@ -40,8 +40,11 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
-        await q.sendMarkers(j, j2 => j2.markers);
+        if (j.kind !== JS.Kind.ExpressionStatement && j.kind !== JS.Kind.StatementExpression) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
+            await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
+            await q.sendMarkers(j, j2 => j2.markers);
+        }
         return j;
     }
 
@@ -554,8 +557,11 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         const draft = createDraft(j);
 
         draft.id = await q.receive(j.id);
-        draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
-        draft.markers = await q.receiveMarkers(j.markers);
+        if (j.kind !== JS.Kind.ExpressionStatement && j.kind !== JS.Kind.StatementExpression) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
+            draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
+            draft.markers = await q.receiveMarkers(j.markers);
+        }
 
         return finishDraft(draft);
     }
@@ -679,7 +685,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitImportSpecifier(jsImportSpecifier: JS.ImportSpecifier, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(jsImportSpecifier);
         draft.importType = await q.receive(draft.importType, el => this.visitLeftPadded(el, q));
-        draft.specifier = await q.receive(draft.specifier, el => this.visitDefined<Expression>(el, q));
+        draft.specifier = await q.receive(draft.specifier, el => this.visitDefined<JS.Alias | J.Identifier>(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }

@@ -448,7 +448,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                                 .getValue();
                 if (aSwitch instanceof SwitchExpression) {
                     Case aCase = getCursor().getValue();
-                    if (!(aCase.getBody() instanceof Block)) {
+                    if (!(aCase.getBody() instanceof Block || s instanceof Block)) {
                         p.append(';');
                     }
                     return;

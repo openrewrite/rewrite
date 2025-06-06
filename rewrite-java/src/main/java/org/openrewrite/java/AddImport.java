@@ -213,10 +213,12 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     return ImportStatus.IMPORT_AMBIGUITY;
                 }
             } else {
-                if (imp.getPackageName().equals(packageName)) {
-                    if (typeName.equals(ending)) {
-                        return ImportStatus.EXPLICITLY_IMPORTED;
-                    } else if ("*".equals(ending)) {
+                String impTypeName = imp.getTypeName().replace('$', '.');
+                if (fullyQualifiedName.equals(impTypeName)) {
+                    return ImportStatus.EXPLICITLY_IMPORTED;
+                } else if ("*".equals(ending)) {
+                    String prefix = impTypeName.substring(0, impTypeName.length() - 1);
+                    if (fullyQualifiedName.startsWith(prefix) && !fullyQualifiedName.substring(prefix.length()).contains(".")) {
                         return ImportStatus.IMPLICITLY_IMPORTED;
                     }
                 }
@@ -267,7 +269,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             //Non-static imports, we just look for field accesses.
             for (NameTree t : FindTypes.find(compilationUnit, fullyQualifiedName)) {
                 if (!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(fullyQualifiedName)) {
-                    return getTypeReference(t);
+                    Optional<JavaType> mayBeTypeReference = getTypeReference(t);
+                    if (mayBeTypeReference.isPresent()) {
+                        return mayBeTypeReference;
+                    }
                 }
             }
             return Optional.empty();
