@@ -45,9 +45,8 @@ class AnnotationApplier {
 
         // Parse the annotation using AnnotationDeserializer
         AnnotationDeserializer.AnnotationInfo annotationInfo = AnnotationDeserializer.parseAnnotation(annotationStr);
-        String annotationName = annotationInfo.getName();
+        String annotationDescriptor = annotationInfo.getDescriptor();
 
-        String annotationDescriptor = "L" + annotationName.replace('.', '/') + ";";
         AnnotationVisitor av = visitAnnotation.create(annotationDescriptor, true);
         if (av != null) {
             // Apply annotation attributes if present
@@ -71,8 +70,8 @@ class AnnotationApplier {
                         }
                         av.visit(attributeName, stringValue);
                     } else if (parsedValue instanceof AnnotationDeserializer.ClassConstant) {
-                        String className = ((AnnotationDeserializer.ClassConstant) parsedValue).getDescriptor();
-                        av.visit(attributeName, org.objectweb.asm.Type.getType(className.replace('.', '/')));
+                        String classDescriptor = ((AnnotationDeserializer.ClassConstant) parsedValue).getDescriptor();
+                        av.visit(attributeName, org.objectweb.asm.Type.getType(classDescriptor));
                     } else if (parsedValue instanceof AnnotationDeserializer.EnumConstant) {
                         AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) parsedValue;
                         String enumDescriptor = enumConstant.getEnumDescriptor();
@@ -81,8 +80,7 @@ class AnnotationApplier {
                     } else if (parsedValue instanceof AnnotationDeserializer.AnnotationInfo) {
                         // Handle nested annotations
                         AnnotationDeserializer.AnnotationInfo nestedAnnotationInfo = (AnnotationDeserializer.AnnotationInfo) parsedValue;
-                        String nestedAnnotationName = nestedAnnotationInfo.getName();
-                        String nestedAnnotationDescriptor = "L" + nestedAnnotationName.replace('.', '/') + ";";
+                        String nestedAnnotationDescriptor = nestedAnnotationInfo.getDescriptor();
                         AnnotationVisitor nestedAv = av.visitAnnotation(attributeName, nestedAnnotationDescriptor);
 
                         if (nestedAv != null && nestedAnnotationInfo.getAttributes() != null && !nestedAnnotationInfo.getAttributes().isEmpty()) {
@@ -105,13 +103,13 @@ class AnnotationApplier {
                                     }
                                     nestedAv.visit(nestedAttributeName, stringValue);
                                 } else if (nestedParsedValue instanceof AnnotationDeserializer.ClassConstant) {
-                                    String className = ((AnnotationDeserializer.ClassConstant) nestedParsedValue).getDescriptor();
-                                    nestedAv.visit(nestedAttributeName, org.objectweb.asm.Type.getObjectType(className.replace('.', '/')));
+                                    String classDescriptor = ((AnnotationDeserializer.ClassConstant) nestedParsedValue).getDescriptor();
+                                    nestedAv.visit(nestedAttributeName, org.objectweb.asm.Type.getObjectType(classDescriptor));
                                 } else if (nestedParsedValue instanceof AnnotationDeserializer.EnumConstant) {
                                     AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) nestedParsedValue;
                                     String enumType = enumConstant.getEnumDescriptor();
                                     String constantName = enumConstant.getConstantName();
-                                    nestedAv.visitEnum(nestedAttributeName, "L" + enumType.replace('.', '/') + ";", constantName);
+                                    nestedAv.visitEnum(nestedAttributeName, enumType, constantName);
                                 }
                                 // We don't handle nested annotations within nested annotations or arrays within nested annotations
                             }
@@ -137,8 +135,8 @@ class AnnotationApplier {
                                     }
                                     arrayVisitor.visit(null, stringValue);
                                 } else if (arrayValue instanceof AnnotationDeserializer.ClassConstant) {
-                                    String className = ((AnnotationDeserializer.ClassConstant) arrayValue).getDescriptor();
-                                    arrayVisitor.visit(null, org.objectweb.asm.Type.getObjectType(className.replace('.', '/')));
+                                    String classDescriptor = ((AnnotationDeserializer.ClassConstant) arrayValue).getDescriptor();
+                                    arrayVisitor.visit(null, org.objectweb.asm.Type.getObjectType(classDescriptor));
                                 } else if (arrayValue instanceof AnnotationDeserializer.EnumConstant) {
                                     AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) arrayValue;
                                     String enumDescriptor = enumConstant.getEnumDescriptor();
@@ -182,16 +180,15 @@ class AnnotationCollectorHelper {
      * @param collectedAnnotations The list to which the serialized annotation will be added
      * @return An annotation visitor that collects annotation values
      */
-    static AnnotationVisitor createCollector(String descriptor, List<String> collectedAnnotations) {
-        String annotationName = Type.getType(descriptor).getClassName();
-        String baseAnnotation = serializeSimpleAnnotation(annotationName);
+    static AnnotationVisitor createCollector(String annotationDescriptor, List<String> collectedAnnotations) {
+        String baseAnnotation = serializeSimpleAnnotation(annotationDescriptor);
 
-        return new AnnotationValueCollector(annotationName, null, result -> {
+        return new AnnotationValueCollector(annotationDescriptor, null, result -> {
             if (result.isEmpty()) {
                 collectedAnnotations.add(baseAnnotation);
             } else {
                 String annotationWithAttributes = serializeAnnotationWithAttributes(
-                        annotationName,
+                        annotationDescriptor,
                         result.toArray(new String[0])
                 );
                 collectedAnnotations.add(annotationWithAttributes);
@@ -213,13 +210,13 @@ class AnnotationCollectorHelper {
         /**
          * Creates a new annotation value collector.
          *
-         * @param annotationName The name of the annotation being collected
+         * @param annotationDescriptor The name of the annotation being collected
          * @param attributeName The name of the attribute being collected (null for array elements)
          * @param callback The callback to invoke with the collected result
          */
-        AnnotationValueCollector(String annotationName, @Nullable String attributeName, ResultCallback callback) {
+        AnnotationValueCollector(String annotationDescriptor, @Nullable String attributeName, ResultCallback callback) {
             super(Opcodes.ASM9);
-            this.annotationName = annotationName;
+            this.annotationName = annotationDescriptor;
             this.attributeName = attributeName;
             this.callback = callback;
         }
@@ -255,17 +252,16 @@ class AnnotationCollectorHelper {
         }
 
         @Override
-        public AnnotationVisitor visitAnnotation(@Nullable String name, String descriptor) {
-            String nestedAnnotationName = Type.getType(descriptor).getClassName();
+        public AnnotationVisitor visitAnnotation(@Nullable String name, String nestedAnnotationDescriptor) {
 
             // Create a new collector for the nested annotation
-            return new AnnotationValueCollector(nestedAnnotationName, name, result -> {
+            return new AnnotationValueCollector(nestedAnnotationDescriptor, name, result -> {
                 String nestedAnnotation;
                 if (result.isEmpty()) {
-                    nestedAnnotation = serializeSimpleAnnotation(nestedAnnotationName);
+                    nestedAnnotation = serializeSimpleAnnotation(nestedAnnotationDescriptor);
                 } else {
                     nestedAnnotation = serializeAnnotationWithAttributes(
-                            nestedAnnotationName,
+                            nestedAnnotationDescriptor,
                             result.toArray(new String[0])
                     );
                 }
@@ -339,11 +335,11 @@ class AnnotationDeserializer {
         String annotationName;
         if (parenIndex == -1) {
             // Simple annotation without attributes
-            annotationName = annotationStr.substring(1).replace('/', '.');
+            annotationName = annotationStr.substring(1);
             return new AnnotationInfo(annotationName, null);
         }
 
-        annotationName = annotationStr.substring(1, parenIndex).replace('/', '.');
+        annotationName = annotationStr.substring(1, parenIndex);
         String attributesStr = annotationStr.substring(parenIndex + 1, annotationStr.length() - 1);
 
         List<AttributeInfo> attributes = parseAttributes(attributesStr);
@@ -611,16 +607,16 @@ class AnnotationDeserializer {
      * Represents an annotation with its name and attributes.
      */
     public static class AnnotationInfo {
-        private final String name;
+        private final String descriptor;
         private final @Nullable List<AttributeInfo> attributes;
 
-        public AnnotationInfo(String name, @Nullable List<AttributeInfo> attributes) {
-            this.name = name;
+        public AnnotationInfo(String descriptor, @Nullable List<AttributeInfo> attributes) {
+            this.descriptor = descriptor;
             this.attributes = attributes;
         }
 
-        public String getName() {
-            return name;
+        public String getDescriptor() {
+            return descriptor;
         }
 
         public @Nullable List<AttributeInfo> getAttributes() {
@@ -723,11 +719,11 @@ class AnnotationSerializer {
     /**
      * Serializes a simple annotation without attributes.
      *
-     * @param annotationName The fully qualified name of the annotation
+     * @param annotationDescriptor The fully qualified name of the annotation
      * @return The serialized annotation string
      */
-    public static String serializeSimpleAnnotation(String annotationName) {
-        return "@" + annotationName.replace('.', '/');
+    public static String serializeSimpleAnnotation(String annotationDescriptor) {
+        return "@" + annotationDescriptor;
     }
 
     /**
@@ -861,17 +857,6 @@ class AnnotationSerializer {
     }
 
     /**
-     * Serializes a field constant.
-     *
-     * @param className The fully qualified name of the class containing the field
-     * @param fieldName The name of the field
-     * @return The serialized field constant
-     */
-    public static String serializeFieldConstant(String className, String fieldName) {
-        return className.replace('.', '/') + "." + fieldName;
-    }
-
-    /**
      * Serializes an enum constant.
      *
      * @param enumDescriptor The enum type descriptor
@@ -907,16 +892,16 @@ class AnnotationSerializer {
     /**
      * Serializes an annotation with attributes.
      *
-     * @param annotationName The fully qualified name of the annotation
+     * @param annotationDescriptor The fully qualified name of the annotation
      * @param attributes The array of serialized attribute name-value pairs
      * @return The serialized annotation
      */
-    public static String serializeAnnotationWithAttributes(String annotationName, String[] attributes) {
+    public static String serializeAnnotationWithAttributes(String annotationDescriptor, String[] attributes) {
         if (attributes.length == 0) {
-            return serializeSimpleAnnotation(annotationName);
+            return serializeSimpleAnnotation(annotationDescriptor);
         }
         StringBuilder sb = new StringBuilder();
-        sb.append("@").append(annotationName.replace('.', '/')).append("(");
+        sb.append("@").append(annotationDescriptor).append("(");
         for (int i = 0; i < attributes.length; i++) {
             if (i > 0) {
                 sb.append(", ");
@@ -1059,7 +1044,7 @@ class AnnotationSerializer {
             annotationDefaultVisitor.visitEnum(null, fieldConstant.getClassName(), fieldConstant.getFieldName());
         } else if (value instanceof AnnotationDeserializer.AnnotationInfo) {
             AnnotationDeserializer.AnnotationInfo annotationInfo = (AnnotationDeserializer.AnnotationInfo) value;
-            AnnotationVisitor annotationVisitor = annotationDefaultVisitor.visitAnnotation(null, 'L' + annotationInfo.getName().replace('.', '/') + ';');
+            AnnotationVisitor annotationVisitor = annotationDefaultVisitor.visitAnnotation(null, annotationInfo.getDescriptor());
             if (annotationInfo.getAttributes() != null) {
                 annotationInfo.getAttributes().forEach(attribute -> {
                     // FIXME call correct visit method
