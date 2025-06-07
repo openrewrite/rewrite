@@ -19,7 +19,7 @@ import {produceAsync, TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor, JS} from "../javascript";
 import {J} from "../java";
-import {Draft, produce} from "immer";
+import {createDraft, Draft, finishDraft, produce} from "immer";
 import {AutoformatVisitor} from "../javascript/format";
 
 export class OrderImports extends Recipe {
@@ -33,7 +33,8 @@ export class OrderImports extends Recipe {
 
             protected async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {
                 const importCount = this.countImports(cu);
-                const imports = cu.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
+                const draft = createDraft(cu);
+                const imports = draft.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
                 const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.element.id, i]));
                 const restStatements = cu.statements.slice(importCount);
                 const sortedImports = await this.sortNamesWithinEachLine(imports);
@@ -60,15 +61,15 @@ export class OrderImports extends Recipe {
                     // Tiebreaker, keep the sort stable
                     return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
                 });
-                const cuWithImportsSorted = await produceAsync(cu, async draft => {
-                    draft.statements = [...sortedImports, ...restStatements];
-                });
-                return produce(cuWithImportsSorted, draft => {
-                    for (let i = 0; i < importCount; i++) {
-                       draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
-                    }
-                    // TODO deal with comments in the whitespace around imports
-                });
+                draft.statements = [...sortedImports, ...restStatements];
+                const cuWithImportsSorted = finishDraft(draft);
+
+                const draft2 = createDraft(cuWithImportsSorted);
+                for (let i = 0; i < importCount; i++) {
+                   draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
+                }
+                // TODO deal with comments in the whitespace around imports
+                return finishDraft(draft2);
             }
 
             private isAsteriskImport(import_: JS.Import): 0 | 1 {
