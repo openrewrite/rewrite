@@ -16,6 +16,7 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
@@ -24,6 +25,8 @@ import java.util.Collection;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 
 public class IntelliJ extends NamedStyles {
     private static final IntelliJ INSTANCE = new IntelliJ();
@@ -95,7 +98,13 @@ public class IntelliJ extends NamedStyles {
     }
 
     public static WrappingAndBracesStyle wrappingAndBraces() {
-        return new WrappingAndBracesStyle(new WrappingAndBracesStyle.IfStatement(false));
+        return new WrappingAndBracesStyle(new WrappingAndBracesStyle.IfStatement(false),
+                new WrappingAndBracesStyle.Annotations(WrapAlways),
+                new WrappingAndBracesStyle.Annotations(WrapAlways),
+                new WrappingAndBracesStyle.Annotations(WrapAlways),
+                new WrappingAndBracesStyle.Annotations(DoNotWrap),
+                new WrappingAndBracesStyle.Annotations(DoNotWrap),
+                new WrappingAndBracesStyle.Annotations(DoNotWrap));
     }
 
 }

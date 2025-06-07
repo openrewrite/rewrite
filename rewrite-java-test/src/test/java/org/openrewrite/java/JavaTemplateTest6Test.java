@@ -61,10 +61,8 @@ class JavaTemplateTest6Test implements RewriteTest {
             """
               class Test {
                   void test() {
-                      @SuppressWarnings("ALL")
-                      final int m;
-                      @SuppressWarnings("ALL")
-                      int n;
+                      @SuppressWarnings("ALL") final int m;
+                      @SuppressWarnings("ALL") int n;
                   }
               }
               """
