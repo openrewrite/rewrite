@@ -234,7 +234,7 @@ class ChangeTaskToTasksRegisterTest implements RewriteTest {
         rewriteRun(
           buildGradleKts(
             """
-               task<Copy>("taskName")
+              task<Copy>("taskName")
               """,
             """
               tasks.register<Copy>("taskName")
