@@ -25,8 +25,10 @@ import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
+import org.openrewrite.tree.ParseError;
 
 import java.io.PrintStream;
+import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -40,10 +42,34 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
+
+    private static class Registry {
+        private static final ThreadLocal<Map<Class<? extends SourceFile>, WeakReference<RewriteRpc>>> INSTANCE =
+                ThreadLocal.withInitial(HashMap::new);
+
+        static <T extends SourceFile> void register(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
+            INSTANCE.get().put(sourceFileClass, new WeakReference<>(rewriteRpc));
+        }
+
+        static <T extends SourceFile> RewriteRpc get(Class<T> sourceFileClass) {
+            WeakReference<RewriteRpc> ref = INSTANCE.get().get(sourceFileClass);
+            return requireNonNull(ref != null ? ref.get() : null);
+        }
+    }
+
+    public static <T extends SourceFile> RewriteRpc forSourceType(Class<T> sourceFileClass) {
+        return Registry.get(sourceFileClass);
+    }
+
+    public static <T extends SourceFile> void register(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
+        Registry.register(sourceFileClass, rewriteRpc);
+    }
+
     private final JsonRpc jsonRpc;
 
     private final AtomicInteger batchSize = new AtomicInteger(10);
@@ -204,32 +230,45 @@ public class RewriteRpc {
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
     }
 
-    public List<SourceFile> parse(String parser, Iterable<Parser.Input> inputs, @Nullable Path relativeTo) {
+    public List<SourceFile> parse(Parser parser, String language, Iterable<Parser.Input> inputs, @Nullable Path relativeTo, ExecutionContext ctx) {
+        List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
+            inputList.add(input);
             if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
-                mappedInputs.add(new Parse.StringInput(input.getSource(new InMemoryExecutionContext()).readFully(), input.getPath()));
+                mappedInputs.add(new Parse.StringInput(input.getSource(ctx).readFully(), input.getPath()));
             } else {
                 mappedInputs.add(new Parse.PathInput(input.getPath()));
             }
         }
 
-        List<String> parsed = send("Parse", new Parse(parser, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+        List<String> parsed = send("Parse", new Parse(language, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
         if (!parsed.isEmpty()) {
-            return parsed.stream()
-                    .map(this::<SourceFile>getObject)
-                    .collect(Collectors.toList());
+            List<SourceFile> list = new ArrayList<>(parsed.size());
+            for (int i = 0; i < parsed.size(); i++) {
+                String s = parsed.get(i);
+                try {
+                    list.add(getObject(s));
+                } catch (Exception e) {
+                    list.add(ParseError.build(parser, inputList.get(i), relativeTo, ctx, e));
+                }
+            }
+            return list;
         }
         return emptyList();
     }
 
     public String print(SourceFile tree) {
-        return print(tree, new Cursor(null, Cursor.ROOT_VALUE));
+        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), null);
     }
 
-    public String print(Tree tree, Cursor parent) {
+    public String print(SourceFile tree, Print.MarkerPrinter markerPrinter) {
+        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
+    }
+
+    public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
         localObjects.put(tree.getId().toString(), tree);
-        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent)), String.class);
+        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent), markerPrinter), String.class);
     }
 
     @VisibleForTesting

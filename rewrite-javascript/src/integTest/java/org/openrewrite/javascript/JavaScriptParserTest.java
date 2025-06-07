@@ -22,7 +22,9 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.rpc.RewriteRpc;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -41,11 +43,15 @@ class JavaScriptParserTest {
 
     @BeforeEach
     void before() {
-        this.parser = JavaScriptParser.builder()
+        JavaScriptRewriteRpc rewriteRpc = JavaScriptRewriteRpc.builder()
           .nodePath(Path.of("node"))
-          .installationDir(Path.of("./rewrite/dist/src"))
+          .installationDirectory(Path.of("./rewrite/dist/src"))
+//          .trace(true)
 //          .socket(12345)
           .build();
+
+        this.parser = JavaScriptParser.builder().rewriteRpc(rewriteRpc).build();
+        RewriteRpc.register(JS.CompilationUnit.class, rewriteRpc);
     }
 
     @Test
@@ -57,9 +63,10 @@ class JavaScriptParserTest {
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.js"), helloWorld);
         Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
         assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(javascript.get()).satisfies(cu ->
-//            assertThat(cu.printAll()).isEqualTo(helloWorld);
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+        assertThat(javascript.get()).satisfies(cu -> {
+            assertThat(cu.printAll()).isEqualTo(helloWorld);
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
+        });
     }
 
     @Test
@@ -72,9 +79,10 @@ class JavaScriptParserTest {
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.ts"), helloWorld);
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), Paths.get("helloworld.ts").toAbsolutePath().getParent(), new InMemoryExecutionContext()).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu ->
-//            assertThat(cu.printAll()).isEqualTo(helloWorld);
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+        assertThat(typescript.get()).satisfies(cu -> {
+            assertThat(cu.printAll()).isEqualTo(helloWorld);
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
+        });
     }
 
     @Test
@@ -151,8 +159,8 @@ class JavaScriptParserTest {
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(typescript.get()).satisfies(cu -> {
-//            assertThat(cu.printAll()).isEqualTo(helloWorld);
-//            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
+            assertThat(cu.printAll()).isEqualTo(script);
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
         });
     }
 
@@ -170,6 +178,6 @@ class JavaScriptParserTest {
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(typescript.get()).satisfies(cu ->
-            assertThat(cu.printAll()).isEqualTo(input.getSource(new InMemoryExecutionContext()).readFully()));
+          assertThat(cu.printAll()).isEqualTo(input.getSource(new InMemoryExecutionContext()).readFully()));
     }
 }

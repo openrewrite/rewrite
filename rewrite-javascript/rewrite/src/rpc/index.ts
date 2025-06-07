@@ -14,5 +14,6 @@
  * limitations under the License.
  */
 export * from "./queue"
+export * from "./reference"
 export * from "./rewrite-rpc"
 export * from "./recipe"

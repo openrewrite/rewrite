@@ -17,6 +17,7 @@ package org.openrewrite.rpc.request;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.PrintOutputCapture;
 
 import java.util.List;
 
@@ -30,4 +31,25 @@ public class Print implements RpcRequest {
      */
     @Nullable
     List<String> cursor;
+
+    @Nullable
+    MarkerPrinter markerPrinter;
+
+    public enum MarkerPrinter {
+        DEFAULT,
+        FENCED,
+        SANITIZED,
+        ;
+
+        public static MarkerPrinter from(PrintOutputCapture.MarkerPrinter markerPrinter) {
+            if (markerPrinter == PrintOutputCapture.MarkerPrinter.DEFAULT) {
+                return DEFAULT;
+            } else if (markerPrinter == PrintOutputCapture.MarkerPrinter.FENCED) {
+                return FENCED;
+            } else if (markerPrinter == PrintOutputCapture.MarkerPrinter.SANITIZED) {
+                return SANITIZED;
+            }
+            throw new IllegalArgumentException("Unknown marker printer " + markerPrinter);
+        }
+    }
 }

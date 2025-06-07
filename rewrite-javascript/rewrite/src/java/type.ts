@@ -1,3 +1,5 @@
+import {asRef} from "../rpc";
+
 export interface JavaType {
     readonly kind: string;
 }
@@ -165,9 +167,9 @@ export namespace JavaType {
         readonly kind: typeof Kind.UniqueSymbol;
     }
 
-    export const unknownType: JavaType = {
+    export const unknownType: JavaType = asRef({
         kind: JavaType.Kind.Unknown
-    };
+    });
 
     export function isPrimitive(type?: JavaType): type is JavaType.Primitive {
         return type?.kind === JavaType.Kind.Primitive;
