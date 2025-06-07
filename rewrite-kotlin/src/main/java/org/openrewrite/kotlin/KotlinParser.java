@@ -29,10 +29,13 @@ import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
+import org.jetbrains.kotlin.cli.common.modules.ModuleChunk;
+import org.jetbrains.kotlin.cli.jvm.compiler.CliCompilerUtilsKt;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
 import org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt;
+import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelinePhase;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.util.text.StringUtilRt;
@@ -43,12 +46,12 @@ import org.jetbrains.kotlin.com.intellij.psi.FileViewProvider;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiManager;
 import org.jetbrains.kotlin.com.intellij.psi.SingleRootFileViewProvider;
-import org.jetbrains.kotlin.com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile;
 import org.jetbrains.kotlin.config.*;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
+import org.jetbrains.kotlin.fir.deserialization.ModuleDataProvider;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
 import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
@@ -56,7 +59,6 @@ import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
-import org.jetbrains.kotlin.load.kotlin.PackagePartProvider;
 import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.platform.TargetPlatform;
@@ -391,30 +393,7 @@ public class KotlinParser implements Parser {
 
     public CompiledSource parse(List<Parser.Input> sources, Disposable disposable, ExecutionContext ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
-        if (classpath != null) {
-            for (Path path : classpath) {
-                File file;
-                try {
-                    file = path.toFile();
-                } catch (UnsupportedOperationException ex) {
-                    continue;
-                }
-                addJvmClasspathRoot(compilerConfiguration, file);
-            }
-        }
-        addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
-
-        K2JVMCompilerArguments arguments = new K2JVMCompilerArguments();
-        configureJdkHome(compilerConfiguration, arguments);
-        configureJavaModulesContentRoots(compilerConfiguration, arguments);
-        configureAdvancedJvmOptions(compilerConfiguration, arguments);
-        configureKlibPaths(compilerConfiguration, arguments);
-        configureContentRootsFromClassPath(compilerConfiguration, arguments);
-        configureJdkClasspathRoots(compilerConfiguration);
-        configureBaseRoots(compilerConfiguration, arguments);
-
-        Module module = configureModuleChunk(compilerConfiguration, arguments, null).getModules()
-                                                                                    .get(0);
+        Module module = buildModule(compilerConfiguration);
 
         KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
                 disposable,
@@ -443,12 +422,12 @@ public class KotlinParser implements Parser {
             kotlinSources.add(new KotlinSource(source, file, cRLFLocations));
         }
 
-        Function1<? super GlobalSearchScope, PackagePartProvider> providerFunction1 = environment::createPackagePartProvider;
         VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(
                 environment.getProject(),
                 VirtualFileManager.getInstance()
                                   .getFileSystem(StandardFileSystems.FILE_PROTOCOL),
-                providerFunction1);
+                environment::createPackagePartProvider
+        );
 
         AbstractProjectFileSearchScope sourceScope = projectEnvironment.getSearchScopeByPsiFiles(ktFiles);
         sourceScope.plus(projectEnvironment.getSearchScopeForProjectJavaSources());
@@ -478,19 +457,23 @@ public class KotlinParser implements Parser {
         Name name = Name.identifier(module.getModuleName());
         TargetPlatform jvmPlatform = JvmPlatforms.INSTANCE.getDefaultJvmPlatform();
 
-        FirSession firSession = SessionConstructionUtils.INSTANCE
-                .prepareSessions(
+        DependencyListForCliModule libraryList = CliCompilerUtilsKt.createLibraryListForJvm(
+            module.getModuleName(),
+            compilerConfiguration,
+            emptyList()
+        );
+        FirSession firSession = JvmFrontendPipelinePhase.INSTANCE
+                .prepareJvmSessions(
                         ktFiles,
-                        compilerConfiguration,
                         name,
-                        jvmPlatform,
-                        false,
-                        null,
-                        ktFile -> true,
-                        KtCommonFile::isScript,
-                        null,
-                        null,
-                        null
+                        compilerConfiguration,
+                        projectEnvironment,
+                        libraryScope,
+                        libraryList,
+                        ktFile -> false,
+                        KtFile::isScript,
+                        (ktFile, s) -> true,
+                        ktFiles1 -> null
                 )
                 .stream()
                 .findFirst()
@@ -558,6 +541,34 @@ public class KotlinParser implements Parser {
 //        }
 
         return new CompiledSource(firSession, kotlinSources);
+    }
+
+    private Module buildModule(CompilerConfiguration compilerConfiguration) {
+        if (classpath != null) {
+            for (Path path : classpath) {
+                File file;
+                try {
+                    file = path.toFile();
+                } catch (UnsupportedOperationException ex) {
+                    continue;
+                }
+                addJvmClasspathRoot(compilerConfiguration, file);
+            }
+        }
+        addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
+
+        K2JVMCompilerArguments arguments = new K2JVMCompilerArguments();
+        configureJdkHome(compilerConfiguration, arguments);
+        configureJavaModulesContentRoots(compilerConfiguration, arguments);
+        configureAdvancedJvmOptions(compilerConfiguration, arguments);
+        configureKlibPaths(compilerConfiguration, arguments);
+        configureContentRootsFromClassPath(compilerConfiguration, arguments);
+        configureJdkClasspathRoots(compilerConfiguration);
+        configureBaseRoots(compilerConfiguration, arguments);
+
+        ModuleChunk moduleChunk = configureModuleChunk(compilerConfiguration, arguments, null);
+        return moduleChunk.getModules()
+                          .get(0);
     }
 
     private static @NotNull String buildFilename(Input source, int index) {

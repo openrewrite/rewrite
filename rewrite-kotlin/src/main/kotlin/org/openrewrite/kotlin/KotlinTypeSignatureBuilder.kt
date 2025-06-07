@@ -222,6 +222,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             is FirFile -> fileSignature(type)
             is FirResolvedTypeRef -> classSignature(type.coneType)
             is FirResolvedQualifier -> convertClassIdToFqn(type.classId)
+            is FirRegularClassSymbol -> convertClassIdToFqn(type.classId)
             else -> {
                 throw UnsupportedOperationException("Unsupported class type: ${type.javaClass.name}")
             }
