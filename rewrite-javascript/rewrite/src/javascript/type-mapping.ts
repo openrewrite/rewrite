@@ -121,22 +121,55 @@ export class JavaScriptTypeMapping {
 
             result.bounds = type.types.map(t => this.getType(t));
             return result;
-        } else if (type.isClass()) {
-            // FIXME flags
-            let result = {
-                kind: JavaType.Kind.Class,
-                flags: 0,
-                name: type.symbol.name
-            };
-            this.typeCache.set(signature, result);
-            // FIXME unsafeSet
-            return result;
         } else if (type.flags & ts.TypeFlags.UniqueESSymbol) {
             let result = {
                 kind: JavaType.Kind.UniqueSymbol,
             } as JavaType.UniqueSymbol;
             this.typeCache.set(signature, result);
             return result;
+        } else if (type.flags & ts.TypeFlags.Object) {
+            const objectType = type as ts.ObjectType;
+            if (objectType.isClassOrInterface()) {
+                let result = {
+                    kind: JavaType.Kind.Class,
+                    classKind: type.isClass() ? JavaType.Class.Kind.Class : JavaType.Class.Kind.Interface, // TODO there are other options, no?
+                    fullyQualifiedName: "missing", // TODO
+                    typeParameters: [], // TODO
+                    annotations: [], // TODO
+                    interfaces: [], // TODO
+                    members: [],
+                    methods: []
+                } as Draft<JavaType.Class>;
+                this.typeCache.set(signature, result);
+                objectType.getProperties().forEach(symbol => {
+                    const memberType = this.checker.getTypeOfSymbol(symbol);
+                    const callSignatures = memberType.getCallSignatures();
+                    if ((memberType.flags & ts.TypeFlags.Object) && callSignatures.length > 0) {
+                        const signature = callSignatures[0]; // TODO understand multiple signatures, maybe all signatures should be added as separate methods?
+                        result.methods.push({
+                            kind: JavaType.Kind.Method,
+                            declaringType: result,
+                            name: symbol.getName(),
+                            returnType: this.getType(signature.getReturnType()),
+                            parameterNames: signature.parameters.map(s => s.getName()),
+                            parameterTypes: signature.parameters.map(s => this.getType(this.checker.getTypeOfSymbol(s))),
+                            thrownExceptions: [],
+                            annotations: [],
+                            defaultValue: [], // TODO
+                            declaredFormalTypeNames: [] // TODO
+                        } as JavaType.Method);
+                    } else {
+                        result.members.push({
+                            kind: JavaType.Kind.Variable,
+                            name: symbol.getName(),
+                            owner: result,
+                            type: this.getType(memberType),
+                            annotations: []
+                        } as JavaType.Variable);
+                    }
+                });
+                return result;
+            }
         }
 
         // if (ts.isRegularExpressionLiteral(node)) {
