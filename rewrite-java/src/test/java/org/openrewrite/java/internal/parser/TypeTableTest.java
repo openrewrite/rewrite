@@ -24,12 +24,17 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParserExecutionContextView;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.micrometer.core.instrument.util.DoubleFormat.decimalOrNan;
@@ -131,13 +136,52 @@ class TypeTableTest implements RewriteTest {
                   @BeforeEach
                   void before() {
                   }
-
+              
                   @Test
                   void foo() {
                       Assertions.assertTrue(true);
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void writeReadWithAnnotations() throws IOException, URISyntaxException {
+        URL resource = TypeTableTest.class.getClassLoader().getResource("jakarta.validation-api-3.1.1.jar");
+        try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
+            writeJar(Path.of(resource.toURI()), writer);
+        }
+
+        TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("jakarta.validation-api"));
+        Path classesDir = table.load("jakarta.validation-api");
+        assertThat(classesDir).isNotNull();
+
+        // Test that we can use the annotations in code
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()
+            .classpath(List.of(classesDir))),
+          java(
+            """
+              import jakarta.validation.constraints.AssertFalse;
+              
+              class AnnotatedTest {
+                  @AssertFalse
+                  int i;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                // Assert that the JavaType.Class has the annotation
+                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                JavaType.Class assertFalseType = (JavaType.Class) field.getLeadingAnnotations().get(0).getType();
+                assertThat(assertFalseType).isNotNull();
+                assertThat(assertFalseType.getFullyQualifiedName()).isEqualTo("jakarta.validation.constraints.AssertFalse");
+                assertThat(assertFalseType.getAnnotations().size()).isEqualTo(5);
+                assertThat(assertFalseType.getMethods().stream().filter(m -> m.getName().equals("message"))).satisfiesExactly(
+                  m -> assertThat(m.getDefaultValue()).containsExactly("{jakarta.validation.constraints.AssertFalse.message}")
+                );
+            })
           )
         );
     }
@@ -166,5 +210,119 @@ class TypeTableTest implements RewriteTest {
         int exp = (int) (Math.log(bytes) / Math.log(unit));
         String pre = "KMGTPE".charAt(exp - 1) + "i";
         return decimalOrNan(bytes / Math.pow(unit, exp)) + " " + pre + "B";
+    }
+
+    @Test
+    void writeReadWithCustomAnnotations() throws IOException, URISyntaxException {
+        // Find the directory containing the compiled classes
+        URL classUrl = TypeTableTest.class.getResource("TypeTableTest.class");
+        Path classesDir = Paths.get(classUrl.toURI()).getParent().getParent().getParent().getParent().getParent().getParent();
+        Path dataDir = classesDir.resolve("org/openrewrite/java/internal/parser/data");
+
+        // Create a temporary jar file
+        Path jarFile = temp.resolve("custom-annotations-1.jar");
+
+        // Create jar file from the compiled classes
+        try (FileSystem zipfs = FileSystems.newFileSystem(
+          jarFile,
+          Map.of("create", "true"))) {
+
+            Files.walk(dataDir)
+              .filter(Files::isRegularFile)
+              .filter(p -> p.toString().endsWith(".class"))
+              .forEach(classFile -> {
+                  try {
+                      Path pathInZip = zipfs.getPath("/").resolve(
+                        classesDir.relativize(classFile).toString());
+                      Files.createDirectories(pathInZip.getParent());
+                      Files.copy(classFile, pathInZip);
+                  } catch (IOException e) {
+                      throw new RuntimeException(e);
+                  }
+              });
+        }
+
+        // Write the jar to the type table
+        try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
+            writeJar(jarFile, writer);
+        }
+
+        // Load the type table
+        TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("custom-annotations"));
+        Path loadedClassesDir = table.load("custom-annotations");
+        assertThat(loadedClassesDir).isNotNull();
+
+        // Test that we can use the annotations in code
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()
+            .classpath(List.of(loadedClassesDir))),
+          java(
+            """
+              import org.openrewrite.java.internal.parser.data.*;
+              
+              @BasicAnnotation
+              @StringAnnotation
+              @NestedAnnotation
+              @ArrayAnnotation
+              @ClassRefAnnotation
+              @EnumAnnotation
+              @ConstantAnnotation
+              class TestClass {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                // Verify that all annotations are properly loaded with their attributes
+                J.ClassDeclaration clazz = cu.getClasses().get(0);
+                List<J.Annotation> annotations = clazz.getLeadingAnnotations();
+
+                // Verify BasicAnnotation
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.BasicAnnotation",
+                  "intValue", "42");
+
+                // Verify StringAnnotation
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.StringAnnotation",
+                  "value", "Default value");
+
+                // Verify ClassRefAnnotation
+                // TODO `JavaType.Method#defaultValue` is of type `List<String>`
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.ClassRefAnnotation",
+                  "value", "java.lang.String");
+
+                // Verify NestedAnnotation
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.NestedAnnotation",
+                  "nested", "@org.openrewrite.java.internal.parser.data.NestedLevel2");
+
+                // Verify ArrayAnnotation
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.ArrayAnnotation",
+                  "strings", "one", "two", "three");
+
+                // Verify EnumAnnotation
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.EnumAnnotation",
+                  "value", ".ONE");
+
+                // Verify ConstantAnnotation
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.ConstantAnnotation",
+                  "value", "This is a constant string");
+            })
+          )
+        );
+    }
+
+    private void verifyAnnotation(List<J.Annotation> annotations, String fqn, String attributeName, String... expectedValues) {
+        J.Annotation annotation = annotations.stream()
+          .filter(a -> {
+              JavaType.Class type = (JavaType.Class) a.getType();
+              return type != null && type.getFullyQualifiedName().equals(fqn);
+          })
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("Annotation " + fqn + " not found"));
+
+        JavaType.Class annotationType = (JavaType.Class) annotation.getType();
+        assertThat(annotationType).isNotNull();
+        assertThat(annotationType.getMethods().stream()
+          .filter(m -> m.getName().equals(attributeName)))
+          .satisfiesExactly(
+            m -> assertThat(m.getDefaultValue()).containsExactly(expectedValues)
+          );
     }
 }
