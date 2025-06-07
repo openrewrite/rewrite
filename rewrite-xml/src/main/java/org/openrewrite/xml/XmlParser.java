@@ -117,7 +117,8 @@ public class XmlParser implements Parser {
                 return true;
             }
         }
-        return path.endsWith("packages.config");
+        return path.endsWith("nuget.config") ||
+                path.endsWith("packages.config");
     }
 
     @Override

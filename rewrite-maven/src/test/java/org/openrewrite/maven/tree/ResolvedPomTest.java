@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ResolvedPomTest implements RewriteTest {
@@ -102,6 +103,53 @@ class ResolvedPomTest implements RewriteTest {
               </project>
               """,
             spec -> spec.path("bar/pom.xml")
+          )
+        );
+    }
+
+    @Test
+    void projectVersion() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>3.17.0</version>
+              </project>
+              """
+          ),
+          mavenProject(
+            "app",
+            pomXml(
+              """
+                <project>
+                    <groupId>org.example</groupId>
+                    <artifactId>app</artifactId>
+                    <version>${project.version}</version>
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>3.17.0</version>
+                        <relativeParent>../pom.xml</relativeParent>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.commons</groupId>
+                            <artifactId>commons-lang3</artifactId>
+                            <version>${project.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec
+                .afterRecipe(doc -> {
+                    List<ResolvedDependency> deps = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
+                      .get(Scope.Compile);
+                    assertThat(deps).hasSize(1);
+                    assertThat(deps.getFirst().getVersion()).isEqualTo("3.17.0");
+                })
+            )
           )
         );
     }
@@ -226,7 +274,7 @@ class ResolvedPomTest implements RewriteTest {
           pomXml(father, spec -> spec.path("father/pom.xml")),
           pomXml(child, spec -> spec.path("father/child/pom.xml").afterRecipe(doc -> {
                 List<Plugin> pluginManagement = doc.getMarkers().findFirst(MavenResolutionResult.class)
-                  .get().getPom().getPluginManagement();
+                  .orElseThrow().getPom().getPluginManagement();
                 assertThat(pluginManagement).hasSize(1);
                 Plugin plugin = pluginManagement.getFirst();
                 assertThat(plugin).extracting(Plugin::getArtifactId).isEqualTo("maven-enforcer-plugin");
@@ -469,7 +517,7 @@ class ResolvedPomTest implements RewriteTest {
               pomXml(father, spec -> spec.path("pom.xml")),
               pomXml(childA, spec -> spec.path("childA/pom.xml")),
               pomXml(childB, spec -> spec.path("childB/pom.xml").afterRecipe(doc -> {
-                    ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).get().getPom();
+                    ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
                     String version = pom.getManagedVersion("com.some", "some-artifact", null, null);
                     // Assert that version is not null!
                     assertThat(version).isEqualTo("1");
@@ -540,7 +588,7 @@ class ResolvedPomTest implements RewriteTest {
               """,
             spec -> spec.path("child/pom.xml")
               .afterRecipe(doc -> {
-                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).get().getPom();
+                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
                   assertThat(pom.getDependencyManagement()).hasSize(1);
               })
           )
@@ -586,7 +634,7 @@ class ResolvedPomTest implements RewriteTest {
               """,
             spec -> spec
               .afterRecipe(doc -> {
-                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).get().getPom();
+                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
                   assertThat(pom.getManagedVersion("com.fasterxml.jackson.core", "jackson-core", null, null)).isEqualTo("2.16.1");
               })
           )

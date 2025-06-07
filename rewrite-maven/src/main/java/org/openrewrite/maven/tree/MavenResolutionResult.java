@@ -195,6 +195,8 @@ public class MavenResolutionResult implements Marker {
                         exceptions = MavenDownloadingExceptions.append(exceptions, exception);
                     }
                 }
+            } catch (IllegalStateException e) {
+                throw new IllegalStateException("Unable to resolve dependencies of " + pom.getGav(), e);
             }
         }
         if (exceptions != null) {
