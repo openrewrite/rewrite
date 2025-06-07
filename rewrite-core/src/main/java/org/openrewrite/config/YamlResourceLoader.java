@@ -42,8 +42,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 import static org.openrewrite.Tree.randomId;
@@ -530,7 +529,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     boolean root = c.containsKey("root") && (Boolean) c.get("root");
                     int priority = c.containsKey("priority") ? (Integer) c.get("priority") : CategoryDescriptor.DEFAULT_PRECEDENCE;
 
-                    return new CategoryDescriptor(name, packageName, description, tags, root, priority, false);
+                    return new CategoryDescriptor(name, packageName, description, tags, root, priority, false, emptySet());
                 })
                 .collect(toList());
     }
