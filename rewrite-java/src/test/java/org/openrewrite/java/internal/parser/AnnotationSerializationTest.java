@@ -167,14 +167,14 @@ class AnnotationSerializationTest {
           "org.example.ArrayAnnotation",
           new String[]{attribute}
         );
-        assertThat(serialized).isEqualTo("@org/example/ArrayAnnotation(value={1, 2, 3})");
+        assertThat(serialized).isEqualTo("@org/example/ArrayAnnotation(value={1,2,3})");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
         assertThat(info.getName()).isEqualTo("org.example.ArrayAnnotation");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("{1, 2, 3}");
+        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("{1,2,3}");
 
         // Parse the value
         Object value = AnnotationDeserializer.parseValue(info.getAttributes().get(0).getValue());
@@ -463,6 +463,6 @@ class AnnotationSerializationTest {
 
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
-        assertThat(collectedAnnotations.get(0)).isEqualTo("@org/example/ArrayAnnotation(value={1, 2, 3})");
+        assertThat(collectedAnnotations.get(0)).isEqualTo("@org/example/ArrayAnnotation(value={1,2,3})");
     }
 }
