@@ -233,4 +233,10 @@ describe('for mapping', () => {
                  }
              `)
         ));
+
+    test('for with weird spacing', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('for(   let j=1 ;j<=5 ;j++ ){}')
+        ));
 });
