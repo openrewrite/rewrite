@@ -68,8 +68,10 @@ import java.lang.annotation.ElementType;
 )
 public class AnnotatedClass {
 
-    @BasicAnnotation
-    private String field;
+    private static final int I = 1000;
+
+    @BasicAnnotation(intValue = I)
+    public String field;
 
     @StringAnnotation
     public void method() {

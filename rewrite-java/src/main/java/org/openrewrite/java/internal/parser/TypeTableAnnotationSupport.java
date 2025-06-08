@@ -221,7 +221,7 @@ class AnnotationCollectorHelper {
         @Override
         public void visit(@Nullable String name, Object value) {
             String attributeValue = serializeValue(value);
-            if (attributeName == null && name ==  null) {
+            if (attributeName == null && name == null) {
                 // This is an array element
                 collectedValues.add(attributeValue);
             } else {
@@ -527,12 +527,18 @@ class AnnotationDeserializer {
             // Handle escape sequences
             char escapeChar = charContent.charAt(1);
             switch (escapeChar) {
-                case '\'': return '\'';
-                case '\\': return '\\';
-                case 'n': return '\n';
-                case 'r': return '\r';
-                case 't': return '\t';
-                default: return escapeChar;
+                case '\'':
+                    return '\'';
+                case '\\':
+                    return '\\';
+                case 'n':
+                    return '\n';
+                case 'r':
+                    return '\r';
+                case 't':
+                    return '\t';
+                default:
+                    return escapeChar;
             }
         } else {
             throw new IllegalArgumentException("Invalid character format: " + value);
@@ -557,13 +563,26 @@ class AnnotationDeserializer {
 
             if (escaped) {
                 switch (c) {
-                    case '"': sb.append('"'); break;
-                    case '\\': sb.append('\\'); break;
-                    case 'n': sb.append('\n'); break;
-                    case 'r': sb.append('\r'); break;
-                    case 't': sb.append('\t'); break;
-                    case '|': sb.append('|'); break;
-                    default: sb.append(c);
+                    case '"':
+                        sb.append('"');
+                        break;
+                    case '\\':
+                        sb.append('\\');
+                        break;
+                    case 'n':
+                        sb.append('\n');
+                        break;
+                    case 'r':
+                        sb.append('\r');
+                        break;
+                    case 't':
+                        sb.append('\t');
+                        break;
+                    case '|':
+                        sb.append('|');
+                        break;
+                    default:
+                        sb.append(c);
                 }
                 escaped = false;
             } else if (c == '\\') {
@@ -1005,10 +1024,16 @@ class AnnotationSerializer {
      * @param value The string value to escape
      * @return The escaped string value, or null if input is null
      */
-    public static String escapeDelimiters(String value) {
+    static String escapeDelimiters(String value) {
         return value.replace("\\", "\\\\")  // Escape backslashes first
                 .replace("|", "\\|")    // Escape pipes
                 .replace("\"", "\\\""); // Escape quotes
+    }
+
+    static String unescapeDelimiters(String value) {
+        return value.replace("\\|", "|")
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\");
     }
 
     /**

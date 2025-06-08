@@ -172,12 +172,6 @@ public class TypeTable implements JavaParserClasspathLoader {
             return input.split("(?<!\\\\)" + Pattern.quote(String.valueOf(delimiter)));
         }
 
-        private static String unescapeDelimiters(String value) {
-            return value.replace("\\|", "|")
-                    .replace("\\\"", "\"")
-                    .replace("\\\\", "\\");
-        }
-
         public void read(InputStream is, Collection<String> artifactNames) throws IOException {
             if (artifactNames.isEmpty()) {
                 // could be empty due to the filtering in `artifactsNotYetWritten()`

@@ -268,11 +268,18 @@ class TypeTableTest implements RewriteTest {
               @EnumAnnotation
               @ConstantAnnotation
               class TestClass {
+                  AnnotatedClass annotatedClass;
               }
               """,
             spec -> spec.afterRecipe(cu -> {
                 // Verify that all annotations are properly loaded with their attributes
                 J.ClassDeclaration clazz = cu.getClasses().get(0);
+
+                JavaType.Class annotatedClass = (JavaType.Class) ((J.VariableDeclarations) clazz.getBody().getStatements().get(0)).getTypeExpression().getType();
+                JavaType.Variable field = annotatedClass.getMembers().stream().filter(m -> m.getName().equals("field")).findFirst().get();
+                JavaType.Annotation.SingleElementValue value = (JavaType.Annotation.SingleElementValue) ((JavaType.Annotation) field.getAnnotations().get(0)).getValues().get(0);
+                assertThat(value.getConstantValue()).isEqualTo(1000);
+
                 List<J.Annotation> annotations = clazz.getLeadingAnnotations();
 
                 // Verify BasicAnnotation
