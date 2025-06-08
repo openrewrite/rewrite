@@ -34,13 +34,12 @@ class AnnotationApplier {
     /**
      * Applies an annotation to a class, method, or field.
      *
-     * @param annotationStr The serialized annotation string
+     * @param annotationStr   The serialized annotation string
      * @param visitAnnotation A function that creates an AnnotationVisitor
-     * @return true if the annotation was applied successfully, false otherwise
      */
-    public static boolean applyAnnotation(String annotationStr, AnnotationVisitorCreator visitAnnotation) {
+    public static void applyAnnotation(String annotationStr, AnnotationVisitorCreator visitAnnotation) {
         if (!annotationStr.startsWith("@")) {
-            return false;
+            return;
         }
 
         // Parse the annotation using AnnotationDeserializer
@@ -151,10 +150,8 @@ class AnnotationApplier {
             }
 
             av.visitEnd();
-            return true;
         }
 
-        return false;
     }
 
     /**
@@ -176,7 +173,7 @@ class AnnotationCollectorHelper {
     /**
      * Creates an annotation visitor that collects annotation values into a serialized string format.
      *
-     * @param descriptor The descriptor of the annotation
+     * @param annotationDescriptor The descriptor of the annotation
      * @param collectedAnnotations The list to which the serialized annotation will be added
      * @return An annotation visitor that collects annotation values
      */
@@ -408,7 +405,7 @@ class AnnotationDeserializer {
 
             if (c == '"' && !inQuotes) {
                 inQuotes = true;
-            } else if (c == '"' && inQuotes) {
+            } else if (c == '"') {
                 inQuotes = false;
             } else if (!inQuotes) {
                 if (c == '(') {
@@ -946,7 +943,7 @@ class AnnotationSerializer {
      * @param typeTableFormat If true, uses TypeTable format (delimiter escaping, compact arrays)
      * @return The serialized string representation
      */
-    private static String serializeValueInternal(Object value, boolean typeTableFormat) {
+    private static String serializeValueInternal(@Nullable Object value, boolean typeTableFormat) {
         if (value == null) {
             return "null";
         } else if (value instanceof String) {
@@ -1009,7 +1006,6 @@ class AnnotationSerializer {
      * @return The escaped string value, or null if input is null
      */
     public static String escapeDelimiters(String value) {
-        if (value == null) return null;
         return value.replace("\\", "\\\\")  // Escape backslashes first
                 .replace("|", "\\|")    // Escape pipes
                 .replace("\"", "\\\""); // Escape quotes
@@ -1021,13 +1017,9 @@ class AnnotationSerializer {
      * enum constants, and field constants.
      *
      * @param annotationDefaultVisitor The annotation visitor to apply the default value to
-     * @param defaultValueStr The string representation of the default value
+     * @param value The default value
      */
     public static void processAnnotationDefaultValue(AnnotationVisitor annotationDefaultVisitor, Object value) {
-        if (annotationDefaultVisitor == null || value == null) {
-            return;
-        }
-
         if (value.getClass().isArray()) {
             AnnotationVisitor annotationVisitor = annotationDefaultVisitor.visitArray(null);
             for (Object v : ((Object[]) value)) {
