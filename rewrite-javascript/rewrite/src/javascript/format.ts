@@ -196,9 +196,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         return produceAsync(ret, async draft => {
             draft.control.prefix.whitespace = this.style.beforeParentheses.forParentheses ? " " : "";
             draft.control.init = await Promise.all(draft.control.init.map(async (oneInit, index) => {
-                if (oneInit.element.kind === JS.Kind.ScopedVariableDeclarations) {
-                    // TODO remove?
-                } else if (oneInit.element.kind === J.Kind.VariableDeclarations) {
+                if (oneInit.element.kind === J.Kind.VariableDeclarations) {
                     const vd = oneInit.element as Draft<J.VariableDeclarations>;
                     if (vd.modifiers && vd.modifiers.length > 0) {
                         vd.modifiers[0].prefix.whitespace = "";

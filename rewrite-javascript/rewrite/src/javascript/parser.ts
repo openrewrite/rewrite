@@ -3252,8 +3252,6 @@ export class JavaScriptParserVisitor {
     }
 
     visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.Import {
-        const kind = this.findChildNode(node, ts.SyntaxKind.ImportKeyword)!;
-
         return {
             kind: JS.Kind.Import,
             id: randomId(),
@@ -3271,7 +3269,7 @@ export class JavaScriptParserVisitor {
             moduleSpecifier: undefined,
             attributes: undefined,
             initializer: this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference))
-        }; // TODO as JS.Import;
+        } as JS.Import;
     }
 
     visitImportKeyword(node: ts.ImportExpression): J.Identifier {
