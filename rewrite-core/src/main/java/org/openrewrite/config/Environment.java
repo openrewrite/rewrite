@@ -29,7 +29,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparingInt;
@@ -298,13 +297,6 @@ public class Environment {
     @SuppressWarnings("unused")
     public List<NamedStyles> activateStyles(String... activeStyles) {
         return activateStyles(Arrays.asList(activeStyles));
-    }
-
-    public Set<License> listLicenses() {
-        return resourceLoaders.stream()
-                .map(ResourceLoader::listLicenses)
-                .flatMap(Collection::stream)
-                .collect(Collectors.toSet());
     }
 
     public Environment(Collection<? extends ResourceLoader> resourceLoaders) {

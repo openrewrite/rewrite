@@ -48,6 +48,22 @@ class RecipeEstimatedEffortTest implements RewriteTest {
     private static final Long EXPECTED_DEFAULT_ESTIMATED_EFFORT = 300L;
     private static final Long EXPECTED_CUSTOM_ESTIMATED_EFFORT = 900L;
 
+    @DocumentExample
+    @Test
+    void defaultEstimatedEffortForRecipeThatChangesSourceFiles() {
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipe(new FindAndReplace("replace_me", "replacement", null, null, null, null, null, null))
+            .dataTable(SourcesFileResults.Row.class, rows -> assertEstimatedEffortInFirstRowOfSourceFileResults(rows, EXPECTED_DEFAULT_ESTIMATED_EFFORT)),
+          text(
+            """
+              replace_me
+              """,
+            """
+              replacement
+              """
+          ));
+    }
+
     @Test
     void zeroEstimatedEffortForRecipeThatDoesNotGenerateSourcesFileResults() {
         rewriteRun(
@@ -73,21 +89,6 @@ class RecipeEstimatedEffortTest implements RewriteTest {
               "main", "1234567", False, Native, emptyList()))
           )
         );
-    }
-
-    @Test
-    void defaultEstimatedEffortForRecipeThatChangesSourceFiles() {
-        rewriteRun(
-          recipeSpec -> recipeSpec.recipe(new FindAndReplace("replace_me", "replacement", null, null, null, null, null, null))
-            .dataTable(SourcesFileResults.Row.class, rows -> assertEstimatedEffortInFirstRowOfSourceFileResults(rows, EXPECTED_DEFAULT_ESTIMATED_EFFORT)),
-          text(
-            """
-              replace_me
-              """,
-            """
-              replacement
-              """
-          ));
     }
 
     @Test
