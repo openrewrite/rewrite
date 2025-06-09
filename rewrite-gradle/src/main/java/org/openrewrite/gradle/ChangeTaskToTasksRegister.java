@@ -24,7 +24,6 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.marker.SearchResult;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -50,9 +49,7 @@ public class ChangeTaskToTasksRegister extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(
-                Preconditions.or(new IsBuildGradle<>(), new IsBuildGradleKts()),
-                new TreeVisitor<Tree, ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new TreeVisitor<Tree, ExecutionContext>() {
                     @Override
                     public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                         if (tree == null) {
@@ -68,32 +65,6 @@ public class ChangeTaskToTasksRegister extends Recipe {
                     }
                 }
         );
-    }
-
-    private static class IsBuildGradle<P> extends TreeVisitor<Tree, P> {
-        @Override
-        public Tree visit(@Nullable Tree tree, P p) {
-            if (tree instanceof SourceFile) {
-                SourceFile sourceFile = (SourceFile) tree;
-                if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
-                    return SearchResult.found(tree);
-                }
-            }
-            return tree;
-        }
-    }
-
-    private static class IsBuildGradleKts extends TreeVisitor<Tree, ExecutionContext> {
-        @Override
-        public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
-            if (tree instanceof SourceFile) {
-                SourceFile sourceFile = (SourceFile) tree;
-                if (sourceFile.getSourcePath().toString().endsWith(".gradle.kts")) {
-                    return SearchResult.found(tree);
-                }
-            }
-            return tree;
-        }
     }
 
     private static class GroovyVisitor extends GroovyIsoVisitor<ExecutionContext> {

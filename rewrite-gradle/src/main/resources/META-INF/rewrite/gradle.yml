@@ -58,6 +58,7 @@ name: org.openrewrite.gradle.GradleBestPractices
 displayName: Apply Gradle Best Practices
 description: Applies a curated set of best practices for Gradle projects.
 recipeList:
+  - org.openrewrite.gradle.MigrateToGradle8
   - org.openrewrite.gradle.ChangeTaskToTasksRegister
 ---
 type: specs.openrewrite.org/v1beta/recipe
