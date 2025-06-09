@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.test.RewriteTest;
 
@@ -33,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -105,6 +107,49 @@ class ResolvedPomTest implements RewriteTest {
             spec -> spec.path("bar/pom.xml")
           )
         );
+    }
+
+    @Test
+    void dependencyWithExplicitParent() {
+        assertThatThrownBy(() -> rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>${project.version}</version>
+              </project>
+              """
+          ),
+          mavenProject(
+            "app",
+            pomXml(
+              """
+                <project>
+                    <groupId>org.example</groupId>
+                    <artifactId>app</artifactId>
+                    <version>${project.version}</version>
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>${project.version}</version>
+                        <relativeParent>../pom.xml</relativeParent>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.commons</groupId>
+                            <artifactId>commons-lang3</artifactId>
+                            <version>${project.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        ))
+          .cause()
+          .isInstanceOf(MavenDownloadingException.class)
+          .hasMessageContaining("org.apache.commons:commons-lang3:${project.version}");
     }
 
     @Test

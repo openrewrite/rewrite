@@ -90,7 +90,8 @@ public class PropertyPlaceholderHelper {
                 if (visitedPlaceholders == null) {
                     visitedPlaceholders = new HashSet<>(4);
                 }
-                if (visitedPlaceholders.add(originalPlaceholder)) {
+                boolean visited = visitedPlaceholders.add(originalPlaceholder);
+                if (visited) {
                     placeholder = parseStringValue(placeholder, placeholderResolver, visitedPlaceholders);
                 }
                 // Recursive invocation, parsing placeholders contained in the placeholder key.
@@ -110,7 +111,11 @@ public class PropertyPlaceholderHelper {
                 if (propVal != null) {
                     // Recursive invocation, parsing placeholders contained in the
                     // previously resolved placeholder value.
-                    propVal = parseStringValue(propVal, placeholderResolver, visitedPlaceholders);
+                    if (propVal.equals(placeholder) && !visited) {
+                        // if the value is the same as the placeholder, only try to parse if we haven't
+                        // already visited it.
+                        propVal = parseStringValue(propVal, placeholderResolver, visitedPlaceholders);
+                    }
                     result.replace(startIndex, endIndex + placeholderSuffix.length(), propVal);
 
                     if (propVal.length() < endIndex - startIndex + 1) {

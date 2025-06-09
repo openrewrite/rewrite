@@ -1032,7 +1032,7 @@ public class ResolvedPom {
                     if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
                         (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
                         (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
-                        throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
+                        throw new MavenDownloadingException("Could not determine values for all properties in " + d.getGav(), null, d.getGav());
                     }
 
                     Pom dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories());
