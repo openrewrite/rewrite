@@ -2094,7 +2094,7 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
-  
+
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5196")
     void unclosedBraceOnLink() {
