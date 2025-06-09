@@ -399,8 +399,7 @@ describe('interface mapping', () => {
                 let columnDescriptor: ColumnDescriptor;
                 `)
         source.afterRecipe = tree => {
-            const scopedVarDecl = tree.statements[1].element as JS.ScopedVariableDeclarations;
-            const varDecl = scopedVarDecl.variables[0].element as J.VariableDeclarations;
+            const varDecl = tree.statements[1].element as J.VariableDeclarations;
             const ident = varDecl.variables[0].element.name as J.Identifier;
             expect(ident.simpleName).toEqual("columnDescriptor");
             expect(ident.type!.kind).toEqual(JavaType.Kind.Class);
