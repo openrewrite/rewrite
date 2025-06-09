@@ -116,8 +116,7 @@ describe('import mapping', () => {
         spec.rewriteRun(
             //language=typescript
             typescript(`
-                import type {SpyInstance} from 'jest';
-                ///*{1}*/import /*{2}*/type /*{3}*/{ /*{4}*/ SpyInstance /*{5}*/} /*{6}*/ from /*{7}*/ 'jest' /*{8}*/;
+                /*{1}*/import /*{2}*/type /*{3}*/{ /*{4}*/ SpyInstance /*{5}*/} /*{6}*/ from /*{7}*/ 'jest' /*{8}*/;
                 import SpyInstance = jest.SpyInstance;
             `)
         ));
