@@ -50,6 +50,7 @@ public class GradlePlugin implements Trait<J> {
     boolean applied;
 
     public static class Matcher extends GradleTraitMatcher<GradlePlugin> {
+        private static final MethodMatcher ALIAS_DSL_MATCHER = new MethodMatcher("* alias(..)", false);
         private static final MethodMatcher APPLY_DSL_MATCHER = new MethodMatcher("* apply(..)", false);
         private static final MethodMatcher PLUGIN_ID_DSL_MATCHER = new MethodMatcher("* id(..)", false);
         private static final MethodMatcher KOTLIN_PLUGIN_DSL_MATCHER = new MethodMatcher("* kotlin(..)", false);
@@ -143,7 +144,13 @@ public class GradlePlugin implements Trait<J> {
                 J.MethodInvocation m = (J.MethodInvocation) object;
 
                 if (withinPlugins(cursor)) {
-                    if (APPLY_DSL_MATCHER.matches(m, true)) {
+                    if (ALIAS_DSL_MATCHER.matches(m, true)) {
+                        if (!(m.getArguments().get(0) instanceof J.FieldAccess)) {
+                            return null;
+                        }
+
+                        return new GradlePlugin(cursor, null, null, null, true);
+                    } else if (APPLY_DSL_MATCHER.matches(m, true)) {
                         if (!(m.getArguments().get(0) instanceof J.Literal)) {
                             return null;
                         }
@@ -193,7 +200,7 @@ public class GradlePlugin implements Trait<J> {
 
                         J.Literal idLiteral = (J.Literal) select.getArguments().get(0);
                         String pluginId = "kotlin".equals(select.getSimpleName()) ? "org.jetbrains.kotlin." + idLiteral.getValue() : (String) idLiteral.getValue();
-                        return maybeGradlePlugin(cursor, pluginId, null, version, true);
+                        return maybeGradlePlugin(cursor, pluginId, null, version, !withinBlock(cursor, "pluginManagement"));
                     } else if (PLUGIN_ID_DSL_MATCHER.matches(m, true) || KOTLIN_PLUGIN_DSL_MATCHER.matches(m, true)) {
                         if (!(m.getArguments().get(0) instanceof J.Literal)) {
                             return null;
@@ -201,7 +208,7 @@ public class GradlePlugin implements Trait<J> {
 
                         J.Literal literal = (J.Literal) m.getArguments().get(0);
                         String pluginId = "kotlin".equals(m.getSimpleName()) ? "org.jetbrains.kotlin." + literal.getValue() : (String) literal.getValue();
-                        return maybeGradlePlugin(cursor, pluginId, null, null, true);
+                        return maybeGradlePlugin(cursor, pluginId, null, null, !withinBlock(cursor, "pluginManagement"));
                     }
                 } else if (isProjectReceiver(cursor) && APPLY_DSL_MATCHER.matches(m, true)) {
                     Expression e = m.getArguments().get(0);
@@ -255,13 +262,29 @@ public class GradlePlugin implements Trait<J> {
             return null;
         }
 
-        private boolean isTopLevel(Cursor cursor) {
-            return cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class) == null;
+        private boolean withinBlock(Cursor cursor, String name) {
+            Cursor parentCursor = cursor.getParent();
+            while (parentCursor != null) {
+                if (parentCursor.getValue() instanceof J.MethodInvocation) {
+                    J.MethodInvocation m = parentCursor.getValue();
+                    if (m.getSimpleName().equals(name)) {
+                        return true;
+                    }
+                }
+                parentCursor = parentCursor.getParent();
+            }
+
+            return false;
         }
 
         private boolean withinPlugins(Cursor cursor) {
             Cursor parent = cursor.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
-            return !parent.isRoot() && ((J.MethodInvocation) parent.getValue()).getSimpleName().equals("plugins") && isTopLevel(parent);
+            if (parent.isRoot() || !((J.MethodInvocation) parent.getValue()).getSimpleName().equals("plugins")) {
+                return false;
+            }
+
+            parent = parent.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
+            return parent.isRoot() || ((J.MethodInvocation) parent.getValue()).getSimpleName().equals("pluginManagement");
         }
 
         private boolean isProjectReceiver(Cursor cursor) {

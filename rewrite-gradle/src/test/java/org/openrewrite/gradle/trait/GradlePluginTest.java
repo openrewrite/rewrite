@@ -24,11 +24,11 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.Collections;
 
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.buildGradleKts;
+import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.gradle.trait.Traits.plugin;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.toml.Assertions.toml;
 
 class GradlePluginTest implements RewriteTest {
     @Nested
@@ -295,6 +295,75 @@ class GradlePluginTest implements RewriteTest {
                   plugins {
                       id "java"
                       /*~~>*/id "org.openrewrite.rewrite" version "8.0.0"
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void alias() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              toml(
+                """
+                  [plugins]
+                  openrewrite = { id = "org.openrewrite.rewrite", version = "8.0.0" }
+                  """
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      alias libs.plugins.openrewrite
+                  }
+                  """,
+                """
+                  plugins {
+                      /*~~>*/id "java"
+                      /*~~>*/alias libs.plugins.openrewrite
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void settingsPlugin() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
+              settingsGradle(
+                """
+                  plugins {
+                      id "com.gradle.develocity" version "4.0.2"
+                  }
+                  """,
+                """
+                  plugins {
+                      /*~~(com.gradle.develocity:4.0.2:true)~~>*/id "com.gradle.develocity" version "4.0.2"
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void settingsPluginManagement() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
+              settingsGradle(
+                """
+                  pluginManagement {
+                      plugins {
+                          id "org.openrewrite.rewrite" version "8.0.0"
+                      }
+                  }
+                  """,
+                """
+                  pluginManagement {
+                      plugins {
+                          /*~~(org.openrewrite.rewrite:8.0.0:false)~~>*/id "org.openrewrite.rewrite" version "8.0.0"
+                      }
                   }
                   """
               )
@@ -628,6 +697,75 @@ class GradlePluginTest implements RewriteTest {
                   plugins {
                       id("java")
                       /*~~>*/id("org.openrewrite.rewrite") version "8.0.0"
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void alias() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              toml(
+                """
+                  [plugins]
+                  openrewrite = { id = "org.openrewrite.rewrite", version = "8.0.0" }
+                  """
+              ),
+              buildGradleKts(
+                """
+                  plugins {
+                      id("java")
+                      alias(libs.plugins.openrewrite)
+                  }
+                  """,
+                """
+                  plugins {
+                      /*~~>*/id("java")
+                      /*~~>*/alias(libs.plugins.openrewrite)
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void settingsPlugin() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
+              settingsGradleKts(
+                """
+                  plugins {
+                      id("com.gradle.develocity") version "4.0.2"
+                  }
+                  """,
+                """
+                  plugins {
+                      /*~~(com.gradle.develocity:4.0.2:true)~~>*/id("com.gradle.develocity") version "4.0.2"
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void settingsPluginManagement() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
+              settingsGradleKts(
+                """
+                  pluginManagement {
+                      plugins {
+                          id("org.openrewrite.rewrite") version "8.0.0"
+                      }
+                  }
+                  """,
+                """
+                  pluginManagement {
+                      plugins {
+                          /*~~(org.openrewrite.rewrite:8.0.0:false)~~>*/id("org.openrewrite.rewrite") version "8.0.0"
+                      }
                   }
                   """
               )

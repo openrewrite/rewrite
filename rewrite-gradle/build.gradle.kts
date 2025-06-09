@@ -63,6 +63,7 @@ dependencies {
         exclude("ch.qos.logback", "logback-classic")
         exclude("org.slf4j", "slf4j-nop")
     }
+    testImplementation(project(":rewrite-toml"))
 
     testImplementation("org.openrewrite.gradle.tooling:model:$latest")
 
