@@ -20,7 +20,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.marker.GradlePluginDescriptor;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
@@ -121,25 +120,16 @@ public class GradlePlugin implements Trait<J> {
         protected @Nullable GradlePlugin test(Cursor cursor) {
             Object object = cursor.getValue();
             if (acceptTransitive && object instanceof JavaSourceFile) {
-                if (StringUtils.isBlank(pluginIdPattern) && StringUtils.isBlank(pluginClass)) {
-                    return null;
-                }
-
                 GradleProject gp = getGradleProject(cursor);
                 if (gp == null) {
                     return null;
                 }
 
-                GradlePluginDescriptor plugin = gp.getPlugins()
+                return gp.getPlugins()
                         .stream()
-                        .filter(pluginDescriptor -> matchesGlob(pluginDescriptor.getId(), pluginIdPattern) || matchesGlob(pluginDescriptor.getFullyQualifiedClassName(), pluginClass))
+                        .map(pluginDescriptor -> maybeGradlePlugin(cursor, pluginDescriptor.getId(), pluginDescriptor.getFullyQualifiedClassName(), null, true))
                         .findFirst()
                         .orElse(null);
-                if (plugin == null) {
-                    return null;
-                }
-
-                return new GradlePlugin(cursor, plugin.getId(), plugin.getFullyQualifiedClassName(), null, true);
             } else if (object instanceof J.MethodInvocation) {
                 J.MethodInvocation m = (J.MethodInvocation) object;
 
@@ -149,7 +139,7 @@ public class GradlePlugin implements Trait<J> {
                             return null;
                         }
 
-                        return new GradlePlugin(cursor, null, null, null, true);
+                        return maybeGradlePlugin(cursor, null, null, null, true);
                     } else if (APPLY_DSL_MATCHER.matches(m, true)) {
                         if (!(m.getArguments().get(0) instanceof J.Literal)) {
                             return null;
