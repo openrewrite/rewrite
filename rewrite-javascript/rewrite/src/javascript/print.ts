@@ -585,7 +585,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 keyword = "static";
                 break;
             case J.ModifierType.Final:
-                keyword = "final";
+                keyword = "const";
                 break;
             case J.ModifierType.Native:
                 keyword = "native";

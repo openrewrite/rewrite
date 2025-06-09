@@ -212,6 +212,11 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                         scopedVD.scope.before.whitespace = "";
                         scopedVD.variables[scopedVD.variables.length - 1].after.whitespace = "";
                     }
+                } else if (oneInit.element.kind === J.Kind.VariableDeclarations) {
+                    const vd = oneInit.element as Draft<J.VariableDeclarations>;
+                    if (vd.modifiers && vd.modifiers.length > 0) {
+                        vd.modifiers[0].prefix.whitespace = "";
+                    }
                 }
                 oneInit.after.whitespace = "";
                 return await this.spaceBeforeRightPaddedElement(oneInit, index === 0 ? this.style.within.forParentheses : true);
