@@ -272,7 +272,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitScopedVariableDeclarations(JS.ScopedVariableDeclarations scopedVariableDeclarations, RpcSendQueue q) {
         q.getAndSendList(scopedVariableDeclarations, JS.ScopedVariableDeclarations::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        q.getAndSend(scopedVariableDeclarations, el -> el.getPadding().getScope(), el -> visitLeftPadded(el, q));
         q.getAndSendList(scopedVariableDeclarations, el -> el.getPadding().getVariables(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return scopedVariableDeclarations;
     }

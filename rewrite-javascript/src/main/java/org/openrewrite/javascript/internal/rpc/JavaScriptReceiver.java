@@ -274,7 +274,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitScopedVariableDeclarations(JS.ScopedVariableDeclarations scopedVariableDeclarations, RpcReceiveQueue q) {
         return scopedVariableDeclarations
                 .withModifiers(q.receiveList(scopedVariableDeclarations.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .getPadding().withScope(q.receive(scopedVariableDeclarations.getPadding().getScope(), el -> visitLeftPadded(el, q, toEnum(JS.ScopedVariableDeclarations.Scope.class))))
                 .getPadding().withVariables(q.receiveList(scopedVariableDeclarations.getPadding().getVariables(), el -> visitRightPadded(el, q)));
     }
 

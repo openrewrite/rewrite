@@ -132,6 +132,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(jsImport, el => el.importClause, el => this.visit(el, q));
         await q.getAndSend(jsImport, el => el.moduleSpecifier, el => this.visitLeftPadded(el, q));
         await q.getAndSend(jsImport, el => el.attributes, el => this.visit(el, q));
+        await q.getAndSend(jsImport, el => el.initializer, el => this.visitLeftPadded(el, q));
         return jsImport;
     }
 
@@ -663,6 +664,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.importClause = await q.receive(draft.importClause, el => this.visitDefined<JS.ImportClause>(el, q));
         draft.moduleSpecifier = await q.receive(draft.moduleSpecifier, el => this.visitLeftPadded(el, q));
         draft.attributes = await q.receive(draft.attributes, el => this.visitDefined<JS.ImportAttributes>(el, q));
+        draft.initializer = await q.receive(draft.initializer, el => this.visitLeftPadded(el, q));
         return finishDraft(draft);
     }
 
