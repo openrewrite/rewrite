@@ -15,15 +15,23 @@
  */
 package org.openrewrite.java.style;
 
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.style.LineWrapSetting;
 
 @Value
 @With
 public class WrappingAndBracesStyle implements JavaStyle {
 
     IfStatement ifStatement;
+    Annotations classAnnotations;
+    Annotations methodAnnotations;
+    Annotations fieldAnnotations;
+    Annotations parameterAnnotations;
+    Annotations localVariableAnnotations;
+    Annotations enumFieldAnnotations;
 
     public IfStatement getIfStatement() {
         //noinspection ConstantConditions
@@ -34,5 +42,11 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @With
     public static class IfStatement {
         Boolean elseOnNewLine;
+    }
+
+    @Value
+    @With
+    public static class Annotations {
+        LineWrapSetting wrap;
     }
 }
