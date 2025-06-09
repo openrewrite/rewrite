@@ -3251,48 +3251,27 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.ScopedVariableDeclarations {
+    visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.Import {
         const kind = this.findChildNode(node, ts.SyntaxKind.ImportKeyword)!;
 
         return {
-            kind: JS.Kind.ScopedVariableDeclarations,
+            kind: JS.Kind.Import,
             id: randomId(),
             prefix: this.prefix(node),
+            importClause: {
+                kind: JS.Kind.ImportClause,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: emptyMarkers,
+                typeOnly: node.isTypeOnly,
+                name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
+                namedBindings: undefined
+            },
             markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
-            scope: this.leftPadded(
-                this.prefix(kind),
-                JS.ScopedVariableDeclarations.Scope.Import
-            ),
-            variables: [
-                this.rightPadded({
-                    kind: J.Kind.VariableDeclarations,
-                    id: randomId(),
-                    prefix: emptySpace,
-                    markers: emptyMarkers,
-                    leadingAnnotations: [],
-                    modifiers: node.isTypeOnly ? [{
-                        kind: J.Kind.Modifier,
-                        id: randomId(),
-                        prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!),
-                        markers: emptyMarkers,
-                        keyword: "type",
-                        type: J.ModifierType.LanguageExtension,
-                        annotations: []
-                    }] : [],
-                    variables: [this.rightPadded({
-                        kind: J.Kind.NamedVariable,
-                        id: randomId(),
-                        prefix: emptySpace,
-                        markers: emptyMarkers,
-                        name: this.visit(node.name),
-                        dimensionsAfterName: [],
-                        initializer: this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference)),
-                        variableType: this.mapVariableType(node)
-                    }, emptySpace)]
-                }, emptySpace)
-            ]
-        }
+            moduleSpecifier: undefined,
+            attributes: undefined,
+            initializer: this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference))
+        }; // TODO as JS.Import;
     }
 
     visitImportKeyword(node: ts.ImportExpression): J.Identifier {

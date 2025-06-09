@@ -236,7 +236,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(scopedVariableDeclarations, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(scopedVariableDeclarations, el => el.scope, el => this.visitLeftPadded(el, q));
         await q.getAndSendList(scopedVariableDeclarations, el => el.variables, el => el.element.id, el => this.visitRightPadded(el, q));
         return scopedVariableDeclarations;
     }
@@ -783,7 +782,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(scopedVariableDeclarations);
         draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
-        draft.scope = await q.receive(draft.scope, el => this.visitLeftPadded(el, q));
         draft.variables = await q.receiveListDefined(draft.variables, el => this.visitRightPadded(el, q));
         return finishDraft(draft);
     }

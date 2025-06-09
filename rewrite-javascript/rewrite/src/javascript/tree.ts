@@ -223,8 +223,9 @@ export namespace JS {
     export interface Import extends JS, Statement {
         readonly kind: typeof Kind.Import;
         readonly importClause?: ImportClause;
-        readonly moduleSpecifier: J.LeftPadded<Expression>;
+        readonly moduleSpecifier?: J.LeftPadded<Expression>;
         readonly attributes?: ImportAttributes;
+        readonly initializer?: J.LeftPadded<Expression>;
     }
 
     /**
@@ -418,18 +419,7 @@ export namespace JS {
     export interface ScopedVariableDeclarations extends JS, Statement {
         readonly kind: typeof Kind.ScopedVariableDeclarations;
         readonly modifiers: J.Modifier[];
-        readonly scope?: J.LeftPadded<ScopedVariableDeclarations.Scope>;
         readonly variables: J.RightPadded<J>[];
-    }
-
-    export namespace ScopedVariableDeclarations {
-        export const enum Scope {
-            Const = "Const",
-            Let = "Let",
-            Var = "Var",
-            Using = "Using",
-            Import = "Import"
-        }
     }
 
     /**
