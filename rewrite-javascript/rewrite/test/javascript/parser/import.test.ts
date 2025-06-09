@@ -121,11 +121,22 @@ describe('import mapping', () => {
             `)
         ));
 
-    test('external module import', () =>
+    test('import equals with require', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
                 import mongodb = /*a*/require/*b*/(/*c*/'mongodb'/*d*/)/*e*/;
+            `)
+        ));
+
+    test('import equals with qualified name', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                namespace MyLib {
+                    export function hello() {}
+                }
+                import my = MyLib.hello;
             `)
         ));
 });
