@@ -19,7 +19,7 @@ export const MarkersKind = {
     Markers: "org.openrewrite.marker.Markers",
     NamedStyles: "org.openrewrite.marker.NamedStyles",
     SearchResult: "org.openrewrite.marker.SearchResult",
-    ParseExceptionResult: "org.openrewrite.marker.ParseExceptionResult",
+    ParseExceptionResult: "org.openrewrite.ParseExceptionResult",
     RpcMarker: "org.openrewrite.rpc.RpcMarker",
 } as const
 

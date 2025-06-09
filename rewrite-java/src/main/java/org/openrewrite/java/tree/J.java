@@ -3640,7 +3640,7 @@ public interface J extends Tree, RpcCodec<J> {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class Literal implements J, Expression, TypedTree {
+    final class Literal implements J, Expression, TypedTree, VariableDeclarator {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -3724,6 +3724,15 @@ public interface J extends Tree, RpcCodec<J> {
                 return literal.getValue() == null ? value == null : literal.getValue().equals(value);
             }
             return false;
+        }
+
+        @Override
+        public List<J.Identifier> getNames() {
+            return Collections.singletonList(
+                // TODO this creates an artificial identifier. Revise this decision.
+                new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Collections.emptyList(),
+                        String.valueOf(value), JavaType.Primitive.String, null)
+            );
         }
 
         @Override

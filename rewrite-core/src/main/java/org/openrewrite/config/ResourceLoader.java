@@ -20,10 +20,7 @@ import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.style.NamedStyles;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public interface ResourceLoader {
 
@@ -65,6 +62,4 @@ public interface ResourceLoader {
     Map<String, List<Contributor>> listContributors();
 
     Map<String, List<RecipeExample>> listRecipeExamples();
-
-    Set<License> listLicenses();
 }

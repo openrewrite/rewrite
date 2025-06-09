@@ -316,7 +316,11 @@ public class ResolvedPom {
             case "version":
             case "project.version":
             case "pom.version":
-                return requested.getVersion();
+                String version = requested.getVersion();
+                if (version.contains(property) && requested.getParent() != null) {
+                    return requested.getParent().getVersion();
+                }
+                return version;
             case "project.parent.version":
             case "parent.version":
                 return requested.getParent() != null ? requested.getParent().getVersion() : null;
@@ -1150,44 +1154,48 @@ public class ResolvedPom {
     }
 
     private Dependency getValues(Dependency dep, int depth) {
-        Dependency d = dep.withGav(getValues(dep.getGav()))
-                .withScope(getValue(dep.getScope()));
+        Dependency d = dep;
+        try {
+            d = dep.withGav(getValues(dep.getGav()))
+                    .withScope(getValue(dep.getScope()));
 
-        if (d.getGroupId() == null) {
-            return d;
-        }
-
-        String scope;
-        if (d.getScope() == null) {
-            Scope parsedScope = getManagedScope(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
-            scope = parsedScope == null ? null : parsedScope.toString().toLowerCase();
-        } else {
-            scope = getValue(d.getScope());
-        }
-
-        List<GroupArtifact> managedExclusions = getManagedExclusions(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
-        if (!managedExclusions.isEmpty()) {
-            d = d.withExclusions(ListUtils.concatAll(d.getExclusions(), managedExclusions));
-        }
-
-        if (d.getClassifier() != null) {
-            d = d.withClassifier(getValue(d.getClassifier()));
-        }
-        if (d.getType() != null) {
-            d = d.withType(getValue(d.getType()));
-        }
-        String version = d.getVersion();
-        if (d.getVersion() == null || depth > 0) {
-            // dependency management overrides transitive dependency versions
-            version = getManagedVersion(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
-            if (version == null) {
-                version = d.getVersion();
+            if (d.getGroupId() == null) {
+                return d;
             }
-        }
 
-        return d
-                .withGav(d.getGav().withVersion(version))
-                .withScope(scope);
+            String scope;
+            if (d.getScope() == null) {
+                Scope parsedScope = getManagedScope(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
+                scope = parsedScope == null ? null : parsedScope.toString().toLowerCase();
+            } else {
+                scope = getValue(d.getScope());
+            }
+
+            List<GroupArtifact> managedExclusions = getManagedExclusions(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
+            if (!managedExclusions.isEmpty()) {
+                d = d.withExclusions(ListUtils.concatAll(d.getExclusions(), managedExclusions));
+            }
+
+            if (d.getClassifier() != null) {
+                d = d.withClassifier(getValue(d.getClassifier()));
+            }
+            if (d.getType() != null) {
+                d = d.withType(getValue(d.getType()));
+            }
+            String version = d.getVersion();
+            if (d.getVersion() == null || depth > 0) {
+                // dependency management overrides transitive dependency versions
+                version = getManagedVersion(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
+                if (version == null) {
+                    version = d.getVersion();
+                }
+            }
+
+            return d.withGav(d.getGav().withVersion(version))
+                    .withScope(scope);
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to get values of " + d, e);
+        }
     }
 
     @Value
