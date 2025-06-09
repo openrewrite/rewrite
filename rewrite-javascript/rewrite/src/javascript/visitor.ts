@@ -279,8 +279,9 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.Import>(jsImport, p, async draft => {
             draft.importClause = jsImport.importClause && await this.visitDefined<JS.ImportClause>(jsImport.importClause, p);
-            draft.moduleSpecifier = await this.visitLeftPadded(jsImport.moduleSpecifier, p);
+            draft.moduleSpecifier = jsImport.moduleSpecifier && await this.visitLeftPadded(jsImport.moduleSpecifier, p);
             draft.attributes = jsImport.attributes && await this.visitDefined<JS.ImportAttributes>(jsImport.attributes, p);
+            draft.initializer = jsImport.initializer && await this.visitLeftPadded(jsImport.initializer, p);
         });
     }
 
@@ -451,7 +452,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.ScopedVariableDeclarations>(scopedVariableDeclarations, p, async draft => {
             draft.modifiers = await mapAsync(scopedVariableDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.scope = scopedVariableDeclarations.scope && await this.visitLeftPadded(scopedVariableDeclarations.scope, p);
             draft.variables = await mapAsync(scopedVariableDeclarations.variables, item => this.visitRightPadded(item, p));
         });
     }

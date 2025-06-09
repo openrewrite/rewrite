@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.DCTree;
@@ -41,7 +40,6 @@ import org.openrewrite.style.NamedStyles;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
-import javax.lang.model.type.DeclaredType;
 import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
