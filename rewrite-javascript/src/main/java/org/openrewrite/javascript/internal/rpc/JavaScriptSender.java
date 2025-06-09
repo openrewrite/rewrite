@@ -153,6 +153,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(jsImport, JS.Import::getImportClause, el -> visit(el, q));
         q.getAndSend(jsImport, el -> el.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q));
         q.getAndSend(jsImport, JS.Import::getAttributes, el -> visit(el, q));
+        q.getAndSend(jsImport, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
         return jsImport;
     }
 
