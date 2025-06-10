@@ -1171,13 +1171,14 @@ public interface JS extends J {
         @Nullable
         ImportClause importClause;
 
+        @Nullable
         JLeftPadded<Expression> moduleSpecifier;
 
-        public Expression getModuleSpecifier() {
-            return moduleSpecifier.getElement();
+        public @Nullable Expression getModuleSpecifier() {
+            return moduleSpecifier != null ? moduleSpecifier.getElement() : null;
         }
 
-        public JS.Import withModuleSpecifier(Expression moduleSpecifier) {
+        public JS.Import withModuleSpecifier(@Nullable Expression moduleSpecifier) {
             return getPadding().withModuleSpecifier(JLeftPadded.withElement(this.moduleSpecifier, moduleSpecifier));
         }
 
@@ -1227,11 +1228,11 @@ public interface JS extends J {
         public static class Padding {
             private final JS.Import t;
 
-            public JLeftPadded<Expression> getModuleSpecifier() {
+            public @Nullable JLeftPadded<Expression> getModuleSpecifier() {
                 return t.moduleSpecifier;
             }
 
-            public JS.Import withModuleSpecifier(JLeftPadded<Expression> moduleSpecifier) {
+            public JS.Import withModuleSpecifier(@Nullable JLeftPadded<Expression> moduleSpecifier) {
                 return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, moduleSpecifier, t.attributes, t.initializer);
             }
 
