@@ -138,6 +138,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 // Add shutdown hook to clean up temporary directory
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                     try (Stream<Path> stream = Files.walk(tempDir)) {
+                        //noinspection ResultOfMethodCallIgnored
                         stream.sorted(Comparator.reverseOrder())
                                 .map(Path::toFile)
                                 .forEach(File::delete);
@@ -174,7 +175,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
                     if (exitCode != 0) {
                         // Read error content from the temporary file
-                        String errorContent = "";
+                        String errorContent;
                         try {
                             errorContent = new String(Files.readAllBytes(errorFile), StandardCharsets.UTF_8);
                         } catch (IOException e) {
