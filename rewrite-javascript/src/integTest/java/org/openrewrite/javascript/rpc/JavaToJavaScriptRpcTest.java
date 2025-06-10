@@ -55,7 +55,7 @@ public class JavaToJavaScriptRpcTest {
                   PrintStream log = new PrintStream(new FileOutputStream("rpc.java.log"));
                   JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder()
                     .nodePath(Path.of("node"))
-                    .installationDirectory(Path.of("./rewrite/dist/src"))
+                    .installationDirectory(Path.of("./rewrite/dist"))
 //                    .socket(12345)
                     .build();
 

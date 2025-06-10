@@ -57,7 +57,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         this.log = new PrintStream(new FileOutputStream("rpc.java.log"));
         this.client = JavaScriptRewriteRpc.builder()
           .nodePath(Path.of("node"))
-          .installationDirectory(Path.of("./rewrite/dist/src"))
+          .installationDirectory(Path.of("./rewrite/dist"))
 //          .socket(12345)
           .build();
 

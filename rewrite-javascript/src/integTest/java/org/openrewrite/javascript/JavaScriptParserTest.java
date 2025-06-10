@@ -45,7 +45,7 @@ class JavaScriptParserTest {
     void before() {
         JavaScriptRewriteRpc rewriteRpc = JavaScriptRewriteRpc.builder()
           .nodePath(Path.of("node"))
-          .installationDirectory(Path.of("./rewrite/dist/src"))
+          .installationDirectory(Path.of("./rewrite/dist"))
 //          .trace(true)
 //          .socket(12345)
           .build();

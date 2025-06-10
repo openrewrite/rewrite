@@ -34,12 +34,16 @@ import org.openrewrite.rpc.RewriteRpc;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 
@@ -104,7 +108,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         return new Builder();
     }
 
+
     public static class Builder {
+        private static volatile @Nullable Path defaultInstallationDirectory;
+
         private Environment marketplace = Environment.builder().build();
         private Path nodePath = Paths.get("node");
         private @Nullable Path installationDirectory;
@@ -112,6 +119,83 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private boolean trace;
         private @Nullable Path logFile;
         private @Nullable Duration timeout;
+
+        private static Path getDefaultInstallationDirectory() {
+            if (defaultInstallationDirectory == null) {
+                synchronized (Builder.class) {
+                    if (defaultInstallationDirectory == null) {
+                        defaultInstallationDirectory = initializeDefaultInstallationDirectory();
+                    }
+                }
+            }
+            return requireNonNull(defaultInstallationDirectory);
+        }
+
+        private static Path initializeDefaultInstallationDirectory() {
+            try {
+                Path tempDir = Files.createTempDirectory("javascript-rewrite-rpc");
+
+                // Add shutdown hook to clean up temporary directory
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    try (Stream<Path> stream = Files.walk(tempDir)) {
+                        stream.sorted(Comparator.reverseOrder())
+                                .map(Path::toFile)
+                                .forEach(File::delete);
+                    } catch (IOException ignore) {
+                    }
+                }));
+
+                // Create package.json with required dependencies
+                //language=json
+                String packageJsonContent = "{\n" +
+                                            "  \"name\": \"javascript-rewrite-rpc-temp\",\n" +
+                                            "  \"version\": \"1.0.0\",\n" +
+                                            "  \"private\": true,\n" +
+                                            "  \"dependencies\": {\n" +
+                                            "    \"@openrewrite/rewrite\": \"next\",\n" +
+                                            "    \"typescript\": \"latest\"\n" +
+                                            "  }\n" +
+                                            "}\n";
+
+                Path packageJsonPath = tempDir.resolve("package.json");
+                Files.write(packageJsonPath, packageJsonContent.getBytes(StandardCharsets.UTF_8));
+
+                Path errorFile = Files.createTempFile("npm-install-error", ".log");
+
+                try {
+                    // Run npm install to download dependencies
+                    ProcessBuilder npmInstall = new ProcessBuilder("npm", "install")
+                            .directory(tempDir.toFile())
+                            .redirectOutput(ProcessBuilder.Redirect.to(new File("/dev/null")))
+                            .redirectError(ProcessBuilder.Redirect.to(errorFile.toFile()));
+
+                    Process process = npmInstall.start();
+                    int exitCode = process.waitFor();
+
+                    if (exitCode != 0) {
+                        // Read error content from the temporary file
+                        String errorContent = "";
+                        try {
+                            errorContent = new String(Files.readAllBytes(errorFile), StandardCharsets.UTF_8);
+                        } catch (IOException e) {
+                            errorContent = "Unable to read error output: " + e.getMessage();
+                        }
+
+                        throw new RuntimeException("Failed to install npm dependencies in temporary directory. Exit code: " +
+                                                   exitCode + ". Error output: " + errorContent);
+                    }
+                } finally {
+                    try {
+                        Files.deleteIfExists(errorFile);
+                    } catch (IOException ignore) {
+                    }
+                }
+
+                return tempDir.resolve("node_modules/@openrewrite/rewrite/dist");
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException("Failed to initialize default installation directory", e);
+            }
+        }
 
         public Builder marketplace(Environment marketplace) {
             this.marketplace = marketplace;
@@ -161,13 +245,18 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 }
                 rewriteRpc = new JavaScriptRewriteRpc(rpc, socket, marketplace);
             } else {
+                // Use default installation directory if none provided (lazy-loaded)
+                Path effectiveInstallationDirectory = installationDirectory != null
+                        ? installationDirectory
+                        : getDefaultInstallationDirectory();
+
                 List<String> command = new ArrayList<>(Arrays.asList(
                         nodePath.toString(),
                         "--stack-size=4000",
                         "--enable-source-maps",
                         // Uncomment this to debug the server
                         //  "--inspect-brk",
-                        requireNonNull(installationDirectory).resolve("rpc/server.js").toString()
+                        effectiveInstallationDirectory.resolve("src/rpc/server.js").toString()
                 ));
                 if (logFile != null) {
                     command.add("--log-file");

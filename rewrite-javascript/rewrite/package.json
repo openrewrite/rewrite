@@ -31,6 +31,7 @@
     "dedent": "^1.5.3",
     "diff": "^7.0.0",
     "immer": "^10.1.1",
+    "typescript": "^5.8.3",
     "vscode-jsonrpc": "^8.2.1"
   },
   "devDependencies": {
