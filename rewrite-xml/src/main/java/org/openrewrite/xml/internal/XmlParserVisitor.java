@@ -31,7 +31,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
 
@@ -329,27 +328,45 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 String subsetPrefix = prefix(c.DTD_SUBSET_OPEN());
                 cursor = c.DTD_SUBSET_OPEN().getSymbol().getStopIndex() + 1;
 
-                List<Xml.Element> elements = new ArrayList<>();
-                List<ParseTree> children = c.intsubset().children;
-                for (int i = 0; i < children.size(); i++) {
-                    ParserRuleContext element = (ParserRuleContext) children.get(i);
+                List<Content> elements = new ArrayList<>();
+                for (ParseTree child : c.intsubset().children) {
+                    ParserRuleContext element = (ParserRuleContext) child;
                     // Markup declarations are not fully implemented.
                     // n.getText() includes element subsets.
-                    Xml.Ident ident = convert(element, (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.getText()));
-
-                    String beforeElementTag = "";
-                    if (i == children.size() - 1) {
-                        beforeElementTag = prefix(c.DTD_SUBSET_CLOSE());
-                        cursor = c.DTD_SUBSET_CLOSE().getSymbol().getStopIndex() + 1;
+                    Content content;
+                    if (element instanceof XMLParser.MarkupdeclContext && ((XMLParser.MarkupdeclContext) element).COMMENT() != null) {
+                        TerminalNode commentNode = ((XMLParser.MarkupdeclContext) element).COMMENT();
+                        content = convert(commentNode, (n, p) -> new Xml.Comment(
+                                randomId(),
+                                p,
+                                Markers.EMPTY,
+                                n.getText().substring("<!--".length(), n.getText().length() - "-->".length())
+                        ));
+                    } else {
+                        content = convert(element, (n, p) -> new Xml.CharData(
+                                randomId(),
+                                p,
+                                Markers.EMPTY,
+                                false,
+                                n.getText(),
+                                ""
+                        ));
                     }
+                    elements.add(content);
+                }
 
-                    elements.add(
-                            new Xml.Element(
-                                    randomId(),
-                                    prefix(element),
-                                    Markers.EMPTY,
-                                    Collections.singletonList(ident),
-                                    beforeElementTag));
+                if (!elements.isEmpty()) {
+                    String beforeElementTag = prefix(c.DTD_SUBSET_CLOSE());
+                    cursor = c.DTD_SUBSET_CLOSE().getSymbol().getStopIndex() + 1;
+
+                    Content lastElement = elements.get(elements.size() - 1);
+                    if (lastElement instanceof Xml.Comment) {
+                        elements.add(new Xml.CharData(randomId(), "", Markers.EMPTY, false, beforeElementTag, ""));
+                    } else if (lastElement instanceof Xml.CharData) {
+                        Xml.CharData lastCharData = (Xml.CharData) lastElement;
+                        String afterText = (lastCharData.getAfterText() == null ? "" : lastCharData.getAfterText()) + beforeElementTag;
+                        elements.set(elements.size() - 1, lastCharData.withAfterText(afterText));
+                    }
                 }
                 externalSubsets = new Xml.DocTypeDecl.ExternalSubsets(randomId(), subsetPrefix, Markers.EMPTY, elements);
             }
