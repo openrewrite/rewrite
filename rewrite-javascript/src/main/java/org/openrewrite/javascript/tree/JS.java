@@ -1181,11 +1181,12 @@ public interface JS extends J {
 
         @Nullable
         JLeftPadded<Expression> initializer;
-        public Expression getInitializer() {
-            return initializer.getElement();
+
+        public @Nullable Expression getInitializer() {
+            return initializer != null ? initializer.getElement() : null;
         }
 
-        public JS.Import withInitializer(Expression initializer) {
+        public JS.Import withInitializer(@Nullable Expression initializer) {
             return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
         }
 
@@ -1227,7 +1228,7 @@ public interface JS extends J {
                 return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, moduleSpecifier, t.attributes, t.initializer);
             }
 
-            public JLeftPadded<Expression> getInitializer() {
+            public @Nullable JLeftPadded<Expression> getInitializer() {
                 return t.initializer;
             }
 
