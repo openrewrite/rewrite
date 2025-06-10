@@ -25,9 +25,11 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
+import java.util.List;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -460,6 +462,46 @@ class XmlParserTest implements RewriteTest {
         rewriteRun(
           xml(
             "<?xml version=\"1.0\"?>CR<a>CR</a>".replace("CR", "\r")
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4930")
+    @Test
+    void commentIsParsedAsXmlComment() {
+        rewriteRun(
+          xml(
+            """
+            <?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+            <!DOCTYPE xsl:stylesheet [
+                <!-- EXSLT-Math -->
+                <!ENTITY foons "https://www.foo.org/bar">
+            ]>
+            <xsl:stylesheet version="1.0"/>
+            """,
+            spec -> spec.afterRecipe(doc -> {
+                Xml.DocTypeDecl docTypeDecl = doc.getProlog().getMisc().stream()
+                  .filter(Xml.DocTypeDecl.class::isInstance)
+                  .map(Xml.DocTypeDecl.class::cast)
+                  .findFirst()
+                  .orElse(null);
+
+                assertNotNull(docTypeDecl, "DocTypeDecl should be present");
+                assertNotNull(docTypeDecl.getExternalSubsets(), "ExternalSubsets should be present");
+
+                List<Content> elements = docTypeDecl.getExternalSubsets().getElements();
+                assertThat(elements.size()).isEqualTo(2);
+
+                assertThat(elements.get(0))
+                  .as("Comment should be Xml.Comment")
+                  .isInstanceOf(Xml.Comment.class);
+                assertThat(((Xml.Comment) elements.get(0)).getText().trim())
+                  .isEqualTo("EXSLT-Math");
+
+                assertThat(elements.get(1))
+                  .as("Non-comment should be Xml.CharData")
+                  .isInstanceOf(Xml.CharData.class);
+            })
           )
         );
     }
