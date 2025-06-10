@@ -245,7 +245,7 @@ public class RewriteRpc {
         }
 
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        parsingListener.intermediateMessage("Starting parsing of " + inputList.size() + " files");
+        parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputList.size()));
         List<String> treeIds = send("Parse", new Parse(language, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
         if (!treeIds.isEmpty()) {
             List<SourceFile> list = new ArrayList<>(treeIds.size());
