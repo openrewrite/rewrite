@@ -1941,6 +1941,7 @@ export class JavaScriptParserVisitor {
             lambda: {
                 kind: J.Kind.Lambda,
                 id: randomId(),
+                prefix: emptySpace,
                 markers: emptyMarkers,
                 parameters: {
                     kind: J.Kind.LambdaParameters,
