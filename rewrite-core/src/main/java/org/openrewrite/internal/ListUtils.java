@@ -570,7 +570,7 @@ public final class ListUtils {
             return emptyList();
         }
 
-        HashSet<T> newS = new HashSet<>(ls);
+        Set<T> newS = new LinkedHashSet<>(ls);
         return new ArrayList<>(newS);
     }
 }
