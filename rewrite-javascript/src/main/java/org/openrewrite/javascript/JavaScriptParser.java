@@ -19,14 +19,15 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.util.Objects.requireNonNull;
 
@@ -40,7 +41,19 @@ public class JavaScriptParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        return rewriteRpc.parse(this, "javascript", sources, relativeTo, ctx).stream();
+        JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
+        return rewriteRpc.parse(this, "javascript", sources, relativeTo, ctx).stream()
+                .map(source -> {
+                    try {
+                        validator.visit(source, 0);
+                        return source;
+                    } catch (Exception e) {
+                        Optional<Input> input = StreamSupport.stream(sources.spliterator(), false)
+                                .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
+                                .findFirst();
+                        return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);
+                    }
+                });
     }
 
     private final static List<String> EXTENSIONS = Collections.unmodifiableList(Arrays.asList(
