@@ -757,8 +757,10 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         // Visit module specifier
-        await this.visit(jsImport.moduleSpecifier.element, otherImport.moduleSpecifier.element);
-        if (!this.match) return jsImport;
+        if (jsImport.moduleSpecifier) {
+            await this.visit(jsImport.moduleSpecifier.element, otherImport.moduleSpecifier!.element);
+            if (!this.match) return jsImport;
+        }
 
         // Compare attributes
         if (!!jsImport.attributes !== !!otherImport.attributes) {
@@ -768,6 +770,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         if (jsImport.attributes) {
             await this.visit(jsImport.attributes, otherImport.attributes!);
+        }
+
+        // Compare initializer
+        if (jsImport.initializer) {
+            await this.visit(jsImport.initializer.element, otherImport.initializer!.element);
+            if (!this.match) return jsImport;
         }
 
         return jsImport;
@@ -1300,19 +1308,6 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         for (let i = 0; i < scopedVariableDeclarations.modifiers.length; i++) {
             await this.visit(scopedVariableDeclarations.modifiers[i], otherScopedVariableDeclarations.modifiers[i]);
             if (!this.match) return scopedVariableDeclarations;
-        }
-
-        // Compare scope
-        if (!!scopedVariableDeclarations.scope !== !!otherScopedVariableDeclarations.scope) {
-            this.abort();
-            return scopedVariableDeclarations;
-        }
-
-        if (scopedVariableDeclarations.scope) {
-            if (!otherScopedVariableDeclarations.scope || scopedVariableDeclarations.scope.element !== otherScopedVariableDeclarations.scope!.element) {
-                this.abort();
-                return scopedVariableDeclarations;
-            }
         }
 
         // Compare variables

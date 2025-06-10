@@ -17,6 +17,7 @@ package org.openrewrite.hcl.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
@@ -268,6 +269,22 @@ class FindAndReplaceLiteralTest implements RewriteTest {
                   cluster_name = "cluster-4"
                 }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5579")
+    void handleNullLiteral() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new FindAndReplaceLiteral("foo", "bar", null, null)
+          ),
+          //language=hcl
+          hcl(
+            """
+              myVar = null
               """
           )
         );

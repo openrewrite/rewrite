@@ -1186,6 +1186,17 @@ public interface JS extends J {
         @Nullable
         ImportAttributes attributes;
 
+        @Nullable
+        JLeftPadded<Expression> initializer;
+        public Expression getInitializer() {
+            return initializer.getElement();
+        }
+
+        public JS.Import withInitializer(Expression initializer) {
+            return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
+        }
+
+
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
             return v.visitImport(this, p);
@@ -1220,8 +1231,17 @@ public interface JS extends J {
             }
 
             public JS.Import withModuleSpecifier(JLeftPadded<Expression> moduleSpecifier) {
-                return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, moduleSpecifier, t.attributes);
+                return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, moduleSpecifier, t.attributes, t.initializer);
             }
+
+            public JLeftPadded<Expression> getInitializer() {
+                return t.initializer;
+            }
+
+            public JS.Import withInitializer(@Nullable JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, t.moduleSpecifier, t.attributes, initializer);
+            }
+
         }
     }
 
@@ -2486,17 +2506,6 @@ public interface JS extends J {
         @Getter
         List<J.Modifier> modifiers;
 
-        @Nullable
-        JLeftPadded<Scope> scope;
-
-        public @Nullable Scope getScope() {
-            return scope != null ? scope.getElement() : null;
-        }
-
-        public ScopedVariableDeclarations withScope(@Nullable Scope scope) {
-            return getPadding().withScope(JLeftPadded.withElement(this.scope, scope));
-        }
-
         List<JRightPadded<J>> variables;
 
         public List<J> getVariables() {
@@ -2532,14 +2541,6 @@ public interface JS extends J {
             return p;
         }
 
-        public enum Scope {
-            Const,
-            Let,
-            Var,
-            Using,
-            Import
-        }
-
         @RequiredArgsConstructor
         public static class Padding {
             private final ScopedVariableDeclarations t;
@@ -2549,15 +2550,7 @@ public interface JS extends J {
             }
 
             public ScopedVariableDeclarations withVariables(List<JRightPadded<J>> variables) {
-                return t.variables == variables ? t : new ScopedVariableDeclarations(t.id, t.prefix, t.markers, t.modifiers, t.scope, variables);
-            }
-
-            public @Nullable JLeftPadded<Scope> getScope() {
-                return t.scope;
-            }
-
-            public ScopedVariableDeclarations withScope(@Nullable JLeftPadded<Scope> scope) {
-                return t.scope == scope ? t : new ScopedVariableDeclarations(t.id, t.prefix, t.markers, t.modifiers, scope, t.variables);
+                return t.variables == variables ? t : new ScopedVariableDeclarations(t.id, t.prefix, t.markers, t.modifiers, variables);
             }
         }
     }
