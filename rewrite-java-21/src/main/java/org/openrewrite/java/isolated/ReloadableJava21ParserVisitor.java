@@ -57,6 +57,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.sun.tools.javac.util.List.from;
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -428,31 +429,34 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             List<JCVariableDecl> constructorParams = new ArrayList<>();
             List<Tree> stateVector = new ArrayList<>();
             for (Tree member : node.getMembers()) {
-                if (member instanceof JCMethodDecl && ((JCMethodDecl) member).sym.isConstructor()) {
-                    constructorParams = ((JCMethodDecl) member).getParameters();
-                }
                 if (member instanceof VariableTree vt) {
                     if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
                         stateVector.add(vt);
                     }
+                } else if (member instanceof JCMethodDecl && ((JCMethodDecl) member).sym.isConstructor()) {
+                    constructorParams = ((JCMethodDecl) member).getParameters();
                 }
             }
 
-            // @Target(value=PARAMETER) annotations are not listed in the members itself, so grab them from constructor parameters
+            // @Target(value=PARAMETER) annotations are not listed in the members itself, so get them from constructor parameters and merge them in the stateVector
             for (Tree sv : stateVector) {
-                if (sv instanceof JCVariableDecl sv1) {
+                if (sv instanceof JCVariableDecl vd) {
                     for (JCVariableDecl constructorParam : constructorParams) {
-                        if (sv1.getName() == constructorParam.getName() && !constructorParam.getModifiers().getAnnotations().isEmpty()) {
+                        if (vd.getName() == constructorParam.getName() && !constructorParam.getModifiers().getAnnotations().isEmpty()) {
+                            // Because AST elements are designed immutably, we use reflection to actually merge the annotation list
                             try {
-                                System.out.println("hoorah");
                                 Field annotationsField = JCModifiers.class.getDeclaredField("annotations");
                                 annotationsField.setAccessible(true);
 
-                                JCModifiers targetModifiers = sv1.getModifiers();
-                                com.sun.tools.javac.util.List<JCAnnotation> x = com.sun.tools.javac.util.List.from((List<JCAnnotation>) annotationsField.get(targetModifiers));
-                                com.sun.tools.javac.util.List<JCAnnotation> combined  = x.appendList(constructorParam.getModifiers().getAnnotations());
+                                JCModifiers modifiers = vd.getModifiers();
+                                com.sun.tools.javac.util.List<JCAnnotation> annotations = from((List<JCAnnotation>) annotationsField.get(modifiers));
+                                for (JCAnnotation ann : constructorParam.getModifiers().getAnnotations()) {
+                                    if (annotations.stream().noneMatch(it -> it.pos == ann.pos)) {
+                                        annotations = annotations.append(ann);
+                                    }
+                                }
 
-                                annotationsField.set(targetModifiers, combined);
+                                annotationsField.set(modifiers, annotations);
                             } catch (NoSuchFieldException | IllegalAccessException e) {
                                 throw new RuntimeException("Failed to merge consructor annotations", e);
                             }
@@ -906,9 +910,17 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitLiteral(LiteralTree node, Space fmt) {
-        cursor(endPos(node));
+        int endPos = endPos(node);
         Object value = node.getValue();
-        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos(node));
+
+        if (endPos == -1) {
+            String str = value + "";
+            int delimLength = source.substring(cursor).indexOf(str);
+            endPos = cursor + delimLength + str.length() + delimLength;
+        }
+
+        cursor(endPos);
+        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos);
         JavaType.Primitive type = typeMapping.primitive(((JCLiteral) node).typetag);
 
         if (value instanceof Character) {
