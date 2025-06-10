@@ -47,7 +47,7 @@ public class DependencyUseMapNotation extends Recipe {
     @Override
     public String getDescription() {
         return "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
-                "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'` (groovy)" +
+                "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'` (groovy) " +
                 "or `group = \"groupId\", name = \"artifactId\", version = \"version\"` (kotlin). " +
                 "This recipe replaces dependencies represented as `Strings` with an equivalent dependency represented as a `Map`.";
     }

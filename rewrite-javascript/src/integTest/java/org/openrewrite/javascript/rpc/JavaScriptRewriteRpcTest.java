@@ -176,6 +176,25 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void forLoopToUseVariableDeclarations() {
+        // language=javascript
+        String source = "for (let i=0; i<5; i++) {}";
+
+        SourceFile cu = client.parse("javascript", List.of(Parser.Input.fromString(
+          Paths.get("test.js"), source)), null).getFirst();
+
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.ForLoop visitForLoop(J.ForLoop forLoop, Integer p) {
+                assertThat(forLoop.getControl().getInit().get(0) instanceof J.VariableDeclarations);
+                return forLoop;
+            }
+        }.visit(cu, 0);
+
+        assertThat(client.print(cu)).isEqualTo(source);
+    }
+
+    @Test
     void printText() {
         rewriteRun(
           text(

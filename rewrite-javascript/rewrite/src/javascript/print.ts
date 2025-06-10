@@ -164,6 +164,11 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         jsImport.attributes && await this.visit(jsImport.attributes, p);
 
+        if (jsImport.initializer) {
+            p.append("=");
+            await this.visitLeftPadded(jsImport.initializer, p);
+        }
+
         await this.afterSyntax(jsImport, p);
         return jsImport;
     }
@@ -432,29 +437,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitModifier(m, p);
         }
 
-        const scope = variableDeclarations.scope;
-        if (scope) {
-            await this.visitSpace(scope.before, p);
-
-            switch (scope.element) {
-                case JS.ScopedVariableDeclarations.Scope.Let:
-                    p.append("let");
-                    break;
-                case JS.ScopedVariableDeclarations.Scope.Const:
-                    p.append("const");
-                    break;
-                case JS.ScopedVariableDeclarations.Scope.Var:
-                    p.append("var");
-                    break;
-                case JS.ScopedVariableDeclarations.Scope.Using:
-                    p.append("using");
-                    break;
-                case JS.ScopedVariableDeclarations.Scope.Import:
-                    p.append("import");
-                    break;
-            }
-        }
-
         await this.visitRightPaddedLocal(variableDeclarations.variables, ",", p);
 
         await this.afterSyntax(variableDeclarations, p);
@@ -585,7 +567,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 keyword = "static";
                 break;
             case J.ModifierType.Final:
-                keyword = "final";
+                keyword = "const";
                 break;
             case J.ModifierType.Native:
                 keyword = "native";
