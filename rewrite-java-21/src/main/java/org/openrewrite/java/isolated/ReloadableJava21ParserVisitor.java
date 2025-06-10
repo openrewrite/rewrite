@@ -26,7 +26,6 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
-import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -426,14 +425,42 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         JContainer<Statement> primaryConstructor = null;
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
+            List<JCVariableDecl> constructorParams = new ArrayList<>();
             List<Tree> stateVector = new ArrayList<>();
             for (Tree member : node.getMembers()) {
+                if (member instanceof JCMethodDecl && ((JCMethodDecl) member).sym.isConstructor()) {
+                    constructorParams = ((JCMethodDecl) member).getParameters();
+                }
                 if (member instanceof VariableTree vt) {
                     if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
                         stateVector.add(vt);
                     }
                 }
             }
+
+            // @Target(value=PARAMETER) annotations are not listed in the members itself, so grab them from constructor parameters
+            for (Tree sv : stateVector) {
+                if (sv instanceof JCVariableDecl sv1) {
+                    for (JCVariableDecl constructorParam : constructorParams) {
+                        if (sv1.getName() == constructorParam.getName() && !constructorParam.getModifiers().getAnnotations().isEmpty()) {
+                            try {
+                                System.out.println("hoorah");
+                                Field annotationsField = JCModifiers.class.getDeclaredField("annotations");
+                                annotationsField.setAccessible(true);
+
+                                JCModifiers targetModifiers = sv1.getModifiers();
+                                com.sun.tools.javac.util.List<JCAnnotation> x = com.sun.tools.javac.util.List.from((List<JCAnnotation>) annotationsField.get(targetModifiers));
+                                com.sun.tools.javac.util.List<JCAnnotation> combined  = x.appendList(constructorParam.getModifiers().getAnnotations());
+
+                                annotationsField.set(targetModifiers, combined);
+                            } catch (NoSuchFieldException | IllegalAccessException e) {
+                                throw new RuntimeException("Failed to merge consructor annotations", e);
+                            }
+                        }
+                    }
+                }
+            }
+
             primaryConstructor = JContainer.build(
                     sourceBefore("("),
                     stateVector.isEmpty() ?
