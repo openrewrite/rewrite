@@ -319,8 +319,9 @@ public class ResolvedPom {
                 String version = requested.getVersion();
                 if (version.contains(property)) {
                     if (requested.getParent() != null) {
-                        return requested.getParent().getVersion();
-                    } else {
+                        version = requested.getParent().getVersion();
+                    }
+                    if (version.contains(property)) {
                         return "error.circular.project.version";
                     }
                 }
