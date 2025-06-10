@@ -169,6 +169,22 @@ export class JavaScriptTypeMapping {
                     }
                 });
                 return result;
+            } else if (objectType.getCallSignatures().length > 0) {
+                const callSignature = objectType.getCallSignatures()[0]; // TODO handle multiple signatures
+                const result = {
+                    kind: JavaType.Kind.Method,
+                    declaringType: JavaType.unknownType, // TODO
+                    name: objectType.getSymbol()?.getName(),
+                    returnType: this.getType(callSignature.getReturnType()),
+                    parameterNames: callSignature.parameters.map(s => s.getName()),
+                    parameterTypes: callSignature.parameters.map(s => this.getType(this.checker.getTypeOfSymbol(s))),
+                    thrownExceptions: [],
+                    annotations: [],
+                    defaultValue: undefined, // TODO
+                    declaredFormalTypeNames: []
+                } as JavaType.Method;
+                this.typeCache.set(signature, result);
+                return result;
             }
         }
 
