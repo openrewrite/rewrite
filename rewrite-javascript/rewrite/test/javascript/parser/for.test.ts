@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J} from "../../../src/java";
 
 describe('for mapping', () => {
     const spec = new RecipeSpec();
@@ -233,6 +234,16 @@ describe('for mapping', () => {
                  }
              `)
         ));
+
+    test('using `J.VariableDeclarations` for loop variable', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`for (let i = 0; i < 5; i++) {
+            }`),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                expect((<J.ForLoop>cu.statements[0].element).control.init[0].element.kind).toBe(J.Kind.VariableDeclarations);
+            }
+        }));
 
     test('for with weird spacing', () =>
         spec.rewriteRun(

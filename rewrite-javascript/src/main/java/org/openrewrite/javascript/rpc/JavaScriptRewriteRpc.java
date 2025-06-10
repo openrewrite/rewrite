@@ -107,7 +107,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     public static class Builder {
         private Environment marketplace = Environment.builder().build();
         private Path nodePath = Paths.get("node");
-        private @Nullable Path instllationDirectory;
+        private @Nullable Path installationDirectory;
         private int port;
         private boolean trace;
         private @Nullable Path logFile;
@@ -124,7 +124,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         }
 
         public Builder installationDirectory(Path installationDirectory) {
-            this.instllationDirectory = installationDirectory;
+            this.installationDirectory = installationDirectory;
             return this;
         }
 
@@ -166,7 +166,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "--enable-source-maps",
                         // Uncomment this to debug the server
                         //  "--inspect-brk",
-                        requireNonNull(instllationDirectory).resolve("rpc/server.js").toString()
+                        requireNonNull(installationDirectory).resolve("rpc/server.js").toString()
                 ));
                 if (logFile != null) {
                     command.add("--log-file");
