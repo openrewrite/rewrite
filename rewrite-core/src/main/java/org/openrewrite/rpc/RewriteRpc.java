@@ -26,6 +26,8 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.PrintStream;
 import java.lang.ref.WeakReference;
@@ -242,13 +244,18 @@ public class RewriteRpc {
             }
         }
 
-        List<String> parsed = send("Parse", new Parse(language, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
-        if (!parsed.isEmpty()) {
-            List<SourceFile> list = new ArrayList<>(parsed.size());
-            for (int i = 0; i < parsed.size(); i++) {
-                String s = parsed.get(i);
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+        parsingListener.intermediateMessage("Starting parsing of " + inputList.size() + " files");
+        List<String> treeIds = send("Parse", new Parse(language, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+        if (!treeIds.isEmpty()) {
+            List<SourceFile> list = new ArrayList<>(treeIds.size());
+            for (int i = 0; i < treeIds.size(); i++) {
+                String id = treeIds.get(i);
                 try {
-                    list.add(getObject(s));
+                    parsingListener.startedParsing(inputList.get(i));
+                    SourceFile sourceFile = getObject(id);
+                    list.add(sourceFile);
+                    parsingListener.parsed(inputList.get(i), sourceFile);
                 } catch (Exception e) {
                     list.add(ParseError.build(parser, inputList.get(i), relativeTo, ctx, e));
                 }
