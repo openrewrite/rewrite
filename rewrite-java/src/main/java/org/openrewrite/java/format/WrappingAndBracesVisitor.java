@@ -205,10 +205,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space wrapElement(Space prefix, String whitespace, WrappingAndBracesStyle.Annotations annotationsStyle) {
-        if (annotationsStyle.getWrap() == DoNotWrap && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
-            return prefix.withWhitespace(Space.SINGLE_SPACE.getWhitespace());
-        } else if (annotationsStyle.getWrap() == WrapAlways) {
-            return prefix.withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace);
+        if (prefix.getComments().isEmpty()) {
+            if (annotationsStyle.getWrap() == DoNotWrap && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
+                return prefix.withWhitespace(Space.SINGLE_SPACE.getWhitespace());
+            } else if (annotationsStyle.getWrap() == WrapAlways) {
+                return prefix.withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace);
+            }
         }
         return prefix;
     }
