@@ -18,9 +18,7 @@ package org.openrewrite.internal;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -517,4 +515,62 @@ public final class ListUtils {
         return array == null || array.length == 0 ? null : array;
     }
 
+    /**
+     * Applies a transformation function to each element in the list, returning a new list.
+     * If the transformation results in null for any element, those elements are removed from the resulting list.
+     *
+     * @param ls The list to transform.
+     * @param <R> The type of elements in the resulting list.
+     * @param <T> The type of elements in the original list.
+     * @return The transformed list, without null elements.
+     */
+    @Contract(pure = true, value = "_, _ -> !null")
+    public static <R, T> List<R> transform(@Nullable List<T> ls, BiFunction<Integer, T, @Nullable R> transformer) {
+        if (ls == null || ls.isEmpty()) {
+            return emptyList();
+        }
+
+        List<R> newLs = new ArrayList<>(ls.size());
+        for (int i = 0; i < ls.size(); i++) {
+            T t = ls.get(i);
+            R r = transformer.apply(i, t);
+            if (r != null) {
+                newLs.add(r);
+            }
+        }
+
+        return newLs;
+    }
+
+    /**
+     * Applies a transformation function to each element in the list, returning a new list.
+     * If the transformation results in null for any element, those elements are removed from the resulting list.
+     *
+     * @param ls The list to transform.
+     * @param <R> The type of elements in the resulting list.
+     * @param <T> The type of elements in the original list.
+     * @return The transformed list, without null elements.
+     */
+    @Contract(pure = true, value = "_, _ -> !null")
+    public static <R, T> List<R> transform(@Nullable List<T> ls, Function<T, @Nullable R> transformer) {
+        return transform(ls, (__, t) -> transformer.apply(t));
+    }
+
+    /**
+     * Returns a new list containing distinct elements from the input list.
+     * If the input list is empty, returns an empty list.
+     *
+     * @param ls The list to filter for distinct elements.
+     * @param <T> The type of elements in the list.
+     * @return A new list with distinct elements.
+     */
+    @Contract(pure = true, value = "_ -> !null")
+    public static <T> List<T> distinct(@Nullable List<T> ls) {
+        if (ls == null || ls.isEmpty()) {
+            return emptyList();
+        }
+
+        Set<T> newS = new LinkedHashSet<>(ls);
+        return new ArrayList<>(newS);
+    }
 }
