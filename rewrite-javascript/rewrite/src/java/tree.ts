@@ -265,7 +265,7 @@ export namespace J {
         }
     }
 
-    export interface ClassDeclaration extends J, TypedTree {
+    export interface ClassDeclaration extends J, Statement, TypedTree {
         readonly kind: typeof Kind.ClassDeclaration;
         readonly leadingAnnotations: Annotation[];
         readonly modifiers: Modifier[];
