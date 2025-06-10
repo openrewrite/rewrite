@@ -48,29 +48,47 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 @SuppressWarnings("UnusedReturnValue")
-public class RewriteRpc {
+public class RewriteRpc implements AutoCloseable {
 
-    private static class Registry {
+    private static class ContextHolder {
         private static final ThreadLocal<Map<Class<? extends SourceFile>, WeakReference<RewriteRpc>>> INSTANCE =
                 ThreadLocal.withInitial(HashMap::new);
 
-        static <T extends SourceFile> void register(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
-            INSTANCE.get().put(sourceFileClass, new WeakReference<>(rewriteRpc));
+        static <T extends SourceFile> boolean hasContextRpc(Class<T> sourceFileClass) {
+            WeakReference<RewriteRpc> ref = INSTANCE.get().get(sourceFileClass);
+            return ref != null && ref.get() != null;
         }
 
-        static <T extends SourceFile> RewriteRpc get(Class<T> sourceFileClass) {
+        static <T extends SourceFile> RewriteRpc getContextRpc(Class<T> sourceFileClass) {
             WeakReference<RewriteRpc> ref = INSTANCE.get().get(sourceFileClass);
             return requireNonNull(ref != null ? ref.get() : null);
         }
+
+        static <T extends SourceFile> void setContextRpc(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
+            INSTANCE.get().put(sourceFileClass, new WeakReference<>(rewriteRpc));
+        }
+
+        static <T extends SourceFile> void removeContextRpc(Class<T> sourceFileClass) {
+            INSTANCE.get().remove(sourceFileClass);
+        }
     }
 
-    public static <T extends SourceFile> RewriteRpc forSourceType(Class<T> sourceFileClass) {
-        return Registry.get(sourceFileClass);
+    public static <T extends SourceFile> boolean hasContextRpc(Class<T> sourceFileClass) {
+        return ContextHolder.hasContextRpc(sourceFileClass);
     }
 
-    public static <T extends SourceFile> void register(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
-        Registry.register(sourceFileClass, rewriteRpc);
+    public static <T extends SourceFile> RewriteRpc getContextRpc(Class<T> sourceFileClass) {
+        return ContextHolder.getContextRpc(sourceFileClass);
     }
+
+    public static <T extends SourceFile> void setContextRpc(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
+        ContextHolder.setContextRpc(sourceFileClass, rewriteRpc);
+    }
+
+    static <T extends SourceFile> void removeContextRpc(Class<T> sourceFileClass) {
+        ContextHolder.removeContextRpc(sourceFileClass);
+    }
+
 
     private final JsonRpc jsonRpc;
 
@@ -151,6 +169,11 @@ public class RewriteRpc {
     public RewriteRpc timeout(Duration timeout) {
         this.timeout = timeout;
         return this;
+    }
+
+    @Override
+    public void close() {
+        shutdown();
     }
 
     public void shutdown() {

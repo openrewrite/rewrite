@@ -51,7 +51,7 @@ class JavaScriptParserTest {
           .build();
 
         this.parser = JavaScriptParser.builder().rewriteRpc(rewriteRpc).build();
-        RewriteRpc.register(JS.CompilationUnit.class, rewriteRpc);
+        RewriteRpc.setContextRpc(JS.CompilationUnit.class, rewriteRpc);
     }
 
     @Test

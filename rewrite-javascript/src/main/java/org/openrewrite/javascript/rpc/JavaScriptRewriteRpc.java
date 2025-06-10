@@ -49,7 +49,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     private final @Nullable Closeable closeable;
 
     private JavaScriptRewriteRpc(JavaScriptRewriteRpcProcess process, Environment marketplace) {
-        super(process.getRpcClient(), marketplace);
+        super(requireNonNull(process.getRpcClient()), marketplace);
         this.process = process;
         this.closeable = null;
     }
@@ -163,6 +163,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             } else {
                 List<String> command = new ArrayList<>(Arrays.asList(
                         nodePath.toString(),
+                        "--stack-size=4000",
                         "--enable-source-maps",
                         // Uncomment this to debug the server
                         //  "--inspect-brk",
@@ -193,7 +194,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private Process process;
 
         @Getter
-        private JsonRpc rpcClient;
+        private @Nullable JsonRpc rpcClient;
 
         public JavaScriptRewriteRpcProcess(boolean trace, String... command) {
             this.trace = trace;

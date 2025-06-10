@@ -28,6 +28,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.internal.rpc.JavaScriptReceiver;
 import org.openrewrite.javascript.internal.rpc.JavaScriptSender;
+import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -198,10 +199,18 @@ public interface JS extends J {
             return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
                 @Override
                 public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
-                    RewriteRpc rpc = RewriteRpc.forSourceType(JS.CompilationUnit.class);
-                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                    return tree;
+                    if (RewriteRpc.hasContextRpc(JS.CompilationUnit.class)) {
+                        RewriteRpc rpc = RewriteRpc.getContextRpc(JS.CompilationUnit.class);
+                        Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                        p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
+                        return tree;
+                    } else {
+                        try (RewriteRpc rpc = JavaScriptRewriteRpc.builder().build()) {
+                            Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                            p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
+                            return tree;
+                        }
+                    }
                 }
             };
         }
