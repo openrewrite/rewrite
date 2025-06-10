@@ -131,12 +131,6 @@ export class JavaScriptTypeMapping {
             this.typeCache.set(signature, result);
             // FIXME unsafeSet
             return result;
-        } else if (type.flags & ts.TypeFlags.UniqueESSymbol) {
-            let result = {
-                kind: JavaType.Kind.UniqueSymbol,
-            } as JavaType.UniqueSymbol;
-            this.typeCache.set(signature, result);
-            return result;
         }
 
         // if (ts.isRegularExpressionLiteral(node)) {
