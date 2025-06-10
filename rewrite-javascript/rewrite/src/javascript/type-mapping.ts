@@ -3,7 +3,7 @@ import {JavaType} from "../java";
 import {Draft} from "immer";
 
 export class JavaScriptTypeMapping {
-    private readonly typeCache: Map<string, JavaType> = new Map();
+    private readonly typeCache: Map<number, JavaType> = new Map();
     private readonly regExpSymbol: ts.Symbol | undefined;
 
     constructor(private readonly checker: ts.TypeChecker) {
@@ -36,9 +36,13 @@ export class JavaScriptTypeMapping {
         return result;
     }
 
-    private getSignature(type: ts.Type) {
+    private getSignature(type: ts.Type): number {
         // FIXME for classes we need to include the containing module / package in the signature and probably include in the qualified name
-        return this.checker.typeToString(type);
+        if ("id" in type) { // a private field returned by the type checker
+            return type.id as number;
+        } else {
+            throw new Error("no id property in type: " + JSON.stringify(type));
+        }
     }
 
     primitiveType(node: ts.Node): JavaType.Primitive {
@@ -60,7 +64,8 @@ export class JavaScriptTypeMapping {
         return undefined;
     }
 
-    private createType(type: ts.Type, signature: string): JavaType {
+    private createType(type: ts.Type, cacheKey: number): JavaType {
+        const signature = this.checker.typeToString(type);
         if (type.isLiteral()) {
             if (type.isNumberLiteral()) {
                 return JavaType.Primitive.Double;
@@ -117,7 +122,7 @@ export class JavaScriptTypeMapping {
                 kind: JavaType.Kind.Union,
                 bounds: []
             };
-            this.typeCache.set(signature, result);
+            this.typeCache.set(cacheKey, result);
 
             result.bounds = type.types.map(t => this.getType(t));
             return result;
@@ -127,14 +132,14 @@ export class JavaScriptTypeMapping {
                 let result = {
                     kind: JavaType.Kind.Class,
                     classKind: type.isClass() ? JavaType.Class.Kind.Class : JavaType.Class.Kind.Interface, // TODO there are other options, no?
-                    fullyQualifiedName: "missing", // TODO
+                    fullyQualifiedName: objectType.getSymbol()?.name, // TODO that's not fully qualified
                     typeParameters: [], // TODO
                     annotations: [], // TODO
                     interfaces: [], // TODO
                     members: [],
                     methods: []
                 } as Draft<JavaType.Class>;
-                this.typeCache.set(signature, result);
+                this.typeCache.set(cacheKey, result);
                 objectType.getProperties().forEach(symbol => {
                     const memberType = this.checker.getTypeOfSymbol(symbol);
                     const callSignatures = memberType.getCallSignatures();
@@ -177,9 +182,11 @@ export class JavaScriptTypeMapping {
                     defaultValue: undefined, // TODO
                     declaredFormalTypeNames: []
                 } as JavaType.Method;
-                this.typeCache.set(signature, result);
+                this.typeCache.set(cacheKey, result);
                 return result;
             }
+        } else if (type.flags & ts.TypeFlags.TypeParameter && signature === "this") {
+            return this.getType(type.getConstraint()!);
         }
 
         // if (ts.isRegularExpressionLiteral(node)) {
