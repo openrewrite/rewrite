@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.test.RewriteTest;
 
@@ -33,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -152,6 +154,32 @@ class ResolvedPomTest implements RewriteTest {
             )
           )
         );
+    }
+
+    @Test
+    void dependencyWithCircularProjectVersionReference() {
+        assertThatThrownBy(() -> rewriteRun(
+            pomXml(
+              """
+                <project>
+                    <groupId>org.example</groupId>
+                    <artifactId>app</artifactId>
+                    <version>${project.version}</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.commons</groupId>
+                            <artifactId>commons-lang3</artifactId>
+                            <version>${project.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        )
+          .cause()
+          .isInstanceOf(MavenDownloadingException.class)
+          .hasMessageContaining("org.apache.commons:commons-lang3:error.circular.project.version");
     }
 
     @Test
@@ -636,6 +664,108 @@ class ResolvedPomTest implements RewriteTest {
               .afterRecipe(doc -> {
                   ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
                   assertThat(pom.getManagedVersion("com.fasterxml.jackson.core", "jackson-core", null, null)).isEqualTo("2.16.1");
+              })
+          )
+        );
+    }
+
+    @Test
+    void circularProjectVersionReference() {
+        // Test case where a property is defined as project.version=${project.version}
+        // This creates a circular reference when resolving ${project.version}
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.example</groupId>
+                <artifactId>parent-project</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <relativePath>../pom.xml</relativePath>
+                </parent>
+                <artifactId>child-project</artifactId>
+                <properties>
+                  <!-- This creates a circular reference! -->
+                  <project.version>${project.version}</project.version>
+                </properties>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+              .afterRecipe(doc -> {
+                  // This should not throw a StackOverflowError
+                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  // When project.version property shadows the built-in one,
+                  // it should still resolve to the actual version
+                  String resolvedVersion = pom.getValue("${project.version}");
+                  assertThat(resolvedVersion).isEqualTo("1.0.0-SNAPSHOT");
+              })
+          )
+        );
+    }
+    
+    @Test
+    void circularProjectVersionInDependency() {
+        // Test case where a property shadows project.version and is used in a dependency
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.example</groupId>
+                <artifactId>parent-project</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <relativePath>../pom.xml</relativePath>
+                </parent>
+                <artifactId>child-project</artifactId>
+                <properties>
+                  <!-- This creates a circular reference! -->
+                  <project.version>${project.version}</project.version>
+                  <my.version>${project.version}</my.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.example</groupId>
+                      <artifactId>example-lib</artifactId>
+                      <version>${my.version}</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+              .afterRecipe(doc -> {
+                  // This should not throw a StackOverflowError during dependency resolution
+                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  // The managed version should resolve correctly
+                  String managedVersion = pom.getManagedVersion("com.example", "example-lib", null, null);
+                  assertThat(managedVersion).isEqualTo("1.0.0-SNAPSHOT");
               })
           )
         );
