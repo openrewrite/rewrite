@@ -296,7 +296,14 @@ public class ResolvedPom {
         // This facilitates the usage of "-D" arguments on the command line to customize builds
         String propVal = System.getProperty(property, properties.get(property));
         if (propVal != null) {
-            return propVal;
+            // Check if this would create a circular reference
+            // e.g., <project.version>${project.version}</project.version>
+            if (propVal.equals("${" + property + "}")) {
+                // Skip the user-defined property and fall through to built-in resolution
+                propVal = null;
+            } else {
+                return propVal;
+            }
         }
         switch (property) {
             case "groupId":
