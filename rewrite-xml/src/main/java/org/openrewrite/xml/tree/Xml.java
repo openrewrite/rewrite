@@ -740,7 +740,7 @@ public interface Xml extends Tree {
             }
 
             Markers markers;
-            List<Content> elements;
+            List<Element> elements;
 
             @Override
             public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
