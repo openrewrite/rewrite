@@ -49,6 +49,64 @@ class RecordTest implements RewriteTest {
         );
     }
 
+    @Test
+    void typeParameterAnnotation() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              import static java.lang.annotation.ElementType.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value=PARAMETER)
+              public @interface A {
+                  String value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              record JavaRecord(@A("one value") String name) {
+              }
+              """
+          )
+        );
+    }
+
+    // TODO: Remove
+    @Test
+    void removeThis() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Documented;
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ ElementType.PARAMETER })
+              @Documented
+              public @interface DefaultValue {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              record TestTubbyProperties(
+                @DefaultValue("https://www.tubby.nl") String url
+              ) {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2455")
     @Test
     void compactConstructor() {
