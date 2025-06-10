@@ -121,12 +121,6 @@ export class JavaScriptTypeMapping {
 
             result.bounds = type.types.map(t => this.getType(t));
             return result;
-        } else if (type.flags & ts.TypeFlags.UniqueESSymbol) {
-            let result = {
-                kind: JavaType.Kind.UniqueSymbol,
-            } as JavaType.UniqueSymbol;
-            this.typeCache.set(signature, result);
-            return result;
         } else if (type.flags & ts.TypeFlags.Object) {
             const objectType = type as ts.ObjectType;
             if (objectType.isClassOrInterface()) {

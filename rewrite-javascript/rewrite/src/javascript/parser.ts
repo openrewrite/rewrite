@@ -1957,7 +1957,7 @@ export class JavaScriptParserVisitor {
                 arrow: this.prefix(node.equalsGreaterThanToken),
                 body: this.convert(node.body),
                 type: this.mapType(node)
-            } as J.Lambda,
+            },
             returnTypeExpression: this.mapTypeInfo(node)
         };
     }
