@@ -234,7 +234,11 @@ public class DependencyInsight extends Recipe {
                             .findAny();
                     if (configurationGav.isPresent()) {
                         configurationToDirectDependency.get(m.getSimpleName());
-                        String resultText = directDependencyToTargetDependency.remove(configurationGav.get()).stream()
+                        Set<GroupArtifactVersion> removed = directDependencyToTargetDependency.remove(configurationGav.get());
+                        if (removed == null) {
+                            return null;
+                        }
+                        String resultText = removed.stream()
                                 .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
                                 .collect(Collectors.joining(","));
                         if (!resultText.isEmpty()) {
