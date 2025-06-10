@@ -317,8 +317,13 @@ public class ResolvedPom {
             case "project.version":
             case "pom.version":
                 String version = requested.getVersion();
-                if (version.contains(property) && requested.getParent() != null) {
-                    return requested.getParent().getVersion();
+                if (version.contains(property)) {
+                    if (requested.getParent() != null) {
+                        version = requested.getParent().getVersion();
+                    }
+                    if (version.contains(property)) {
+                        return "error.circular.project.version";
+                    }
                 }
                 return version;
             case "project.parent.version":
