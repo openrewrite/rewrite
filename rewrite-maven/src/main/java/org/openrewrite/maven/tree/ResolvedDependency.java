@@ -119,7 +119,7 @@ public class ResolvedDependency implements Serializable {
         return findDependencies0(groupId, artifactId, Collections.newSetFromMap(new IdentityHashMap<>()));
     }
 
-    public List<ResolvedDependency> findDependencies0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
+    private List<ResolvedDependency> findDependencies0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
         List<ResolvedDependency> dependencies = new ArrayList<>();
         if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
             dependencies.add(this);

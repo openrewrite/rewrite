@@ -350,15 +350,15 @@ class DependencyInsightTest implements RewriteTest {
           buildGradle(
             """
               buildscript {
-              	    ext {
-              	    	springBootVersion = '2.6.6'
-              	    }
-              	    dependencies {
-              	        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
-              	    }
-              	    repositories {
-              	        mavenCentral()
-              	    }
+                  ext {
+                      springBootVersion = '2.6.6'
+                  }
+                  dependencies {
+                      classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
               }
               repositories {
                   mavenCentral()
@@ -380,15 +380,15 @@ class DependencyInsightTest implements RewriteTest {
               """,
             """
               buildscript {
-              	    ext {
-              	    	springBootVersion = '2.6.6'
-              	    }
-              	    dependencies {
-              	        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
-              	    }
-              	    repositories {
-              	        mavenCentral()
-              	    }
+                  ext {
+                      springBootVersion = '2.6.6'
+                  }
+                  dependencies {
+                      classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
               }
               repositories {
                   mavenCentral()
