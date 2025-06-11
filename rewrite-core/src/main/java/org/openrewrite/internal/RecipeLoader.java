@@ -40,7 +40,7 @@ public class RecipeLoader {
                     classLoader == null ? this.getClass().getClassLoader() : classLoader);
             return RecipeIntrospectionUtils.constructRecipe(recipeClass, recipeArgs == null ? emptyMap() : recipeArgs);
         } catch (ReflectiveOperationException | RecipeIntrospectionException | IllegalArgumentException e) {
-            return instantiateRecipe(recipeName, recipeArgs == null ? emptyMap() : recipeArgs);
+            return instantiateRecipeUsingJackson(recipeName, recipeArgs == null ? emptyMap() : recipeArgs);
         }
     }
 
@@ -48,7 +48,7 @@ public class RecipeLoader {
         try {
             return RecipeIntrospectionUtils.constructRecipe(recipeClass, recipeArgs == null ? emptyMap() : recipeArgs);
         } catch (RecipeIntrospectionException | IllegalArgumentException e) {
-            return instantiateRecipe(recipeClass.getName(), recipeArgs == null ? emptyMap() : recipeArgs);
+            return instantiateRecipeUsingJackson(recipeClass.getName(), recipeArgs == null ? emptyMap() : recipeArgs);
         }
     }
 
@@ -56,7 +56,7 @@ public class RecipeLoader {
         return mapper != null ? mapper : (mapper = ObjectMappers.propertyBasedMapper(classLoader));
     }
 
-    private Recipe instantiateRecipe(String recipeName, Map<String, Object> args) throws IllegalArgumentException {
+    private Recipe instantiateRecipeUsingJackson(String recipeName, Map<String, Object> args) throws IllegalArgumentException {
         Map<Object, Object> withJsonType = new HashMap<>(args);
         withJsonType.put("@c", recipeName);
         return getMapper().convertValue(withJsonType, Recipe.class);
