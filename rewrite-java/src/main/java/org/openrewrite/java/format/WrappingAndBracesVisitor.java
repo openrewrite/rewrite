@@ -25,10 +25,10 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.style.LineWrapSetting;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
 import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
 import static org.openrewrite.style.LineWrapSetting.WrapAlways;
@@ -205,7 +205,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space wrapElement(Space prefix, String whitespace, WrappingAndBracesStyle.Annotations annotationsStyle) {
-        if (annotationsStyle != null && prefix.getComments().isEmpty()) {
+        if (prefix.getComments().isEmpty()) {
             if (annotationsStyle.getWrap() == DoNotWrap && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
                 return prefix.withWhitespace(Space.SINGLE_SPACE.getWhitespace());
             } else if (annotationsStyle.getWrap() == WrapAlways) {
@@ -219,12 +219,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         if (prefix.getComments().isEmpty()) {
             return prefix.withWhitespace((hasLineBreak(prefix.getWhitespace()) ? "" : "\n") + prefix.getWhitespace());
         } else if (prefix.getComments().get(prefix.getComments().size() - 1).isMultiline()) {
-            return prefix.withComments(ListUtils.mapLast(prefix.getComments(), c -> c.withSuffix("\n")));
+            return prefix.withComments(ListUtils.mapLast(prefix.getComments(), c -> requireNonNull(c).withSuffix("\n")));
         }
         return prefix;
     }
 
     private List<J.Modifier> withNewline(List<J.Modifier> modifiers, String whitespace, WrappingAndBracesStyle.Annotations annotationsStyle) {
-        return ListUtils.mapFirst(modifiers, mod -> mod.withPrefix(wrapElement(mod.getPrefix(), whitespace, annotationsStyle)));
+        return ListUtils.mapFirst(modifiers, mod -> requireNonNull(mod).withPrefix(wrapElement(mod.getPrefix(), whitespace, annotationsStyle)));
     }
 }
