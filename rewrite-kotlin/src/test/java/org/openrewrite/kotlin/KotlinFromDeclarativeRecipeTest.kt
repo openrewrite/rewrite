@@ -57,7 +57,8 @@ recipeList:
 class KotlinReplaceAllRecipeJackson @JsonCreator constructor(
     @field:Option(
         displayName = "Replacement text",
-        description = "Resulting text after the replacement occurs."
+        description = "Resulting text after the replacement occurs.",
+        example = "REPLACEMENT_TEXT"
     ) @param:JsonProperty("replacementText") val replacementText: String
 ) : Recipe() {
     override fun getDisplayName() = "Tests a simple Kotlin recipe with options and Jackson annotations"
@@ -75,7 +76,8 @@ class KotlinReplaceAllRecipeJackson @JsonCreator constructor(
 class KotlinReplaceAllRecipe(
     @field:Option(
         displayName = "Replacement text",
-        description = "Resulting text after the replacement occurs."
+        description = "Resulting text after the replacement occurs.",
+        example = "REPLACEMENT_TEXT"
     ) val replacementText: String
 ) : Recipe() {
     override fun getDisplayName() = "Tests a simple Kotlin recipe with options"
