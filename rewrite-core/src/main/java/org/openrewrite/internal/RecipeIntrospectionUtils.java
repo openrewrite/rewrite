@@ -113,7 +113,7 @@ public class RecipeIntrospectionUtils {
 
     private static <V> V construct(Class<?> clazz, @Nullable Map<String, Object> args) {
         Constructor<?> constructor = getConstructor(clazz, args);
-        Object @Nullable[] constructorArgs = new Object[constructor.getParameterCount()];
+        Object [] constructorArgs = new Object[constructor.getParameterCount()];
         for (int i = 0; i < constructor.getParameters().length; i++) {
             java.lang.reflect.Parameter param = constructor.getParameters()[i];
             if (args != null && args.containsKey(param.getName())) {
@@ -149,6 +149,11 @@ public class RecipeIntrospectionUtils {
     }
 
     private static Constructor<?> getConstructor(Class<?> clazz, @Nullable Map<String, Object> args) {
+        for (Annotation annotation : clazz.getDeclaredAnnotations()) {
+            if (annotation.annotationType().getName().equals("kotlin.Metadata")) {
+                throw new RecipeIntrospectionException("Kotlin recipes must be instantiated using Jackson");
+            }
+        }
         if (args == null || args.isEmpty()) {
             Constructor<?> constructor = getZeroArgsConstructor(clazz);
             if (constructor != null) {

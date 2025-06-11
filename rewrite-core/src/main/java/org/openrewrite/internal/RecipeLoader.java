@@ -26,9 +26,8 @@ import java.util.Map;
 import static java.util.Collections.emptyMap;
 
 public class RecipeLoader {
-    @Nullable
-    private final ClassLoader classLoader;
 
+    private final @Nullable ClassLoader classLoader;
     private @Nullable ObjectMapper mapper;
 
     public RecipeLoader(@Nullable ClassLoader classLoader) {
@@ -42,6 +41,14 @@ public class RecipeLoader {
             return RecipeIntrospectionUtils.constructRecipe(recipeClass, recipeArgs == null ? emptyMap() : recipeArgs);
         } catch (ReflectiveOperationException | RecipeIntrospectionException | IllegalArgumentException e) {
             return instantiateRecipe(recipeName, recipeArgs == null ? emptyMap() : recipeArgs);
+        }
+    }
+
+    public Recipe load(Class<?> recipeClass, @Nullable Map<String, Object> recipeArgs) {
+        try {
+            return RecipeIntrospectionUtils.constructRecipe(recipeClass, recipeArgs == null ? emptyMap() : recipeArgs);
+        } catch (RecipeIntrospectionException | IllegalArgumentException e) {
+            return instantiateRecipe(recipeClass.getName(), recipeArgs == null ? emptyMap() : recipeArgs);
         }
     }
 
