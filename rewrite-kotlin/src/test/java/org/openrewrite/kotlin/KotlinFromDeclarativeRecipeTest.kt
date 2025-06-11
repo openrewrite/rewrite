@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Option
@@ -37,19 +38,41 @@ name: org.openrewrite.kotlin.KotlinReplaceAllRecipeWrapper
 displayName: Kotlin Replace All Wrapper
 description: Tests a simple Kotlin recipe that replaces all text with the provided option.
 recipeList:
+  - org.openrewrite.kotlin.KotlinReplaceAllRecipeJackson:
+      replacementText: "REPLACED_WITH_JACKSON"
   - org.openrewrite.kotlin.KotlinReplaceAllRecipe:
-      replacementText: "REPLACEMENT_TEXT"
+      replacementText: "REPLACED_WITH_KOTLIN"
             """, "org.openrewrite.kotlin.KotlinReplaceAllRecipeWrapper"
         )
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1)
     }
 
     @Test
     fun `replaces all text with provided replacement argument text`() =
-        rewriteRun(text("Some Text", "REPLACEMENT_TEXT"))
+        rewriteRun(text("Some Text", "REPLACED_WITH_KOTLIN"))
 }
 
 @Suppress("unused")
-class KotlinReplaceAllRecipe @JsonCreator constructor(
+class KotlinReplaceAllRecipeJackson @JsonCreator constructor(
+    @field:Option(
+        displayName = "Replacement text",
+        description = "Resulting text after the replacement occurs."
+    ) @param:JsonProperty("replacementText") val replacementText: String
+) : Recipe() {
+    override fun getDisplayName() = "Tests a simple Kotlin recipe with options and Jackson annotations"
+    override fun getDescription() = "A test case for recipe authoring in Kotlin."
+
+    override fun getVisitor(): TreeVisitor<*, ExecutionContext> =
+        object : PlainTextVisitor<ExecutionContext>() {
+            override fun visitText(text: PlainText, p: ExecutionContext): PlainText {
+                return super.visitText(text.withText(replacementText), p)
+            }
+        }
+}
+
+@Suppress("unused")
+class KotlinReplaceAllRecipe(
     @field:Option(
         displayName = "Replacement text",
         description = "Resulting text after the replacement occurs."
