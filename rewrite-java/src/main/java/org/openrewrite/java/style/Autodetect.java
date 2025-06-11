@@ -1285,37 +1285,37 @@ public class Autodetect extends NamedStyles {
 
         public WrappingAndBracesStyle getWrappingAndBracesStyle() {
             WrappingAndBracesStyle wrappingAndBracesStyle = IntelliJ.wrappingAndBraces();
-            if (classAnnotationsWrapped != 0) {
+            if (classAnnotationsWrapped != 0 && wrappingAndBracesStyle.getClassAnnotations() != null) {
                 wrappingAndBracesStyle = wrappingAndBracesStyle.withClassAnnotations(
                         wrappingAndBracesStyle.getClassAnnotations()
                                 .withWrap(determineWrapping(classAnnotationsWrapped, wrappingAndBracesStyle.getClassAnnotations().getWrap()))
                 );
             }
-            if (methodAnnotationsWrapped != 0) {
+            if (methodAnnotationsWrapped != 0 && wrappingAndBracesStyle.getMethodAnnotations() != null) {
                 wrappingAndBracesStyle = wrappingAndBracesStyle.withMethodAnnotations(
                         wrappingAndBracesStyle.getMethodAnnotations()
                                 .withWrap(determineWrapping(methodAnnotationsWrapped, wrappingAndBracesStyle.getMethodAnnotations().getWrap()))
                 );
             }
-            if (fieldAnnotationsWrapped != 0) {
+            if (fieldAnnotationsWrapped != 0 && wrappingAndBracesStyle.getFieldAnnotations() != null) {
                 wrappingAndBracesStyle = wrappingAndBracesStyle.withFieldAnnotations(
                         wrappingAndBracesStyle.getFieldAnnotations()
                                 .withWrap(determineWrapping(fieldAnnotationsWrapped, wrappingAndBracesStyle.getFieldAnnotations().getWrap()))
                 );
             }
-            if (parameterAnnotationsWrapped != 0) {
+            if (parameterAnnotationsWrapped != 0 && wrappingAndBracesStyle.getParameterAnnotations() != null) {
                 wrappingAndBracesStyle = wrappingAndBracesStyle.withParameterAnnotations(
                         wrappingAndBracesStyle.getParameterAnnotations()
                                 .withWrap(determineWrapping(parameterAnnotationsWrapped, wrappingAndBracesStyle.getParameterAnnotations().getWrap()))
                 );
             }
-            if (localVariableAnnotationsWrapped != 0) {
+            if (localVariableAnnotationsWrapped != 0 && wrappingAndBracesStyle.getLocalVariableAnnotations() != null) {
                 wrappingAndBracesStyle = wrappingAndBracesStyle.withLocalVariableAnnotations(
                         wrappingAndBracesStyle.getLocalVariableAnnotations()
                                 .withWrap(determineWrapping(localVariableAnnotationsWrapped, wrappingAndBracesStyle.getLocalVariableAnnotations().getWrap()))
                 );
             }
-            if (enumFieldAnnotationsWrapped != 0) {
+            if (enumFieldAnnotationsWrapped != 0 && wrappingAndBracesStyle.getEnumFieldAnnotations() != null) {
                 wrappingAndBracesStyle = wrappingAndBracesStyle.withEnumFieldAnnotations(
                         wrappingAndBracesStyle.getEnumFieldAnnotations()
                                 .withWrap(determineWrapping(enumFieldAnnotationsWrapped, wrappingAndBracesStyle.getEnumFieldAnnotations().getWrap()))
