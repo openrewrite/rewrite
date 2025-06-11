@@ -133,7 +133,7 @@ export class JavaScriptTypeMapping {
                     kind: JavaType.Kind.Class,
                     classKind: type.isClass() ? JavaType.Class.Kind.Class : JavaType.Class.Kind.Interface, // TODO there are other options, no?
                     fullyQualifiedName: objectType.getSymbol()?.name, // TODO that's not fully qualified
-                    typeParameters: [], // TODO
+                    typeParameters: objectType.typeParameters?.map(tp => this.getType(tp)),
                     annotations: [], // TODO
                     interfaces: [], // TODO
                     members: [],
@@ -194,6 +194,15 @@ export class JavaScriptTypeMapping {
             }
         } else if (type.flags & ts.TypeFlags.TypeParameter && signature === "this") {
             return this.getType(type.getConstraint()!);
+        } else if (type.isTypeParameter()) {
+            const typeParameter = type as ts.TypeParameter;
+            const result = {
+                kind: JavaType.Kind.GenericTypeVariable,
+                name: typeParameter.symbol.name,
+                bounds: typeParameter.getConstraint() ? [this.getType(typeParameter.getConstraint()!)] : []
+            }; // TODO probably need to defer bounds after setting the cache
+            this.typeCache.set(cacheKey, result);
+            return result;
         }
 
         // if (ts.isRegularExpressionLiteral(node)) {
