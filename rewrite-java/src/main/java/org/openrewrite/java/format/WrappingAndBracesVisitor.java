@@ -98,7 +98,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         String whitespace = m.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
         m = m.withLeadingAnnotations(wrapAnnotations(m.getLeadingAnnotations(), whitespace, style.getMethodAnnotations()));
-        if (!m.getLeadingAnnotations().isEmpty()) {
+        if (!m.getLeadingAnnotations().isEmpty() && style.getMethodAnnotations() != null) {
             if (!m.getModifiers().isEmpty()) {
                 m = m.withModifiers(withNewline(m.getModifiers(), whitespace, style.getMethodAnnotations()));
             } else if (m.getAnnotations().getTypeParameters() != null) {
@@ -141,7 +141,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
         String whitespace = j.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
         j = j.withLeadingAnnotations(wrapAnnotations(j.getLeadingAnnotations(), whitespace, style.getClassAnnotations()));
-        if (!j.getLeadingAnnotations().isEmpty()) {
+        if (!j.getLeadingAnnotations().isEmpty() && style.getClassAnnotations() != null) {
             if (!j.getModifiers().isEmpty()) {
                 j = j.withModifiers(withNewline(j.getModifiers(), whitespace, style.getClassAnnotations()));
             } else {
@@ -159,7 +159,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         J.EnumValue enumValue = super.visitEnumValue(_enum, p);
         String whitespace = enumValue.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
         enumValue = enumValue.withAnnotations(wrapAnnotations(enumValue.getAnnotations(), whitespace, style.getEnumFieldAnnotations()));
-        if (!enumValue.getAnnotations().isEmpty()) {
+        if (!enumValue.getAnnotations().isEmpty() && style.getEnumFieldAnnotations() != null) {
             enumValue = enumValue.withName(
                     enumValue.getName()
                             .withPrefix(wrapElement(enumValue.getName().getPrefix(), whitespace, style.getEnumFieldAnnotations()))
@@ -193,7 +193,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return super.visit(tree, p);
     }
 
-    private List<J.Annotation> wrapAnnotations(List<J.Annotation> annotations, String whitespace, WrappingAndBracesStyle.Annotations annotationsStyle) {
+    private List<J.Annotation> wrapAnnotations(List<J.Annotation> annotations, String whitespace, WrappingAndBracesStyle.@Nullable Annotations annotationsStyle) {
+        if (annotationsStyle == null) {
+            return annotations;
+        }
         return ListUtils.map(annotations, (index, ann) -> {
             if (annotationsStyle.getWrap() == DoNotWrap && hasLineBreak(ann.getPrefix().getWhitespace())) {
                 ann = ann.withPrefix(ann.getPrefix().withWhitespace(Space.SINGLE_SPACE.getWhitespace()));
