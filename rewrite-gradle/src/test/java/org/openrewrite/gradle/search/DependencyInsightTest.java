@@ -411,4 +411,43 @@ class DependencyInsightTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void duplicateDependencies() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()).recipe(new DependencyInsight("org.projectlombok", "lombok", null, null)),
+          buildGradle(
+            """
+            plugins {
+                id 'java'
+            }
+            repositories {
+                mavenCentral()
+            }
+            dependencies {
+                compileOnly("org.projectlombok:lombok:1.18.38")
+                annotationProcessor("org.projectlombok:lombok:1.18.38")
+            
+                testCompileOnly("org.projectlombok:lombok:1.18.38")
+                testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
+            }
+            """,
+            """
+            plugins {
+                id 'java'
+            }
+            repositories {
+                mavenCentral()
+            }
+            dependencies {
+                /*~~(org.projectlombok:lombok:1.18.38)~~>*/compileOnly("org.projectlombok:lombok:1.18.38")
+                /*~~(org.projectlombok:lombok:1.18.38)~~>*/annotationProcessor("org.projectlombok:lombok:1.18.38")
+            
+                /*~~(org.projectlombok:lombok:1.18.38)~~>*/testCompileOnly("org.projectlombok:lombok:1.18.38")
+                /*~~(org.projectlombok:lombok:1.18.38)~~>*/testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
+            }
+            """
+          )
+        );
+    }
 }
