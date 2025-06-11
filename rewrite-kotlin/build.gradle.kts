@@ -39,3 +39,9 @@ kotlin {
         jvmTarget = JvmTarget.JVM_1_8
     }
 }
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    if (name == "compileTestKotlin") {
+        kotlinOptions.jvmTarget = "21"
+    }
+}
