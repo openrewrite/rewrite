@@ -33,15 +33,15 @@ class KotlinFromDeclarativeRecipeTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipeFromYaml(
             """
-type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.kotlin.KotlinReplaceAllRecipeWrapper
-displayName: Kotlin Replace All Wrapper
-description: Tests a simple Kotlin recipe that replaces all text with the provided option.
-recipeList:
-  - org.openrewrite.kotlin.KotlinReplaceAllRecipeJackson:
-      replacementText: "REPLACED_WITH_JACKSON"
-  - org.openrewrite.kotlin.KotlinReplaceAllRecipe:
-      replacementText: "REPLACED_WITH_KOTLIN"
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.kotlin.KotlinReplaceAllRecipeWrapper
+            displayName: Kotlin Replace All Wrapper
+            description: Tests a simple Kotlin recipe that replaces all text with the provided option.
+            recipeList:
+              - org.openrewrite.kotlin.KotlinReplaceAllRecipeJackson:
+                  replacementText: "REPLACED_WITH_JACKSON"
+              - org.openrewrite.kotlin.KotlinReplaceAllRecipe:
+                  replacementText: "REPLACED_WITH_KOTLIN"
             """, "org.openrewrite.kotlin.KotlinReplaceAllRecipeWrapper"
         )
             .cycles(1)
