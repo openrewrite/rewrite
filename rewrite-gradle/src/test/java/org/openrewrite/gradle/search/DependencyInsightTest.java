@@ -77,7 +77,7 @@ class DependencyInsightTest implements RewriteTest {
                   gradlePluginPortal()
               }
               """,
-                spec -> spec.path("buildSrc/build.gradle")),
+            spec -> spec.path("buildSrc/build.gradle")),
           groovy(
             """
               plugins{
@@ -87,7 +87,7 @@ class DependencyInsightTest implements RewriteTest {
                   implementation 'com.google.guava:guava:31.1-jre'
               }
               """,
-                spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
+            spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
           buildGradle(
             """
               plugins {
@@ -127,7 +127,7 @@ class DependencyInsightTest implements RewriteTest {
                   gradlePluginPortal()
               }
               """,
-                spec -> spec.path("buildSrc/build.gradle")),
+            spec -> spec.path("buildSrc/build.gradle")),
           groovy(
             """
               plugins{
@@ -137,7 +137,7 @@ class DependencyInsightTest implements RewriteTest {
                   implementation 'com.google.guava:guava:31.1-jre'
               }
               """,
-                spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
+            spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
           buildGradle(
             """
               plugins {
@@ -255,16 +255,16 @@ class DependencyInsightTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("org.springframework.boot", "*", null, null))
             .dataTable(DependenciesInUse.Row.class, rows -> {
-              assertThat(rows).isNotEmpty();
-              DependenciesInUse.Row row = rows.getFirst();
-              assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-web");
-              assertThat(row.getDepth()).isEqualTo(0);
-              assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
-              row = rows.get(4);
-              assertThat(row.getArtifactId()).isEqualTo("spring-boot");
-              assertThat(row.getDepth()).isEqualTo(4);
-              assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
-          }),
+                assertThat(rows).isNotEmpty();
+                DependenciesInUse.Row row = rows.getFirst();
+                assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-web");
+                assertThat(row.getDepth()).isEqualTo(0);
+                assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
+                row = rows.get(4);
+                assertThat(row.getArtifactId()).isEqualTo("spring-boot");
+                assertThat(row.getDepth()).isEqualTo(4);
+                assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
+            }),
           buildGradle(
             """
               buildscript {
@@ -281,11 +281,11 @@ class DependencyInsightTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-    
+              
               apply plugin: 'org.springframework.boot'
               apply plugin: 'io.spring.dependency-management'
               apply plugin: 'java'
-
+              
               java {
                   sourceCompatibility = '11'
               }
@@ -311,11 +311,11 @@ class DependencyInsightTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-    
+              
               apply plugin: 'org.springframework.boot'
               apply plugin: 'io.spring.dependency-management'
               apply plugin: 'java'
-
+              
               java {
                   sourceCompatibility = '11'
               }
@@ -363,11 +363,11 @@ class DependencyInsightTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-    
+              
               apply plugin: 'org.springframework.boot'
               apply plugin: 'io.spring.dependency-management'
               apply plugin: 'java'
-
+              
               java {
                   sourceCompatibility = '11'
               }
@@ -393,11 +393,11 @@ class DependencyInsightTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-    
+              
               apply plugin: 'org.springframework.boot'
               apply plugin: 'io.spring.dependency-management'
               apply plugin: 'java'
-
+              
               java {
                   sourceCompatibility = '11'
               }
@@ -406,6 +406,45 @@ class DependencyInsightTest implements RewriteTest {
                   /*~~(com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
                   /*~~(com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
                   /*~~(com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void duplicateDependencies() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()).recipe(new DependencyInsight("org.projectlombok", "lombok", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  compileOnly("org.projectlombok:lombok:1.18.38")
+                  annotationProcessor("org.projectlombok:lombok:1.18.38")
+              
+                  testCompileOnly("org.projectlombok:lombok:1.18.38")
+                  testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  /*~~(org.projectlombok:lombok:1.18.38)~~>*/compileOnly("org.projectlombok:lombok:1.18.38")
+                  /*~~(org.projectlombok:lombok:1.18.38)~~>*/annotationProcessor("org.projectlombok:lombok:1.18.38")
+              
+                  /*~~(org.projectlombok:lombok:1.18.38)~~>*/testCompileOnly("org.projectlombok:lombok:1.18.38")
+                  /*~~(org.projectlombok:lombok:1.18.38)~~>*/testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
               }
               """
           )
