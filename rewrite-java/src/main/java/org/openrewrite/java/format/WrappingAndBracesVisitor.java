@@ -205,7 +205,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space wrapElement(Space prefix, String whitespace, WrappingAndBracesStyle.Annotations annotationsStyle) {
-        if (prefix.getComments().isEmpty()) {
+        if (annotationsStyle != null && prefix.getComments().isEmpty()) {
             if (annotationsStyle.getWrap() == DoNotWrap && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
                 return prefix.withWhitespace(Space.SINGLE_SPACE.getWhitespace());
             } else if (annotationsStyle.getWrap() == WrapAlways) {
