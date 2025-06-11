@@ -3770,7 +3770,7 @@ public interface J extends Tree, RpcCodec<J> {
             return containing == null ? null : containing.getElement();
         }
 
-        public MemberReference withContaining(Expression containing) {
+        public MemberReference withContaining(@Nullable Expression containing) {
             //noinspection ConstantConditions
             return getPadding().withContaining(JRightPadded.withElement(this.containing, containing));
         }
@@ -3864,11 +3864,11 @@ public interface J extends Tree, RpcCodec<J> {
         public static class Padding {
             private final MemberReference t;
 
-            public JRightPadded<Expression> getContaining() {
+            public @Nullable JRightPadded<Expression> getContaining() {
                 return t.containing;
             }
 
-            public MemberReference withContaining(JRightPadded<Expression> containing) {
+            public MemberReference withContaining(@Nullable JRightPadded<Expression> containing) {
                 return t.containing == containing ? t : new MemberReference(t.id, t.prefix, t.markers, containing, t.typeParameters, t.reference, t.type, t.methodType, t.variableType);
             }
 
