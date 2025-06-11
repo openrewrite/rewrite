@@ -2654,7 +2654,20 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 markers: emptyMarkers,
-                variable: this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)),
+                variable: (() => {
+                    if (node.initializer.kind == ts.SyntaxKind.Identifier) {
+                        const ident = this.visit(node.initializer);
+                        return this.rightPadded({
+                            kind: JS.Kind.ExpressionStatement,
+                            id: randomId(),
+                            expression: ident,
+                            markers: emptyMarkers,
+                            prefix: emptySpace
+                        } as JS.ExpressionStatement, this.suffix(node.initializer));
+                    } else {
+                        return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
+                    }
+                })(),
                 iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
             },
             body: this.rightPadded(
@@ -2685,7 +2698,20 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                     markers: emptyMarkers,
-                    variable: this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)),
+                    variable: (() => {
+                        if (node.initializer.kind == ts.SyntaxKind.Identifier) {
+                            const ident = this.visit(node.initializer);
+                            return this.rightPadded({
+                                kind: JS.Kind.ExpressionStatement,
+                                id: randomId(),
+                                expression: ident,
+                                markers: emptyMarkers,
+                                prefix: emptySpace
+                            } as JS.ExpressionStatement, this.suffix(node.initializer));
+                        } else {
+                            return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
+                        }
+                    })(),
                     iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
                 },
                 body: this.rightPadded(

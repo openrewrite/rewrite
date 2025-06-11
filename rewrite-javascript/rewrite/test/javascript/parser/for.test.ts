@@ -250,4 +250,28 @@ describe('for mapping', () => {
             //language=typescript
             typescript('for(   let j=1 ;j<=5 ;j++ ){}')
         ));
+
+    test('using `ExpressionStatement(Identifier())` in a for-of loop which declares variable outside of the loop', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`let i; for (i of [1,2,3]) {}`),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const forOfLoop = <JS.ForOfLoop>cu.statements[1].element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
+                const expressionStatement = <JS.ExpressionStatement>forOfLoop.loop.control.variable.element;
+                expect(expressionStatement.expression.kind).toBe(J.Kind.Identifier);
+            }
+        }));
+
+    test('using `ExpressionStatement(Identifier())` in a for-in loop which declares variable outside of the loop', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`let i; for (i in [1,2,3]) {}`),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const forInLoop = <JS.ForInLoop>cu.statements[1].element;
+                expect(forInLoop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
+                const expressionStatement = <JS.ExpressionStatement>forInLoop.control.variable.element;
+                expect(expressionStatement.expression.kind).toBe(J.Kind.Identifier);
+            }
+        }));
 });
