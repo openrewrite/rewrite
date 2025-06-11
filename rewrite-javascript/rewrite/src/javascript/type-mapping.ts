@@ -184,6 +184,13 @@ export class JavaScriptTypeMapping {
                 } as JavaType.Method;
                 this.typeCache.set(cacheKey, result);
                 return result;
+            } else if (objectType.objectFlags & ts.ObjectFlags.Reference) {
+                const typeReference = objectType as ts.TypeReference;
+                if (typeReference.target != type) { // TODO handle cases where it is the same
+                    const result = this.getType(typeReference.target);
+                    this.typeCache.set(cacheKey, result);
+                    return result;
+                }
             }
         } else if (type.flags & ts.TypeFlags.TypeParameter && signature === "this") {
             return this.getType(type.getConstraint()!);
