@@ -3763,10 +3763,11 @@ public interface J extends Tree, RpcCodec<J> {
         @Getter
         Markers markers;
 
+        @Nullable
         JRightPadded<Expression> containing;
 
-        public Expression getContaining() {
-            return containing.getElement();
+        public @Nullable Expression getContaining() {
+            return containing == null ? null : containing.getElement();
         }
 
         public MemberReference withContaining(Expression containing) {
