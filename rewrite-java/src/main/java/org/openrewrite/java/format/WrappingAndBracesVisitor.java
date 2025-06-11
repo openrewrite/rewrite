@@ -66,7 +66,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         J.VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
-        String whitespace = variableDeclarations.getPrefix().getWhitespace().replaceFirst("^\\n+", "\n");
+        String whitespace = variableDeclarations.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
         WrappingAndBracesStyle.Annotations annotationsStyle = null;
         Cursor possiblyBlock = getCursor().dropParentUntil(J.class::isInstance);
         if (possiblyBlock.getValue() instanceof J.Block) {
@@ -96,7 +96,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
-        String whitespace = m.getPrefix().getWhitespace().replaceFirst("^\\n+", "\n");
+        String whitespace = m.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
         m = m.withLeadingAnnotations(wrapAnnotations(m.getLeadingAnnotations(), whitespace, style.getMethodAnnotations()));
         if (!m.getLeadingAnnotations().isEmpty()) {
             if (!m.getModifiers().isEmpty()) {
@@ -139,7 +139,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
-        String whitespace = j.getPrefix().getWhitespace().replaceFirst("^\\n+", "\n");
+        String whitespace = j.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
         j = j.withLeadingAnnotations(wrapAnnotations(j.getLeadingAnnotations(), whitespace, style.getClassAnnotations()));
         if (!j.getLeadingAnnotations().isEmpty()) {
             if (!j.getModifiers().isEmpty()) {
@@ -157,7 +157,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.EnumValue visitEnumValue(J.EnumValue _enum, P p) {
         J.EnumValue enumValue = super.visitEnumValue(_enum, p);
-        String whitespace = enumValue.getPrefix().getWhitespace().replaceFirst("^\\n+", "\n");
+        String whitespace = enumValue.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
         enumValue = enumValue.withAnnotations(wrapAnnotations(enumValue.getAnnotations(), whitespace, style.getEnumFieldAnnotations()));
         if (!enumValue.getAnnotations().isEmpty()) {
             enumValue = enumValue.withName(
