@@ -160,7 +160,7 @@ public class DependencyInsight extends Recipe {
                                     dep.getDatedSnapshotVersion(),
                                     dep.getRequested().getScope(),
                                     dep.getDepth(),
-                                    resolvedDependency.getGav().asGroupArtifactVersion()
+                                    resolvedDependency.getGav().asGroupArtifactVersion().toString()
                             ));
                         }
                     }

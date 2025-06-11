@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
 
 @JsonIgnoreType
 public class DependenciesInUse extends DataTable<DependenciesInUse.Row> {
@@ -70,6 +69,6 @@ public class DependenciesInUse extends DataTable<DependenciesInUse.Row> {
                 description = "What dependency brings this dependency to the project. If depth is 0, this will be the same as the detected dependency. " +
                               "Only for gradle dependencies")
         @Nullable
-        GroupArtifactVersion direct;
+        String direct;
     }
 }
