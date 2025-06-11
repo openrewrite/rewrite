@@ -61,9 +61,9 @@ class RecordTest implements RewriteTest {
               import static java.lang.annotation.ElementType.*;
               
               @Retention(RetentionPolicy.RUNTIME)
-              @Target(value=PARAMETER)
+              @Target(PARAMETER)
               public @interface A {
-                  String value() default {};
+                  String value() default "";
               }
               """
           ),
