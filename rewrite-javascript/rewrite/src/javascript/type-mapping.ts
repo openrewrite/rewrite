@@ -117,9 +117,9 @@ export class JavaScriptTypeMapping {
             return JavaType.Primitive.Boolean;
         }
 
-        if (type.isUnion()) {
+        if (type.isUnion() || type.isIntersection()) {
             let result: Draft<JavaType.Union> = {
-                kind: JavaType.Kind.Union,
+                kind: type.isUnion() ? JavaType.Kind.Union : JavaType.Kind.Intersection,
                 bounds: []
             };
             this.typeCache.set(cacheKey, result);
