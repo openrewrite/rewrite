@@ -207,4 +207,22 @@ class FindDependencyTest implements RewriteTest {
         }
 
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5599")
+    void ignoreConstraints() {
+        rewriteRun(spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", "implementation")),
+          buildGradle(
+            //language=gradle
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1') 
+                  }
+              }
+              """));
+    }
 }
