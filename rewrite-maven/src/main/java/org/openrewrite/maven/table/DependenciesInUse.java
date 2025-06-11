@@ -64,11 +64,5 @@ public class DependenciesInUse extends DataTable<DependenciesInUse.Row> {
         @Column(displayName = "Depth",
                 description = "How many levels removed from a direct dependency. This will be 0 for direct dependencies.")
         Integer depth;
-
-        @Column(displayName = "Direct dependency",
-                description = "What dependency brings this dependency to the project. If depth is 0, this will be the same as the detected dependency. " +
-                              "Only for gradle dependencies")
-        @Nullable
-        String direct;
     }
 }

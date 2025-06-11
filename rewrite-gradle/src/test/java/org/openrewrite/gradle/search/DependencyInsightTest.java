@@ -259,11 +259,9 @@ class DependencyInsightTest implements RewriteTest {
               DependenciesInUse.Row row = rows.getFirst();
               assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-web");
               assertThat(row.getDepth()).isEqualTo(0);
-              assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
               row = rows.get(4);
               assertThat(row.getArtifactId()).isEqualTo("spring-boot");
               assertThat(row.getDepth()).isEqualTo(4);
-              assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
           }),
           buildGradle(
             """
@@ -340,12 +338,10 @@ class DependencyInsightTest implements RewriteTest {
                 assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.datatype");
                 assertThat(row.getArtifactId()).isEqualTo("jackson-datatype-jsr310");
                 assertThat(row.getDepth()).isEqualTo(2);
-                assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
                 row = rows.get(4);
                 assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.core");
                 assertThat(row.getArtifactId()).isEqualTo("jackson-core");
                 assertThat(row.getDepth()).isEqualTo(3);
-                assertThat(row.getDirect()).isNotNull().hasToString("org.springframework.boot:spring-boot-starter-web:2.6.6");
             }),
           buildGradle(
             """
