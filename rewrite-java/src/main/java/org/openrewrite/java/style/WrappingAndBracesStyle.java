@@ -15,11 +15,15 @@
  */
 package org.openrewrite.java.style;
 
-import lombok.AllArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.style.LineWrapSetting;
+
+import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 
 @Value
 @With
@@ -32,6 +36,23 @@ public class WrappingAndBracesStyle implements JavaStyle {
     Annotations parameterAnnotations;
     Annotations localVariableAnnotations;
     Annotations enumFieldAnnotations;
+
+    @JsonCreator
+    public WrappingAndBracesStyle(IfStatement ifStatement,
+                                  @Nullable Annotations classAnnotations,
+                                  @Nullable Annotations methodAnnotations,
+                                  @Nullable Annotations fieldAnnotations,
+                                  @Nullable Annotations parameterAnnotations,
+                                  @Nullable Annotations localVariableAnnotations,
+                                  @Nullable Annotations enumFieldAnnotations) {
+        this.ifStatement = ifStatement;
+        this.classAnnotations = classAnnotations == null ? new WrappingAndBracesStyle.Annotations(WrapAlways) : classAnnotations;
+        this.methodAnnotations = methodAnnotations == null ? new WrappingAndBracesStyle.Annotations(WrapAlways) : methodAnnotations;
+        this.fieldAnnotations = fieldAnnotations == null ? new WrappingAndBracesStyle.Annotations(WrapAlways) : fieldAnnotations;
+        this.parameterAnnotations = parameterAnnotations == null ? new WrappingAndBracesStyle.Annotations(DoNotWrap) : parameterAnnotations;
+        this.localVariableAnnotations = localVariableAnnotations == null ? new WrappingAndBracesStyle.Annotations(DoNotWrap) : localVariableAnnotations;
+        this.enumFieldAnnotations = enumFieldAnnotations == null ? new WrappingAndBracesStyle.Annotations(DoNotWrap) : enumFieldAnnotations;
+    }
 
     public IfStatement getIfStatement() {
         //noinspection ConstantConditions
