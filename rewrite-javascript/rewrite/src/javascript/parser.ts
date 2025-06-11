@@ -2708,6 +2708,23 @@ export class JavaScriptParserVisitor {
                                 markers: emptyMarkers,
                                 prefix: emptySpace
                             } as JS.ExpressionStatement, this.suffix(node.initializer));
+                        } else if (node.initializer.kind == ts.SyntaxKind.ArrayLiteralExpression) {
+                            const arrayLiteral = node.initializer as ts.ArrayLiteralExpression;
+                            const elementsMapped =
+                                arrayLiteral.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e)));
+                            return this.rightPadded({
+                                kind: JS.Kind.ArrayBindingPattern,
+                                id: randomId(),
+                                elements: {
+                                    kind: J.Kind.Container,
+                                    id: randomId(),
+                                    before: emptySpace,
+                                    elements: elementsMapped,
+                                    markers: emptyMarkers
+                                } as J.Container<Expression>,
+                                markers: emptyMarkers,
+                                prefix: emptySpace
+                            } as JS.ArrayBindingPattern, this.suffix(node.initializer))
                         } else {
                             return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
                         }

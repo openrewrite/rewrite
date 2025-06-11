@@ -274,4 +274,30 @@ describe('for mapping', () => {
                 expect(expressionStatement.expression.kind).toBe(J.Kind.Identifier);
             }
         }));
+
+    test('a for-of loop which uses array deconstruction with variables defined outside of the loop', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                const pairs: [string, number][] = [
+                    ["Alice", 25],
+                    ["Bob", 30],
+                    ["Carol", 28],
+                ];
+                let firstName;
+                let age;
+                for ([firstName, age] of pairs) {
+                    console.log(firstName, age);
+                }
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const forOfLoop = <JS.ForOfLoop>cu.statements[3].element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ArrayBindingPattern);
+                const arrayBinding = <JS.ArrayBindingPattern>forOfLoop.loop.control.variable.element;
+                expect(arrayBinding.elements.elements[0].element.kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[0].element as J.Identifier).simpleName).toBe("firstName");
+                expect(arrayBinding.elements.elements[1].element.kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[1].element as J.Identifier).simpleName).toBe("age");
+            }
+        }));
 });
