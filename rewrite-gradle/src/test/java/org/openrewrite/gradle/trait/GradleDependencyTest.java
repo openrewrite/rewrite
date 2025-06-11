@@ -206,4 +206,29 @@ class GradleDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void ignoreConstraint() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  constraints {
+                      implementation('com.google.guava:guava:28.2-jre') {
+                          because 'CVE-2021-47621'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
