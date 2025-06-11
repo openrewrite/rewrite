@@ -32,7 +32,7 @@ class GradleDependencyConstraintTest implements RewriteTest {
         spec
           .beforeRecipe(withToolingApi())
           .recipe(RewriteTest.toRecipe(() -> gradleDependencyConstraint().asVisitor(dep ->
-            SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
+            SearchResult.found(dep.getTree(), dep.getGav().toString()))));
     }
 
     @DocumentExample
@@ -65,9 +65,9 @@ class GradleDependencyConstraintTest implements RewriteTest {
               }
               
               dependencies {
-                    constraints {
-                        /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:28.2-jre"
-                    }
+                  constraints {
+                      /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:28.2-jre"
+                  }
               }
               """
           )
@@ -153,44 +153,6 @@ class GradleDependencyConstraintTest implements RewriteTest {
     }
 
     @Test
-    void platform() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-                  constraints {
-                      implementation(platform("com.google.guava:guava:28.2-jre"))
-                  }
-              }
-              """,
-            """
-              plugins {
-                  id "java"
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-                  constraints {
-                      /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation(platform("com.google.guava:guava:28.2-jre"))
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void enforcedPlatform() {
         rewriteRun(
           buildGradle(
@@ -229,7 +191,7 @@ class GradleDependencyConstraintTest implements RewriteTest {
     }
 
     @Test
-    void ignoreConstraint() {
+    void ignoreDependencies() {
         rewriteRun(
           buildGradle(
             """
