@@ -1537,8 +1537,8 @@ public class GroovyParserVisitor {
                         forEachMarkers = forEachMarkers.add(new InStyleForEachLoop(randomId()));
                     }
 
-                    JRightPadded<Statement> variable = JRightPadded.build(
-                            (Statement) new J.VariableDeclarations(randomId(), paramFmt, Markers.EMPTY, emptyList(), modifiers, paramType, null, emptyList(), singletonList(paramName))
+                    JRightPadded<Statement> variable = JRightPadded.<Statement>build(
+                            new J.VariableDeclarations(randomId(), paramFmt, Markers.EMPTY, emptyList(), modifiers, paramType, null, emptyList(), singletonList(paramName))
                     ).withAfter(rightPad);
 
                     JRightPadded<Expression> iterable = JRightPadded.build((Expression) visit(forLoop.getCollectionExpression()))
