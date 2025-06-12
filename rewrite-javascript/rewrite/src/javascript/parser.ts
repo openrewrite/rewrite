@@ -3977,7 +3977,7 @@ export class JavaScriptParserVisitor {
     }
 
     private mapType(node: ts.Node): JavaType | undefined {
-        return this.typeMapping.type(node);
+        return Object.freeze(this.typeMapping.type(node));
     }
 
     private mapPrimitiveType(node: ts.Node): JavaType.Primitive {
