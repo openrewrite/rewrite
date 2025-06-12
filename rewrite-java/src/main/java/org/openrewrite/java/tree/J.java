@@ -2296,7 +2296,7 @@ public interface J extends Tree, RpcCodec<J> {
 
             // If used to be VariableDeclarations, but got widened to Statement for JS/TS sake as one can
             // have other statements there. For instance, use a variable defined before the loop.
-            // Keeping the "variable" name as this is the most prominent usage anyway.
+            // Keeping the "variable" name as this is the most prominent usage anyway and backward compatibility of LSTs.
             JRightPadded<Statement> variable;
 
             public Statement getVariable() {
