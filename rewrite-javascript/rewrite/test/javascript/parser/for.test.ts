@@ -326,4 +326,24 @@ describe('for mapping', () => {
                 }
             }
         }));
+
+    test('a for-of loop which uses array spread deconstruction with variables defined outside of the loop', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                let first, rest;
+                for ([first, ...rest] of [[1,2],[3,4]]) {
+                    console.log(first, rest);
+                }
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const forOfLoop = <JS.ForOfLoop>cu.statements[1].element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ArrayBindingPattern);
+                const arrayBinding = <JS.ArrayBindingPattern>forOfLoop.loop.control.variable.element;
+                expect(arrayBinding.elements.elements[0].element.kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[0].element as J.Identifier).simpleName).toBe("first");
+                expect(arrayBinding.elements.elements[1].element.kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[1].element as J.Identifier).simpleName).toBe("rest");
+            }
+        }));
 });
