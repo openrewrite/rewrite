@@ -39,7 +39,7 @@ export class Print {
                 return await printer(tree).print(tree, out);
             } else {
                 const cursor = await getCursor(request.cursor);
-                return await printer(cursor).print(tree, out)
+                return await printer(cursor).print(tree, out);
             }
         });
     }
