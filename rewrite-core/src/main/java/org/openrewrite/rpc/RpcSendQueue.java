@@ -197,7 +197,7 @@ public class RpcSendQueue {
         }
         Class<?> type = after.getClass();
         if (type.isPrimitive() || type.getPackage().getName().startsWith("java.lang") ||
-            type.equals(UUID.class) || Iterable.class.isAssignableFrom(type)) {
+            type.equals(UUID.class) || Iterable.class.isAssignableFrom(type) || Enum.class.isAssignableFrom(type)) {
             return null;
         }
         return type.getName();
