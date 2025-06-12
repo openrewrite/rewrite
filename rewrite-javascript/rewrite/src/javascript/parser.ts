@@ -2498,7 +2498,9 @@ export class JavaScriptParserVisitor {
 
     visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations | J.VariableDeclarations {
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
-            draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            if (node.modifiers) {
+                draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            }
             draft.prefix = this.prefix(node);
         });
     }
@@ -3975,7 +3977,7 @@ export class JavaScriptParserVisitor {
     }
 
     private mapType(node: ts.Node): JavaType | undefined {
-        return this.typeMapping.type(node);
+        return Object.freeze(this.typeMapping.type(node));
     }
 
     private mapPrimitiveType(node: ts.Node): JavaType.Primitive {
