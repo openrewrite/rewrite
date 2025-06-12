@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 
-import {describe} from "@jest/globals";
-import {mapAsync} from "../src";
-
 export function tap<T>(obj: T, fn: (x: T) => void) {
     fn(obj);
 }
