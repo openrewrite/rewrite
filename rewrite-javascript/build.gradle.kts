@@ -89,6 +89,13 @@ val npmVersion = tasks.register<NpmTask>("npmVersion") {
 }
 
 val npmRunBuild = tasks.register<NpmTask>("npmBuild") {
+    inputs.files(npmInstall)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("rewrite") {
+        include("*.json")
+    }).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("rewrite/src"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(npmVersion)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(file("rewrite/dist/"))
