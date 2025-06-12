@@ -199,7 +199,7 @@ public interface JS extends J {
             return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
                 @Override
                 public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
-                    try (RewriteRpc rpc = JavaScriptRewriteRpc.builder().build()) {
+                    try (RewriteRpc rpc = JavaScriptRewriteRpc.bundledInstallation()) {
                         Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
                         p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
                         return tree;

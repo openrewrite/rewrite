@@ -34,7 +34,6 @@ import org.openrewrite.rpc.RewriteRpc;
 
 import java.io.*;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -106,41 +105,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         ).getRecipesInstalled();
     }
 
-    public static JavaScriptRewriteRpc fromProductionPackage() {
-        try {
-            Path tempDir = Files.createTempDirectory("javascript-rewrite-rpc-production");
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                try (Stream<Path> stream = Files.walk(tempDir)) {
-                    stream.sorted(Comparator.reverseOrder())
-                            .map(Path::toFile)
-                            .forEach(File::delete);
-                } catch (IOException ignore) {
-                }
-            }));
-
-            InputStream packageStream = JavaScriptRewriteRpc.class.getResourceAsStream("/production-package.zip");
-            if (packageStream == null) {
-                throw new IllegalStateException("production-package.zip not found in resources");
-            }
-
-            try (ZipInputStream zipIn = new ZipInputStream(packageStream)) {
-                ZipEntry entry;
-                while ((entry = zipIn.getNextEntry()) != null) {
-                    if (!entry.isDirectory()) {
-                        Path outputPath = tempDir.resolve(entry.getName());
-                        Files.createDirectories(outputPath.getParent());
-                        Files.copy(zipIn, outputPath);
-                    }
-                    zipIn.closeEntry();
-                }
-            }
-
-            return builder()
-                    .installationDirectory(tempDir.resolve("node_modules/@openrewrite/rewrite/dist"))
-                    .build();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public static JavaScriptRewriteRpc bundledInstallation() {
+        return JavaScriptRewriteRpc.builder().build();
     }
 
     public static Builder builder() {
@@ -149,7 +115,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
 
     public static class Builder {
-        private static volatile @Nullable Path defaultInstallationDirectory;
+        private static volatile @Nullable Path bundledInstallationDirectory;
 
         private Environment marketplace = Environment.builder().build();
         private Path nodePath = Paths.get("node");
@@ -159,25 +125,22 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private @Nullable Path logFile;
         private @Nullable Duration timeout;
 
-        private static Path getDefaultInstallationDirectory() {
-            if (defaultInstallationDirectory == null) {
+        private static Path getBundledInstallationDirectory() {
+            if (bundledInstallationDirectory == null) {
                 synchronized (Builder.class) {
-                    if (defaultInstallationDirectory == null) {
-                        defaultInstallationDirectory = initializeDefaultInstallationDirectory();
+                    if (bundledInstallationDirectory == null) {
+                        bundledInstallationDirectory = initializeBundledInstallationDirectory();
                     }
                 }
             }
-            return requireNonNull(defaultInstallationDirectory);
+            return requireNonNull(bundledInstallationDirectory);
         }
 
-        private static Path initializeDefaultInstallationDirectory() {
+        private static Path initializeBundledInstallationDirectory() {
             try {
                 Path tempDir = Files.createTempDirectory("javascript-rewrite-rpc");
-
-                // Add shutdown hook to clean up temporary directory
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                     try (Stream<Path> stream = Files.walk(tempDir)) {
-                        //noinspection ResultOfMethodCallIgnored
                         stream.sorted(Comparator.reverseOrder())
                                 .map(Path::toFile)
                                 .forEach(File::delete);
@@ -185,55 +148,26 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                     }
                 }));
 
-                // Create package.json with required dependencies
-                //language=json
-                String packageJsonContent = "{\n" +
-                                            "  \"name\": \"javascript-rewrite-rpc-temp\",\n" +
-                                            "  \"version\": \"1.0.0\",\n" +
-                                            "  \"private\": true,\n" +
-                                            "  \"dependencies\": {\n" +
-                                            "    \"@openrewrite/rewrite\": \"next\",\n" +
-                                            "    \"typescript\": \"latest\"\n" +
-                                            "  }\n" +
-                                            "}\n";
+                InputStream packageStream = JavaScriptRewriteRpc.class.getResourceAsStream("/production-package.zip");
+                if (packageStream == null) {
+                    throw new IllegalStateException("production-package.zip not found in resources");
+                }
 
-                Path packageJsonPath = tempDir.resolve("package.json");
-                Files.write(packageJsonPath, packageJsonContent.getBytes(StandardCharsets.UTF_8));
-
-                Path errorFile = Files.createTempFile("npm-install-error", ".log");
-
-                try {
-                    // Run npm install to download dependencies
-                    ProcessBuilder npmInstall = new ProcessBuilder("npm", "install")
-                            .directory(tempDir.toFile())
-                            .redirectOutput(ProcessBuilder.Redirect.to(new File("/dev/null")))
-                            .redirectError(ProcessBuilder.Redirect.to(errorFile.toFile()));
-
-                    Process process = npmInstall.start();
-                    int exitCode = process.waitFor();
-
-                    if (exitCode != 0) {
-                        // Read error content from the temporary file
-                        String errorContent;
-                        try {
-                            errorContent = new String(Files.readAllBytes(errorFile), StandardCharsets.UTF_8);
-                        } catch (IOException e) {
-                            errorContent = "Unable to read error output: " + e.getMessage();
+                try (ZipInputStream zipIn = new ZipInputStream(packageStream)) {
+                    ZipEntry entry;
+                    while ((entry = zipIn.getNextEntry()) != null) {
+                        if (!entry.isDirectory()) {
+                            Path outputPath = tempDir.resolve(entry.getName());
+                            Files.createDirectories(outputPath.getParent());
+                            Files.copy(zipIn, outputPath);
                         }
-
-                        throw new RuntimeException("Failed to install npm dependencies in temporary directory. Exit code: " +
-                                                   exitCode + ". Error output: " + errorContent);
-                    }
-                } finally {
-                    try {
-                        Files.deleteIfExists(errorFile);
-                    } catch (IOException ignore) {
+                        zipIn.closeEntry();
                     }
                 }
 
                 return tempDir.resolve("node_modules/@openrewrite/rewrite/dist");
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException("Failed to initialize default installation directory", e);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
             }
         }
 
@@ -288,7 +222,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 // Use default installation directory if none provided (lazy-loaded)
                 Path effectiveInstallationDirectory = installationDirectory != null
                         ? installationDirectory
-                        : getDefaultInstallationDirectory();
+                        : getBundledInstallationDirectory();
 
                 List<String> command = new ArrayList<>(Arrays.asList(
                         nodePath.toString(),
