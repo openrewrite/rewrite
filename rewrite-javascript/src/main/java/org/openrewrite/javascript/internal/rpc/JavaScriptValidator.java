@@ -608,7 +608,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
 
     @Override
     public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
-        visitAndValidateNonNull(control.getVariable(), J.VariableDeclarations.class, p);
+        visitAndValidateNonNull(control.getVariable(), Statement.class, p);
         visitAndValidateNonNull(control.getIterable(), Expression.class, p);
         return control;
     }
