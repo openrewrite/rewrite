@@ -44,6 +44,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static java.util.Objects.requireNonNull;
 
@@ -102,6 +104,43 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         new InstallRecipesByPackage.Package(packageName, version)),
                 InstallRecipesResponse.class
         ).getRecipesInstalled();
+    }
+
+    public static JavaScriptRewriteRpc fromProductionPackage() {
+        try {
+            Path tempDir = Files.createTempDirectory("javascript-rewrite-rpc-production");
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try (Stream<Path> stream = Files.walk(tempDir)) {
+                    stream.sorted(Comparator.reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(File::delete);
+                } catch (IOException ignore) {
+                }
+            }));
+
+            InputStream packageStream = JavaScriptRewriteRpc.class.getResourceAsStream("/production-package.zip");
+            if (packageStream == null) {
+                throw new IllegalStateException("production-package.zip not found in resources");
+            }
+
+            try (ZipInputStream zipIn = new ZipInputStream(packageStream)) {
+                ZipEntry entry;
+                while ((entry = zipIn.getNextEntry()) != null) {
+                    if (!entry.isDirectory()) {
+                        Path outputPath = tempDir.resolve(entry.getName());
+                        Files.createDirectories(outputPath.getParent());
+                        Files.copy(zipIn, outputPath);
+                    }
+                    zipIn.closeEntry();
+                }
+            }
+
+            return builder()
+                    .installationDirectory(tempDir.resolve("node_modules/@openrewrite/rewrite/dist"))
+                    .build();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static Builder builder() {

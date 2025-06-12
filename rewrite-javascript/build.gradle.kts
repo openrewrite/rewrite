@@ -103,32 +103,86 @@ val npmPack = tasks.register<NpmTask>("npmPack") {
     dependsOn(npmRunBuild, npmVersion)
     finalizedBy(npmResetVersion)
 
+    val tempPackDir = layout.buildDirectory.dir("tmp/npm-pack").get().asFile
+
     // Delete existing tgz files before packing
     doFirst {
-        val outputDir = layout.buildDirectory.dir("resources/main").get().asFile
-        if (outputDir.exists()) {
-            outputDir.listFiles { _, name -> name.endsWith(".tgz") }?.forEach { file ->
+        if (tempPackDir.exists()) {
+            tempPackDir.listFiles { _, name -> name.endsWith(".tgz") }?.forEach { file ->
                 file.delete()
             }
         }
+        tempPackDir.mkdirs()
     }
 
     args.set(listOf(
         "pack",
-        "--pack-destination=${layout.buildDirectory.dir("resources/main").get().asFile.absolutePath}"
+        "--pack-destination=${tempPackDir.absolutePath}"
     ))
     workingDir.set(file("rewrite"))
 
     inputs.files(fileTree("rewrite/dist"))
     inputs.files("rewrite/package.json", "rewrite/package-lock.json")
-    outputs.files(fileTree(layout.buildDirectory.dir("resources/main")) {
+    outputs.files(fileTree(tempPackDir) {
         include("*.tgz")
     })
 }
 
-// Make npmPack part of the resource processing pipeline
+val npmInitTemp by tasks.registering(NpmTask::class) {
+    val tempInstallDir = layout.buildDirectory.dir("tmp/npmInstall").get().asFile
+    args.set(listOf("init", "-y"))
+    workingDir.set(tempInstallDir)
+
+    doFirst {
+        if (tempInstallDir.exists()) {
+            tempInstallDir.deleteRecursively()
+        }
+        tempInstallDir.mkdirs()
+    }
+}
+
+val npmInstallTemp by tasks.registering(NpmTask::class) {
+    dependsOn(npmInitTemp, npmPack)
+    val tempInstallDir = layout.buildDirectory.dir("tmp/npmInstall").get().asFile
+    workingDir.set(tempInstallDir)
+
+    // Use a provider to defer evaluation until execution time
+    args.set(provider {
+        val tgzFile = npmPack.get().outputs.files.singleFile
+        listOf("install", tgzFile.absolutePath, "--omit=dev")
+    })
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDir("src/main/generated-resources")
+        }
+    }
+}
+
+tasks.named<Jar>("sourcesJar") {
+    dependsOn("createProductionPackage")
+    exclude("production-package.zip")
+}
+
+// Creates a production-ready package; writing it to `src/main/generated-resources` so that it will be included by IDEA
+val createProductionPackage by tasks.register<Zip>("createProductionPackage") {
+    dependsOn(npmInstallTemp)
+
+    // Configure the tar output
+    archiveFileName.set("production-package.zip")
+    destinationDirectory.set(layout.projectDirectory.dir("src/main/generated-resources"))
+
+    from(layout.buildDirectory.dir("tmp/npmInstall")) {
+        // Include everything from the temp install directory
+        include("**/*")
+    }
+}
+
+// Update processResources to depend on the new task instead
 tasks.named("processResources") {
-    dependsOn(npmPack)
+    dependsOn(createProductionPackage)
 }
 
 // npm pack --pack-destination=out/production rewrite/
