@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.rpc;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
@@ -37,11 +36,11 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     private final JavaScriptSenderDelegate delegate = new JavaScriptSenderDelegate(this);
 
     @Override
-    public @Nullable J visit(@Nullable Tree tree, RpcSendQueue p, Cursor parent) {
+    public @Nullable J visit(@Nullable Tree tree, RpcSendQueue p) {
         if (tree instanceof JS) {
-            return super.visit(tree, p, parent);
+            return super.visit(tree, p);
         }
-        return delegate.visit(tree, p, parent);
+        return delegate.visit(tree, p);
     }
 
     @Override
@@ -153,6 +152,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(jsImport, JS.Import::getImportClause, el -> visit(el, q));
         q.getAndSend(jsImport, el -> el.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q));
         q.getAndSend(jsImport, JS.Import::getAttributes, el -> visit(el, q));
+        q.getAndSend(jsImport, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
         return jsImport;
     }
 
@@ -272,7 +272,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitScopedVariableDeclarations(JS.ScopedVariableDeclarations scopedVariableDeclarations, RpcSendQueue q) {
         q.getAndSendList(scopedVariableDeclarations, JS.ScopedVariableDeclarations::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        q.getAndSend(scopedVariableDeclarations, el -> el.getPadding().getScope(), el -> visitLeftPadded(el, q));
         q.getAndSendList(scopedVariableDeclarations, el -> el.getPadding().getVariables(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return scopedVariableDeclarations;
     }

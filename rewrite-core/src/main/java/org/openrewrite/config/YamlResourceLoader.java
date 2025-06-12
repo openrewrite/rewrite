@@ -39,7 +39,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -589,15 +588,6 @@ public class YamlResourceLoader implements ResourceLoader {
         }
 
         return recipeNameToExamples;
-    }
-
-    @Override
-    public Set<License> listLicenses() {
-        return dependencyResourceLoaders.stream()
-                .filter(loader -> this != loader)
-                .map(ResourceLoader::listLicenses)
-                .flatMap(Collection::stream)
-                .collect(Collectors.toSet());
     }
 
     @Override

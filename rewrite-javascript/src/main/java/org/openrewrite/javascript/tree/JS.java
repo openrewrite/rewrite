@@ -1164,13 +1164,14 @@ public interface JS extends J {
         @Nullable
         ImportClause importClause;
 
+        @Nullable
         JLeftPadded<Expression> moduleSpecifier;
 
-        public Expression getModuleSpecifier() {
-            return moduleSpecifier.getElement();
+        public @Nullable Expression getModuleSpecifier() {
+            return moduleSpecifier != null ? moduleSpecifier.getElement() : null;
         }
 
-        public JS.Import withModuleSpecifier(Expression moduleSpecifier) {
+        public JS.Import withModuleSpecifier(@Nullable Expression moduleSpecifier) {
             return getPadding().withModuleSpecifier(JLeftPadded.withElement(this.moduleSpecifier, moduleSpecifier));
         }
 
@@ -1178,6 +1179,18 @@ public interface JS extends J {
         @Getter
         @Nullable
         ImportAttributes attributes;
+
+        @Nullable
+        JLeftPadded<Expression> initializer;
+
+        public @Nullable Expression getInitializer() {
+            return initializer != null ? initializer.getElement() : null;
+        }
+
+        public JS.Import withInitializer(@Nullable Expression initializer) {
+            return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
+        }
+
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
@@ -1208,13 +1221,22 @@ public interface JS extends J {
         public static class Padding {
             private final JS.Import t;
 
-            public JLeftPadded<Expression> getModuleSpecifier() {
+            public @Nullable JLeftPadded<Expression> getModuleSpecifier() {
                 return t.moduleSpecifier;
             }
 
-            public JS.Import withModuleSpecifier(JLeftPadded<Expression> moduleSpecifier) {
-                return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, moduleSpecifier, t.attributes);
+            public JS.Import withModuleSpecifier(@Nullable JLeftPadded<Expression> moduleSpecifier) {
+                return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, moduleSpecifier, t.attributes, t.initializer);
             }
+
+            public @Nullable JLeftPadded<Expression> getInitializer() {
+                return t.initializer;
+            }
+
+            public JS.Import withInitializer(@Nullable JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, t.moduleSpecifier, t.attributes, initializer);
+            }
+
         }
     }
 
@@ -2479,17 +2501,6 @@ public interface JS extends J {
         @Getter
         List<J.Modifier> modifiers;
 
-        @Nullable
-        JLeftPadded<Scope> scope;
-
-        public @Nullable Scope getScope() {
-            return scope != null ? scope.getElement() : null;
-        }
-
-        public ScopedVariableDeclarations withScope(@Nullable Scope scope) {
-            return getPadding().withScope(JLeftPadded.withElement(this.scope, scope));
-        }
-
         List<JRightPadded<J>> variables;
 
         public List<J> getVariables() {
@@ -2525,14 +2536,6 @@ public interface JS extends J {
             return p;
         }
 
-        public enum Scope {
-            Const,
-            Let,
-            Var,
-            Using,
-            Import
-        }
-
         @RequiredArgsConstructor
         public static class Padding {
             private final ScopedVariableDeclarations t;
@@ -2542,15 +2545,7 @@ public interface JS extends J {
             }
 
             public ScopedVariableDeclarations withVariables(List<JRightPadded<J>> variables) {
-                return t.variables == variables ? t : new ScopedVariableDeclarations(t.id, t.prefix, t.markers, t.modifiers, t.scope, variables);
-            }
-
-            public @Nullable JLeftPadded<Scope> getScope() {
-                return t.scope;
-            }
-
-            public ScopedVariableDeclarations withScope(@Nullable JLeftPadded<Scope> scope) {
-                return t.scope == scope ? t : new ScopedVariableDeclarations(t.id, t.prefix, t.markers, t.modifiers, scope, t.variables);
+                return t.variables == variables ? t : new ScopedVariableDeclarations(t.id, t.prefix, t.markers, t.modifiers, variables);
             }
         }
     }

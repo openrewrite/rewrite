@@ -43,8 +43,9 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public @Nullable J visit(@Nullable Tree tree, RpcReceiveQueue p) {
-        if (tree instanceof JS)
+        if (tree instanceof JS) {
             return super.visit(tree, p);
+        }
         return delegate.visit(tree, p);
     }
 
@@ -154,7 +155,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return anImport
                 .withImportClause(q.receive(anImport.getImportClause(), el -> (JS.ImportClause) visitNonNull(el, q)))
                 .getPadding().withModuleSpecifier(q.receive(anImport.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q)))
-                .withAttributes(q.receive(anImport.getAttributes(), el -> (JS.ImportAttributes) visitNonNull(el, q)));
+                .withAttributes(q.receive(anImport.getAttributes(), el -> (JS.ImportAttributes) visitNonNull(el, q)))
+                .getPadding().withInitializer(q.receive(anImport.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
     }
 
     @Override
@@ -274,7 +276,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitScopedVariableDeclarations(JS.ScopedVariableDeclarations scopedVariableDeclarations, RpcReceiveQueue q) {
         return scopedVariableDeclarations
                 .withModifiers(q.receiveList(scopedVariableDeclarations.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .getPadding().withScope(q.receive(scopedVariableDeclarations.getPadding().getScope(), el -> visitLeftPadded(el, q, toEnum(JS.ScopedVariableDeclarations.Scope.class))))
                 .getPadding().withVariables(q.receiveList(scopedVariableDeclarations.getPadding().getVariables(), el -> visitRightPadded(el, q)));
     }
 
