@@ -139,4 +139,12 @@ describe('import mapping', () => {
                 import my = MyLib.hello;
             `)
         ));
+
+    test('import type equals', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                import   type my = require('my-library');
+            `)
+        ));
 });

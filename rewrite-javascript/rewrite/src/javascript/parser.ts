@@ -3262,7 +3262,14 @@ export class JavaScriptParserVisitor {
             importClause: {
                 kind: JS.Kind.ImportClause,
                 id: randomId(),
-                prefix: this.prefix(node),
+                prefix: (() => {
+                    if (node.isTypeOnly) {
+                        const typeKeyword = node.getChildren().find(n => n.kind === ts.SyntaxKind.TypeKeyword);
+                        return this.prefix(typeKeyword!);
+                    } else {
+                        return emptySpace;
+                    }
+                })(),
                 markers: emptyMarkers,
                 typeOnly: node.isTypeOnly,
                 name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
