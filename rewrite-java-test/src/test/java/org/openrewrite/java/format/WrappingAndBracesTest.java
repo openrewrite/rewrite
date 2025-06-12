@@ -23,7 +23,6 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
-import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -345,7 +344,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """,
-              """
+            """
               public class Test {
                   public void doSomething() {
                       @SuppressWarnings("ALL") int foo;
@@ -875,6 +874,63 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationWrappingWithCommentsWithModifiers() {
         rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              class Test {
+                  @Foo //comment
+                  final String method1(){
+                      return "test";
+                  }
+              
+                  @Foo /* comment
+                  on multiple
+                  lines */
+                  final String method2(){
+                      return "test";
+                  }
+              
+                  @Foo
+                  //comment
+                  final String method3(){
+                      return "test";
+                  }
+              
+                  @Foo
+                  /* comment
+                  on multiple
+                  lines */
+                  final String method4(){
+                      return "test";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingWithNulls() {
+        rewriteRun(spec ->
+            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+              new WrappingAndBracesStyle.IfStatement(false),
+              null,
+              null,
+              null,
+              null,
+              null,
+              null)))),
           java(
             """
               import java.lang.annotation.Repeatable;

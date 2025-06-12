@@ -782,6 +782,78 @@ class ResolvedPomTest implements RewriteTest {
         Files.writeString(localJar, "some content not to be empty");
     }
 
+    @Test
+    void siblingDependencyWithTgzPackagingAndSnapshot() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>api-parent</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
+              
+                  <modules>
+                      <module>api-definitions</module>
+                      <module>api-codegen</module>
+                  </modules>
+              </project>
+              """
+          ),
+          mavenProject(
+            "api-definitions",
+            pomXml("""
+                <project>
+                    <artifactId>api-definitions</artifactId>
+                    <packaging>tgz</packaging>
+                
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>api-parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <relativePath>../pom.xml</relativePath>
+                    </parent>
+                </project>
+                """,
+              spec -> spec.path("api-definitions/pom.xml")
+            )
+          ),
+          mavenProject(
+            "api-codegen",
+            pomXml("""
+                <project>
+                    <artifactId>api-codegen</artifactId>
+                
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>api-parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <relativePath>../pom.xml</relativePath>
+                    </parent>
+                
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>api-definitions</artifactId>
+                            <version>${project.version}</version>
+                            <type>tgz</type>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec.path("api-codegen/pom.xml").afterRecipe(pom -> {
+                  List<ResolvedDependency> deps = pom.getMarkers().findFirst(MavenResolutionResult.class)
+                    .orElseThrow().getDependencies().get(Scope.Compile);
+                  assertThat(deps).hasSize(1);
+                  assertThat(deps.getFirst().getArtifactId()).isEqualTo("api-definitions");
+                  assertThat(deps.getFirst().getVersion()).isEqualTo("1.0.0-SNAPSHOT");
+                  assertThat(deps.getFirst().getType()).isEqualTo("tgz");
+              })
+            )
+          )
+        );
+    }
+
     private static MavenRepository createMavenRepository(Path localRepository, String name) {
         return MavenRepository.builder()
           .id(name)
