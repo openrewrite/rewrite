@@ -43,8 +43,9 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public @Nullable J visit(@Nullable Tree tree, RpcReceiveQueue p) {
-        if (tree instanceof JS)
+        if (tree instanceof JS) {
             return super.visit(tree, p);
+        }
         return delegate.visit(tree, p);
     }
 
