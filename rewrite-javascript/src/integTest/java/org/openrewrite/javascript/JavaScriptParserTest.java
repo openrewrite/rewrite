@@ -24,7 +24,6 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
-import org.openrewrite.rpc.RewriteRpc;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -51,7 +50,6 @@ class JavaScriptParserTest {
           .build();
 
         this.parser = JavaScriptParser.builder().rewriteRpc(rewriteRpc).build();
-        RewriteRpc.setContextRpc(JS.CompilationUnit.class, rewriteRpc);
     }
 
     @Test

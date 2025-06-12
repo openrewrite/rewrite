@@ -99,19 +99,70 @@ tasks.named("build") {
     dependsOn(npmRunBuild)
 }
 
+val npmPack = tasks.register<NpmTask>("npmPack") {
+    dependsOn(npmRunBuild, npmVersion)
+    finalizedBy(npmResetVersion)
+
+    // Delete existing tgz files before packing
+    doFirst {
+        val outputDir = layout.buildDirectory.dir("resources/main").get().asFile
+        if (outputDir.exists()) {
+            outputDir.listFiles { _, name -> name.endsWith(".tgz") }?.forEach { file ->
+                file.delete()
+            }
+        }
+    }
+
+    args.set(listOf(
+        "pack",
+        "--pack-destination=${layout.buildDirectory.dir("resources/main").get().asFile.absolutePath}"
+    ))
+    workingDir.set(file("rewrite"))
+
+    inputs.files(fileTree("rewrite/dist"))
+    inputs.files("rewrite/package.json", "rewrite/package-lock.json")
+    outputs.files(fileTree(layout.buildDirectory.dir("resources/main")) {
+        include("*.tgz")
+    })
+}
+
+// Make npmPack part of the resource processing pipeline
+tasks.named("processResources") {
+    dependsOn(npmPack)
+}
+
+// npm pack --pack-destination=out/production rewrite/
+// npm install --no-save out/production/openrewrite-rewrite-0.tgz
+
 tasks.named("integrationTest") {
     dependsOn(npmRunBuild)
 }
 
 val npmVersion = tasks.register("npmVersion", NpmTask::class) {
-    args.set(
-        listOf(
-            "version", project.version.toString().replace(
+    val versionProperty = "npmVersionGenerated"
+
+    args.set(provider {
+        // Check if we already generated a version for this build
+        val existingVersion = project.extensions.findByName(versionProperty) as String?
+        if (existingVersion != null) {
+            listOf("version", "--no-git-tag-version", existingVersion)
+        } else {
+            val generatedVersion = project.version.toString().replace(
                 "SNAPSHOT",
-                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd.HHmmss"))
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
             )
-        )
-    )
+            // Store the generated version for reuse
+            project.extensions.add(versionProperty, generatedVersion)
+            listOf("version", "--no-git-tag-version", generatedVersion)
+        }
+    })
+
+    workingDir.set(file("rewrite"))
+}
+
+val npmResetVersion = tasks.register<NpmTask>("npmResetVersion") {
+    args.set(listOf("version", "0.0.0", "--no-git-tag-version"))
+    workingDir.set(file("rewrite"))
 }
 
 // This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
@@ -127,10 +178,20 @@ tasks.register("setupNpmrc") {
 
 // Implicitly `--tag latest` if not specified
 val npmPublish = tasks.named<NpmTask>("npm_publish") {
-    if (!project.hasProperty("releasing")) {
-        args.set(listOf("--tag", "next"))
-    }
-    dependsOn(tasks.named("setupNpmrc"))
+    dependsOn(tasks.named("setupNpmrc"), npmRunBuild, npmVersion)
+    finalizedBy(npmResetVersion)
+
+    args.set(provider {
+        buildList {
+            add("--dry-run")
+            if (!project.hasProperty("releasing")) {
+                add("--tag")
+                add("next")
+            }
+        }
+    })
+
+    workingDir.set(file("rewrite"))
 }
 
 open class RestorePackageJson : DefaultTask() {
