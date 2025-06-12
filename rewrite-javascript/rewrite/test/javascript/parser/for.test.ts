@@ -300,4 +300,30 @@ describe('for mapping', () => {
                 expect((arrayBinding.elements.elements[1].element as J.Identifier).simpleName).toBe("age");
             }
         }));
+
+    test('a for-of loop which uses class deconstruction with variables defined outside of the loop', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                const users = [
+                    {name: 'Alice', age: 30, city: 'NYC'},
+                    {name: 'Bob', age: 25, city: 'LA'},
+                    {name: 'Carol', age: 35, city: 'Chicago'}
+                ];
+
+                let n, a, c;
+                for ({name: n, age: a, city: c} of users) {
+                    console.log("" + n + " is " + a + " years old and lives in " + c);
+                }
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const forOfLoop = <JS.ForOfLoop>cu.statements[2].element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(J.Kind.NewClass);
+                const newClass = <J.NewClass>forOfLoop.loop.control.variable.element;
+                expect(newClass.body!.statements!.length).toBe(3);
+                for (let i = 0; i < 3; i++) {
+                    expect(newClass.body!.statements[0].element.kind).toBe(JS.Kind.PropertyAssignment);
+                }
+            }
+        }));
 });
