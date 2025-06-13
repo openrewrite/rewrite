@@ -42,7 +42,7 @@ public class JavaScriptParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
-        return rewriteRpc.parse(this, "javascript", sources, relativeTo, ctx).stream()
+        return rewriteRpc.parse(this, sources, relativeTo, ctx).stream()
                 .map(source -> {
                     try {
                         validator.visit(source, 0);

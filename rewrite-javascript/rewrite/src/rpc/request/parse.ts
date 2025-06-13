@@ -19,15 +19,14 @@ import {UUID} from "node:crypto";
 import {Parser, ParserInput, Parsers, ParserType} from "../../parser";
 
 export class Parse {
-    constructor(private readonly parser: ParserType,
-                private readonly inputs: ParserInput[],
+    constructor(private readonly inputs: ParserInput[],
                 private readonly relativeTo?: string) {
     }
 
     static handle(connection: rpc.MessageConnection,
                   localObjects: Map<string, any>): void {
         connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), async (request) => {
-            let parser: Parser | undefined = Parsers.createParser(request.parser, {ctx: new ExecutionContext(), relativeTo: request.relativeTo});
+            let parser: Parser | undefined = Parsers.createParser("javascript", {ctx: new ExecutionContext(), relativeTo: request.relativeTo});
 
             if (parser) {
                 const parsed = await parser.parse(...request.inputs);

@@ -357,7 +357,7 @@ public class RewriteRpc implements AutoCloseable {
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
     }
 
-    public List<SourceFile> parse(Parser parser, String language, Iterable<Parser.Input> inputs, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public List<SourceFile> parse(Parser parser, Iterable<Parser.Input> inputs, @Nullable Path relativeTo, ExecutionContext ctx) {
         List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
@@ -371,7 +371,7 @@ public class RewriteRpc implements AutoCloseable {
 
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputList.size()));
-        List<String> treeIds = send("Parse", new Parse(language, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+        List<String> treeIds = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
         if (!treeIds.isEmpty()) {
             List<SourceFile> list = new ArrayList<>(treeIds.size());
             for (int i = 0; i < treeIds.size(); i++) {
