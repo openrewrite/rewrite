@@ -16,6 +16,7 @@
 package org.openrewrite.javascript;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -39,12 +40,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaScriptParserTest {
 
+    private JavaScriptRewriteRpc rewriteRpc;
     private JavaScriptParser parser;
     private ExecutionContext ctx;
 
     @BeforeEach
     void before() {
-        JavaScriptRewriteRpc rewriteRpc = JavaScriptRewriteRpc.builder()
+        rewriteRpc = JavaScriptRewriteRpc.builder()
           .nodePath(Path.of("node"))
           .installationDirectory(Path.of("./rewrite/dist"))
 //          .trace(true)
@@ -53,6 +55,11 @@ class JavaScriptParserTest {
 
         this.parser = JavaScriptParser.builder().rewriteRpc(rewriteRpc).build();
         this.ctx = new InMemoryExecutionContext();
+    }
+
+    @AfterEach
+    void after() {
+        rewriteRpc.close();
     }
 
     @Test

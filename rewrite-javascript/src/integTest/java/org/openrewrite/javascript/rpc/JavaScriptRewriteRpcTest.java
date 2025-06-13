@@ -37,7 +37,6 @@ import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -61,10 +60,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 //          .socket(12345)
           .build();
 
-        client.batchSize(20)
-          .timeout(Duration.ofMinutes(10))
-          .traceGetObjectOutput()
-          .traceGetObjectInput(log);
+//        client
+//          .timeout(Duration.ofMinutes(10))
+//          .traceGetObjectOutput()
+//          .traceGetObjectInput(log);
     }
 
     @AfterEach
