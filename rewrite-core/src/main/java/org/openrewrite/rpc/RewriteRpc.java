@@ -69,7 +69,7 @@ public class RewriteRpc implements AutoCloseable {
      * Contexts inherit values from their parent context.
      */
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    public static class Context {
+    public static final class Context {
 
         private final @Nullable Context parent;
         private final Map<Class<?>, @Nullable WeakReference<?>> clients = new HashMap<>();
