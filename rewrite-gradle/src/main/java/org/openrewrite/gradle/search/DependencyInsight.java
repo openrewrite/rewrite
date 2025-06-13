@@ -159,8 +159,7 @@ public class DependencyInsight extends Recipe {
                                     dep.getVersion(),
                                     dep.getDatedSnapshotVersion(),
                                     dep.getRequested().getScope(),
-                                    dep.getDepth(),
-                                    resolvedDependency.getGav().asGroupArtifactVersion()
+                                    dep.getDepth()
                             ));
                         }
                     }
@@ -195,11 +194,14 @@ public class DependencyInsight extends Recipe {
     private static class MarkIndividualDependency extends JavaIsoVisitor<ExecutionContext> {
         private final Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency;
         private final Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency;
+        private final Set<GroupArtifactVersion> individuallyMarkedDependencies = new HashSet<>();
 
         public Tree attachMarkers(Tree before, ExecutionContext ctx) {
             Tree after = super.visitNonNull(before, ctx);
             if (after == before) {
-                String resultText = directDependencyToTargetDependency.values().stream()
+                String resultText = directDependencyToTargetDependency.entrySet().stream()
+                        .filter(target -> !individuallyMarkedDependencies.contains(target.getKey()))
+                        .map(Map.Entry::getValue)
                         .flatMap(Set::stream)
                         .distinct()
                         .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
@@ -215,7 +217,9 @@ public class DependencyInsight extends Recipe {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (DEPENDENCY_CLOSURE_MATCHER.matches(m)) {
-                String resultText = directDependencyToTargetDependency.values().stream()
+                String resultText = directDependencyToTargetDependency.entrySet().stream()
+                        .filter(target -> !individuallyMarkedDependencies.contains(target.getKey()))
+                        .map(Map.Entry::getValue)
                         .flatMap(Set::stream)
                         .distinct()
                         .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
@@ -234,11 +238,12 @@ public class DependencyInsight extends Recipe {
                             .findAny();
                     if (configurationGav.isPresent()) {
                         configurationToDirectDependency.get(m.getSimpleName());
-                        Set<GroupArtifactVersion> removed = directDependencyToTargetDependency.remove(configurationGav.get());
-                        if (removed == null) {
+                        Set<GroupArtifactVersion> mark = directDependencyToTargetDependency.get(configurationGav.get());
+                        if (mark == null) {
                             return null;
                         }
-                        String resultText = removed.stream()
+                        individuallyMarkedDependencies.add(configurationGav.get());
+                        String resultText = mark.stream()
                                 .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
                                 .collect(Collectors.joining(","));
                         if (!resultText.isEmpty()) {

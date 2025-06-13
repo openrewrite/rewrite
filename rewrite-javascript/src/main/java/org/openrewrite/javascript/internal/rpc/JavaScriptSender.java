@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.rpc;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
@@ -37,11 +36,11 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     private final JavaScriptSenderDelegate delegate = new JavaScriptSenderDelegate(this);
 
     @Override
-    public @Nullable J visit(@Nullable Tree tree, RpcSendQueue p, Cursor parent) {
+    public @Nullable J visit(@Nullable Tree tree, RpcSendQueue p) {
         if (tree instanceof JS) {
-            return super.visit(tree, p, parent);
+            return super.visit(tree, p);
         }
-        return delegate.visit(tree, p, parent);
+        return delegate.visit(tree, p);
     }
 
     @Override

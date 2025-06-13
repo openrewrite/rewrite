@@ -85,8 +85,10 @@ public class MavenSettings {
 
     public static @Nullable MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
-            return new Interpolator().interpolate(
+            MavenSettings settings = new Interpolator().interpolate(
                     MavenXmlMapper.readMapper().readValue(source.getSource(ctx), MavenSettings.class));
+            settings.maybeDecryptPasswords(ctx);
+            return settings;
         } catch (IOException e) {
             ctx.getOnError().accept(new IOException("Failed to parse " + source.getPath(), e));
             return null;
@@ -94,7 +96,7 @@ public class MavenSettings {
     }
 
     public static @Nullable MavenSettings parse(Path settingsPath, ExecutionContext ctx) {
-        return parse(new Parser.Input(settingsPath, () -> {
+        MavenSettings settings = parse(new Parser.Input(settingsPath, () -> {
             try {
                 return Files.newInputStream(settingsPath);
             } catch (IOException e) {
@@ -102,6 +104,12 @@ public class MavenSettings {
                 return null;
             }
         }), ctx);
+
+        if (settings != null) {
+            settings.maybeDecryptPasswords(ctx);
+        }
+
+        return settings;
     }
 
     public static @Nullable MavenSettings readMavenSettingsFromDisk(ExecutionContext ctx) {
