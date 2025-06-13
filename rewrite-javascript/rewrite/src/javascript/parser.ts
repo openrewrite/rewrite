@@ -105,7 +105,7 @@ export class JavaScriptParser extends Parser {
         return this;
     }
 
-    override async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
+    override async *parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
         const inputFiles = new Map<SourcePath, ParserInput>();
 
         // Populate inputFiles map and remove from cache if necessary
@@ -171,42 +171,39 @@ export class JavaScriptParser extends Parser {
 
         const typeChecker = program.getTypeChecker();
 
-        const result: SourceFile[] = [];
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
             const sourceFile = program.getSourceFile(filePath);
             if (!sourceFile) {
-                result.push(this.error(input, new Error('Parser returned undefined')));
+                yield this.error(input, new Error('Parser returned undefined'));
                 continue;
             }
 
             if (hasFlowAnnotation(sourceFile)) {
-                result.push(this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported")));
+                yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
                 continue;
             }
 
             const syntaxErrors = checkSyntaxErrors(program, sourceFile);
             if (syntaxErrors.length > 0) {
                 let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                result.push(this.error(input, new SyntaxError(`Compiler error(s): ${errors}`)))
+                yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
                 continue;
             }
 
             try {
-                result.push(produce(
+                yield produce(
                     new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
                             draft.markers.markers = draft.markers.markers.concat(this.styles);
                         }
-                    }));
+                    });
             } catch (error) {
-                result.push(this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error)));
+                yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
             }
         }
-
-        return result;
     }
 }
 

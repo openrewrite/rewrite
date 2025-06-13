@@ -29,11 +29,13 @@ export class Parse {
             let parser: Parser | undefined = Parsers.createParser("javascript", {ctx: new ExecutionContext(), relativeTo: request.relativeTo});
 
             if (parser) {
-                const parsed = await parser.parse(...request.inputs);
-                return parsed.map(g => {
+                // FIXME can we here yield one-by-one or batches somehow?
+                const ids: string[] = [];
+                for await (const g of parser.parse(...request.inputs)) {
                     localObjects.set(g.id.toString(), g);
-                    return g.id;
-                })
+                    ids.push(g.id);
+                }
+                return ids;
             }
             return [];
         });
