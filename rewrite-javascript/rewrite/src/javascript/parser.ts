@@ -2657,7 +2657,7 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 markers: emptyMarkers,
                 variable: (() => {
-                    if (node.initializer.kind == ts.SyntaxKind.Identifier) {
+                    if (ts.isIdentifier(node.initializer)) {
                         const ident = this.visit(node.initializer);
                         return this.rightPadded({
                             kind: JS.Kind.ExpressionStatement,
@@ -2701,7 +2701,7 @@ export class JavaScriptParserVisitor {
                     prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                     markers: emptyMarkers,
                     variable: (() => {
-                        if (node.initializer.kind == ts.SyntaxKind.Identifier) {
+                        if (ts.isIdentifier(node.initializer)) {
                             const ident = this.visit(node.initializer);
                             return this.rightPadded({
                                 kind: JS.Kind.ExpressionStatement,
@@ -2710,7 +2710,7 @@ export class JavaScriptParserVisitor {
                                 markers: emptyMarkers,
                                 prefix: emptySpace
                             } as JS.ExpressionStatement, this.suffix(node.initializer));
-                        } else if (node.initializer.kind == ts.SyntaxKind.ArrayLiteralExpression) {
+                        } else if (ts.isArrayLiteralExpression(node.initializer)) {
                             const arrayLiteral = node.initializer as ts.ArrayLiteralExpression;
                             return this.rightPadded({
                                 kind: JS.Kind.ArrayBindingPattern,
@@ -2725,7 +2725,7 @@ export class JavaScriptParserVisitor {
                                 markers: emptyMarkers,
                                 prefix: emptySpace
                             } as JS.ArrayBindingPattern, this.suffix(node.initializer))
-                        } else if (node.initializer.kind == ts.SyntaxKind.ObjectLiteralExpression) {
+                        } else if (ts.isObjectLiteralExpression(node.initializer)) {
                             const objectLiteral = node.initializer as ts.ObjectLiteralExpression;
                             return this.rightPadded({
                                 kind: JS.Kind.ObjectBindingDeclarations,
