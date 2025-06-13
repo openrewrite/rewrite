@@ -24,14 +24,15 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.gradle.trait.Traits.gradleDependency;
+import static org.openrewrite.gradle.trait.Traits.gradleDependencyConstraint;
 
-class GradleDependencyTest implements RewriteTest {
+class GradleDependencyConstraintTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
           .beforeRecipe(withToolingApi())
-          .recipe(RewriteTest.toRecipe(() -> gradleDependency().asVisitor(dep ->
-            SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
+          .recipe(RewriteTest.toRecipe(() -> gradleDependencyConstraint().asVisitor(dep ->
+            SearchResult.found(dep.getTree(), dep.getGav().toString()))));
     }
 
     @DocumentExample
@@ -49,7 +50,9 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  implementation "com.google.guava:guava:28.2-jre"
+                  constraints {
+                      implementation "com.google.guava:guava:28.2-jre"
+                  }
               }
               """,
             """
@@ -62,7 +65,9 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:28.2-jre"
+                  constraints {
+                      /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:28.2-jre"
+                  }
               }
               """
           )
@@ -84,7 +89,9 @@ class GradleDependencyTest implements RewriteTest {
               
               dependencies {
                   def version = "28.2-jre"
-                  implementation "com.google.guava:guava:${version}"
+                  constraints {
+                      implementation "com.google.guava:guava:${version}"
+                  }
               }
               """,
             """
@@ -98,7 +105,9 @@ class GradleDependencyTest implements RewriteTest {
               
               dependencies {
                   def version = "28.2-jre"
-                  /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:${version}"
+                  constraints {
+                      /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:${version}"
+                  }
               }
               """
           )
@@ -119,7 +128,9 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  implementation group: "com.google.guava", name: "guava", version: "28.2-jre"
+                  constraints {
+                      implementation group: "com.google.guava", name: "guava", version: "28.2-jre"
+                  }
               }
               """,
             """
@@ -132,41 +143,9 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation group: "com.google.guava", name: "guava", version: "28.2-jre"
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void platform() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id "java"
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-                  implementation(platform("com.google.guava:guava:28.2-jre"))
-              }
-              """,
-            """
-              plugins {
-                  id "java"
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-                  /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation(platform("com.google.guava:guava:28.2-jre"))
+                  constraints {
+                      /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation group: "com.google.guava", name: "guava", version: "28.2-jre"
+                  }
               }
               """
           )
@@ -187,7 +166,9 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  implementation(enforcedPlatform("com.google.guava:guava:28.2-jre"))
+                  constraints {
+                      implementation(enforcedPlatform("com.google.guava:guava:28.2-jre"))
+                  }
               }
               """,
             """
@@ -200,7 +181,9 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation(enforcedPlatform("com.google.guava:guava:28.2-jre"))
+                  constraints {
+                      /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation(enforcedPlatform("com.google.guava:guava:28.2-jre"))
+                  }
               }
               """
           )
@@ -208,7 +191,7 @@ class GradleDependencyTest implements RewriteTest {
     }
 
     @Test
-    void ignoreConstraint() {
+    void ignoreDependencies() {
         rewriteRun(
           buildGradle(
             """
@@ -221,11 +204,7 @@ class GradleDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  constraints {
-                      implementation('com.google.guava:guava:28.2-jre') {
-                          because 'CVE-2021-47621'
-                      }
-                  }
+                  implementation('com.google.guava:guava:28.2-jre')
               }
               """
           )
