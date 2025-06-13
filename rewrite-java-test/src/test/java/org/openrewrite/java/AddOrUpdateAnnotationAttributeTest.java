@@ -1454,40 +1454,24 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3978")
     void changeAnnotationValueFromClassToDifferentClass() {
         rewriteRun(
-          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("java.lang.annotation.Repeatable", null, "Foo3.class", null, null, null)),
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("java.lang.annotation.Repeatable", null, "Integer.class", null, null, null)),
           java(
             """
-              import java.lang.annotation.Repeatable;
-              import java.lang.annotation.Retention;
-              import java.lang.annotation.RetentionPolicy;
-              @Retention(RetentionPolicy.RUNTIME)
-              @interface Foo2 {
-                  Foo[] value();
-              }
-              @Retention(RetentionPolicy.RUNTIME)
-              @interface Foo3 {
-                  Foo[] value();
-              }
-              @Repeatable(Foo2.class)
+              package org.example;
               public @interface Foo {
-                  String bar();
+                  Class<?> value();
+              }
+              """
+          ),
+          java(
+            """
+              @Foo(String.class)
+              public class Foo {
               }
               """,
             """
-              import java.lang.annotation.Repeatable;
-              import java.lang.annotation.Retention;
-              import java.lang.annotation.RetentionPolicy;
-              @Retention(RetentionPolicy.RUNTIME)
-              @interface Foo2 {
-                  Foo[] value();
-              }
-              @Retention(RetentionPolicy.RUNTIME)
-              @interface Foo3 {
-                  Foo[] value();
-              }
-              @Repeatable(Foo3.class)
-              public @interface Foo {
-                  String bar();
+              @Foo(Integer.class)
+              public class Foo {
               }
               """
           )
