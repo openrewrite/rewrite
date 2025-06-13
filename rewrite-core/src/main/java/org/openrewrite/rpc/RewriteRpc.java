@@ -30,6 +30,7 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.PrintStream;
+import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -43,14 +44,55 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc implements AutoCloseable {
 
+    private static class ContextHolder {
+        private static final ThreadLocal<Map<Class<? extends SourceFile>, WeakReference<RewriteRpc>>> INSTANCE =
+                ThreadLocal.withInitial(HashMap::new);
+
+        static <T extends SourceFile> boolean hasContextRpc(Class<T> sourceFileClass) {
+            WeakReference<RewriteRpc> ref = INSTANCE.get().get(sourceFileClass);
+            return ref != null && ref.get() != null;
+        }
+
+        static <T extends SourceFile> RewriteRpc getContextRpc(Class<T> sourceFileClass) {
+            WeakReference<RewriteRpc> ref = INSTANCE.get().get(sourceFileClass);
+            return requireNonNull(ref != null ? ref.get() : null);
+        }
+
+        static <T extends SourceFile> void setContextRpc(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
+            INSTANCE.get().put(sourceFileClass, new WeakReference<>(rewriteRpc));
+        }
+
+        static <T extends SourceFile> void removeContextRpc(Class<T> sourceFileClass) {
+            INSTANCE.get().remove(sourceFileClass);
+        }
+    }
+
+    public static <T extends SourceFile> boolean hasContextRpc(Class<T> sourceFileClass) {
+        return ContextHolder.hasContextRpc(sourceFileClass);
+    }
+
+    public static <T extends SourceFile> RewriteRpc getContextRpc(Class<T> sourceFileClass) {
+        return ContextHolder.getContextRpc(sourceFileClass);
+    }
+
+    public static <T extends SourceFile> void setContextRpc(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
+        ContextHolder.setContextRpc(sourceFileClass, rewriteRpc);
+    }
+
+    static <T extends SourceFile> void removeContextRpc(Class<T> sourceFileClass) {
+        ContextHolder.removeContextRpc(sourceFileClass);
+    }
+
+
     private final JsonRpc jsonRpc;
 
-    private final AtomicInteger batchSize = new AtomicInteger(10);
+    private final AtomicInteger batchSize = new AtomicInteger(100);
     private Duration timeout = Duration.ofMinutes(1);
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
     private @Nullable PrintStream logFile;

@@ -185,9 +185,6 @@ tasks.named("processResources") {
     dependsOn(createProductionPackage)
 }
 
-// npm pack --pack-destination=out/production rewrite/
-// npm install --no-save out/production/openrewrite-rewrite-0.tgz
-
 tasks.named("integrationTest") {
     dependsOn(npmRunBuild)
 }

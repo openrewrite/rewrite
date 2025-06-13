@@ -199,10 +199,17 @@ public interface JS extends J {
             return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
                 @Override
                 public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
-                    try (RewriteRpc rpc = JavaScriptRewriteRpc.bundledInstallation()) {
+                    if (JavaScriptRewriteRpc.hasContextRpc(JS.CompilationUnit.class)) {
+                        RewriteRpc rpc = JavaScriptRewriteRpc.getContextRpc(JS.CompilationUnit.class);
                         Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
                         p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
                         return tree;
+                    } else {
+                        try (RewriteRpc rpc = JavaScriptRewriteRpc.bundledInstallation()) {
+                            Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                            p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
+                            return tree;
+                        }
                     }
                 }
             };
