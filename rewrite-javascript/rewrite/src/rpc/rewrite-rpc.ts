@@ -116,11 +116,11 @@ export class RewriteRpc {
         return cursor;
     }
 
-    async parse(parser: "javascript", inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
+    async parse(inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
         const parsed: SourceFile[] = [];
         for (const g of await this.connection.sendRequest(
             new rpc.RequestType<Parse, string[], Error>("Parse"),
-            new Parse(parser, inputs, relativeTo)
+            new Parse(inputs, relativeTo)
         )) {
             parsed.push(await this.getObject(g));
         }

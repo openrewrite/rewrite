@@ -22,6 +22,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
@@ -41,19 +42,27 @@ public class JavaScriptParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
-        return rewriteRpc.parse(this, sources, relativeTo, ctx).stream()
-                .map(source -> {
-                    try {
-                        validator.visit(source, 0);
-                        return source;
-                    } catch (Exception e) {
-                        Optional<Input> input = StreamSupport.stream(sources.spliterator(), false)
-                                .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
-                                .findFirst();
-                        return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);
-                    }
-                });
+        // Registering `RewriteRpc` due to print-idempotence check
+            RewriteRpc.Scope scope = RewriteRpc.current().withClient(rewriteRpc).attach();
+            try {
+                JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
+                return rewriteRpc.parse(sources, relativeTo, this, ctx).stream()
+                        .map(source -> {
+                            try {
+                                validator.visit(source, 0);
+                                return source;
+                            } catch (Exception e) {
+                                Optional<Input> input = StreamSupport.stream(sources.spliterator(), false)
+                                        .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
+                                        .findFirst();
+                                return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);
+                            }
+                        })
+                        .onClose(scope::close);
+            } catch (Exception e) {
+                scope.close();
+                throw e;
+            }
     }
 
     private final static List<String> EXTENSIONS = Collections.unmodifiableList(Arrays.asList(

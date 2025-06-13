@@ -357,7 +357,7 @@ public class RewriteRpc implements AutoCloseable {
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
     }
 
-    public List<SourceFile> parse(Parser parser, Iterable<Parser.Input> inputs, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public List<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo, Parser parser, ExecutionContext ctx) {
         List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
@@ -375,14 +375,20 @@ public class RewriteRpc implements AutoCloseable {
         if (!treeIds.isEmpty()) {
             List<SourceFile> list = new ArrayList<>(treeIds.size());
             for (int i = 0; i < treeIds.size(); i++) {
+                Parser.Input input = inputList.get(i);
                 String id = treeIds.get(i);
+
+                SourceFile sourceFile = null;
+                parsingListener.startedParsing(input);
                 try {
-                    parsingListener.startedParsing(inputList.get(i));
-                    SourceFile sourceFile = getObject(id);
-                    list.add(sourceFile);
-                    parsingListener.parsed(inputList.get(i), sourceFile);
+                    sourceFile = parser.requirePrintEqualsInput(getObject(id), input, relativeTo, ctx);
                 } catch (Exception e) {
-                    list.add(ParseError.build(parser, inputList.get(i), relativeTo, ctx, e));
+                    sourceFile = ParseError.build(parser, input, relativeTo, ctx, e);
+                } finally {
+                    if (sourceFile != null) {
+                        list.add(sourceFile);
+                        parsingListener.parsed(input, sourceFile);
+                    }
                 }
             }
             return list;
