@@ -1449,4 +1449,48 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+   @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3978")
+    void changeAnnotationValueFromClassToDifferentClass() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("java.lang.annotation.Repeatable", null, "Foo3.class", null, null, null)),
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface Foo2 {
+                  Foo[] value();
+              }
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface Foo3 {
+                  Foo[] value();
+              }
+              @Repeatable(Foo2.class)
+              public @interface Foo {
+                  String bar();
+              }
+              """,
+            """
+              import java.lang.annotation.Repeatable;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface Foo2 {
+                  Foo[] value();
+              }
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface Foo3 {
+                  Foo[] value();
+              }
+              @Repeatable(Foo3.class)
+              public @interface Foo {
+                  String bar();
+              }
+              """
+          )
+        );
+    }
 }
