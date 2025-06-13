@@ -1450,7 +1450,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         );
     }
 
-   @Test
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3978")
     void changeAnnotationValueFromClassToDifferentClass() {
         rewriteRun(
