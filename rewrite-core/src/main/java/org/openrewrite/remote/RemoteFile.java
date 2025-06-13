@@ -34,6 +34,7 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
 
 @Value
@@ -68,6 +69,9 @@ public class RemoteFile implements Remote {
         RemoteArtifactCache cache = RemoteExecutionContextView.view(ctx).getArtifactCache();
         try {
             Path localFile = cache.compute(uri, () -> {
+                if ("file".equals(uri.getScheme())) {
+                    return Files.newInputStream(Paths.get(uri));
+                }
                 //noinspection resource
                 HttpSender.Response response = httpSender.get(uri.toString()).send();
                 if (response.isSuccessful()) {

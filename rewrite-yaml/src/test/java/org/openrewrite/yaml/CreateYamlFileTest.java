@@ -34,6 +34,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.function.Consumer;
 
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -186,6 +187,34 @@ class CreateYamlFileTest implements RewriteTest {
         );
     }
 
+    @Test
+    void shouldUseFileContents() throws Exception{
+        @Language("yml")
+        String yamlContent = """
+          # This is a comment
+          foo: x
+          bar:
+            z: y
+          """;
+        var file = File.createTempFile("rewrite", "yaml");
+        Files.writeString(file.toPath(), yamlContent, StandardOpenOption.APPEND);
+        var url = file.toURI().toURL();
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CreateYamlFile(
+              "test/test.yaml",
+              null,
+              url.toString(),
+              true)
+            ),
+          yaml(
+            null,
+            yamlContent,
+            spec -> spec.path("test/test.yaml")
+          )
+        );
+    }
     @Test
     void shouldUseFileContentsWhenContentsAndContentsUrlNotNull() {
         @Language("yml")
