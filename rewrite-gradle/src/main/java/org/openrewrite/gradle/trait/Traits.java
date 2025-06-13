@@ -26,4 +26,8 @@ public class Traits {
     public static JvmTestSuite.Matcher jvmTestSuite() {
         return new JvmTestSuite.Matcher();
     }
+
+    public static GradlePlugin.Matcher plugin() {
+        return new GradlePlugin.Matcher();
+    }
 }
