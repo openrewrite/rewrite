@@ -161,8 +161,10 @@ sourceSets {
     }
 }
 
-tasks.named("licenseMain") {
-    dependsOn(createProductionPackage)
+afterEvaluate {
+    tasks.named("licenseMain") {
+        dependsOn(createProductionPackage)
+    }
 }
 
 tasks.named<Jar>("sourcesJar") {
