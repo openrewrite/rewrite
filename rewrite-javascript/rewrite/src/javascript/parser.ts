@@ -74,7 +74,7 @@ export class JavaScriptParser extends Parser {
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
-    private sourceFileCache: Map<string, ts.SourceFile>;
+    private sourceFileCache?: Map<string, ts.SourceFile>;
 
     constructor(
         {
@@ -95,12 +95,12 @@ export class JavaScriptParser extends Parser {
             jsx: ts.JsxEmit.Preserve
         };
         this.styles = styles;
-        this.sourceFileCache = sourceFileCache || new Map();
+        this.sourceFileCache = sourceFileCache;
     }
 
     // noinspection JSUnusedGlobalSymbols
     reset(): this {
-        this.sourceFileCache.clear();
+        this.sourceFileCache && this.sourceFileCache.clear();
         this.oldProgram = undefined;
         return this;
     }
@@ -113,7 +113,7 @@ export class JavaScriptParser extends Parser {
             const sourcePath = parserInputFile(input);
             inputFiles.set(sourcePath, input);
             // Remove from cache if previously cached
-            this.sourceFileCache.delete(sourcePath);
+            this.sourceFileCache && this.sourceFileCache.delete(sourcePath);
         }
 
         // Create a new CompilerHost within parseInputs
@@ -122,7 +122,7 @@ export class JavaScriptParser extends Parser {
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
             // Check if the SourceFile is in the cache
-            let sourceFile = this.sourceFileCache.get(fileName);
+            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(fileName);
             if (sourceFile) {
                 return sourceFile;
             }
@@ -142,7 +142,7 @@ export class JavaScriptParser extends Parser {
             if (sourceText !== undefined) {
                 sourceFile = ts.createSourceFile(fileName, sourceText, languageVersion, true);
                 // Cache the SourceFile if it's a dependency
-                if (!input) {
+                if (!input && this.sourceFileCache) {
                     this.sourceFileCache.set(fileName, sourceFile);
                 }
                 return sourceFile;

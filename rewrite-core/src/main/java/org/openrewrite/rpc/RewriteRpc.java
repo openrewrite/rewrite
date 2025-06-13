@@ -391,6 +391,7 @@ public class RewriteRpc implements AutoCloseable {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 // Get next batch if needed
                 if (currentBatch == null || batchIndex >= currentBatch.size()) {
+                    // FIXME handle `TimeoutException` gracefully
                     if (isFirstCall) {
                         // First call with actual inputs
                         currentBatch = send("Parse", new Parse(parseId, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
