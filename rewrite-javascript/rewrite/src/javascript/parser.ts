@@ -3259,6 +3259,18 @@ export class JavaScriptParserVisitor {
             kind: JS.Kind.Import,
             id: randomId(),
             prefix: this.prefix(node),
+            exportModifier: ( () => {
+                const exportModifier = node.modifiers?.find(m => m.kind === ts.SyntaxKind.ExportKeyword);
+                return (exportModifier && this.rightPadded({
+                    kind: J.Kind.Modifier,
+                    id: randomId(),
+                    prefix: this.prefix(exportModifier),
+                    markers: emptyMarkers,
+                    keyword: 'export',
+                    type: J.ModifierType.LanguageExtension,
+                    annotations: []
+                }, this.suffix(exportModifier))) as J.RightPadded<J.Modifier> | undefined;
+            })(),
             importClause: {
                 kind: JS.Kind.ImportClause,
                 id: randomId(),

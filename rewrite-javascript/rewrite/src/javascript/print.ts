@@ -157,7 +157,13 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitImportDeclaration(jsImport: JS.Import, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(jsImport, p);
+
+        if (jsImport.exportModifier) {
+            await this.visitRightPadded(jsImport.exportModifier!, p);
+        }
+
         p.append("import");
+
         jsImport.importClause && await this.visit(jsImport.importClause, p);
 
         await this.visitLeftPaddedLocal(jsImport.importClause ? "from" : "", jsImport.moduleSpecifier, p);
@@ -1777,6 +1783,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: PrintOutputCapture): Promise<J.RightPadded<T>> {
         if (isTree(right.element)) {
             await this.visit(right.element, p);
+        } else if (typeof right.element !== 'boolean' && typeof right.element === 'object' && 'kind' in right.element && (right.element as any).kind === J.Kind.Modifier) {
+            await this.visitModifier(right.element as J.Modifier, p);
         }
 
         await this.visitSpace(right.after, p);
