@@ -161,6 +161,10 @@ sourceSets {
     }
 }
 
+tasks.named("licenseMain") {
+    dependsOn(createProductionPackage)
+}
+
 tasks.named<Jar>("sourcesJar") {
     dependsOn("createProductionPackage")
     exclude("production-package.zip")
