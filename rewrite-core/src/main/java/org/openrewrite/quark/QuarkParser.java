@@ -17,7 +17,6 @@ package org.openrewrite.quark;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
@@ -34,7 +33,7 @@ import static org.openrewrite.Tree.randomId;
 
 public class QuarkParser implements Parser {
 
-    public static Stream<SourceFile> parseAllOtherFiles(Path rootDir, List<SourceFile> sourceFiles) throws IOException {
+    public static Stream<SourceFile> parseAllOtherFiles(Path rootDir, List<SourceFile> sourceFiles, ExecutionContext ctx) throws IOException {
         Stack<List<PathMatcher>> gitignores = new Stack<>();
         parseGitignore(new File(System.getProperty("user.home") + "/.gitignore"), gitignores);
 
@@ -84,7 +83,7 @@ public class QuarkParser implements Parser {
             }
         });
 
-        return new QuarkParser().parse(quarks, rootDir, new InMemoryExecutionContext());
+        return new QuarkParser().parse(quarks, rootDir, ctx);
     }
 
     private static void parseGitignore(File gitignore, Stack<List<PathMatcher>> gitignores) throws IOException {
