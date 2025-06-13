@@ -385,7 +385,9 @@ public class RewriteRpc implements AutoCloseable {
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
-                if (index >= treeIds.size()) return false;
+                if (index == treeIds.size()) {
+                    return false;
+                }
 
                 Parser.Input input = inputList.get(index);
                 String id = treeIds.get(index);
