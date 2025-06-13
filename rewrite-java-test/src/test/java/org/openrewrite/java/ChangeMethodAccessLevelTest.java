@@ -157,8 +157,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
               package com.abc;
                     
               class A {
-                  // comment
-                  @SuppressWarnings("ALL")
+                  @SuppressWarnings("ALL") // comment
                   void aMethod(String s) {
                   }
                     
@@ -213,13 +212,11 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   A(Integer i) {
                   }
                     
-                  // comment
-                  @Deprecated
+                  @Deprecated // comment
                   A(Float f) {
                   }
                     
-                  // comment
-                  @Deprecated
+                  @Deprecated // comment
                   void aMethod(String s) {
                   }
                     
