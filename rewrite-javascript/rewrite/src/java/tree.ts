@@ -348,7 +348,7 @@ export namespace J {
     export namespace ForEachLoop {
         export interface Control extends J {
             readonly kind: typeof Kind.ForEachLoopControl;
-            readonly variable: RightPadded<VariableDeclarations>;
+            readonly variable: RightPadded<Statement>;
             readonly iterable: RightPadded<Expression>;
         }
     }
