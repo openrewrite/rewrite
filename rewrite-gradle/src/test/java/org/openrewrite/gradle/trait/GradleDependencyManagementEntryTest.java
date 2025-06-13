@@ -1,6 +1,7 @@
 package org.openrewrite.gradle.trait;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -27,6 +28,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
             )));
     }
 
+    @DocumentExample
     @Test
     void dependencyPluginManagedDependencies() {
         rewriteRun(
