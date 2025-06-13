@@ -27,7 +27,9 @@ import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static java.lang.String.format;
 import static java.util.Collections.emptyList;
 
 @Value
@@ -103,25 +105,32 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
             // If target access level is package-private (no modifier), remove the current access level modifier
             // and copy any associated comments
             else if (newAccessLevel == null) {
-                final List<Comment> modifierComments = new ArrayList<>();
+                AtomicReference<Space> spaceOfRemovedModifier = new AtomicReference<>();
+
                 List<J.Modifier> modifiers = ListUtils.map(m.getModifiers(), mod -> {
                     if (mod.getType() == currentMethodAccessLevel) {
-                        modifierComments.addAll(mod.getComments());
+                        if (!mod.getPrefix().getComments().isEmpty())
+                            spaceOfRemovedModifier.set(mod.getPrefix());
                         return null;
                     }
 
                     // copy access level modifier comment to next modifier if it exists
-                    if (!modifierComments.isEmpty()) {
-                        J.Modifier nextModifier = mod.withComments(ListUtils.concatAll(new ArrayList<>(modifierComments), mod.getComments()));
-                        modifierComments.clear();
+                    if (spaceOfRemovedModifier.get() != null) {
+                        J.Modifier nextModifier = mod.withPrefix(spaceOfRemovedModifier.get());
+                        spaceOfRemovedModifier.set(null);
                         return nextModifier;
                     }
                     return mod;
                 });
 
                 // if no following modifier exists, add comments to method itself
-                if (!modifierComments.isEmpty()) {
-                    m = m.withComments(ListUtils.concatAll(m.getComments(), modifierComments));
+                if (spaceOfRemovedModifier.get() != null) {
+                    if (m.isConstructor())
+                        m = m.withName(m.getName().withPrefix(spaceOfRemovedModifier.get()));
+                    else
+                        m = m.withReturnTypeExpression(
+                                m.getReturnTypeExpression().withPrefix(spaceOfRemovedModifier.get())
+                        );
                 }
                 m = maybeAutoFormat(m, m.withModifiers(modifiers), p).withBody(m.getBody());
             }
