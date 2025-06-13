@@ -1454,7 +1454,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3978")
     void changeAnnotationValueFromClassToDifferentClass() {
         rewriteRun(
-          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("java.lang.annotation.Repeatable", null, "Integer.class", null, null, null)),
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", null, null, null)),
           java(
             """
               package org.example;
