@@ -17,7 +17,6 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
@@ -28,7 +27,6 @@ import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
 import java.util.Objects;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -122,44 +120,53 @@ public class FindAndReplace extends Recipe {
                         }
                     }
                 }
-                String searchStr = find;
-                if (!Boolean.TRUE.equals(regex)) {
-                    searchStr = Pattern.quote(searchStr);
-                }
-                int patternOptions = 0;
-                if (!Boolean.TRUE.equals(caseSensitive)) {
-                    patternOptions |= Pattern.CASE_INSENSITIVE;
-                }
-                if (Boolean.TRUE.equals(multiline)) {
-                    patternOptions |= Pattern.MULTILINE;
-                }
-                if (Boolean.TRUE.equals(dotAll)) {
-                    patternOptions |= Pattern.DOTALL;
-                }
-                PlainText plainText = PlainTextParser.convert(sourceFile);
-                Pattern pattern = Pattern.compile(searchStr, patternOptions);
-                Matcher matcher = pattern.matcher(plainText.getText());
 
-                if (!matcher.find()) {
-                    return sourceFile;
-                }
+                PlainText plainText = PlainTextParser.convert(sourceFile);
                 String replacement = replace == null ? "" : replace;
                 if (!Boolean.TRUE.equals(regex)) {
                     replacement = replacement.replace("$", "\\$");
                 }
-                String newText = matcher.replaceAll(replacement);
-                return plainText.withText(newText)
+
+                String newText;
+                if (!Boolean.TRUE.equals(regex) && Boolean.TRUE.equals(caseSensitive)) {
+                    // optimize the case when doing case-sensitive string replacements
+                    newText = plainText.getText().replace(find, replacement);
+                } else {
+                    int patternOptions = 0;
+                    if (!Boolean.TRUE.equals(regex)) {
+                        patternOptions |= Pattern.LITERAL;
+                    }
+                    if (!Boolean.TRUE.equals(caseSensitive)) {
+                        patternOptions |= Pattern.CASE_INSENSITIVE;
+                    }
+                    if (Boolean.TRUE.equals(multiline)) {
+                        patternOptions |= Pattern.MULTILINE;
+                    }
+                    if (Boolean.TRUE.equals(dotAll)) {
+                        patternOptions |= Pattern.DOTALL;
+                    }
+                    Pattern pattern = Pattern.compile(find, patternOptions);
+                    newText = pattern.matcher(plainText.getText()).replaceAll(replacement);
+                }
+
+                if (newText.equals(plainText.getText())) {
+                    return sourceFile;
+                }
+
+                return plainText
+                        .withText(newText)
                         .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
             }
         };
+
         if (filePattern != null) {
             visitor = Preconditions.check(new FindSourceFiles(filePattern), visitor);
         }
 
         if (Boolean.TRUE.equals(plaintextOnly)) {
-            visitor = Preconditions.check(new PlainTextVisitor<ExecutionContext>(){
+            visitor = Preconditions.check(new PlainTextVisitor<ExecutionContext>() {
                 @Override
-                public @NonNull PlainText visitText(@NonNull PlainText text, @NonNull ExecutionContext ctx) {
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     return SearchResult.found(text);
                 }
             }, visitor);
