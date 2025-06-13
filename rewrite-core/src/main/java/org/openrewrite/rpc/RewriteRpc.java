@@ -394,7 +394,7 @@ public class RewriteRpc implements AutoCloseable {
         return print(tree, new Cursor(null, Cursor.ROOT_VALUE), null);
     }
 
-    public String print(SourceFile tree, Print.MarkerPrinter markerPrinter) {
+    public String print(SourceFile tree, Print.@Nullable MarkerPrinter markerPrinter) {
         return print(tree, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
     }
 

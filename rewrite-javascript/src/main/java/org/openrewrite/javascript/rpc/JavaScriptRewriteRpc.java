@@ -120,6 +120,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private Environment marketplace = Environment.builder().build();
         private Path nodePath = Paths.get("node");
         private @Nullable Path installationDirectory;
+        private int inspectPort;
         private int port;
         private boolean trace;
         private @Nullable Path logFile;
@@ -186,6 +187,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        public Builder inspectAndBreak() {
+            return inspectAndBreak(9229);
+        }
+
+        public Builder inspectAndBreak(int port) {
+            this.inspectPort = port;
+            return this;
+        }
+
         public Builder socket(int port) {
             this.port = port;
             return this;
@@ -227,14 +237,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 List<String> command = new ArrayList<>(Arrays.asList(
                         nodePath.toString(),
                         "--stack-size=4000",
-                        "--enable-source-maps",
-                        // Uncomment this to debug the server
-                        //  "--inspect-brk",
-                        effectiveInstallationDirectory.resolve("src/rpc/server.js").toString()
+                        "--enable-source-maps"
                 ));
+                if (inspectPort != 0) {
+                    command.add("--inspect-brk=" + inspectPort);
+                }
+                command.add(effectiveInstallationDirectory.resolve("src/rpc/server.js").toString());
+
                 if (logFile != null) {
-                    command.add("--log-file");
-                    command.add(logFile.toString());
+                    command.add("--log-file=" + logFile);
                 }
 
                 JavaScriptRewriteRpcProcess process = new JavaScriptRewriteRpcProcess(trace, command.toArray(new String[0]));

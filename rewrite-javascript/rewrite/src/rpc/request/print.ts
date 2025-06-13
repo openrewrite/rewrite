@@ -25,7 +25,7 @@ export const enum MarkerPrinter {
 }
 
 export class Print {
-    constructor(private readonly treeId: UUID, private readonly cursor?: string[], readonly markerPrinter?: MarkerPrinter) {
+    constructor(private readonly treeId: UUID, private readonly cursor?: string[], readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT) {
     }
 
     static handle(connection: rpc.MessageConnection,
@@ -33,8 +33,7 @@ export class Print {
                   getCursor: (cursorIds: string[] | undefined) => Promise<Cursor>): void {
         connection.onRequest(new rpc.RequestType<Print, string, Error>("Print"), async request => {
             const tree: Tree = await getObject(request.treeId.toString());
-            const out = new PrintOutputCapture(request.markerPrinter ? PrintMarkerPrinter[request.markerPrinter] ??
-                PrintMarkerPrinter.DEFAULT : PrintMarkerPrinter.DEFAULT);
+            const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
             if (isSourceFile(tree)) {
                 return await printer(tree).print(tree, out);
             } else {
