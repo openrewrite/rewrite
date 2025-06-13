@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.search.DeclaresMethod;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TextComment;
@@ -31,25 +31,25 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * This recipe adds a comment to method declarations in a Java source file. The comment can be a single line or a multiline comment.
+ * This recipe adds a comment to method invocations in a Java source file. The comment can be a single line or a multiline comment.
  * <p>
- * The {@link AddCommentToMethod#comment} must be supplied and is the comment to add.
+ * The {@link AddCommentToMethodInvocations#comment} must be supplied and is the comment to add.
  * <p>
- * The {@link AddCommentToMethod#methodPattern} is a pattern to match methods to add the comment to.
+ * The {@link AddCommentToMethodInvocations#methodPattern} is a pattern to match methods to add the comment to.
  * <p>
- * The {@link AddCommentToMethod#isMultiline} is an optional flag (defaulted to false) to indicate if the comment is a multiline comment.
+ * The {@link AddCommentToMethodInvocations#isMultiline} is an optional flag (defaulted to false) to indicate if the comment is a multiline comment.
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AddCommentToMethod extends Recipe {
+public class AddCommentToMethodInvocations extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Add comment to method declarations";
+        return "Add comment to method invocations";
     }
 
     @Override
     public String getDescription() {
-        return "Add a comment to method declarations in a Java source file.";
+        return "Add a comment to method invocations in a Java source file.";
     }
 
     @Option(displayName = "Comment",
@@ -58,7 +58,7 @@ public class AddCommentToMethod extends Recipe {
     String comment;
 
     @Option(displayName = "Method pattern",
-            description = "A pattern to match methods to add the comment to. " + MethodMatcher.METHOD_PATTERN_DECLARATIONS_DESCRIPTION,
+            description = "A pattern to match methods to add the comment to. " + MethodMatcher.METHOD_PATTERN_INVOCATIONS_DESCRIPTION,
             example = "java.util.List add*(..)")
     String methodPattern;
 
@@ -78,31 +78,30 @@ public class AddCommentToMethod extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
-        return Preconditions.check(new DeclaresMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
-                J.ClassDeclaration cd = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
 
-                if (methodMatcher.matches(md, cd)) {
-                    String methodPrefixWhitespace = md.getPrefix().getWhitespace();
+                if (methodMatcher.matches(mi)) {
+                    String methodPrefixWhitespace = mi.getPrefix().getWhitespace();
 
-                    boolean isMultiline = Boolean.TRUE.equals(AddCommentToMethod.this.isMultiline);
+                    boolean isMultiline = Boolean.TRUE.equals(AddCommentToMethodInvocations.this.isMultiline);
                     Matcher matcher = NEWLINE.matcher(comment);
-                    String newCommentText = matcher.find() ? matcher.replaceAll(isMultiline ? methodPrefixWhitespace: " ") : comment;
+                    String newCommentText = matcher.find() ? matcher.replaceAll(isMultiline ? methodPrefixWhitespace : " ") : comment;
 
-                    if (doesNotHaveComment(newCommentText, md.getComments())) {
+                    if (doesNotHaveComment(newCommentText, mi.getComments())) {
                         TextComment textComment = new TextComment(isMultiline, newCommentText, methodPrefixWhitespace, Markers.EMPTY);
-                        return md.withComments(ListUtils.concat(md.getComments(), textComment));
+                        return mi.withComments(ListUtils.concat(mi.getComments(), textComment));
                     }
                 }
-                return md;
+                return mi;
             }
 
             private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {
                 for (Comment c : comments) {
                     if (c instanceof TextComment &&
-                        lookFor.equals(((TextComment) c).getText())) {
+                            lookFor.equals(((TextComment) c).getText())) {
                         return false;
                     }
                 }
