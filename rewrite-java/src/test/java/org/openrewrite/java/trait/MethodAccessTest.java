@@ -24,7 +24,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.trait.Traits.methodAccess;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ALL")
@@ -32,8 +31,7 @@ class MethodAccessTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(markMethodAccesses(methodAccess(
-          new MethodMatcher("java.util.List add(..)", true))));
+        spec.recipe(markMethodAccesses(new MethodAccess.Matcher(new MethodMatcher("java.util.List add(..)", true))));
     }
 
     @DocumentExample

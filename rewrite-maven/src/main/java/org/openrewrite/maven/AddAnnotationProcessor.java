@@ -22,6 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.maven.trait.MavenPlugin;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -30,8 +31,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.openrewrite.maven.trait.Traits.mavenPlugin;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -73,7 +72,7 @@ public class AddAnnotationProcessor extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag plugins = (Xml.Tag) super.visitTag(tag, ctx);
-                plugins = (Xml.Tag) mavenPlugin().asVisitor(plugin -> {
+                plugins = (Xml.Tag) new MavenPlugin.Matcher().asVisitor(plugin -> {
                     if (MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(plugin.getGroupId()) &&
                             MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getArtifactId())) {
                         MavenResolutionResult mrr = getResolutionResult();
