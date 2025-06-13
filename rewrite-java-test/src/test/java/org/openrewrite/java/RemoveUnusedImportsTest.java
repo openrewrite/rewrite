@@ -2071,6 +2071,96 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
+    void lombokValInLambda() {
+        rewriteRun(
+          java(
+            """
+            import lombok.val;
+            import java.util.List;
+            import java.util.ArrayList;
+            import java.util.stream.Collectors;
+            
+            public class Foo {
+
+                List<String> names = new ArrayList<>();
+
+                public String method() {
+                    return names.stream()
+                    .map(n -> {
+                        val name = "";
+                        return n + name;
+                    })
+                    .collect(Collectors.joining(""));
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void importAnnotation() {
+        rewriteRun(
+          java(
+            """
+              package org.springframework.context.annotation;
+              import java.lang.annotation.*;
+
+              @Target({ElementType.TYPE})
+              @Retention(RetentionPolicy.RUNTIME)
+              @Documented
+              public @interface Import {
+                  Class<?>[] value();
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              package a;
+              
+              public class A {
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              import a.A;
+              import org.springframework.context.annotation.Import;
+              
+              @Import({
+                A.class
+              })
+              public class SomeClass {
+              
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedImportsImportUsageEnum() {
+        rewriteRun(
+          java(
+                """
+              package a;
+              
+              public class A {
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              import a.A;
+
+              public enum SomeEnum {;
+                  private A a;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5498")
     void javaUtilMapEntry() {
         // language=java
@@ -2090,7 +2180,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import java.util.HashMap;
               import java.util.Map;
               import java.util.Optional;
-                      
+
               public class Usages {
                   HashMap<String, String> hashMap;
                   Map<String, String> map;
@@ -2111,7 +2201,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.Map;
               import java.util.Optional;
-                      
+
               public class WithoutMap {
                   Optional<String> optional;
                   Map.Entry<String, String> favoriteEntry;
