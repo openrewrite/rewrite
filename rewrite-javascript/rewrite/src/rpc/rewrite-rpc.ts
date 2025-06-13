@@ -35,6 +35,7 @@ import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
 import {WriteStream} from "fs";
 import {ParserInput} from "../parser";
+import {randomId} from "../uuid";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
@@ -118,9 +119,10 @@ export class RewriteRpc {
 
     async parse(inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
         const parsed: SourceFile[] = [];
+        // FIXME properly handle multiple results
         for (const g of await this.connection.sendRequest(
             new rpc.RequestType<Parse, string[], Error>("Parse"),
-            new Parse(inputs, relativeTo)
+            new Parse(randomId(), inputs, relativeTo)
         )) {
             parsed.push(await this.getObject(g));
         }

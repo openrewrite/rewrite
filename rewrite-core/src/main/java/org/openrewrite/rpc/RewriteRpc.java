@@ -378,20 +378,43 @@ public class RewriteRpc implements AutoCloseable {
 
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputList.size()));
-        List<String> treeIds = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+
+        String parseId = SnowflakeId.generateId();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
+            private @Nullable List<String> currentBatch;
+            private int batchIndex = 0;
+            private boolean isFirstCall = true;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
-                if (index == treeIds.size()) {
+                // Get next batch if needed
+                if (currentBatch == null || batchIndex >= currentBatch.size()) {
+                    if (isFirstCall) {
+                        // First call with actual inputs
+                        currentBatch = send("Parse", new Parse(parseId, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+                        isFirstCall = false;
+                    } else {
+                        currentBatch = send("Parse", new Parse(parseId, emptyList(), null), ParseResponse.class);
+                    }
+                    batchIndex = 0;
+
+                    // If batch is empty, we're done
+                    if (currentBatch.isEmpty()) {
+                        return false;
+                    }
+                }
+
+                // Process current item in batch
+                if (index >= inputList.size()) {
                     return false;
                 }
 
                 Parser.Input input = inputList.get(index);
-                String id = treeIds.get(index);
+                String id = currentBatch.get(batchIndex);
                 index++;
+                batchIndex++;
 
                 SourceFile sourceFile = null;
                 parsingListener.startedParsing(input);
@@ -412,7 +435,7 @@ public class RewriteRpc implements AutoCloseable {
             public @Nullable Spliterator<SourceFile> trySplit() { return null; }
 
             @Override
-            public long estimateSize() { return treeIds.size() - index; }
+            public long estimateSize() { return inputList.size() - index; }
 
             @Override
             public int characteristics() { return ORDERED | SIZED | SUBSIZED; }

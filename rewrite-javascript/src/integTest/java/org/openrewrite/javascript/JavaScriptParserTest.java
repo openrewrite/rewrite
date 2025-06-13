@@ -80,6 +80,22 @@ class JavaScriptParserTest {
     }
 
     @Test
+    void parseMultiple() {
+        @Language("js")
+        String helloWorld = """
+          console.info("Hello world!")
+          """;
+        Parser.Input input1 = Parser.Input.fromString(Paths.get("helloworld1.js"), helloWorld);
+        Parser.Input input2 = Parser.Input.fromString(Paths.get("helloworld2.js"), helloWorld);
+
+        List<SourceFile> sourceFiles = parser.parseInputs(List.of(input1, input2), null, ctx).toList();
+        assertThat(sourceFiles).hasSize(2);
+        assertThat(sourceFiles).allSatisfy(cu ->
+          assertThat(cu).isInstanceOf(JS.CompilationUnit.class)
+        );
+    }
+
+    @Test
     void helloTypeScript() {
         @Language("ts")
         String helloWorld = """
