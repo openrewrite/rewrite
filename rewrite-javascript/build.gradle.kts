@@ -10,6 +10,7 @@ plugins {
     id("org.openrewrite.build.moderne-source-available-license")
     id("com.netflix.nebula.integtest-standalone")
     id("com.github.node-gradle.node") version "latest.release"
+    id("publishing")
 }
 
 dependencies {
@@ -34,7 +35,7 @@ dependencies {
     integTestRuntimeOnly("org.junit.platform:junit-platform-suite-engine:latest.release")
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
 
@@ -55,47 +56,52 @@ extensions.configure<NodeExtension> {
     nodeProjectDir.set(projectDir.resolve("rewrite"))
 }
 
-val npmTest = tasks.named("npm_test")
-npmTest.configure {
+val npmInstall = tasks.named("npmInstall")
+
+val npmTest = tasks.register<NpmTask>("npmTest") {
+    inputs.files(npmInstall)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
         include("*.json")
         include("jest.config.js")
-    })
+    }).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/src"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/test"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files("rewrite/build/test-results/jest/junit.xml")
 
-    dependsOn(tasks.named("npmInstall"))
+    npmCommand = listOf("test")
 }
 
-tasks.register<Test>("npmTestReporting") {
-    description = "Makes Jest test results visible to Develocity"
-
-    // Don't run any JVM tests
-    enabled = true
-    testClassesDirs = files()
-    classpath = files()
-
-    // Configure where to find the Jest test results
-    reports.junitXml.outputLocation.set(file("rewrite/build/test-results/jest"))
-
-    // Always run
-    outputs.upToDateWhen { false }
-
-    // This runs after npmTest completes
+tasks.named("check") {
     dependsOn(npmTest)
 }
 
-tasks.check {
-    dependsOn(
-        tasks.named("npmInstall"),
-        tasks.named("npmTestReporting"),
+val npmVersion = tasks.register<NpmTask>("npmVersion") {
+    val datedSnapshotVersion = project.version.toString().replace(
+        "SNAPSHOT",
+        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd.HHmmss"))
     )
+    inputs.property("version", datedSnapshotVersion)
+    outputs.file(file("package.json"))
+    args = listOf("version", datedSnapshotVersion)
 }
 
-
-val npmRunBuild = tasks.named("npm_run_build")
-tasks.named("build") {
+val npmRunBuild = tasks.register<NpmTask>("npmBuild") {
+    inputs.files(npmInstall)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("rewrite") {
+        include("*.json")
+    }).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("rewrite/src"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(npmVersion)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(file("rewrite/dist/"))
+    npmCommand = listOf("run", "build")
+}
+tasks.named("assemble") {
     dependsOn(npmRunBuild)
 }
 
@@ -103,20 +109,11 @@ tasks.named("integrationTest") {
     dependsOn(npmRunBuild)
 }
 
-val npmVersion = tasks.register("npmVersion", NpmTask::class) {
-    args.set(
-        listOf(
-            "version", project.version.toString().replace(
-                "SNAPSHOT",
-                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd.HHmmss"))
-            )
-        )
-    )
-}
-
 // This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
 // For local development the user would typically have a `~/.npmrc` file with the token in it
-tasks.register("setupNpmrc") {
+val setupNpmrc = tasks.register("setupNpmrc") {
+    inputs.property("nodeAuthToken", project.findProperty("nodeAuthToken"))
+    outputs.file(file("rewrite/.npmrc"))
     doLast {
         if (project.hasProperty("nodeAuthToken")) {
             val npmrcFile = file("rewrite/.npmrc")
@@ -126,11 +123,11 @@ tasks.register("setupNpmrc") {
 }
 
 // Implicitly `--tag latest` if not specified
-val npmPublish = tasks.named<NpmTask>("npm_publish") {
+val npmPublish = tasks.register<NpmTask>("npmPublish") {
     if (!project.hasProperty("releasing")) {
-        args.set(listOf("--tag", "next"))
+        args = listOf("publish", "--tag", "next")
     }
-    dependsOn(tasks.named("setupNpmrc"))
+    dependsOn(setupNpmrc, npmRunBuild)
 }
 
 open class RestorePackageJson : DefaultTask() {
@@ -148,22 +145,11 @@ open class RestorePackageJson : DefaultTask() {
     }
 }
 
-val restorePackageJson = tasks.register("restorePackageJson", RestorePackageJson::class)
+val restorePackageJson = tasks.register<RestorePackageJson>("restorePackageJson")
 
-// To later install a snapshot: npm install @openrewrite/rewrite@next
-val npmPublishProcess = tasks.register("npmPublish") {
-    dependsOn(
-        tasks.named("build"),
-        npmVersion,
-        npmPublish,
-        restorePackageJson
-    )
-}
-
-listOf("final", "snapshot").forEach { phase ->
-    project.rootProject.tasks.named(phase) {
-        dependsOn(npmPublishProcess)
-    }
+tasks.named("publish") {
+    dependsOn(npmPublish)
+    finalizedBy(restorePackageJson)
 }
 
 extensions.configure<LicenseExtension> {
