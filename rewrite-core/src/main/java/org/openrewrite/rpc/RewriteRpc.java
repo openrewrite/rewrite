@@ -42,7 +42,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -357,7 +360,7 @@ public class RewriteRpc implements AutoCloseable {
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
     }
 
-    public List<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo, Parser parser, ExecutionContext ctx) {
+    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo, Parser parser, ExecutionContext ctx) {
         List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
@@ -369,14 +372,24 @@ public class RewriteRpc implements AutoCloseable {
             }
         }
 
+        if (inputList.isEmpty()) {
+            return Stream.of();
+        }
+
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputList.size()));
         List<String> treeIds = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
-        if (!treeIds.isEmpty()) {
-            List<SourceFile> list = new ArrayList<>(treeIds.size());
-            for (int i = 0; i < treeIds.size(); i++) {
-                Parser.Input input = inputList.get(i);
-                String id = treeIds.get(i);
+
+        return StreamSupport.stream(new Spliterator<SourceFile>() {
+            private int index = 0;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                if (index >= treeIds.size()) return false;
+
+                Parser.Input input = inputList.get(index);
+                String id = treeIds.get(index);
+                index++;
 
                 SourceFile sourceFile = null;
                 parsingListener.startedParsing(input);
@@ -386,14 +399,22 @@ public class RewriteRpc implements AutoCloseable {
                     sourceFile = ParseError.build(parser, input, relativeTo, ctx, e);
                 } finally {
                     if (sourceFile != null) {
-                        list.add(sourceFile);
+                        action.accept(sourceFile);
                         parsingListener.parsed(input, sourceFile);
                     }
                 }
+                return true;
             }
-            return list;
-        }
-        return emptyList();
+
+            @Override
+            public @Nullable Spliterator<SourceFile> trySplit() { return null; }
+
+            @Override
+            public long estimateSize() { return treeIds.size() - index; }
+
+            @Override
+            public int characteristics() { return ORDERED | SIZED | SUBSIZED; }
+        }, false);
     }
 
     public String print(SourceFile tree) {

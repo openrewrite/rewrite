@@ -46,7 +46,7 @@ public class JavaScriptParser implements Parser {
             RewriteRpc.Scope scope = RewriteRpc.current().withClient(rewriteRpc).attach();
             try {
                 JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
-                return rewriteRpc.parse(sources, relativeTo, this, ctx).stream()
+                return rewriteRpc.parse(sources, relativeTo, this, ctx)
                         .map(source -> {
                             try {
                                 validator.visit(source, 0);
