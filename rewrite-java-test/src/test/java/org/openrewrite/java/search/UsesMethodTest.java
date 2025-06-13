@@ -16,8 +16,12 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -66,7 +70,7 @@ class UsesMethodTest implements RewriteTest {
           java(
             """
               package abc;
-                            
+
               import java.util.Set;
               import java.util.Collections;
               import java.util.concurrent.ConcurrentHashMap;
@@ -84,7 +88,7 @@ class UsesMethodTest implements RewriteTest {
           java(
             """
               package abc;
-                            
+
               import java.util.Set;
               class Test {
                   Set<String> s = Thing.newConcurrentHashSet();
@@ -92,7 +96,7 @@ class UsesMethodTest implements RewriteTest {
               """,
             """
               /*~~>*/package abc;
-                            
+
               import java.util.Set;
               class Test {
                   Set<String> s = Thing.newConcurrentHashSet();
@@ -203,6 +207,101 @@ class UsesMethodTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @ParameterizedTest
+    @Issue("https://github.com/openrewrite/rewrite/issues/5376")
+    @ValueSource(strings = {
+      "java.util.Collection contains(..)",
+      "java.util.Set contains(..)",
+      "com.google.common.collect.ImmutableSet contains(..)",
+    })
+    void usesMethodDeepHierarchy(String methodPattern) {
+        //noinspection ResultOfMethodCallIgnored
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>(methodPattern, true)))
+            .parser(JavaParser.fromJavaVersion().classpath("guava")),
+          java(
+            """
+              import com.google.common.collect.ImmutableMap;
+              
+              class TestMethodInvocation {
+                  void test() {
+                      ImmutableMap.of("1", 4, "2", 5).keySet().contains("3");
+                  }
+              }
+              """,
+            """
+              /*~~>*/import com.google.common.collect.ImmutableMap;
+              
+              class TestMethodInvocation {
+                  void test() {
+                      ImmutableMap.of("1", 4, "2", 5).keySet().contains("3");
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import com.google.common.collect.ImmutableSet;
+              
+              import java.util.stream.Stream;
+              
+              class TestMemberReference {
+                  void test() {
+                      var set = ImmutableSet.of("1");
+                      Stream.of("foo").filter(set::contains);
+                  }
+              }
+              """,
+            """
+              /*~~>*/import com.google.common.collect.ImmutableSet;
+              
+              import java.util.stream.Stream;
+              
+              class TestMemberReference {
+                  void test() {
+                      var set = ImmutableSet.of("1");
+                      Stream.of("foo").filter(set::contains);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void usesMethodMatchesEnums() {
+        rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("java.lang.Enum equals(java.lang.Object)", true)))
+                      .parser(JavaParser.fromJavaVersion().classpath("guava")),
+              java(
+                      """
+                        import java.time.DayOfWeek;
+                        
+                        class Test {
+                            void method(DayOfWeek arg0) {
+                                if (DayOfWeek.SUNDAY.equals(arg0)) {
+                                }
+                                if (arg0.equals(DayOfWeek.MONDAY)) {
+                                }
+                            }
+                        }
+                        """,
+                      """
+                        /*~~>*/import java.time.DayOfWeek;
+                        
+                        class Test {
+                            void method(DayOfWeek arg0) {
+                                if (DayOfWeek.SUNDAY.equals(arg0)) {
+                                }
+                                if (arg0.equals(DayOfWeek.MONDAY)) {
+                                }
+                            }
+                        }
+                        """
+              )
         );
     }
 }
