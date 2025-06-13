@@ -26,6 +26,7 @@ class RawMavenTest {
     @Test
     void emptyContainers() {
         RawPom pom = RawPom.parse(
+          null,
           new ByteArrayInputStream(
             //language=xml
             """
@@ -60,6 +61,7 @@ class RawMavenTest {
     @Test
     void dependencyManagement() {
         RawPom pom = RawPom.parse(
+          null,
           new ByteArrayInputStream(
             //language=xml
             """
