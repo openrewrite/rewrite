@@ -15,28 +15,30 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {Cursor, isSourceFile, Tree} from "../../tree";
-import {printer} from "../../print";
+import {MarkerPrinter as PrintMarkerPrinter, printer, PrintOutputCapture} from "../../print";
 import {UUID} from "../../uuid";
 
+export const enum MarkerPrinter {
+    DEFAULT = "DEFAULT",
+    FENCED = "FENCED",
+    SANITIZED = "SANITIZED"
+}
+
 export class Print {
-    constructor(private readonly treeId: UUID, private readonly cursor?: string[]) {
+    constructor(private readonly treeId: UUID, private readonly cursor?: string[], readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT) {
     }
 
     static handle(connection: rpc.MessageConnection,
                   getObject: (id: string) => any,
                   getCursor: (cursorIds: string[] | undefined) => Promise<Cursor>): void {
         connection.onRequest(new rpc.RequestType<Print, string, Error>("Print"), async request => {
-            try {
-                const tree: Tree = await getObject(request.treeId.toString());
-                if (isSourceFile(tree)) {
-                    return printer(tree).print(tree);
-                } else {
-                    const cursor = await getCursor(request.cursor);
-                    return printer(cursor).print(tree)
-                }
-            } catch (e: any) {
-                console.log(e.stack);
-                throw e;
+            const tree: Tree = await getObject(request.treeId.toString());
+            const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
+            if (isSourceFile(tree)) {
+                return await printer(tree).print(tree, out);
+            } else {
+                const cursor = await getCursor(request.cursor);
+                return await printer(cursor).print(tree, out);
             }
         });
     }

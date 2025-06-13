@@ -1,6 +1,7 @@
 import * as ts from "typescript";
 import {JavaType} from "../java";
 import {Draft} from "immer";
+import {asRef} from "../rpc";
 
 export class JavaScriptTypeMapping {
     private readonly typeCache: Map<number, JavaType> = new Map();
@@ -129,7 +130,7 @@ export class JavaScriptTypeMapping {
         } else if (type.flags & ts.TypeFlags.Object) {
             const objectType = type as ts.ObjectType;
             if (objectType.isClassOrInterface()) {
-                let result = {
+                let result = asRef({
                     kind: JavaType.Kind.Class,
                     classKind: type.isClass() ? JavaType.Class.Kind.Class : JavaType.Class.Kind.Interface, // TODO there are other options, no?
                     fullyQualifiedName: objectType.getSymbol()?.name, // TODO that's not fully qualified
@@ -138,14 +139,14 @@ export class JavaScriptTypeMapping {
                     interfaces: [], // TODO
                     members: [],
                     methods: []
-                } as Draft<JavaType.Class>;
+                }) as Draft<JavaType.Class>;
                 this.typeCache.set(cacheKey, result);
                 objectType.getProperties().forEach(symbol => {
                     const memberType = this.checker.getTypeOfSymbol(symbol);
                     const callSignatures = memberType.getCallSignatures();
                     if ((memberType.flags & ts.TypeFlags.Object) && callSignatures.length > 0) {
                         const signature = callSignatures[0]; // TODO understand multiple signatures, maybe all signatures should be added as separate methods?
-                        result.methods.push({
+                        result.methods.push(asRef({
                             kind: JavaType.Kind.Method,
                             declaringType: result,
                             name: symbol.getName(),
@@ -156,21 +157,21 @@ export class JavaScriptTypeMapping {
                             annotations: [],
                             defaultValue: [], // TODO
                             declaredFormalTypeNames: [] // TODO
-                        } as JavaType.Method);
+                        } as JavaType.Method));
                     } else {
-                        result.members.push({
+                        result.members.push(asRef({
                             kind: JavaType.Kind.Variable,
                             name: symbol.getName(),
                             owner: result,
                             type: this.getType(memberType),
                             annotations: []
-                        } as JavaType.Variable);
+                        } as JavaType.Variable));
                     }
                 });
                 return result;
             } else if (objectType.getCallSignatures().length > 0) {
                 const callSignature = objectType.getCallSignatures()[0]; // TODO handle multiple signatures
-                const result = {
+                const result = asRef({
                     kind: JavaType.Kind.Method,
                     declaringType: JavaType.unknownType, // TODO
                     name: objectType.getSymbol()?.getName(),
@@ -181,7 +182,7 @@ export class JavaScriptTypeMapping {
                     annotations: [],
                     defaultValue: undefined, // TODO
                     declaredFormalTypeNames: []
-                } as JavaType.Method;
+                } as JavaType.Method);
                 this.typeCache.set(cacheKey, result);
                 return result;
             } else if (objectType.objectFlags & ts.ObjectFlags.Reference) {
@@ -196,11 +197,11 @@ export class JavaScriptTypeMapping {
             return this.getType(type.getConstraint()!);
         } else if (type.isTypeParameter()) {
             const typeParameter = type as ts.TypeParameter;
-            const result = {
+            const result = asRef({
                 kind: JavaType.Kind.GenericTypeVariable,
                 name: typeParameter.symbol.name,
                 bounds: typeParameter.getConstraint() ? [this.getType(typeParameter.getConstraint()!)] : []
-            }; // TODO probably need to defer bounds after setting the cache
+            }); // TODO probably need to defer bounds after setting the cache
             this.typeCache.set(cacheKey, result);
             return result;
         }
