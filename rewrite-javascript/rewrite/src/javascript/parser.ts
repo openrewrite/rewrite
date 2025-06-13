@@ -2712,8 +2712,6 @@ export class JavaScriptParserVisitor {
                             } as JS.ExpressionStatement, this.suffix(node.initializer));
                         } else if (node.initializer.kind == ts.SyntaxKind.ArrayLiteralExpression) {
                             const arrayLiteral = node.initializer as ts.ArrayLiteralExpression;
-                            const elementsMapped =
-                                arrayLiteral.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e)));
                             return this.rightPadded({
                                 kind: JS.Kind.ArrayBindingPattern,
                                 id: randomId(),
@@ -2721,13 +2719,33 @@ export class JavaScriptParserVisitor {
                                     kind: J.Kind.Container,
                                     id: randomId(),
                                     before: emptySpace,
-                                    elements: elementsMapped,
+                                    elements: arrayLiteral.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
                                     markers: emptyMarkers
                                 } as J.Container<Expression>,
                                 markers: emptyMarkers,
                                 prefix: emptySpace
                             } as JS.ArrayBindingPattern, this.suffix(node.initializer))
-                        } else {
+                        } else if (node.initializer.kind == ts.SyntaxKind.ObjectLiteralExpression) {
+                            const objectLiteral = node.initializer as ts.ObjectLiteralExpression;
+                            return this.rightPadded({
+                                kind: JS.Kind.ObjectBindingDeclarations,
+                                id: randomId(),
+                                leadingAnnotations: [],
+                                modifiers: [],
+                                typeExpression: undefined,
+                                initializer: undefined,
+                                bindings: {
+                                    kind: J.Kind.Container,
+                                    id: randomId(),
+                                    before: emptySpace,
+                                    elements: objectLiteral.properties.map(p => this.rightPadded(this.visit(p) as Expression, this.suffix(p))),
+                                    markers: emptyMarkers
+                                } as J.Container<Expression>,
+                                markers: emptyMarkers,
+                                prefix: emptySpace
+                            } as JS.ObjectBindingDeclarations, this.suffix(node.initializer))
+                        }
+                        else {
                             return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
                         }
                     })(),
