@@ -72,6 +72,16 @@ public class MethodMatcher {
                                                             "`*(..)` matches any method name with any number of arguments. <br/><br/>" +
                                                             "For more specific queries, like Guava's `ImmutableMap`, use " +
                                                             "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
+    public static final String METHOD_PATTERN_INVOCATIONS_DESCRIPTION = METHOD_PATTERN_DESCRIPTION;
+    //language=markdown
+    public static final String METHOD_PATTERN_DECLARATIONS_DESCRIPTION = "A [method pattern](https://docs.openrewrite.org/reference/method-patterns) is used to find matching method declarations. " +
+                                                                         "For example, to find all method declarations in the Guava library, use the pattern: " +
+                                                                         "`com.google.common..*#*(..)`.<br/><br/>" +
+                                                                         "The pattern format is `<PACKAGE>#<METHOD_NAME>(<ARGS>)`. <br/><br/>" +
+                                                                         "`..*` includes all subpackages of `com.google.common`. <br/>" +
+                                                                         "`*(..)` matches any method name with any number of arguments. <br/><br/>" +
+                                                                         "For more specific queries, like Guava's `ImmutableMap`, use " +
+                                                                         "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
 
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
     private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
