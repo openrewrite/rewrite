@@ -19,6 +19,8 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.internal.SnowflakeId;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -44,51 +46,151 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
+/**
+ * Base class for RPC clients with thread-local context support.
+ */
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc implements AutoCloseable {
 
-    private static class ContextHolder {
-        private static final ThreadLocal<Map<Class<? extends SourceFile>, WeakReference<RewriteRpc>>> INSTANCE =
-                ThreadLocal.withInitial(HashMap::new);
+    private static final ThreadLocal<Context> CURRENT_CONTEXT = ThreadLocal.withInitial(() -> new Context(null));
 
-        static <T extends SourceFile> boolean hasContextRpc(Class<T> sourceFileClass) {
-            WeakReference<RewriteRpc> ref = INSTANCE.get().get(sourceFileClass);
-            return ref != null && ref.get() != null;
+    /**
+     * Gets the current RPC context for the calling thread.
+     */
+    public static Context current() {
+        return CURRENT_CONTEXT.get();
+    }
+
+    /**
+     * Immutable context that holds RPC clients keyed by their implementation class.
+     * Uses weak references to allow clients to be garbage collected.
+     * Contexts inherit values from their parent context.
+     */
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class Context {
+
+        private final @Nullable Context parent;
+        private final Map<Class<?>, @Nullable WeakReference<?>> clients = new HashMap<>();
+        private boolean frozen;
+
+        /**
+         * Creates a context with the given RPC client.
+         * <p>
+         * If this context is frozen (already attached), returns a new mutable context
+         * with this context as parent. Otherwise, modifies this context in place.
+         *
+         * @param <T> the RPC client type (must extend RewriteRpc)
+         * @param rpc the RPC client instance to store
+         * @return this context (if mutable) or a new context (if frozen)
+         */
+        public <T extends RewriteRpc> Context withClient(T rpc) {
+            if (frozen) {
+                // Create new mutable context with this as parent
+                Context newContext = new Context(this);
+                newContext.clients.put(rpc.getClass(), new WeakReference<>(rpc));
+                return newContext;
+            } else {
+                // Mutate this context
+                this.clients.put(rpc.getClass(), new WeakReference<>(rpc));
+                return this;
+            }
         }
 
-        static <T extends SourceFile> RewriteRpc getContextRpc(Class<T> sourceFileClass) {
-            WeakReference<RewriteRpc> ref = INSTANCE.get().get(sourceFileClass);
-            return requireNonNull(ref != null ? ref.get() : null);
+        /**
+         * Attaches this context to the current thread, making it the current context.
+         * Returns a Scope that must be closed to restore the previous context.
+         * <p>
+         * Use with try-with-resources for automatic cleanup:
+         * <pre>
+         * try (RewriteRpc.Scope scope = context.attach()) {
+         *     // code that uses the context
+         * }
+         * </pre>
+         *
+         * @return a Scope that restores the previous context when closed
+         */
+        public Scope attach() {
+            this.frozen = true;
+            Context previous = CURRENT_CONTEXT.get();
+            CURRENT_CONTEXT.set(this);
+            return new Scope(previous);
         }
 
-        static <T extends SourceFile> void setContextRpc(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
-            INSTANCE.get().put(sourceFileClass, new WeakReference<>(rewriteRpc));
+        /**
+         * Gets the RPC client instance for the given class from this context.
+         * Searches this context and its parent contexts until a value is found.
+         *
+         * @param <T>         the client type
+         * @param clientClass the class key
+         * @return Optional containing the RPC client instance, or empty if not present or garbage collected
+         */
+        @SuppressWarnings("unchecked")
+        public <T extends RewriteRpc> Optional<T> get(Class<T> clientClass) {
+            Context current = this;
+
+            while (current != null) {
+                WeakReference<?> ref = current.clients.get(clientClass);
+                if (ref != null) {
+                    Object client = ref.get();
+                    if (client != null) {
+                        return Optional.of((T) client);
+                    } else {
+                        // Clean up the dead reference if this is the current thread's context
+                        current.cleanupDeadReference(clientClass);
+                    }
+                }
+                current = current.parent;
+            }
+
+            return Optional.empty();
         }
 
-        static <T extends SourceFile> void removeContextRpc(Class<T> sourceFileClass) {
-            INSTANCE.get().remove(sourceFileClass);
+        /**
+         * Gets the RPC client instance for the given class, throwing if not present.
+         *
+         * @param <T>      the client type
+         * @param rpcClass the class key
+         * @return the RPC client instance
+         * @throws IllegalStateException if no client is present or was garbage collected
+         */
+        public <T extends RewriteRpc> T require(Class<T> rpcClass) {
+            return get(rpcClass).orElseThrow(() ->
+                    new IllegalStateException("No " + rpcClass.getSimpleName() +
+                            " client found in context or parent contexts (may have been garbage collected)"));
+        }
+
+        /**
+         * Cleans up a dead weak reference from this context if it's currently active.
+         * This is called automatically when a null reference is detected.
+         */
+        private void cleanupDeadReference(Class<?> clientClass) {
+            Context current = CURRENT_CONTEXT.get();
+            if (current == this) {
+                // Only clean up if this context is currently active
+                WeakReference<?> ref = this.clients.get(clientClass);
+                if (ref != null && ref.get() == null) {
+                    this.clients.remove(clientClass);
+                }
+            }
         }
     }
 
-    public static <T extends SourceFile> boolean hasContextRpc(Class<T> sourceFileClass) {
-        return ContextHolder.hasContextRpc(sourceFileClass);
-    }
+    /**
+     * A scope that restores the previous context when closed.
+     * Designed to be used with try-with-resources.
+     */
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+    public static final class Scope implements AutoCloseable {
 
-    public static <T extends SourceFile> RewriteRpc getContextRpc(Class<T> sourceFileClass) {
-        return ContextHolder.getContextRpc(sourceFileClass);
-    }
+        private final Context previous;
 
-    public static <T extends SourceFile> void setContextRpc(Class<T> sourceFileClass, RewriteRpc rewriteRpc) {
-        ContextHolder.setContextRpc(sourceFileClass, rewriteRpc);
+        @Override
+        public void close() {
+            CURRENT_CONTEXT.set(previous);
+        }
     }
-
-    static <T extends SourceFile> void removeContextRpc(Class<T> sourceFileClass) {
-        ContextHolder.removeContextRpc(sourceFileClass);
-    }
-
 
     private final JsonRpc jsonRpc;
 

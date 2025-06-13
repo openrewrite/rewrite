@@ -199,18 +199,18 @@ public interface JS extends J {
             return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
                 @Override
                 public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
-                    if (JavaScriptRewriteRpc.hasContextRpc(JS.CompilationUnit.class)) {
-                        RewriteRpc rpc = JavaScriptRewriteRpc.getContextRpc(JS.CompilationUnit.class);
-                        Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                        p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                        return tree;
-                    } else {
-                        try (RewriteRpc rpc = JavaScriptRewriteRpc.bundledInstallation()) {
-                            Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                            p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                            return tree;
-                        }
-                    }
+                    return RewriteRpc.current().get(JavaScriptRewriteRpc.class)
+                            .map(rpc -> {
+                                Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                                p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
+                                return tree;
+                            }).orElseGet(() -> {
+                                try (RewriteRpc localRpc = JavaScriptRewriteRpc.bundledInstallation()) {
+                                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                                    p.append(localRpc.print(tree, cursor, mappedMarkerPrinter));
+                                    return tree;
+                                }
+                            });
                 }
             };
         }
@@ -3817,8 +3817,8 @@ public interface JS extends J {
         @Override
         public String toString() {
             return "ComputedPropertyMethodDeclaration{" +
-                   (getMethodType() == null ? "unknown" : getMethodType()) +
-                   "}";
+                    (getMethodType() == null ? "unknown" : getMethodType()) +
+                    "}";
         }
 
         public ComputedPropertyMethodDeclaration.Padding getPadding() {
