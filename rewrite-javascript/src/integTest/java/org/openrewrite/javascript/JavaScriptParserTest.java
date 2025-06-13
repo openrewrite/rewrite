@@ -26,6 +26,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.rpc.RewriteRpc;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -40,25 +41,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaScriptParserTest {
 
-    private JavaScriptRewriteRpc rewriteRpc;
-    private JavaScriptParser parser;
-    private ExecutionContext ctx;
+    JavaScriptRewriteRpc rewriteRpc;
+    JavaScriptParser parser;
+    ExecutionContext ctx;
+    RewriteRpc.Scope scope;
 
     @BeforeEach
     void before() {
-        rewriteRpc = JavaScriptRewriteRpc.builder()
+        this.rewriteRpc = JavaScriptRewriteRpc.builder()
           .nodePath(Path.of("node"))
           .installationDirectory(Path.of("./rewrite/dist"))
+//          .inspectAndBreak()
 //          .trace(true)
-//          .socket(12345)
           .build();
-
+        this.scope = RewriteRpc.current().withClient(rewriteRpc).attach();
         this.parser = JavaScriptParser.builder().rewriteRpc(rewriteRpc).build();
         this.ctx = new InMemoryExecutionContext();
     }
 
     @AfterEach
     void after() {
+        scope.close();
         rewriteRpc.close();
     }
 
