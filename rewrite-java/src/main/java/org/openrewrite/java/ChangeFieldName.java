@@ -18,10 +18,14 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.trait.ScopedVariable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -30,6 +34,18 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     String hasName;
     String toName;
 
+    Map<J.Identifier, ScopedVariable> scopedVariableMap = new HashMap<>();
+
+
+    @Override
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
+        new ScopedVariable.Matcher().asVisitor(var -> {
+            scopedVariableMap.put(var.getIdentifier(), var);
+            return var.getTree();
+        }).visit(cu, p);
+        return super.visitCompilationUnit(cu, p);
+    }
+
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, p);
@@ -37,8 +53,8 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         if (enclosingClass == null) {
             return v;
         }
-        if (variable.isField(getCursor()) && matchesClass(enclosingClass.getType()) &&
-                variable.getSimpleName().equals(hasName)) {
+        if (scopedVariableMap.get(variable.getName()).isField(getCursor()) && matchesClass(enclosingClass.getType()) &&
+            variable.getSimpleName().equals(hasName)) {
             if (v.getVariableType() != null) {
                 v = v.withVariableType(v.getVariableType().withName(toName));
             }
@@ -54,7 +70,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, P p) {
         J.FieldAccess f = super.visitFieldAccess(fieldAccess, p);
         if (matchesClass(fieldAccess.getTarget().getType()) &&
-                fieldAccess.getSimpleName().equals(hasName)) {
+            fieldAccess.getSimpleName().equals(hasName)) {
             f = f.getPadding().withName(f.getPadding().getName().withElement(f.getPadding().getName().getElement().withSimpleName(toName)));
         }
         return f;
