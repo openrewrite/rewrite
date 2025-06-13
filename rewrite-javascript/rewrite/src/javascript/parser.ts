@@ -2711,7 +2711,6 @@ export class JavaScriptParserVisitor {
                                 prefix: emptySpace
                             } as JS.ExpressionStatement, this.suffix(node.initializer));
                         } else if (ts.isArrayLiteralExpression(node.initializer)) {
-                            const arrayLiteral = node.initializer as ts.ArrayLiteralExpression;
                             return this.rightPadded({
                                 kind: JS.Kind.ArrayBindingPattern,
                                 id: randomId(),
@@ -2719,14 +2718,13 @@ export class JavaScriptParserVisitor {
                                     kind: J.Kind.Container,
                                     id: randomId(),
                                     before: emptySpace,
-                                    elements: arrayLiteral.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
+                                    elements: node.initializer.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
                                     markers: emptyMarkers
                                 } as J.Container<Expression>,
                                 markers: emptyMarkers,
                                 prefix: emptySpace
                             } as JS.ArrayBindingPattern, this.suffix(node.initializer))
                         } else if (ts.isObjectLiteralExpression(node.initializer)) {
-                            const objectLiteral = node.initializer as ts.ObjectLiteralExpression;
                             return this.rightPadded({
                                 kind: JS.Kind.ObjectBindingDeclarations,
                                 id: randomId(),
@@ -2738,7 +2736,7 @@ export class JavaScriptParserVisitor {
                                     kind: J.Kind.Container,
                                     id: randomId(),
                                     before: emptySpace,
-                                    elements: objectLiteral.properties.map(p => this.rightPadded(this.visit(p) as Expression, this.suffix(p))),
+                                    elements: node.initializer.properties.map(p => this.rightPadded(this.visit(p) as Expression, this.suffix(p))),
                                     markers: emptyMarkers
                                 } as J.Container<Expression>,
                                 markers: emptyMarkers,
