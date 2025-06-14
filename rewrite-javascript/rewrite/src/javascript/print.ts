@@ -74,6 +74,18 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return del;
     }
 
+    override async visitExpressionStatement(statement: JS.ExpressionStatement, p: PrintOutputCapture): Promise<J | undefined> {
+        // has no markers or prefix
+        await this.visit(statement.expression, p);
+        return statement;
+    }
+
+    override async visitStatementExpression(statementExpression: JS.StatementExpression, p: PrintOutputCapture): Promise<J | J | undefined> {
+        // has no markers or prefix
+        await this.visit(statementExpression.statement, p);
+        return statementExpression;
+    }
+
     override async visitTrailingTokenStatement(statement: JS.TrailingTokenStatement, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(statement, p);
         await this.visitRightPadded(statement.expression, p);
@@ -1839,27 +1851,33 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     protected async preVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
-        for (const marker of tree.markers.markers) {
-            if (marker.kind === JS.Markers.Spread) {
-                await this.visitSpace((marker as Spread).prefix, p);
-                p.append("...");
+        // FIXME: This is currently only required for `ExpressionStatement` and `StatementExpression`
+        if (tree.markers) {
+            for (const marker of tree.markers.markers) {
+                if (marker.kind === JS.Markers.Spread) {
+                    await this.visitSpace((marker as Spread).prefix, p);
+                    p.append("...");
+                }
             }
         }
         return tree;
     }
 
     protected async postVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
-        for (const marker of tree.markers.markers) {
-            if (marker.kind === JS.Markers.NonNullAssertion) {
-                await this.visitSpace((marker as NonNullAssertion).prefix, p);
-                p.append("!");
-            }
-            if (marker.kind === JS.Markers.Optional) {
-                await this.visitSpace((marker as Optional).prefix, p);
-                p.append("?");
-                if (this.cursor.parent?.value?.kind === J.Kind.MethodInvocation ||
-                    this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
-                    p.append(".");
+        // FIXME: This is currently only required for `ExpressionStatement` and `StatementExpression`
+        if (tree.markers) {
+            for (const marker of tree.markers.markers) {
+                if (marker.kind === JS.Markers.NonNullAssertion) {
+                    await this.visitSpace((marker as NonNullAssertion).prefix, p);
+                    p.append("!");
+                }
+                if (marker.kind === JS.Markers.Optional) {
+                    await this.visitSpace((marker as Optional).prefix, p);
+                    p.append("?");
+                    if (this.cursor.parent?.value?.kind === J.Kind.MethodInvocation ||
+                        this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
+                        p.append(".");
+                    }
                 }
             }
         }
