@@ -23,6 +23,10 @@ public class Traits {
         return new GradleDependency.Matcher();
     }
 
+    public static GradleDependencyManagementEntry.Matcher gradleDependencyManagement() {
+        return new GradleDependencyManagementEntry.Matcher();
+    }
+
     public static JvmTestSuite.Matcher jvmTestSuite() {
         return new JvmTestSuite.Matcher();
     }
