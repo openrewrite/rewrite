@@ -667,7 +667,7 @@ class ChangeDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                implementation platform("com.google.guava:guava:29.0-jre")
+                  implementation platform("io.moderne.recipe:rewrite-spring")
               }
               dependencyManagement {
                   imports {
@@ -685,7 +685,7 @@ class ChangeDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                implementation platform("com.google.guava:guava:29.0-jre")
+                  implementation platform("org.openrewrite:rewrite-core")
               }
               dependencyManagement {
                   imports {
@@ -713,7 +713,7 @@ class ChangeDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                implementation(platform("com.google.guava:guava:29.0-jre"))
+                  implementation(platform("io.moderne.recipe:rewrite-spring"))
               }
               dependencyManagement {
                   imports {
@@ -732,7 +732,7 @@ class ChangeDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                implementation(platform("com.google.guava:guava:29.0-jre"))
+                  implementation(platform("org.openrewrite:rewrite-core"))
               }
               dependencyManagement {
                   imports {
