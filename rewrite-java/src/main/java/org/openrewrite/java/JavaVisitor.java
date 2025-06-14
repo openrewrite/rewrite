@@ -67,13 +67,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return maybeAutoFormat(before, after, p, getCursor().getParentTreeCursor());
     }
 
-    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor cursor) {
-        return maybeAutoFormat(before, after, null, p, cursor);
+    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor parent) {
+        return maybeAutoFormat(before, after, null, p, parent);
     }
 
-    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor cursor) {
+    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor parent) {
         if (before != after) {
-            return autoFormat(after, stopAfter, p, cursor);
+            return autoFormat(after, stopAfter, p, parent);
         }
         return after;
     }
@@ -82,17 +82,17 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return autoFormat(j, p, getCursor().getParentTreeCursor());
     }
 
-    public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor cursor) {
-        return autoFormat(j, null, p, cursor);
+    public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor parent) {
+        return autoFormat(j, null, p, parent);
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
-    public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor cursor) {
+    public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor parent) {
         JavaSourceFile cu = (j instanceof JavaSourceFile) ?
                 (JavaSourceFile) j :
                 getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         AutoFormatService service = cu.service(AutoFormatService.class);
-        return (J2) service.autoFormatVisitor(stopAfter).visit(j, p, cursor);
+        return (J2) service.autoFormatVisitor(stopAfter).visit(j, p, parent);
     }
 
     /**
