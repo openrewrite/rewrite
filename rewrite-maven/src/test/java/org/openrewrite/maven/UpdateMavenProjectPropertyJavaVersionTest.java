@@ -122,6 +122,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/5183#discussion_r1998863149")
     @Test
     void withNestedVariables() {
         rewriteRun(
@@ -154,6 +155,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
               </project>
               """
           )
+        );
     }
 
     @Test
