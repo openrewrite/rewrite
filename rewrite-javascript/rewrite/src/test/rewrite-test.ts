@@ -165,7 +165,11 @@ export class RecipeSpec {
                 before.push([spec, {text: dedent(spec.before), sourcePath: sourcePath}]);
             }
         }
-        const parsed = await specs[0].parser(this.executionContext).parse(...before.map(([_, parserInput]) => parserInput));
+        const parser = specs[0].parser(this.executionContext);
+        const parsed: SourceFile[] = [];
+        for await (const sourceFile of parser.parse(...before.map(([_, parserInput]) => parserInput))) {
+            parsed.push(sourceFile);
+        }
         const specToParsed: [SourceSpec<any>, SourceFile][] = before.map(([spec, _], i) => [spec, parsed[i]]);
         return await mapAsync(specToParsed, async ([spec, sourceFile]) => {
             const b = spec.beforeRecipe ? spec.beforeRecipe(sourceFile) : sourceFile;

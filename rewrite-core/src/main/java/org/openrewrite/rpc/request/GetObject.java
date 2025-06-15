@@ -54,7 +54,7 @@ public class GetObject implements RpcRequest {
         private final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
 
         @Override
-        protected Object handle(GetObject request) throws Exception {
+        protected List<RpcObjectData> handle(GetObject request) throws Exception {
             Object after = localObjects.get(request.getId());
 
             if (after == null) {

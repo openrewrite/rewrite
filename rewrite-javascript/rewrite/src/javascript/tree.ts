@@ -80,7 +80,7 @@ export namespace JS {
         StatementExpression: "org.openrewrite.javascript.tree.JS$StatementExpression",
         TaggedTemplateExpression: "org.openrewrite.javascript.tree.JS$TaggedTemplateExpression",
         TemplateExpression: "org.openrewrite.javascript.tree.JS$TemplateExpression",
-        TemplateExpressionSpan: "org.openrewrite.javascript.tree.JS$TemplateExpression$TemplateSpan",
+        TemplateExpressionSpan: "org.openrewrite.javascript.tree.JS$TemplateExpression$Span",
         TrailingTokenStatement: "org.openrewrite.javascript.tree.JS$TrailingTokenStatement",
         Tuple: "org.openrewrite.javascript.tree.JS$Tuple",
         TypeDeclaration: "org.openrewrite.javascript.tree.JS$TypeDeclaration",
@@ -223,8 +223,9 @@ export namespace JS {
     export interface Import extends JS, Statement {
         readonly kind: typeof Kind.Import;
         readonly importClause?: ImportClause;
-        readonly moduleSpecifier: J.LeftPadded<Expression>;
+        readonly moduleSpecifier?: J.LeftPadded<Expression>;
         readonly attributes?: ImportAttributes;
+        readonly initializer?: J.LeftPadded<Expression>;
     }
 
     /**
@@ -418,18 +419,7 @@ export namespace JS {
     export interface ScopedVariableDeclarations extends JS, Statement {
         readonly kind: typeof Kind.ScopedVariableDeclarations;
         readonly modifiers: J.Modifier[];
-        readonly scope?: J.LeftPadded<ScopedVariableDeclarations.Scope>;
         readonly variables: J.RightPadded<J>[];
-    }
-
-    export namespace ScopedVariableDeclarations {
-        export const enum Scope {
-            Const = "Const",
-            Let = "Let",
-            Var = "Var",
-            Using = "Using",
-            Import = "Import"
-        }
     }
 
     /**
@@ -742,10 +732,10 @@ export namespace JS {
     }
 
     export namespace NamespaceDeclaration {
-        export enum KeywordType {
-            Namespace,
-            Module,
-            Empty,
+        export const enum KeywordType {
+            Namespace = "Namespace",
+            Module = "Module",
+            Empty = "Empty"
         }
     }
 
