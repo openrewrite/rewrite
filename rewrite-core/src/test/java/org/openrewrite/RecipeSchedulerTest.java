@@ -57,7 +57,7 @@ class RecipeSchedulerTest implements RewriteTest {
             .executionContext(new InMemoryExecutionContext())
             .recipe(new BoomRecipe())
             .afterRecipe(run -> {
-                  SourceFile after = run.getChangeset().getAllResults().get(0).getAfter();
+                  SourceFile after = run.getChangeset().getAllResults().getFirst().getAfter();
                   assertThat(after).isNotNull();
                   assertThat(after.getMarkers().findFirst(Markup.Error.class))
                     .hasValueSatisfying(err -> {

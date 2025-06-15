@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import java.util.Collections;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaTemplate;
@@ -25,6 +24,7 @@ import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.kotlin.internal.template.KotlinSubstitutions;
 import org.openrewrite.kotlin.internal.template.KotlinTemplateParser;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;

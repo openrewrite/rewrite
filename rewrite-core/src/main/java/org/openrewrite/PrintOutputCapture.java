@@ -17,6 +17,8 @@ package org.openrewrite;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.function.UnaryOperator;
 
@@ -79,6 +81,21 @@ public class PrintOutputCapture<P> implements Cloneable {
             public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
                 return marker.print(cursor, commentWrapper, true);
             }
+        };
+
+        MarkerPrinter FENCED = new MarkerPrinter() {
+            @Override
+            public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult || marker instanceof Markup ? "{{" + marker.getId() + "}}" : "";
+            }
+
+            @Override
+            public String afterSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult || marker instanceof Markup ? "{{" + marker.getId() + "}}" : "";
+            }
+        };
+
+        MarkerPrinter SANITIZED = new MarkerPrinter() {
         };
 
         default String beforePrefix(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {

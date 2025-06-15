@@ -72,7 +72,7 @@ dependencies {
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly(gradleApi())
     testRuntimeOnly("com.google.guava:guava:latest.release")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
 }
 
@@ -88,6 +88,7 @@ tasks.withType<GroovyCompile> {
 tasks.withType<Javadoc> {
     exclude(
         "**/GradleProject**",
+        "**/GradleDependencyConfiguration**",
         "**/GradleSettings**"
     )
 }

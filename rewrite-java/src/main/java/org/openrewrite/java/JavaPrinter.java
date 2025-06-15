@@ -448,7 +448,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                                 .getValue();
                 if (aSwitch instanceof SwitchExpression) {
                     Case aCase = getCursor().getValue();
-                    if (!(aCase.getBody() instanceof Block)) {
+                    if (!(aCase.getBody() instanceof Block || s instanceof Block)) {
                         p.append(';');
                     }
                     return;
@@ -831,15 +831,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         for (Modifier m : method.getModifiers()) {
             visitModifier(m, p);
         }
-        TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
-        if (typeParameters != null) {
-            visit(typeParameters.getAnnotations(), p);
-            visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
-            visitMarkers(typeParameters.getMarkers(), p);
-            p.append('<');
-            visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
-            p.append('>');
-        }
+        visit(method.getAnnotations().getTypeParameters(), p);
         visit(method.getReturnTypeExpression(), p);
         visit(method.getAnnotations().getName().getAnnotations(), p);
         visit(method.getName(), p);
@@ -1118,6 +1110,17 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitContainer("extends", typeParam.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);
         afterSyntax(typeParam, p);
         return typeParam;
+    }
+
+    @Override
+    public J visitTypeParameters(TypeParameters typeParameters, PrintOutputCapture<P> p) {
+        visit(typeParameters.getAnnotations(), p);
+        visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
+        visitMarkers(typeParameters.getMarkers(), p);
+        p.append('<');
+        visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
+        p.append('>');
+        return typeParameters;
     }
 
     @Override

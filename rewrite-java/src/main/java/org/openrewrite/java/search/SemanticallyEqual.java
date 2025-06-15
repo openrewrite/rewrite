@@ -24,9 +24,6 @@ import org.openrewrite.java.tree.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.openrewrite.java.tree.TypeUtils.isAssignableTo;
-import static org.openrewrite.java.tree.TypeUtils.isOfType;
-
 /**
  * Recursively checks the equality of each element of two ASTs to determine if two trees are semantically equal.
  * <p>
@@ -932,6 +929,15 @@ public class SemanticallyEqual {
                     return memberRef;
                 }
 
+                // if the method reference is on an instance, compare it
+                if (memberRef.getContaining() instanceof J.Identifier && ((J.Identifier) memberRef.getContaining()).getFieldType() != null ||
+                        compareTo.getContaining() instanceof J.Identifier && ((J.Identifier) compareTo.getContaining()).getFieldType() != null) {
+                    visit(memberRef.getContaining(), compareTo.getContaining());
+                } else if (memberRef.getContaining() instanceof J.FieldAccess && ((J.FieldAccess) memberRef.getContaining()).getName().getFieldType() != null ||
+                        compareTo.getContaining() instanceof J.FieldAccess && ((J.FieldAccess) compareTo.getContaining()).getName().getFieldType() != null) {
+                    visit(memberRef.getContaining(), compareTo.getContaining());
+                }
+
                 visitList(memberRef.getTypeParameters(), compareTo.getTypeParameters());
             }
             return memberRef;
@@ -1526,6 +1532,14 @@ public class SemanticallyEqual {
                 }
             }
             return firstTypeName;
+        }
+
+        protected boolean isOfType(JavaType target, JavaType source) {
+            return TypeUtils.isOfType(target, source);
+        }
+
+        protected boolean isAssignableTo(JavaType to, JavaType from) {
+            return TypeUtils.isAssignableTo(to, from);
         }
     }
 }

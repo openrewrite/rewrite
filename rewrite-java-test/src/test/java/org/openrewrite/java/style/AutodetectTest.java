@@ -24,6 +24,8 @@ import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 
 @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored", "PointlessBooleanExpression"})
 class AutodetectTest implements RewriteTest {
@@ -435,7 +437,7 @@ class AutodetectTest implements RewriteTest {
         var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
 
 
-        assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
+        assertThat(importLayout.getLayout().getFirst()).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
         assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(2))
@@ -493,7 +495,7 @@ class AutodetectTest implements RewriteTest {
         cus.forEach(detector::sample);
         var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
 
-        assertThat(importLayout.getLayout().get(0))
+        assertThat(importLayout.getLayout().getFirst())
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
           .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("com\\.example\\..+"));
@@ -1125,4 +1127,379 @@ class AutodetectTest implements RewriteTest {
               .isEqualTo(3);
         }
     }
+
+    @Nested
+    class AnnotationWrapping {
+        @Test
+        void classLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                @Foo
+                @Foo
+                class Test {
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getClassAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void methodLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                class Test {
+                    @Foo
+                    @Foo
+                    void method() {
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getMethodAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void fieldLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                class Test {
+                    @Foo
+                    @Foo
+                    private int field;
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getFieldAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void paramLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                class Test {
+                    void method(@Foo @Foo int param) {
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getParameterAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void localVariableLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                class Test {
+                    void method() {
+                        @Foo @Foo int localVar;
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getLocalVariableAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void enumFieldLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                enum MyEnum {
+                    @Foo @Foo VALUE
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getEnumFieldAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void recordFieldAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                record someRecord(@Foo @Foo String name) {
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getParameterAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void classLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                @Foo @Foo class Test {
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getClassAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void methodLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                class Test {
+                    @Foo @Foo void method() {
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getMethodAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void fieldLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                class Test {
+                    @Foo @Foo private int field;
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getFieldAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void paramLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                class Test {
+                    void method(
+                      @Foo
+                      @Foo
+                      int param) {
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getParameterAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void localVariableLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                class Test {
+                    void method() {
+                        @Foo
+                        @Foo
+                        int localVar;
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getLocalVariableAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void enumFieldLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                enum MyEnum {
+                    @Foo
+                    @Foo
+                    VALUE
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getEnumFieldAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void recordFieldOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+                
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+                
+                record someRecord(
+                  @Foo
+                  @Foo
+                  String name) {
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getParameterAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+    }
+
 }

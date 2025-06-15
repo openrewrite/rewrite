@@ -149,11 +149,11 @@ class JavaTemplateTest5Test implements RewriteTest {
                   return method;
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              J.MethodInvocation m = (J.MethodInvocation) ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(2)).getBody()
-                .getStatements().get(0);
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              J.MethodInvocation m = (J.MethodInvocation) ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(2)).getBody()
+                .getStatements().getFirst();
               JavaType.Method type = m.getMethodType();
-              assertThat(type.getParameterTypes().get(0)).isEqualTo(JavaType.Primitive.Int);
+              assertThat(type.getParameterTypes().getFirst()).isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(1)).isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(2)).matches(jt ->
                 TypeUtils.asFullyQualified(jt).getFullyQualifiedName().equals("java.lang.String"));
@@ -390,10 +390,8 @@ class JavaTemplateTest5Test implements RewriteTest {
               class Test {
                   void test() {
                       // the m
-                      @SuppressWarnings("other")
-                      int m;
-                      @SuppressWarnings("other")
-                      final int n;
+                      @SuppressWarnings("other") int m;
+                      @SuppressWarnings("other") final int n;
                   }
               }
               """
@@ -436,18 +434,12 @@ class JavaTemplateTest5Test implements RewriteTest {
                   @Deprecated
                   private final int m, a;
                   void test() {
-                      @SuppressWarnings("ALL")
-                      @Deprecated /* hello */
+                      @SuppressWarnings("ALL") @Deprecated /* hello */
                       Boolean z;
                       // comment n
-                      @SuppressWarnings("ALL")
-                      @Deprecated
-                      int n;
-                      @SuppressWarnings("ALL")
-                      @Deprecated
-                      final Boolean b;
-                      @SuppressWarnings("ALL")
-                      @Deprecated
+                      @SuppressWarnings("ALL") @Deprecated int n;
+                      @SuppressWarnings("ALL") @Deprecated final Boolean b;
+                      @SuppressWarnings("ALL") @Deprecated
                       // comment x, y
                       private Boolean x, y;
                   }

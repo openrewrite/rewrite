@@ -21,6 +21,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -46,6 +47,17 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
     static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
+
+    // there are several implicitly defined version properties that we should never attempt to update
+    private static final Set<String> IMPLICITLY_DEFINED_VERSION_PROPERTIES = new HashSet<>(Arrays.asList(
+            "${version}",
+            "${project.version}",
+            "${pom.version}",
+            "${project.parent.version}",
+            "${revision}",
+            "${sha1}",
+            "${changelist}"
+    ));
 
     private transient Xml.@Nullable Document document;
 
@@ -269,6 +281,32 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
     }
 
+    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, P p) {
+        return changeChildTagValue(tag, childTagName, newValue, false, p);
+    }
+
+    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, @Nullable Boolean addPropertyIfMissing, P p) {
+        Optional<Xml.Tag> childTag = tag.getChild(childTagName);
+        if (childTag.isPresent()) {
+            String oldValue = childTag.get().getValue().orElse(null);
+            if (newValue != null && !newValue.equals(oldValue)) {
+                if (isProperty(oldValue)) {
+                    String propertyName = oldValue.substring(2, oldValue.length() - 1);
+                    if (getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
+                        doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, addPropertyIfMissing, false).getVisitor());
+                    }
+                } else {
+                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, p);
+                }
+            }
+        }
+        return tag;
+    }
+
+    protected boolean isProperty(@Nullable String value) {
+        return value != null && value.startsWith("${") && !IMPLICITLY_DEFINED_VERSION_PROPERTIES.contains(value);
+    }
+
     public @Nullable ResolvedDependency findDependency(Xml.Tag tag) {
         Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
         Scope scope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
@@ -293,7 +331,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 .orElse(getResolutionResult().getPom().getGroupId()));
         String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
         String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
-        String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse("jar"));
+        String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse(null));
         if (groupId != null && artifactId != null) {
             return findManagedDependency(groupId, artifactId, classifier, type);
         }
@@ -301,19 +339,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId) {
-        return findManagedDependency(groupId, artifactId, null);
+        return findManagedDependency(groupId, artifactId, null, null);
     }
 
-    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier) {
-        return findManagedDependency(groupId, artifactId, classifier, "jar");
-    }
-
-    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, String type) {
+    private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
         for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
             if (groupId.equals(d.getGroupId()) &&
                 artifactId.equals(d.getArtifactId()) &&
-                Objects.equals(classifier, d.getClassifier()) &&
-                Objects.equals(type, d.getType())) {
+                (classifier == null || classifier.equals(d.getClassifier())) &&
+                (type == null || type.equals(d.getType()))) {
                 return d;
             }
         }

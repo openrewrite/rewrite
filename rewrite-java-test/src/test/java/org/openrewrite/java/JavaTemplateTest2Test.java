@@ -190,7 +190,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                       return JavaTemplate.builder("createBis(#{anyArray()})")
                         .contextSensitive()
                         .build()
-                        .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().get(0));
+                        .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().getFirst());
                   }
                   return newClass;
               }

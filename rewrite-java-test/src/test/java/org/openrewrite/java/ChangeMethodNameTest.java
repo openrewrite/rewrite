@@ -113,12 +113,12 @@ class ChangeMethodNameTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
                 List<Statement> statements = testMethodDecl.getBody().getStatements();
-                J.MethodInvocation barInvocation = (J.MethodInvocation) statements.get(0);
+                J.MethodInvocation barInvocation = (J.MethodInvocation) statements.getFirst();
                 assertThat(barInvocation.getName().getSimpleName()).isEqualTo("bar");
                 assertThat(barInvocation.getMethodType().getName()).isEqualTo("bar");
-                J.MemberReference barReference = (J.MemberReference) ((J.MethodInvocation) statements.get(1)).getArguments().get(0);
+                J.MemberReference barReference = (J.MemberReference) ((J.MethodInvocation) statements.get(1)).getArguments().getFirst();
                 JavaType.Method barRefType = barReference.getMethodType();
                 assertThat(barRefType.getName()).isEqualTo("bar");
             })
@@ -435,8 +435,8 @@ class ChangeMethodNameTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J visit(Tree tree, ExecutionContext executionContext) {
-                  return (J) new ChangeMethodName("com.abc.B static1(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, executionContext);
+              public J visit(Tree tree, ExecutionContext ctx) {
+                  return (J) new ChangeMethodName("com.abc.B static1(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, ctx);
               }
           })),
           java(b, SourceSpec::skip),

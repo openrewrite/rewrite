@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -811,9 +810,9 @@ class RenameVariableTest implements RewriteTest {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
-                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n2"));
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "n2"));
                   } else if (!(getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration)) {
-                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "n1"));
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
               }
@@ -1006,7 +1005,7 @@ class RenameVariableTest implements RewriteTest {
                 @Override
                 public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                     if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
-                        doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
+                        doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "n1"));
                     }
                     return super.visitVariableDeclarations(multiVariable, ctx);
                 }
@@ -1037,16 +1036,15 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("PR #5372 was reverted, due to regressions")
     void hiddenVariablesHierarchyRenameBase() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J target = getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
-                  if ("hidden".equals(multiVariable.getVariables().get(0).getSimpleName()) &&
+                  if ("hidden".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
                     target instanceof J.ClassDeclaration && ((J.ClassDeclaration) target).getSimpleName().equals("Base")) {
-                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "changed"));
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "changed"));
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
               }
@@ -1133,16 +1131,15 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("PR #5372 was reverted, due to regressions")
     void hiddenVariablesHierarchyRenameExtended() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J target = getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
-                  if ("hidden".equals(multiVariable.getVariables().get(0).getSimpleName()) &&
+                  if ("hidden".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
                     target instanceof J.ClassDeclaration && ((J.ClassDeclaration) target).getSimpleName().equals("Extended")) {
-                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "changed"));
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "changed"));
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
               }
@@ -1229,16 +1226,15 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("PR #5372 was reverted, due to regressions")
     void hiddenVariablesHierarchyRenameLocal() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J target = getCursor().getParentTreeCursor().getValue();
-                  if ("hidden".equals(multiVariable.getVariables().get(0).getSimpleName()) &&
+                  if ("hidden".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
                     target instanceof J.MethodDeclaration) {
-                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "changed"));
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "changed"));
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
               }
@@ -1331,10 +1327,10 @@ class RenameVariableTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if (multiVariable.getVariables().get(0).isField(getCursor()) || multiVariable.getPrefix().getComments().isEmpty()) {
+                  if (multiVariable.getVariables().getFirst().isField(getCursor()) || multiVariable.getPrefix().getComments().isEmpty()) {
                       return multiVariable;
                   }
-                  doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
+                  doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "n1"));
                   return super.visitVariableDeclarations(multiVariable, ctx);
               }
           })),
@@ -1388,7 +1384,7 @@ class RenameVariableTest implements RewriteTest {
                   if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof J.ClassDeclaration) {
                       for (Statement statement : block.getStatements()) {
                           if (statement instanceof J.VariableDeclarations) {
-                              doAfterVisit(new RenameVariable<>(((J.VariableDeclarations) statement).getVariables().get(0), "n1"));
+                              doAfterVisit(new RenameVariable<>(((J.VariableDeclarations) statement).getVariables().getFirst(), "n1"));
                           }
                       }
                   }

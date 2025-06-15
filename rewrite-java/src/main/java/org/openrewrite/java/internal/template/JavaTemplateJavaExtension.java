@@ -29,7 +29,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
@@ -388,6 +389,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                if (getCursor().firstEnclosing(Javadoc.DocComment.class) != null) {
+                    // We don't have support for changing method references in Javadoc comments (yet), so it's safer not to attempt any changes
+                    return method;
+                }
                 if ((loc == METHOD_INVOCATION_ARGUMENTS || loc == METHOD_INVOCATION_NAME) && isScope(method)) {
                     J.MethodInvocation m;
                     if (loc == METHOD_INVOCATION_ARGUMENTS) {

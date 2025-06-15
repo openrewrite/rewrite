@@ -92,6 +92,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.Import ||
                 tree instanceof J.ClassDeclaration ||
                 tree instanceof J.Label ||
+                tree instanceof J.Lambda.Parameters ||
                 tree instanceof J.DoWhileLoop ||
                 tree instanceof J.ArrayDimension) {
             getCursor().putMessage("indentType", IndentType.ALIGN);
@@ -107,6 +108,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.ForEachLoop.Control ||
                 tree instanceof J.WhileLoop ||
                 tree instanceof J.Case ||
+                tree instanceof J.Lambda ||
                 tree instanceof J.EnumValueSet ||
                 (tree instanceof J.Ternary && !wrappingStyle.getElvisExpressions().getUseContinuationIndent()) ||
                 (tree instanceof J.FieldAccess || tree instanceof J.MethodInvocation) &&

@@ -42,6 +42,38 @@ examples:
     language: java
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.AddOrUpdateAnnotationAttribute
+examples:
+- description: ''
+  parameters:
+  - org.example.Foo
+  - 'null'
+  - hello
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      import org.example.Foo;
+
+      @Foo
+      public class A {
+      }
+    after: |
+      import org.example.Foo;
+
+      @Foo("hello")
+      public class A {
+      }
+    language: java
+  - before: |
+      package org.example;
+      public @interface Foo {
+          String value() default "";
+      }
+    language: java
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeAnnotationAttributeName
 examples:
 - description: ''
