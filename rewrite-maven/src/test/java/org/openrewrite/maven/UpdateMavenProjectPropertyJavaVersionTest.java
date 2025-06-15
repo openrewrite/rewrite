@@ -122,6 +122,42 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/5183#discussion_r1998863149")
+    @Test
+    void withNestedVariables() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0.0</version>
+                  <modelVersion>4.0</modelVersion>
+                  <properties>
+                      <java.version>${release.version}</java.version>
+                      <release.version>${my.java.version}</release.version>
+                      <my.java.version>11</my.java.version>
+                  </properties>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0.0</version>
+                  <modelVersion>4.0</modelVersion>
+                  <properties>
+                      <java.version>${release.version}</java.version>
+                      <release.version>${my.java.version}</release.version>
+                      <my.java.version>17</my.java.version>
+                  </properties>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void updateLocalParent() {
         rewriteRun(
