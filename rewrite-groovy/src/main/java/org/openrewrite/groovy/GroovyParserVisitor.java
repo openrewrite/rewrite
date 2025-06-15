@@ -1421,23 +1421,23 @@ public class GroovyParserVisitor {
                 Space prefixBeforeOpenParentheses = whitespace();
                 typeExpr = visitTupleExpressionType(expression.getTupleExpression());
                 JContainer<J.Identifier> identifiers = visit(expression.getTupleExpression());
-                namedVariables = identifiers.getElements().stream()
-                        .map(this::createNamedVariable)
-                        .collect(toList());
-                namedVariables = ListUtils.mapFirst(namedVariables, first -> first.withPrefix(prefixBeforeOpenParentheses).withMarkers(Markers.build(singletonList(new OpenParentheses(randomId())))));
-                namedVariables = ListUtils.mapLast(namedVariables, last -> last.withMarkers(Markers.build(singletonList(new CloseParentheses(randomId())))));
+                namedVariables = identifiers.getElements().stream().map(this::createNamedVariable).collect(toList());
+                namedVariables = ListUtils.mapFirst(namedVariables,
+                        first -> first.withPrefix(prefixBeforeOpenParentheses).withMarkers(Markers.build(singletonList(new OpenParentheses(randomId())))));
+                namedVariables = ListUtils.mapLast(namedVariables,
+                        last -> last.withMarkers(Markers.build(singletonList(new CloseParentheses(randomId())))));
             } else {
                 typeExpr = visitVariableExpressionType(expression.getVariableExpression());
                 J.Identifier name = visit(expression.getVariableExpression());
-                namedVariables = new ArrayList<>(singletonList(createNamedVariable(name)));
+                namedVariables = singletonList(createNamedVariable(name));
             }
 
             if (!(expression.getRightExpression() instanceof EmptyExpression)) {
                 Space beforeAssign = sourceBefore("=");
                 Expression initializer = visit(expression.getRightExpression());
-
                 // For destructuring assignments, add the initializer to the last variable
-                namedVariables.set(namedVariables.size()-1, namedVariables.get(namedVariables.size()-1).getPadding().withInitializer(padLeft(beforeAssign, initializer)));
+                namedVariables = ListUtils.mapLast(namedVariables,
+                        last -> last.getPadding().withInitializer(padLeft(beforeAssign, initializer)));
             }
 
             J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(

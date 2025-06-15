@@ -318,7 +318,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
             beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
-            if(variable.getMarkers().findFirst(OpenParentheses.class).isPresent()) {
+            if (variable.getMarkers().findFirst(OpenParentheses.class).isPresent()) {
                 p.append('(');
             }
             visit(variable.getName(), p);
@@ -328,7 +328,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 visitSpace(dimension.getElement(), Space.Location.DIMENSION, p);
                 p.append(']');
             }
-            if(variable.getMarkers().findFirst(CloseParentheses.class).isPresent()) {
+            if (variable.getMarkers().findFirst(CloseParentheses.class).isPresent()) {
                 p.append(')');
             }
             visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
