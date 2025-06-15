@@ -1,3 +1,5 @@
+import {asRef} from "../rpc";
+
 export interface JavaType {
     readonly kind: string;
 }
@@ -6,13 +8,13 @@ export namespace JavaType {
     export const Kind = {
         Annotation: "org.openrewrite.java.tree.JavaType$Annotation",
         AnnotationElementValue: "org.openrewrite.java.tree.JavaType$Annotation$ElementValue",
+        Array: "org.openrewrite.java.tree.JavaType$Array",
         Class: "org.openrewrite.java.tree.JavaType$Class",
+        GenericTypeVariable: "org.openrewrite.java.tree.JavaType$GenericTypeVariable",
+        Intersection: "org.openrewrite.java.tree.JavaType$Intersection",
+        Method: "org.openrewrite.java.tree.JavaType$Method",
         Parameterized: "org.openrewrite.java.tree.JavaType$Parameterized",
         Primitive: "org.openrewrite.java.tree.JavaType$Primitive",
-        Array: "org.openrewrite.java.tree.JavaType$Array",
-        Method: "org.openrewrite.java.tree.JavaType$Method",
-        Intersection: "org.openrewrite.java.tree.JavaType$Intersection",
-        GenericTypeVariable: "org.openrewrite.java.tree.JavaType$GenericTypeVariable",
         ShallowClass: "org.openrewrite.java.tree.JavaType$ShallowClass",
         Union: "org.openrewrite.java.tree.JavaType$MultiCatch",
         Unknown: "org.openrewrite.java.tree.JavaType$Unknown",
@@ -146,11 +148,6 @@ export namespace JavaType {
         }
     }
 
-    export interface Primitive extends JavaType {
-        readonly kind: typeof Kind.Primitive;
-        readonly keyword: string;
-    }
-
     export interface Union extends JavaType {
         readonly kind: typeof Kind.Union;
         readonly bounds: JavaType[];
@@ -165,9 +162,9 @@ export namespace JavaType {
         readonly kind: typeof Kind.ShallowClass;
     }
 
-    export const unknownType: JavaType = {
+    export const unknownType: JavaType = asRef({
         kind: JavaType.Kind.Unknown
-    };
+    });
 
     export function isPrimitive(type?: JavaType): type is JavaType.Primitive {
         return type?.kind === JavaType.Kind.Primitive;

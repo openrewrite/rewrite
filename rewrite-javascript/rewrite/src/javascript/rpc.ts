@@ -40,8 +40,11 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
-        await q.sendMarkers(j, j2 => j2.markers);
+        if (j.kind !== JS.Kind.ExpressionStatement && j.kind !== JS.Kind.StatementExpression) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
+            await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
+            await q.sendMarkers(j, j2 => j2.markers);
+        }
         return j;
     }
 
@@ -129,6 +132,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(jsImport, el => el.importClause, el => this.visit(el, q));
         await q.getAndSend(jsImport, el => el.moduleSpecifier, el => this.visitLeftPadded(el, q));
         await q.getAndSend(jsImport, el => el.attributes, el => this.visit(el, q));
+        await q.getAndSend(jsImport, el => el.initializer, el => this.visitLeftPadded(el, q));
         return jsImport;
     }
 
@@ -233,7 +237,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(scopedVariableDeclarations, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(scopedVariableDeclarations, el => el.scope, el => this.visitLeftPadded(el, q));
         await q.getAndSendList(scopedVariableDeclarations, el => el.variables, el => el.element.id, el => this.visitRightPadded(el, q));
         return scopedVariableDeclarations;
     }
@@ -554,8 +557,11 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         const draft = createDraft(j);
 
         draft.id = await q.receive(j.id);
-        draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
-        draft.markers = await q.receiveMarkers(j.markers);
+        if (j.kind !== JS.Kind.ExpressionStatement && j.kind !== JS.Kind.StatementExpression) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
+            draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
+            draft.markers = await q.receiveMarkers(j.markers);
+        }
 
         return finishDraft(draft);
     }
@@ -658,6 +664,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.importClause = await q.receive(draft.importClause, el => this.visitDefined<JS.ImportClause>(el, q));
         draft.moduleSpecifier = await q.receive(draft.moduleSpecifier, el => this.visitLeftPadded(el, q));
         draft.attributes = await q.receive(draft.attributes, el => this.visitDefined<JS.ImportAttributes>(el, q));
+        draft.initializer = await q.receive(draft.initializer, el => this.visitLeftPadded(el, q));
         return finishDraft(draft);
     }
 
@@ -679,7 +686,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitImportSpecifier(jsImportSpecifier: JS.ImportSpecifier, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(jsImportSpecifier);
         draft.importType = await q.receive(draft.importType, el => this.visitLeftPadded(el, q));
-        draft.specifier = await q.receive(draft.specifier, el => this.visitDefined<Expression>(el, q));
+        draft.specifier = await q.receive(draft.specifier, el => this.visitDefined<JS.Alias | J.Identifier>(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
@@ -777,7 +784,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(scopedVariableDeclarations);
         draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
-        draft.scope = await q.receive(draft.scope, el => this.visitLeftPadded(el, q));
         draft.variables = await q.receiveListDefined(draft.variables, el => this.visitRightPadded(el, q));
         return finishDraft(draft);
     }

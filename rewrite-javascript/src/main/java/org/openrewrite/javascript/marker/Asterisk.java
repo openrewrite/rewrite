@@ -17,14 +17,32 @@ package org.openrewrite.javascript.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class Asterisk implements Marker {
+public class Asterisk implements Marker, RpcCodec<Asterisk> {
     UUID id;
     Space prefix;
+
+    @Override
+    public void rpcSend(Asterisk after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, Asterisk::getPrefix, space -> new JavaSender().visitSpace(space, q));
+    }
+
+    @Override
+    public Asterisk rpcReceive(Asterisk before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withPrefix(q.receive(before.getPrefix(), space -> new JavaReceiver().visitSpace(space, q)));
+    }
 }

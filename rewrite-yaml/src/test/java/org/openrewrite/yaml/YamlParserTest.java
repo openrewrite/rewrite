@@ -409,4 +409,59 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void withAnchorScalar() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor_name This string will appear as the value.
+              other_anchor: *anchor_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorMap() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor_name
+                anchor_key: 1
+                another_anchor_key: 2
+              other_anchor: *anchor_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorSequence() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor
+                - item1
+                - item2
+              other_anchor: *anchor
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5553")
+    void withAnchorSequenceOnRootLevel() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor
+              - item1
+              - item2
+              other_anchor: *anchor
+              """
+          )
+        );
+    }
 }
