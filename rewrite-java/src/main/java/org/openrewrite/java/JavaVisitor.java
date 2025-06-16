@@ -1303,7 +1303,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.VariableDeclarations.NamedVariable v = variable;
         v = v.withPrefix(visitSpace(v.getPrefix(), Space.Location.VARIABLE_PREFIX, p));
         v = v.withMarkers(visitMarkers(v.getMarkers(), p));
-        v = v.withName(visitAndCast(v.getName(), p));
+        v = v.withDeclarator(visitAndCast(v.getDeclarator(), p));
         v = v.withDimensionsAfterName(
                 ListUtils.map(v.getDimensionsAfterName(),
                         dim -> dim.withBefore(visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p))

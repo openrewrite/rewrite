@@ -74,7 +74,7 @@ export class JavaScriptParser extends Parser {
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
-    private sourceFileCache: Map<string, ts.SourceFile>;
+    private sourceFileCache?: Map<string, ts.SourceFile>;
 
     constructor(
         {
@@ -95,17 +95,17 @@ export class JavaScriptParser extends Parser {
             jsx: ts.JsxEmit.Preserve
         };
         this.styles = styles;
-        this.sourceFileCache = sourceFileCache || new Map();
+        this.sourceFileCache = sourceFileCache;
     }
 
     // noinspection JSUnusedGlobalSymbols
     reset(): this {
-        this.sourceFileCache.clear();
+        this.sourceFileCache && this.sourceFileCache.clear();
         this.oldProgram = undefined;
         return this;
     }
 
-    override async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
+    override async *parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
         const inputFiles = new Map<SourcePath, ParserInput>();
 
         // Populate inputFiles map and remove from cache if necessary
@@ -113,7 +113,7 @@ export class JavaScriptParser extends Parser {
             const sourcePath = parserInputFile(input);
             inputFiles.set(sourcePath, input);
             // Remove from cache if previously cached
-            this.sourceFileCache.delete(sourcePath);
+            this.sourceFileCache && this.sourceFileCache.delete(sourcePath);
         }
 
         // Create a new CompilerHost within parseInputs
@@ -122,7 +122,7 @@ export class JavaScriptParser extends Parser {
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
             // Check if the SourceFile is in the cache
-            let sourceFile = this.sourceFileCache.get(fileName);
+            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(fileName);
             if (sourceFile) {
                 return sourceFile;
             }
@@ -142,7 +142,7 @@ export class JavaScriptParser extends Parser {
             if (sourceText !== undefined) {
                 sourceFile = ts.createSourceFile(fileName, sourceText, languageVersion, true);
                 // Cache the SourceFile if it's a dependency
-                if (!input) {
+                if (!input && this.sourceFileCache) {
                     this.sourceFileCache.set(fileName, sourceFile);
                 }
                 return sourceFile;
@@ -171,42 +171,39 @@ export class JavaScriptParser extends Parser {
 
         const typeChecker = program.getTypeChecker();
 
-        const result: SourceFile[] = [];
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
             const sourceFile = program.getSourceFile(filePath);
             if (!sourceFile) {
-                result.push(this.error(input, new Error('Parser returned undefined')));
+                yield this.error(input, new Error('Parser returned undefined'));
                 continue;
             }
 
             if (hasFlowAnnotation(sourceFile)) {
-                result.push(this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported")));
+                yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
                 continue;
             }
 
             const syntaxErrors = checkSyntaxErrors(program, sourceFile);
             if (syntaxErrors.length > 0) {
                 let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                result.push(this.error(input, new SyntaxError(`Compiler error(s): ${errors}`)))
+                yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
                 continue;
             }
 
             try {
-                result.push(produce(
+                yield produce(
                     new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
                             draft.markers.markers = draft.markers.markers.concat(this.styles);
                         }
-                    }));
+                    });
             } catch (error) {
-                result.push(this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error)));
+                yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
             }
         }
-
-        return result;
     }
 }
 
@@ -1941,6 +1938,7 @@ export class JavaScriptParserVisitor {
             lambda: {
                 kind: J.Kind.Lambda,
                 id: randomId(),
+                prefix: emptySpace,
                 markers: emptyMarkers,
                 parameters: {
                     kind: J.Kind.LambdaParameters,
@@ -1956,7 +1954,7 @@ export class JavaScriptParserVisitor {
                 arrow: this.prefix(node.equalsGreaterThanToken),
                 body: this.convert(node.body),
                 type: this.mapType(node)
-            } as J.Lambda,
+            },
             returnTypeExpression: this.mapTypeInfo(node)
         };
     }
@@ -2495,9 +2493,11 @@ export class JavaScriptParserVisitor {
         return this.newEmpty(this.prefix(node));
     }
 
-    visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations {
+    visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations | J.VariableDeclarations {
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
-            draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            if (node.modifiers) {
+                draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            }
             draft.prefix = this.prefix(node);
         });
     }
@@ -2611,7 +2611,7 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 markers: emptyMarkers,
                 init: [node.initializer ?
-                    (ts.isVariableDeclarationList(node.initializer) ? this.rightPadded(this.visit(node.initializer), emptySpace) :
+                    (ts.isVariableDeclarationList(node.initializer) ? this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)) :
                         this.rightPadded(ts.isStatement(node.initializer) ? this.visit(node.initializer) : {
                             kind: JS.Kind.ExpressionStatement,
                             id: randomId(),
@@ -2848,13 +2848,13 @@ export class JavaScriptParserVisitor {
         } as J.VariableDeclarations.NamedVariable;
     }
 
-    visitVariableDeclarationList(node: ts.VariableDeclarationList): JS.ScopedVariableDeclarations {
+    visitVariableDeclarationList(node: ts.VariableDeclarationList): J.VariableDeclarations | JS.ScopedVariableDeclarations {
         let kind = node.getFirstToken();
 
         // to parse the declaration case: await using db = ...
-        let modifier;
+        let modifiers: J.Modifier[] = [];
         if (kind?.kind === ts.SyntaxKind.AwaitKeyword) {
-            modifier = {
+            modifiers.push({
                 kind: J.Kind.Modifier,
                 id: randomId(),
                 prefix: this.prefix(kind),
@@ -2862,43 +2862,83 @@ export class JavaScriptParserVisitor {
                 keyword: 'await',
                 type: J.ModifierType.LanguageExtension,
                 annotations: []
-            };
+            });
             kind = node.getChildAt(1);
         }
 
-        return {
-            kind: JS.Kind.ScopedVariableDeclarations,
-            id: randomId(),
-            prefix: emptySpace,
-            markers: emptyMarkers,
-            modifiers: modifier ? [modifier] : [],
-            scope: this.leftPadded(
-                kind ? this.prefix(kind) : this.prefix(node),
-                kind?.kind === ts.SyntaxKind.LetKeyword
-                    ? JS.ScopedVariableDeclarations.Scope.Let
-                    : kind?.kind === ts.SyntaxKind.ConstKeyword
-                        ? JS.ScopedVariableDeclarations.Scope.Const
-                        : kind?.kind === ts.SyntaxKind.UsingKeyword
-                            ? JS.ScopedVariableDeclarations.Scope.Using
-                            : JS.ScopedVariableDeclarations.Scope.Var
-            ),
-            variables: node.declarations.map((declaration) => {
-                // FIXME this is suspect... we are creating a whole VariableDeclarations for each declaration?
-                return this.rightPadded(
-                    {
-                        kind: J.Kind.VariableDeclarations,
-                        id: randomId(),
-                        prefix: this.prefix(declaration),
-                        markers: emptyMarkers,
-                        leadingAnnotations: [],
-                        modifiers: [],
-                        typeExpression: this.mapTypeInfo(declaration),
-                        variables: [this.rightPadded(this.visit(declaration), emptySpace)]
-                    },
-                    this.suffix(declaration)
-                );
-            })
-        };
+        if (kind?.kind === ts.SyntaxKind.VarKeyword ||
+            kind?.kind === ts.SyntaxKind.LetKeyword ||
+            kind?.kind === ts.SyntaxKind.ConstKeyword ||
+            kind?.kind === ts.SyntaxKind.UsingKeyword) {
+            modifiers.push({
+                kind: J.Kind.Modifier,
+                id: randomId(),
+                prefix: this.prefix(kind),
+                markers: emptyMarkers,
+                annotations: [],
+                keyword: kind.kind === ts.SyntaxKind.VarKeyword ? 'var' :
+                    kind.kind === ts.SyntaxKind.LetKeyword ? 'let' :
+                        kind.kind === ts.SyntaxKind.ConstKeyword ? 'const' : 'using',
+                type: kind.kind == ts.SyntaxKind.ConstKeyword ? J.ModifierType.Final : J.ModifierType.LanguageExtension
+            } as J.Modifier);
+        }
+        const isMulti = node.declarations.length > 1;
+        const varDecls = node.declarations.map(declaration => {
+            return this.rightPadded({
+                kind: J.Kind.VariableDeclarations,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                leadingAnnotations: [],
+                modifiers: modifiers,
+                typeExpression: this.mapTypeInfo(declaration),
+                variables: [this.rightPadded({
+                            kind: J.Kind.NamedVariable,
+                            id: randomId(),
+                            prefix: this.prefix(declaration),
+                            markers: produce(emptyMarkers, draft => {
+                                if (declaration.exclamationToken) {
+                                    draft.markers.push({
+                                        kind: JS.Markers.NonNullAssertion,
+                                        id: randomId(),
+                                        prefix: this.suffix(declaration.name)
+                                    } as NonNullAssertion);
+                                }
+                            }),
+                            name: this.visit(declaration.name),
+                            dimensionsAfterName: [],
+                            initializer: ( () => {
+                                if (declaration.initializer) {
+                                    const equalSign = declaration.getChildren().find(c => c.kind == ts.SyntaxKind.EqualsToken)
+                                    const prefix = equalSign && this.prefix(equalSign);
+                                    return this.leftPadded(prefix ?? emptySpace, this.visit(declaration.initializer) as Expression)
+                                } else {
+                                    return undefined;
+                                }
+                            })(),
+                            variableType: this.mapVariableType(declaration)
+                        } as J.VariableDeclarations.NamedVariable, emptySpace)]
+            } as J.VariableDeclarations, isMulti ? this.suffix(declaration) : emptySpace)});
+
+        if (varDecls.length === 1) {
+            return varDecls[0].element;
+        } else {
+            return {
+                kind: JS.Kind.ScopedVariableDeclarations,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                modifiers: [],
+                scope: undefined,
+                variables: varDecls.map((v, idx) => {
+                    return produce(v, draft => {
+                        if (idx > 0) {
+                            draft.element.modifiers = [];
+                        }
+                    });
+                })
+            } as JS.ScopedVariableDeclarations;
+        }
     }
 
     visitFunctionDeclaration(node: ts.FunctionDeclaration): J.MethodDeclaration {
@@ -3211,48 +3251,32 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.ScopedVariableDeclarations {
-        const kind = this.findChildNode(node, ts.SyntaxKind.ImportKeyword)!;
-
+    visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.Import {
         return {
-            kind: JS.Kind.ScopedVariableDeclarations,
+            kind: JS.Kind.Import,
             id: randomId(),
             prefix: this.prefix(node),
+            importClause: {
+                kind: JS.Kind.ImportClause,
+                id: randomId(),
+                prefix: (() => {
+                    if (node.isTypeOnly) {
+                        const typeKeyword = node.getChildren().find(n => n.kind === ts.SyntaxKind.TypeKeyword);
+                        return this.prefix(typeKeyword!);
+                    } else {
+                        return emptySpace;
+                    }
+                })(),
+                markers: emptyMarkers,
+                typeOnly: node.isTypeOnly,
+                name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
+                namedBindings: undefined
+            },
             markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
-            scope: this.leftPadded(
-                this.prefix(kind),
-                JS.ScopedVariableDeclarations.Scope.Import
-            ),
-            variables: [
-                this.rightPadded({
-                    kind: J.Kind.VariableDeclarations,
-                    id: randomId(),
-                    prefix: emptySpace,
-                    markers: emptyMarkers,
-                    leadingAnnotations: [],
-                    modifiers: node.isTypeOnly ? [{
-                        kind: J.Kind.Modifier,
-                        id: randomId(),
-                        prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!),
-                        markers: emptyMarkers,
-                        keyword: "type",
-                        type: J.ModifierType.LanguageExtension,
-                        annotations: []
-                    }] : [],
-                    variables: [this.rightPadded({
-                        kind: J.Kind.NamedVariable,
-                        id: randomId(),
-                        prefix: emptySpace,
-                        markers: emptyMarkers,
-                        name: this.visit(node.name),
-                        dimensionsAfterName: [],
-                        initializer: this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference)),
-                        variableType: this.mapVariableType(node)
-                    }, emptySpace)]
-                }, emptySpace)
-            ]
-        }
+            moduleSpecifier: undefined,
+            attributes: undefined,
+            initializer: this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference))
+        } as JS.Import;
     }
 
     visitImportKeyword(node: ts.ImportExpression): J.Identifier {
@@ -3957,7 +3981,7 @@ export class JavaScriptParserVisitor {
     }
 
     private mapType(node: ts.Node): JavaType | undefined {
-        return this.typeMapping.type(node);
+        return Object.freeze(this.typeMapping.type(node));
     }
 
     private mapPrimitiveType(node: ts.Node): JavaType.Primitive {

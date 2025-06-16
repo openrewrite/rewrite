@@ -227,7 +227,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     }
                                     return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
                                 } else if (exp instanceof J.FieldAccess) {
-                                    if (Boolean.TRUE.equals(addOnly)) {
+                                    if (Boolean.TRUE.equals(addOnly) || oldAttributeValue != null) {
                                         return it;
                                     }
                                     int index = finalA.getArguments().indexOf(as);

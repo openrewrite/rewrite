@@ -296,7 +296,14 @@ public class ResolvedPom {
         // This facilitates the usage of "-D" arguments on the command line to customize builds
         String propVal = System.getProperty(property, properties.get(property));
         if (propVal != null) {
-            return propVal;
+            // Check if this would create a circular reference
+            // e.g., <project.version>${project.version}</project.version>
+            if (propVal.equals("${" + property + "}")) {
+                // Skip the user-defined property and fall through to built-in resolution
+                propVal = null;
+            } else {
+                return propVal;
+            }
         }
         switch (property) {
             case "groupId":
@@ -317,8 +324,13 @@ public class ResolvedPom {
             case "project.version":
             case "pom.version":
                 String version = requested.getVersion();
-                if (version.contains(property) && requested.getParent() != null) {
-                    return requested.getParent().getVersion();
+                if (version.contains(property)) {
+                    if (requested.getParent() != null) {
+                        version = requested.getParent().getVersion();
+                    }
+                    if (version.contains(property)) {
+                        return "error.circular.project.version";
+                    }
                 }
                 return version;
             case "project.parent.version":
@@ -989,7 +1001,7 @@ public class ResolvedPom {
                                              (d.getScope() == null ? "" : ":" + d.getScope());
                         throw new MavenDownloadingException("No version provided for direct dependency " + coordinates, null, dd.getDependency().getGav());
                     }
-                    if (d.getVersion() == null || (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType()) && !"bom".equals(d.getType())))) {
+                    if (d.getVersion() == null || (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType()) && !"bom".equals(d.getType()) && !"tgz".equals(d.getType())))) {
                         continue;
                     }
 

@@ -778,11 +778,4 @@ public class ChangeType extends Recipe {
 
         return fqn != null && fqn.equals(curFqn);
     }
-
-    private static String decapitalize(@Nullable String string) {
-        if (string != null && !string.isEmpty()) {
-            return Character.toLowerCase(string.charAt(0)) + string.substring(1);
-        }
-        return "";
-    }
 }
