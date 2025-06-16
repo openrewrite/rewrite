@@ -179,87 +179,6 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
     }
 
     @Test
-    void moveAnnotationAsLeadingAnnotationWhenModifierIsRemoved() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
-          java(
-            """
-              package com.abc;
-              
-              class A {
-                  final /* X */ @Deprecated // comment
-                  public @jdk.jfr.Name("A") void aMethod(String s) {
-                  }
-              }
-              """,
-            """
-              package com.abc;
-              
-              class A {
-                  /* X */ @Deprecated final // comment
-                  @jdk.jfr.Name("A") void aMethod(String s) {
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void yy() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
-          java(
-            """
-              package com.abc;
-              
-              class A {
-                  @Deprecated final  // comment
-                  public                   /* comment */ void aMethod(String s) {
-                  }
-              }
-              """,
-            """
-              package com.abc;
-                    
-              class A {                    
-                  @Deprecated final  // comment
-                  /* comment */ void aMethod(String s) {
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void zz() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
-          java(
-            """
-              package com.abc;
-              
-              class A {
-                  @Deprecated final  // comment
-                  public                   void aMethod(String s) {
-                  }
-              }
-              """,
-            """
-              package com.abc;
-                    
-              class A {                    
-                  @Deprecated final  // comment
-                                     void aMethod(String s) {
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void publicToPackagePrivateWildcard() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
@@ -499,6 +418,94 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   @Deprecated
                   static void aMethod(Double d) {
                       System.out.print (  "foo");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * WHEN A MODIFIER IS REMOVED, THE COMMENTS AND ANNOTATIONS HAVE TO BE MOVED TO ANOTHER LST ELEMENT.
+     * IDEALLY, WE CHANGE AS LITTLE AS POSSIBLE.
+     * TO KEEP THE RECIPE MAINTAINABLE, WE CALL maybeAutoFormat(<method>) WHICH RESULTS INTO EXTRA CLEANUP, WHICH WE TAKE FOR GRANTED.
+     * THE NEXT TESTS PROVE THIS BEHAVIOR.
+     */
+
+    @Test
+    void moveAnnotationAsLeadingAnnotationWhenModifierIsRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  final /* X */ @Deprecated // comment
+                  public @jdk.jfr.Name("A") void aMethod(String s) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+              
+              class A {
+                  /* X */ @Deprecated final // comment
+                  @jdk.jfr.Name("A") void aMethod(String s) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void yy() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  @Deprecated final  // comment
+                  public                   /* comment */ void aMethod(String s) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+                    
+              class A {                    
+                  @Deprecated final  // comment
+                  /* comment */ void aMethod(String s) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void cleanupSpaceWhenModifierIsRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  @Deprecated final  // comment
+                  public                   void aMethod(String s) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+                    
+              class A {                    
+                  @Deprecated final  // comment
+                  void aMethod(String s) {
                   }
               }
               """
