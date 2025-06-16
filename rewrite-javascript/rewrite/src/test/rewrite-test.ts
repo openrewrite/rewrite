@@ -32,8 +32,8 @@ export interface SourceSpec<T extends SourceFile> {
     after?: AfterRecipeText
     path?: string,
     parser: (ctx: ExecutionContext) => Parser,
-    beforeRecipe?: (sourceFile: T) => T | void | Promise<T>,
-    afterRecipe?: (sourceFile: T) => T | void | Promise<T>,
+    beforeRecipe?: (sourceFile: T) => T | void | Promise<T> | Promise<void>,
+    afterRecipe?: (sourceFile: T) => T | void | Promise<T> | Promise<void>,
     ext: string
 }
 
@@ -121,7 +121,7 @@ export class RecipeSpec {
                     // fail("Expected after to be undefined.");
                 }
                 if (spec.afterRecipe) {
-                    spec.afterRecipe(matchingSpec![1]);
+                    await spec.afterRecipe(matchingSpec![1]);
                 }
             } else {
                 await this.expectAfter(spec, after);
@@ -149,7 +149,7 @@ export class RecipeSpec {
             (spec.after as (actual: string) => string)(actualAfter) : spec.after as string;
         expect(actualAfter).toEqual(afterSource);
         if (spec.afterRecipe) {
-            spec.afterRecipe(actualAfter);
+            await spec.afterRecipe(actualAfter);
         }
     }
 
@@ -165,7 +165,11 @@ export class RecipeSpec {
                 before.push([spec, {text: dedent(spec.before), sourcePath: sourcePath}]);
             }
         }
-        const parsed = await specs[0].parser(this.executionContext).parse(...before.map(([_, parserInput]) => parserInput));
+        const parser = specs[0].parser(this.executionContext);
+        const parsed: SourceFile[] = [];
+        for await (const sourceFile of parser.parse(...before.map(([_, parserInput]) => parserInput))) {
+            parsed.push(sourceFile);
+        }
         const specToParsed: [SourceSpec<any>, SourceFile][] = before.map(([spec, _], i) => [spec, parsed[i]]);
         return await mapAsync(specToParsed, async ([spec, sourceFile]) => {
             const b = spec.beforeRecipe ? spec.beforeRecipe(sourceFile) : sourceFile;

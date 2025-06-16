@@ -279,8 +279,9 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.Import>(jsImport, p, async draft => {
             draft.importClause = jsImport.importClause && await this.visitDefined<JS.ImportClause>(jsImport.importClause, p);
-            draft.moduleSpecifier = await this.visitLeftPadded(jsImport.moduleSpecifier, p);
+            draft.moduleSpecifier = jsImport.moduleSpecifier && await this.visitLeftPadded(jsImport.moduleSpecifier, p);
             draft.attributes = jsImport.attributes && await this.visitDefined<JS.ImportAttributes>(jsImport.attributes, p);
+            draft.initializer = jsImport.initializer && await this.visitLeftPadded(jsImport.initializer, p);
         });
     }
 
@@ -313,7 +314,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.ImportSpecifier>(importSpecifier, p, async draft => {
             draft.importType = await this.visitLeftPadded(importSpecifier.importType, p);
-            draft.specifier = await this.visitDefined<Expression>(importSpecifier.specifier, p);
+            draft.specifier = await this.visitDefined<JS.Alias | J.Identifier>(importSpecifier.specifier, p);
             draft.type = importSpecifier.type && await this.visitType(importSpecifier.type, p);
         });
     }
@@ -399,19 +400,19 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitObjectBindingDeclarations(objectBindingDeclarations: JS.ObjectBindingDeclarations, p: P): Promise<J | undefined> {
-        const expression = await this.visitExpression(objectBindingDeclarations, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ObjectBindingDeclarations) {
+    protected async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(objectBindingPattern, p);
+           if (!expression?.kind || expression.kind !== JS.Kind.ObjectBindingPattern) {
                return expression;
            }
-           objectBindingDeclarations = expression as JS.ObjectBindingDeclarations;
+           objectBindingPattern = expression as JS.ObjectBindingPattern;
 
-        return this.produceJavaScript<JS.ObjectBindingDeclarations>(objectBindingDeclarations, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(objectBindingDeclarations.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
-            draft.modifiers = await mapAsync(objectBindingDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.typeExpression = objectBindingDeclarations.typeExpression && await this.visitDefined<TypedTree>(objectBindingDeclarations.typeExpression, p);
-            draft.bindings = await this.visitContainer(objectBindingDeclarations.bindings, p);
-            draft.initializer = objectBindingDeclarations.initializer && await this.visitLeftPadded(objectBindingDeclarations.initializer, p);
+        return this.produceJavaScript<JS.ObjectBindingPattern>(objectBindingPattern, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(objectBindingPattern.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
+            draft.modifiers = await mapAsync(objectBindingPattern.modifiers, item => this.visitDefined<J.Modifier>(item, p));
+            draft.typeExpression = objectBindingPattern.typeExpression && await this.visitDefined<TypedTree>(objectBindingPattern.typeExpression, p);
+            draft.bindings = await this.visitContainer(objectBindingPattern.bindings, p);
+            draft.initializer = objectBindingPattern.initializer && await this.visitLeftPadded(objectBindingPattern.initializer, p);
         });
     }
 
@@ -451,7 +452,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.ScopedVariableDeclarations>(scopedVariableDeclarations, p, async draft => {
             draft.modifiers = await mapAsync(scopedVariableDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.scope = scopedVariableDeclarations.scope && await this.visitLeftPadded(scopedVariableDeclarations.scope, p);
             draft.variables = await mapAsync(scopedVariableDeclarations.variables, item => this.visitRightPadded(item, p));
         });
     }
@@ -937,8 +937,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitKeysRemapping(tree as unknown as JS.MappedType.KeysRemapping, p);
                 case JS.Kind.MappedTypeParameter:
                     return this.visitMappedTypeParameter(tree as unknown as JS.MappedType.Parameter, p);
-                case JS.Kind.ObjectBindingDeclarations:
-                    return this.visitObjectBindingDeclarations(tree as unknown as JS.ObjectBindingDeclarations, p);
+                case JS.Kind.ObjectBindingPattern:
+                    return this.visitObjectBindingPattern(tree as unknown as JS.ObjectBindingPattern, p);
                 case JS.Kind.PropertyAssignment:
                     return this.visitPropertyAssignment(tree as unknown as JS.PropertyAssignment, p);
                 case JS.Kind.SatisfiesExpression:

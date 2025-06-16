@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J, JavaType} from "../../../src/java";
+import {tap} from "../../test-util";
 
 describe('class mapping', () => {
     const spec = new RecipeSpec();
@@ -563,4 +565,51 @@ describe('class mapping', () => {
                 })({hello: "world"});
             `)
         ));
+
+    test('class type mapping', async () => {
+        const spec = new RecipeSpec();
+        //language=typescript
+        const source = typescript(`
+            class Base {
+                s: string;
+
+                constructor(private n: number, s: string) {
+                    this.attrs = attrs;
+                    this.s = s;
+                }
+
+                m(): boolean {
+                    return true;
+                }
+            }
+            let base: Base;
+        `)
+        source.afterRecipe = tree => {
+            const varDecl = tree.statements[1].element as J.VariableDeclarations;
+            const ident = varDecl.variables[0].element.name as J.Identifier;
+            expect(ident.simpleName).toEqual("base");
+            expect(ident.type!.kind).toEqual(JavaType.Kind.Class);
+            const type = ident.type! as JavaType.Class;
+            expect((ident.type! as JavaType.Class).classKind).toEqual(JavaType.Class.Kind.Class);
+            expect(type.members).toHaveLength(2);
+            tap(type.members[0], mem => {
+                expect(mem.kind).toEqual(JavaType.Kind.Variable);
+                expect((mem as JavaType.Variable).name).toEqual("s");
+                expect(mem.type.kind).toEqual(JavaType.Kind.Primitive);
+            });
+            tap(type.members[1], mem => {
+                expect(mem.kind).toEqual(JavaType.Kind.Variable);
+                expect((mem as JavaType.Variable).name).toEqual("n");
+                expect(mem.type.kind).toEqual(JavaType.Kind.Primitive);
+            });
+            expect(type.methods).toHaveLength(1);
+            tap(type.methods[0], method => {
+                expect(method.kind).toEqual(JavaType.Kind.Method);
+                expect((method as JavaType.Method).name).toEqual("m");
+                expect(method.returnType.kind).toEqual(JavaType.Kind.Primitive);
+                expect(method.parameterNames).toEqual([]);
+            });
+        }
+        await spec.rewriteRun(source);
+    })
 });

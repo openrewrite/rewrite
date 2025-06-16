@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J, JavaType} from "../../../src/java";
 
 describe('this mapping', () => {
     const spec = new RecipeSpec();
@@ -22,4 +23,26 @@ describe('this mapping', () => {
     test('simple', () => spec.rewriteRun(
         typescript('this')
     ));
+
+    test('this type mapping', () => spec.rewriteRun({
+        ...typescript(
+           `
+            class A {
+               m(): A { return this; }
+            }
+            class B {
+               m(): B { return this; }
+            }
+            const aa = new A().m();
+            const bb = new B().m();
+            `),
+            afterRecipe: (tree: JS.CompilationUnit) => {
+                for (let i = 0; i < 2; i++) {
+                    const methodInA = (tree.statements[i].element as J.ClassDeclaration).body.statements[0].element as J.MethodDeclaration;
+                    const typeOfThisInA = ((methodInA.body?.statements![0].element as J.Return).expression! as J.Identifier).type! as JavaType.Class;
+                    expect(typeOfThisInA.fullyQualifiedName).toEqual(i == 0 ? "A" : "B");
+                }
+            }
+        })
+    );
 });

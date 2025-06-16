@@ -2069,4 +2069,55 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5498")
+    void javaUtilMapEntry() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+
+              public class Usages {
+                  HashMap<String, String> hashMap;
+                  Map<String, String> map;
+                  Optional<String> optional;
+                  Map.Entry<String, String> favoriteEntry;
+              }
+              """,
+            """
+              import java.util.HashMap;
+              import java.util.Map;
+              import java.util.Optional;
+                      
+              public class Usages {
+                  HashMap<String, String> hashMap;
+                  Map<String, String> map;
+                  Optional<String> optional;
+                  Map.Entry<String, String> favoriteEntry;
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.*;
+
+              public class WithoutMap {
+                  Optional<String> optional;
+                  Map.Entry<String, String> favoriteEntry;
+              }
+              """,
+            """
+              import java.util.Map;
+              import java.util.Optional;
+                      
+              public class WithoutMap {
+                  Optional<String> optional;
+                  Map.Entry<String, String> favoriteEntry;
+              }
+              """
+          )
+        );
+    }
 }

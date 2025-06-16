@@ -74,6 +74,18 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return del;
     }
 
+    override async visitExpressionStatement(statement: JS.ExpressionStatement, p: PrintOutputCapture): Promise<J | undefined> {
+        // has no markers or prefix
+        await this.visit(statement.expression, p);
+        return statement;
+    }
+
+    override async visitStatementExpression(statementExpression: JS.StatementExpression, p: PrintOutputCapture): Promise<J | J | undefined> {
+        // has no markers or prefix
+        await this.visit(statementExpression.statement, p);
+        return statementExpression;
+    }
+
     override async visitTrailingTokenStatement(statement: JS.TrailingTokenStatement, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(statement, p);
         await this.visitRightPadded(statement.expression, p);
@@ -163,6 +175,11 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visitLeftPaddedLocal(jsImport.importClause ? "from" : "", jsImport.moduleSpecifier, p);
 
         jsImport.attributes && await this.visit(jsImport.attributes, p);
+
+        if (jsImport.initializer) {
+            p.append("=");
+            await this.visitLeftPadded(jsImport.initializer, p);
+        }
 
         await this.afterSyntax(jsImport, p);
         return jsImport;
@@ -432,29 +449,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitModifier(m, p);
         }
 
-        const scope = variableDeclarations.scope;
-        if (scope) {
-            await this.visitSpace(scope.before, p);
-
-            switch (scope.element) {
-                case JS.ScopedVariableDeclarations.Scope.Let:
-                    p.append("let");
-                    break;
-                case JS.ScopedVariableDeclarations.Scope.Const:
-                    p.append("const");
-                    break;
-                case JS.ScopedVariableDeclarations.Scope.Var:
-                    p.append("var");
-                    break;
-                case JS.ScopedVariableDeclarations.Scope.Using:
-                    p.append("using");
-                    break;
-                case JS.ScopedVariableDeclarations.Scope.Import:
-                    p.append("import");
-                    break;
-            }
-        }
-
         await this.visitRightPaddedLocal(variableDeclarations.variables, ",", p);
 
         await this.afterSyntax(variableDeclarations, p);
@@ -585,7 +579,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 keyword = "static";
                 break;
             case J.ModifierType.Final:
-                keyword = "final";
+                keyword = "const";
                 break;
             case J.ModifierType.Native:
                 keyword = "native";
@@ -1100,18 +1094,18 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return mappedTypeParameter;
     }
 
-    override async visitObjectBindingDeclarations(objectBindingDeclarations: JS.ObjectBindingDeclarations, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(objectBindingDeclarations, p);
-        await this.visitNodes(objectBindingDeclarations.leadingAnnotations, p);
-        for (const m of objectBindingDeclarations.modifiers) {
+    override async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(objectBindingPattern, p);
+        await this.visitNodes(objectBindingPattern.leadingAnnotations, p);
+        for (const m of objectBindingPattern.modifiers) {
             await this.visitModifier(m, p);
         }
 
-        objectBindingDeclarations.typeExpression && await this.visit(objectBindingDeclarations.typeExpression, p);
-        await this.visitContainerLocal("{", objectBindingDeclarations.bindings, ",", "}", p);
-        objectBindingDeclarations.initializer && await this.visitLeftPaddedLocal("=", objectBindingDeclarations.initializer, p);
-        await this.afterSyntax(objectBindingDeclarations, p);
-        return objectBindingDeclarations;
+        objectBindingPattern.typeExpression && await this.visit(objectBindingPattern.typeExpression, p);
+        await this.visitContainerLocal("{", objectBindingPattern.bindings, ",", "}", p);
+        objectBindingPattern.initializer && await this.visitLeftPaddedLocal("=", objectBindingPattern.initializer, p);
+        await this.afterSyntax(objectBindingPattern, p);
+        return objectBindingPattern;
     }
 
     override async visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, p: PrintOutputCapture): Promise<J | undefined> {
@@ -1857,27 +1851,33 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     protected async preVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
-        for (const marker of tree.markers.markers) {
-            if (marker.kind === JS.Markers.Spread) {
-                await this.visitSpace((marker as Spread).prefix, p);
-                p.append("...");
+        // FIXME: This is currently only required for `ExpressionStatement` and `StatementExpression`
+        if (tree.markers) {
+            for (const marker of tree.markers.markers) {
+                if (marker.kind === JS.Markers.Spread) {
+                    await this.visitSpace((marker as Spread).prefix, p);
+                    p.append("...");
+                }
             }
         }
         return tree;
     }
 
     protected async postVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
-        for (const marker of tree.markers.markers) {
-            if (marker.kind === JS.Markers.NonNullAssertion) {
-                await this.visitSpace((marker as NonNullAssertion).prefix, p);
-                p.append("!");
-            }
-            if (marker.kind === JS.Markers.Optional) {
-                await this.visitSpace((marker as Optional).prefix, p);
-                p.append("?");
-                if (this.cursor.parent?.value?.kind === J.Kind.MethodInvocation ||
-                    this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
-                    p.append(".");
+        // FIXME: This is currently only required for `ExpressionStatement` and `StatementExpression`
+        if (tree.markers) {
+            for (const marker of tree.markers.markers) {
+                if (marker.kind === JS.Markers.NonNullAssertion) {
+                    await this.visitSpace((marker as NonNullAssertion).prefix, p);
+                    p.append("!");
+                }
+                if (marker.kind === JS.Markers.Optional) {
+                    await this.visitSpace((marker as Optional).prefix, p);
+                    p.append("?");
+                    if (this.cursor.parent?.value?.kind === J.Kind.MethodInvocation ||
+                        this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
+                        p.append(".");
+                    }
                 }
             }
         }
@@ -1923,4 +1923,4 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 }
 
-TreePrinters.register(JS.Kind.CompilationUnit, new JavaScriptPrinter());
+TreePrinters.register(JS.Kind.CompilationUnit, () => new JavaScriptPrinter());

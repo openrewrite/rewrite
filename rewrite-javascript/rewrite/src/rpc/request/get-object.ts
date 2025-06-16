@@ -15,6 +15,7 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
+import {ReferenceMap} from "../reference";
 
 export class GetObject {
     constructor(private readonly id: string) {
@@ -28,7 +29,7 @@ export class GetObject {
         trace: boolean
     ): void {
         const pendingData = new Map<string, RpcObjectData[]>();
-        const localRefs = new WeakMap<any, number>();
+        const localRefs = new ReferenceMap();
 
         connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
             if (!localObjects.has(request.id)) {

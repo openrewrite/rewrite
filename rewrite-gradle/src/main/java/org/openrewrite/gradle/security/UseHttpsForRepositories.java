@@ -15,7 +15,10 @@
  */
 package org.openrewrite.gradle.security;
 
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.groovy.tree.G;
@@ -25,8 +28,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.tree.K;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.singleton;

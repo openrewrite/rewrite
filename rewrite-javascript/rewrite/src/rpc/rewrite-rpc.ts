@@ -35,6 +35,7 @@ import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
 import {WriteStream} from "fs";
 import {ParserInput} from "../parser";
+import {randomId} from "../uuid";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
@@ -67,7 +68,7 @@ export class RewriteRpc {
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
-        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, options?.batchSize || 10,
+        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, options?.batchSize || 100,
             !!options?.traceGetObjectOutput);
         GetRecipes.handle(this.connection, registry);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
@@ -116,11 +117,12 @@ export class RewriteRpc {
         return cursor;
     }
 
-    async parse(parser: "javascript", inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
+    async parse(inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
         const parsed: SourceFile[] = [];
+        // FIXME properly handle multiple results
         for (const g of await this.connection.sendRequest(
             new rpc.RequestType<Parse, string[], Error>("Parse"),
-            new Parse(parser, inputs, relativeTo)
+            new Parse(randomId(), inputs, relativeTo)
         )) {
             parsed.push(await this.getObject(g));
         }

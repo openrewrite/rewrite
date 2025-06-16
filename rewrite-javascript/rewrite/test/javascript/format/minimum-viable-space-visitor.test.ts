@@ -29,7 +29,7 @@ describe('MinimumViableSpacingVisitor', () => {
         const ret = typescript(before, after);
         class JavaScriptParserWithSpacesRemoved extends JavaScriptParser {
             constructor() {
-                super(undefined, undefined);
+                super({});
             }
 
             static RemoveSpaces = class <P> extends JavaScriptVisitor<P> {
@@ -41,12 +41,12 @@ describe('MinimumViableSpacingVisitor', () => {
                 }
             }
 
-            override async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
-                const files = await super.parse(...inputs);
+            override async *parse(...inputs: ParserInput[]): AsyncGenerator<JS.CompilationUnit> {
                 const removeSpaces = new JavaScriptParserWithSpacesRemoved.RemoveSpaces();
-                return await mapAsync(files, async (file) => {
-                    return await removeSpaces.visit(file, undefined) as unknown as SourceFile;
-                });
+
+                for await (const file of super.parse(...inputs)) {
+                    yield (await removeSpaces.visit<JS.CompilationUnit>(file, undefined))!;
+                }
             }
         }
         return produce(ret, draft => {

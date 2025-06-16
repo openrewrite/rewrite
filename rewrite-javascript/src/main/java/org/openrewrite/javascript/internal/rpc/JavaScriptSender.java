@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.rpc;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
@@ -37,18 +36,21 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     private final JavaScriptSenderDelegate delegate = new JavaScriptSenderDelegate(this);
 
     @Override
-    public @Nullable J visit(@Nullable Tree tree, RpcSendQueue p, Cursor parent) {
+    public @Nullable J visit(@Nullable Tree tree, RpcSendQueue p) {
         if (tree instanceof JS) {
-            return super.visit(tree, p, parent);
+            return super.visit(tree, p);
         }
-        return delegate.visit(tree, p, parent);
+        return delegate.visit(tree, p);
     }
 
     @Override
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
-        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.sendMarkers(j, Tree::getMarkers);
+        if (!(j instanceof JS.ExpressionStatement) && !(j instanceof JS.StatementExpression)) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
+            q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
+            q.sendMarkers(j, Tree::getMarkers);
+        }
 
         return j;
     }
@@ -150,6 +152,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(jsImport, JS.Import::getImportClause, el -> visit(el, q));
         q.getAndSend(jsImport, el -> el.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q));
         q.getAndSend(jsImport, JS.Import::getAttributes, el -> visit(el, q));
+        q.getAndSend(jsImport, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
         return jsImport;
     }
 
@@ -241,13 +244,13 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, RpcSendQueue q) {
-        q.getAndSendList(objectBindingDeclarations, JS.ObjectBindingDeclarations::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
-        q.getAndSendList(objectBindingDeclarations, JS.ObjectBindingDeclarations::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        q.getAndSend(objectBindingDeclarations, JS.ObjectBindingDeclarations::getTypeExpression, el -> visit(el, q));
-        q.getAndSend(objectBindingDeclarations, el -> el.getPadding().getBindings(), el -> visitContainer(el, q));
-        q.getAndSend(objectBindingDeclarations, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
-        return objectBindingDeclarations;
+    public J visitObjectBindingPattern(JS.ObjectBindingPattern objectBindingPattern, RpcSendQueue q) {
+        q.getAndSendList(objectBindingPattern, JS.ObjectBindingPattern::getLeadingAnnotations, J.Annotation::getId, el -> visit(el, q));
+        q.getAndSendList(objectBindingPattern, JS.ObjectBindingPattern::getModifiers, J.Modifier::getId, el -> visit(el, q));
+        q.getAndSend(objectBindingPattern, JS.ObjectBindingPattern::getTypeExpression, el -> visit(el, q));
+        q.getAndSend(objectBindingPattern, el -> el.getPadding().getBindings(), el -> visitContainer(el, q));
+        q.getAndSend(objectBindingPattern, el -> el.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
+        return objectBindingPattern;
     }
 
     @Override
@@ -269,7 +272,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitScopedVariableDeclarations(JS.ScopedVariableDeclarations scopedVariableDeclarations, RpcSendQueue q) {
         q.getAndSendList(scopedVariableDeclarations, JS.ScopedVariableDeclarations::getModifiers, J.Modifier::getId, el -> visit(el, q));
-        q.getAndSend(scopedVariableDeclarations, el -> el.getPadding().getScope(), el -> visitLeftPadded(el, q));
         q.getAndSendList(scopedVariableDeclarations, el -> el.getPadding().getVariables(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return scopedVariableDeclarations;
     }

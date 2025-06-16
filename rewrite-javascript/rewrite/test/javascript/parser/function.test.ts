@@ -17,6 +17,7 @@
  */
 import {RecipeSpec} from "../../../src/test";
 import {typescript} from "../../../src/javascript";
+import {J, JavaType} from "../../../src/java";
 
 describe('function mapping', () => {
     const spec = new RecipeSpec();
@@ -427,4 +428,28 @@ describe('function mapping', () => {
                  }("Hello", "World");
              `)
         ));
+
+    test('function type mapping', async () => {
+        const spec = new RecipeSpec();
+        //language=typescript
+        const source = typescript(`
+            function f(s: string): number {
+                return s.length;
+            }
+            const a = f;
+        `)
+        source.afterRecipe = tree => {
+            const varDecl = tree.statements[1].element as J.VariableDeclarations;
+            const ident = varDecl.variables[0].element.name as J.Identifier;
+            expect(ident.simpleName).toEqual("a");
+            expect(ident.type!.kind).toEqual(JavaType.Kind.Method);
+            const type = ident.type! as JavaType.Method;
+            expect(type.name).toEqual("f");
+            expect(type.parameterTypes.length).toEqual(1);
+            expect(type.parameterTypes[0].kind).toEqual(JavaType.Kind.Primitive);
+            expect(type.parameterNames.length).toEqual(1);
+            expect(type.parameterNames[0]).toEqual("s");
+        }
+        await spec.rewriteRun(source);
+    })
 });

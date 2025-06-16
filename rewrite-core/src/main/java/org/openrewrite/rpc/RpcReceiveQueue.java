@@ -100,7 +100,7 @@ public class RpcReceiveQueue {
      * @return The received value.
      */
     @SuppressWarnings("DataFlowIssue")
-    public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
+    public <T> @Nullable T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
         if (logFile != null && message.getTrace() != null) {
             logFile.println(message.withTrace(null));
@@ -148,7 +148,7 @@ public class RpcReceiveQueue {
         }
     }
 
-    public <T> List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
+    public <T> @Nullable List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData msg = take();
         switch (msg.getState()) {
             case NO_CHANGE:

@@ -18,6 +18,8 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -25,6 +27,7 @@ import static org.openrewrite.java.Assertions.java;
 
 class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void addValueAttribute() {
         rewriteRun(
@@ -1326,5 +1329,124 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               )
             );
         }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5526")
+    @Test
+    void fieldAccessArgumentDefaultAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", null, "hello", null, false, false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public interface Bar {
+                  String BAR = "bar";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Bar;
+              import org.example.Foo;
+              
+              @Foo({Bar.BAR})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Bar;
+              import org.example.Foo;
+              
+              @Foo({"hello"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5526")
+    @Test
+    void fieldAccessArgumentNamedAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", "foo", "hello", null, false, false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] foo() default {};
+              }
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public interface Bar {
+                  String BAR = "bar";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Bar;
+              import org.example.Foo;
+              
+              @Foo(foo = {Bar.BAR})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Bar;
+              import org.example.Foo;
+              
+              @Foo(foo = {"hello"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotMisMatchWhenUsingFieldReferenceOnNamedAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "name",
+              "newValue",
+              "oldValue",
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(name = A.OTHER_VALUE)
+              public class A {
+                  public static final String OTHER_VALUE = "otherValue";
+              }
+              """
+          )
+        );
     }
 }
