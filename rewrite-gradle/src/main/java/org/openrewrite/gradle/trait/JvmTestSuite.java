@@ -248,21 +248,6 @@ public class JvmTestSuite implements Trait<Statement> {
             return new JvmTestSuite(cursor, getGradleProject(cursor), simpleName);
         }
 
-        private boolean withinBlock(Cursor cursor, String name) {
-            Cursor parentCursor = cursor.getParent();
-            while (parentCursor != null) {
-                if (parentCursor.getValue() instanceof J.MethodInvocation) {
-                    J.MethodInvocation m = parentCursor.getValue();
-                    if (m.getSimpleName().equals(name)) {
-                        return true;
-                    }
-                }
-                parentCursor = parentCursor.getParent();
-            }
-
-            return false;
-        }
-
         private boolean withinTestingBlock(Cursor cursor) {
             return withinBlock(cursor, "testing");
         }

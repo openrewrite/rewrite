@@ -42,6 +42,8 @@ import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
@@ -49,6 +51,10 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvocation> {
+    private static final String GROUP = "group";
+    private static final String ARTIFACT = "name";
+    private static final String VERSION = "version";
+
     Cursor cursor;
 
     String group;
@@ -153,26 +159,14 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                 if (importedBom != null) {
                     artifacts.add(importedBom.getArtifactId());
                 }
+                if (StringUtils.isBlank(group) || artifacts.isEmpty() || StringUtils.isBlank(version)) {
+                    return null;
+                }
 
                 return new SpringDependencyManagementPluginEntry(cursor, group, artifacts, version);
             }
 
             return null;
-        }
-
-        private boolean withinBlock(Cursor cursor, String name) {
-            Cursor parentCursor = cursor.getParent();
-            while (parentCursor != null) {
-                if (parentCursor.getValue() instanceof J.MethodInvocation) {
-                    J.MethodInvocation m = parentCursor.getValue();
-                    if (m.getSimpleName().equals(name)) {
-                        return true;
-                    }
-                }
-                parentCursor = parentCursor.getParent();
-            }
-
-            return false;
         }
 
         private boolean withinDependencyManagementBlock(Cursor cursor) {
@@ -210,83 +204,28 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             List<Expression> arguments = methodInvocation.getArguments();
             Expression argument = arguments.get(0);
             entries.forEach(entry -> {
-                GroupArtifactVersion dependency = null;
+                GavMap gavMap = null;
                 if (argument instanceof J.Literal) {
                     String notation = (String) ((J.Literal) argument).getValue();
-                    int versionIdx = notation.lastIndexOf(':');
+                    int versionIdx = notation == null ? -1 : notation.lastIndexOf(':');
                     if (versionIdx != -1) {
-                        dependency = new GroupArtifactVersion(notation.substring(0, versionIdx), entry, notation.substring(versionIdx + 1));
+                        dependencies.add(new GroupArtifactVersion(notation.substring(0, versionIdx), entry, notation.substring(versionIdx + 1)));
                     }
+                    return;
                 } else if (argument instanceof G.MapLiteral) {
-                    List<Expression> mapEntryExpressions = ((G.MapLiteral) argument).getElements()
-                            .stream()
-                            .map(e -> (Expression) e)
-                            .collect(Collectors.toList());
-                    dependency = getMapEntriesDependencySet(mapEntryExpressions, entry);
+                    gavMap = getGAVMapEntriesForGMapEntries(((G.MapLiteral) argument).getElements());
                 } else if (argument instanceof G.MapEntry) {
-                    dependency = getMapEntriesDependencySet(arguments, entry);
+                    gavMap = getGAVMapEntriesForGMapEntries(arguments);
                 } else if (argument instanceof J.Assignment) {
-                    String group = null;
-                    String version = null;
-
-                    for (Expression e : arguments) {
-                        if (!(e instanceof J.Assignment)) {
-                            continue;
-                        }
-                        J.Assignment arg = (J.Assignment) e;
-                        if (!(arg.getVariable() instanceof J.Identifier) || !(arg.getAssignment() instanceof J.Literal)) {
-                            continue;
-                        }
-                        J.Identifier identifier = (J.Identifier) arg.getVariable();
-                        J.Literal value = (J.Literal) arg.getAssignment();
-                        if (!(value.getValue() instanceof String)) {
-                            continue;
-                        }
-                        String name = identifier.getSimpleName();
-                        if ("group".equals(name)) {
-                            group = (String) value.getValue();
-                        } else if ("version".equals(name)) {
-                            version = (String) value.getValue();
-                        }
-                    }
-
-                    if (group != null) {
-                        dependency = new GroupArtifactVersion(group, entry, version);
-                    }
-                } else if (argument instanceof J.MethodInvocation && "mapOf".equals(((J.MethodInvocation) argument).getSimpleName())) {
-                    String group = null;
-                    String version = null;
-
-                    for (Expression e : ((J.MethodInvocation) argument).getArguments()) {
-                        if (!(e instanceof J.MethodInvocation)) {
-                            continue;
-                        }
-                        J.MethodInvocation m = (J.MethodInvocation) e;
-                        if (!("to".equals(m.getSimpleName()) || m.getSelect() instanceof J.Literal || m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Literal))) {
-                            continue;
-                        }
-                        J.Literal identifier = (J.Literal) m.getSelect();
-                        J.Literal value = (J.Literal) m.getArguments().get(0);
-                        if (!(identifier.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                            continue;
-                        }
-                        String name = (String) identifier.getValue();
-                        switch (name) {
-                            case "group":
-                                group = (String) value.getValue();
-                                break;
-                            case "version":
-                                version = (String) value.getValue();
-                                break;
-                        }
-                    }
-
-                    if (group != null) {
-                        dependency = new GroupArtifactVersion(group, entry, version);
-                    }
+                    gavMap = getGAVMapEntriesForAssignments(arguments);
+                } else if (argument instanceof J.MethodInvocation) {
+                    gavMap = getGAVMapEntriesForMapOfInvocation((J.MethodInvocation) argument);
                 }
-                if (dependency != null) {
-                    dependencies.add(dependency);
+                if (gavMap != null && gavMap.isValid()) {
+                    GroupArtifactVersion gav = gavMap.asGav(entry);
+                    if (gav != null) {
+                        dependencies.add(gav);
+                    }
                 }
             });
             return dependencies;
@@ -295,159 +234,25 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
         private @Nullable GroupArtifactVersion parseDependency(List<Expression> arguments) {
             Expression argument = arguments.get(0);
+            GavMap gavMap = null;
             if (argument instanceof J.Literal) {
-                Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) argument).getValue());
+                String stringNotation = (String) ((J.Literal) argument).getValue();
+                Dependency dependency = stringNotation == null ? null : DependencyStringNotationConverter.parse(stringNotation);
                 return dependency == null ? null : dependency.getGav();
             } else if (argument instanceof G.MapLiteral) {
-                List<Expression> mapEntryExpressions = ((G.MapLiteral) argument).getElements()
-                        .stream()
-                        .map(e -> (Expression) e)
-                        .collect(Collectors.toList());
-                return getMapEntriesDependency(mapEntryExpressions);
+                gavMap = getGAVMapEntriesForGMapEntries(((G.MapLiteral) argument).getElements());
             } else if (argument instanceof G.MapEntry) {
-                return getMapEntriesDependency(arguments);
+                gavMap = getGAVMapEntriesForGMapEntries(arguments);
             } else if (argument instanceof J.Assignment) {
-                String group = null;
-                String artifact = null;
-                String version = null;
-
-                for (Expression e : arguments) {
-                    if (!(e instanceof J.Assignment)) {
-                        continue;
-                    }
-                    J.Assignment arg = (J.Assignment) e;
-                    if (!(arg.getVariable() instanceof J.Identifier) || !(arg.getAssignment() instanceof J.Literal)) {
-                        continue;
-                    }
-                    J.Identifier identifier = (J.Identifier) arg.getVariable();
-                    J.Literal value = (J.Literal) arg.getAssignment();
-                    if (!(value.getValue() instanceof String)) {
-                        continue;
-                    }
-                    String name = identifier.getSimpleName();
-                    switch (name) {
-                        case "group":
-                            group = (String) value.getValue();
-                            break;
-                        case "name":
-                            artifact = (String) value.getValue();
-                            break;
-                        case "version":
-                            version = (String) value.getValue();
-                            break;
-                    }
-                }
-
-                if (group == null || artifact == null) {
-                    return null;
-                }
-
-                return new GroupArtifactVersion(group, artifact, version);
-            } else if (argument instanceof J.MethodInvocation && "mapOf".equals(((J.MethodInvocation) argument).getSimpleName())) {
-                String group = null;
-                String artifact = null;
-                String version = null;
-
-                for (Expression e : ((J.MethodInvocation) argument).getArguments()) {
-                    if (!(e instanceof J.MethodInvocation)) {
-                        continue;
-                    }
-                    J.MethodInvocation m = (J.MethodInvocation) e;
-                    if (!("to".equals(m.getSimpleName()) || m.getSelect() instanceof J.Literal || m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Literal))) {
-                        continue;
-                    }
-                    J.Literal identifier = (J.Literal) m.getSelect();
-                    J.Literal value = (J.Literal) m.getArguments().get(0);
-                    if (!(identifier.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                        continue;
-                    }
-                    String name = (String) identifier.getValue();
-                    switch (name) {
-                        case "group":
-                            group = (String) value.getValue();
-                            break;
-                        case "name":
-                            artifact = (String) value.getValue();
-                            break;
-                        case "version":
-                            version = (String) value.getValue();
-                            break;
-                    }
-                }
-
-                if (group != null && artifact != null) {
-                    return new GroupArtifactVersion(group, artifact, version);
-                }
+                gavMap = getGAVMapEntriesForAssignments(arguments);
+            } else if (argument instanceof J.MethodInvocation) {
+                gavMap = getGAVMapEntriesForMapOfInvocation((J.MethodInvocation) argument);
             }
 
-            return null;
-        }
-
-        private static @Nullable GroupArtifactVersion getMapEntriesDependency(List<Expression> arguments) {
-            String group = null;
-            String artifact = null;
-            String version = null;
-
-            for (Expression e : arguments) {
-                if (!(e instanceof G.MapEntry)) {
-                    continue;
-                }
-                G.MapEntry arg = (G.MapEntry) e;
-                if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                    continue;
-                }
-                J.Literal key = (J.Literal) arg.getKey();
-                J.Literal value = (J.Literal) arg.getValue();
-                if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                    continue;
-                }
-                String keyValue = (String) key.getValue();
-                if ("group".equals(keyValue)) {
-                    group = (String) value.getValue();
-                } else if ("name".equals(keyValue)) {
-                    artifact = (String) value.getValue();
-                } else if ("version".equals(keyValue)) {
-                    version = (String) value.getValue();
-                }
-            }
-
-            if (group == null || artifact == null) {
+            if (gavMap == null || !gavMap.isValid()) {
                 return null;
             }
-
-            return new GroupArtifactVersion(group, artifact, version);
-        }
-
-        private static @Nullable GroupArtifactVersion getMapEntriesDependencySet(List<Expression> arguments, String artifactId) {
-            String group = null;
-            String version = null;
-
-            for (Expression e : arguments) {
-                if (!(e instanceof G.MapEntry)) {
-                    continue;
-                }
-                G.MapEntry arg = (G.MapEntry) e;
-                if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                    continue;
-                }
-                J.Literal key = (J.Literal) arg.getKey();
-                J.Literal value = (J.Literal) arg.getValue();
-                if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                    continue;
-                }
-                String keyValue = (String) key.getValue();
-                if ("group".equals(keyValue)) {
-                    group = (String) value.getValue();
-                } else if ("version".equals(keyValue)) {
-                    version = (String) value.getValue();
-                }
-            }
-
-            if (group == null) {
-                return null;
-            }
-
-            return new GroupArtifactVersion(group, artifactId, version);
+            return gavMap.asGav();
         }
     }
 
@@ -479,7 +284,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
             if ("dependency".equals(method.getSimpleName()) || "mavenBom".equals(method.getSimpleName())) {
-                return updateDependency(m, ctx, gradleProject, depMatcher);
+                return updateDependency(m, ctx, gradleProject);
             } else if ("dependencySet".equals(method.getSimpleName())) {
                 return updateDependencySet(m, ctx);
             }
@@ -499,7 +304,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                     if (!StringUtils.isBlank(newArtifact) && !updated.getArtifactId().equals(newArtifact)) {
                         updated = updated.withArtifactId(newArtifact);
                     }
-                    if (!StringUtils.isBlank(newVersion)) {
+                    if (!StringUtils.isBlank(newVersion) && updated.getGroupId() != null) {
                         String resolvedVersion;
                         try {
                             resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
@@ -539,19 +344,19 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                             if (arg instanceof J.Literal) {
                                 return ChangeStringLiteral.withStringValue((J.Literal) arg, newGav.getGroupId() + ":" + newGav.getVersion());
                             } else if (arg instanceof G.MapEntry) {
-                                return updateMapEntry((G.MapEntry) arg, newGav);
+                                return updateMapEntry((G.MapEntry) arg);
                             } else if (arg instanceof G.MapLiteral) {
                                 G.MapLiteral mapArg = (G.MapLiteral) arg;
-                                return mapArg.withElements(ListUtils.map(mapArg.getElements(), e -> updateMapEntry(e, newGav)));
+                                return mapArg.withElements(ListUtils.map(mapArg.getElements(), this::updateMapEntry));
                             } else if (arg instanceof J.Assignment) {
                                 J.Assignment ass = (J.Assignment) arg;
                                 if (ass.getVariable() instanceof J.Identifier && ass.getAssignment() instanceof J.Literal) {
                                     J.Identifier identifier = (J.Identifier) ass.getVariable();
                                     J.Literal assignment = (J.Literal) ass.getAssignment();
                                     if (assignment.getValue() instanceof String) {
-                                        if ("group".equals(identifier.getSimpleName())) {
+                                        if (GROUP.equals(identifier.getSimpleName()) && newGav.getGroupId() != null) {
                                             return ass.withAssignment(ChangeStringLiteral.withStringValue(assignment, newGav.getGroupId()));
-                                        } else if ("version".equals(identifier.getSimpleName())) {
+                                        } else if (VERSION.equals(identifier.getSimpleName()) && newGav.getVersion() != null) {
                                             return ass.withAssignment(ChangeStringLiteral.withStringValue(assignment, newGav.getVersion()));
                                         }
                                     }
@@ -568,17 +373,17 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                                     }
                                     J.Literal identifier = (J.Literal) methodInvocation.getSelect();
                                     J.Literal value = (J.Literal) methodInvocation.getArguments().get(0);
-                                    if (!(identifier.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+                                    if (identifier == null || !(identifier.getValue() instanceof String) || !(value.getValue() instanceof String)) {
                                         return e;
                                     }
                                     String name = (String) identifier.getValue();
                                     switch (name) {
-                                        case "group":
-                                            return methodInvocation.withArguments(ListUtils.map(methodInvocation.getArguments(), literal -> ChangeStringLiteral.withStringValue(literal, newGav.getGroupId())));
-                                        case "name":
-                                            return methodInvocation.withArguments(ListUtils.map(methodInvocation.getArguments(), literal -> ChangeStringLiteral.withStringValue(literal, newGav.getArtifactId())));
-                                        case "version":
-                                            return methodInvocation.withArguments(ListUtils.map(methodInvocation.getArguments(), literal -> ChangeStringLiteral.withStringValue(literal, newGav.getVersion())));
+                                        case GROUP:
+                                            return methodInvocation.withArguments(ListUtils.map(methodInvocation.getArguments(), literal -> literal == null || newGav.getGroupId() == null ? literal : ChangeStringLiteral.withStringValue(literal, newGav.getGroupId())));
+                                        case ARTIFACT:
+                                            return methodInvocation.withArguments(ListUtils.map(methodInvocation.getArguments(), literal -> literal == null ? null : ChangeStringLiteral.withStringValue(literal, newGav.getArtifactId())));
+                                        case VERSION:
+                                            return methodInvocation.withArguments(ListUtils.map(methodInvocation.getArguments(), literal -> literal == null || newGav.getVersion() == null ? literal : ChangeStringLiteral.withStringValue(literal, newGav.getVersion())));
                                     }
                                     return e;
                                 }));
@@ -591,16 +396,16 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                     return visited;
                 }
 
-                private G.@Nullable MapEntry updateMapEntry(G.@Nullable MapEntry entry, GroupArtifactVersion gav) {
+                private G.@Nullable MapEntry updateMapEntry(G.@Nullable MapEntry entry) {
                     if (entry != null) {
                         if ((entry.getKey() instanceof J.Literal) && (entry.getValue() instanceof J.Literal)) {
                             J.Literal key = (J.Literal) entry.getKey();
                             J.Literal value = (J.Literal) entry.getValue();
                             if ((key.getValue() instanceof String) && (value.getValue() instanceof String)) {
                                 String keyValue = (String) key.getValue();
-                                if ("group".equals(keyValue)) {
+                                if (GROUP.equals(keyValue) && newGav.getGroupId() != null) {
                                     return entry.withValue(ChangeStringLiteral.withStringValue(value, newGav.getGroupId()));
-                                } else if ("version".equals(keyValue)) {
+                                } else if (VERSION.equals(keyValue) && newGav.getVersion() != null) {
                                     return entry.withValue(ChangeStringLiteral.withStringValue(value, newGav.getVersion()));
                                 }
                             }
@@ -611,7 +416,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             }.visit(m, ctx));
         }
 
-        private J.MethodInvocation updateDependency(J.MethodInvocation m, ExecutionContext ctx, GradleProject gradleProject, DependencyMatcher depMatcher) {
+        private J.MethodInvocation updateDependency(J.MethodInvocation m, ExecutionContext ctx, GradleProject gradleProject) {
             List<Expression> depArgs = m.getArguments();
             if (depArgs.get(0) instanceof J.Literal) {
                 String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
@@ -639,361 +444,232 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                         }
                         if (original != updated) {
                             String replacement = updated.toStringNotation();
-                            m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, replacement)));
+                            m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> arg == null ? null : ChangeStringLiteral.withStringValue((J.Literal) arg, replacement)));
                         }
                     }
                 }
-            } else if (m.getArguments().get(0) instanceof G.MapEntry) {
-                G.MapEntry groupEntry = null;
-                G.MapEntry artifactEntry = null;
-                G.MapEntry versionEntry = null;
-                String groupId = null;
-                String artifactId = null;
-                String version = null;
+                return m;
+            }
 
-                for (Expression e : depArgs) {
-                    if (!(e instanceof G.MapEntry)) {
-                        continue;
-                    }
-                    G.MapEntry arg = (G.MapEntry) e;
-                    if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                        continue;
-                    }
-                    J.Literal key = (J.Literal) arg.getKey();
-                    J.Literal value = (J.Literal) arg.getValue();
-                    if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                        continue;
-                    }
-                    String keyValue = (String) key.getValue();
-                    String valueValue = (String) value.getValue();
-                    switch (keyValue) {
-                        case "group":
-                            groupEntry = arg;
-                            groupId = valueValue;
-                            break;
-                        case "name":
-                            artifactEntry = arg;
-                            artifactId = valueValue;
-                            break;
-                        case "version":
-                            versionEntry = arg;
-                            version = valueValue;
-                            break;
-                    }
-                }
-                if (groupId == null || artifactId == null) {
-                    return m;
-                }
-                if (!depMatcher.matches(groupId, artifactId)) {
-                    return m;
-                }
-                String updatedGroupId = groupId;
-                if (!StringUtils.isBlank(newGroup) && !updatedGroupId.equals(newGroup)) {
-                    updatedGroupId = newGroup;
-                }
-                String updatedArtifactId = artifactId;
-                if (!StringUtils.isBlank(newArtifact) && !updatedArtifactId.equals(newArtifact)) {
-                    updatedArtifactId = newArtifact;
-                }
-                String updatedVersion = version;
-                if (!StringUtils.isBlank(newVersion)) {
-                    String resolvedVersion;
-                    try {
-                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(m);
-                    }
-                    if (resolvedVersion != null && !resolvedVersion.equals(updatedVersion)) {
-                        updatedVersion = resolvedVersion;
-                    }
-                }
-
-                if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || updatedVersion != null && !updatedVersion.equals(version)) {
-                    G.MapEntry finalGroup = groupEntry;
-                    String finalGroupIdValue = updatedGroupId;
-                    G.MapEntry finalArtifact = artifactEntry;
-                    String finalArtifactIdValue = updatedArtifactId;
-                    G.MapEntry finalVersion = versionEntry;
-                    String finalVersionValue = updatedVersion;
-                    m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                        if (arg == finalGroup) {
-                            return finalGroup.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalGroup.getValue(), finalGroupIdValue));
-                        }
-                        if (arg == finalArtifact) {
-                            return finalArtifact.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalArtifact.getValue(), finalArtifactIdValue));
-                        }
-                        if (arg == finalVersion) {
-                            return finalVersion.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalVersion.getValue(), finalVersionValue));
-                        }
-                        return arg;
-                    }));
-                }
+            GavMap gavMap = null;
+            if (m.getArguments().get(0) instanceof G.MapEntry) {
+                gavMap = getGAVMapEntriesForGMapEntries(depArgs);
             } else if (m.getArguments().get(0) instanceof G.MapLiteral) {
-                G.MapLiteral map = (G.MapLiteral) depArgs.get(0);
-                G.MapEntry groupEntry = null;
-                G.MapEntry artifactEntry = null;
-                G.MapEntry versionEntry = null;
-                String groupId = null;
-                String artifactId = null;
-                String version = null;
-
-                for (G.MapEntry arg : map.getElements()) {
-                    if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                        continue;
-                    }
-                    J.Literal key = (J.Literal) arg.getKey();
-                    J.Literal value = (J.Literal) arg.getValue();
-                    if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                        continue;
-                    }
-                    String keyValue = (String) key.getValue();
-                    String valueValue = (String) value.getValue();
-                    switch (keyValue) {
-                        case "group":
-                            groupEntry = arg;
-                            groupId = valueValue;
-                            break;
-                        case "name":
-                            artifactEntry = arg;
-                            artifactId = valueValue;
-                            break;
-                        case "version":
-                            versionEntry = arg;
-                            version = valueValue;
-                            break;
-                    }
-                }
-                if (groupId == null || artifactId == null) {
-                    return m;
-                }
-                if (!depMatcher.matches(groupId, artifactId)) {
-                    return m;
-                }
-                String updatedGroupId = groupId;
-                if (!StringUtils.isBlank(newGroup) && !updatedGroupId.equals(newGroup)) {
-                    updatedGroupId = newGroup;
-                }
-                String updatedArtifactId = artifactId;
-                if (!StringUtils.isBlank(newArtifact) && !updatedArtifactId.equals(newArtifact)) {
-                    updatedArtifactId = newArtifact;
-                }
-                String updatedVersion = version;
-                if (!StringUtils.isBlank(newVersion)) {
-                    String resolvedVersion;
-                    try {
-                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(m);
-                    }
-                    if (resolvedVersion != null && !resolvedVersion.equals(updatedVersion)) {
-                        updatedVersion = resolvedVersion;
-                    }
-                }
-
-                if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || updatedVersion != null && !updatedVersion.equals(version)) {
-                    G.MapEntry finalGroup = groupEntry;
-                    String finalGroupIdValue = updatedGroupId;
-                    G.MapEntry finalArtifact = artifactEntry;
-                    String finalArtifactIdValue = updatedArtifactId;
-                    G.MapEntry finalVersion = versionEntry;
-                    String finalVersionValue = updatedVersion;
-                    m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                        G.MapLiteral mapLiteral = (G.MapLiteral) arg;
-                        return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> {
-                            if (e == finalGroup) {
-                                return finalGroup.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalGroup.getValue(), finalGroupIdValue));
-                            }
-                            if (e == finalArtifact) {
-                                return finalArtifact.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalArtifact.getValue(), finalArtifactIdValue));
-                            }
-                            if (e == finalVersion) {
-                                return finalVersion.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalVersion.getValue(), finalVersionValue));
-                            }
-                            return e;
-                        }));
-                    }));
-                }
+                gavMap = getGAVMapEntriesForGMapEntries(((G.MapLiteral) depArgs.get(0)).getElements());
             } else if (m.getArguments().get(0) instanceof J.Assignment) {
-                J.Assignment groupAssignment = null;
-                J.Assignment artifactAssignment = null;
-                J.Assignment versionAssignment = null;
-                String groupId = null;
-                String artifactId = null;
-                String version = null;
+                gavMap = getGAVMapEntriesForAssignments(depArgs);
+            } else if (m.getArguments().get(0) instanceof J.MethodInvocation) {
+                gavMap = getGAVMapEntriesForMapOfInvocation((J.MethodInvocation) m.getArguments().get(0));
+            }
 
-                for (Expression e : depArgs) {
-                    if (!(e instanceof J.Assignment)) {
-                        continue;
-                    }
-                    J.Assignment arg = (J.Assignment) e;
-                    if (!(arg.getVariable() instanceof J.Identifier) || !(arg.getAssignment() instanceof J.Literal)) {
-                        continue;
-                    }
-                    J.Identifier identifier = (J.Identifier) arg.getVariable();
-                    J.Literal assignment = (J.Literal) arg.getAssignment();
-                    if (!(assignment.getValue() instanceof String)) {
-                        continue;
-                    }
-                    String valueValue = (String) assignment.getValue();
-                    switch (identifier.getSimpleName()) {
-                        case "group":
-                            groupAssignment = arg;
-                            groupId = valueValue;
-                            break;
-                        case "name":
-                            artifactAssignment = arg;
-                            artifactId = valueValue;
-                            break;
-                        case "version":
-                            versionAssignment = arg;
-                            version = valueValue;
-                            break;
-                    }
-                }
-                if (groupId == null || artifactId == null) {
-                    return m;
-                }
-                if (!depMatcher.matches(groupId, artifactId)) {
-                    return m;
-                }
-                String updatedGroupId = groupId;
-                if (!StringUtils.isBlank(newGroup) && !updatedGroupId.equals(newGroup)) {
-                    updatedGroupId = newGroup;
-                }
-                String updatedArtifactId = artifactId;
-                if (!StringUtils.isBlank(newArtifact) && !updatedArtifactId.equals(newArtifact)) {
-                    updatedArtifactId = newArtifact;
-                }
-                String updatedVersion = version;
-                if (!StringUtils.isBlank(newVersion)) {
-                    String resolvedVersion;
-                    try {
-                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(m);
-                    }
-                    if (resolvedVersion != null && !resolvedVersion.equals(updatedVersion)) {
-                        updatedVersion = resolvedVersion;
-                    }
-                }
+            if (gavMap != null && gavMap.isValid()) {
+                GavMapEntry<?> groupId = gavMap.get(GROUP);
+                GavMapEntry<?> artifactId = gavMap.get(ARTIFACT);
+                GavMapEntry<?> version = gavMap.get(VERSION);
 
-                if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || updatedVersion != null && !updatedVersion.equals(version)) {
-                    J.Assignment finalGroup = groupAssignment;
-                    String finalGroupIdValue = updatedGroupId;
-                    J.Assignment finalArtifact = artifactAssignment;
-                    String finalArtifactIdValue = updatedArtifactId;
-                    J.Assignment finalVersion = versionAssignment;
-                    String finalVersionValue = updatedVersion;
-                    m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                        if (arg == finalGroup) {
-                            return finalGroup.withAssignment(ChangeStringLiteral.withStringValue((J.Literal) finalGroup.getAssignment(), finalGroupIdValue));
-                        }
-                        if (arg == finalArtifact) {
-                            return finalArtifact.withAssignment(ChangeStringLiteral.withStringValue((J.Literal) finalArtifact.getAssignment(), finalArtifactIdValue));
-                        }
-                        if (arg == finalVersion) {
-                            return finalVersion.withAssignment(ChangeStringLiteral.withStringValue((J.Literal) finalVersion.getAssignment(), finalVersionValue));
-                        }
-                        return arg;
-                    }));
-                }
-            } else if (m.getArguments().get(0) instanceof J.MethodInvocation && "mapOf".equals(((J.MethodInvocation) m.getArguments().get(0)).getSimpleName())) {
-                J.MethodInvocation groupMethodInvocation = null;
-                J.MethodInvocation artifactMethodInvocation = null;
-                J.MethodInvocation versionMethodInvocation = null;
-                String groupId = null;
-                String artifactId = null;
-                String version = null;
+                try {
+                    GroupArtifactVersion targetGav = calculateTargetGav(groupId, artifactId, version, m.getSimpleName(), ctx);
 
-                J.MethodInvocation method = (J.MethodInvocation) m.getArguments().get(0);
-                for (Expression e : method.getArguments()) {
-                    if (!(e instanceof J.MethodInvocation)) {
-                        continue;
+                    if (targetGav == null) {
+                        return m;
                     }
-                    J.MethodInvocation methodInvocation = (J.MethodInvocation) e;
-                    if (!("to".equals(m.getSimpleName()) || methodInvocation.getSelect() instanceof J.Literal) || methodInvocation.getArguments().size() != 1 || !(methodInvocation.getArguments().get(0) instanceof J.Literal)) {
-                        continue;
-                    }
-                    J.Literal identifier = (J.Literal) methodInvocation.getSelect();
-                    J.Literal value = (J.Literal) methodInvocation.getArguments().get(0);
-                    if (!(identifier.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                        continue;
-                    }
-                    String name = (String) identifier.getValue();
-                    switch (name) {
-                        case "group":
-                            groupId = (String) value.getValue();
-                            groupMethodInvocation = methodInvocation;
-                            break;
-                        case "name":
-                            artifactId = (String) value.getValue();
-                            artifactMethodInvocation = methodInvocation;
-                            break;
-                        case "version":
-                            version = (String) value.getValue();
-                            versionMethodInvocation = methodInvocation;
-                            break;
-                    }
-                }
-                if (groupId == null || artifactId == null) {
-                    return m;
-                }
-                if (!depMatcher.matches(groupId, artifactId)) {
-                    return m;
-                }
-                String updatedGroupId = groupId;
-                if (!StringUtils.isBlank(newGroup) && !updatedGroupId.equals(newGroup)) {
-                    updatedGroupId = newGroup;
-                }
-                String updatedArtifactId = artifactId;
-                if (!StringUtils.isBlank(newArtifact) && !updatedArtifactId.equals(newArtifact)) {
-                    updatedArtifactId = newArtifact;
-                }
-                String updatedVersion = version;
-                if (!StringUtils.isBlank(newVersion)) {
-                    String resolvedVersion;
-                    try {
-                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(m);
-                    }
-                    if (resolvedVersion != null && !resolvedVersion.equals(updatedVersion)) {
-                        updatedVersion = resolvedVersion;
-                    }
-                }
 
-                if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || updatedVersion != null && !updatedVersion.equals(version)) {
-                    J.MethodInvocation finalGroup = groupMethodInvocation;
-                    String finalGroupIdValue = updatedGroupId;
-                    J.MethodInvocation finalArtifact = artifactMethodInvocation;
-                    String finalArtifactIdValue = updatedArtifactId;
-                    J.MethodInvocation finalVersion = versionMethodInvocation;
-                    String finalVersionValue = updatedVersion;
-                    m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                        if (arg instanceof J.MethodInvocation && "mapOf".equals(((J.MethodInvocation) arg).getSimpleName())) {
-                            return ((J.MethodInvocation) arg).withArguments(ListUtils.map(((J.MethodInvocation) arg).getArguments(), e -> {
-                                if (e == finalGroup) {
-                                    return finalGroup.withArguments(ListUtils.map(finalGroup.getArguments(), literal -> ChangeStringLiteral.withStringValue(literal, finalGroupIdValue)));
+                    if (!Objects.equals(targetGav.getGroupId(), groupId.getValue()) ||
+                            !Objects.equals(targetGav.getArtifactId(), artifactId.getValue()) ||
+                            (targetGav.getVersion() != null && !Objects.equals(targetGav.getVersion(), version == null ? null : version.getValue()))) {
+                        if (m.getArguments().get(0) instanceof G.MapEntry || m.getArguments().get(0) instanceof G.MapLiteral) {
+                            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                                if (arg == groupId.getElement() && targetGav.getGroupId() != null) {
+                                    return ((G.MapEntry) groupId.getElement()).withValue(ChangeStringLiteral.withStringValue((J.Literal) ((G.MapEntry) groupId.getElement()).getValue(), targetGav.getGroupId()));
                                 }
-                                if (e == finalArtifact) {
-                                    return finalArtifact.withArguments(ListUtils.map(finalArtifact.getArguments(), literal -> ChangeStringLiteral.withStringValue(literal, finalArtifactIdValue)));
+                                if (arg == artifactId.getElement()) {
+                                    return ((G.MapEntry) artifactId.getElement()).withValue(ChangeStringLiteral.withStringValue((J.Literal) ((G.MapEntry) artifactId.getElement()).getValue(), targetGav.getArtifactId()));
                                 }
-                                if (e == finalVersion) {
-                                    return finalVersion.withArguments(ListUtils.map(finalVersion.getArguments(), literal -> ChangeStringLiteral.withStringValue(literal, finalVersionValue)));
+                                if (version != null && arg == version.getElement() && targetGav.getVersion() != null) {
+                                    return ((G.MapEntry) version.getElement()).withValue(ChangeStringLiteral.withStringValue((J.Literal) ((G.MapEntry) version.getElement()).getValue(), targetGav.getVersion()));
                                 }
-                                return e;
+                                return arg;
+                            }));
+                        } else if (m.getArguments().get(0) instanceof J.Assignment) {
+                            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                                if (arg == groupId.getElement() && targetGav.getGroupId() != null) {
+                                    return ((J.Assignment) groupId.getElement()).withAssignment(ChangeStringLiteral.withStringValue((J.Literal) ((J.Assignment) groupId.getElement()).getAssignment(), targetGav.getGroupId()));
+                                }
+                                if (arg == artifactId.getElement()) {
+                                    return ((J.Assignment) artifactId.getElement()).withAssignment(ChangeStringLiteral.withStringValue((J.Literal) ((J.Assignment) artifactId.getElement()).getAssignment(), targetGav.getArtifactId()));
+                                }
+                                if (version != null && arg == version.getElement() && targetGav.getVersion() != null) {
+                                    return ((J.Assignment) version.getElement()).withAssignment(ChangeStringLiteral.withStringValue((J.Literal) ((J.Assignment) version.getElement()).getAssignment(), targetGav.getVersion()));
+                                }
+                                return arg;
+                            }));
+                        } else if (m.getArguments().get(0) instanceof J.MethodInvocation) {
+                            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                                if (arg instanceof J.MethodInvocation && "mapOf".equals(((J.MethodInvocation) arg).getSimpleName())) {
+                                    return ((J.MethodInvocation) arg).withArguments(ListUtils.map(((J.MethodInvocation) arg).getArguments(), e -> {
+                                        if (e == groupId.getElement() && targetGav.getGroupId() != null) {
+                                            return ((J.MethodInvocation) groupId.getElement()).withArguments(ListUtils.map(((J.MethodInvocation) groupId.getElement()).getArguments(), literal -> literal == null ? null : ChangeStringLiteral.withStringValue(literal, targetGav.getGroupId())));
+                                        }
+                                        if (e == artifactId.getElement()) {
+                                            return ((J.MethodInvocation) artifactId.getElement()).withArguments(ListUtils.map(((J.MethodInvocation) artifactId.getElement()).getArguments(), literal -> literal == null ? null : ChangeStringLiteral.withStringValue(literal, targetGav.getArtifactId())));
+                                        }
+                                        if (version != null && e == version.getElement() && targetGav.getVersion() != null) {
+                                            return ((J.MethodInvocation) version.getElement()).withArguments(ListUtils.map(((J.MethodInvocation) version.getElement()).getArguments(), literal -> literal == null ? null : ChangeStringLiteral.withStringValue(literal, targetGav.getVersion())));
+                                        }
+                                        return e;
+                                    }));
+                                }
+                                return arg;
                             }));
                         }
-                        return arg;
-                    }));
+                    }
+                } catch (MavenDownloadingException e) {
+                    return e.warn(m);
                 }
             }
 
             return m;
         }
+
+        private @Nullable GroupArtifactVersion calculateTargetGav(@Nullable GavMapEntry<?> groupId, @Nullable GavMapEntry<?> artifactId, @Nullable GavMapEntry<?> version, String configuration, ExecutionContext ctx) throws MavenDownloadingException {
+            if (groupId == null || artifactId == null) {
+                return null;
+            }
+            if (!depMatcher.matches(groupId.getValue(), artifactId.getValue())) {
+                return null;
+            }
+            String updatedGroupId = groupId.getValue();
+            if (!StringUtils.isBlank(newGroup) && !updatedGroupId.equals(newGroup)) {
+                updatedGroupId = newGroup;
+            }
+            String updatedArtifactId = artifactId.getValue();
+            if (!StringUtils.isBlank(newArtifact) && !updatedArtifactId.equals(newArtifact)) {
+                updatedArtifactId = newArtifact;
+            }
+            String updatedVersion = version == null ? null : version.getValue();
+            if (!StringUtils.isBlank(newVersion)) {
+                String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                        .select(new GroupArtifact(updatedGroupId, updatedArtifactId), configuration, newVersion, versionPattern, ctx);
+                if (resolvedVersion != null && !resolvedVersion.equals(updatedVersion)) {
+                    updatedVersion = resolvedVersion;
+                }
+            }
+
+            return new GroupArtifactVersion(updatedGroupId, updatedArtifactId, updatedVersion);
+        }
+    }
+
+    private static GavMap getGAVMapEntriesForMapOfInvocation(J.MethodInvocation mapOf) {
+        if (!"mapOf".equals(mapOf.getSimpleName())) {
+            return new GavMap();
+        }
+        return getGAVMapEntries(
+                mapOf.getArguments(),
+                J.MethodInvocation.class,
+                J.MethodInvocation::getSelect,
+                invocation -> invocation.getArguments().get(0),
+                e -> !"to".equals(e.getSimpleName()),
+                e -> !(e.getSelect() instanceof J.Literal),
+                e -> e.getArguments().size() != 1,
+                e -> !(e.getArguments().get(0) instanceof J.Literal)
+        );
+    }
+
+    private static GavMap getGAVMapEntriesForGMapEntries(List<? extends Expression> mapEntries) {
+        return getGAVMapEntries(
+                mapEntries,
+                G.MapEntry.class,
+                G.MapEntry::getKey,
+                G.MapEntry::getValue,
+                e -> !(e.getKey() instanceof J.Literal),
+                e -> !(e.getValue() instanceof J.Literal)
+        );
+    }
+
+    private static GavMap getGAVMapEntriesForAssignments(List<? extends Expression> assignments) {
+        return getGAVMapEntries(
+                assignments,
+                J.Assignment.class,
+                J.Assignment::getVariable,
+                J.Assignment::getAssignment,
+                a -> !(a.getVariable() instanceof J.Identifier),
+                a -> !(a.getAssignment() instanceof J.Literal)
+        );
+    }
+
+    @SafeVarargs
+    private static <T extends Expression> GavMap getGAVMapEntries(List<? extends Expression> elements, Class<T> type, Function<T, @Nullable Expression> keyExtractor, Function<T, @Nullable Expression> valueExtractor, Predicate<T>... ignore) {
+        GavMap map = new GavMap();
+        for (Expression e : elements) {
+            if (!type.isInstance(e)) {
+                continue;
+            }
+            T element = type.cast(e);
+            if (Arrays.stream(ignore).anyMatch(predicate -> predicate.test(element))) {
+                continue;
+            }
+            Expression keyExpression = keyExtractor.apply(element);
+            Expression valueExpression = valueExtractor.apply(element);
+            if (keyExpression == null || valueExpression == null) {
+                continue;
+            }
+            String key = literalOrIdentifierToString(keyExpression);
+            String value = literalOrIdentifierToString(valueExpression);
+            map.put(key, new GavMapEntry<>(element, value));
+        }
+
+        return map;
+    }
+
+    private static String literalOrIdentifierToString(Expression expr) {
+        if (expr instanceof J.Literal) {
+            Object value = ((J.Literal) expr).getValue();
+            return value == null ? "" : value.toString();
+        } else if (expr instanceof J.Identifier) {
+            return ((J.Identifier) expr).getSimpleName();
+        }
+        throw new IllegalArgumentException("Expression must be a J.Literal or J.Identifier");
+    }
+
+    private static class GavMap {
+        Map<String, GavMapEntry<? extends Expression>> entries = new HashMap<>();
+
+        void put(String key, GavMapEntry<? extends Expression> entry) {
+            entries.put(key, entry);
+        }
+
+        @Nullable
+        GavMapEntry<? extends Expression> get(String key) {
+            return entries.get(key);
+        }
+
+        @Nullable GroupArtifactVersion asGav() {
+            return asGav(null);
+        }
+
+        @Nullable GroupArtifactVersion asGav(@Nullable String artifactName) {
+            GavMapEntry<? extends Expression> group = entries.get(GROUP);
+            GavMapEntry<? extends Expression> artifact = entries.get(ARTIFACT);
+            GavMapEntry<? extends Expression> version = entries.get(VERSION);
+
+            if (group != null && (artifact != null || !StringUtils.isBlank(artifactName))) {
+                return new GroupArtifactVersion(
+                        group.getValue(),
+                        !StringUtils.isBlank(artifactName) ? artifactName : requireNonNull(artifact).getValue(),
+                        version == null ? null : version.getValue()
+                );
+            }
+            return null;
+        }
+
+        private boolean isValid() {
+            return entries.containsKey(GROUP);
+        }
+    }
+
+    @Value
+    private static class GavMapEntry<T> {
+        T element;
+        String value;
     }
 }
