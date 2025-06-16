@@ -25,7 +25,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.java.ImportManager.ImportStatus;
+import org.openrewrite.java.ImportAnalyzer.ImportStatus;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
@@ -34,9 +34,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class ImportManagerTest {
+class ImportAnalyzerTest {
 
-    private ImportManager importManager;
+    private ImportAnalyzer importManager;
     private J.CompilationUnit compilationUnit;
 
     @BeforeAll
@@ -80,7 +80,7 @@ class ImportManagerTest {
           public class Record {}
           """);
 
-        importManager = ImportManager.init(compilationUnit);
+        importManager = ImportAnalyzer.init(compilationUnit);
     }
 
     @Test
@@ -93,10 +93,10 @@ class ImportManagerTest {
         // Assertions for unused imports
         assertThat(importManager.getUnusedImports()).hasSize(3);
         assertThat(importManager.getUnusedImports())
-          .extracting(ImportManager.ImportEntry::getImportName)
+          .extracting(ImportAnalyzer.ImportEntry::getImportName)
           .containsExactlyInAnyOrder("java.util.function.Supplier", "java.util.stream.Collectors.toList", "java.time.LocalDateTime.*");
         assertThat(importManager.getUnusedImports())
-          .filteredOn(ImportManager.ImportEntry::isMemberImport)
+          .filteredOn(ImportAnalyzer.ImportEntry::isMemberImport)
           .hasSize(2);
     }
 
@@ -133,7 +133,7 @@ class ImportManagerTest {
         J j = new AddStatement(template).visit(compilationUnit, new InMemoryExecutionContext());
         assert j instanceof J.CompilationUnit;
         J.CompilationUnit cu = (J.CompilationUnit) j;
-        ImportManager importManager = ImportManager.init(cu);
+        ImportAnalyzer importManager = ImportAnalyzer.init(cu);
         assertThat(importManager.getMissingTypeImports())
           .extracting(JavaType.FullyQualified::getFullyQualifiedName)
           .containsOnly("java.util.concurrent.ConcurrentHashMap");
@@ -149,9 +149,9 @@ class ImportManagerTest {
         J j = new AddStatement(template).visit(compilationUnit, new InMemoryExecutionContext());
         assert j instanceof J.CompilationUnit;
         J.CompilationUnit cu = (J.CompilationUnit) j;
-        ImportManager importManager = ImportManager.init(cu);
+        ImportAnalyzer importManager = ImportAnalyzer.init(cu);
         assertThat(importManager.getMissingMemberImports())
-          .extracting(ImportManager::toMemberName)
+          .extracting(ImportAnalyzer::toMemberName)
           .containsOnly("java.util.stream.Stream.of");
     }
 
@@ -164,9 +164,9 @@ class ImportManagerTest {
         J j = new AddStatement(template).visit(compilationUnit, new InMemoryExecutionContext());
         assert j instanceof J.CompilationUnit;
         J.CompilationUnit cu = (J.CompilationUnit) j;
-        ImportManager importManager = ImportManager.init(cu);
+        ImportAnalyzer importManager = ImportAnalyzer.init(cu);
         assertThat(importManager.getMissingMemberImports())
-          .extracting(ImportManager::toMemberName)
+          .extracting(ImportAnalyzer::toMemberName)
           .containsOnly("java.util.Arrays.sort");
     }
 

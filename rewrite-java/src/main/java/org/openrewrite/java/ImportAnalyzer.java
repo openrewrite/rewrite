@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -27,9 +28,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.ImportManager.ImportStatus.*;
+import static org.openrewrite.java.ImportAnalyzer.ImportStatus.*;
 
-public class ImportManager {
+public class ImportAnalyzer {
 
     private static final J.Import JAVA_LANG = new J.Import(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
             new JLeftPadded<>(Space.EMPTY,false, Markers.EMPTY), TypeTree.build("java.lang.*"), null);
@@ -43,13 +44,13 @@ public class ImportManager {
     @Getter private final List<JavaType.FullyQualified> missingTypeImports = new ArrayList<>();
     @Getter private final List<JavaType> missingMemberImports = new ArrayList<>();
 
-    private ImportManager(List<ImportEntry> imports, Set<JavaType.FullyQualified> declaredTypes, Set<JavaType> declaredStaticMembers) {
+    private ImportAnalyzer(List<ImportEntry> imports, Set<JavaType.FullyQualified> declaredTypes, Set<JavaType> declaredStaticMembers) {
         this.imports = imports;
         this.declaredTypes = declaredTypes;
         this.declaredStaticMembers = declaredStaticMembers;
     }
 
-    public static ImportManager init(J.CompilationUnit cu) {
+    public static ImportAnalyzer init(J.CompilationUnit cu) {
         Set<JavaType.FullyQualified> typeReferences = new FindUnqualifiedTypeReference().reduce(cu, new HashSet<>());
         Set<JavaType> memberReferences = new FindStaticReferences().reduce(cu, new HashSet<>());
         Set<JavaType.FullyQualified> declaredTypes = new FindDeclaredTypes().reduce(cu, new HashSet<>());
@@ -66,7 +67,7 @@ public class ImportManager {
 
         String packageName = cu.getPackageDeclaration() == null ? "" : cu.getPackageDeclaration().getPackageName();
 
-        ImportManager importManager = new ImportManager(imports, declaredTypes, declaredStaticMembers);
+        ImportAnalyzer importManager = new ImportAnalyzer(imports, declaredTypes, declaredStaticMembers);
         importManager.populateUnusedImports();
         importManager.populateAmbiguousImports();
         importManager.populateMissingTypeImports(typeReferences, packageName);
@@ -211,6 +212,12 @@ public class ImportManager {
         return (idx != -1) ? s.substring(0, idx) : "";
     }
 
+    private static boolean isStaticClassVariable(JavaType.@Nullable Variable variable) {
+        return variable != null
+                && variable.getOwner() instanceof JavaType.Class
+                && variable.hasFlags(Flag.Static);
+    }
+
     public enum ImportStatus {
         NOT_IMPORTED,
         IMPLICITLY_IMPORTED,
@@ -218,21 +225,15 @@ public class ImportManager {
         IMPORT_AMBIGUITY,
     }
 
-    @Getter
+    @Value
     public static class ImportEntry {
-        private final String typeName;
-        @Nullable private final String memberName;
-        private final boolean isWildcardImport;
+        String typeName;
+        boolean isWildcardImport;
+        @Nullable String memberName;
         @Getter(AccessLevel.PRIVATE)
-        private final List<JavaType.FullyQualified> resolvedTypes = new ArrayList<>();
+        List<JavaType.FullyQualified> resolvedTypes = new ArrayList<>();
         @Getter(AccessLevel.PRIVATE)
-        private final List<JavaType> resolvedMembers = new ArrayList<>();
-
-        private ImportEntry(String typeName, boolean isWildcardImport, @Nullable String memberName) {
-            this.typeName = typeName;
-            this.isWildcardImport = isWildcardImport;
-            this.memberName = memberName;
-        }
+        List<JavaType> resolvedMembers = new ArrayList<>();
 
         public boolean isMemberImport() {
             return memberName != null;
@@ -291,8 +292,9 @@ public class ImportManager {
     private static class FindUnqualifiedTypeReference extends JavaVisitor<Set<JavaType.FullyQualified>> {
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, Set<JavaType.FullyQualified> types) {
-            if (fieldAccess.getType() instanceof JavaType.FullyQualified) {
-                if (fieldAccess.isFullyQualifiedClassReference(((JavaType.FullyQualified) fieldAccess.getType()).getFullyQualifiedName())) {
+            JavaType.FullyQualified fieldAccessType = TypeUtils.asFullyQualified(fieldAccess.getType());
+            if (fieldAccessType != null) {
+                if (fieldAccess.isFullyQualifiedClassReference(fieldAccessType.getFullyQualifiedName())) {
                     return fieldAccess;
                 }
             }
@@ -327,7 +329,7 @@ public class ImportManager {
                 return identifier;
             }
             JavaType.Variable variable = identifier.getFieldType();
-            if (variable != null && variable.getOwner() instanceof JavaType.Class && variable.hasFlags(Flag.Static)) {
+            if (isStaticClassVariable(variable)) {
                 memberReferences.add(variable);
             }
             return super.visitIdentifier(identifier, memberReferences);
@@ -355,16 +357,10 @@ public class ImportManager {
 
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Set<JavaType> declaredMembers) {
-            if (isStaticClassVariable(variable)) {
+            if (isStaticClassVariable(variable.getVariableType())) {
                 declaredMembers.add(variable.getVariableType());
             }
             return super.visitVariable(variable, declaredMembers);
-        }
-
-        private boolean isStaticClassVariable(J.VariableDeclarations.NamedVariable variable) {
-            return variable.getVariableType() != null
-                    && variable.getVariableType().getOwner() instanceof JavaType.Class
-                    && variable.getVariableType().hasFlags(Flag.Static);
         }
     }
 }
