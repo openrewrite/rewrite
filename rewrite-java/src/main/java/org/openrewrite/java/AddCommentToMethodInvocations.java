@@ -80,22 +80,22 @@ public class AddCommentToMethodInvocations extends Recipe {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
         return Preconditions.check(new UsesMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                if (methodMatcher.matches(mi)) {
-                    String methodPrefixWhitespace = mi.getPrefix().getWhitespace();
+                if (methodMatcher.matches(m)) {
+                    String methodPrefixWhitespace = m.getPrefix().getWhitespace();
 
-                    boolean isMultiline = Boolean.TRUE.equals(AddCommentToMethodInvocations.this.isMultiline);
+                    boolean createMultiline = Boolean.TRUE.equals(isMultiline);
                     Matcher matcher = NEWLINE.matcher(comment);
-                    String newCommentText = matcher.find() ? matcher.replaceAll(isMultiline ? methodPrefixWhitespace : " ") : comment;
+                    String newCommentText = matcher.find() ? matcher.replaceAll(createMultiline ? methodPrefixWhitespace : " ") : comment;
 
-                    if (doesNotHaveComment(newCommentText, mi.getComments())) {
-                        TextComment textComment = new TextComment(isMultiline, newCommentText, methodPrefixWhitespace, Markers.EMPTY);
-                        return mi.withComments(ListUtils.concat(mi.getComments(), textComment));
+                    if (doesNotHaveComment(newCommentText, m.getComments())) {
+                        TextComment textComment = new TextComment(createMultiline, newCommentText, methodPrefixWhitespace, Markers.EMPTY);
+                        return m.withComments(ListUtils.concat(m.getComments(), textComment));
                     }
                 }
-                return mi;
+                return m;
             }
 
             private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {
