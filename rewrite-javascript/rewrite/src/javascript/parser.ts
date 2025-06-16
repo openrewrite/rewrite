@@ -2723,7 +2723,7 @@ export class JavaScriptParserVisitor {
                             } as JS.ArrayBindingPattern, this.suffix(node.initializer))
                         } else if (ts.isObjectLiteralExpression(node.initializer)) {
                             return this.rightPadded({
-                                kind: JS.Kind.ObjectBindingDeclarations,
+                                kind: JS.Kind.ObjectBindingPattern,
                                 id: randomId(),
                                 leadingAnnotations: [],
                                 modifiers: [],
@@ -2738,7 +2738,7 @@ export class JavaScriptParserVisitor {
                                 } as J.Container<Expression>,
                                 markers: emptyMarkers,
                                 prefix: emptySpace
-                            } as JS.ObjectBindingDeclarations, this.suffix(node.initializer))
+                            } as JS.ObjectBindingPattern, this.suffix(node.initializer))
                         }
                         else {
                             return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))

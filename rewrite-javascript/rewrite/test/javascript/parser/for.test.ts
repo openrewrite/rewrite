@@ -318,8 +318,8 @@ describe('for mapping', () => {
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const forOfLoop = <JS.ForOfLoop>cu.statements[2].element;
-                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ObjectBindingDeclarations);
-                const objectBinding = <JS.ObjectBindingDeclarations>forOfLoop.loop.control.variable.element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ObjectBindingPattern);
+                const objectBinding = <JS.ObjectBindingPattern>forOfLoop.loop.control.variable.element;
                 expect(objectBinding.bindings.elements.length).toBe(3);
                 for (let i = 0; i < 3; i++) {
                     expect(objectBinding.bindings.elements[i].element.kind).toBe(JS.Kind.PropertyAssignment);
