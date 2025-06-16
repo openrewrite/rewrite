@@ -31,6 +31,38 @@ class AddPropertyTest implements RewriteTest {
         spec.recipe(new AddProperty("key", "value", null, false));
     }
 
+    @DocumentExample
+    @Test
+    void addFirstProperty() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              
+                <dependencies>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void notIfParentHasDefined() {
         rewriteRun(
@@ -271,38 +303,6 @@ class AddPropertyTest implements RewriteTest {
               </project>
               """
 
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void addFirstProperty() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              
-                <dependencies>
-                </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <properties>
-                  <key>value</key>
-                </properties>
-              
-                <dependencies>
-                </dependencies>
-              </project>
-              """
           )
         );
     }

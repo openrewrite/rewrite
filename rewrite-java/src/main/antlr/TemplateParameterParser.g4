@@ -7,6 +7,10 @@ matcherPattern
     | parameterName
     ;
 
+genericPattern
+    : genericName (Extends (type AND)* type)?
+    ;
+
 typedPattern
     : (parameterName COLON)? patternType
     ;
@@ -16,7 +20,7 @@ patternType
     ;
 
 type
-    : typeName (LBRACK (typeParameter COMMA)* typeParameter RBRACK)?
+    : typeName (LBRACK (typeParameter COMMA)* typeParameter RBRACK)? typeArray*
     ;
 
 typeParameter
@@ -25,10 +29,19 @@ typeParameter
     ;
 
 variance
-    : WILDCARD Variance
+    : WILDCARD Extends
+    | WILDCARD Super
+    ;
+
+typeArray
+    : LSBRACK RSBRACK
     ;
 
 parameterName
+    : Identifier
+    ;
+
+genericName
     : Identifier
     ;
 

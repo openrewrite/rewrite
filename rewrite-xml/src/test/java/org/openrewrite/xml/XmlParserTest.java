@@ -146,8 +146,8 @@ class XmlParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getValue().equals("java.lang.String"))).isTrue();
-                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.TYPE))).isTrue();
-                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.PACKAGE))).isTrue();
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind() == Reference.Kind.TYPE)).isTrue();
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind() == Reference.Kind.PACKAGE)).isTrue();
             })
           )
         );
@@ -453,5 +453,14 @@ class XmlParserTest implements RewriteTest {
     })
     void acceptWithInvalidPaths(String path) {
         assertThat(new XmlParser().accept(Paths.get(path))).isFalse();
+    }
+
+    @Test
+    void CRsWithNoLFs() {
+        rewriteRun(
+          xml(
+            "<?xml version=\"1.0\"?>CR<a>CR</a>".replace("CR", "\r")
+          )
+        );
     }
 }

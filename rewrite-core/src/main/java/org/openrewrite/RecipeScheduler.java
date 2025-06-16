@@ -78,10 +78,7 @@ public class RecipeScheduler {
 
                     // pre-transformation scanning phase where there can only be modifications to capture exceptions
                     // occurring during the scanning phase
-                    if (hasScanningRecipe(recipe)) {
-                        after = cycle.scanSources(after);
-                    }
-
+                    after = cycle.scanSources(after);
                     // transformation phases
                     after = cycle.generateSources(after);
                     after = cycle.editSources(after);
@@ -113,20 +110,16 @@ public class RecipeScheduler {
             }
         } finally {
             recipeRunStats.flush(ctx);
+            recursiveOnComplete(recipe, ctxWithWatch);
         }
         return after;
     }
 
-    private boolean hasScanningRecipe(Recipe recipe) {
-        if (recipe instanceof ScanningRecipe) {
-            return true;
-        }
+    private void recursiveOnComplete(Recipe recipe, ExecutionContext ctx) {
+        recipe.onComplete(ctx);
         for (Recipe r : recipe.getRecipeList()) {
-            if (hasScanningRecipe(r)) {
-                return true;
-            }
+            recursiveOnComplete(r, ctx);
         }
-        return false;
     }
 
     // Delete any files created in the working directory

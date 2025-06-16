@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -30,6 +29,24 @@ class ConstructorTest implements RewriteTest {
           groovy(
             """
               ( new String("foo") )
+              """
+          )
+        );
+    }
+
+    @Test
+    void declaration() {
+        rewriteRun(
+          groovy(
+            """
+              class Pair {
+                  String first
+                  String second
+                  Pair(String first, String second) {
+                      this.first = first
+                      this.second = second
+                  }
+              }
               """
           )
         );
@@ -52,7 +69,6 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("Fails to parse")
     void implicitPublic() {
         rewriteRun(
           groovy(
@@ -67,7 +83,39 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("Fails to parse")
+    void superCall() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  T() {
+                      super ( )
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void thisCall() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  T() {
+                      this ( 3 )
+                  }
+                  T(int foo) {
+                      super ( )
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void defaultConstructorArguments() {
         rewriteRun(
           groovy(

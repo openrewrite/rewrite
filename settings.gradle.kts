@@ -5,6 +5,8 @@ pluginManagement {
     }
 }
 
+rootProject.name = "rewrite"
+
 // ---------------------------------------------------------------
 // ------ Included Projects --------------------------------------
 // ---------------------------------------------------------------
@@ -22,11 +24,14 @@ val allProjects = listOf(
         "rewrite-java-lombok",
         "rewrite-java-17", // remove this when rewrite recipe gradle plugin moves to 21
         "rewrite-java-21",
+        "rewrite-javascript",
         "rewrite-json",
+        "rewrite-kotlin",
         "rewrite-maven",
         "rewrite-properties",
         "rewrite-protobuf",
         "rewrite-test",
+        "rewrite-toml",
         "rewrite-xml",
         "rewrite-yaml",
 )

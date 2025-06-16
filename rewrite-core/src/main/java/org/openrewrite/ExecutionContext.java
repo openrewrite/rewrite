@@ -16,13 +16,14 @@
 package org.openrewrite;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
+import org.openrewrite.rpc.request.Visit;
 import org.openrewrite.scheduling.RecipeRunCycle;
 
 import java.util.*;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
+import java.util.function.*;
 
 import static java.util.Objects.requireNonNull;
 
@@ -30,12 +31,13 @@ import static java.util.Objects.requireNonNull;
  * Passes messages between individual visitors or parsing operations and allows errors to be propagated
  * back to the process controlling parsing or recipe execution.
  */
-public interface ExecutionContext {
+public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     String CURRENT_CYCLE = "org.openrewrite.currentCycle";
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
     String DATA_TABLES = "org.openrewrite.dataTables";
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
+    String SCANNING_MUTATION_VALIDATION = "org.openrewrite.test.scanningMutationValidation";
 
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
@@ -49,11 +51,18 @@ public interface ExecutionContext {
         return getMessage("org.openrewrite.internal.treeObservers", Collections.emptySet());
     }
 
+    Map<String, @Nullable Object> getMessages();
+
     void putMessage(String key, @Nullable Object value);
 
     <T> @Nullable T getMessage(String key);
 
-    default <V, T> T computeMessage(String key, V value, Supplier<T> defaultValue, BiFunction<V, ? super T, ? extends T> remappingFunction) {
+    default <T> T computeMessageIfAbsent(String key, Function<? super String, ? extends T> defaultValue) {
+        //noinspection unchecked
+        return (T) getMessages().computeIfAbsent(key, defaultValue);
+    }
+
+    default <V, T> T computeMessage(String key, @Nullable V value, Supplier<T> defaultValue, BiFunction<@Nullable V, ? super T, ? extends T> remappingFunction) {
         T oldMessage = getMessage(key);
         if (oldMessage == null) {
             oldMessage = defaultValue.get();
@@ -106,5 +115,19 @@ public interface ExecutionContext {
 
     default RecipeRunCycle<?> getCycleDetails() {
         return requireNonNull(getMessage(CURRENT_CYCLE));
+    }
+
+    /**
+     * The after state will change if any messages have changed by a call to clone in the
+     * {@link Visit.Handler} implementation.
+     */
+    @Override
+    default void rpcSend(ExecutionContext ctx, RpcSendQueue q) {
+        // TODO send enough information for the remote to know which DataTableStore to use
+    }
+
+    @Override
+    default ExecutionContext rpcReceive(ExecutionContext ctx, RpcReceiveQueue q) {
+        return ctx;
     }
 }

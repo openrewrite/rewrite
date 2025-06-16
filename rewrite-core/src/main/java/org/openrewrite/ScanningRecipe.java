@@ -101,6 +101,7 @@ public abstract class ScanningRecipe<T> extends Recipe {
     public final TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
 
+            @Nullable
             private TreeVisitor<?, ExecutionContext> delegate;
 
             private TreeVisitor<?, ExecutionContext> delegate(ExecutionContext ctx) {

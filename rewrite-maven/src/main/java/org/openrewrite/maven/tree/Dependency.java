@@ -37,9 +37,11 @@ public class Dependency implements Serializable {
     String type;
 
     @With
+    @Nullable // Calls of `@AllArgsConstructor` result in a `null` value for this field
     String scope;
 
     @Builder.Default
+    @Nullable // Calls of `@AllArgsConstructor` result in a `null` value for this field
     List<GroupArtifact> exclusions = emptyList();
 
     @Nullable

@@ -38,6 +38,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.style.Style;
 
 import java.nio.file.Paths;
 import java.util.Optional;
@@ -92,7 +93,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
     @Nullable
     Boolean uploadInBackground;
 
-    @Option(displayName = "Publish Criteria",
+    @Option(displayName = "Publish criteria",
             description = "When set to `Always` the plugin will publish build scans of every single build. " +
                           "When set to `Failure` the plugin will only publish build scans when the build fails. " +
                           "When omitted scans will be published only when the `--scan` option is passed to the build.",
@@ -158,7 +159,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     GradleSettings gradleSettings = maybeGradleSettings.get();
 
                     try {
-                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, null, gradleSettings), ctx);
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(metadataFailures, null, gradleSettings), ctx);
                         if (newVersion == null) {
                             return cu;
                         }
@@ -183,7 +184,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     GradleProject gradleProject = maybeGradleProject.get();
 
                     try {
-                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, gradleProject, null), ctx);
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(metadataFailures, gradleProject, null), ctx);
                         if (newVersion == null) {
                             return cu;
                         }
@@ -210,7 +211,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
     }
 
     private G.CompilationUnit withPlugin(G.CompilationUnit cu, String pluginId, String newVersion, VersionComparator versionComparator, ExecutionContext ctx) {
-        cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null, null)
+        cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null, null, false)
                 .visitNonNull(cu, ctx);
         cu = (G.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
                 .visitNonNull(cu, ctx);
@@ -314,7 +315,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
     }
 
     private static String getIndent(G.CompilationUnit cu) {
-        TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class, IntelliJ.tabsAndIndents());
+        TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
         if (style.getUseTabCharacter()) {
             return "\t";
         } else {

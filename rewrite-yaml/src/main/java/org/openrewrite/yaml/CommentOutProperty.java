@@ -17,7 +17,11 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayDeque;
@@ -40,6 +44,12 @@ public class CommentOutProperty extends Recipe {
             example = "The `foo` property is deprecated, please migrate")
     String commentText;
 
+    @Option(example = "true", displayName = "Comment out property",
+            description = "If false, property wouldn't be commented out, only comment will be added. By default, set to true",
+            required = false)
+    @Nullable
+    Boolean commentOutProperty;
+
     @Override
     public String getDisplayName() {
         return "Comment out property";
@@ -61,6 +71,7 @@ public class CommentOutProperty extends Recipe {
             private boolean nextDocNeedsNewline;
             private String comment = "";
             private String indentation = "";
+            private boolean isBlockCommentExists;
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
@@ -72,7 +83,7 @@ public class CommentOutProperty extends Recipe {
                 }
 
                 // Add any leftover comment to the end of document
-                if (!comment.isEmpty()) {
+                if (!comment.isEmpty() && !Boolean.FALSE.equals(commentOutProperty)) {
                     String newPrefix = String.format("%s# %s%s%s",
                             indentation,
                             commentText,
@@ -89,7 +100,9 @@ public class CommentOutProperty extends Recipe {
             public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry,
                                                           ExecutionContext ctx) {
                 indentation = entry.getPrefix();
-                if (!comment.isEmpty()) {
+                if (Boolean.FALSE.equals(commentOutProperty)) {
+                    return addBockCommentIfNecessary(entry, ctx);
+                } else if (!comment.isEmpty()) {
                     // add comment and return
                     String newPrefix = entry.getPrefix() + "# " + commentText + comment + entry.getPrefix();
                     comment = "";
@@ -103,20 +116,13 @@ public class CommentOutProperty extends Recipe {
                 String lastIndentation = indentation;
                 indentation = entry.getPrefix();
 
-                if (!comment.isEmpty()) {
+                if (!comment.isEmpty() && !Boolean.FALSE.equals(commentOutProperty)) {
                     String newPrefix = entry.getPrefix() + "# " + commentText + comment + entry.getPrefix();
                     comment = "";
                     return entry.withPrefix(newPrefix);
                 }
 
-                Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
-                        .filter(Yaml.Mapping.Entry.class::isInstance)
-                        .map(Yaml.Mapping.Entry.class::cast)
-                        .collect(Collectors.toCollection(ArrayDeque::new));
-
-                String prop = stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
-                        .map(e2 -> e2.getKey().getValue())
-                        .collect(Collectors.joining("."));
+                String prop = calculateCurrentKeyPath();
 
                 if (prop.equals(propertyKey)) {
                     String prefix = entry.getPrefix();
@@ -128,11 +134,49 @@ public class CommentOutProperty extends Recipe {
                         comment = lastIndentation + "#" + entry.print(getCursor().getParentTreeCursor());
                     }
 
-                    doAfterVisit(new DeleteProperty(propertyKey, null, null, null).getVisitor());
+                    if (Boolean.FALSE.equals(commentOutProperty)) {
+                        if (!entry.getPrefix().contains(commentText) && !isBlockCommentExists) {
+                            return entry.withPrefix(entry.getPrefix() + "# " + commentText + (entry.getPrefix().contains("\n") ? entry.getPrefix() : "\n" + entry.getPrefix()));
+                        }
+                    } else {
+                        doAfterVisit(new DeleteProperty(propertyKey, null, null, null).getVisitor());
+                    }
                     return entry;
                 }
 
                 return super.visitMappingEntry(entry, ctx);
+            }
+
+            private Yaml.Sequence.Entry addBockCommentIfNecessary(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
+                boolean propertyExistsInSequence = isPropertyExistsInSequence(entry);
+                if (propertyExistsInSequence) {
+                    isBlockCommentExists = true;
+                    if (!entry.getPrefix().contains(commentText)) {
+                        return entry.withPrefix(entry.getPrefix() + "# " + commentText + (entry.getPrefix().contains("\n") ? entry.getPrefix() : "\n" + entry.getPrefix()));
+                    }
+                }
+                return super.visitSequenceEntry(entry, ctx);
+            }
+
+            private boolean isPropertyExistsInSequence(Yaml.Sequence.Entry entry) {
+                if (!(entry.getBlock() instanceof Yaml.Mapping)) {
+                    return false;
+                }
+                Yaml.Mapping mapping = (Yaml.Mapping) entry.getBlock();
+                String prop = calculateCurrentKeyPath();
+                return mapping.getEntries().stream()
+                        .anyMatch(e -> propertyKey.equals(prop + "." + e.getKey().getValue()));
+            }
+
+            private String calculateCurrentKeyPath() {
+                Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
+                        .filter(Yaml.Mapping.Entry.class::isInstance)
+                        .map(Yaml.Mapping.Entry.class::cast)
+                        .collect(Collectors.toCollection(ArrayDeque::new));
+
+                return stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
+                        .map(e2 -> e2.getKey().getValue())
+                        .collect(Collectors.joining("."));
             }
         };
     }

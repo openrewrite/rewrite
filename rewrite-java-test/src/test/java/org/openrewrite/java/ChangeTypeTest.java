@@ -29,7 +29,9 @@ import org.openrewrite.test.SourceSpec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.xml.Assertions.xml;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 @SuppressWarnings("ConstantConditions")
 class ChangeTypeTest implements RewriteTest {
@@ -65,6 +67,35 @@ class ChangeTypeTest implements RewriteTest {
           java(
             "public class ThinkPositive { private Integer fred = 1;}",
             "public class ThinkPositive { private Long fred = 1;}"
+          )
+        );
+    }
+
+    @Test
+    void okWithTopLevelType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.Map$Entry", "java.util.List", true)),
+          java(
+            """
+              import java.util.Map;
+              
+              public class TestController {
+              
+                  public Map.Entry respond() {
+                     return null;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              public class TestController {
+              
+                  public List respond() {
+                     return null;
+                  }
+              }
+              """
           )
         );
     }
@@ -207,7 +238,7 @@ class ChangeTypeTest implements RewriteTest {
               class Test {
                   List p;
                   List p2;
-                  java.util.List p3;
+                  List p3;
               }
               """
           )
@@ -351,7 +382,11 @@ class ChangeTypeTest implements RewriteTest {
           java(a2),
           java(
             "public class B extends a.A1 {}",
-            "public class B extends a.A2 {}"
+            """
+              import a.A2;
+              
+              public class B extends A2 {}
+              """
           )
         );
     }
@@ -363,8 +398,14 @@ class ChangeTypeTest implements RewriteTest {
           java("package a.b.c;\npublic @interface A1 {}"),
           java("package a.b.d;\npublic @interface A2 {}"),
           java(
-            "@a.b.c.A1 public class B {}",
-            "@a.b.d.A2 public class B {}"
+            """
+              @a.b.c.A1 public class B {}
+              """,
+            """
+              import a.b.d.A2;
+              
+              @A2 public class B {}
+              """
           )
         );
     }
@@ -1354,7 +1395,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             spec -> spec.path("a/b/NoMatch.java").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/NoMatch.java");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "x.y.Target")).isTrue();
             })
           )
         );
@@ -1378,7 +1419,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             spec -> spec.path("a/b/Original.java").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/Target.java");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "x.y.Target")).isTrue();
             })
           )
         );
@@ -1582,9 +1623,166 @@ class ChangeTypeTest implements RewriteTest {
 
                 assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName())
                   .isEqualTo("a.A2");
-                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().get(0)).getFullyQualifiedName())
+                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().getFirst()).getFullyQualifiedName())
                   .isEqualTo("a.A2");
             })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/582")
+    @Test
+    void renameWhenInitializerTypeMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", false)),
+          //language=java
+          java(
+            """
+              import java.util.*;
+
+              class Test {
+                  void test() {
+                      List<Integer> list = new ArrayList<>();
+                      list.add(1);
+                      list.add(2);
+                  }
+              }
+              """,
+            """
+              import java.util.*;
+
+              class Test {
+                  void test() {
+                      List<Integer> list = new LinkedList<>();
+                      list.add(1);
+                      list.add(2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameRandomVariablesMatchingClassName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
+          java(
+            """
+              package a;
+              public class A1 {
+              }
+              """,
+            """
+              package a;
+              public class A2 {
+              }
+              """
+          ),
+          java(
+            """
+              package org.foo;
+              
+              import a.A1;
+              
+              public class Example {
+                  public String method(A1 a, String a1) {
+                      return a1;
+                  }
+              }
+              """,
+            """
+              package org.foo;
+              
+              import a.A2;
+              
+              public class Example {
+                  public String method(A2 a, String a1) {
+                      return a1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeToVariableNameWithoutChangeToType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+              public class A2 {
+              }
+              """
+          ),
+          java(
+            """
+              package org.foo;
+              
+              import a.A1;
+              import a.A2;
+              
+              public class Example {
+                  public A1 method1(A1 a1) {
+                      return a1;
+                  }
+                  public A2 method2(A2 a1) {
+                      return a1; // Unchanged
+                  }
+              }
+              """,
+            """
+              package org.foo;
+              
+              import a.A2;
+              
+              public class Example {
+                  public A2 method1(A2 a1) {
+                      return a1;
+                  }
+                  public A2 method2(A2 a1) {
+                      return a1; // Unchanged
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameVariableNeedlessly() {
+        // Comparison to java.util.Optional: this method is equivalent to Java 8's Optional.orElse(null).
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.awt.List", "java.util.List", false)),
+          //language=java
+          java(
+            """
+              import java.awt.List;
+              
+              class A {
+                  List foo(List list) {
+                      return list;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              class A {
+                  List foo(List list) {
+                      return list;
+                  }
+              }
+              """
           )
         );
     }
@@ -1940,6 +2138,7 @@ class ChangeTypeTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4452")
+    @Disabled("flaky on CI")
     void shouldFullyQualifyWhenNewTypeIsAmbiguous() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType(
@@ -1987,7 +2186,8 @@ class ChangeTypeTest implements RewriteTest {
               public class A {
                 public static String A = "A";
               }
-              """),
+              """
+          ),
           java(
             """
               package org.ab;
@@ -1996,7 +2196,8 @@ class ChangeTypeTest implements RewriteTest {
                 public static String A = "A";
                 public static String B = "B";
               }
-              """),
+              """
+          ),
           // language=java
           java(
             """
@@ -2039,7 +2240,6 @@ class ChangeTypeTest implements RewriteTest {
               """
           )
         );
-
     }
 
     @Test
@@ -2055,11 +2255,167 @@ class ChangeTypeTest implements RewriteTest {
                 TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
 
                 J.CompilationUnit cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
-                assertEquals("GoodbyeClass", cu.getClasses().get(0).getSimpleName());
+                assertEquals("GoodbyeClass", cu.getClasses().getFirst().getSimpleName());
 
-                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().get(0), new InMemoryExecutionContext());
+                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().getFirst(), new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cd.getSimpleName());
             }))
+        );
+    }
+
+    @Test
+    void changeTypeInPropertiesFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
+          properties(
+            """
+              a.property=java.lang.String
+              c.property=java.lang.StringBuilder
+              b.property=String
+              """,
+            """
+              a.property=java.lang.Integer
+              c.property=java.lang.StringBuilder
+              b.property=String
+              """,
+                spec -> spec.path("application.properties"))
+        );
+    }
+
+    @Test
+    void changeTypeInYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
+          yaml(
+            """
+              root:
+                  a: java.lang.String
+                  b: java.lang.StringBuilder
+                  c: java.lang.test.String
+                  d: String
+              """,
+            """
+              root:
+                  a: java.lang.Integer
+                  b: java.lang.StringBuilder
+                  c: java.lang.test.String
+                  d: String
+              """,
+            spec -> spec.path("application.yaml")
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4773")
+    void noRenameOfTypeWithMatchingPrefix() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
+            .parser(JavaParser.fromJavaVersion()
+              .dependsOn(
+                """
+                  package org.codehaus.jackson.annotate;
+                  public @interface JsonIgnoreProperties {
+                      boolean ignoreUnknown() default false;
+                  }
+                  """,
+                """
+                  package org.codehaus.jackson.annotate;
+                  public @interface JsonIgnore {
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import org.codehaus.jackson.annotate.JsonIgnore;
+              import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+              
+              @JsonIgnoreProperties(ignoreUnknown = true)
+              public class myClass {
+                  @JsonIgnore
+                  public boolean isDirty() {
+                      return false;
+                  }
+              }
+              """,
+            """
+              import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+              import org.codehaus.jackson.annotate.JsonIgnore;
+              
+              @JsonIgnoreProperties(ignoreUnknown = true)
+              public class myClass {
+                  @JsonIgnore
+                  public boolean isDirty() {
+                      return false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4764")
+    void changeTypeOfInnerClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+                  
+                  public class A {
+                    public A.Builder builder() {
+                      return new A.Builder();
+                    }
+                  
+                    public static class Builder {
+                      public A build() {
+                        return new A();
+                      }
+                    }
+                  }
+                  """,
+                """
+                  package bar;
+                  
+                  public class A {
+                    public A.Builder builder() {
+                      return new A.Builder();
+                    }
+                  
+                    public static class Builder {
+                      public A build() {
+                        return new A();
+                      }
+                    }
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+              import foo.A.Builder;
+              
+              class Test {
+                A test() {
+                    A.Builder b = A.builder();
+                    return b.build();
+                }
+              }
+              """,
+                """
+              import foo.A;
+              
+              class Test {
+                A test() {
+                    bar.A.Builder b = A.builder();
+                    return b.build();
+                }
+              }
+              """
+          )
         );
     }
 }

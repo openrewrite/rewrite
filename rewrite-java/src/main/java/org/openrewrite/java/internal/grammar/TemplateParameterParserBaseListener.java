@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -39,6 +39,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitMatcherPattern(TemplateParameterParser.MatcherPatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterGenericPattern(TemplateParameterParser.GenericPatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitGenericPattern(TemplateParameterParser.GenericPatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -104,6 +116,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterTypeArray(TemplateParameterParser.TypeArrayContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTypeArray(TemplateParameterParser.TypeArrayContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterParameterName(TemplateParameterParser.ParameterNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -111,6 +135,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitParameterName(TemplateParameterParser.ParameterNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterGenericName(TemplateParameterParser.GenericNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitGenericName(TemplateParameterParser.GenericNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

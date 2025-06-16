@@ -45,7 +45,7 @@ public class RemoveImplements extends Recipe {
                "Removes `@Overrides` annotations from methods which no longer override anything.";
     }
 
-    @Option(displayName = "Interface Type",
+    @Option(displayName = "Interface type",
             description = "The fully qualified name of the interface to remove.",
             example = "java.io.Serializable")
     String interfaceType;

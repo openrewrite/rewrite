@@ -36,7 +36,6 @@ import static java.util.Objects.requireNonNull;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindCommitters extends ScanningRecipe<AtomicReference<GitProvenance>> {
-
     transient DistinctCommitters committers = new DistinctCommitters(this);
     transient CommitsByDay commitsByDay = new CommitsByDay(this);
 

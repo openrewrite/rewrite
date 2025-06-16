@@ -17,15 +17,10 @@ package org.openrewrite.java;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.trait.Reference;
-import org.openrewrite.xml.tree.Xml;
 
 @Getter
-public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
+public class PackageMatcher implements Reference.Matcher {
 
     private final @Nullable String targetPackage;
 
@@ -43,7 +38,7 @@ public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
 
     @Override
     public boolean matchesReference(Reference reference) {
-        if (reference.getKind().equals(Reference.Kind.TYPE) || reference.getKind().equals(Reference.Kind.PACKAGE)) {
+        if (reference.getKind() == Reference.Kind.TYPE || reference.getKind() == Reference.Kind.PACKAGE) {
             String recursivePackageNamePrefix = targetPackage + ".";
             if (reference.getValue().equals(targetPackage) || recursive && reference.getValue().startsWith(recursivePackageNamePrefix)) {
                 return true;
@@ -53,34 +48,20 @@ public class PackageMatcher implements Reference.Renamer, Reference.Matcher {
     }
 
     @Override
-    public TreeVisitor<Tree, ExecutionContext> rename(String newValue) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (StringUtils.isNotEmpty(newValue)) {
-                    if (tree instanceof Xml.Attribute) {
-                        return ((Xml.Attribute) tree).withValue(((Xml.Attribute) tree).getValue().withValue(getReplacement(((Xml.Attribute) tree).getValueAsString(), targetPackage, newValue)));
-                    }
-                    if (tree instanceof Xml.Tag) {
-                        if (((Xml.Tag) tree).getValue().isPresent()) {
-                            return ((Xml.Tag) tree).withValue(getReplacement(((Xml.Tag) tree).getValue().get(), targetPackage, newValue));
-                        }
-                    }
-                }
-                return super.visit(tree, ctx);
-            }
-        };
+    public Reference.Renamer createRenamer(String newName) {
+        return reference -> getReplacement(reference.getValue(), targetPackage, newName);
     }
 
     String getReplacement(String value, @Nullable String oldValue, String newValue) {
         if (oldValue != null) {
-            if (recursive) {
-                return value.replace(oldValue, newValue);
-            } else if (value.startsWith(oldValue) && Character.isUpperCase(value.charAt(oldValue.length() + 1))) {
-                return value.replace(oldValue, newValue);
+            if (value.equals(oldValue)) {
+                return newValue;
+            } else if (value.startsWith(oldValue)) {
+                if (recursive || value.length() > oldValue.length() + 1 && Character.isUpperCase(value.charAt(oldValue.length() + 1))) {
+                    return newValue + value.substring(oldValue.length());
+                }
             }
         }
         return value;
     }
-
 }

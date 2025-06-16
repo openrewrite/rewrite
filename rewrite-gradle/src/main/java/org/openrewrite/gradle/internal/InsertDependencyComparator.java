@@ -16,58 +16,66 @@
 package org.openrewrite.gradle.internal;
 
 import lombok.Getter;
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class InsertDependencyComparator implements Comparator<Statement> {
     private final Map<Statement, Float> positions = new LinkedHashMap<>();
 
     @Getter
+    @Nullable
     private Statement afterDependency;
 
     @Getter
+    @Nullable
     private Statement beforeDependency;
 
-    public InsertDependencyComparator(List<Statement> existingStatements, J.MethodInvocation dependencyToAdd) {
-        for (int i = 0, len = existingStatements.size(); i < len; i++) {
-            positions.put(existingStatements.get(i), (float) i);
+    public InsertDependencyComparator(List<Statement> statements, J.MethodInvocation dependencyToAdd) {
+        for (int i = 0, len = statements.size(); i < len; i++) {
+            positions.put(statements.get(i), (float) i);
         }
 
-        List<Statement> ideallySortedDependencies = existingStatements.stream()
-                .filter(s -> s instanceof J.MethodInvocation || (s instanceof J.Return && ((J.Return) s).getExpression() instanceof J.MethodInvocation))
-                .collect(Collectors.toList());
+        // Make a copy of statements with only dependencies
+        List<Statement> dependencies = new ArrayList<>(statements.size() + 1);
+        for (Statement s : statements) {
+            if (s instanceof J.MethodInvocation || (s instanceof J.Return && ((J.Return) s).getExpression() instanceof J.MethodInvocation)) {
+                dependencies.add(s);
+            }
+        }
 
-        ideallySortedDependencies.add(dependencyToAdd);
-        ideallySortedDependencies.sort(dependenciesComparator);
+        if (dependencies.isEmpty()) {
+            positions.put(dependencyToAdd, statements.size() + 0.5f);
+            return;
+        }
 
-        for (int i = 0, len = ideallySortedDependencies.size(); i < len; i++) {
-            Statement d = ideallySortedDependencies.get(i);
-            if (dependencyToAdd == d) {
+        // Fill `afterDependency` and `beforeDependency`
+        dependencies.add(dependencyToAdd);
+        dependencies.sort(dependenciesComparator);
+        for (int i = 0, len = dependencies.size(); i < len; i++) {
+            if (dependencyToAdd == dependencies.get(i)) {
                 if (i > 0) {
-                    afterDependency = ideallySortedDependencies.get(i - 1);
+                    afterDependency = dependencies.get(i - 1);
                 }
-                if (i + 1 < ideallySortedDependencies.size()) {
-                    beforeDependency = ideallySortedDependencies.get(i + 1);
+                if (i + 1 < dependencies.size()) {
+                    beforeDependency = dependencies.get(i + 1);
                 }
                 break;
             }
         }
 
-        float insertPos = afterDependency == null ? -0.5f : 0.5f;
-        List<Statement> statements = new ArrayList<>(positions.keySet());
-        for (float f = afterDependency == null ? 0 : positions.get(afterDependency); f < statements.size(); f++) {
+        // Put `dependencyToAdd` at the proper place in the positions map
+        boolean isFirst = afterDependency == null;
+        for (float f = isFirst ? 0 : positions.get(afterDependency); f < statements.size(); f++) {
             Statement s = statements.get((int) f);
             if (!(s instanceof J.MethodInvocation || (s instanceof J.Return && ((J.Return) s).getExpression() instanceof J.MethodInvocation))) {
                 continue;
             }
-            positions.put(dependencyToAdd, positions.get(statements.get((int) f)) + insertPos);
+            positions.put(dependencyToAdd, positions.get(s) + (isFirst ? -0.5f : 0.5f));
             break;
         }
     }

@@ -23,10 +23,7 @@ import org.openrewrite.Recipe;
 public class DependencyGraph extends DataTable<DependencyGraph.Row> {
 
     public DependencyGraph(Recipe recipe) {
-        super(recipe, DependencyGraph.Row.class,
-                DependenciesInUse.class.getName(),
-                "Dependency graph",
-                "Relationships between dependencies.");
+        super(recipe, "Dependency graph", "Relationships between dependencies.");
     }
 
     @Value

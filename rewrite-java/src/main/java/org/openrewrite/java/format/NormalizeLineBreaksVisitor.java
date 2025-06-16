@@ -24,6 +24,8 @@ import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
 
+import static org.openrewrite.format.LineBreaks.normalizeNewLines;
+
 public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
@@ -64,22 +66,6 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
 
             return c.withSuffix(normalizeNewLines(c.getSuffix(), style.isUseCRLFNewLines()));
         }));
-    }
-
-    private static String normalizeNewLines(String text, boolean useCrlf) {
-        if (!text.contains("\n")) {
-            return text;
-        }
-        StringBuilder normalized = new StringBuilder();
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (useCrlf && c == '\n' && (i == 0 || text.charAt(i - 1) != '\r')) {
-                normalized.append('\r').append('\n');
-            } else if (useCrlf || c != '\r') {
-                normalized.append(c);
-            }
-        }
-        return normalized.toString();
     }
 
     @Override

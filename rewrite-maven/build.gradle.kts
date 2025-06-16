@@ -16,7 +16,7 @@ dependencies {
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
 
-    implementation("org.antlr:antlr4-runtime:4.11.1")
+    implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("dev.failsafe:failsafe:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
@@ -25,8 +25,6 @@ dependencies {
 
     // needed by AddDependency
     implementation(project(":rewrite-java"))
-
-    compileOnly("guru.nidi:graphviz-java:latest.release")
 
     compileOnly("org.rocksdb:rocksdbjni:latest.release")
     compileOnly(project(":rewrite-yaml"))
@@ -37,14 +35,15 @@ dependencies {
     implementation("org.apache.commons:commons-text:latest.release")
 
     testImplementation(project(":rewrite-test"))
+
+    testImplementation("com.squareup.okhttp3:okhttp:4.+")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
     testImplementation("com.squareup.okhttp3:okhttp-tls:4.+")
     testImplementation("com.squareup.okio:okio-jvm:3.9.1")
     testImplementation("org.mapdb:mapdb:latest.release")
-    testImplementation("guru.nidi:graphviz-java:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
 }
 
@@ -71,7 +70,7 @@ tasks.withType<Javadoc> {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/VersionRangeParser**", "**/AddDependency**")
+    exclude("**/VersionRangeParser**", "**/AddDependency**", "**/MavenResolutionResult**")
 }
 
 configure<LicenseExtension> {

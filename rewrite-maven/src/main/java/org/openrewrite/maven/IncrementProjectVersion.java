@@ -17,14 +17,19 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.marker.AlreadyIncremented;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.ChangeTagValue;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -165,13 +170,15 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                     return t;
                 }
                 String newVersion = acc.get(new GroupArtifact(
-                        t.getChildValue("groupId").orElse(null), t.getChildValue("artifactId").orElse(null)));
-                if (newVersion == null || newVersion.equals(t.getChildValue("version").orElse(null))) {
+                        t.getChildValue("groupId").orElse(null),
+                        t.getChildValue("artifactId").orElse(null)));
+                String oldVersion = t.getChildValue("version").orElse(null);
+                if (newVersion == null || newVersion.equals(oldVersion)) {
                     return t;
                 }
                 t = t.withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
-                return (Xml.Tag) new ChangeTagValue("version", null, newVersion).getVisitor()
-                        .visitNonNull(t, ctx);
+                return (Xml.Tag) new ChangeTagValue("version", oldVersion, newVersion, null)
+                        .getVisitor().visitNonNull(t, ctx);
             }
         };
     }

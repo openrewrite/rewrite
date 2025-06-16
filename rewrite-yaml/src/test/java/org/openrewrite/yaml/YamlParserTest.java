@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class YamlParserTest implements RewriteTest {
@@ -38,15 +39,15 @@ class YamlParserTest implements RewriteTest {
         List<SourceFile> yamlSources = YamlParser.builder().build().parse("a: b\n").toList();
         assertThat(yamlSources).singleElement().isInstanceOf(Yaml.Documents.class);
 
-        Yaml.Documents documents = (Yaml.Documents) yamlSources.get(0);
-        Yaml.Document document = documents.getDocuments().get(0);
+        Yaml.Documents documents = (Yaml.Documents) yamlSources.getFirst();
+        Yaml.Document document = documents.getDocuments().getFirst();
 
         // Assert that end is parsed correctly
         assertThat(document.getEnd().getPrefix()).isEqualTo("\n");
 
         // Assert that the title is parsed correctly
         Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
-        Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
+        Yaml.Mapping.Entry entry = mapping.getEntries().getFirst();
         Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
         assertThat(title.getValue()).isEqualTo("b");
     }
@@ -121,11 +122,11 @@ class YamlParserTest implements RewriteTest {
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
 
         Yaml.Documents documents = (Yaml.Documents) sourceFile;
-        Yaml.Document document = documents.getDocuments().get(0);
+        Yaml.Document document = documents.getDocuments().getFirst();
 
         // Assert that end is parsed correctly
         Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
-        Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
+        Yaml.Mapping.Entry entry = mapping.getEntries().getFirst();
         Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
         assertThat(title.getValue()).isEqualTo(input.trim());
     }
@@ -212,6 +213,253 @@ class YamlParserTest implements RewriteTest {
                       kind: "SINGLE"
                       rules:
                         possibleValues: []
+              """
+          )
+        );
+    }
+
+    @Test
+    void atSymbols() {
+        rewriteRun(
+          yaml(
+            // BTW, the @ sign is forbidden as the first character of a scalar value by the YAML spec:
+            // https://github.com/yaml/yaml-spec/blob/1b1a1be43bd6e0cfec45caf0e40af3b5d2bb7f8a/spec/1.2.2/spec.md#L1877
+            """
+              root:
+                specifier: npm:@testing-library/vue@5.0.4
+                date: @build.timestamp@
+                version: @project.version@
+              """
+          )
+        );
+    }
+
+    @Test
+    void pipeLiteralInASequenceWithDoubleQuotes() {
+        rewriteRun(
+          yaml(
+               """
+               - "one": |
+                   two
+                 "three": "four"
+               """
+          )
+        );
+    }
+
+    @Test
+    void spaceBeforeColon() {
+        rewriteRun(
+          yaml(
+            """
+            index_patterns : []
+            """
+          )
+        );
+    }
+
+    @Test
+    void tagsAsInCloudFormation() {
+        rewriteRun(
+          yaml(
+            """
+            AttributeDefinitions: !Dynamo
+              - AttributeName: Title
+            """
+          )
+        );
+    }
+
+    @Test
+    void tagsAsInScalar() {
+        rewriteRun(
+          yaml(
+            """
+            AttributeDefinitions: !Dynamo Title
+            """
+          )
+        );
+    }
+
+    @Test
+    void globalTags() {
+        rewriteRun(
+          yaml(
+            """
+            age: !!int "42"
+            pi: !!float "3.14159"
+            is_valid: !!bool "true"
+            names: !!seq
+              - Alice
+              - Bob
+              - Charlie
+            person: !!map
+              name: John Doe
+              age: 30
+            """
+          )
+        );
+    }
+
+    @Test
+    void parseTagInMapping() {
+        // given
+        @Language("yml") String code =
+          """
+          person: !!map
+            name: Jonah Mathews
+          """;
+
+        // when
+        Yaml.Documents parsed = (Yaml.Documents) YamlParser.builder().build().parse(code).toList().getFirst();
+
+        // test
+        Yaml.Document document = parsed.getDocuments().getFirst();
+        Yaml.Mapping topMapping = (Yaml.Mapping) document.getBlock();
+        Yaml.Mapping.Entry person = topMapping.getEntries().getFirst();
+        assertEquals("person", person.getKey().getValue());
+        Yaml.Mapping withinPerson = (Yaml.Mapping) person.getValue();
+        assertEquals("map", withinPerson.getTag().getName());
+        assertEquals(Yaml.Tag.Kind.IMPLICIT_GLOBAL, withinPerson.getTag().getKind());
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5099")
+    @Test
+    void parseFlowSequenceAtBufferBoundary() {
+        // May change over time in SnakeYaml, rendering this test fragile
+        var snakeYamlEffectiveStreamReaderBufferSize = 1024 - 1;
+
+        @Language("yml")
+        var yaml = "a: " + "x".repeat(1000) + "\n" + "b".repeat(16) + ": []";
+        assertEquals(snakeYamlEffectiveStreamReaderBufferSize - 1, yaml.lastIndexOf('['));
+
+        rewriteRun(
+          // Could be whatever recipe, it just proves the `IndexOutOfBoundsException` is not thrown,
+          // thus proving the parser can handle a flow-style sequence ending at the boundary of the internal buffer used by SnakeYaml StreamReader.
+          spec -> spec.recipe(new DeleteKey(".nonexistent","*")),
+          yaml(yaml)
+        );
+    }
+
+    @Test
+    void withUnicodeCharacters() {
+        rewriteRun(
+          yaml(
+            """
+            - name: Elephant
+            - #🦍COMMENT: unicode
+            - action: Do something
+            """
+          )
+        );
+    }
+
+    @Test
+    void withUnicodeCharactersInSingleLine() {
+        rewriteRun(
+          yaml(
+            """
+            - name: Elephant
+            - #🦍COMMENT: 🐶unicode
+            - action: Do something
+            """
+          )
+        );
+    }
+
+    @Test
+    void withoutUnicodeCharacters() {
+        rewriteRun(
+          yaml(
+            """
+            - name: Elephant
+            - #COMMENT: unicode
+            - action: Do something
+            """
+          )
+        );
+    }
+
+    @Test
+    void withMultipleUnicodeCharacters() {
+        rewriteRun(
+          yaml(
+            """
+            - name: Rat
+            - #🐀COMMENT: unicode
+            - color: Black
+            - #🦍COMMENT: unicode
+            - action: Escape
+            """
+          )
+        );
+    }
+
+    @Test
+    void withMultipleUnicodeCharactersPerLine() {
+        rewriteRun(
+          yaml(
+            """
+            - name: Rat
+            - #🐀COMMENT: 🦍unicode
+            - color: Black
+            - #🦍COMMENT: 🎱unicode
+            - action: Escape
+            """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorScalar() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor_name This string will appear as the value.
+              other_anchor: *anchor_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorMap() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor_name
+                anchor_key: 1
+                another_anchor_key: 2
+              other_anchor: *anchor_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorSequence() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor
+                - item1
+                - item2
+              other_anchor: *anchor
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5553")
+    void withAnchorSequenceOnRootLevel() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor
+              - item1
+              - item2
+              other_anchor: *anchor
               """
           )
         );

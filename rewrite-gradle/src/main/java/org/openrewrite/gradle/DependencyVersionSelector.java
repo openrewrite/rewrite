@@ -30,7 +30,6 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.*;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Collections.singletonList;
@@ -43,7 +42,6 @@ import static java.util.Objects.requireNonNull;
 @Incubating(since = "8.17.0")
 @Value
 public class DependencyVersionSelector {
-    @Nullable
     MavenMetadataFailures metadataFailures;
 
     @Nullable
@@ -123,26 +121,50 @@ public class DependencyVersionSelector {
      * @return The selected version, if any.
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
-    public @Nullable String select(GroupArtifactVersion gav,
-                         @Nullable String configuration,
-                         @Nullable String version,
-                         @Nullable String versionPattern,
-                         ExecutionContext ctx) throws MavenDownloadingException {
+    public @Nullable String select(
+            GroupArtifactVersion gav,
+            @Nullable String configuration,
+            @Nullable String version,
+            @Nullable String versionPattern,
+            ExecutionContext ctx) throws MavenDownloadingException {
+        try {
+            VersionComparator versionComparator = StringUtils.isBlank(version) ?
+                    new LatestRelease(versionPattern) :
+                    requireNonNull(Semver.validate(version, versionPattern).getValue());
+            return select(gav, configuration, version, versionComparator, ctx);
+        } catch (IllegalStateException e) {
+            // this can happen when we encounter exotic versions
+            return null;
+        }
+    }
+
+    /**
+     * Used to upgrade a version for a dependency that already has a version.
+     *
+     * @param gav            The group, artifact, and version of the existing dependency.
+     * @param configuration  The configuration to select the version for. The configuration influences
+     *                       which set of Maven repositories (either plugin repositories or regular repositories)
+     *                       are used to resolve Maven metadata from.     * @param version        The version to select, in node-semver format.
+     * @param versionComparator the comparator used to establish the validity of a potential upgrade
+     * @param ctx            The execution context, which can influence dependency resolution.
+     * @return The selected version, if any.
+     * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
+     */
+    public @Nullable String select(
+            GroupArtifactVersion gav,
+            @Nullable String configuration,
+            @Nullable String version,
+            VersionComparator versionComparator,
+            ExecutionContext ctx) throws MavenDownloadingException {
         if (gav.getVersion() == null) {
             throw new IllegalArgumentException("Version must be specified. Call the select method " +
                                                "that accepts a GroupArtifact instead if there is no " +
                                                "current version.");
         }
-
         try {
-            VersionComparator versionComparator = StringUtils.isBlank(version) ?
-                    new LatestRelease(versionPattern) :
-                    requireNonNull(Semver.validate(version, versionPattern).getValue());
-
             if (versionComparator instanceof ExactVersion) {
                 return versionComparator.upgrade(gav.getVersion(), singletonList(version)).orElse(null);
-            } else if (versionComparator instanceof LatestPatch &&
-                    !versionComparator.isValid(gav.getVersion(), gav.getVersion())) {
+            } else if (versionComparator instanceof LatestPatch && !Semver.isVersion(gav.getVersion())) {
                 // in the case of "latest.patch", a new version can only be derived if the
                 // current version is a semantic version
                 return null;
@@ -164,6 +186,7 @@ public class DependencyVersionSelector {
                 return Optional.empty();
             }
             List<MavenRepository> repos = determineRepos(configuration);
+            // There is still at least one place where this is null that remains to be fixed
             MavenMetadata mavenMetadata = metadataFailures == null ?
                     downloadMetadata(gav.getGroupId(), gav.getArtifactId(), repos, ctx) :
                     metadataFailures.insertRows(ctx, () -> downloadMetadata(gav.getGroupId(), gav.getArtifactId(),
@@ -185,7 +208,9 @@ public class DependencyVersionSelector {
         if (gradleSettings != null) {
             return gradleSettings.getBuildscript().getMavenRepositories();
         }
-        Objects.requireNonNull(gradleProject);
+        if (gradleProject == null) {
+            throw new IllegalStateException("Gradle project must be set to determine repositories."); // Caught by caller
+        }
         return "classpath".equals(configuration) ?
                 gradleProject.getBuildscript().getMavenRepositories() :
                 gradleProject.getMavenRepositories();

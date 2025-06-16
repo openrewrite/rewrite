@@ -43,29 +43,29 @@ class JavaTemplateTest4Test implements RewriteTest {
                   if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
                       // insert in outer method
                       J.MethodDeclaration m = t.apply(getCursor(), method.getCoordinates().replaceParameters());
-                      J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().get(0);
+                      J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().getFirst();
 
                       // insert in inner method
-                      J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().get(0);
+                      J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().getFirst();
                       return t.apply(updateCursor(m), innerMethod.getCoordinates().replaceParameters());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
               JavaType.Method type = m.getMethodType();
               assertThat(type.getParameterNames())
                 .as("Changing the method's parameters should have also updated its type's parameter names")
                 .containsExactly("m", "n");
-              assertThat(type.getParameterTypes().get(0))
+              assertThat(type.getParameterTypes().getFirst())
                 .as("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
                 .isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(1))
                 .matches(jt -> jt instanceof JavaType.Parameterized &&
                                ((JavaType.Parameterized) jt).getType().getFullyQualifiedName().equals("java.util.List") &&
                                ((JavaType.Parameterized) jt).getTypeParameters().size() == 1 &&
-                               TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().get(0)).getFullyQualifiedName().equals("java.lang.String"),
+                               TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().getFirst()).getFullyQualifiedName().equals("java.lang.String"),
                   "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'"
                 );
               assertThat(m.getName().getType()).isEqualTo(type);
@@ -107,27 +107,27 @@ class JavaTemplateTest4Test implements RewriteTest {
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("test") && method.getParameters().get(0) instanceof J.Empty) {
+                  if (method.getSimpleName().equals("test") && method.getParameters().getFirst() instanceof J.Empty) {
                       // insert in outer method
                       J.MethodDeclaration m = t.apply(getCursor(), method.getCoordinates().replaceParameters());
-                      J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().get(0);
+                      J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().getFirst();
 
                       // insert in inner method
-                      J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().get(0);
+                      J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().getFirst();
                       return t.apply(updateCursor(m), innerMethod.getCoordinates().replaceParameters());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              final JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0))
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              final JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst())
                 .getMethodType();
 
               assertThat(type.getParameterNames())
                 .as("Changing the method's parameters should have also updated its type's parameter names")
                 .containsExactly("values");
 
-              var param = TypeUtils.asArray(type.getParameterTypes().get(0));
+              var param = TypeUtils.asArray(type.getParameterTypes().getFirst());
               assertThat(param.getElemType())
                 .as("Changing the method's parameters should have resulted in the first parameter's type being 'Object[]'")
                 .matches(at -> TypeUtils.asFullyQualified(TypeUtils.asArray(at).getElemType()).getFullyQualifiedName()
@@ -167,21 +167,20 @@ class JavaTemplateTest4Test implements RewriteTest {
                   {
                       if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
                           return JavaTemplate.builder("int n, #{}")
-                            .contextSensitive()
                             .build()
-                            .apply(getCursor(), method.getCoordinates().replaceParameters(), method.getParameters().get(0));
+                            .apply(getCursor(), method.getCoordinates().replaceParameters(), method.getParameters().getFirst());
                       }
                       return method;
                   }
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
 
               assertThat(type.getParameterNames())
                 .as("Changing the method's parameters should have also updated its type's parameter names")
                 .containsExactly("n", "s");
-              assertThat(type.getParameterTypes().get(0))
+              assertThat(type.getParameterTypes().getFirst())
                 .as("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
                 .isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(1))
@@ -323,7 +322,7 @@ class JavaTemplateTest4Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  var statement = method.getBody().getStatements().get(0);
+                  var statement = method.getBody().getStatements().getFirst();
                   if (statement instanceof J.Assignment) {
                       return JavaTemplate.builder("assert n == 0;")
                         .contextSensitive()
@@ -365,7 +364,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                       return JavaTemplate.builder("n = 1;")
                         .contextSensitive()
                         .build()
-                        .apply(getCursor(), method.getBody().getStatements().get(0).getCoordinates().after());
+                        .apply(getCursor(), method.getBody().getStatements().getFirst().getCoordinates().after());
                   }
                   return method;
               }

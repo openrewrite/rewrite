@@ -29,6 +29,7 @@ import org.openrewrite.test.TypeValidation;
 
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("RedundantOperationOnEmptyContainer")
@@ -36,6 +37,39 @@ class FindMethodsTest implements RewriteTest {
 
     static Stream<JavaType.FullyQualified> missingTypes() {
         return Stream.of(null, JavaType.Unknown.getInstance());
+    }
+
+    @DocumentExample
+    @Test
+    void findConstructors() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("A <constructor>(String)", false)),
+          java(
+            """
+              class Test {
+                  A a = new A("test");
+              }
+              """,
+            """
+              class Test {
+                  A a = /*~~>*/new A("test");
+              }
+              """
+          ),
+          java(
+            """
+              class A {
+                  public A(String s) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void incorrectMethodPattern() {
+        assertThat(new FindMethods("com.google.common.collect.*", false)
+          .validate().isValid()).isFalse();
     }
 
     @ParameterizedTest
@@ -69,33 +103,6 @@ class FindMethodsTest implements RewriteTest {
                       javaType;
                 }
             }.visitNonNull(cu, 0))
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void findConstructors() {
-        rewriteRun(
-          spec -> spec.recipe(new FindMethods("A <constructor>(String)", false)),
-          java(
-            """
-              class Test {
-                  A a = new A("test");
-              }
-              """,
-            """
-              class Test {
-                  A a = /*~~>*/new A("test");
-              }
-              """
-          ),
-          java(
-            """
-              class A {
-                  public A(String s) {}
-              }
-              """
           )
         );
     }
@@ -303,7 +310,7 @@ class FindMethodsTest implements RewriteTest {
             """
               public @interface Example {
                   String name() default "";
-                            
+              
                   String description() default "";
               }
               """

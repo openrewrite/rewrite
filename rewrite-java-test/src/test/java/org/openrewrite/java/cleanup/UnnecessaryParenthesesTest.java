@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
@@ -43,6 +44,59 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(UnnecessaryParenthesesVisitor::new));
+    }
+
+    @DocumentExample
+    @Test
+    void fullUnwrappingDefault() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+
+              class Test {
+                  int square(int a, int b) {
+                      int square = (a * b);
+
+                      int sumOfSquares = 0;
+                      for (int i = (0); i < 10; i++) {
+                          sumOfSquares += (square(i * i, i));
+                      }
+                      double num = (10.0);
+
+                      List<String> list = Arrays.asList("a1", "b1", "c1");
+                      list.stream()
+                              .filter((s) -> s.startsWith("c"))
+                              .forEach(System.out::println);
+
+                      return (square);
+                  }
+              }
+              """,
+            """
+              import java.util.*;
+
+              class Test {
+                  int square(int a, int b) {
+                      int square = a * b;
+
+                      int sumOfSquares = 0;
+                      for (int i = 0; i < 10; i++) {
+                          sumOfSquares += square(i * i, i);
+                      }
+                      double num = 10.0;
+
+                      List<String> list = Arrays.asList("a1", "b1", "c1");
+                      list.stream()
+                              .filter(s -> s.startsWith("c"))
+                              .forEach(System.out::println);
+
+                      return square;
+                  }
+              }
+              """
+          )
+        );
     }
 
     private static Consumer<RecipeSpec> unnecessaryParentheses(UnaryOperator<UnnecessaryParenthesesStyle> with) {
@@ -101,59 +155,6 @@ class UnnecessaryParenthesesTest implements RewriteTest {
               class Test {
                   int test() {
                       return 1;
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void fullUnwrappingDefault() {
-        rewriteRun(
-          java(
-            """
-              import java.util.*;
-
-              class Test {
-                  int square(int a, int b) {
-                      int square = (a * b);
-
-                      int sumOfSquares = 0;
-                      for (int i = (0); i < 10; i++) {
-                          sumOfSquares += (square(i * i, i));
-                      }
-                      double num = (10.0);
-
-                      List<String> list = Arrays.asList("a1", "b1", "c1");
-                      list.stream()
-                              .filter((s) -> s.startsWith("c"))
-                              .forEach(System.out::println);
-
-                      return (square);
-                  }
-              }
-              """,
-            """
-              import java.util.*;
-
-              class Test {
-                  int square(int a, int b) {
-                      int square = a * b;
-
-                      int sumOfSquares = 0;
-                      for (int i = 0; i < 10; i++) {
-                          sumOfSquares += square(i * i, i);
-                      }
-                      double num = 10.0;
-
-                      List<String> list = Arrays.asList("a1", "b1", "c1");
-                      list.stream()
-                              .filter(s -> s.startsWith("c"))
-                              .forEach(System.out::println);
-
-                      return square;
                   }
               }
               """
@@ -295,7 +296,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                       String t = ("literallyString" + "stringLiteral");
                       if (s == null) {
                           s = null;
-                      } else if (("someLiteral".toLowerCase()).equals(s)) {
+                      } else if ("someLiteral".toLowerCase().equals(s)) {
                           s = null;
                       }
                   }
@@ -931,6 +932,53 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
+    @Test
+    @ExpectedToFail("Not implemented yet")
+    void unwrapBinaryInIf() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(String s, int x) {
+                  if (((x > 3) || x < 0)) {}
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(String s, int x) {
+                  if (x > 3 || x < 0) {}
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapMethodArguments() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(String s, int x) {
+                  System.err.printf((s + "."), (x), (x + 3));
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(String s, int x) {
+                  System.err.printf(s + ".", x, x + 3);
+                }
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class DoNotUnwrap {
         @Test
@@ -1050,5 +1098,47 @@ class UnnecessaryParenthesesTest implements RewriteTest {
             );
         }
 
+        @Test
+        void methodInvocationSelect() {
+            //language=java
+            rewriteRun(
+              java(
+                """
+                  class A {
+                    void f(String s, int x) {
+                      (s + x).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class B {
+                    void f(String s, boolean b) {
+                      (b ? s : "not s").toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class C {
+                    void f(Object x) {
+                      ((String) x).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class D {
+                    void f(Object x) {
+                      (x = "Foo").toString();
+                    }
+                  }
+                  """
+              )
+            );
+        }
     }
 }

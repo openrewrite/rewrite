@@ -43,7 +43,7 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
 
     private final JavaType.Parameterized goatCuType = requireNonNull(TypeUtils.asParameterized(goatCu
       .getClasses()
-      .get(0)
+      .getFirst()
       .getType()));
 
     @Override
@@ -74,14 +74,14 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
     public JavaType firstMethodParameter(String methodName) {
         return goatCuType.getType().getMethods().stream()
           .filter(m -> m.getName().equals(methodName))
-          .map(m -> m.getParameterTypes().get(0))
+          .map(m -> m.getParameterTypes().getFirst())
           .findAny()
           .orElseThrow();
     }
 
     @Override
     public JavaType innerClassSignature(String innerClassSimpleName) {
-        return requireNonNull(goatCu.getClasses().get(0).getBody().getStatements()
+        return requireNonNull(goatCu.getClasses().getFirst().getBody().getStatements()
           .stream()
           .filter(it -> it instanceof J.ClassDeclaration)
           .map(it -> (J.ClassDeclaration) it)
@@ -94,7 +94,7 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
     @Override
     public JavaType lastClassTypeParameter() {
         List<JavaType> typeParameters = goatCuType.getTypeParameters();
-        return typeParameters.get(typeParameters.size() - 1);
+        return typeParameters.getLast();
     }
 
     @Override

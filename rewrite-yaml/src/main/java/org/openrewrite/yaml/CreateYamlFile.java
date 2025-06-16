@@ -46,7 +46,10 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
     @Language("yml")
     @Option(displayName = "File contents",
             description = "Multiline text content for the file.",
-            example = "a:\nproperty: value\nanother:\nproperty: value",
+            example = "a:\n" +
+                      "  property: value\n" +
+                      "another:\n" +
+                      "  property: value",
             required = false)
     @Nullable
     String fileContents;
@@ -129,7 +132,9 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
     private String getYamlContents(ExecutionContext ctx) {
         @Language("yml") String yamlContents = fileContents;
         if (yamlContents == null && fileContentsUrl != null) {
-            yamlContents = Remote.builder(Paths.get(relativeFileName), URI.create(fileContentsUrl)).build().printAll(ctx);
+            yamlContents = Remote.builder(Paths.get(relativeFileName))
+                    .build(URI.create(fileContentsUrl))
+                    .printAll(ctx);
         }
         return yamlContents == null ? "" : yamlContents;
     }

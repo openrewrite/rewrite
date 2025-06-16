@@ -36,6 +36,19 @@ class RemoveUnusedImportsTest implements RewriteTest {
         spec.recipe(new RemoveUnusedImports());
     }
 
+    @DocumentExample
+    @Test
+    void removeNamedImport() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              class A {}
+              """,
+            "class A {}")
+        );
+    }
+
     @Test
     void enumsFromInnerClass() {
         rewriteRun(
@@ -153,19 +166,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
               }
               """
           )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void removeNamedImport() {
-        rewriteRun(
-          java(
-            """
-              import java.util.List;
-              class A {}
-              """,
-            "class A {}")
         );
     }
 
@@ -1749,7 +1749,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
                     B9 b9 = r.theOther9();
                   }
               }
-              """));
+              """
+          ));
     }
 
     @Test
@@ -2063,6 +2064,57 @@ class RemoveUnusedImportsTest implements RewriteTest {
               
               public class Foo {
                   A method(A.B ab, A.C ac) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5498")
+    void javaUtilMapEntry() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+
+              public class Usages {
+                  HashMap<String, String> hashMap;
+                  Map<String, String> map;
+                  Optional<String> optional;
+                  Map.Entry<String, String> favoriteEntry;
+              }
+              """,
+            """
+              import java.util.HashMap;
+              import java.util.Map;
+              import java.util.Optional;
+                      
+              public class Usages {
+                  HashMap<String, String> hashMap;
+                  Map<String, String> map;
+                  Optional<String> optional;
+                  Map.Entry<String, String> favoriteEntry;
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.*;
+
+              public class WithoutMap {
+                  Optional<String> optional;
+                  Map.Entry<String, String> favoriteEntry;
+              }
+              """,
+            """
+              import java.util.Map;
+              import java.util.Optional;
+                      
+              public class WithoutMap {
+                  Optional<String> optional;
+                  Map.Entry<String, String> favoriteEntry;
               }
               """
           )

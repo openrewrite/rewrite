@@ -62,11 +62,13 @@ public class Plugin {
     @Value
     public static class Execution {
 
+        @Nullable
         String id;
 
         @Nullable
         List<String> goals;
 
+        @Nullable
         String phase;
 
         @Nullable

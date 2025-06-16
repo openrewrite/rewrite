@@ -100,4 +100,30 @@ class SwitchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multipleSwitchStatements() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void test(int i) {
+                      switch (i) {
+                          case 1:
+                              System.out.println("1");
+                          default:
+                              throw new IllegalStateException("Unexpected value: " + i);
+                      }
+                      switch (i) {
+                          case 1:
+                              System.out.println("1");
+                          default:
+                              throw new IllegalStateException("Unexpected value: " + i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
