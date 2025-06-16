@@ -119,7 +119,7 @@ const is_expressions: string[] = [
     JS.Kind.MappedType,
     JS.Kind.NamedExports,
     JS.Kind.NamedImports,
-    JS.Kind.ObjectBindingDeclarations,
+    JS.Kind.ObjectBindingPattern,
     JS.Kind.SatisfiesExpression,
     JS.Kind.TaggedTemplateExpression,
     JS.Kind.TemplateExpression,

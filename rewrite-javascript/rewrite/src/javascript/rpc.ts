@@ -212,13 +212,13 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return mappedTypeParameter;
     }
 
-    override async visitObjectBindingDeclarations(objectBindingDeclarations: JS.ObjectBindingDeclarations, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(objectBindingDeclarations, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
-        await q.getAndSendList(objectBindingDeclarations, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(objectBindingDeclarations, el => el.typeExpression, el => this.visit(el, q));
-        await q.getAndSend(objectBindingDeclarations, el => el.bindings, el => this.visitContainer(el, q));
-        await q.getAndSend(objectBindingDeclarations, el => el.initializer, el => this.visitLeftPadded(el, q));
-        return objectBindingDeclarations;
+    override async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSendList(objectBindingPattern, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
+        await q.getAndSendList(objectBindingPattern, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        await q.getAndSend(objectBindingPattern, el => el.typeExpression, el => this.visit(el, q));
+        await q.getAndSend(objectBindingPattern, el => el.bindings, el => this.visitContainer(el, q));
+        await q.getAndSend(objectBindingPattern, el => el.initializer, el => this.visitLeftPadded(el, q));
+        return objectBindingPattern;
     }
 
     override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, q: RpcSendQueue): Promise<J | undefined> {
@@ -755,8 +755,8 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitObjectBindingDeclarations(objectBindingDeclarations: JS.ObjectBindingDeclarations, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(objectBindingDeclarations);
+    override async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(objectBindingPattern);
         draft.leadingAnnotations = await q.receiveListDefined(draft.leadingAnnotations, el => this.visitDefined<J.Annotation>(el, q));
         draft.modifiers = await q.receiveListDefined(draft.modifiers, el => this.visitDefined<J.Modifier>(el, q));
         draft.typeExpression = await q.receive(draft.typeExpression, el => this.visitDefined<TypeTree>(el, q));

@@ -1151,79 +1151,79 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
-     * Overrides the visitObjectBindingDeclarations method to compare object binding declarations.
+     * Overrides the visitObjectBindingPattern method to compare object binding declarations.
      * 
-     * @param objectBindingDeclarations The object binding declarations to visit
+     * @param objectBindingPattern The object binding declarations to visit
      * @param other The other object binding declarations to compare with
      * @returns The visited object binding declarations, or undefined if the visit was aborted
      */
-    override async visitObjectBindingDeclarations(objectBindingDeclarations: JS.ObjectBindingDeclarations, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.ObjectBindingDeclarations) {
+    override async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== JS.Kind.ObjectBindingPattern) {
             this.abort();
-            return objectBindingDeclarations;
+            return objectBindingPattern;
         }
 
-        const otherObjectBindingDeclarations = other as JS.ObjectBindingDeclarations;
+        const otherObjectBindingPattern = other as JS.ObjectBindingPattern;
 
         // Compare leading annotations
-        if (objectBindingDeclarations.leadingAnnotations.length !== otherObjectBindingDeclarations.leadingAnnotations.length) {
+        if (objectBindingPattern.leadingAnnotations.length !== otherObjectBindingPattern.leadingAnnotations.length) {
             this.abort();
-            return objectBindingDeclarations;
+            return objectBindingPattern;
         }
 
         // Visit leading annotations in lock step
-        for (let i = 0; i < objectBindingDeclarations.leadingAnnotations.length; i++) {
-            await this.visit(objectBindingDeclarations.leadingAnnotations[i], otherObjectBindingDeclarations.leadingAnnotations[i]);
-            if (!this.match) return objectBindingDeclarations;
+        for (let i = 0; i < objectBindingPattern.leadingAnnotations.length; i++) {
+            await this.visit(objectBindingPattern.leadingAnnotations[i], otherObjectBindingPattern.leadingAnnotations[i]);
+            if (!this.match) return objectBindingPattern;
         }
 
         // Compare modifiers
-        if (objectBindingDeclarations.modifiers.length !== otherObjectBindingDeclarations.modifiers.length) {
+        if (objectBindingPattern.modifiers.length !== otherObjectBindingPattern.modifiers.length) {
             this.abort();
-            return objectBindingDeclarations;
+            return objectBindingPattern;
         }
 
         // Visit modifiers in lock step
-        for (let i = 0; i < objectBindingDeclarations.modifiers.length; i++) {
-            await this.visit(objectBindingDeclarations.modifiers[i], otherObjectBindingDeclarations.modifiers[i]);
-            if (!this.match) return objectBindingDeclarations;
+        for (let i = 0; i < objectBindingPattern.modifiers.length; i++) {
+            await this.visit(objectBindingPattern.modifiers[i], otherObjectBindingPattern.modifiers[i]);
+            if (!this.match) return objectBindingPattern;
         }
 
         // Compare type expression
-        if (!!objectBindingDeclarations.typeExpression !== !!otherObjectBindingDeclarations.typeExpression) {
+        if (!!objectBindingPattern.typeExpression !== !!otherObjectBindingPattern.typeExpression) {
             this.abort();
-            return objectBindingDeclarations;
+            return objectBindingPattern;
         }
 
-        if (objectBindingDeclarations.typeExpression) {
-            await this.visit(objectBindingDeclarations.typeExpression, otherObjectBindingDeclarations.typeExpression!);
-            if (!this.match) return objectBindingDeclarations;
+        if (objectBindingPattern.typeExpression) {
+            await this.visit(objectBindingPattern.typeExpression, otherObjectBindingPattern.typeExpression!);
+            if (!this.match) return objectBindingPattern;
         }
 
         // Compare bindings
-        if (objectBindingDeclarations.bindings.elements.length !== otherObjectBindingDeclarations.bindings.elements.length) {
+        if (objectBindingPattern.bindings.elements.length !== otherObjectBindingPattern.bindings.elements.length) {
             this.abort();
-            return objectBindingDeclarations;
+            return objectBindingPattern;
         }
 
         // Visit bindings in lock step
-        for (let i = 0; i < objectBindingDeclarations.bindings.elements.length; i++) {
-            await this.visit(objectBindingDeclarations.bindings.elements[i].element, 
-                           otherObjectBindingDeclarations.bindings.elements[i].element);
-            if (!this.match) return objectBindingDeclarations;
+        for (let i = 0; i < objectBindingPattern.bindings.elements.length; i++) {
+            await this.visit(objectBindingPattern.bindings.elements[i].element,
+                           otherObjectBindingPattern.bindings.elements[i].element);
+            if (!this.match) return objectBindingPattern;
         }
 
         // Compare initializer
-        if (!!objectBindingDeclarations.initializer !== !!otherObjectBindingDeclarations.initializer) {
+        if (!!objectBindingPattern.initializer !== !!otherObjectBindingPattern.initializer) {
             this.abort();
-            return objectBindingDeclarations;
+            return objectBindingPattern;
         }
 
-        if (objectBindingDeclarations.initializer) {
-            await this.visit(objectBindingDeclarations.initializer.element, otherObjectBindingDeclarations.initializer!.element);
+        if (objectBindingPattern.initializer) {
+            await this.visit(objectBindingPattern.initializer.element, otherObjectBindingPattern.initializer!.element);
         }
 
-        return objectBindingDeclarations;
+        return objectBindingPattern;
     }
 
     /**

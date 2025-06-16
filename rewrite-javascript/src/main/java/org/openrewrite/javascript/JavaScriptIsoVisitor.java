@@ -218,8 +218,8 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.ObjectBindingDeclarations visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, P p) {
-        return (JS.ObjectBindingDeclarations) super.visitObjectBindingDeclarations(objectBindingDeclarations, p);
+    public JS.ObjectBindingPattern visitObjectBindingPattern(JS.ObjectBindingPattern objectBindingPattern, P p) {
+        return (JS.ObjectBindingPattern) super.visitObjectBindingPattern(objectBindingPattern, p);
     }
 
     @Override
