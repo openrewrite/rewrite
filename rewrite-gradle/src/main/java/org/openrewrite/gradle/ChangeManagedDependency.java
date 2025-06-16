@@ -102,7 +102,7 @@ public class ChangeManagedDependency extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change Gradle dependency";
+        return "Change Gradle managed dependency";
     }
 
     @Override
@@ -112,7 +112,8 @@ public class ChangeManagedDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change a Gradle dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.";
+        return "Change a Gradle managed dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.\n" +
+                "For now, only Spring Dependency Management Plugin entries are supported and no other forms of managed dependencies (yet).";
     }
 
     @Override
@@ -163,7 +164,7 @@ public class ChangeManagedDependency extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                return Traits.gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId)
+                return Traits.springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId)
                         .get(getCursor())
                         .map(dep -> dep.withGroupArtifactVersion(depMatcher, newGroupId, newArtifactId, newVersion, versionPattern, metadataFailures, ctx))
                         .map(Trait::getTree)

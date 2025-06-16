@@ -26,9 +26,9 @@ import java.util.Objects;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
-import static org.openrewrite.gradle.trait.Traits.gradleDependencyManagement;
+import static org.openrewrite.gradle.trait.Traits.springDependencyManagementPluginEntry;
 
-class GradleDependencyManagementEntryTest implements RewriteTest {
+class SpringDependencyManagementPluginEntryTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -38,7 +38,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         spec
           .beforeRecipe(withToolingApi())
           .recipe(RewriteTest.toRecipe(() ->
-            gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+            springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
               matcher, "jakarta.validation", "jakarta.validation-api", "3.0.x", null, null, ctx).getTree()
             )));
     }
@@ -161,7 +161,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         DependencyMatcher matcher = Objects.requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+            springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
               matcher, "org.openrewrite", "rewrite-core", "8.44.1", null, null, ctx).getTree()
             ))),
           buildGradle(
@@ -212,7 +212,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         DependencyMatcher matcher = Objects.requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+            springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
               matcher, "org.openrewrite", "rewrite-core", "8.44.1", null, null, ctx).getTree()
             ))),
           buildGradleKts(
@@ -383,7 +383,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         DependencyMatcher matcher = Objects.requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+            springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
               matcher, "jakarta.validation", null, null, null, null, ctx).getTree()
             ))),
           buildGradle(
@@ -446,7 +446,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         DependencyMatcher matcher = Objects.requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+            springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
               matcher, "jakarta.validation", null, null, null, null, ctx).getTree()
             ))),
           buildGradleKts(
@@ -507,7 +507,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         DependencyMatcher matcher = Objects.requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+            springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
               matcher, null, "jakarta.validation-api", null, null, null, ctx).getTree()
             ))),
           buildGradle(
@@ -570,7 +570,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         DependencyMatcher matcher = Objects.requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+            springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
               matcher, null, "jakarta.validation-api", null, null, null, ctx).getTree()
             ))),
           buildGradleKts(
@@ -631,7 +631,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         DependencyMatcher matcher = Objects.requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+            springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
               matcher, null, null, "2.0.0.Final", null, null, ctx).getTree()
             ))),
           buildGradle(
@@ -694,7 +694,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         DependencyMatcher matcher = Objects.requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+            springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
               matcher, null, null, "2.0.0.Final", null, null, ctx).getTree()
             ))),
           buildGradleKts(
@@ -755,7 +755,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         DependencyMatcher matcher = Objects.requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-              gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+              springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
                 matcher, "jakarta.validation", null, null, null, null, ctx).getTree()
               ))),
           buildGradle(
@@ -818,7 +818,7 @@ class GradleDependencyManagementEntryTest implements RewriteTest {
         DependencyMatcher matcher = Objects.requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            gradleDependencyManagement().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
+            springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId).asVisitor((dep, ctx) -> dep.withGroupArtifactVersion(
               matcher, "jakarta.validation", null, null, null, null, ctx).getTree()
             ))),
           buildGradleKts(

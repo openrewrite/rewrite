@@ -604,14 +604,14 @@ public class ChangeDependency extends Recipe {
                         assert requested != null;
                         if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
                             requested = updatedRequested.computeIfAbsent(requested, r -> {
-                                GroupArtifactVersion gav = r .getGav();
+                                GroupArtifactVersion gav = r.getGav();
                                 if (newGroupId != null) {
                                     gav = gav.withGroupId(newGroupId);
                                 }
                                 if (newArtifactId != null) {
                                     gav = gav.withArtifactId(newArtifactId);
                                 }
-                                if (gav != r .getGav()) {
+                                if (gav != r.getGav()) {
                                     r = r.withGav(gav);
                                 }
                                 return r;

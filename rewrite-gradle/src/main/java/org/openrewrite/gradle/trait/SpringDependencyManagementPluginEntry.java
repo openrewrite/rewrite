@@ -48,21 +48,21 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
-public class GradleDependencyManagementEntry implements Trait<J.MethodInvocation> {
+public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvocation> {
     Cursor cursor;
 
     String group;
     Set<String> artifacts; //As dependencySet can have multiple Entry invocations
     String version;
 
-    public GradleDependencyManagementEntry withGroupArtifactVersion(DependencyMatcher matcher, @Nullable String newGroup, @Nullable String newArtifact, @Nullable String newVersion, @Nullable String versionPattern, MavenMetadataFailures metadataFailures, ExecutionContext ctx) {
+    public SpringDependencyManagementPluginEntry withGroupArtifactVersion(DependencyMatcher matcher, @Nullable String newGroup, @Nullable String newArtifact, @Nullable String newVersion, @Nullable String versionPattern, MavenMetadataFailures metadataFailures, ExecutionContext ctx) {
         GradleProject gradleProject = getGradleProject();
         if (gradleProject == null) {
             return this;
         }
         ChangeDependencyManagementVisitor changeDependencyManagementVisitor = new ChangeDependencyManagementVisitor(gradleProject, matcher, metadataFailures, this, newGroup, newArtifact, newVersion, versionPattern);
         Cursor newCursor = new Cursor(this.cursor.getParent(), requireNonNull(changeDependencyManagementVisitor.visit(getTree(), ctx)));
-        return new GradleDependencyManagementEntry(newCursor, newGroup == null ? group : newGroup, artifacts, version);
+        return new SpringDependencyManagementPluginEntry(newCursor, newGroup == null ? group : newGroup, artifacts, version);
     }
 
     private @Nullable GradleProject getGradleProject() {
@@ -75,7 +75,7 @@ public class GradleDependencyManagementEntry implements Trait<J.MethodInvocation
         return maybeGp.orElse(null);
     }
 
-    public static class Matcher extends GradleTraitMatcher<GradleDependencyManagementEntry> {
+    public static class Matcher extends GradleTraitMatcher<SpringDependencyManagementPluginEntry> {
         private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("io.spring.gradle.dependencymanagement.dsl.DependenciesHandler dependency(..)");
         private static final MethodMatcher DEPENDENCY_SET_MATCHER = new MethodMatcher("io.spring.gradle.dependencymanagement.dsl.DependenciesHandler dependencySet(..)");
         private static final MethodMatcher IMPORTS_MATCHER = new MethodMatcher("io.spring.gradle.dependencymanagement.dsl.ImportsHandler mavenBom(..)");
@@ -97,7 +97,7 @@ public class GradleDependencyManagementEntry implements Trait<J.MethodInvocation
         }
 
         @Override
-        protected @Nullable GradleDependencyManagementEntry test(Cursor cursor) {
+        protected @Nullable SpringDependencyManagementPluginEntry test(Cursor cursor) {
             Object object = cursor.getValue();
             if (object instanceof J.MethodInvocation) {
                 J.MethodInvocation methodInvocation = (J.MethodInvocation) object;
@@ -154,7 +154,7 @@ public class GradleDependencyManagementEntry implements Trait<J.MethodInvocation
                     artifacts.add(importedBom.getArtifactId());
                 }
 
-                return new GradleDependencyManagementEntry(cursor, group, artifacts, version);
+                return new SpringDependencyManagementPluginEntry(cursor, group, artifacts, version);
             }
 
             return null;
@@ -457,7 +457,7 @@ public class GradleDependencyManagementEntry implements Trait<J.MethodInvocation
         private final GradleProject gradleProject;
         private final DependencyMatcher depMatcher;
         private final MavenMetadataFailures metadataFailures;
-        private final GradleDependencyManagementEntry dependencyManagement;
+        private final SpringDependencyManagementPluginEntry dependencyManagement;
 
         @Nullable
         private final String newGroup;

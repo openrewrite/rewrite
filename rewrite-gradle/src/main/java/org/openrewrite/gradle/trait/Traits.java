@@ -23,8 +23,8 @@ public class Traits {
         return new GradleDependency.Matcher();
     }
 
-    public static GradleDependencyManagementEntry.Matcher gradleDependencyManagement() {
-        return new GradleDependencyManagementEntry.Matcher();
+    public static SpringDependencyManagementPluginEntry.Matcher springDependencyManagementPluginEntry() {
+        return new SpringDependencyManagementPluginEntry.Matcher();
     }
 
     public static JvmTestSuite.Matcher jvmTestSuite() {
