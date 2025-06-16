@@ -17,36 +17,38 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpecs;
 
 import static org.openrewrite.java.Assertions.java;
 
 class AddCommentToMethodInvocationsTest implements RewriteTest {
     private static final String SHORT_COMMENT = " Short comment to add";
     private static final String LONG_COMMENT = " This is a very long comment to add. The comment uses multiline comments, not single line.";
-    //language=java
-    private static final SourceSpecs STUB = java(
-      """
-        package foo;
-        public class Foo {
-            public void bar(String arg) {}
-        }
-        """
-    );
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.parser(JavaParser.fromJavaVersion().dependsOn(
+          """
+            package foo;
+            public class Foo {
+                public void bar(String arg) {}
+            }
+            """
+        ));
+    }
 
     @DocumentExample
     @Test
     void addSingleLineComment() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToMethodInvocations(SHORT_COMMENT, "foo.Foo bar(..)", false)),
-          STUB,
           //language=java
           java(
             """
               import foo.Foo;
-              
-              public class Other {
+   
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       foo.bar("a");
@@ -55,8 +57,8 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       // Short comment to add
@@ -72,13 +74,12 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
     void addLongComment() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToMethodInvocations(LONG_COMMENT, "foo.Foo bar(..)", true)),
-          STUB,
           //language=java
           java(
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       foo.bar("a");
@@ -87,8 +88,8 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       /* This is a very long comment to add. The comment uses multiline comments, not single line.*/
@@ -104,13 +105,12 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
     void addMultilineComment() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToMethodInvocations("\nLine 1\nLine 2\nLine 3\n", "foo.Foo bar(..)", true)),
-          STUB,
           //language=java
           java(
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       foo.bar("a");
@@ -119,8 +119,8 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       /*
@@ -140,13 +140,12 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
     void addMultilineCommentOnSingleLine() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToMethodInvocations("\nLine 1\nLine 2\nLine 3\n", "foo.Foo bar(..)", false)),
-          STUB,
           //language=java
           java(
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       foo.bar("a");
@@ -155,8 +154,8 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       // Line 1 Line 2 Line 3\s
@@ -172,13 +171,12 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
     void addSingleLineCommentToExistingSingleLineComments() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToMethodInvocations(SHORT_COMMENT, "foo.Foo bar(..)", false)),
-          STUB,
           //language=java
           java(
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       // Existing single line comment
@@ -189,8 +187,8 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       // Existing single line comment
@@ -208,13 +206,12 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
     void addSingleLineCommentToExistingMultiLineComment() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToMethodInvocations(SHORT_COMMENT, "foo.Foo bar(..)", false)),
-          STUB,
           //language=java
           java(
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       /*
@@ -227,8 +224,8 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       /*
@@ -248,13 +245,12 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
     void addLongCommentToExistingMultiLineComment() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToMethodInvocations(LONG_COMMENT, "foo.Foo bar(..)", true)),
-          STUB,
           //language=java
           java(
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       /*
@@ -267,8 +263,8 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
-              public class Other {
+
+              class Other {
                   void method() {
                       Foo foo = new Foo();
                       /*
