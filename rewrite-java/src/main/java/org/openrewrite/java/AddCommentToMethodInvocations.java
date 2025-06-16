@@ -30,15 +30,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * This recipe adds a comment to method invocations in a Java source file. The comment can be a single line or a multiline comment.
- * <p>
- * The {@link AddCommentToMethodInvocations#comment} must be supplied and is the comment to add.
- * <p>
- * The {@link AddCommentToMethodInvocations#methodPattern} is a pattern to match methods to add the comment to.
- * <p>
- * The {@link AddCommentToMethodInvocations#isMultiline} is an optional flag (defaulted to false) to indicate if the comment is a multiline comment.
- */
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddCommentToMethodInvocations extends Recipe {
