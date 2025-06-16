@@ -102,7 +102,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void canUseAnyWildcardForArtifactId() {
+    void canUseAnyWildcardForMultipleMatchingArtifactIds() {
         rewriteRun(spec ->
             spec.recipe(new UpgradeTransitiveDependencyVersion(
               "org.apache.tomcat.embed", "*", "10.1.42", null, null, null, null, null, null, null)),
