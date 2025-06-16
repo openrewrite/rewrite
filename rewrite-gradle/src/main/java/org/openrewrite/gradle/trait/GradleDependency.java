@@ -90,8 +90,6 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             };
         }
 
-
-
         @Override
         protected @Nullable GradleDependency test(Cursor cursor) {
             Object object = cursor.getValue();
