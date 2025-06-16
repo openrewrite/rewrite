@@ -19,14 +19,20 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.internal.SnowflakeId;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
+import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.PrintStream;
+import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -36,17 +42,162 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
+/**
+ * Base class for RPC clients with thread-local context support.
+ */
 @SuppressWarnings("UnusedReturnValue")
-public class RewriteRpc {
+public class RewriteRpc implements AutoCloseable {
+
+    private static final ThreadLocal<Context> CURRENT_CONTEXT = ThreadLocal.withInitial(() -> new Context(null));
+
+    /**
+     * Gets the current RPC context for the calling thread.
+     */
+    public static Context current() {
+        return CURRENT_CONTEXT.get();
+    }
+
+    /**
+     * Immutable context that holds RPC clients keyed by their implementation class.
+     * Uses weak references to allow clients to be garbage collected.
+     * Contexts inherit values from their parent context.
+     */
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+    public static final class Context {
+
+        private final @Nullable Context parent;
+        private final Map<Class<?>, @Nullable WeakReference<?>> clients = new HashMap<>();
+        private boolean frozen;
+
+        /**
+         * Creates a context with the given RPC client.
+         * <p>
+         * If this context is frozen (already attached), returns a new mutable context
+         * with this context as parent. Otherwise, modifies this context in place.
+         *
+         * @param <T> the RPC client type (must extend RewriteRpc)
+         * @param rpc the RPC client instance to store
+         * @return this context (if mutable) or a new context (if frozen)
+         */
+        public <T extends RewriteRpc> Context withClient(T rpc) {
+            if (frozen) {
+                // Create new mutable context with this as parent
+                Context newContext = new Context(this);
+                newContext.clients.put(rpc.getClass(), new WeakReference<>(rpc));
+                return newContext;
+            } else {
+                // Mutate this context
+                this.clients.put(rpc.getClass(), new WeakReference<>(rpc));
+                return this;
+            }
+        }
+
+        /**
+         * Attaches this context to the current thread, making it the current context.
+         * Returns a Scope that must be closed to restore the previous context.
+         * <p>
+         * Use with try-with-resources for automatic cleanup:
+         * <pre>
+         * try (RewriteRpc.Scope scope = context.attach()) {
+         *     // code that uses the context
+         * }
+         * </pre>
+         *
+         * @return a Scope that restores the previous context when closed
+         */
+        public Scope attach() {
+            this.frozen = true;
+            Context previous = CURRENT_CONTEXT.get();
+            CURRENT_CONTEXT.set(this);
+            return new Scope(previous);
+        }
+
+        /**
+         * Gets the RPC client instance for the given class from this context.
+         * Searches this context and its parent contexts until a value is found.
+         *
+         * @param <T>         the client type
+         * @param clientClass the class key
+         * @return Optional containing the RPC client instance, or empty if not present or garbage collected
+         */
+        @SuppressWarnings("unchecked")
+        public <T extends RewriteRpc> Optional<T> get(Class<T> clientClass) {
+            Context current = this;
+
+            while (current != null) {
+                WeakReference<?> ref = current.clients.get(clientClass);
+                if (ref != null) {
+                    Object client = ref.get();
+                    if (client != null) {
+                        return Optional.of((T) client);
+                    } else {
+                        // Clean up the dead reference if this is the current thread's context
+                        current.cleanupDeadReference(clientClass);
+                    }
+                }
+                current = current.parent;
+            }
+
+            return Optional.empty();
+        }
+
+        /**
+         * Gets the RPC client instance for the given class, throwing if not present.
+         *
+         * @param <T>      the client type
+         * @param rpcClass the class key
+         * @return the RPC client instance
+         * @throws IllegalStateException if no client is present or was garbage collected
+         */
+        public <T extends RewriteRpc> T require(Class<T> rpcClass) {
+            return get(rpcClass).orElseThrow(() ->
+                    new IllegalStateException("No " + rpcClass.getSimpleName() +
+                            " client found in context or parent contexts (may have been garbage collected)"));
+        }
+
+        /**
+         * Cleans up a dead weak reference from this context if it's currently active.
+         * This is called automatically when a null reference is detected.
+         */
+        private void cleanupDeadReference(Class<?> clientClass) {
+            Context current = CURRENT_CONTEXT.get();
+            if (current == this) {
+                // Only clean up if this context is currently active
+                WeakReference<?> ref = this.clients.get(clientClass);
+                if (ref != null && ref.get() == null) {
+                    this.clients.remove(clientClass);
+                }
+            }
+        }
+    }
+
+    /**
+     * A scope that restores the previous context when closed.
+     * Designed to be used with try-with-resources.
+     */
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+    public static final class Scope implements AutoCloseable {
+
+        private final Context previous;
+
+        @Override
+        public void close() {
+            CURRENT_CONTEXT.set(previous);
+        }
+    }
+
     private final JsonRpc jsonRpc;
 
-    private final AtomicInteger batchSize = new AtomicInteger(10);
+    private final AtomicInteger batchSize = new AtomicInteger(100);
     private Duration timeout = Duration.ofMinutes(1);
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
     private @Nullable PrintStream logFile;
@@ -123,6 +274,11 @@ public class RewriteRpc {
     public RewriteRpc timeout(Duration timeout) {
         this.timeout = timeout;
         return this;
+    }
+
+    @Override
+    public void close() {
+        shutdown();
     }
 
     public void shutdown() {
@@ -204,32 +360,100 @@ public class RewriteRpc {
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
     }
 
-    public List<SourceFile> parse(String parser, Iterable<Parser.Input> inputs, @Nullable Path relativeTo) {
+    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo, Parser parser, ExecutionContext ctx) {
+        List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
+            inputList.add(input);
             if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
-                mappedInputs.add(new Parse.StringInput(input.getSource(new InMemoryExecutionContext()).readFully(), input.getPath()));
+                mappedInputs.add(new Parse.StringInput(input.getSource(ctx).readFully(), input.getPath()));
             } else {
                 mappedInputs.add(new Parse.PathInput(input.getPath()));
             }
         }
 
-        List<String> parsed = send("Parse", new Parse(parser, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
-        if (!parsed.isEmpty()) {
-            return parsed.stream()
-                    .map(this::<SourceFile>getObject)
-                    .collect(Collectors.toList());
+        if (inputList.isEmpty()) {
+            return Stream.of();
         }
-        return emptyList();
+
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+        parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputList.size()));
+
+        String parseId = SnowflakeId.generateId();
+
+        return StreamSupport.stream(new Spliterator<SourceFile>() {
+            private int index = 0;
+            private @Nullable List<String> currentBatch;
+            private int batchIndex = 0;
+            private boolean isFirstCall = true;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                // Get next batch if needed
+                if (currentBatch == null || batchIndex >= currentBatch.size()) {
+                    // FIXME handle `TimeoutException` gracefully
+                    if (isFirstCall) {
+                        // First call with actual inputs
+                        currentBatch = send("Parse", new Parse(parseId, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+                        isFirstCall = false;
+                    } else {
+                        currentBatch = send("Parse", new Parse(parseId, emptyList(), null), ParseResponse.class);
+                    }
+                    batchIndex = 0;
+
+                    // If batch is empty, we're done
+                    if (currentBatch.isEmpty()) {
+                        return false;
+                    }
+                }
+
+                // Process current item in batch
+                if (index >= inputList.size()) {
+                    return false;
+                }
+
+                Parser.Input input = inputList.get(index);
+                String id = currentBatch.get(batchIndex);
+                index++;
+                batchIndex++;
+
+                SourceFile sourceFile = null;
+                parsingListener.startedParsing(input);
+                try {
+                    sourceFile = parser.requirePrintEqualsInput(getObject(id), input, relativeTo, ctx);
+                } catch (Exception e) {
+                    sourceFile = ParseError.build(parser, input, relativeTo, ctx, e);
+                } finally {
+                    if (sourceFile != null) {
+                        action.accept(sourceFile);
+                        parsingListener.parsed(input, sourceFile);
+                    }
+                }
+                return true;
+            }
+
+            @Override
+            public @Nullable Spliterator<SourceFile> trySplit() { return null; }
+
+            @Override
+            public long estimateSize() { return inputList.size() - index; }
+
+            @Override
+            public int characteristics() { return ORDERED | SIZED | SUBSIZED; }
+        }, false);
     }
 
     public String print(SourceFile tree) {
-        return print(tree, new Cursor(null, Cursor.ROOT_VALUE));
+        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), null);
     }
 
-    public String print(Tree tree, Cursor parent) {
+    public String print(SourceFile tree, Print.@Nullable MarkerPrinter markerPrinter) {
+        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
+    }
+
+    public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
         localObjects.put(tree.getId().toString(), tree);
-        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent)), String.class);
+        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent), markerPrinter), String.class);
     }
 
     @VisibleForTesting

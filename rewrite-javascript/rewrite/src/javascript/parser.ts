@@ -74,7 +74,7 @@ export class JavaScriptParser extends Parser {
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
-    private sourceFileCache: Map<string, ts.SourceFile>;
+    private sourceFileCache?: Map<string, ts.SourceFile>;
 
     constructor(
         {
@@ -95,17 +95,17 @@ export class JavaScriptParser extends Parser {
             jsx: ts.JsxEmit.Preserve
         };
         this.styles = styles;
-        this.sourceFileCache = sourceFileCache || new Map();
+        this.sourceFileCache = sourceFileCache;
     }
 
     // noinspection JSUnusedGlobalSymbols
     reset(): this {
-        this.sourceFileCache.clear();
+        this.sourceFileCache && this.sourceFileCache.clear();
         this.oldProgram = undefined;
         return this;
     }
 
-    override async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
+    override async *parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
         const inputFiles = new Map<SourcePath, ParserInput>();
 
         // Populate inputFiles map and remove from cache if necessary
@@ -113,7 +113,7 @@ export class JavaScriptParser extends Parser {
             const sourcePath = parserInputFile(input);
             inputFiles.set(sourcePath, input);
             // Remove from cache if previously cached
-            this.sourceFileCache.delete(sourcePath);
+            this.sourceFileCache && this.sourceFileCache.delete(sourcePath);
         }
 
         // Create a new CompilerHost within parseInputs
@@ -122,7 +122,7 @@ export class JavaScriptParser extends Parser {
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
             // Check if the SourceFile is in the cache
-            let sourceFile = this.sourceFileCache.get(fileName);
+            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(fileName);
             if (sourceFile) {
                 return sourceFile;
             }
@@ -142,7 +142,7 @@ export class JavaScriptParser extends Parser {
             if (sourceText !== undefined) {
                 sourceFile = ts.createSourceFile(fileName, sourceText, languageVersion, true);
                 // Cache the SourceFile if it's a dependency
-                if (!input) {
+                if (!input && this.sourceFileCache) {
                     this.sourceFileCache.set(fileName, sourceFile);
                 }
                 return sourceFile;
@@ -171,42 +171,39 @@ export class JavaScriptParser extends Parser {
 
         const typeChecker = program.getTypeChecker();
 
-        const result: SourceFile[] = [];
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
             const sourceFile = program.getSourceFile(filePath);
             if (!sourceFile) {
-                result.push(this.error(input, new Error('Parser returned undefined')));
+                yield this.error(input, new Error('Parser returned undefined'));
                 continue;
             }
 
             if (hasFlowAnnotation(sourceFile)) {
-                result.push(this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported")));
+                yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
                 continue;
             }
 
             const syntaxErrors = checkSyntaxErrors(program, sourceFile);
             if (syntaxErrors.length > 0) {
                 let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                result.push(this.error(input, new SyntaxError(`Compiler error(s): ${errors}`)))
+                yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
                 continue;
             }
 
             try {
-                result.push(produce(
+                yield produce(
                     new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
                             draft.markers.markers = draft.markers.markers.concat(this.styles);
                         }
-                    }));
+                    });
             } catch (error) {
-                result.push(this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error)));
+                yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
             }
         }
-
-        return result;
     }
 }
 
@@ -1655,9 +1652,9 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitObjectBindingPattern(node: ts.ObjectBindingPattern): JS.ObjectBindingDeclarations {
+    visitObjectBindingPattern(node: ts.ObjectBindingPattern): JS.ObjectBindingPattern {
         return {
-            kind: JS.Kind.ObjectBindingDeclarations,
+            kind: JS.Kind.ObjectBindingPattern,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,

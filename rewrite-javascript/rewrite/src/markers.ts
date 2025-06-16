@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import {randomId, UUID} from "./uuid";
+import {asRef} from "./rpc/reference";
 
 export const MarkersKind = {
     Markers: "org.openrewrite.marker.Markers",
@@ -59,11 +60,11 @@ export function findMarker<T extends Marker>(
     );
 }
 
-export const emptyMarkers: Markers = {
+export const emptyMarkers: Markers = asRef({
     kind: MarkersKind.Markers,
     id: randomId(),
     markers: []
-}
+});
 
 export interface SearchResult extends Marker {
     readonly kind: typeof MarkersKind.SearchResult,
