@@ -46,7 +46,7 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
-        if(classDecl == null) {
+        if (classDecl == null) {
             return m;
         }
         if (methodMatcher.matches(method, classDecl)) {
@@ -69,16 +69,15 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                 );
             }
 
-            // If current access level is package-private (no modifier), add the new modifier
+            // If the current access level is package-private (no modifier), add the new modifier
             else if (currentMethodAccessLevel == null) {
                 J.Modifier mod = new J.Modifier(Tree.randomId(), Space.build(" ", emptyList()), Markers.EMPTY, null, newAccessLevel, Collections.emptyList());
                 m = m.withModifiers(ListUtils.concat(mod, m.getModifiers()));
-
-                if(method.getModifiers().isEmpty()) {
+                if (method.getModifiers().isEmpty()) {
                     J.TypeParameters typeParams = m.getPadding().getTypeParameters();
-                    if(typeParams == null) {
+                    if (typeParams == null) {
                         TypeTree returnExpr = m.getReturnTypeExpression();
-                        if(returnExpr == null) {
+                        if (returnExpr == null) {
                             m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), m.getName().getPrefix()));
                             m = m.withName(m.getName().withPrefix(Space.format(" ")));
                         } else {
@@ -89,8 +88,7 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                         m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), typeParams.getPrefix()));
                         m = m.getPadding().withTypeParameters(typeParams.withPrefix(Space.format(" ")));
                     }
-                }
-                else {
+                } else {
                     m = m.withModifiers(ListUtils.map(m.getModifiers(), (i, mod2) -> {
                         if (i == 0) {
                             return mod2.withPrefix(method.getModifiers().get(0).getPrefix());
@@ -102,37 +100,48 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                 }
             }
 
-            // If target access level is package-private (no modifier), remove the current access level modifier
+            // If the target access level is package-private (no modifier), remove the current access level modifier
             // and copy any associated comments
             else if (newAccessLevel == null) {
-                AtomicReference<Space> spaceOfRemovedModifier = new AtomicReference<>();
+                AtomicReference<@Nullable Space> spaceOfRemovedModifier = new AtomicReference<>();
 
                 List<J.Modifier> modifiers = ListUtils.map(m.getModifiers(), mod -> {
                     if (mod.getType() == currentMethodAccessLevel) {
-                        if (!mod.getPrefix().getComments().isEmpty())
+                        System.out.println("Removing " + mod);
+                        if (!mod.getPrefix().isEmpty() || !mod.getPrefix().getComments().isEmpty()) {
+                            System.out.println("Copy prefix: " + mod.getPrefix());
                             spaceOfRemovedModifier.set(mod.getPrefix());
+                        }
                         return null;
                     }
 
-                    // copy access level modifier comment to next modifier if it exists
-                    if (spaceOfRemovedModifier.get() != null) {
-                        J.Modifier nextModifier = mod.withPrefix(spaceOfRemovedModifier.get());
+                    // copy access level modifier comment to the next modifier if it exists
+                    Space prefix = spaceOfRemovedModifier.get();
+                    if (prefix != null) {
+                        System.out.println("Old prefix: " + mod.getPrefix());
+                        mod = mod.withPrefix(prefix);
                         spaceOfRemovedModifier.set(null);
-                        return nextModifier;
                     }
                     return mod;
                 });
 
                 // if no following modifier exists, add comments to method itself
-                if (spaceOfRemovedModifier.get() != null) {
-                    if (m.isConstructor())
-                        m = m.withName(m.getName().withPrefix(spaceOfRemovedModifier.get()));
-                    else
-                        m = m.withReturnTypeExpression(
-                                m.getReturnTypeExpression().withPrefix(spaceOfRemovedModifier.get())
-                        );
+                Space prefix = spaceOfRemovedModifier.get();
+                if (prefix != null) {
+                    if (m.isConstructor()) {
+                        Space space = m.getName().getPrefix().withComments(prefix.getComments()).withWhitespace(prefix.getWhitespace());
+                        m = m.withName(m.getName().withPrefix(space));
+                    } else {
+                        String whitespace = prefix.getWhitespace();// + m.getReturnTypeExpression().getPrefix().getWhitespace();
+                        J.MethodDeclaration finalM = m;
+                        List<Comment> comments = ListUtils.concatAll(ListUtils.mapLast(prefix.getComments(), it ->
+                                it.withSuffix(it.getSuffix() + finalM.getReturnTypeExpression().getPrefix().getWhitespace())
+                        ), m.getReturnTypeExpression().getPrefix().getComments());
+                        m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(Space.build(whitespace, comments)));
+                    }
                 }
-                m = maybeAutoFormat(m, m.withModifiers(modifiers), p).withBody(m.getBody());
+                m = m.withModifiers(modifiers).withBody(m.getBody());
+                //m = maybeAutoFormat(m, m.withModifiers(modifiers), p).withBody(m.getBody());
             }
         }
         return m;

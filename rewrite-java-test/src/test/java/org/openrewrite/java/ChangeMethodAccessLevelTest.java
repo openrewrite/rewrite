@@ -179,26 +179,107 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
     }
 
     @Test
+    void xx() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  final @Deprecated // comment
+                  public void aMethod(String s) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+                    
+              class A {                    
+                  final @Deprecated // comment
+                  void aMethod(String s) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void yy() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  @Deprecated final  // comment
+                  public                   /* comment */ void aMethod(String s) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+                    
+              class A {                    
+                  @Deprecated final  // comment
+                                     /* comment */ void aMethod(String s) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void zz() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  @Deprecated final  // comment
+                  public                   void aMethod(String s) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+                    
+              class A {                    
+                  @Deprecated final  // comment
+                                     void aMethod(String s) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void publicToPackagePrivateWildcard() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
           java(
             """
               package com.abc;
-                      
+              
               class A {
                   // comment
                   public A(Integer i) {
                   }
-                      
+              
                   @Deprecated // comment
                   public A(Float f) {
                   }
-                      
-                  @Deprecated // comment
+              
+                  final @Deprecated // comment
                   public void aMethod(String s) {
                   }
-                      
+              
                   // comment
                   public void aMethod(Integer i) {
                   }
@@ -216,7 +297,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   A(Float f) {
                   }
                     
-                  @Deprecated // comment
+                  final @Deprecated // comment
                   void aMethod(String s) {
                   }
                     
