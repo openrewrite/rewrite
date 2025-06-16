@@ -179,7 +179,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
     }
 
     @Test
-    void moveAnnotationAsLeadingAnnotation() {
+    void moveAnnotationAsLeadingAnnotationWhenModifierIsRemoved() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
           java(
