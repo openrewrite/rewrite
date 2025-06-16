@@ -247,13 +247,13 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, RpcReceiveQueue q) {
-        return objectBindingDeclarations
-                .withLeadingAnnotations(q.receiveList(objectBindingDeclarations.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
-                .withModifiers(q.receiveList(objectBindingDeclarations.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .withTypeExpression(q.receive(objectBindingDeclarations.getTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
-                .getPadding().withBindings(q.receive(objectBindingDeclarations.getPadding().getBindings(), el -> visitContainer(el, q)))
-                .getPadding().withInitializer(q.receive(objectBindingDeclarations.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
+    public J visitObjectBindingPattern(JS.ObjectBindingPattern objectBindingPattern, RpcReceiveQueue q) {
+        return objectBindingPattern
+                .withLeadingAnnotations(q.receiveList(objectBindingPattern.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
+                .withModifiers(q.receiveList(objectBindingPattern.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
+                .withTypeExpression(q.receive(objectBindingPattern.getTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
+                .getPadding().withBindings(q.receive(objectBindingPattern.getPadding().getBindings(), el -> visitContainer(el, q)))
+                .getPadding().withInitializer(q.receive(objectBindingPattern.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
     }
 
     @Override

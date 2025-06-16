@@ -73,7 +73,7 @@ export namespace JS {
         NamedExports: "org.openrewrite.javascript.tree.JS$NamedExports",
         NamedImports: "org.openrewrite.javascript.tree.JS$NamedImports",
         NamespaceDeclaration: "org.openrewrite.javascript.tree.JS$NamespaceDeclaration",
-        ObjectBindingDeclarations: "org.openrewrite.javascript.tree.JS$ObjectBindingDeclarations",
+        ObjectBindingPattern: "org.openrewrite.javascript.tree.JS$ObjectBindingPattern",
         PropertyAssignment: "org.openrewrite.javascript.tree.JS$PropertyAssignment",
         SatisfiesExpression: "org.openrewrite.javascript.tree.JS$SatisfiesExpression",
         ScopedVariableDeclarations: "org.openrewrite.javascript.tree.JS$ScopedVariableDeclarations",
@@ -373,8 +373,8 @@ export namespace JS {
      * Represents object destructuring patterns.
      * @example const { a, b } = obj;
      */
-    export interface ObjectBindingDeclarations extends JS, Expression, TypedTree, VariableDeclarator {
-        readonly kind: typeof Kind.ObjectBindingDeclarations;
+    export interface ObjectBindingPattern extends JS, Expression, TypedTree, VariableDeclarator {
+        readonly kind: typeof Kind.ObjectBindingPattern;
         readonly leadingAnnotations: J.Annotation[];
         readonly modifiers: J.Modifier[];
         readonly typeExpression?: TypeTree;
