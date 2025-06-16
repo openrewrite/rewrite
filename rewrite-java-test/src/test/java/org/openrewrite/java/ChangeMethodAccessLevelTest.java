@@ -179,7 +179,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
     }
 
     @Test
-    void xx() {
+    void moveAnnotationAsLeadingAnnotation() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
           java(
@@ -187,17 +187,17 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
               package com.abc;
               
               class A {
-                  final @Deprecated // comment
-                  public void aMethod(String s) {
+                  final /* X */ @Deprecated // comment
+                  public @jdk.jfr.Name("A") void aMethod(String s) {
                   }
               }
               """,
             """
               package com.abc;
-                    
-              class A {                    
-                  final @Deprecated // comment
-                  void aMethod(String s) {
+              
+              class A {
+                  /* X */ @Deprecated final // comment
+                  @jdk.jfr.Name("A") void aMethod(String s) {
                   }
               }
               """
@@ -224,7 +224,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                     
               class A {                    
                   @Deprecated final  // comment
-                                     /* comment */ void aMethod(String s) {
+                  /* comment */ void aMethod(String s) {
                   }
               }
               """

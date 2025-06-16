@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static java.lang.String.format;
 import static java.util.Collections.emptyList;
+import static org.openrewrite.internal.ListUtils.concatAll;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -104,13 +105,16 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
             // and copy any associated comments
             else if (newAccessLevel == null) {
                 AtomicReference<@Nullable Space> spaceOfRemovedModifier = new AtomicReference<>();
+                AtomicReference<List<J.Annotation>> annotationsOfRemovedModifier = new AtomicReference<>();
 
                 List<J.Modifier> modifiers = ListUtils.map(m.getModifiers(), mod -> {
                     if (mod.getType() == currentMethodAccessLevel) {
                         System.out.println("Removing " + mod);
                         if (!mod.getPrefix().isEmpty() || !mod.getPrefix().getComments().isEmpty()) {
                             System.out.println("Copy prefix: " + mod.getPrefix());
+                            System.out.println("Copy annotations: " + mod.getAnnotations());
                             spaceOfRemovedModifier.set(mod.getPrefix());
+                            annotationsOfRemovedModifier.set(mod.getAnnotations());
                         }
                         return null;
                     }
@@ -125,23 +129,33 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                     return mod;
                 });
 
-                // if no following modifier exists, add comments to method itself
+                // if no following modifier exists, add comments to the method itself
                 Space prefix = spaceOfRemovedModifier.get();
                 if (prefix != null) {
+                    String whitespace = prefix.getWhitespace();
                     if (m.isConstructor()) {
-                        Space space = m.getName().getPrefix().withComments(prefix.getComments()).withWhitespace(prefix.getWhitespace());
-                        m = m.withName(m.getName().withPrefix(space));
+                        List<Comment> comments = concatAll(prefix.getComments(), m.getName().getComments());
+                        m = m.withName(m.getName().withPrefix(Space.build(whitespace, comments)));
                     } else {
-                        String whitespace = prefix.getWhitespace();// + m.getReturnTypeExpression().getPrefix().getWhitespace();
-                        J.MethodDeclaration finalM = m;
-                        List<Comment> comments = ListUtils.concatAll(ListUtils.mapLast(prefix.getComments(), it ->
-                                it.withSuffix(it.getSuffix() + finalM.getReturnTypeExpression().getPrefix().getWhitespace())
-                        ), m.getReturnTypeExpression().getPrefix().getComments());
-                        m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(Space.build(whitespace, comments)));
+                        TypeTree returnTypeExpression = m.getReturnTypeExpression();
+                        List<Comment> comments = concatAll(prefix.getComments(), returnTypeExpression.getPrefix().getComments());
+                        m = m.withReturnTypeExpression(returnTypeExpression.withPrefix(Space.build(whitespace, comments)));
+                    }
+
+                    AtomicReference<@Nullable String> annWhitespace = new AtomicReference<>();
+                    m = m.withLeadingAnnotations(ListUtils.concatAll(
+                            m.getLeadingAnnotations(),
+                            ListUtils.mapFirst(annotationsOfRemovedModifier.get(), it -> {
+                                annWhitespace.set(it.getPrefix().getWhitespace());
+                                return it.withPrefix(it.getPrefix().withWhitespace(""));
+                            }))
+                    );
+                    if (!annotationsOfRemovedModifier.get().isEmpty()) {
+                        modifiers = ListUtils.mapFirst(modifiers, it -> it.withPrefix(it.getPrefix().withWhitespace(annWhitespace.get() + it.getPrefix().getWhitespace())));
                     }
                 }
                 m = m.withModifiers(modifiers).withBody(m.getBody());
-                //m = maybeAutoFormat(m, m.withModifiers(modifiers), p).withBody(m.getBody());
+                m = maybeAutoFormat(m, m.withModifiers(modifiers), p).withBody(m.getBody());
             }
         }
         return m;
