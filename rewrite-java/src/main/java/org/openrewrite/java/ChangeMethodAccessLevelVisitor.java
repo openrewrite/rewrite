@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
@@ -28,14 +29,19 @@ import org.openrewrite.marker.Markers;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
 import static java.lang.String.format;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.sort;
 import static org.openrewrite.internal.ListUtils.concatAll;
+import static org.openrewrite.internal.ListUtils.mapLast;
+import static org.openrewrite.internal.StringUtils.hasLineBreak;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
     private static final Collection<J.Modifier.Type> EXPLICIT_ACCESS_LEVELS = Arrays.asList(J.Modifier.Type.Public,
             J.Modifier.Type.Private, J.Modifier.Type.Protected);
 
@@ -109,10 +115,7 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
 
                 List<J.Modifier> modifiers = ListUtils.map(m.getModifiers(), mod -> {
                     if (mod.getType() == currentMethodAccessLevel) {
-                        System.out.println("Removing " + mod);
                         if (!mod.getPrefix().isEmpty() || !mod.getPrefix().getComments().isEmpty()) {
-                            System.out.println("Copy prefix: " + mod.getPrefix());
-                            System.out.println("Copy annotations: " + mod.getAnnotations());
                             spaceOfRemovedModifier.set(mod.getPrefix());
                             annotationsOfRemovedModifier.set(mod.getAnnotations());
                         }
@@ -122,8 +125,8 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                     // copy access level modifier comment to the next modifier if it exists
                     Space prefix = spaceOfRemovedModifier.get();
                     if (prefix != null) {
-                        System.out.println("Old prefix: " + mod.getPrefix());
-                        mod = mod.withPrefix(prefix);
+                        List<Comment> comments = concatAll(prefix.getComments(), mod.getComments());
+                        mod = mod.withPrefix(Space.build(prefix.getWhitespace(), comments));
                         spaceOfRemovedModifier.set(null);
                     }
                     return mod;
@@ -131,15 +134,41 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
 
                 // if no following modifier exists, add comments to the method itself
                 Space prefix = spaceOfRemovedModifier.get();
+                if (prefix == null ) {
+                    // GOAL: fix the one-off white-space
+
+                    /*
+                     if no modifier and annotations:
+                       hasLineBreak(m.getPrefix().getWhitespace())
+                     if !modifiers.isEmpty()
+                       takeLastLElement and check: hasLineBreak(<last-modifer>.getWhitespace())
+                     if !annotation.isEmpty()
+                       takeLastLElement and check: hasLineBreak(<last-ann>.getWhitespace())
+                     */
+
+
+                    /*if (hasLineBreak(m.getPrefix().getWhitespace())) {
+                        System.out.println("-----");
+                        if (m.isConstructor() && !hasLineBreak(m.getName().getPrefix().getWhitespace())) {
+                            System.out.println(m.getName().getComments());
+                            prefix = Space.EMPTY;
+                        } else if (!hasLineBreak(m.getReturnTypeExpression().getPrefix().getWhitespace())) {
+                            System.out.println(m.getReturnTypeExpression().getComments());
+                            prefix = Space.EMPTY;
+                        }
+                    }*/
+                }
+
                 if (prefix != null) {
-                    String whitespace = prefix.getWhitespace();
                     if (m.isConstructor()) {
                         List<Comment> comments = concatAll(prefix.getComments(), m.getName().getComments());
-                        m = m.withName(m.getName().withPrefix(Space.build(whitespace, comments)));
+                        m = m.withName(m.getName().withPrefix(Space.build(prefix.getWhitespace(), comments)));
                     } else {
                         TypeTree returnTypeExpression = m.getReturnTypeExpression();
                         List<Comment> comments = concatAll(prefix.getComments(), returnTypeExpression.getPrefix().getComments());
-                        m = m.withReturnTypeExpression(returnTypeExpression.withPrefix(Space.build(whitespace, comments)));
+                        System.out.println("Method: " + m);
+                        System.out.println("<" + returnTypeExpression.getPrefix().getWhitespace() + ">");
+                        m = m.withReturnTypeExpression(returnTypeExpression.withPrefix(Space.build(prefix.getWhitespace(), comments)));
                     }
 
                     AtomicReference<@Nullable String> annWhitespace = new AtomicReference<>();
@@ -150,12 +179,21 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                                 return it.withPrefix(it.getPrefix().withWhitespace(""));
                             }))
                     );
-                    if (!annotationsOfRemovedModifier.get().isEmpty()) {
+                    /*if (!annotationsOfRemovedModifier.get().isEmpty()) {
                         modifiers = ListUtils.mapFirst(modifiers, it -> it.withPrefix(it.getPrefix().withWhitespace(annWhitespace.get() + it.getPrefix().getWhitespace())));
-                    }
+                    }*/
                 }
-                m = m.withModifiers(modifiers).withBody(m.getBody());
-                m = maybeAutoFormat(m, m.withModifiers(modifiers), p).withBody(m.getBody());
+                /*} else {
+                    if (m.isConstructor()) {
+                    } else {
+                        TypeTree returnTypeExpression = m.getReturnTypeExpression();
+                        System.out.println("Method: " + m);
+                        System.out.println("<" +  returnTypeExpression.getPrefix().getWhitespace() + ">");
+                        //m = m.withReturnTypeExpression(returnTypeExpression.withPrefix(Space.build(prefix.getWhitespace(), comments)));
+                    }
+                }*/
+                m = m.withModifiers(modifiers);
+                //m = maybeAutoFormat(m, m.withModifiers(modifiers), p).withBody(m.getBody());
             }
         }
         return m;

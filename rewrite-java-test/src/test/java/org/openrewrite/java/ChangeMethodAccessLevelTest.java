@@ -155,22 +155,51 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
               """,
             """
               package com.abc;
-                    
+              
               class A {
                   @SuppressWarnings("ALL") // comment
                   void aMethod(String s) {
                   }
-                    
+              
                   // comment
                   @SuppressWarnings("ALL")
                   void aMethod() {
                   }
-                    
+              
                   // comment
                   void aMethod(Integer i) {
                   }
-                    
+              
                   void aMethod(Double i) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void xxxxxx() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  // comment
+                  @Deprecated protected static void aMethod(Double d) {
+                      System.out.print (  "foo");
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  // comment
+                  @Deprecated static void aMethod(Double d) {
+                      System.out.print (  "foo");
                   }
               }
               """
@@ -195,7 +224,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   public A(Float f) {
                   }
               
-                  final @Deprecated // comment
+                  @Deprecated // comment
                   public void aMethod(String s) {
                   }
               
@@ -216,7 +245,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   A(Float f) {
                   }
                     
-                  final @Deprecated // comment
+                  @Deprecated // comment
                   void aMethod(String s) {
                   }
                     
@@ -395,6 +424,13 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
         );
     }
 
+    /**
+     * WHEN A MODIFIER IS REMOVED, THE COMMENTS AND ANNOTATIONS ARE MOVED TO ANOTHER LST ELEMENT.
+     * IDEALLY, WE CHANGE AS LITTLE AS POSSIBLE.
+     * TO KEEP THE RECIPE MAINTAINABLE, WE CALL maybeAutoFormat(<method>), WHICH RESULTS IN EXTRA CLEANUP, WHICH WE TAKE FOR GRANTED.
+     * THE NEXT TESTS PROVE THIS BEHAVIOR.
+     */
+
     @Test
     void dontAutoFormatBody() {
         rewriteRun(
@@ -415,8 +451,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
 
               class A {
                   // comment
-                  @Deprecated
-                  static void aMethod(Double d) {
+                  @Deprecated static void aMethod(Double d) {
                       System.out.print (  "foo");
                   }
               }
@@ -425,12 +460,32 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
         );
     }
 
-    /**
-     * WHEN A MODIFIER IS REMOVED, THE COMMENTS AND ANNOTATIONS HAVE TO BE MOVED TO ANOTHER LST ELEMENT.
-     * IDEALLY, WE CHANGE AS LITTLE AS POSSIBLE.
-     * TO KEEP THE RECIPE MAINTAINABLE, WE CALL maybeAutoFormat(<method>) WHICH RESULTS INTO EXTRA CLEANUP, WHICH WE TAKE FOR GRANTED.
-     * THE NEXT TESTS PROVE THIS BEHAVIOR.
-     */
+    @Test
+    void xx() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  // comment
+                  public @jdk.jfr.Name("A") void a(Integer i) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+              
+              class A {
+                  // comment
+                  @jdk.jfr.Name("A") void a(Integer i) {
+                  }
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void moveAnnotationAsLeadingAnnotationWhenModifierIsRemoved() {
