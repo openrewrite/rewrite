@@ -74,7 +74,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void after() {
         scope.close();
         log.close();
-        client.shutdown();
+        client.close();
     }
 
     @Override

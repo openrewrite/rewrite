@@ -205,7 +205,7 @@ public interface JS extends J {
                                 p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
                                 return tree;
                             }).orElseGet(() -> {
-                                try (RewriteRpc localRpc = JavaScriptRewriteRpc.bundledInstallation()) {
+                                try (RewriteRpc localRpc = JavaScriptRewriteRpc.bundledInstallation().build()) {
                                     Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
                                     p.append(localRpc.print(tree, cursor, mappedMarkerPrinter));
                                     return tree;

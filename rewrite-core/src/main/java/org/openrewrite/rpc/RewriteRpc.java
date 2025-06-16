@@ -43,6 +43,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -55,9 +56,24 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
  * Base class for RPC clients with thread-local context support.
  */
 @SuppressWarnings("UnusedReturnValue")
-public class RewriteRpc implements AutoCloseable {
+public abstract class RewriteRpc implements AutoCloseable {
 
     private static final ThreadLocal<Context> CURRENT_CONTEXT = ThreadLocal.withInitial(() -> new Context(null));
+
+    public static Builder<?> from(Supplier<JsonRpc> jsonRpc) {
+        //noinspection rawtypes
+        return new Builder() {
+            @Override
+            public RewriteRpc build() {
+                return new RewriteRpc(Objects.requireNonNull(marketplace), batchSize, timeout) {
+                    @Override
+                    protected JsonRpc createJsonRpc() {
+                        return jsonRpc.get();
+                    }
+                };
+            }
+        };
+    }
 
     /**
      * Gets the current RPC context for the calling thread.
@@ -195,10 +211,37 @@ public class RewriteRpc implements AutoCloseable {
         }
     }
 
-    private final JsonRpc jsonRpc;
+    public abstract static class Builder<T extends Builder<T>> {
+        protected Environment marketplace = Environment.builder().build();
+        protected Duration timeout = Duration.ofMinutes(1);
+        protected int batchSize = 100;
+
+        public T marketplace(Environment marketplace) {
+            this.marketplace = marketplace;
+            //noinspection unchecked
+            return (T) this;
+        }
+
+        public T timeout(Duration timeout) {
+            this.timeout = timeout;
+            //noinspection unchecked
+            return (T) this;
+        }
+
+        public T batchSize(int batchSize) {
+            this.batchSize = batchSize;
+            //noinspection unchecked
+            return (T) this;
+        }
+
+        public abstract RewriteRpc build();
+    }
+
+    private final Environment marketplace;
+    private @Nullable JsonRpc jsonRpc;
 
     private final AtomicInteger batchSize = new AtomicInteger(100);
-    private Duration timeout = Duration.ofMinutes(1);
+    private final Duration timeout;
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
     private @Nullable PrintStream logFile;
 
@@ -220,46 +263,50 @@ public class RewriteRpc implements AutoCloseable {
     /**
      * Creates a new RPC interface that can be used to communicate with a remote.
      *
-     * @param jsonRpc     The JSON-RPC connection to the remote peer.
      * @param marketplace The marketplace of recipes that this peer makes available.
      *                    Even if this peer is the host process, configuring this
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
      */
-    public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
-        this.jsonRpc = jsonRpc;
-
-        Map<String, Recipe> preparedRecipes = new HashMap<>();
-        Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
-
-        jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes, recipeCursors,
-                this::getObject, this::getCursor));
-        jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
-                this::getObject));
-        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, traceSendPackets));
-        jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
-            @Override
-            protected Object handle(Void noParams) {
-                return marketplace.listRecipeDescriptors();
-            }
-        });
-        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes));
-        jsonRpc.rpc("Print", new JsonRpcMethod<Print>() {
-            @Override
-            protected Object handle(Print request) {
-                Tree tree = getObject(request.getTreeId());
-                Cursor cursor = getCursor(request.getCursor());
-                return tree.print(new Cursor(cursor, tree));
-            }
-        });
-
-        jsonRpc.bind();
-    }
-
-    public RewriteRpc batchSize(int batchSize) {
+    protected RewriteRpc(Environment marketplace, int batchSize, Duration timeout) {
+        this.marketplace = marketplace;
         this.batchSize.set(batchSize);
-        return this;
+        this.timeout = timeout;
     }
+
+    private void ensureInitialized() {
+        if (jsonRpc == null) {
+            jsonRpc = createJsonRpc();
+
+            Map<String, Recipe> preparedRecipes = new HashMap<>();
+            Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
+
+            jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes, recipeCursors,
+                    this::getObject, this::getCursor));
+            jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
+                    this::getObject));
+            jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, traceSendPackets));
+            jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
+                @Override
+                protected Object handle(Void noParams) {
+                    return marketplace.listRecipeDescriptors();
+                }
+            });
+            jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes));
+            jsonRpc.rpc("Print", new JsonRpcMethod<Print>() {
+                @Override
+                protected Object handle(Print request) {
+                    Tree tree = getObject(request.getTreeId());
+                    Cursor cursor = getCursor(request.getCursor());
+                    return tree.print(new Cursor(cursor, tree));
+                }
+            });
+
+            jsonRpc.bind();
+        }
+    }
+
+    protected abstract JsonRpc createJsonRpc();
 
     public RewriteRpc traceGetObjectOutput() {
         this.traceSendPackets.set(true);
@@ -271,18 +318,11 @@ public class RewriteRpc implements AutoCloseable {
         return this;
     }
 
-    public RewriteRpc timeout(Duration timeout) {
-        this.timeout = timeout;
-        return this;
-    }
-
     @Override
     public void close() {
-        shutdown();
-    }
-
-    public void shutdown() {
-        jsonRpc.shutdown();
+        if (jsonRpc != null) {
+            jsonRpc.shutdown();
+        }
     }
 
     public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p) {
@@ -474,6 +514,7 @@ public class RewriteRpc implements AutoCloseable {
 
     @VisibleForTesting
     public <T> T getObject(String id) {
+        ensureInitialized();
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
                 new GetObject(id), GetObjectResponse.class));
         Object remoteObject = q.receive(localObjects.get(id), null);
@@ -489,6 +530,7 @@ public class RewriteRpc implements AutoCloseable {
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
+        ensureInitialized();
         try {
             // TODO handle error
             return jsonRpc
