@@ -79,7 +79,7 @@ describe("Rewrite RPC", () => {
     ));
 
     test("parse", async () => {
-        let sourceFile = (await client.parse("javascript", [{
+        let sourceFile = (await client.parse([{
             text: "console.info('hello',)",
             sourcePath: "hello.js"
         }]))[0];

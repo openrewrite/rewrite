@@ -82,4 +82,39 @@ class GroovyParserTest implements RewriteTest {
           ));
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5296")
+    @Test
+    void anonymousClassWithNestedGenericType() {
+        rewriteRun(groovy("new ArrayList<Map<String, String>>() {}"));
+    }
+
+    @Test
+    void deeplyNestedAnonymousGeneric() {
+        rewriteRun(groovy("new HashMap<String, List<Map<Integer, String>>>() {}"));
+    }
+
+    @Test
+    void rawAnonymousClassShouldNotGetGenerics() {
+        rewriteRun(groovy("new ArrayList() {}"));
+    }
+
+    @Test
+    void inferredGenericsWithDiamondOperator() {
+        rewriteRun(groovy("new ArrayList<>() {}"));
+    }
+
+    @Test
+    void nestedAnonymousWithGenerics() {
+        rewriteRun(
+          groovy(
+            """
+              new HashMap<String, List<String>>() {
+                  void inner() {
+                      new ArrayList<Map<Integer, String>>() {}
+                  }
+              }
+              """
+          )
+        );
+    }
 }

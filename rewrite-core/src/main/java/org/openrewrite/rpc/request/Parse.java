@@ -25,7 +25,7 @@ import java.util.List;
 @Value
 public class Parse implements RpcRequest {
 
-    String parser;
+    String id;
     List<Input> inputs;
 
     @Nullable

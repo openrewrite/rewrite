@@ -659,4 +659,29 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5329")
+    @Test
+    void arraysWithAnnotations() {
+        rewriteRun(
+          java(
+            """
+            import java.lang.annotation.ElementType;
+            import java.lang.annotation.Target;
+            
+            class A {
+               @Target({ ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
+               private static @interface C {
+               }
+               @Target({ ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
+               private static @interface B {
+               }
+
+               Comparable<@C Object @C []> specialArray1;
+               Comparable<@C Object @B []> specialArray2;
+            }
+            """
+          )
+        );
+    }
 }

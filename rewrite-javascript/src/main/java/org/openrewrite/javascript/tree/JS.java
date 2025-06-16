@@ -28,9 +28,12 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.internal.rpc.JavaScriptReceiver;
 import org.openrewrite.javascript.internal.rpc.JavaScriptSender;
+import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
+import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -172,7 +175,7 @@ public interface JS extends J {
 
         @Override
         @Transient
-        public @NonNull List<ClassDeclaration> getClasses() {
+        public List<ClassDeclaration> getClasses() {
             return statements.stream()
                     .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
@@ -181,7 +184,6 @@ public interface JS extends J {
         }
 
         @Override
-        @NonNull
         public JavaSourceFile withClasses(List<ClassDeclaration> classes) {
             // FIXME unsupported
             return this;
@@ -194,12 +196,26 @@ public interface JS extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            // FIXME decide how we will instantiate the JavaScriptRewriteRPC process to call print
-            throw new UnsupportedOperationException("TODO decide how we will instantiate the JavaScriptRewriteRPC process");
+            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
+                @Override
+                public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
+                    return RewriteRpc.current().get(JavaScriptRewriteRpc.class)
+                            .map(rpc -> {
+                                Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                                p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
+                                return tree;
+                            }).orElseGet(() -> {
+                                try (RewriteRpc localRpc = JavaScriptRewriteRpc.bundledInstallation()) {
+                                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                                    p.append(localRpc.print(tree, cursor, mappedMarkerPrinter));
+                                    return tree;
+                                }
+                            });
+                }
+            };
         }
 
         @Transient
-        @NonNull
         @Override
         public TypesInUse getTypesInUse() {
             TypesInUse cache;
@@ -1164,13 +1180,14 @@ public interface JS extends J {
         @Nullable
         ImportClause importClause;
 
+        @Nullable
         JLeftPadded<Expression> moduleSpecifier;
 
-        public Expression getModuleSpecifier() {
-            return moduleSpecifier.getElement();
+        public @Nullable Expression getModuleSpecifier() {
+            return moduleSpecifier != null ? moduleSpecifier.getElement() : null;
         }
 
-        public JS.Import withModuleSpecifier(Expression moduleSpecifier) {
+        public JS.Import withModuleSpecifier(@Nullable Expression moduleSpecifier) {
             return getPadding().withModuleSpecifier(JLeftPadded.withElement(this.moduleSpecifier, moduleSpecifier));
         }
 
@@ -1181,11 +1198,12 @@ public interface JS extends J {
 
         @Nullable
         JLeftPadded<Expression> initializer;
-        public Expression getInitializer() {
-            return initializer.getElement();
+
+        public @Nullable Expression getInitializer() {
+            return initializer != null ? initializer.getElement() : null;
         }
 
-        public JS.Import withInitializer(Expression initializer) {
+        public JS.Import withInitializer(@Nullable Expression initializer) {
             return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
         }
 
@@ -1219,15 +1237,15 @@ public interface JS extends J {
         public static class Padding {
             private final JS.Import t;
 
-            public JLeftPadded<Expression> getModuleSpecifier() {
+            public @Nullable JLeftPadded<Expression> getModuleSpecifier() {
                 return t.moduleSpecifier;
             }
 
-            public JS.Import withModuleSpecifier(JLeftPadded<Expression> moduleSpecifier) {
+            public JS.Import withModuleSpecifier(@Nullable JLeftPadded<Expression> moduleSpecifier) {
                 return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, moduleSpecifier, t.attributes, t.initializer);
             }
 
-            public JLeftPadded<Expression> getInitializer() {
+            public @Nullable JLeftPadded<Expression> getInitializer() {
                 return t.initializer;
             }
 
@@ -2154,11 +2172,11 @@ public interface JS extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ObjectBindingDeclarations implements JS, Expression, TypedTree, VariableDeclarator {
+    final class ObjectBindingPattern implements JS, Expression, TypedTree, VariableDeclarator {
 
         @Nullable
         @NonFinal
-        transient WeakReference<ObjectBindingDeclarations.Padding> padding;
+        transient WeakReference<ObjectBindingPattern.Padding> padding;
 
         @With
         @EqualsAndHashCode.Include
@@ -2203,7 +2221,7 @@ public interface JS extends J {
             return list;
         }
 
-        public ObjectBindingDeclarations withBindings(List<J> bindings) {
+        public ObjectBindingPattern withBindings(List<J> bindings) {
             return getPadding().withBindings(JContainer.withElements(this.bindings, bindings));
         }
 
@@ -2214,13 +2232,13 @@ public interface JS extends J {
             return initializer == null ? null : initializer.getElement();
         }
 
-        public ObjectBindingDeclarations withInitializer(@Nullable Expression initializer) {
+        public ObjectBindingPattern withInitializer(@Nullable Expression initializer) {
             return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
         }
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitObjectBindingDeclarations(this, p);
+            return v.visitObjectBindingPattern(this, p);
         }
 
         @Transient
@@ -2252,7 +2270,7 @@ public interface JS extends J {
 
         @SuppressWarnings("unchecked")
         @Override
-        public ObjectBindingDeclarations withType(@Nullable JavaType type) {
+        public ObjectBindingPattern withType(@Nullable JavaType type) {
             return typeExpression == null ? this :
                     withTypeExpression(typeExpression.withType(type));
         }
@@ -2261,15 +2279,15 @@ public interface JS extends J {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
 
-        public ObjectBindingDeclarations.Padding getPadding() {
-            ObjectBindingDeclarations.Padding p;
+        public ObjectBindingPattern.Padding getPadding() {
+            ObjectBindingPattern.Padding p;
             if (this.padding == null) {
-                p = new ObjectBindingDeclarations.Padding(this);
+                p = new ObjectBindingPattern.Padding(this);
                 this.padding = new WeakReference<>(p);
             } else {
                 p = this.padding.get();
                 if (p == null || p.t != this) {
-                    p = new ObjectBindingDeclarations.Padding(this);
+                    p = new ObjectBindingPattern.Padding(this);
                     this.padding = new WeakReference<>(p);
                 }
             }
@@ -2278,22 +2296,22 @@ public interface JS extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final ObjectBindingDeclarations t;
+            private final ObjectBindingPattern t;
 
             public JContainer<J> getBindings() {
                 return t.bindings;
             }
 
-            public ObjectBindingDeclarations withBindings(JContainer<J> bindings) {
-                return t.bindings == bindings ? t : new ObjectBindingDeclarations(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeExpression, bindings, t.initializer);
+            public ObjectBindingPattern withBindings(JContainer<J> bindings) {
+                return t.bindings == bindings ? t : new ObjectBindingPattern(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeExpression, bindings, t.initializer);
             }
 
             public @Nullable JLeftPadded<Expression> getInitializer() {
                 return t.initializer;
             }
 
-            public ObjectBindingDeclarations withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                return t.initializer == initializer ? t : new ObjectBindingDeclarations(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeExpression, t.bindings, initializer);
+            public ObjectBindingPattern withInitializer(@Nullable JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new ObjectBindingPattern(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeExpression, t.bindings, initializer);
             }
         }
     }
@@ -3799,8 +3817,8 @@ public interface JS extends J {
         @Override
         public String toString() {
             return "ComputedPropertyMethodDeclaration{" +
-                   (getMethodType() == null ? "unknown" : getMethodType()) +
-                   "}";
+                    (getMethodType() == null ? "unknown" : getMethodType()) +
+                    "}";
         }
 
         public ComputedPropertyMethodDeclaration.Padding getPadding() {

@@ -13,22 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Parser, ParserInput, readSourceSync} from "../parser";
-import {PlainText} from "./tree";
-import {randomId} from "../uuid";
-import {emptyMarkers} from "../markers";
 
-export class PlainTextParser extends Parser {
-    async *parse(...sourcePaths: ParserInput[]): AsyncGenerator<PlainText> {
-        for (const sourcePath of sourcePaths) {
-            yield {
-                kind: PlainText.Kind.PlainText,
-                id: randomId(),
-                markers: emptyMarkers,
-                sourcePath: this.relativePath(sourcePath),
-                text: readSourceSync(sourcePath),
-                snippets: []
-            };
-        }
-    }
+export function tap<T>(obj: T, fn: (x: T) => void) {
+    fn(obj);
 }

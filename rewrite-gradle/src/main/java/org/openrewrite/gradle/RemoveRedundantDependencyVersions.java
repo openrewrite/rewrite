@@ -51,6 +51,7 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.gradle.RemoveRedundantDependencyVersions.Comparator.*;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -119,7 +120,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
                     GradleProject gp;
                     final Map<String, List<ResolvedPom>> platforms = new HashMap<>();
-                    final List<ResolvedDependency> directDependencies = new ArrayList<>();
+                    final Map<String, List<ResolvedDependency>> directDependencies = new HashMap<>();
 
 
                     @Override
@@ -141,7 +142,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             .artifactId(artifactPattern)
                                             .get(getCursor())
                                             .ifPresent(it ->
-                                                directDependencies.add(it.getResolvedDependency()));
+                                                directDependencies.computeIfAbsent(m.getSimpleName(), k -> new ArrayList<>()).add(it.getResolvedDependency()));
 
                                     if (!m.getSimpleName().equals("platform") && !m.getSimpleName().equals("enforcedPlatform")) {
                                         return m;
@@ -213,12 +214,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                                 m.getArguments().get(0).getType() != JavaType.Primitive.String) {
                                             return m;
                                         }
-                                        //noinspection DataFlowIssue
                                         String value = (String) ((J.Literal) m.getArguments().get(0)).getValue();
                                         Dependency dependency = DependencyStringNotationConverter.parse(value);
                                         try {
-                                            Object parent = getCursor().dropParentUntil(obj -> obj instanceof J.MethodInvocation && ((J.MethodInvocation) obj).getSimpleName().equals("constraints")).getValue();
-                                            if (parent != null && shouldRemoveRedundantConstraint(dependency, gp.getConfiguration(m.getSimpleName()))) {
+                                            getCursor().dropParentUntil(obj -> obj instanceof J.MethodInvocation && ((J.MethodInvocation) obj).getSimpleName().equals("constraints")).getValue();
+                                            if (shouldRemoveRedundantConstraint(dependency, gp.getConfiguration(m.getSimpleName()))) {
                                                 return null;
                                             }
                                             return m;
@@ -246,40 +246,55 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 }
 
                                 private boolean shouldRemoveRedundantDependency(Dependency dependency, String configurationName) {
-                                    if (platforms == null || platforms.get(configurationName) == null || platforms.get(configurationName).isEmpty()) {
+                                    if ((groupPattern != null && !matchesGlob(dependency.getGroupId(), groupPattern)) ||
+                                            (artifactPattern != null && !matchesGlob(dependency.getArtifactId(), artifactPattern))) {
                                         return false;
                                     }
 
-                                    if ((groupPattern != null && !StringUtils.matchesGlob(dependency.getGroupId(), groupPattern)) ||
-                                            (artifactPattern != null && !StringUtils.matchesGlob(dependency.getArtifactId(), artifactPattern))) {
-                                        return false;
+                                    String dependencyManagedVersion = null;
+                                    if (platforms.get(configurationName) != null && !platforms.get(configurationName).isEmpty()) {
+                                        dependencyManagedVersion = platforms.get(configurationName)
+                                                .stream()
+                                                .map(e -> e.getManagedDependency(dependency.getGroupId(), dependency.getArtifactId(), null, null))
+                                                .filter(Objects::nonNull)
+                                                .map(ResolvedManagedDependency::getVersion)
+                                                .max(VERSION_COMPARATOR)
+                                                .orElse(null);
                                     }
 
-                                    String dependencyManagedVersion = platforms.get(configurationName)
-                                            .stream()
-                                            .map(e -> e.getManagedDependency(dependency.getGroupId(), dependency.getArtifactId(), null, null))
-                                            .filter(Objects::nonNull)
-                                            .map(ResolvedManagedDependency::getVersion)
-                                            .max(VERSION_COMPARATOR)
-                                            .orElse(null);
+                                    for (Map.Entry<String, List<ResolvedDependency>> entry : directDependencies.entrySet()) {
+                                        for (ResolvedDependency d : entry.getValue()) {
+                                            // ignore self
+                                            if (d.getGroupId().equals(dependency.getGroupId()) && d.getArtifactId().equals(dependency.getArtifactId())) {
+                                                continue;
+                                            }
 
-                                    for (ResolvedDependency d : directDependencies) {
-                                        //ignore self
-                                        if (d.getGroupId().equals(dependency.getGroupId()) && d.getArtifactId().equals(dependency.getArtifactId())) {
-                                            continue;
-                                        }
+                                            // noinspection ConstantConditions
+                                            if (d.getDependencies() == null) {
+                                                continue;
+                                            }
 
-                                        if (d.getDependencies() == null) {
-                                            continue;
-                                        }
-
-
-                                        ResolvedDependency resolvedDependency = d.findDependency(dependency.getGroupId(), dependency.getArtifactId());
-                                        if (resolvedDependency != null && (dependency.getVersion() == null || VERSION_COMPARATOR.compare(dependency.getVersion(), dependencyManagedVersion) <= 0)) {
-                                            return true;
+                                            ResolvedDependency resolvedDependency = d.findDependency(dependency.getGroupId(), dependency.getArtifactId());
+                                            if (resolvedDependency != null && (dependency.getVersion() == null ||
+                                                    (dependencyManagedVersion == null && matchesConfiguration(configurationName, entry.getKey()) && dependency.getVersion().equals(resolvedDependency.getVersion())) ||
+                                                    (dependencyManagedVersion != null && VERSION_COMPARATOR.compare(dependency.getVersion(), dependencyManagedVersion) <= 0))) {
+                                                return true;
+                                            }
                                         }
                                     }
                                     return false;
+                                }
+
+                                boolean matchesConfiguration(String configA, String configB) {
+                                    if (configA.equals("runtimeOnly") && configB.equals("implementation")) {
+                                        return true;
+                                    }
+                                    if (configA.equals("testRuntimeOnly")) {
+                                        if (configB.equals("testImplementation") || configB.equals("implementation")) {
+                                            return true;
+                                        }
+                                    }
+                                    return configA.equals(configB);
                                 }
 
                                 boolean shouldRemoveRedundantConstraint(@Nullable Dependency constraint, @Nullable GradleDependencyConfiguration c) {
@@ -290,8 +305,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         // https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
                                         return false;
                                     }
-                                    if ((groupPattern != null && !StringUtils.matchesGlob(constraint.getGroupId(), groupPattern)) ||
-                                            (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
+                                    if ((groupPattern != null && !matchesGlob(constraint.getGroupId(), groupPattern)) ||
+                                            (artifactPattern != null && !matchesGlob(constraint.getArtifactId(), artifactPattern))) {
                                         return false;
                                     }
 

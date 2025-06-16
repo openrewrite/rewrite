@@ -537,6 +537,85 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void removeUnmanagedDependencyIfDependencyIsLoadedTransitivelyIsExactlyTheSame() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation('org.flywaydb:flyway-sqlserver:10.10.0')
+                  runtimeOnly('org.flywaydb:flyway-core:10.10.0')
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation('org.flywaydb:flyway-sqlserver:10.10.0')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepUnmanagedDependencyIfDependencyIsLoadedTransitivelyIsDifferentVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation('org.flywaydb:flyway-sqlserver:10.10.0')
+                  runtimeOnly('org.flywaydb:flyway-core:10.11.0')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepUnmanagedDirectDependencyIfDependencyIsLoadedTransitivelyHasNoVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation('org.flywaydb:flyway-sqlserver')
+                  runtimeOnly('org.flywaydb:flyway-core')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void kotlin() {
         rewriteRun(
           buildGradleKts(

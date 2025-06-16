@@ -55,7 +55,7 @@ export abstract class Parser {
     protected ctx: ExecutionContext;
     protected readonly relativeTo?: string;
 
-    abstract parse(...sourcePaths: ParserInput[]): Promise<SourceFile[]>
+    abstract parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile>
 
     protected relativePath(sourcePath: ParserInput): string {
         const path = typeof sourcePath === "string" ? sourcePath : sourcePath.sourcePath;
