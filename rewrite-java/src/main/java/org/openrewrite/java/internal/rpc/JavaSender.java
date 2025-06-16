@@ -72,7 +72,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     @Override
     public J visitAssert(J.Assert assertStmt, RpcSendQueue q) {
         q.getAndSend(assertStmt, J.Assert::getCondition, cond -> visit(cond, q));
-        q.getAndSend(assertStmt, J.Assert::getDetail, detail -> visitLeftPadded(detail, q));
+        q.getAndSend(assertStmt, a -> a.getPadding().getDetail(), detail -> visitLeftPadded(detail, q));
         return assertStmt;
     }
 
