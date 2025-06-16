@@ -218,13 +218,13 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.ObjectBindingDeclarations visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, P p) {
-        ListUtils.map(objectBindingDeclarations.getLeadingAnnotations(), el -> visitAndValidateNonNull(el, J.Annotation.class, p));
-        ListUtils.map(objectBindingDeclarations.getModifiers(), el -> visitAndValidateNonNull(el, J.Modifier.class, p));
-        visitAndValidate(objectBindingDeclarations.getTypeExpression(), TypeTree.class, p);
-        visitAndValidate(objectBindingDeclarations.getBindings(), J.class, p);
-        visitAndValidate(objectBindingDeclarations.getInitializer(), Expression.class, p);
-        return objectBindingDeclarations;
+    public JS.ObjectBindingPattern visitObjectBindingPattern(JS.ObjectBindingPattern objectBindingPattern, P p) {
+        ListUtils.map(objectBindingPattern.getLeadingAnnotations(), el -> visitAndValidateNonNull(el, J.Annotation.class, p));
+        ListUtils.map(objectBindingPattern.getModifiers(), el -> visitAndValidateNonNull(el, J.Modifier.class, p));
+        visitAndValidate(objectBindingPattern.getTypeExpression(), TypeTree.class, p);
+        visitAndValidate(objectBindingPattern.getBindings(), J.class, p);
+        visitAndValidate(objectBindingPattern.getInitializer(), Expression.class, p);
+        return objectBindingPattern;
     }
 
     @Override

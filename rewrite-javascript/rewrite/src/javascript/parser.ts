@@ -1652,9 +1652,9 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitObjectBindingPattern(node: ts.ObjectBindingPattern): JS.ObjectBindingDeclarations {
+    visitObjectBindingPattern(node: ts.ObjectBindingPattern): JS.ObjectBindingPattern {
         return {
-            kind: JS.Kind.ObjectBindingDeclarations,
+            kind: JS.Kind.ObjectBindingPattern,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,

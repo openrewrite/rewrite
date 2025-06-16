@@ -2172,11 +2172,11 @@ public interface JS extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ObjectBindingDeclarations implements JS, Expression, TypedTree, VariableDeclarator {
+    final class ObjectBindingPattern implements JS, Expression, TypedTree, VariableDeclarator {
 
         @Nullable
         @NonFinal
-        transient WeakReference<ObjectBindingDeclarations.Padding> padding;
+        transient WeakReference<ObjectBindingPattern.Padding> padding;
 
         @With
         @EqualsAndHashCode.Include
@@ -2221,7 +2221,7 @@ public interface JS extends J {
             return list;
         }
 
-        public ObjectBindingDeclarations withBindings(List<J> bindings) {
+        public ObjectBindingPattern withBindings(List<J> bindings) {
             return getPadding().withBindings(JContainer.withElements(this.bindings, bindings));
         }
 
@@ -2232,13 +2232,13 @@ public interface JS extends J {
             return initializer == null ? null : initializer.getElement();
         }
 
-        public ObjectBindingDeclarations withInitializer(@Nullable Expression initializer) {
+        public ObjectBindingPattern withInitializer(@Nullable Expression initializer) {
             return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
         }
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitObjectBindingDeclarations(this, p);
+            return v.visitObjectBindingPattern(this, p);
         }
 
         @Transient
@@ -2270,7 +2270,7 @@ public interface JS extends J {
 
         @SuppressWarnings("unchecked")
         @Override
-        public ObjectBindingDeclarations withType(@Nullable JavaType type) {
+        public ObjectBindingPattern withType(@Nullable JavaType type) {
             return typeExpression == null ? this :
                     withTypeExpression(typeExpression.withType(type));
         }
@@ -2279,15 +2279,15 @@ public interface JS extends J {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
 
-        public ObjectBindingDeclarations.Padding getPadding() {
-            ObjectBindingDeclarations.Padding p;
+        public ObjectBindingPattern.Padding getPadding() {
+            ObjectBindingPattern.Padding p;
             if (this.padding == null) {
-                p = new ObjectBindingDeclarations.Padding(this);
+                p = new ObjectBindingPattern.Padding(this);
                 this.padding = new WeakReference<>(p);
             } else {
                 p = this.padding.get();
                 if (p == null || p.t != this) {
-                    p = new ObjectBindingDeclarations.Padding(this);
+                    p = new ObjectBindingPattern.Padding(this);
                     this.padding = new WeakReference<>(p);
                 }
             }
@@ -2296,22 +2296,22 @@ public interface JS extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final ObjectBindingDeclarations t;
+            private final ObjectBindingPattern t;
 
             public JContainer<J> getBindings() {
                 return t.bindings;
             }
 
-            public ObjectBindingDeclarations withBindings(JContainer<J> bindings) {
-                return t.bindings == bindings ? t : new ObjectBindingDeclarations(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeExpression, bindings, t.initializer);
+            public ObjectBindingPattern withBindings(JContainer<J> bindings) {
+                return t.bindings == bindings ? t : new ObjectBindingPattern(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeExpression, bindings, t.initializer);
             }
 
             public @Nullable JLeftPadded<Expression> getInitializer() {
                 return t.initializer;
             }
 
-            public ObjectBindingDeclarations withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                return t.initializer == initializer ? t : new ObjectBindingDeclarations(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeExpression, t.bindings, initializer);
+            public ObjectBindingPattern withInitializer(@Nullable JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new ObjectBindingPattern(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeExpression, t.bindings, initializer);
             }
         }
     }
