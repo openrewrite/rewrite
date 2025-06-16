@@ -18,13 +18,13 @@ import {emptySpace, Json, space} from "./tree";
 
 export class JsonParser extends Parser {
 
-    async parse(...sourcePaths: ParserInput[]): Promise<SourceFile[]> {
-        return sourcePaths.map(sourcePath => {
-            return {
+    async *parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile> {
+        for (const sourcePath of sourcePaths) {
+            yield {
                 ...new ParseJsonReader(sourcePath).parse(),
                 sourcePath: this.relativePath(sourcePath)
             };
-        });
+        }
     }
 }
 

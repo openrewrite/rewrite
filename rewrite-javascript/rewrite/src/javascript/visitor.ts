@@ -400,19 +400,19 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitObjectBindingDeclarations(objectBindingDeclarations: JS.ObjectBindingDeclarations, p: P): Promise<J | undefined> {
-        const expression = await this.visitExpression(objectBindingDeclarations, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ObjectBindingDeclarations) {
+    protected async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(objectBindingPattern, p);
+           if (!expression?.kind || expression.kind !== JS.Kind.ObjectBindingPattern) {
                return expression;
            }
-           objectBindingDeclarations = expression as JS.ObjectBindingDeclarations;
+           objectBindingPattern = expression as JS.ObjectBindingPattern;
 
-        return this.produceJavaScript<JS.ObjectBindingDeclarations>(objectBindingDeclarations, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(objectBindingDeclarations.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
-            draft.modifiers = await mapAsync(objectBindingDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.typeExpression = objectBindingDeclarations.typeExpression && await this.visitDefined<TypedTree>(objectBindingDeclarations.typeExpression, p);
-            draft.bindings = await this.visitContainer(objectBindingDeclarations.bindings, p);
-            draft.initializer = objectBindingDeclarations.initializer && await this.visitLeftPadded(objectBindingDeclarations.initializer, p);
+        return this.produceJavaScript<JS.ObjectBindingPattern>(objectBindingPattern, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(objectBindingPattern.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
+            draft.modifiers = await mapAsync(objectBindingPattern.modifiers, item => this.visitDefined<J.Modifier>(item, p));
+            draft.typeExpression = objectBindingPattern.typeExpression && await this.visitDefined<TypedTree>(objectBindingPattern.typeExpression, p);
+            draft.bindings = await this.visitContainer(objectBindingPattern.bindings, p);
+            draft.initializer = objectBindingPattern.initializer && await this.visitLeftPadded(objectBindingPattern.initializer, p);
         });
     }
 
@@ -937,8 +937,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitKeysRemapping(tree as unknown as JS.MappedType.KeysRemapping, p);
                 case JS.Kind.MappedTypeParameter:
                     return this.visitMappedTypeParameter(tree as unknown as JS.MappedType.Parameter, p);
-                case JS.Kind.ObjectBindingDeclarations:
-                    return this.visitObjectBindingDeclarations(tree as unknown as JS.ObjectBindingDeclarations, p);
+                case JS.Kind.ObjectBindingPattern:
+                    return this.visitObjectBindingPattern(tree as unknown as JS.ObjectBindingPattern, p);
                 case JS.Kind.PropertyAssignment:
                     return this.visitPropertyAssignment(tree as unknown as JS.PropertyAssignment, p);
                 case JS.Kind.SatisfiesExpression:
