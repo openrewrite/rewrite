@@ -15,6 +15,13 @@
  */
 package org.openrewrite.javascript.rpc;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
@@ -25,32 +32,55 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.Environment;
 import org.openrewrite.rpc.RewriteRpc;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
+import java.io.*;
+import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+import static java.util.Objects.requireNonNull;
 
 public class JavaScriptRewriteRpc extends RewriteRpc {
-    private final JavaScriptRewriteRpcProcess process;
+
+    private final @Nullable JavaScriptRewriteRpcProcess process;
+    private final @Nullable Closeable closeable;
 
     private JavaScriptRewriteRpc(JavaScriptRewriteRpcProcess process, Environment marketplace) {
-        super(process.getRpcClient(), marketplace);
+        super(requireNonNull(process.getRpcClient()), marketplace);
         this.process = process;
+        this.closeable = null;
     }
 
-    public static JavaScriptRewriteRpc start(Environment marketplace, String... command) {
-        JavaScriptRewriteRpcProcess process = new JavaScriptRewriteRpcProcess(command);
-        process.start();
-        return new JavaScriptRewriteRpc(process, marketplace);
+    private JavaScriptRewriteRpc(JsonRpc rpc, Closeable closeable, Environment marketplace) {
+        super(rpc, marketplace);
+        this.process = null;
+        this.closeable = closeable;
     }
 
     @Override
     public void shutdown() {
         super.shutdown();
-        process.interrupt();
-        try {
-            process.join();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+        if (process != null) {
+            process.interrupt();
+            try {
+                process.join();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (IOException ignore) {
+            }
         }
     }
 
@@ -75,16 +105,173 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         ).getRecipesInstalled();
     }
 
+    public static JavaScriptRewriteRpc bundledInstallation() {
+        return JavaScriptRewriteRpc.builder().build();
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+
+    public static class Builder {
+        private static volatile @Nullable Path bundledInstallationDirectory;
+
+        private Environment marketplace = Environment.builder().build();
+        private Path nodePath = Paths.get("node");
+        private @Nullable Path installationDirectory;
+        private int inspectPort;
+        private int port;
+        private boolean trace;
+        private @Nullable Path logFile;
+        private @Nullable Duration timeout;
+
+        private static Path getBundledInstallationDirectory() {
+            if (bundledInstallationDirectory == null) {
+                synchronized (Builder.class) {
+                    if (bundledInstallationDirectory == null) {
+                        bundledInstallationDirectory = initializeBundledInstallationDirectory();
+                    }
+                }
+            }
+            return requireNonNull(bundledInstallationDirectory);
+        }
+
+        private static Path initializeBundledInstallationDirectory() {
+            try {
+                Path tempDir = Files.createTempDirectory("javascript-rewrite-rpc");
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    try (Stream<Path> stream = Files.walk(tempDir)) {
+                        stream.sorted(Comparator.reverseOrder())
+                                .map(Path::toFile)
+                                .forEach(File::delete);
+                    } catch (IOException ignore) {
+                    }
+                }));
+
+                InputStream packageStream = JavaScriptRewriteRpc.class.getResourceAsStream("/production-package.zip");
+                if (packageStream == null) {
+                    throw new IllegalStateException("production-package.zip not found in resources");
+                }
+
+                try (ZipInputStream zipIn = new ZipInputStream(packageStream)) {
+                    ZipEntry entry;
+                    while ((entry = zipIn.getNextEntry()) != null) {
+                        if (!entry.isDirectory()) {
+                            Path outputPath = tempDir.resolve(entry.getName());
+                            Files.createDirectories(outputPath.getParent());
+                            Files.copy(zipIn, outputPath);
+                        }
+                        zipIn.closeEntry();
+                    }
+                }
+
+                return tempDir.resolve("node_modules/@openrewrite/rewrite/dist");
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        public Builder marketplace(Environment marketplace) {
+            this.marketplace = marketplace;
+            return this;
+        }
+
+        public Builder nodePath(Path nodePath) {
+            this.nodePath = nodePath;
+            return this;
+        }
+
+        public Builder installationDirectory(Path installationDirectory) {
+            this.installationDirectory = installationDirectory;
+            return this;
+        }
+
+        public Builder inspectAndBreak() {
+            return inspectAndBreak(9229);
+        }
+
+        public Builder inspectAndBreak(int port) {
+            this.inspectPort = port;
+            return this;
+        }
+
+        public Builder socket(int port) {
+            this.port = port;
+            return this;
+        }
+
+        public Builder trace(boolean trace) {
+            this.trace = trace;
+            return this;
+        }
+
+        public Builder timeout(Duration timeout) {
+            this.timeout = timeout;
+            return this;
+        }
+
+        public Builder logFile(Path logFile) {
+            this.logFile = logFile;
+            return this;
+        }
+
+        public JavaScriptRewriteRpc build() {
+            JavaScriptRewriteRpc rewriteRpc;
+            if (port != 0) {
+                Socket socket;
+                JsonRpc rpc;
+                try {
+                    socket = new Socket("127.0.0.1", port);
+                    rpc = createRpcClient(socket.getInputStream(), socket.getOutputStream(), trace);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                rewriteRpc = new JavaScriptRewriteRpc(rpc, socket, marketplace);
+            } else {
+                // Use default installation directory if none provided (lazy-loaded)
+                Path effectiveInstallationDirectory = installationDirectory != null
+                        ? installationDirectory
+                        : getBundledInstallationDirectory();
+
+                List<String> command = new ArrayList<>(Arrays.asList(
+                        nodePath.toString(),
+                        "--stack-size=4000",
+                        "--enable-source-maps"
+                ));
+                if (inspectPort != 0) {
+                    command.add("--inspect-brk=" + inspectPort);
+                }
+                command.add(effectiveInstallationDirectory.resolve("src/rpc/server.js").toString());
+
+                if (logFile != null) {
+                    command.add("--log-file=" + logFile);
+                }
+
+                JavaScriptRewriteRpcProcess process = new JavaScriptRewriteRpcProcess(trace, command.toArray(new String[0]));
+                process.start();
+                rewriteRpc = new JavaScriptRewriteRpc(process, marketplace);
+            }
+
+            if (timeout != null) {
+                rewriteRpc.timeout(timeout);
+            }
+            return rewriteRpc;
+        }
+    }
+
     private static class JavaScriptRewriteRpcProcess extends Thread {
+        private final boolean trace;
         private final String[] command;
 
         @Nullable
         private Process process;
 
         @Getter
-        private JsonRpc rpcClient;
+        private @Nullable JsonRpc rpcClient;
 
-        public JavaScriptRewriteRpcProcess(String... command) {
+        public JavaScriptRewriteRpcProcess(boolean trace, String... command) {
+            this.trace = trace;
             this.command = command;
             this.setDaemon(false);
         }
@@ -110,14 +297,35 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                     throw new RuntimeException(e);
                 }
             }
-            MessageHandler handler = new HeaderDelimitedMessageHandler(
-                    new JsonMessageFormatter(),
-                    this.process.getInputStream(),
-                    this.process.getOutputStream());
 
-            // FIXME provide an option to make tracing optional
+            this.rpcClient = createRpcClient(this.process.getInputStream(), this.process.getOutputStream(), trace);
+        }
+    }
+
+    private static JsonRpc createRpcClient(InputStream inputStream, OutputStream outputStream, boolean trace) {
+        SimpleModule module = new SimpleModule();
+        module.addSerializer(Path.class, new PathSerializer());
+        module.addDeserializer(Path.class, new PathDeserializer());
+        JsonMessageFormatter formatter = new JsonMessageFormatter(module);
+        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter, inputStream, outputStream);
+
+        if (trace)
             handler = new TraceMessageHandler("client", handler);
-            this.rpcClient = new JsonRpc(handler);
+        return new JsonRpc(handler);
+    }
+
+    private static class PathSerializer extends JsonSerializer<Path> {
+        @Override
+        public void serialize(Path path, JsonGenerator g, SerializerProvider serializerProvider) throws IOException {
+            g.writeString(path.toString());
+        }
+    }
+
+    private static class PathDeserializer extends JsonDeserializer<Path> {
+        @Override
+        public Path deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            String pathString = p.getValueAsString();
+            return Paths.get(pathString);
         }
     }
 }

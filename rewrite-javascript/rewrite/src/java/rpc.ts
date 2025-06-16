@@ -176,9 +176,9 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitForLoopControl(control: J.ForLoop.Control, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(control, c => c.init, init => this.visitRightPadded(init, q));
-        await q.getAndSend(control, c => c.condition, cond => this.visitRightPadded(cond, q));
-        await q.getAndSendList(control, c => c.update, update => this.visitRightPadded(update, q));
+        await q.getAndSendList(control, c => c.init, i => i.element.id, i => this.visitRightPadded(i, q));
+        await q.getAndSend(control, c => c.condition, c => this.visitRightPadded(c, q));
+        await q.getAndSendList(control, c => c.update, u => u.element.id, u => this.visitRightPadded(u, q));
         return control;
     }
 
@@ -400,7 +400,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitUnary(unary: J.Unary, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(unary, u => u.operator);
+        await q.getAndSend(unary, u => u.operator, op => this.visitLeftPadded(op, q));
         await q.getAndSend(unary, u => u.expression, expr => this.visit(expr, q));
         await q.getAndSend(unary, u => asRef(u.type), type => this.visitType(type, q));
         return unary;
@@ -493,12 +493,13 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSendList(method, m => m.modifiers, mod => mod.id, mod => this.visit(mod, q));
         await q.getAndSend(method, m => m.typeParameters, params => this.visit(params, q));
         await q.getAndSend(method, m => m.returnTypeExpression, type => this.visit(type, q));
-        await q.getAndSendList(method, m => m.nameAnnotations, name => this.visit(name, q));
+        await q.getAndSendList(method, m => m.nameAnnotations, a => a.id, name => this.visit(name, q));
         await q.getAndSend(method, m => m.name, name => this.visit(name, q));
         await q.getAndSend(method, m => m.parameters, params => this.visitContainer(params, q));
         await q.getAndSend(method, m => m.throws, throws => this.visitContainer(throws, q));
         await q.getAndSend(method, m => m.body, body => this.visit(body, q));
         await q.getAndSend(method, m => m.defaultValue, def => this.visitLeftPadded(def, q));
+        await q.getAndSend(method, m => asRef(m.methodType), type => this.visitType(type, q));
         return method;
     }
 
@@ -1086,7 +1087,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitUnary(unary: J.Unary, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(unary);
 
-        draft.operator = await q.receive(unary.operator);
+        draft.operator = await q.receive(unary.operator, op => this.visitLeftPadded(op, q));
         draft.expression = await q.receive(unary.expression, expr => this.visit(expr, q));
         draft.type = await q.receive(unary.type, type => this.visitType(type, q));
 
@@ -1267,6 +1268,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         draft.throws = await q.receive(method.throws, throws => this.visitContainer(throws, q));
         draft.body = await q.receive(method.body, body => this.visit(body, q));
         draft.defaultValue = await q.receive(method.defaultValue, def => this.visitLeftPadded(def, q));
+        draft.methodType = await q.receive(method.methodType, type => this.visitType(type, q) as unknown as JavaType.Method);
 
         return finishDraft(draft);
     }

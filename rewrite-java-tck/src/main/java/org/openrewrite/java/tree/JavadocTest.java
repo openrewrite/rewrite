@@ -2029,4 +2029,140 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5444")
+    void whitespaceInGenericTypesInJavadocTags() {
+        rewriteRun(
+          java(
+            """
+            import java.util.Optional;
+
+            public class Foo {
+                private void bar(Optional<String> b) {}
+
+                /**
+                 * This has an extra whitespace {@link #bar(Optional <String>)}
+                 * This has 3 extra whitespaces {@link #bar(Optional   <String>)}
+                 * This has no extra whitespace {@link #bar(Optional<String>)}
+                 */
+                public void foo() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5411")
+    void multilineHtmlCommentInJavadoc() {
+        rewriteRun(
+          java(
+            """
+              /** 
+              * First line of comment
+              * <!-- comment 
+              *   Second line of comment
+              * -->
+              * <!-- another comment -->
+              * Final comment line
+              */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5443")
+    @Test
+    void parsingIncorrectJavadocValueReference() {
+        rewriteRun(
+          spec-> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          // language=java
+          java(
+            """
+            public class Foo {
+                private static final String BAR = "bar";
+
+                /**
+                This is an incorrect reference {@value BAR}
+                */
+                public void foo() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5443")
+    @Test
+    void parsingIncorrectJavadocValueReference2() {
+        rewriteRun(
+          spec-> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          // language=java
+          java(
+            """
+            public class Foo {
+                /**
+                 * The {@value DEFAULT_TABLE_NAME} default name for the locks table in the DynamoDB.
+                 */
+                public static final String DEFAULT_TABLE_NAME = "SpringIntegrationLockRegistry";
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5196")
+    void unclosedBraceOnLink() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                 /**   
+                  * {@link int
+                  * Some other text.
+                  * See {@link java.lang.String}
+                  * @param arg description
+                  */                  
+                  void method(String arg) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    void badlyClosedXmlTags() {
+        rewriteRun(
+          java(
+            """
+            /**
+             * <!--Optional:->
+             * <urn:portalId>?</urn:portalId-->
+             */
+            class Test { }
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    void spaceStarAfterStartOfJavaDoc() {
+        rewriteRun(
+          java(
+            """
+            /** *
+             * @author x
+             */
+            class Test { }
+            """
+          )
+        );
+    }
 }

@@ -183,6 +183,15 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
                         assert resolvedPluginVersion != null;
                         acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
+                    } else if (versionArgs.get(0) instanceof J.Identifier) {
+                        J.Identifier identifier = (J.Identifier) versionArgs.get(0);
+                        String versionVariableName = identifier.getSimpleName();
+                        String resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+
+                        acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
+                        assert resolvedPluginVersion != null;
+                        acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
                     }
                 } catch (MavenDownloadingException e) {
                     // continue
@@ -249,6 +258,21 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     assert v != null;
                     return ChangeStringLiteral.withStringValue(v, resolvedVersion);
                 }));
+            }
+
+            @Override
+            public J visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+                J.VariableDeclarations.NamedVariable visited = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
+                if (acc.versionPropNameToPluginId.containsKey(visited.getSimpleName()) && visited.getInitializer() instanceof J.Literal) {
+                    J.Literal initializer = (J.Literal) visited.getInitializer();
+                    String oldVersion = literalValue(initializer);
+                    String newVersion = acc.pluginIdToNewVersion.get(acc.versionPropNameToPluginId.get(visited.getSimpleName()));
+                    if (newVersion != null && !newVersion.equals(oldVersion)) {
+                        String valueSource = initializer.getValueSource() == null || oldVersion == null ? initializer.getValueSource() : initializer.getValueSource().replace(oldVersion, newVersion);
+                        return visited.withInitializer(initializer.withValueSource(valueSource).withValue(newVersion));
+                    }
+                }
+                return visited;
             }
         };
         return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor));

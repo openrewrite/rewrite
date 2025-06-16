@@ -23,17 +23,21 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
 
 import static java.util.Collections.singletonList;
 
 @Value
 @With
-public class ParseError implements SourceFile {
+public class ParseError implements SourceFile, RpcCodec<ParseError> {
     @EqualsAndHashCode.Include
     UUID id;
 
@@ -116,5 +120,29 @@ public class ParseError implements SourceFile {
                     .orElseThrow(() -> new IllegalStateException("No ParseExceptionResult marker on parser failure"));
             return new IllegalStateException(ex.getExceptionType() + ": " + ex.getMessage());
         }
+    }
+
+    @Override
+    public void rpcSend(ParseError after, RpcSendQueue q) {
+        q.getAndSend(after, Tree::getId);
+        q.sendMarkers(after, Tree::getMarkers);
+        q.getAndSend(after, (ParseError d) -> d.getSourcePath().toString());
+        q.getAndSend(after, (ParseError d) -> d.getCharset().name());
+        q.getAndSend(after, ParseError::isCharsetBomMarked);
+        q.getAndSend(after, ParseError::getChecksum);
+        q.getAndSend(after, ParseError::getFileAttributes);
+        q.getAndSend(after, ParseError::getText);
+    }
+
+    @Override
+    public ParseError rpcReceive(ParseError t, RpcReceiveQueue q) {
+        return t.withId(q.receiveAndGet(t.getId(), UUID::fromString))
+                .withMarkers(q.receiveMarkers(t.getMarkers()))
+                .withSourcePath(q.<Path, String>receiveAndGet(t.getSourcePath(), Paths::get))
+                .withCharset(q.<Charset, String>receiveAndGet(t.getCharset(), Charset::forName))
+                .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
+                .withChecksum(q.receive(t.getChecksum()))
+                .<ParseError>withFileAttributes(q.receive(t.getFileAttributes()))
+                .withText(q.receive(t.getText()));
     }
 }

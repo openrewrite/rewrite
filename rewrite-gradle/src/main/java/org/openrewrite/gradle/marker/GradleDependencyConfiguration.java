@@ -15,6 +15,8 @@
  */
 package org.openrewrite.gradle.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
@@ -33,6 +35,7 @@ import static java.util.Collections.emptyList;
 @SuppressWarnings("unused")
 @Value
 @With
+@AllArgsConstructor(onConstructor_ = {@JsonCreator})
 public class GradleDependencyConfiguration implements Serializable {
     /**
      * The name of the dependency configuration. Unique within a given project.
@@ -44,9 +47,23 @@ public class GradleDependencyConfiguration implements Serializable {
 
     boolean isTransitive;
 
+    /**
+     * Indicates that this configuration is intended for resolving a set of dependencies into a dependency graph. A resolvable configuration should not be declarable or consumable.
+     * See <a href="https://docs.gradle.org/current/userguide/declaring_configurations.html#sec:configuration-flags-roles">Configuration flag roles</a>
+     */
     boolean isCanBeResolved;
 
+    /**
+     *  Indicates that this configuration is intended for exposing artifacts outside this project. A consumable configuration should not be declarable or resolvable.
+     *  See <a href="https://docs.gradle.org/current/userguide/declaring_configurations.html#sec:configuration-flags-roles">Configuration flag roles</a>
+     */
     boolean isCanBeConsumed;
+
+    /**
+     * Indicates that this configuration is intended for declaring dependencies. A declarable configuration should not be resolvable or consumable.
+     * See <a href="https://docs.gradle.org/current/userguide/declaring_configurations.html#sec:configuration-flags-roles">Configuration flag roles</a>
+     */
+    boolean isCanBeDeclared;
 
     /**
      * The list of zero or more configurations this configuration extends from.
@@ -88,6 +105,34 @@ public class GradleDependencyConfiguration implements Serializable {
      */
     @Nullable
     String message;
+
+    @Deprecated
+    public GradleDependencyConfiguration(
+            String name,
+            @Nullable String description,
+            boolean isTransitive,
+            boolean isCanBeResolved,
+            boolean isCanBeConsumed,
+            List<GradleDependencyConfiguration> extendsFrom,
+            List<Dependency> requested,
+            List<ResolvedDependency> directResolved,
+            @Nullable String exceptionType,
+            @Nullable String message
+    ) {
+        this.name = name;
+        this.description = description;
+        this.isTransitive = isTransitive;
+        this.isCanBeResolved = isCanBeResolved;
+        this.isCanBeConsumed = isCanBeConsumed;
+        // Introduced in Gradle 8.2, but the concept is relevant for earlier versions as well.
+        // Most of the time this means excluding "runtimeClasspath" and "compileClasspath", but not just the buildscript's "classpath"
+        this.isCanBeDeclared = !name.endsWith("Classpath");
+        this.extendsFrom = extendsFrom;
+        this.requested = requested;
+        this.directResolved = directResolved;
+        this.exceptionType = exceptionType;
+        this.message = message;
+    }
 
     /**
      * List the configurations which are extended by the given configuration.

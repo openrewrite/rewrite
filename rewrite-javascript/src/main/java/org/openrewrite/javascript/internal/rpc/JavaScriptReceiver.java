@@ -21,6 +21,7 @@ import org.openrewrite.java.internal.rpc.JavaReceiver;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.javascript.tree.JSX;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
@@ -42,13 +43,18 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public @Nullable J visit(@Nullable Tree tree, RpcReceiveQueue p) {
-        if (tree instanceof JS)
+        if (tree instanceof JS) {
             return super.visit(tree, p);
+        }
         return delegate.visit(tree, p);
     }
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
+        if (j instanceof JS.ExpressionStatement || j instanceof JS.StatementExpression) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
+            return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)));
+        }
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
@@ -57,11 +63,10 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
         return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
-                .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
+                .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<JS.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
-                .getPadding().withImports(q.receiveList(cu.getPadding().getImports(), imp -> visitRightPadded(imp, q)))
                 .getPadding().withStatements(q.receiveList(cu.getPadding().getStatements(), stmt -> visitRightPadded(stmt, q)))
                 .withEof(q.receive(cu.getEof(), space -> visitSpace(space, q)));
     }
@@ -150,7 +155,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return anImport
                 .withImportClause(q.receive(anImport.getImportClause(), el -> (JS.ImportClause) visitNonNull(el, q)))
                 .getPadding().withModuleSpecifier(q.receive(anImport.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q)))
-                .withAttributes(q.receive(anImport.getAttributes(), el -> (JS.ImportAttributes) visitNonNull(el, q)));
+                .withAttributes(q.receive(anImport.getAttributes(), el -> (JS.ImportAttributes) visitNonNull(el, q)))
+                .getPadding().withInitializer(q.receive(anImport.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
     }
 
     @Override
@@ -241,13 +247,13 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, RpcReceiveQueue q) {
-        return objectBindingDeclarations
-                .withLeadingAnnotations(q.receiveList(objectBindingDeclarations.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
-                .withModifiers(q.receiveList(objectBindingDeclarations.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .withTypeExpression(q.receive(objectBindingDeclarations.getTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
-                .getPadding().withBindings(q.receive(objectBindingDeclarations.getPadding().getBindings(), el -> visitContainer(el, q)))
-                .getPadding().withInitializer(q.receive(objectBindingDeclarations.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
+    public J visitObjectBindingPattern(JS.ObjectBindingPattern objectBindingPattern, RpcReceiveQueue q) {
+        return objectBindingPattern
+                .withLeadingAnnotations(q.receiveList(objectBindingPattern.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
+                .withModifiers(q.receiveList(objectBindingPattern.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
+                .withTypeExpression(q.receive(objectBindingPattern.getTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
+                .getPadding().withBindings(q.receive(objectBindingPattern.getPadding().getBindings(), el -> visitContainer(el, q)))
+                .getPadding().withInitializer(q.receive(objectBindingPattern.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
     }
 
     @Override
@@ -270,7 +276,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitScopedVariableDeclarations(JS.ScopedVariableDeclarations scopedVariableDeclarations, RpcReceiveQueue q) {
         return scopedVariableDeclarations
                 .withModifiers(q.receiveList(scopedVariableDeclarations.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .getPadding().withScope(q.receive(scopedVariableDeclarations.getPadding().getScope(), el -> visitLeftPadded(el, q, toEnum(JS.ScopedVariableDeclarations.Scope.class))))
                 .getPadding().withVariables(q.receiveList(scopedVariableDeclarations.getPadding().getVariables(), el -> visitRightPadded(el, q)));
     }
 
@@ -427,6 +432,45 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return withStatement
                 .withExpression(q.receive(withStatement.getExpression(), expr -> (J.ControlParentheses<Expression>) visitNonNull(expr, q)))
                 .getPadding().withBody(q.receive(withStatement.getPadding().getBody(), el -> visitRightPadded(el, q)));
+    }
+
+    @Override
+    public J visitJsxTag(JSX.Tag tag, RpcReceiveQueue q) {
+        return tag
+                .getPadding().withOpenName(q.receive(tag.getPadding().getOpenName(), name1 -> visitLeftPadded(name1, q)))
+                .withAfterName(q.receive(tag.getAfterName(), space2 -> visitSpace(space2, q)))
+                .getPadding().withAttributes(q.receiveList(tag.getPadding().getAttributes(), attr -> visitRightPadded(attr, q)))
+                .withSelfClosing(q.receive(tag.getSelfClosing(), space1 -> visitSpace(space1, q)))
+                .withChildren(q.receiveList(tag.getChildren(), child -> (Expression) visitNonNull(child, q)))
+                .getPadding().withClosingName(q.receive(tag.getPadding().getClosingName(), name -> visitLeftPadded(name, q)))
+                .withAfterClosingName(q.receive(tag.getAfterClosingName(), space -> visitSpace(space, q)));
+    }
+
+    @Override
+    public J visitJsxAttribute(JSX.Attribute attribute, RpcReceiveQueue q) {
+        return attribute
+                .withKey(q.receive(attribute.getKey(), key -> (NameTree) visitNonNull(key, q)))
+                .getPadding().withValue(q.receive(attribute.getPadding().getValue(), value -> visitLeftPadded(value, q)));
+    }
+
+    @Override
+    public J visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, RpcReceiveQueue q) {
+        return spreadAttribute
+                .withDots(q.receive(spreadAttribute.getDots(), dots -> visitSpace(dots, q)))
+                .getPadding().withExpression(q.receive(spreadAttribute.getPadding().getExpression(), expr -> visitRightPadded(expr, q)));
+    }
+
+    @Override
+    public J visitJsxEmbeddedExpression(JSX.EmbeddedExpression embeddedExpression, RpcReceiveQueue q) {
+        return embeddedExpression
+                .getPadding().withExpression(q.receive(embeddedExpression.getPadding().getExpression(), expr -> visitRightPadded(expr, q)));
+    }
+
+    @Override
+    public J visitJsxNamespacedName(JSX.NamespacedName namespacedName, RpcReceiveQueue q) {
+        return namespacedName
+                .withNamespace(q.receive(namespacedName.getNamespace(), ns -> (J.Identifier) visitNonNull(ns, q)))
+                .getPadding().withName(q.receive(namespacedName.getPadding().getName(), name -> visitLeftPadded(name, q)));
     }
 
     @Override

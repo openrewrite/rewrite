@@ -21,14 +21,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.config.Environment;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.javascript.JavaScriptParser;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.rpc.RewriteRpc;
+import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -36,8 +36,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -49,8 +49,33 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 @Disabled
 class JavaScriptRewriteRpcTest implements RewriteTest {
+
     JavaScriptRewriteRpc client;
     PrintStream log;
+    RewriteRpc.Scope scope;
+
+    @BeforeEach
+    void before() throws FileNotFoundException {
+        this.log = new PrintStream(new FileOutputStream("rpc.java.log"));
+        this.client = JavaScriptRewriteRpc.builder()
+          .nodePath(Path.of("node"))
+          .installationDirectory(Path.of("./rewrite/dist"))
+//          .inspectAndBreak()
+          .build();
+        this.scope = RewriteRpc.current().withClient(client).attach();
+
+//        client
+//          .timeout(Duration.ofMinutes(10))
+//          .traceGetObjectOutput()
+//          .traceGetObjectInput(log);
+    }
+
+    @AfterEach
+    void after() {
+        scope.close();
+        log.close();
+        client.shutdown();
+    }
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -58,28 +83,31 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           .cycles(1);
     }
 
-    @BeforeEach
-    void before() throws FileNotFoundException {
-        this.log = new PrintStream(new FileOutputStream("rpc.java.log"));
-        this.client = JavaScriptRewriteRpc.start(
-          Environment.builder().build(),
-          "node",
-          "--enable-source-maps",
-          // Uncomment this to debug the server
-//          "--inspect-brk",
-          "./rewrite/dist/src/rpc/server.js"
+    @DocumentExample
+    @Test
+    void runRecipe() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client.prepareRecipe("org.openrewrite.example.npm.change-version",
+              Map.of("version", "1.0.0")))
+            .expectedCyclesThatMakeChanges(1),
+          json(
+            """
+              {
+                "name": "my-project",
+                "version": "0.0.1"
+              }
+              """,
+            """
+              {
+                "name": "my-project",
+                "version": "1.0.0"
+              }
+              """,
+            spec -> spec.path("package.json")
+          )
         );
-
-        client.batchSize(20)
-          .timeout(Duration.ofMinutes(10))
-          .traceGetObjectOutput()
-          .traceGetObjectInput(log);
-    }
-
-    @AfterEach
-    void after() {
-        log.close();
-        client.shutdown();
     }
 
     @Test
@@ -133,8 +161,9 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         // language=javascript
         String source = "const two = 1 + 1";
 
-        SourceFile cu = client.parse("javascript", List.of(Parser.Input.fromString(
-          Paths.get("test.js"), source)), null).getFirst();
+        SourceFile cu = JavaScriptParser.builder().rewriteRpc(client).build()
+          .parseInputs(List.of(Parser.Input.fromString(
+          Paths.get("test.js"), source)), null, new InMemoryExecutionContext()).findFirst().get();
 
         new JavaIsoVisitor<Integer>() {
             @Override
@@ -159,6 +188,46 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void printFencedMarker() {
+        rewriteRun(
+          text(
+            "Hello Jon!",
+            spec -> spec.beforeRecipe(text -> {
+                text = Markup.info(text, "INFO", null);
+                String fence = "{{" + text.getMarkers().getMarkers().get(0).getId() + "}}";
+                assertThat(client.print(text, Print.MarkerPrinter.FENCED)).isEqualTo(fence + "Hello Jon!" + fence);
+            })
+          )
+        );
+    }
+
+    @Test
+    void printSanitizedMarker() {
+        rewriteRun(
+          text(
+            "Hello Jon!",
+            spec -> spec.beforeRecipe(text -> {
+                text = Markup.info(text, "INFO", null);
+                assertThat(client.print(text, Print.MarkerPrinter.SANITIZED)).isEqualTo("Hello Jon!");
+            })
+          )
+        );
+    }
+
+    @Test
+    void printDefaultMarker() {
+        rewriteRun(
+          text(
+            "Hello Jon!",
+            spec -> spec.beforeRecipe(text -> {
+                text = Markup.info(text, "INFO", null);
+                assertThat(client.print(text, Print.MarkerPrinter.DEFAULT)).isEqualTo("~~(INFO)~~>Hello Jon!");
+            })
+          )
+        );
+    }
+
+    @Test
     void printJson() {
         @Language("json")
         String packageJson = """
@@ -170,32 +239,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         rewriteRun(
           json(packageJson, spec -> spec.beforeRecipe(json ->
             assertThat(client.print(json)).isEqualTo(packageJson.trim())))
-        );
-    }
-
-    @Test
-    void runRecipe() {
-        installRecipes();
-        rewriteRun(
-          spec -> spec
-            .recipe(client.prepareRecipe("org.openrewrite.example.npm.change-version",
-              Map.of("version", "1.0.0")))
-            .expectedCyclesThatMakeChanges(1),
-          json(
-            """
-              {
-                "name": "my-project",
-                "version": "0.0.1"
-              }
-              """,
-            """
-              {
-                "name": "my-project",
-                "version": "1.0.0"
-              }
-              """,
-            spec -> spec.path("package.json")
-          )
         );
     }
 

@@ -56,10 +56,40 @@ extensions.configure<NodeExtension> {
 }
 
 val npmTest = tasks.named("npm_test")
+npmTest.configure {
+    inputs.files(fileTree("rewrite") {
+        include("*.json")
+        include("jest.config.js")
+    })
+    inputs.files(fileTree("rewrite/src"))
+    inputs.files(fileTree("rewrite/test"))
+    outputs.files("rewrite/build/test-results/jest/junit.xml")
+
+    dependsOn(tasks.named("npmInstall"))
+}
+
+tasks.register<Test>("npmTestReporting") {
+    description = "Makes Jest test results visible to Develocity"
+
+    // Don't run any JVM tests
+    enabled = true
+    testClassesDirs = files()
+    classpath = files()
+
+    // Configure where to find the Jest test results
+    reports.junitXml.outputLocation.set(file("rewrite/build/test-results/jest"))
+
+    // Always run
+    outputs.upToDateWhen { false }
+
+    // This runs after npmTest completes
+    dependsOn(npmTest)
+}
+
 tasks.check {
     dependsOn(
         tasks.named("npmInstall"),
-        npmTest
+        tasks.named("npmTestReporting"),
     )
 }
 
@@ -69,19 +99,127 @@ tasks.named("build") {
     dependsOn(npmRunBuild)
 }
 
+val npmPack = tasks.register<NpmTask>("npmPack") {
+    dependsOn(npmRunBuild, npmVersion)
+    finalizedBy(npmResetVersion)
+
+    val tempPackDir = layout.buildDirectory.dir("tmp/npm-pack").get().asFile
+
+    // Delete existing tgz files before packing
+    doFirst {
+        if (tempPackDir.exists()) {
+            tempPackDir.listFiles { _, name -> name.endsWith(".tgz") }?.forEach { file ->
+                file.delete()
+            }
+        }
+        tempPackDir.mkdirs()
+    }
+
+    args.set(listOf(
+        "pack",
+        "--pack-destination=${tempPackDir.absolutePath}"
+    ))
+    workingDir.set(file("rewrite"))
+
+    inputs.files(fileTree("rewrite/dist"))
+    inputs.files("rewrite/package.json", "rewrite/package-lock.json")
+    outputs.files(fileTree(tempPackDir) {
+        include("*.tgz")
+    })
+}
+
+val npmInitTemp by tasks.registering(NpmTask::class) {
+    val tempInstallDir = layout.buildDirectory.dir("tmp/npmInstall").get().asFile
+    args.set(listOf("init", "-y"))
+    workingDir.set(tempInstallDir)
+
+    doFirst {
+        if (tempInstallDir.exists()) {
+            tempInstallDir.deleteRecursively()
+        }
+        tempInstallDir.mkdirs()
+    }
+}
+
+val npmInstallTemp by tasks.registering(NpmTask::class) {
+    dependsOn(npmInitTemp, npmPack)
+    val tempInstallDir = layout.buildDirectory.dir("tmp/npmInstall").get().asFile
+    workingDir.set(tempInstallDir)
+
+    // Use a provider to defer evaluation until execution time
+    args.set(provider {
+        val tgzFile = npmPack.get().outputs.files.singleFile
+        listOf("install", tgzFile.absolutePath, "--omit=dev")
+    })
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDir("src/main/generated-resources")
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.named("licenseMain") {
+        dependsOn(createProductionPackage)
+    }
+}
+
+tasks.named<Jar>("sourcesJar") {
+    dependsOn("createProductionPackage")
+    exclude("production-package.zip")
+}
+
+// Creates a production-ready package; writing it to `src/main/generated-resources` so that it will be included by IDEA
+val createProductionPackage by tasks.register<Zip>("createProductionPackage") {
+    dependsOn(npmInstallTemp)
+
+    // Configure the tar output
+    archiveFileName.set("production-package.zip")
+    destinationDirectory.set(layout.projectDirectory.dir("src/main/generated-resources"))
+
+    from(layout.buildDirectory.dir("tmp/npmInstall")) {
+        // Include everything from the temp install directory
+        include("**/*")
+    }
+}
+
+// Update processResources to depend on the new task instead
+tasks.named("processResources") {
+    dependsOn(createProductionPackage)
+}
+
 tasks.named("integrationTest") {
     dependsOn(npmRunBuild)
 }
 
 val npmVersion = tasks.register("npmVersion", NpmTask::class) {
-    args.set(
-        listOf(
-            "version", project.version.toString().replace(
+    val versionProperty = "npmVersionGenerated"
+
+    args.set(provider {
+        // Check if we already generated a version for this build
+        val existingVersion = project.extensions.findByName(versionProperty) as String?
+        if (existingVersion != null) {
+            listOf("version", "--no-git-tag-version", existingVersion)
+        } else {
+            val generatedVersion = project.version.toString().replace(
                 "SNAPSHOT",
-                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd.HHmmss"))
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
             )
-        )
-    )
+            // Store the generated version for reuse
+            project.extensions.add(versionProperty, generatedVersion)
+            listOf("version", "--no-git-tag-version", generatedVersion)
+        }
+    })
+
+    workingDir.set(file("rewrite"))
+}
+
+val npmResetVersion = tasks.register<NpmTask>("npmResetVersion") {
+    args.set(listOf("version", "0.0.0", "--no-git-tag-version"))
+    workingDir.set(file("rewrite"))
 }
 
 // This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
@@ -97,10 +235,20 @@ tasks.register("setupNpmrc") {
 
 // Implicitly `--tag latest` if not specified
 val npmPublish = tasks.named<NpmTask>("npm_publish") {
-    if (!project.hasProperty("releasing")) {
-        args.set(listOf("--tag", "next"))
-    }
-    dependsOn(tasks.named("setupNpmrc"))
+    dependsOn(tasks.named("setupNpmrc"), npmRunBuild, npmVersion)
+    finalizedBy(npmResetVersion)
+
+    args.set(provider {
+        buildList {
+            add("--dry-run")
+            if (!project.hasProperty("releasing")) {
+                add("--tag")
+                add("next")
+            }
+        }
+    })
+
+    workingDir.set(file("rewrite"))
 }
 
 open class RestorePackageJson : DefaultTask() {

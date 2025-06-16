@@ -43,6 +43,10 @@ export function isTree(tree: any): tree is Tree {
     );
 }
 
+export function isScope(a: Tree, b: Tree): boolean {
+    return a !== undefined && b !== undefined && (a === b || a.id === b.id);
+}
+
 export class Cursor {
     private _messages?: Map<string | symbol, any>;
 
@@ -54,6 +58,11 @@ export class Cursor {
             this._messages = new Map<string, any>();
         }
         return this._messages;
+    }
+
+    getNearestMessage<T>(key: string): any {
+        const t = this._messages == undefined ? undefined : this._messages.get(key);
+        return t == null && this.parent != null ? this.parent.getNearestMessage<T>(key) : t;
     }
 
     asArray(): any[] {
