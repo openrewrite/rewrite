@@ -1475,7 +1475,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             """
               import org.example.Foo;
               
-              @Foo(value = "test")
+              @Foo(value = "oldValue")
               public class A {}
               """
           )
