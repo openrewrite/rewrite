@@ -388,15 +388,15 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
-    public J visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, P p) {
-        JS.ObjectBindingDeclarations o = objectBindingDeclarations;
+    public J visitObjectBindingPattern(JS.ObjectBindingPattern objectBindingPattern, P p) {
+        JS.ObjectBindingPattern o = objectBindingPattern;
         o = o.withPrefix(visitSpace(o.getPrefix(), JsSpace.Location.OBJECT_BINDING_DECLARATIONS_PREFIX, p));
         o = o.withMarkers(visitMarkers(o.getMarkers(), p));
         Expression temp = (Expression) visitExpression(o, p);
-        if (!(temp instanceof JS.ObjectBindingDeclarations)) {
+        if (!(temp instanceof JS.ObjectBindingPattern)) {
             return temp;
         } else {
-            o = (JS.ObjectBindingDeclarations) temp;
+            o = (JS.ObjectBindingPattern) temp;
         }
         o = o.withLeadingAnnotations(requireNonNull(ListUtils.map(o.getLeadingAnnotations(), a -> visitAndCast(a, p))));
         o = o.withModifiers(requireNonNull(ListUtils.map(o.getModifiers(), e -> visitAndCast(e, p))));

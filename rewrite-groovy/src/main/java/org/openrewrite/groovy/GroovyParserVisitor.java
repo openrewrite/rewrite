@@ -993,6 +993,9 @@ public class GroovyParserVisitor {
                     case "<=>":
                         gBinaryOp = G.Binary.Type.Spaceship;
                         break;
+                    case "?=":
+                        gBinaryOp = G.Binary.Type.ElvisAssignment;
+                        break;
                 }
 
                 cursor += binary.getOperation().getText().length();
@@ -1374,7 +1377,7 @@ public class GroovyParserVisitor {
                 }
 
                 skip("new");
-                TypeTree clazz = visitTypeTree(ctor.getType(), ctor.getNodeMetaData().containsKey(StaticTypesMarker.INFERRED_TYPE));
+                TypeTree clazz = visitTypeTree(ctor.getType(), isInferred(ctor));
                 JContainer<Expression> args = visit(ctor.getArguments());
                 J.Block body = null;
                 if (ctor.isUsingAnonymousInnerClass() && ctor.getType() instanceof InnerClassNode) {
@@ -2443,7 +2446,17 @@ public class GroovyParserVisitor {
 
         assert expr != null;
         if (classNode != null) {
-            if (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
+            boolean isAnonymousClassWithGenericSuper = classNode instanceof InnerClassNode
+                    && classNode.getUnresolvedSuperClass() != null
+                    && classNode.getUnresolvedSuperClass().isUsingGenerics()
+                    && !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder()
+                    && classNode.getGenericsTypes() == null;
+            if (isAnonymousClassWithGenericSuper) {
+                JContainer<Expression> typeParameters = inferredType ?
+                        JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
+                        visitTypeParameterizations(classNode.getUnresolvedSuperClass().getGenericsTypes());
+                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, typeParameters, typeMapping.type(classNode));
+            } else if (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
                 JContainer<Expression> typeParameters = inferredType ?
                         JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
                         visitTypeParameterizations(classNode.getGenericsTypes());
@@ -3013,6 +3026,21 @@ public class GroovyParserVisitor {
         } else {
             return inferred;
         }
+    }
+
+    private boolean isInferred(ConstructorCallExpression ctor) {
+        if (ctor.getNodeMetaData().containsKey(StaticTypesMarker.INFERRED_TYPE)) {
+            return true;
+        }
+
+        ClassNode innerClass = ctor.getType();
+        if (!(innerClass instanceof InnerClassNode)) {
+            return false;
+        }
+
+        ClassNode superClass = innerClass.getUnresolvedSuperClass();
+        GenericsType[] generics = superClass != null ? superClass.getGenericsTypes() : null;
+        return generics != null && generics.length == 0;
     }
 
     private static final Map<String, J.Modifier.Type> modifierNameToType;
