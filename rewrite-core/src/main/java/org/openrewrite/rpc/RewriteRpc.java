@@ -63,14 +63,16 @@ public abstract class RewriteRpc implements AutoCloseable {
         return new Builder() {
             @Override
             public RewriteRpc build() {
-                //noinspection resource
                 RewriteRpc rewriteRpc = new RewriteRpc(Objects.requireNonNull(marketplace), batchSize, timeout) {
                     @Override
                     protected JsonRpc createJsonRpc() {
                         return jsonRpc.get();
                     }
                 };
-                return start ? rewriteRpc.ensureInitialized() : rewriteRpc;
+                if (start) {
+                    rewriteRpc.ensureInitialized();
+                }
+                return rewriteRpc;
             }
         };
     }
@@ -209,7 +211,7 @@ public abstract class RewriteRpc implements AutoCloseable {
 
         @Override
         public void close() {
-            CURRENT_CONTEXT.set(previous);
+            Context.CURRENT_CONTEXT.set(previous);
         }
     }
 
@@ -283,7 +285,7 @@ public abstract class RewriteRpc implements AutoCloseable {
         this.timeout = timeout;
     }
 
-    protected RewriteRpc ensureInitialized() {
+    protected void ensureInitialized() {
         if (jsonRpc == null) {
             jsonRpc = createJsonRpc();
 
@@ -313,7 +315,6 @@ public abstract class RewriteRpc implements AutoCloseable {
 
             jsonRpc.bind();
         }
-        return this;
     }
 
     protected abstract JsonRpc createJsonRpc();
@@ -541,6 +542,7 @@ public abstract class RewriteRpc implements AutoCloseable {
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
         ensureInitialized();
+        assert jsonRpc != null;
         try {
             // TODO handle error
             return jsonRpc

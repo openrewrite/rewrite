@@ -338,7 +338,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 }, marketplace, batchSize, timeout);
             }
 
-            return start ? (JavaScriptRewriteRpc) rewriteRpc.ensureInitialized() : rewriteRpc;
+            if (start) {
+                rewriteRpc.ensureInitialized();
+            }
+
+            return rewriteRpc;
         }
     }
 
