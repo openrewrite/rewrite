@@ -198,7 +198,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     public static class Builder extends RewriteRpc.Builder<Builder> {
         private static volatile @Nullable Path bundledInstallationDirectory;
 
-        private Environment marketplace = Environment.builder().build();
         private Path nodePath = Paths.get("node");
         private @Nullable Path installationDirectory;
         private int inspectPort;
@@ -235,11 +234,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             }
         }
 
-        public Builder marketplace(Environment marketplace) {
-            this.marketplace = marketplace;
-            return this;
-        }
-
         public Builder nodePath(Path nodePath) {
             this.nodePath = nodePath;
             return this;
@@ -274,6 +268,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        @Override
         public JavaScriptRewriteRpc build() {
             JavaScriptRewriteRpc rewriteRpc;
             if (port != 0) {

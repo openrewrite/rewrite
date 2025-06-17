@@ -19,7 +19,6 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.SneakyThrows;
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,6 +63,7 @@ class JsonSendReceiveTest implements RewriteTest {
           .marketplace(env)
           .batchSize(1)
           .timeout(Duration.ofSeconds(10))
+          .startServer(true)
           .build();
     }
 
@@ -78,7 +78,7 @@ class JsonSendReceiveTest implements RewriteTest {
         spec.recipe(toRecipe(() -> new TreeVisitor<>() {
             @SneakyThrows
             @Override
-            public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 Tree t = server.visit((SourceFile) tree, ChangeValue.class.getName(), 0);
                 stopAfterPreVisit();
                 return t;

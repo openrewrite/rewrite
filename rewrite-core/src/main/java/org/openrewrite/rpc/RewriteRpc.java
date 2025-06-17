@@ -58,28 +58,21 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @SuppressWarnings("UnusedReturnValue")
 public abstract class RewriteRpc implements AutoCloseable {
 
-    private static final ThreadLocal<Context> CURRENT_CONTEXT = ThreadLocal.withInitial(() -> new Context(null));
-
     public static Builder<?> from(Supplier<JsonRpc> jsonRpc) {
         //noinspection rawtypes
         return new Builder() {
             @Override
             public RewriteRpc build() {
-                return new RewriteRpc(Objects.requireNonNull(marketplace), batchSize, timeout) {
+                //noinspection resource
+                RewriteRpc rewriteRpc = new RewriteRpc(Objects.requireNonNull(marketplace), batchSize, timeout) {
                     @Override
                     protected JsonRpc createJsonRpc() {
                         return jsonRpc.get();
                     }
                 };
+                return start ? rewriteRpc.ensureInitialized() : rewriteRpc;
             }
         };
-    }
-
-    /**
-     * Gets the current RPC context for the calling thread.
-     */
-    public static Context current() {
-        return CURRENT_CONTEXT.get();
     }
 
     /**
@@ -90,9 +83,18 @@ public abstract class RewriteRpc implements AutoCloseable {
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     public static final class Context {
 
+        private static final ThreadLocal<Context> CURRENT_CONTEXT = ThreadLocal.withInitial(() -> new Context(null));
+
         private final @Nullable Context parent;
         private final Map<Class<?>, @Nullable WeakReference<?>> clients = new HashMap<>();
         private boolean frozen;
+
+        /**
+         * Gets the current RPC context for the calling thread.
+         */
+        public static Context current() {
+            return Context.CURRENT_CONTEXT.get();
+        }
 
         /**
          * Creates a context with the given RPC client.
@@ -104,7 +106,7 @@ public abstract class RewriteRpc implements AutoCloseable {
          * @param rpc the RPC client instance to store
          * @return this context (if mutable) or a new context (if frozen)
          */
-        public <T extends RewriteRpc> Context withClient(T rpc) {
+        public <T extends RewriteRpc> Context with(T rpc) {
             if (frozen) {
                 // Create new mutable context with this as parent
                 Context newContext = new Context(this);
@@ -211,26 +213,33 @@ public abstract class RewriteRpc implements AutoCloseable {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public abstract static class Builder<T extends Builder<T>> {
         protected Environment marketplace = Environment.builder().build();
         protected Duration timeout = Duration.ofMinutes(1);
         protected int batchSize = 100;
+        protected boolean start = false;
 
         public T marketplace(Environment marketplace) {
             this.marketplace = marketplace;
-            //noinspection unchecked
             return (T) this;
         }
 
         public T timeout(Duration timeout) {
             this.timeout = timeout;
-            //noinspection unchecked
             return (T) this;
         }
 
         public T batchSize(int batchSize) {
             this.batchSize = batchSize;
-            //noinspection unchecked
+            return (T) this;
+        }
+
+        /**
+         * Starts the RPC service eagerly after calling {@link #build()}, so that it can immediately start serving requests.
+         */
+        public T startServer(boolean start) {
+            this.start = start;
             return (T) this;
         }
 
@@ -274,7 +283,7 @@ public abstract class RewriteRpc implements AutoCloseable {
         this.timeout = timeout;
     }
 
-    private void ensureInitialized() {
+    protected RewriteRpc ensureInitialized() {
         if (jsonRpc == null) {
             jsonRpc = createJsonRpc();
 
@@ -304,6 +313,7 @@ public abstract class RewriteRpc implements AutoCloseable {
 
             jsonRpc.bind();
         }
+        return this;
     }
 
     protected abstract JsonRpc createJsonRpc();

@@ -61,12 +61,14 @@ class RewriteRpcTest implements RewriteTest {
           .marketplace(env)
           .batchSize(1)
           .timeout(Duration.ofMinutes(10))
+          .startServer(true)
           .build();
 
         server = RewriteRpc.from(() -> new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)))
           .marketplace(env)
           .batchSize(1)
           .timeout(Duration.ofMinutes(10))
+          .startServer(true)
           .build();
     }
 
