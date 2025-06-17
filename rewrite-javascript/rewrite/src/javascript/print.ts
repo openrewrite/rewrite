@@ -1795,8 +1795,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: PrintOutputCapture): Promise<J.RightPadded<T>> {
         if (isTree(right.element)) {
             await this.visit(right.element, p);
-        } else if (typeof right.element !== 'boolean' && typeof right.element === 'object' && 'kind' in right.element && (right.element as any).kind === J.Kind.Modifier) {
-            await this.visitModifier(right.element as J.Modifier, p);
         }
 
         await this.visitSpace(right.after, p);
