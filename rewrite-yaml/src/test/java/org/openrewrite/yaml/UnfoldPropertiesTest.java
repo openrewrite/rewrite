@@ -137,6 +137,31 @@ class UnfoldPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void unfoldAcrossLineBreaks() {
+        rewriteRun(
+          yaml(
+            """
+              a:
+                b1.c: x
+              
+                b2.c: x
+              x.y: z
+              """,
+            """
+              a:
+                b1:
+                  c: x
+              
+                b2:
+                  c: x
+              x:
+                y: z
+              """
+          )
+        );
+    }
+
+    @Test
     void exclusions() {
         rewriteRun(
           spec -> spec.recipe(new UnfoldProperties(List.of(
