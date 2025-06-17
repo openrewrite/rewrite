@@ -57,17 +57,25 @@ class RewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        JsonRpc clientJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut));
-        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
+        client = RewriteRpc.from(() -> new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)))
+          .marketplace(env)
+          .batchSize(1)
+          .timeout(Duration.ofMinutes(10))
+          .startServer(true)
+          .build();
 
-        JsonRpc serverJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut));
-        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
+        server = RewriteRpc.from(() -> new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)))
+          .marketplace(env)
+          .batchSize(1)
+          .timeout(Duration.ofMinutes(10))
+          .startServer(true)
+          .build();
     }
 
     @AfterEach
     void after() {
-        client.shutdown();
-        server.shutdown();
+        client.close();
+        server.close();
     }
 
     @DocumentExample

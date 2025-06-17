@@ -57,10 +57,11 @@ public class JavaToJavaScriptRpcTest {
                     .nodePath(Path.of("node"))
                     .installationDirectory(Path.of("./rewrite/dist"))
 //                    .socket(12345)
+                    .batchSize(20)
+                    .timeout(Duration.ofMinutes(10))
                     .build();
 
-                  client.batchSize(20)
-                    .timeout(Duration.ofMinutes(10))
+                  client
                     .traceGetObjectOutput()
                     .traceGetObjectInput(log);
 
@@ -78,7 +79,7 @@ public class JavaToJavaScriptRpcTest {
                               return tree;
                           } finally {
                               log.close();
-                              client.shutdown();
+                              client.close();
                           }
                       }
                   };

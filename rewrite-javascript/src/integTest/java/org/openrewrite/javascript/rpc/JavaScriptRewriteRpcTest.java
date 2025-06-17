@@ -61,11 +61,11 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           .nodePath(Path.of("node"))
           .installationDirectory(Path.of("./rewrite/dist"))
 //          .inspectAndBreak()
+//          .timeout(Duration.ofMinutes(10))
           .build();
-        this.scope = RewriteRpc.current().withClient(client).attach();
+        this.scope = RewriteRpc.Context.current().with(client).attach();
 
 //        client
-//          .timeout(Duration.ofMinutes(10))
 //          .traceGetObjectOutput()
 //          .traceGetObjectInput(log);
     }
@@ -74,7 +74,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void after() {
         scope.close();
         log.close();
-        client.shutdown();
+        client.close();
     }
 
     @Override
