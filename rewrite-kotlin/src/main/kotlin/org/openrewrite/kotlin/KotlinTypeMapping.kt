@@ -212,6 +212,7 @@ class KotlinTypeMapping(
             }
 
             else -> {
+                println("Unsupported type: $type")
                 Unknown.getInstance()
             }
         }

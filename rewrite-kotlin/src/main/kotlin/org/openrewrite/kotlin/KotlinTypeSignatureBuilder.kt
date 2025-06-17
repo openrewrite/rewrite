@@ -188,7 +188,17 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 type.asString()
             }
 
-            else -> "{undefined}"
+            is FirRegularClassSymbol -> {
+                if (type.fir.typeParameters.isNotEmpty()) {
+                    parameterizedSignature(type.fir)
+                } else {
+                    classSignature(type.fir)
+                }
+            }
+            else -> {
+                println("Undefined type: $type")
+                "{undefined}"
+            }
         }
     }
 

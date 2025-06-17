@@ -24,7 +24,6 @@ import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
-import org.jetbrains.kotlin.cli.common.SessionConstructionUtils;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
@@ -51,8 +50,6 @@ import org.jetbrains.kotlin.config.*;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
-import org.jetbrains.kotlin.fir.deserialization.ModuleDataProvider;
-import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
 import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
@@ -61,9 +58,6 @@ import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
 import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.name.Name;
-import org.jetbrains.kotlin.platform.TargetPlatform;
-import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
-import org.jetbrains.kotlin.psi.KtCommonFile;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.utils.PathUtil;
 import org.jspecify.annotations.Nullable;
@@ -95,7 +89,6 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
-import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.JvmArgumentsKt.*;
 import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
@@ -433,9 +426,6 @@ public class KotlinParser implements Parser {
         sourceScope.plus(projectEnvironment.getSearchScopeForProjectJavaSources());
 
         AbstractProjectFileSearchScope libraryScope = projectEnvironment.getSearchScopeForProjectLibraries();
-        LanguageVersionSettings languageVersionSettings = compilerConfiguration.getNotNull(LANGUAGE_VERSION_SETTINGS);
-
-        FirProjectSessionProvider sessionProvider = new FirProjectSessionProvider();
 
         Function1<DependencyListForCliModule.Builder, Unit> dependencyListBuilderProvider = builder -> {
             List<File> jvmContentFiles = JvmContentRootsKt.getJvmClasspathRoots(compilerConfiguration);
@@ -455,12 +445,10 @@ public class KotlinParser implements Parser {
         };
 
         Name name = Name.identifier(module.getModuleName());
-        TargetPlatform jvmPlatform = JvmPlatforms.INSTANCE.getDefaultJvmPlatform();
-
         DependencyListForCliModule libraryList = CliCompilerUtilsKt.createLibraryListForJvm(
-            module.getModuleName(),
-            compilerConfiguration,
-            emptyList()
+                module.getModuleName(),
+                compilerConfiguration,
+                compilerConfiguration.get(JVMConfigurationKeys.FRIEND_PATHS, emptyList())
         );
         FirSession firSession = JvmFrontendPipelinePhase.INSTANCE
                 .prepareJvmSessions(
@@ -472,35 +460,13 @@ public class KotlinParser implements Parser {
                         libraryList,
                         ktFile -> false,
                         KtFile::isScript,
-                        (ktFile, s) -> true,
-                        ktFiles1 -> null
+                        (ktFile, moduleName) -> {return true;}, //TODO how to find out whether file belongs to the module or not?
+                        files -> null
                 )
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Unable to create FirSession"))
                 .getSession();
-
-
-        //TODO build session with dependencies
-
-//        FirSession firSession = FirSessionFactoryHelper.INSTANCE.createSessionWithDependencies(
-//                Name.identifier(module.getModuleName()),
-//                JvmPlatforms.INSTANCE.getUnspecifiedJvmPlatform(),
-//                JvmPlatformAnalyzerServices.INSTANCE,
-//                sessionProvider,
-//                projectEnvironment,
-//                languageVersionSettings,
-//                sourceScope,
-//                libraryScope,
-//                compilerConfiguration.get(LOOKUP_TRACKER),
-//                compilerConfiguration.get(ENUM_WHEN_TRACKER),
-//                compilerConfiguration.get(IMPORT_TRACKER),
-//                null, // Do not incrementally compile
-//                emptyList(), // Add extension registrars when needed here.
-//                true,
-//                dependencyListBuilderProvider,
-//                sessionConfigurator
-//        );
 
         List<FirFile> rawFir = FirUtilsKt.buildFirFromKtFiles(firSession, ktFiles);
         Pair<ScopeSession, List<FirFile>> result = AnalyseKt.runResolution(firSession, rawFir);
@@ -602,7 +568,7 @@ public class KotlinParser implements Parser {
     private CompilerConfiguration compilerConfiguration() {
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
 
-        compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
+        compilerConfiguration.put(MODULE_NAME, moduleName);
         compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
                 MessageCollector.Companion.getNONE());

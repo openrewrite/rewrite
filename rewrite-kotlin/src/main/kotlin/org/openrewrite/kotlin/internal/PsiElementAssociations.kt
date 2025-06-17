@@ -334,7 +334,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 p is KtPostfixExpression -> allFirInfos.firstOrNull { it.fir is FirResolvedTypeRef || it.fir is FirFunctionCall }?.fir
                 p is KtTypeReference -> allFirInfos.firstOrNull { it.fir is FirResolvedTypeRef }?.fir
                 p is KtWhenConditionInRange || p is KtBinaryExpression -> allFirInfos.firstOrNull { it.fir is FirFunctionCall }?.fir
-                p is KtNameReferenceExpression -> allFirInfos.firstOrNull { it.fir is FirClass }?.fir
+                p is KtNameReferenceExpression -> allFirInfos.firstOrNull { it.fir is FirDesugaredAssignmentValueReferenceExpression }?.fir
                 else -> {
                     throw IllegalStateException("Unable to determine the FIR element associated to the PSI." + if (psi == null) "null element" else "original PSI: ${psi.javaClass.name}, mapped PSI: ${p.javaClass.name}")
                 }
