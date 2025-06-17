@@ -1259,6 +1259,13 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     public J visitAnnotatedType(AnnotatedTypeTree node, Space fmt) {
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getAnnotations(),
                 new HashMap<>(node.getAnnotations().size()));
+        Tree underlying = node.getUnderlyingType();
+        if (underlying instanceof JCArrayTypeTree) {
+            Tree element = ((JCArrayTypeTree) underlying).getType();
+            if (element instanceof JCAnnotatedType) {
+                annotationPosTable.putAll(mapAnnotations(((JCAnnotatedType) element).getAnnotations(), new HashMap<>()));
+            }
+        }
         List<J.Annotation> leadingAnnotations = leadingAnnotations(annotationPosTable);
         if (!annotationPosTable.isEmpty()) {
             if (node.getUnderlyingType() instanceof JCFieldAccess) {

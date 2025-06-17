@@ -19,14 +19,16 @@ import {randomId} from "../uuid";
 import {emptyMarkers} from "../markers";
 
 export class PlainTextParser extends Parser {
-    async parse(...sourcePaths: ParserInput[]): Promise<PlainText[]> {
-        return sourcePaths.map(sourcePath => ({
-            kind: PlainText.Kind.PlainText,
-            id: randomId(),
-            markers: emptyMarkers,
-            sourcePath: this.relativePath(sourcePath),
-            text: readSourceSync(sourcePath),
-            snippets: []
-        }))
+    async *parse(...sourcePaths: ParserInput[]): AsyncGenerator<PlainText> {
+        for (const sourcePath of sourcePaths) {
+            yield {
+                kind: PlainText.Kind.PlainText,
+                id: randomId(),
+                markers: emptyMarkers,
+                sourcePath: this.relativePath(sourcePath),
+                text: readSourceSync(sourcePath),
+                snippets: []
+            };
+        }
     }
 }

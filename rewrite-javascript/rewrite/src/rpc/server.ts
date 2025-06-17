@@ -19,6 +19,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {RewriteRpc} from "./rewrite-rpc";
 import * as fs from "fs";
 import {WriteStream} from "fs";
+import {Command} from 'commander';
 
 // Include all languages you want this server to support.
 import "../text";
@@ -26,20 +27,38 @@ import "../json";
 import "../java";
 import "../javascript";
 
-// Configuration options
-const socketPort = process.argv[2] ? parseInt(process.argv[2], 10) : undefined;
+interface ProgramOptions {
+    port?: number;
+    logFile?: string;
+    verbose?: boolean;
+    batchSize?: number;
+    traceGetObjectOutput?: boolean;
+    traceGetObjectInput?: boolean;
+}
 
-const log: WriteStream = fs.createWriteStream(`${process.cwd()}/rpc.js.log`, {flags: 'w'});
+const program = new Command();
+program
+    .option('--port <number>', 'port number')
+    .option('--log-file <path>', 'log file path')
+    .option('-v, --verbose', 'enable verbose output')
+    .option('--batch-size [size]', 'sets the batch size (default is 100)', s => parseInt(s, 10), 100)
+    .option('--trace-get-object-output', 'enable `GetObject` output tracing')
+    .option('--trace-get-object-input', 'enable `GetObject` input tracing')
+    .parse();
+
+const options = program.opts() as ProgramOptions;
+
+const log: WriteStream = fs.createWriteStream(options.logFile ?? `${process.cwd()}/rpc.js.log`, {flags: 'w'});
 log.write(`[js-rewrite-rpc] starting\n\n`);
 
 const logger: rpc.Logger = {
     error: (msg: string) => log.write(`[Error] ${msg}\n`),
     warn: (msg: string) => log.write(`[Warn] ${msg}\n`),
-    info: (msg: string) => log.write(`[Info] ${msg}\n`),
-    log: (msg: string) => log.write(`[Log] ${msg}\n`)
+    info: (msg: string) => options.verbose && log.write(`[Info] ${msg}\n`),
+    log: (msg: string) => options.verbose && log.write(`[Log] ${msg}\n`)
 };
 
-if (!socketPort) {
+if (!options.port) {
 // Create the connection with the custom logger
     const connection = rpc.createMessageConnection(
         new rpc.StreamMessageReader(process.stdin),
@@ -64,7 +83,11 @@ if (!socketPort) {
         log.write(`[js-rewrite-rpc] connection disposed\n\n`);
     });
 
-    new RewriteRpc(connection, {traceGetObjectInput: log, traceGetObjectOutput: true});
+    new RewriteRpc(connection, {
+        batchSize: options.batchSize,
+        traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
+        traceGetObjectOutput: options.traceGetObjectOutput,
+    });
 } else {
 // Create a TCP server
     const server: net.Server = net.createServer((socket: net.Socket) => {
@@ -103,7 +126,11 @@ if (!socketPort) {
         });
 
         // Initialize the RPC mechanism
-        new RewriteRpc(connection, {traceGetObjectInput: log, traceGetObjectOutput: true});
+        new RewriteRpc(connection, {
+            batchSize: options.batchSize,
+            traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
+            traceGetObjectOutput: options.traceGetObjectOutput,
+        });
     });
 
 // Handle server errors
@@ -113,8 +140,8 @@ if (!socketPort) {
     });
 
 // Start the server
-    server.listen(socketPort, '127.0.0.1', () => {
-        log.write(`[js-rewrite-rpc] server listening on 127.0.0.1:${socketPort}\n`);
+    server.listen(options.port, '127.0.0.1', () => {
+        log.write(`[js-rewrite-rpc] server listening on 127.0.0.1:${options.port}\n`);
     });
 
 // Handle process termination
