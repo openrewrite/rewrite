@@ -140,7 +140,12 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void installRecipesFromNpm() {
         assertThat(client.installRecipes("@openrewrite/recipes-npm")).isEqualTo(1);
         assertThat(client.getRecipes()).satisfiesExactly(
-          d -> assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`")
+          d -> {
+              assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`");
+              assertThat(d.getOptions()).satisfiesExactly(
+                o -> assertThat(o.isRequired()).isTrue()
+              );
+          }
         );
     }
 
