@@ -316,8 +316,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 }
 
                 rewriteRpc = new JavaScriptRewriteRpc(new CloseableSupplier<JsonRpc>() {
-                    @SuppressWarnings("NotNullFieldNotInitialized")
-                    private JavaScriptRewriteRpcProcess process;
+                    private @Nullable JavaScriptRewriteRpcProcess process;
 
                     @Override
                     public JsonRpc get() {
@@ -328,11 +327,13 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
                     @Override
                     public void close() {
-                        process.interrupt();
-                        try {
-                            process.join();
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
+                        if (process != null) {
+                            process.interrupt();
+                            try {
+                                process.join();
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
                         }
                     }
                 }, marketplace, batchSize, timeout);
