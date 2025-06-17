@@ -4045,35 +4045,36 @@ class MavenParserTest implements RewriteTest {
         // The POM for Impala:ImpalaJDBC42:jar:2.6.26.1031 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
         // But does not fail the build as it does not actually have any transitive dependencies
         rewriteRun(
-          pomXml("""
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-
-                <groupId>test</groupId>
-                <artifactId>impala-test</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-                <packaging>jar</packaging>
-
-                <name>Impala test</name>
-                <description>The POM for Impala:ImpalaJDBC42:jar:2.6.26.1031 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details</description>
-
-                <dependencies>
-                    <dependency>
-                        <groupId>Impala</groupId>
-                        <artifactId>ImpalaJDBC42</artifactId>
-                        <version>2.6.26.1031</version>
-                    </dependency>
-                </dependencies>
-
-                <repositories>
-                    <repository>
-                        <id>cloudera</id>
-                        <name>cloudera</name>
-                        <url>https://repository.cloudera.com/repository/cloudera-repos/</url>
-                    </repository>
-                </repositories>
-            </project>
+          pomXml(
             """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+              
+                  <groupId>test</groupId>
+                  <artifactId>impala-test</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <packaging>jar</packaging>
+              
+                  <name>Impala test</name>
+                  <description>The POM for Impala:ImpalaJDBC42:jar:2.6.26.1031 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details</description>
+              
+                  <dependencies>
+                      <dependency>
+                          <groupId>Impala</groupId>
+                          <artifactId>ImpalaJDBC42</artifactId>
+                          <version>2.6.26.1031</version>
+                      </dependency>
+                  </dependencies>
+              
+                  <repositories>
+                      <repository>
+                          <id>cloudera</id>
+                          <name>cloudera</name>
+                          <url>https://repository.cloudera.com/repository/cloudera-repos/</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """
           )
         );
     }
