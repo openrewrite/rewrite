@@ -612,6 +612,18 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return mod;
     }
 
+    override async visitFunctionCall(functionCall: JS.FunctionCall, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(functionCall, p);
+
+        functionCall.select && await this.visitRightPadded(functionCall.select, p);
+
+        functionCall.typeParameters && await this.visitContainerLocal("<", functionCall.typeParameters, ",", ">", p);
+        await this.visitContainerLocal("(", functionCall.arguments, ",", ")", p);
+
+        await this.afterSyntax(functionCall, p);
+        return functionCall;
+    }
+
     override async visitFunctionType(functionType: JS.FunctionType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(functionType, p);
         for (const m of functionType.modifiers) {
@@ -1878,6 +1890,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                     await this.visitSpace((marker as Optional).prefix, p);
                     p.append("?");
                     if (this.cursor.parent?.value?.kind === J.Kind.MethodInvocation ||
+                        this.cursor.parent?.value?.kind === JS.Kind.FunctionCall ||
                         this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
                         p.append(".");
                     }

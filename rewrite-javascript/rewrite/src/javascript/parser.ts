@@ -1791,7 +1791,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitCallExpression(node: ts.CallExpression): J.MethodInvocation {
+    visitCallExpression(node: ts.CallExpression): J.MethodInvocation | JS.FunctionCall {
         const prefix = this.prefix(node);
         const typeArguments = node.typeArguments && this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments);
 
@@ -1837,16 +1837,29 @@ export class JavaScriptParserVisitor {
             select = this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
         }
 
-        return {
-            kind: J.Kind.MethodInvocation,
-            id: randomId(),
-            prefix,
-            markers: emptyMarkers,
-            select,
-            typeParameters: typeArguments,
-            name,
-            arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
-            methodType: this.mapMethodType(node)
+        if (name && name.simpleName.length > 0) {
+            return {
+                kind: J.Kind.MethodInvocation,
+                id: randomId(),
+                prefix,
+                markers: emptyMarkers,
+                select,
+                typeParameters: typeArguments,
+                name,
+                arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
+                methodType: this.mapMethodType(node)
+            }
+        } else {
+            return {
+                kind: JS.Kind.FunctionCall,
+                id: randomId(),
+                prefix,
+                markers: emptyMarkers,
+                select,
+                typeParameters: typeArguments,
+                arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
+                functionType: this.mapMethodType(node)
+            }
         }
     }
 

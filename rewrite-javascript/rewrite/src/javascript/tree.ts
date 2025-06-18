@@ -56,6 +56,7 @@ export namespace JS {
         IndexedAccessTypeIndexType: "org.openrewrite.javascript.tree.JS$IndexedAccessType$IndexType",
         InferType: "org.openrewrite.javascript.tree.JS$InferType",
         Intersection: "org.openrewrite.javascript.tree.JS$Intersection",
+        FunctionCall: "org.openrewrite.javascript.tree.JS$FunctionCall",
         ForInLoop: "org.openrewrite.javascript.tree.JS$ForInLoop",
         ForOfLoop: "org.openrewrite.javascript.tree.JS$ForOfLoop",
         JsxEmbeddedExpression: "org.openrewrite.javascript.tree.JSX$EmbeddedExpression",
@@ -641,6 +642,21 @@ export namespace JS {
         readonly kind: typeof Kind.Intersection;
         readonly types: J.RightPadded<Expression>[];
         readonly type?: JavaType;
+    }
+
+    /**
+     * Represents function calls which are not method invocations.
+     * @example f(5, 0, 4)
+     * @example f?.(5, 0, 4)
+     * @example data["key"](5, 0, 4)
+     * @example (() => { return 3 + 5 })()
+     */
+    export interface FunctionCall extends JS, Expression {
+        readonly kind: typeof Kind.FunctionCall;
+        readonly select?: J.RightPadded<Expression>;
+        readonly typeParameters?: J.Container<Expression>;
+        readonly arguments: J.Container<Expression>;
+        readonly functionType?: JavaType.Method;
     }
 
     /**

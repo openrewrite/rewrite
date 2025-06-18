@@ -59,10 +59,9 @@ describe('call mapping', () => {
                 const result2 = func/*a*/?./*b*/call("TS"); // Invokes the function
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                for (let idx = 1; idx <= 2; idx++) {
-                    const init = (cu.statements[idx].element as J.VariableDeclarations).variables[0].element.initializer!.element;
-                    expect(init.kind).toEqual(J.Kind.MethodInvocation); // TODO actually we want something else here, adjust the expectations
-                }
+                const inits = [1, 2].map(i => (cu.statements[i].element as J.VariableDeclarations).variables[0].element.initializer!.element);
+                expect(inits[0].kind).toEqual(JS.Kind.FunctionCall);
+                expect(inits[1].kind).toEqual(J.Kind.MethodInvocation);
             }
         }));
 
