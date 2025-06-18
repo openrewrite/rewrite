@@ -1,6 +1,6 @@
 {
   "name": "@openrewrite/rewrite",
-  "version": "0",
+  "version": "0.0.0",
   "license": "Moderne Source Available License",
   "description": "OpenRewrite JavaScript.",
   "homepage": "https://github.com/openrewrite/rewrite",
@@ -27,15 +27,18 @@
   "dependencies": {
     "@akashrajpurohit/snowflake-id": "^2.0.0",
     "@types/node": "^22.5.4",
+    "commander": "^14.0.0",
     "dedent": "^1.5.3",
     "diff": "^7.0.0",
     "immer": "^10.1.1",
+    "typescript": "^5.8.3",
     "vscode-jsonrpc": "^8.2.1"
   },
   "devDependencies": {
     "@types/diff": "^5.2.2",
     "@types/jest": "^29.5.13",
     "jest": "^29.7.0",
+    "jest-junit": "^16.0.0",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2"
   },

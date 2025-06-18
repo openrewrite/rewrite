@@ -290,8 +290,10 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             if (!(docTree instanceof DCTree.DCText && i > 0)) {
                 body.addAll(whitespaceBefore());
             }
-            if (docTree instanceof DCTree.DCText) {
-                body.addAll(visitText(((DCTree.DCText) docTree).getBody()));
+            if (docTree instanceof DCTree.DCText textNode) {
+                body.addAll(visitText(textNode.getBody()));
+            } else if (docTree instanceof DCTree.DCComment commentNode) {
+                body.addAll(visitText(commentNode.getBody()));
             } else {
                 body.add((Javadoc) scan(docTree, body));
             }
@@ -662,11 +664,14 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                         methodRefType
                 );
             } else {
+                if (qualifier == null) {
+                    return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name.getSimpleName(), qualifierType, fieldRefType);
+                }
                 return new J.MemberReference(
                         randomId(),
-                        qualifier == null ? Space.EMPTY : qualifier.getPrefix(),
+                        qualifier.getPrefix(),
                         Markers.EMPTY,
-                        qualifier == null ? null : JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
+                        JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
                         JContainer.empty(),
                         JLeftPadded.build(name),
                         null,
@@ -1227,6 +1232,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
             NameTree id = (NameTree) javaVisitor.scan(node.getType(), Space.EMPTY);
             List<JRightPadded<Expression>> expressions = new ArrayList<>(node.getTypeArguments().size());
+            String spaceBeforeTypeParams = whitespaceBeforeAsString();
             cursor += 1; // skip '<', JavaDocVisitor does not interpret List <Integer> as Parameterized.
             int argsSize = node.getTypeArguments().size();
             for (int i = 0; i < argsSize; i++) {
@@ -1241,7 +1247,9 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 expression = expression.withAfter(after);
                 expressions.add(expression);
             }
-            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions), typeMapping.type(node));
+            JContainer<Expression> typeArgs = JContainer.build(expressions)
+                    .withBefore(Space.build(spaceBeforeTypeParams, emptyList()));
+            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, typeArgs, typeMapping.type(node));
         }
     }
 }

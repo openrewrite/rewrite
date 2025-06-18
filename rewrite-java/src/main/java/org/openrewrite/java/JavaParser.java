@@ -120,6 +120,7 @@ public interface JavaParser extends Parser {
         try (RewriteClasspathJarClasspathLoader rewriteClasspathJarClasspathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
             List<JavaParserClasspathLoader> loaders = new ArrayList<>(2);
             loaders.add(rewriteClasspathJarClasspathLoader);
+            // TODO support annotations in type tables (e.g. required by meta annotations support)
             Optional.ofNullable(TypeTable.fromClasspath(ctx, missingArtifactNames)).ifPresent(loaders::add);
 
             for (JavaParserClasspathLoader loader : loaders) {

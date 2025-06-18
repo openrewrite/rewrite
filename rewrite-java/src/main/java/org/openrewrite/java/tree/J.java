@@ -3640,7 +3640,7 @@ public interface J extends Tree, RpcCodec<J> {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class Literal implements J, Expression, TypedTree {
+    final class Literal implements J, Expression, TypedTree, VariableDeclarator {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -3718,12 +3718,21 @@ public interface J extends Tree, RpcCodec<J> {
          * @return {@code true} if the given {@link Expression} is a {@link Literal} with the given value.
          */
         @Incubating(since = "7.25.0")
-        public static boolean isLiteralValue(@Nullable Expression maybeLiteral, Object value) {
+        public static boolean isLiteralValue(@Nullable Expression maybeLiteral, @Nullable Object value) {
             if (maybeLiteral instanceof Literal) {
                 Literal literal = (Literal) maybeLiteral;
-                return literal.getValue() != null && literal.getValue().equals(value);
+                return literal.getValue() == null ? value == null : literal.getValue().equals(value);
             }
             return false;
+        }
+
+        @Override
+        public List<J.Identifier> getNames() {
+            return Collections.singletonList(
+                // TODO this creates an artificial identifier. Revise this decision.
+                new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Collections.emptyList(),
+                        String.valueOf(value), JavaType.Primitive.String, null)
+            );
         }
 
         @Override
@@ -4012,7 +4021,7 @@ public interface J extends Tree, RpcCodec<J> {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return methodType == null ? null : methodType.getReturnType();
         }
 
@@ -5100,7 +5109,7 @@ public interface J extends Tree, RpcCodec<J> {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return tree.getElement() instanceof Expression ? ((Expression) tree.getElement()).getType() :
                     tree.getElement() instanceof NameTree ? ((NameTree) tree.getElement()).getType() :
                             null;

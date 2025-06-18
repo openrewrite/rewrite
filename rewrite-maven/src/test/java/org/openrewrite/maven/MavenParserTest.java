@@ -4038,6 +4038,47 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
+    @Disabled
+    @Test
+    void weirdImpalaPom() {
+        // Maven says:
+        // The POM for Impala:ImpalaJDBC42:jar:2.6.26.1031 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+        // But does not fail the build as it does not actually have any transitive dependencies
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+              
+                  <groupId>test</groupId>
+                  <artifactId>impala-test</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <packaging>jar</packaging>
+              
+                  <name>Impala test</name>
+                  <description>The POM for Impala:ImpalaJDBC42:jar:2.6.26.1031 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details</description>
+              
+                  <dependencies>
+                      <dependency>
+                          <groupId>Impala</groupId>
+                          <artifactId>ImpalaJDBC42</artifactId>
+                          <version>2.6.26.1031</version>
+                      </dependency>
+                  </dependencies>
+              
+                  <repositories>
+                      <repository>
+                          <id>cloudera</id>
+                          <name>cloudera</name>
+                          <url>https://repository.cloudera.com/repository/cloudera-repos/</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """
+          )
+        );
+    }
+
     @Nested
     class DependencyManagement {
         // https://repo1.maven.org/maven2/org/apache/maven/plugins/maven-site-plugin/3.9.1/
@@ -4377,5 +4418,145 @@ class MavenParserTest implements RewriteTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5402")
+        @Test
+        void allDependencyManagementEntryVariants_allDependencyVariants() {
+            rewriteRun(
+              mavenProject(
+                "my-bom",
+                pomXml(
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-bom</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                         <dependencies>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>jar</type>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <scope>compile</scope>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>jar</type>
+                                 <scope>compile</scope>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>pom</type>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <classifier>sources</classifier>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <classifier>javadoc</classifier>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>test-jar</type>
+                                 <scope>test</scope>
+                             </dependency>
+                         </dependencies>
+                      </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject(
+                  "my-app",
+                  pomXml(
+                    """
+                      <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencyManagement>
+                          <dependencies>
+                            <dependency>
+                              <groupId>com.mycompany.app</groupId>
+                              <artifactId>my-bom</artifactId>
+                              <version>1</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                            </dependency>
+                          </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>jar</type>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <scope>compile</scope>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>jar</type>
+                             <scope>compile</scope>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>pom</type>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <classifier>sources</classifier>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <classifier>javadoc</classifier>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>test-jar</type>
+                             <scope>test</scope>
+                           </dependency>
+                        </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
     }
 }

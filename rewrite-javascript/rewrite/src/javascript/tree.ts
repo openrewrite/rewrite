@@ -17,7 +17,7 @@
  */
 
 import {SourceFile, TreeKind} from "../";
-import {Expression, J, JavaType, Statement, TypedTree, TypeTree, VariableDeclarator,} from "../java";
+import {Expression, J, JavaType, NameTree, Statement, TypedTree, TypeTree, VariableDeclarator,} from "../java";
 import getType = TypedTree.getType;
 import FunctionType = JS.FunctionType;
 
@@ -30,9 +30,12 @@ export namespace JS {
         Alias: "org.openrewrite.javascript.tree.JS$Alias",
         ArrayBindingPattern: "org.openrewrite.javascript.tree.JS$ArrayBindingPattern",
         ArrowFunction: "org.openrewrite.javascript.tree.JS$ArrowFunction",
+        AssignmentOperation: "org.openrewrite.javascript.tree.JS$AssignmentOperation",
         Await: "org.openrewrite.javascript.tree.JS$Await",
+        Binary: "org.openrewrite.javascript.tree.JS$Binary",
         BindingElement: "org.openrewrite.javascript.tree.JS$BindingElement",
         CompilationUnit: "org.openrewrite.javascript.tree.JS$CompilationUnit",
+        ComputedPropertyMethodDeclaration: "org.openrewrite.javascript.tree.JS$ComputedPropertyMethodDeclaration",
         ComputedPropertyName: "org.openrewrite.javascript.tree.JS$ComputedPropertyName",
         ConditionalType: "org.openrewrite.javascript.tree.JS$ConditionalType",
         Delete: "org.openrewrite.javascript.tree.JS$Delete",
@@ -55,9 +58,11 @@ export namespace JS {
         Intersection: "org.openrewrite.javascript.tree.JS$Intersection",
         ForInLoop: "org.openrewrite.javascript.tree.JS$ForInLoop",
         ForOfLoop: "org.openrewrite.javascript.tree.JS$ForOfLoop",
-        ComputedPropertyMethodDeclaration: "org.openrewrite.javascript.tree.JS$ComputedPropertyMethodDeclaration",
-        AssignmentOperation: "org.openrewrite.javascript.tree.JS$AssignmentOperation",
-        Binary: "org.openrewrite.javascript.tree.JS$Binary",
+        JsxEmbeddedExpression: "org.openrewrite.javascript.tree.JSX$EmbeddedExpression",
+        JsxSpreadAttribute: "org.openrewrite.javascript.tree.JSX$SpreadAttribute",
+        JsxNamespacedName: "org.openrewrite.javascript.tree.JSX$NamespacedName",
+        JsxTag: "org.openrewrite.javascript.tree.JSX$Tag",
+        JsxAttribute: "org.openrewrite.javascript.tree.JSX$Attribute",
         Import: "org.openrewrite.javascript.tree.JS$Import",
         ImportClause: "org.openrewrite.javascript.tree.JS$ImportClause",
         ImportSpecifier: "org.openrewrite.javascript.tree.JS$ImportSpecifier",
@@ -68,14 +73,14 @@ export namespace JS {
         NamedExports: "org.openrewrite.javascript.tree.JS$NamedExports",
         NamedImports: "org.openrewrite.javascript.tree.JS$NamedImports",
         NamespaceDeclaration: "org.openrewrite.javascript.tree.JS$NamespaceDeclaration",
-        ObjectBindingDeclarations: "org.openrewrite.javascript.tree.JS$ObjectBindingDeclarations",
+        ObjectBindingPattern: "org.openrewrite.javascript.tree.JS$ObjectBindingPattern",
         PropertyAssignment: "org.openrewrite.javascript.tree.JS$PropertyAssignment",
         SatisfiesExpression: "org.openrewrite.javascript.tree.JS$SatisfiesExpression",
         ScopedVariableDeclarations: "org.openrewrite.javascript.tree.JS$ScopedVariableDeclarations",
         StatementExpression: "org.openrewrite.javascript.tree.JS$StatementExpression",
         TaggedTemplateExpression: "org.openrewrite.javascript.tree.JS$TaggedTemplateExpression",
         TemplateExpression: "org.openrewrite.javascript.tree.JS$TemplateExpression",
-        TemplateExpressionSpan: "org.openrewrite.javascript.tree.JS$TemplateExpression$TemplateSpan",
+        TemplateExpressionSpan: "org.openrewrite.javascript.tree.JS$TemplateExpression$Span",
         TrailingTokenStatement: "org.openrewrite.javascript.tree.JS$TrailingTokenStatement",
         Tuple: "org.openrewrite.javascript.tree.JS$Tuple",
         TypeDeclaration: "org.openrewrite.javascript.tree.JS$TypeDeclaration",
@@ -218,8 +223,9 @@ export namespace JS {
     export interface Import extends JS, Statement {
         readonly kind: typeof Kind.Import;
         readonly importClause?: ImportClause;
-        readonly moduleSpecifier: J.LeftPadded<Expression>;
+        readonly moduleSpecifier?: J.LeftPadded<Expression>;
         readonly attributes?: ImportAttributes;
+        readonly initializer?: J.LeftPadded<Expression>;
     }
 
     /**
@@ -239,7 +245,7 @@ export namespace JS {
      */
     export interface NamedImports extends JS, Expression {
         readonly kind: typeof Kind.NamedImports;
-        readonly elements: J.Container<Expression>;
+        readonly elements: J.Container<ImportSpecifier>;
         readonly type?: JavaType;
     }
 
@@ -250,7 +256,7 @@ export namespace JS {
     export interface ImportSpecifier extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.ImportSpecifier;
         readonly importType: J.LeftPadded<boolean>;
-        readonly specifier: Expression;
+        readonly specifier: J.Identifier | Alias;
         readonly type?: JavaType;
     }
 
@@ -367,8 +373,8 @@ export namespace JS {
      * Represents object destructuring patterns.
      * @example const { a, b } = obj;
      */
-    export interface ObjectBindingDeclarations extends JS, Expression, TypedTree, VariableDeclarator {
-        readonly kind: typeof Kind.ObjectBindingDeclarations;
+    export interface ObjectBindingPattern extends JS, Expression, TypedTree, VariableDeclarator {
+        readonly kind: typeof Kind.ObjectBindingPattern;
         readonly leadingAnnotations: J.Annotation[];
         readonly modifiers: J.Modifier[];
         readonly typeExpression?: TypeTree;
@@ -413,18 +419,7 @@ export namespace JS {
     export interface ScopedVariableDeclarations extends JS, Statement {
         readonly kind: typeof Kind.ScopedVariableDeclarations;
         readonly modifiers: J.Modifier[];
-        readonly scope?: J.LeftPadded<ScopedVariableDeclarations.Scope>;
         readonly variables: J.RightPadded<J>[];
-    }
-
-    export namespace ScopedVariableDeclarations {
-        export const enum Scope {
-            Const = "Const",
-            Let = "Let",
-            Var = "Var",
-            Using = "Using",
-            Import = "Import"
-        }
     }
 
     /**
@@ -737,10 +732,10 @@ export namespace JS {
     }
 
     export namespace NamespaceDeclaration {
-        export enum KeywordType {
-            Namespace,
-            Module,
-            Empty,
+        export const enum KeywordType {
+            Namespace = "Namespace",
+            Module = "Module",
+            Empty = "Empty"
         }
     }
 
@@ -822,12 +817,81 @@ export namespace JS {
     }
 }
 
+export namespace JSX {
+    /**
+     * Represents a JSX tag. Note that `selfClosing` and `children` are mutually exclusive.
+     * @example <div>{child}</div>
+     */
+    export type Tag =
+        (BaseTag & {
+            readonly selfClosing: J.Space;
+            readonly children?: undefined;
+            readonly closingName?: undefined;
+            readonly afterClosingName?: undefined;
+        }) |
+        (BaseTag & {
+            readonly selfClosing?: undefined;
+            readonly children: (EmbeddedExpression | Tag | J.Identifier | J.Literal | J.Empty)[];
+            readonly closingName: J.LeftPadded<J.Identifier | J.FieldAccess | NamespacedName | J.Empty>;
+            readonly afterClosingName: J.Space;
+        });
+
+    interface BaseTag extends JS, Expression {
+        readonly kind: typeof JS.Kind.JsxTag;
+        readonly openName: J.LeftPadded<J.Identifier | J.FieldAccess | NamespacedName | J.Empty>;
+        readonly afterName: J.Space;
+        readonly attributes: J.RightPadded<Attribute | SpreadAttribute>[];
+    }
+
+    /**
+     * Represents a single JSX attribute.
+     * @example prop="value"
+     */
+    export interface Attribute extends JS {
+        readonly kind: typeof JS.Kind.JsxAttribute;
+        readonly key: J.Identifier | NamespacedName;
+        readonly value?: J.LeftPadded<Expression>;
+    }
+
+    /**
+     * Represents a spread attribute in JSX.
+     * @example {...props}
+     */
+    export interface SpreadAttribute extends JS {
+        readonly kind: typeof JS.Kind.JsxSpreadAttribute;
+        readonly dots: J.Space
+        readonly expression: J.RightPadded<Expression>;
+    }
+
+    /**
+     * Represents a JSX expression container.
+     * @example {expression}
+     */
+    export interface EmbeddedExpression extends JS, Expression {
+        readonly kind: typeof JS.Kind.JsxEmbeddedExpression;
+        readonly expression: J.RightPadded<Expression>;
+    }
+
+    /**
+     * Represents a namespaced JSX name.
+     * @example namespace:Name
+     */
+    export interface NamespacedName extends JS, NameTree {
+        readonly kind: typeof JS.Kind.JsxNamespacedName;
+        readonly namespace: J.Identifier;
+        readonly name: J.LeftPadded<J.Identifier>;
+    }
+}
+
 const KindValues = new Set(Object.values(JS.Kind));
 
 export function isJavaScript(tree: any): tree is JS {
     return KindValues.has(tree["kind"]);
 }
 
+export function isExpressionStatement(tree: any): tree is JS.ExpressionStatement {
+    return tree["kind"] === JS.Kind.ExpressionStatement;
+}
 
 TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => getType(tree.initializer));
 TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: FunctionType) => getType(tree.returnType.element))

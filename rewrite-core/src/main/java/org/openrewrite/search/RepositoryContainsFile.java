@@ -85,7 +85,7 @@ public class RepositoryContainsFile extends ScanningRecipe<AtomicBoolean> {
         //noinspection NullableProblems
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visit(Tree tree, ExecutionContext executionContext) {
+            public Tree visit(Tree tree, ExecutionContext ctx) {
                 if(tree.getMarkers().findFirst(SearchResult.class).isPresent()) {
                     return tree;
                 }

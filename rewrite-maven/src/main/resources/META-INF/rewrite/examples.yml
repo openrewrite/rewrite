@@ -411,12 +411,7 @@ examples:
   - org.openrewrite.maven
   - rewrite-maven-plugin
   - '100.0'
-  - |-
-    <configuration>
-    <activeRecipes>
-    <recipe>io.moderne.FindTest</recipe>
-    </activeRecipes>
-    </configuration>
+  - <configuration><activeRecipes><recipe>io.moderne.FindTest</recipe></activeRecipes></configuration>
   - 'null'
   - 'null'
   - 'null'
@@ -1528,6 +1523,54 @@ examples:
                   <directory>src/resources</directory>
                 </resource>
               </resources>
+          </build>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.OrderPomElements
+examples:
+- description: ''
+  sources:
+  - before: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <artifactId>my-project</artifactId>
+          <groupId>my.org.project</groupId>
+          <version>4.3.0</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <configuration>
+                          <source>1.8</source>
+                          <target>1.8</target>
+                      </configuration>
+                      <version>3.8.1</version>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <groupId>org.apache.maven.plugins</groupId>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    after: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>my.org.project</groupId>
+          <artifactId>my-project</artifactId>
+          <version>4.3.0</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                      <configuration>
+                          <source>1.8</source>
+                          <target>1.8</target>
+                      </configuration>
+                  </plugin>
+              </plugins>
           </build>
       </project>
     path: pom.xml
@@ -2958,6 +3001,149 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.search.ModuleHasDependency
+examples:
+- description: ''
+  parameters:
+  - org.openrewrite
+  - rewrite-maven
+  - 'null'
+  - 8.52.0
+  - 'null'
+  sources:
+  - before: |
+      class A {}
+    after: |
+      /*~~(Module has dependency: org.openrewrite:rewrite-maven:8.52.0)~~>*/class A {}
+    language: java
+  - before: |
+      class B {}
+    language: java
+  - before: multi-project-build
+    language: mavenProject
+  - before: other-project
+    language: mavenProject
+  - before: project-uses-rewrite-maven
+    language: mavenProject
+  - before: |
+      <project>
+          <groupId>org.openrewrite.example</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+          <dependencies>
+              <dependency>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>rewrite-maven</artifactId>
+                  <version>8.52.0</version>
+              </dependency>
+          </dependencies>
+      </project>
+    after: |
+      <!--~~(Module has dependency: org.openrewrite:rewrite-maven:8.52.0)~~>--><project>
+          <groupId>org.openrewrite.example</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+          <dependencies>
+              <dependency>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>rewrite-maven</artifactId>
+                  <version>8.52.0</version>
+              </dependency>
+          </dependencies>
+      </project>
+    path: pom.xml
+    language: xml
+  - before: |
+      <project>
+          <groupId>org.openrewrite.example</groupId>
+          <artifactId>other-project</artifactId>
+          <version>1</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>not-rewrite-maven</artifactId>
+                      <version>3.0.0</version>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.search.ModuleHasPlugin
+examples:
+- description: ''
+  parameters:
+  - org.openrewrite.maven
+  - rewrite-maven-plugin
+  sources:
+  - before: |
+      class A {}
+    after: |
+      /*~~(Module has plugin: org.openrewrite.maven:rewrite-maven-plugin)~~>*/class A {}
+    language: java
+  - before: |
+      class B {}
+    language: java
+  - before: multi-project-build
+    language: mavenProject
+  - before: other-project
+    language: mavenProject
+  - before: project-applies-openrewrite-plugin
+    language: mavenProject
+  - before: |
+      <project>
+          <groupId>org.openrewrite.example</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>6.18.0</version>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    after: |
+      <!--~~(Module has plugin: org.openrewrite.maven:rewrite-maven-plugin)~~>--><project>
+          <groupId>org.openrewrite.example</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>6.18.0</version>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    path: pom.xml
+    language: xml
+  - before: |
+      <project>
+          <groupId>org.openrewrite.example</groupId>
+          <artifactId>other-project</artifactId>
+          <version>1</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>not-rewrite-maven-plugin</artifactId>
+                      <version>6.18.0</version>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.ParentPomInsight
 examples:
 - description: ''
@@ -3053,19 +3239,21 @@ examples:
       3 [label="org.junit.jupiter:junit-jupiter-api:5.7.0"];
       4 [label="org.junit.jupiter:junit-jupiter-params:5.7.0"];
       5 [label="org.junit.jupiter:junit-jupiter-engine:5.7.0"];
-      6 [label="org.apiguardian:apiguardian-api:1.1.0"];
-      7 [label="org.opentest4j:opentest4j:1.2.0"];
-      8 [label="org.junit.platform:junit-platform-commons:1.7.0"];
-      9 [label="org.junit.platform:junit-platform-engine:1.7.0"];
+      6 [label="org.junit:junit-bom:5.7.0"];
+      7 [label="org.apiguardian:apiguardian-api:1.1.0"];
+      8 [label="org.opentest4j:opentest4j:1.2.0"];
+      9 [label="org.junit.platform:junit-platform-commons:1.7.0"];
+      10 [label="org.junit.platform:junit-platform-engine:1.7.0"];
       0 -> 1 [taillabel="Compile"];
       0 -> 2 [taillabel="Test"];
       2 -> 3 [taillabel="Test"];
-      3 -> 6 [taillabel="Test"];
       3 -> 7 [taillabel="Test"];
       3 -> 8 [taillabel="Test"];
+      3 -> 9 [taillabel="Test"];
       2 -> 4 [taillabel="Test"];
       2 -> 5 [taillabel="Test"];
-      5 -> 9 [taillabel="Test"];
+      5 -> 10 [taillabel="Test"];
+      2 -> 6 [taillabel="Test"];
       })~~>--><project>
         <groupId>com.mycompany.app</groupId>
         <artifactId>my-app</artifactId>

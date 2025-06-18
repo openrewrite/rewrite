@@ -17,6 +17,7 @@
  */
 import {RecipeSpec} from "../../../src/test";
 import {JS, typescript} from "../../../src/javascript";
+import {J} from "../../../src/java";
 
 describe('variable declaration mapping', () => {
     const spec = new RecipeSpec();
@@ -32,10 +33,12 @@ describe('variable declaration mapping', () => {
             afterRecipe: (cu: JS.CompilationUnit) => {
                 expect(cu).toBeDefined();
                 expect(cu.statements).toHaveLength(2);
-                cu.statements.forEach(statement => expect(statement.element.kind).toBe(JS.Kind.ScopedVariableDeclarations));
+                cu.statements.forEach(statement => expect(statement.element.kind).toBe(J.Kind.VariableDeclarations));
                 cu.statements.forEach(statement => {
+                    const varDecl = statement.element as J.VariableDeclarations;
                     expect(statement.after.comments).toHaveLength(0);
                     expect(statement.after.whitespace).toBe('');
+                    expect(varDecl.variables.length).toBe(1);
                 });
             }
         }));

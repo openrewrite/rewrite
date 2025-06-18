@@ -289,6 +289,8 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             }
             if (docTree instanceof DCTree.DCText) {
                 body.addAll(visitText(((DCTree.DCText) docTree).getBody()));
+            } else if (docTree instanceof DCTree.DCComment) {
+                body.addAll(visitText(((DCTree.DCComment) docTree).getBody()));
             } else {
                 body.add((Javadoc) scan(docTree, body));
             }
@@ -619,11 +621,14 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         methodRefType
                 );
             } else {
+                if (qualifier == null) {
+                    return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name.getSimpleName(), qualifierType, fieldRefType);
+                }
                 return new J.MemberReference(
                         randomId(),
-                        qualifier == null ? Space.EMPTY : qualifier.getPrefix(),
+                        qualifier.getPrefix(),
                         Markers.EMPTY,
-                        qualifier == null ? null : JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
+                        JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
                         JContainer.empty(),
                         JLeftPadded.build(name),
                         null,
@@ -1013,9 +1018,14 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         if (cursor < source.length()) {
             int tempCursor = cursor;
             List<Javadoc> end = whitespaceBefore();
-            if (cursor < source.length() && source.charAt(cursor) == '}') {
-                end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
-                cursor++;
+            if (cursor < source.length()) {
+                boolean containsEndLine = end.stream().anyMatch(p -> p instanceof Javadoc.LineBreak);
+                if (source.charAt(cursor) == '}') {
+                    end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
+                    cursor++;
+                } else if (containsEndLine) {
+                    end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, ""));
+                }
                 return end;
             } else {
                 cursor = tempCursor;
@@ -1150,6 +1160,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
             NameTree id = (NameTree) javaVisitor.scan(node.getType(), Space.EMPTY);
             List<JRightPadded<Expression>> expressions = new ArrayList<>(node.getTypeArguments().size());
+            String spaceBeforeTypeParams = whitespaceBeforeAsString();
             cursor += 1; // skip '<', JavaDocVisitor does not interpret List <Integer> as Parameterized.
             int argsSize = node.getTypeArguments().size();
             for (int i = 0; i < argsSize; i++) {
@@ -1164,7 +1175,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 expression = expression.withAfter(after);
                 expressions.add(expression);
             }
-            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions), typeMapping.type(node));
+            JContainer<Expression> typeArgs = JContainer.build(expressions)
+                    .withBefore(Space.build(spaceBeforeTypeParams, emptyList()));
+            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, typeArgs, typeMapping.type(node));
         }
     }
 }
