@@ -15,7 +15,6 @@
  */
 package org.openrewrite.javascript.rpc;
 
-import org.jspecify.annotations.NonNull;
 import org.junit.platform.suite.api.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -57,7 +56,6 @@ public class JavaToJavaScriptRpcTest {
                     .nodePath(Path.of("node"))
                     .installationDirectory(Path.of("./rewrite/dist"))
 //                    .socket(12345)
-                    .batchSize(20)
                     .timeout(Duration.ofMinutes(10))
                     .build();
 
@@ -71,7 +69,7 @@ public class JavaToJavaScriptRpcTest {
 
                   return new JavaVisitor<>() {
                       @Override
-                      public J preVisit(@NonNull J tree, @NonNull ExecutionContext ctx) {
+                      public J preVisit(J tree, ExecutionContext ctx) {
                           SourceFile t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
                           try {
                               assertThat(t.printAll()).isEqualTo(((SourceFile) tree).printAll());

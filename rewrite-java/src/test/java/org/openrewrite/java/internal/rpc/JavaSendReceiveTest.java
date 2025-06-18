@@ -53,15 +53,15 @@ class JavaSendReceiveTest implements RewriteTest {
 
         server = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("server",
           new HeaderDelimitedMessageHandler(serverIn, serverOut))))
-          .batchSize(1)
           .timeout(Duration.ofSeconds(10))
-          .build();
+          .build()
+          .batchSize(1);
 
         client = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("client",
           new HeaderDelimitedMessageHandler(clientIn, clientOut))))
-          .batchSize(1)
           .timeout(Duration.ofSeconds(10))
-          .build();
+          .build()
+          .batchSize(1);
     }
 
     @AfterEach

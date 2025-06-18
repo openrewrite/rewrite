@@ -15,6 +15,8 @@
  */
 package org.openrewrite.rpc;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
@@ -25,6 +27,7 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
 import org.openrewrite.tree.ParseError;
@@ -63,7 +66,7 @@ public abstract class RewriteRpc implements AutoCloseable {
         return new Builder() {
             @Override
             public RewriteRpc build() {
-                RewriteRpc rewriteRpc = new RewriteRpc(Objects.requireNonNull(marketplace), batchSize, timeout) {
+                RewriteRpc rewriteRpc = new RewriteRpc(Objects.requireNonNull(marketplace), timeout) {
                     @Override
                     protected JsonRpc createJsonRpc() {
                         return jsonRpc.get();
@@ -88,7 +91,7 @@ public abstract class RewriteRpc implements AutoCloseable {
         private static final ThreadLocal<Context> CURRENT_CONTEXT = ThreadLocal.withInitial(() -> new Context(null));
 
         private final @Nullable Context parent;
-        private final Map<Class<?>, @Nullable WeakReference<?>> clients = new HashMap<>();
+        private final Map<Class<?>, @Nullable WeakReference<?>> values = new HashMap<>();
         private boolean frozen;
 
         /**
@@ -112,11 +115,11 @@ public abstract class RewriteRpc implements AutoCloseable {
             if (frozen) {
                 // Create new mutable context with this as parent
                 Context newContext = new Context(this);
-                newContext.clients.put(rpc.getClass(), new WeakReference<>(rpc));
+                newContext.values.put(rpc.getClass(), new WeakReference<>(rpc));
                 return newContext;
             } else {
                 // Mutate this context
-                this.clients.put(rpc.getClass(), new WeakReference<>(rpc));
+                this.values.put(rpc.getClass(), new WeakReference<>(rpc));
                 return this;
             }
         }
@@ -154,7 +157,7 @@ public abstract class RewriteRpc implements AutoCloseable {
             Context current = this;
 
             while (current != null) {
-                WeakReference<?> ref = current.clients.get(clientClass);
+                WeakReference<?> ref = current.values.get(clientClass);
                 if (ref != null) {
                     Object client = ref.get();
                     if (client != null) {
@@ -192,9 +195,9 @@ public abstract class RewriteRpc implements AutoCloseable {
             Context current = CURRENT_CONTEXT.get();
             if (current == this) {
                 // Only clean up if this context is currently active
-                WeakReference<?> ref = this.clients.get(clientClass);
+                WeakReference<?> ref = this.values.get(clientClass);
                 if (ref != null && ref.get() == null) {
-                    this.clients.remove(clientClass);
+                    this.values.remove(clientClass);
                 }
             }
         }
@@ -219,7 +222,6 @@ public abstract class RewriteRpc implements AutoCloseable {
     public abstract static class Builder<T extends Builder<T>> {
         protected Environment marketplace = Environment.builder().build();
         protected Duration timeout = Duration.ofMinutes(1);
-        protected int batchSize = 100;
         protected boolean start = false;
 
         public T marketplace(Environment marketplace) {
@@ -229,11 +231,6 @@ public abstract class RewriteRpc implements AutoCloseable {
 
         public T timeout(Duration timeout) {
             this.timeout = timeout;
-            return (T) this;
-        }
-
-        public T batchSize(int batchSize) {
-            this.batchSize = batchSize;
             return (T) this;
         }
 
@@ -261,13 +258,13 @@ public abstract class RewriteRpc implements AutoCloseable {
      * visits and other operations for which incremental state sharing is useful
      * between two processes.
      */
-    private final Map<String, Object> remoteObjects = new HashMap<>();
+    private final Cache<String, Object> remoteObjects = Caffeine.newBuilder().softValues().build();
 
     @VisibleForTesting
-    final Map<String, Object> localObjects = new HashMap<>();
+    final Cache<String, Object> localObjects = Caffeine.newBuilder().softValues().build();
 
     /* A reverse map of the objects back to their IDs */
-    final Map<Object, String> localObjectIds = new IdentityHashMap<>();
+    final Map<Object, String> localObjectIds = new SoftIdentityHashMap<>();
 
     private final Map<Integer, Object> remoteRefs = new HashMap<>();
 
@@ -279,9 +276,8 @@ public abstract class RewriteRpc implements AutoCloseable {
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
      */
-    protected RewriteRpc(Environment marketplace, int batchSize, Duration timeout) {
+    protected RewriteRpc(Environment marketplace, Duration timeout) {
         this.marketplace = marketplace;
-        this.batchSize.set(batchSize);
         this.timeout = timeout;
     }
 
@@ -318,6 +314,11 @@ public abstract class RewriteRpc implements AutoCloseable {
     }
 
     protected abstract JsonRpc createJsonRpc();
+
+    public RewriteRpc batchSize(int batchSize) {
+        this.batchSize.set(batchSize);
+        return this;
+    }
 
     public RewriteRpc traceGetObjectOutput() {
         this.traceSendPackets.set(true);
@@ -408,6 +409,12 @@ public abstract class RewriteRpc implements AutoCloseable {
 
     public Recipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+        // FIXME do this validation on the server side instead
+        for (OptionDescriptor option : r.getDescriptor().getOptions()) {
+            if (option.isRequired() && !options.containsKey(option.getName())) {
+                throw new IllegalArgumentException("Missing required option `" + option.getName() + "` for recipe `" + id + "`.");
+            }
+        }
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
     }
 
@@ -528,7 +535,7 @@ public abstract class RewriteRpc implements AutoCloseable {
         ensureInitialized();
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
                 new GetObject(id), GetObjectResponse.class));
-        Object remoteObject = q.receive(localObjects.get(id), null);
+        Object remoteObject = q.receive(localObjects.getIfPresent(id), null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }

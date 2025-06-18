@@ -55,8 +55,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     private final CloseableSupplier<JsonRpc> supplier;
 
-    private JavaScriptRewriteRpc(CloseableSupplier<JsonRpc> supplier, Environment marketplace, int batchSize, Duration timeout) {
-        super(marketplace, batchSize, timeout);
+    private JavaScriptRewriteRpc(CloseableSupplier<JsonRpc> supplier, Environment marketplace, Duration timeout) {
+        super(marketplace, timeout);
         this.supplier = supplier;
     }
 
@@ -203,7 +203,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                             throw new UncheckedIOException(e);
                         }
                     }
-                }, marketplace, batchSize, timeout);
+                }, marketplace, timeout);
             } else {
                 // Use default installation directory if none provided (lazy-loaded)
                 Path effectiveInstallationDirectory = installationDirectory != null
@@ -245,7 +245,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                             }
                         }
                     }
-                }, marketplace, batchSize, timeout);
+                }, marketplace, timeout);
             }
 
             if (start) {
