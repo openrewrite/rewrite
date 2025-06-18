@@ -758,7 +758,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             method.select && await this.visitRightPadded(method.select, p);
         } else {
             method.select && await this.visitRightPaddedLocalSingle(method.select, "", p);
-            if (method.select) {
+            if (method.select && !method.select.element.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
                 p.append(".");
             }
             await this.visit(method.name, p);

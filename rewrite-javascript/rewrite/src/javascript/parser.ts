@@ -1806,25 +1806,33 @@ export class JavaScriptParserVisitor {
             type: undefined,
             fieldType: undefined
         };
-
         if (ts.isIdentifier(node.expression) && !node.questionDotToken) {
             select = undefined;
             name = this.convert(node.expression);
         } else if (node.questionDotToken) {
             select = this.rightPadded(
                 produce(this.convert<Expression>(node.expression), draft => {
-                    if (node.questionDotToken) {
-                        draft.markers.markers.push({
-                            kind: JS.Markers.Optional,
-                            id: randomId(),
-                            prefix: this.suffix(node.expression)
-                        } as Optional);
-                    }
+                    draft.markers.markers.push({
+                        kind: JS.Markers.Optional,
+                        id: randomId(),
+                        prefix: this.suffix(node.expression)
+                    } as Optional);
                 }),
                 emptySpace
             )
         } else if (ts.isPropertyAccessExpression(node.expression)) {
+            const hasQuestionDotToken = node.expression.questionDotToken !== undefined;
             select = this.rightPadded(this.visit(node.expression.expression), this.suffix(node.expression.expression));
+            if (hasQuestionDotToken) {
+                select = produce(select, draft => {
+                    draft!.element.markers.markers.push({
+                        kind: JS.Markers.Optional,
+                        id: randomId(),
+                        prefix: draft.after
+                    } as Optional);
+                    draft.after = emptySpace;
+                });
+            }
             name = this.visit(node.expression.name);
         } else {
             select = this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
