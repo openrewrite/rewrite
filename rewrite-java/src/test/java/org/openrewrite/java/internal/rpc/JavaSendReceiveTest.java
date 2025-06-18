@@ -19,7 +19,6 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.SneakyThrows;
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -51,13 +50,13 @@ class JavaSendReceiveTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        server = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("server",
+        server = RewriteRpc.from(new JsonRpc(new TraceMessageHandler("server",
           new HeaderDelimitedMessageHandler(serverIn, serverOut))))
           .timeout(Duration.ofSeconds(10))
           .build()
           .batchSize(1);
 
-        client = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("client",
+        client = RewriteRpc.from(new JsonRpc(new TraceMessageHandler("client",
           new HeaderDelimitedMessageHandler(clientIn, clientOut))))
           .timeout(Duration.ofSeconds(10))
           .build()
@@ -75,7 +74,7 @@ class JavaSendReceiveTest implements RewriteTest {
         spec.recipe(toRecipe(() -> new TreeVisitor<>() {
             @SneakyThrows
             @Override
-            public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 Tree t = server.visit((SourceFile) tree, ChangeValue.class.getName(), 0);
                 stopAfterPreVisit();
                 return requireNonNull(t);

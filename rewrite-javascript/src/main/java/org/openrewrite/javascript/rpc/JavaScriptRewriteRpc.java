@@ -56,13 +56,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     private final CloseableSupplier<JsonRpc> supplier;
 
     private JavaScriptRewriteRpc(CloseableSupplier<JsonRpc> supplier, Environment marketplace, Duration timeout) {
-        super(marketplace, timeout);
+        super(supplier.get(), marketplace, timeout);
         this.supplier = supplier;
-    }
-
-    @Override
-    protected JsonRpc createJsonRpc() {
-        return supplier.get();
     }
 
     @Override
@@ -246,10 +241,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         }
                     }
                 }, marketplace, timeout);
-            }
-
-            if (start) {
-                rewriteRpc.ensureInitialized();
             }
 
             return rewriteRpc;
