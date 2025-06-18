@@ -124,6 +124,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Value
     public static class DependencyVersionState {
+        Map<String, Map<GroupArtifact, Set<String>>> variableNames = new HashMap<>();
         Map<String, GroupArtifact> versionPropNameToGA = new HashMap<>();
 
         /**
@@ -134,7 +135,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         Map<String, Map<GroupArtifact, Set<String>>> configurationPerGAPerModule = new HashMap<>();
         Set<GradleProject> modules = new HashSet<>();
-        Map<String, Map<GroupArtifact, Set<String>>> variableNames = new HashMap<>();
     }
 
     @Override
@@ -402,8 +402,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             private void gatherVariables(J.MethodInvocation method) {
-                J.MethodInvocation m = method;
-                m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                List<Expression> depArgs = method.getArguments();
+                if (depArgs.size() == 1) {
+                    Expression arg = depArgs.get(0);
                     J.Literal groupArtifact = null;
                     Object versionVariable = null;
                     if (arg instanceof G.GString) {
@@ -427,10 +428,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     .add(method.getSimpleName());
                         }
                     }
-                    return arg;
-                }));
-                List<Expression> depArgs = m.getArguments();
-                if (depArgs.size() >= 3) {
+                } else if (depArgs.size() >= 3) {
                     Expression groupValue = null;
                     Expression artifactValue = null;
                     Expression versionExp = null;
@@ -447,13 +445,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (groupValue instanceof J.Literal && artifactValue instanceof J.Literal && versionExp instanceof J.Identifier) {
                         J.Literal groupLiteral = (J.Literal) groupValue;
                         J.Literal artifactLiteral = (J.Literal) artifactValue;
-                        if (groupLiteral.getValue() == null || artifactLiteral.getValue() == null || !shouldResolveVersion((String) groupLiteral.getValue(), (String) artifactLiteral.getValue())) {
-                            return;
+                        if (groupLiteral.getValue() instanceof String && artifactLiteral.getValue() instanceof String && shouldResolveVersion((String) groupLiteral.getValue(), (String) artifactLiteral.getValue())) {
+                            String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
+                            acc.variableNames.computeIfAbsent(versionVariableName, it -> new HashMap<>())
+                                    .computeIfAbsent(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()), it -> new HashSet<>())
+                                    .add(method.getSimpleName());
                         }
-                        String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
-                        acc.variableNames.computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                                .computeIfAbsent(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()), it -> new HashSet<>())
-                                .add(m.getSimpleName());
                     }
                 }
             }
@@ -616,45 +613,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         private J.MethodInvocation updateDependency(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = method;
             m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                if (arg instanceof G.GString) {
-                    G.GString gString = (G.GString) arg;
-                    List<J> strings = gString.getStrings();
-                    if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
-                        return arg;
-                    }
-                    J.Literal groupArtifact = (J.Literal) strings.get(0);
-                    G.GString.Value versionValue = (G.GString.Value) strings.get(1);
-                    if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
-                        return arg;
-                    }
-                    Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                    if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
-                        Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
-                        if (scanResult instanceof Exception) {
-                            getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, scanResult);
-                            return arg;
-                        }
-                    }
-                } else if (arg instanceof K.StringTemplate) {
-                    K.StringTemplate template = (K.StringTemplate) arg;
-                    List<J> strings = template.getStrings();
-                    if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof K.StringTemplate.Expression)) {
-                        return arg;
-                    }
-                    J.Literal groupArtifact = (J.Literal) strings.get(0);
-                    K.StringTemplate.Expression versionValue = (K.StringTemplate.Expression) strings.get(1);
-                    if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
-                        return arg;
-                    }
-                    Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                    if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
-                        Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
-                        if (scanResult instanceof Exception) {
-                            getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, scanResult);
-                            return arg;
-                        }
-                    }
-                } else if (arg instanceof J.Literal) {
+                if (arg instanceof J.Literal) {
                     J.Literal literal = (J.Literal) arg;
                     if (literal.getType() != JavaType.Primitive.String) {
                         return arg;
