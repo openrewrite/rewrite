@@ -58,12 +58,12 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc implements AutoCloseable {
 
-    public static Builder<?> from(JsonRpc jsonRpc) {
+    public static Builder<?> from(JsonRpc jsonRpc, Environment marketplace) {
         //noinspection rawtypes
-        return new Builder() {
+        return new Builder(marketplace) {
             @Override
             public RewriteRpc build() {
-                return new RewriteRpc(jsonRpc, Objects.requireNonNull(marketplace), timeout);
+                return new RewriteRpc(jsonRpc, marketplace, timeout);
             }
         };
     }
@@ -208,12 +208,11 @@ public class RewriteRpc implements AutoCloseable {
 
     @SuppressWarnings("unchecked")
     public abstract static class Builder<T extends Builder<T>> {
-        protected Environment marketplace = Environment.builder().build();
+        protected final Environment marketplace;
         protected Duration timeout = Duration.ofMinutes(1);
 
-        public T marketplace(Environment marketplace) {
+        protected Builder(Environment marketplace) {
             this.marketplace = marketplace;
-            return (T) this;
         }
 
         public T timeout(Duration timeout) {

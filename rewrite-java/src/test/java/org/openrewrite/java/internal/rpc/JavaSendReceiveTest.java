@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.rpc.RewriteRpc;
@@ -50,14 +51,16 @@ class JavaSendReceiveTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
+        Environment env = Environment.builder().build();
+
         server = RewriteRpc.from(new JsonRpc(new TraceMessageHandler("server",
-          new HeaderDelimitedMessageHandler(serverIn, serverOut))))
+          new HeaderDelimitedMessageHandler(serverIn, serverOut))), env)
           .timeout(Duration.ofSeconds(10))
           .build()
           .batchSize(1);
 
         client = RewriteRpc.from(new JsonRpc(new TraceMessageHandler("client",
-          new HeaderDelimitedMessageHandler(clientIn, clientOut))))
+          new HeaderDelimitedMessageHandler(clientIn, clientOut))), env)
           .timeout(Duration.ofSeconds(10))
           .build()
           .batchSize(1);

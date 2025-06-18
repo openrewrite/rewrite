@@ -56,14 +56,12 @@ class RewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        client = RewriteRpc.from(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)))
-          .marketplace(env)
+        client = RewriteRpc.from(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env)
           .timeout(Duration.ofMinutes(10))
           .build()
           .batchSize(1);
 
-        server = RewriteRpc.from(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)))
-          .marketplace(env)
+        server = RewriteRpc.from(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env)
           .timeout(Duration.ofMinutes(10))
           .build()
           .batchSize(1);

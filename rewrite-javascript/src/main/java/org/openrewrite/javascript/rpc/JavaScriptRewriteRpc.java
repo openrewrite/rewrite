@@ -87,16 +87,16 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         ).getRecipesInstalled();
     }
 
-    public static Builder bundledInstallation() {
-        return builder();
+    public static Builder bundledInstallation(Environment marketplace) {
+        return builder(marketplace);
     }
 
-    public static Builder bundledInstallation(Path installationDirectory) {
-        return builder().installationDirectory(extractBundledInstallation(installationDirectory));
+    public static Builder bundledInstallation(Environment marketplace, Path installationDirectory) {
+        return builder(marketplace).installationDirectory(extractBundledInstallation(installationDirectory));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public static Builder builder(Environment marketplace) {
+        return new Builder(marketplace);
     }
 
     public static class Builder extends RewriteRpc.Builder<Builder> {
@@ -108,6 +108,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private int port;
         private boolean trace;
         private @Nullable Path logFile;
+
+        private Builder(Environment marketplace) {
+            super(marketplace);
+        }
 
         private static Path getBundledInstallationDirectory() {
             if (bundledInstallationDirectory == null) {

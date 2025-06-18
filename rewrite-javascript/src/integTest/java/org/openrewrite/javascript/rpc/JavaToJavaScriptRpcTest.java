@@ -19,6 +19,7 @@ import org.junit.platform.suite.api.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
+import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
@@ -52,7 +53,7 @@ public class JavaToJavaScriptRpcTest {
           .recipe(toRecipe(() -> {
               try {
                   PrintStream log = new PrintStream(new FileOutputStream("rpc.java.log"));
-                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder()
+                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder(Environment.builder().build())
                     .nodePath(Path.of("node"))
                     .installationDirectory(Path.of("./rewrite/dist"))
 //                    .socket(12345)

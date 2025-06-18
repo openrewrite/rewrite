@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -56,7 +57,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @BeforeEach
     void before() throws FileNotFoundException {
         this.log = new PrintStream(new FileOutputStream("rpc.java.log"));
-        this.client = JavaScriptRewriteRpc.builder()
+        this.client = JavaScriptRewriteRpc.builder(Environment.builder().build())
           .nodePath(Path.of("node"))
           .installationDirectory(Path.of("./rewrite/dist"))
 //          .inspectAndBreak()

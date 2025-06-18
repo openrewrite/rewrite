@@ -21,6 +21,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
@@ -205,7 +206,7 @@ public interface JS extends J {
                                 p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
                                 return tree;
                             }).orElseGet(() -> {
-                                try (RewriteRpc localRpc = JavaScriptRewriteRpc.bundledInstallation().build()) {
+                                try (RewriteRpc localRpc = JavaScriptRewriteRpc.bundledInstallation(Environment.builder().build()).build()) {
                                     Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
                                     p.append(localRpc.print(tree, cursor, mappedMarkerPrinter));
                                     return tree;

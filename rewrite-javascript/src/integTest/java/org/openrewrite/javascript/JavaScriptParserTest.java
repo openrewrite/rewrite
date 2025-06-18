@@ -24,6 +24,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.config.Environment;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.rpc.RewriteRpc;
@@ -48,7 +49,7 @@ class JavaScriptParserTest {
 
     @BeforeEach
     void before() {
-        this.rewriteRpc = JavaScriptRewriteRpc.builder()
+        this.rewriteRpc = JavaScriptRewriteRpc.builder(Environment.builder().build())
           .nodePath(Path.of("node"))
           .installationDirectory(Path.of("./rewrite/dist"))
 //          .inspectAndBreak()
