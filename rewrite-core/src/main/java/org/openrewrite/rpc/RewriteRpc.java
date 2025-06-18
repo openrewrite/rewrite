@@ -15,8 +15,6 @@
  */
 package org.openrewrite.rpc;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
@@ -258,13 +256,13 @@ public abstract class RewriteRpc implements AutoCloseable {
      * visits and other operations for which incremental state sharing is useful
      * between two processes.
      */
-    private final Cache<String, Object> remoteObjects = Caffeine.newBuilder().softValues().build();
+    private final Map<String, Object> remoteObjects = new HashMap<>();
 
     @VisibleForTesting
-    final Cache<String, Object> localObjects = Caffeine.newBuilder().softValues().build();
+    final Map<String, Object> localObjects = new HashMap<>();
 
     /* A reverse map of the objects back to their IDs */
-    final Map<Object, String> localObjectIds = new SoftIdentityHashMap<>();
+    final Map<Object, String> localObjectIds = new IdentityHashMap<>();
 
     private final Map<Integer, Object> remoteRefs = new HashMap<>();
 
@@ -535,7 +533,7 @@ public abstract class RewriteRpc implements AutoCloseable {
         ensureInitialized();
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
                 new GetObject(id), GetObjectResponse.class));
-        Object remoteObject = q.receive(localObjects.getIfPresent(id), null);
+        Object remoteObject = q.receive(localObjects.get(id), null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
