@@ -1821,9 +1821,8 @@ export class JavaScriptParserVisitor {
                 emptySpace
             )
         } else if (ts.isPropertyAccessExpression(node.expression)) {
-            const hasQuestionDotToken = node.expression.questionDotToken !== undefined;
             select = this.rightPadded(this.visit(node.expression.expression), this.suffix(node.expression.expression));
-            if (hasQuestionDotToken) {
+            if (node.expression.questionDotToken) {
                 select = produce(select, draft => {
                     draft!.element.markers.markers.push({
                         kind: JS.Markers.Optional,
