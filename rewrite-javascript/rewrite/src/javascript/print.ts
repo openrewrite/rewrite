@@ -1094,18 +1094,18 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return mappedTypeParameter;
     }
 
-    override async visitObjectBindingDeclarations(objectBindingDeclarations: JS.ObjectBindingDeclarations, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(objectBindingDeclarations, p);
-        await this.visitNodes(objectBindingDeclarations.leadingAnnotations, p);
-        for (const m of objectBindingDeclarations.modifiers) {
+    override async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(objectBindingPattern, p);
+        await this.visitNodes(objectBindingPattern.leadingAnnotations, p);
+        for (const m of objectBindingPattern.modifiers) {
             await this.visitModifier(m, p);
         }
 
-        objectBindingDeclarations.typeExpression && await this.visit(objectBindingDeclarations.typeExpression, p);
-        await this.visitContainerLocal("{", objectBindingDeclarations.bindings, ",", "}", p);
-        objectBindingDeclarations.initializer && await this.visitLeftPaddedLocal("=", objectBindingDeclarations.initializer, p);
-        await this.afterSyntax(objectBindingDeclarations, p);
-        return objectBindingDeclarations;
+        objectBindingPattern.typeExpression && await this.visit(objectBindingPattern.typeExpression, p);
+        await this.visitContainerLocal("{", objectBindingPattern.bindings, ",", "}", p);
+        objectBindingPattern.initializer && await this.visitLeftPaddedLocal("=", objectBindingPattern.initializer, p);
+        await this.afterSyntax(objectBindingPattern, p);
+        return objectBindingPattern;
     }
 
     override async visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, p: PrintOutputCapture): Promise<J | undefined> {

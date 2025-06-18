@@ -138,14 +138,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
                         .stream()
                         .filter(dep -> dep.getDepth() > 0)
                         .collect(toCollection(LinkedHashSet::new));
-                if(matchingDependencies.isEmpty()) {
+                if (matchingDependencies.isEmpty()) {
                     return document;
                 }
                 Xml.Document d = document;
                 for (ResolvedDependency matchingDependency : matchingDependencies) {
                     d = (Xml.Document) addManagedDependency(matchingDependency.getGroupId(), matchingDependency.getArtifactId())
                             .getVisitor(acc)
-                            .visitNonNull(document, ctx);
+                            .visitNonNull(d, ctx);
                 }
                 return d;
             }

@@ -170,6 +170,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             case Spaceship:
                 keyword = "<=>";
                 break;
+            case ElvisAssignment:
+                keyword = "?=";
+                break;
         }
         beforeSyntax(binary, GSpace.Location.BINARY_PREFIX, p);
         visit(binary.getLeft(), p);

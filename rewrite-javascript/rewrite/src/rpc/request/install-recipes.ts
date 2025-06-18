@@ -65,6 +65,7 @@ export class InstallRecipes {
 
             let recipeModule;
             try {
+                setupSharedDependencies(resolvedPath);
                 recipeModule = require(resolvedPath);
             } catch (e: any) {
                 throw new Error(`Failed to load recipe module from ${resolvedPath}: ${e.stack}`);
@@ -79,4 +80,30 @@ export class InstallRecipes {
             return {recipesInstalled: registry.all.size - beforeInstall};
         });
     }
+}
+
+function setupSharedDependencies(targetModulePath: string) {
+    const sharedDeps = [
+        '@openrewrite/rewrite',
+        'vscode-jsonrpc',
+    ];
+
+    sharedDeps.forEach(dep => {
+        try {
+            // Get your already-loaded version
+            const yourDepPath = require.resolve(dep);
+            const yourModule = require.cache[yourDepPath];
+
+            if (yourModule) {
+                // Find where the target would look for this dependency
+                const targetDir = path.dirname(targetModulePath);
+                const targetDepPath = require.resolve(dep, { paths: [targetDir] });
+
+                // Make the target use your cached version
+                require.cache[targetDepPath] = yourModule;
+            }
+        } catch (e) {
+            // Module not found or not resolvable, skip
+        }
+    });
 }
