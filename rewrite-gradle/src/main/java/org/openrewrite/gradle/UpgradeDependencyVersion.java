@@ -57,7 +57,6 @@ import static java.util.Collections.*;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVersion.DependencyVersionState> {
-    private static final String VERSION_VARIABLE_KEY = "VERSION_VARIABLE";
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
 
     @EqualsAndHashCode.Exclude
@@ -135,6 +134,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         Map<String, Map<GroupArtifact, Set<String>>> configurationPerGAPerModule = new HashMap<>();
         Set<GradleProject> modules = new HashSet<>();
+        Map<String, Map<GroupArtifact, Set<String>>> variableNames = new HashMap<>();
     }
 
     @Override
@@ -173,6 +173,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
 
                 if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
+                    List<Expression> depArgs = m.getArguments();
+                    if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof J.Assignment || depArgs.get(0) instanceof K.StringTemplate) {
+                        gatherVariables(m);
+                    } else if (depArgs.get(0) instanceof J.MethodInvocation &&
+                            (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                                    ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                        gatherVariables((J.MethodInvocation) depArgs.get(0));
+                    }
+
                     if (m.getArguments().get(0) instanceof G.MapEntry) {
                         String declaredGroupId = null;
                         String declaredArtifactId = null;
@@ -391,6 +400,63 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return (groupId == null || artifactId == null) ||
                         new DependencyMatcher(groupId, artifactId, null).matches(declaredGroupId, declaredArtifactId);
             }
+
+            private void gatherVariables(J.MethodInvocation method) {
+                J.MethodInvocation m = method;
+                m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                    J.Literal groupArtifact = null;
+                    Object versionVariable = null;
+                    if (arg instanceof G.GString) {
+                        List<J> strings = ((G.GString) arg).getStrings();
+                        if (strings.size() == 2 && strings.get(0) instanceof J.Literal && strings.get(1) instanceof G.GString.Value) {
+                            groupArtifact = (J.Literal) strings.get(0);
+                            versionVariable = ((G.GString.Value) strings.get(1)).getTree();
+                        }
+                    } else if (arg instanceof K.StringTemplate) {
+                        List<J> strings = ((K.StringTemplate) arg).getStrings();
+                        if (strings.size() == 2 && strings.get(0) instanceof J.Literal && strings.get(1) instanceof K.StringTemplate.Expression) {
+                            groupArtifact = (J.Literal) strings.get(0);
+                            versionVariable = ((K.StringTemplate.Expression) strings.get(1)).getTree();
+                        }
+                    }
+                    if (groupArtifact != null && groupArtifact.getValue() instanceof String && versionVariable instanceof J.Identifier) {
+                        Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                        if (dep != null && shouldResolveVersion(dep.getGroupId(), dep.getArtifactId())) {
+                            acc.variableNames.computeIfAbsent(((J.Identifier) versionVariable).getSimpleName(), it -> new HashMap<>())
+                                    .computeIfAbsent(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), it -> new HashSet<>())
+                                    .add(method.getSimpleName());
+                        }
+                    }
+                    return arg;
+                }));
+                List<Expression> depArgs = m.getArguments();
+                if (depArgs.size() >= 3) {
+                    Expression groupValue = null;
+                    Expression artifactValue = null;
+                    Expression versionExp = null;
+                    if (depArgs.get(0) instanceof G.MapEntry && depArgs.get(1) instanceof G.MapEntry && depArgs.get(2) instanceof G.MapEntry) {
+                        groupValue = ((G.MapEntry) depArgs.get(0)).getValue();
+                        artifactValue = ((G.MapEntry) depArgs.get(1)).getValue();
+                        versionExp = ((G.MapEntry) depArgs.get(2)).getValue();
+
+                    } else if (depArgs.get(0) instanceof J.Assignment && depArgs.get(1) instanceof J.Assignment && depArgs.get(2) instanceof J.Assignment) {
+                        groupValue = ((J.Assignment) depArgs.get(0)).getAssignment();
+                        artifactValue = ((J.Assignment) depArgs.get(1)).getAssignment();
+                        versionExp = ((J.Assignment) depArgs.get(2)).getAssignment();
+                    }
+                    if (groupValue instanceof J.Literal && artifactValue instanceof J.Literal && versionExp instanceof J.Identifier) {
+                        J.Literal groupLiteral = (J.Literal) groupValue;
+                        J.Literal artifactLiteral = (J.Literal) artifactValue;
+                        if (groupLiteral.getValue() == null || artifactLiteral.getValue() == null || !shouldResolveVersion((String) groupLiteral.getValue(), (String) artifactLiteral.getValue())) {
+                            return;
+                        }
+                        String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
+                        acc.variableNames.computeIfAbsent(versionVariableName, it -> new HashMap<>())
+                                .computeIfAbsent(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()), it -> new HashSet<>())
+                                .add(m.getSimpleName());
+                    }
+                }
+            }
         };
     }
 
@@ -520,8 +586,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         public J postVisit(J tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
-                Map<String, Map<GroupArtifact, Set<String>>> variableNames = getCursor().getMessage(VERSION_VARIABLE_KEY);
-                if (variableNames != null) {
+                Map<String, Map<GroupArtifact, Set<String>>> variableNames = acc.getVariableNames();
+                if (!variableNames.isEmpty()) {
                     cu = (JavaSourceFile) new UpdateVariable(variableNames, gradleProject).visitNonNull(cu, ctx);
                 }
                 return cu;
@@ -568,13 +634,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, scanResult);
                             return arg;
                         }
-
-                        String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
-                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
-                                .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
-                                .computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                                .computeIfAbsent(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), it -> new HashSet<>())
-                                .add(method.getSimpleName());
                     }
                 } else if (arg instanceof K.StringTemplate) {
                     K.StringTemplate template = (K.StringTemplate) arg;
@@ -594,13 +653,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, scanResult);
                             return arg;
                         }
-
-                        String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
-                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
-                                .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
-                                .computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                                .computeIfAbsent(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), it -> new HashSet<>())
-                                .add(method.getSimpleName());
                     }
                 } else if (arg instanceof J.Literal) {
                     J.Literal literal = (J.Literal) arg;
@@ -696,13 +748,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         newArgs.addAll(depArgs.subList(3, depArgs.size()));
 
                         return m.withArguments(newArgs);
-                    } else if (versionExp instanceof J.Identifier) {
-                        String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
-                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
-                                .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
-                                .computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                                .computeIfAbsent(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()), it -> new HashSet<>())
-                                .add(m.getSimpleName());
                     }
                 } else if (depArgs.get(0) instanceof J.Assignment &&
                         depArgs.get(1) instanceof J.Assignment &&
@@ -752,13 +797,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         newArgs.addAll(depArgs.subList(3, depArgs.size()));
 
                         return m.withArguments(newArgs);
-                    } else if (versionExp instanceof J.Identifier) {
-                        String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
-                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
-                                .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
-                                .computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                                .computeIfAbsent(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()), it -> new HashSet<>())
-                                .add(m.getSimpleName());
                     }
                 }
             }
