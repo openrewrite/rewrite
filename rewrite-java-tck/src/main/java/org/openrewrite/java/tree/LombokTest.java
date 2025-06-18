@@ -201,18 +201,18 @@ class LombokTest implements RewriteTest {
             rewriteRun(
               spec -> spec.parser(JavaParser.fromJavaVersion().classpath("lombok")),
               java(
-                    """
-                import lombok.Builder;
-
-                @Builder
-                public class Clazz {
-
-                    private final String accountID;
-                    private final String documentNumber;
-
-                    public static class ClazzBuilder {}
-                }
                 """
+                  import lombok.Builder;
+                  
+                  @Builder
+                  public class Clazz {
+                  
+                      private final String accountID;
+                      private final String documentNumber;
+                  
+                      public static class ClazzBuilder {}
+                  }
+                  """
               )
             );
         }
@@ -742,21 +742,116 @@ class LombokTest implements RewriteTest {
         );
     }
 
-    @Test
-    void val() {
-        rewriteRun(
-          java(
-            """
-              import lombok.val;
-              
-              class A {
-                  void m() {
-                      val foo = "foo";
+    @Nested
+    class Val {
+        @Test
+        void basic() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.val;
+                  
+                  class A {
+                      void m() {
+                          val foo = "foo";
+                      }
                   }
-              }
-              """
-          )
-        );
+                  """
+              )
+            );
+        }
+
+        @Test
+        void method() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.val;
+                  
+                  class A {
+                      String init() {
+                          return "foo";
+                      }
+                      void m() {
+                          val foo = init();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void parameter() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.val;
+                  
+                  class A {
+                      void m(String value) {
+                          val foo = value;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void parameterMethod() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.val;
+                  
+                  class A {
+                      void m(String value) {
+                          val foo = value.strip();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void forEach() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.val;
+                  import java.nio.file.Path;
+                  
+                  class A {
+                      void m(List<Path> paths) {
+                          for(val p : paths) {
+                              System.out.println(p);
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void ternary() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.val;
+                  import java.nio.file.Path;
+                  
+                  class A {
+                      void m(List<Path> paths) {
+                          val first = paths.isEmpty() ? null : paths.get(0);
+                      }
+                  }
+                  """
+              )
+            );
+        }
     }
 
     @Test
