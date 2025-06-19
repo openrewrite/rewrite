@@ -19,6 +19,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.java.trait.ScopedVariable;
 import org.openrewrite.java.tree.*;
 
 import java.text.Normalizer;
