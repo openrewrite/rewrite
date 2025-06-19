@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Collections;
@@ -58,12 +59,12 @@ class GradlePluginTest implements RewriteTest {
               buildGradle(
                 """
                   plugins {
-                      id "org.openrewrite.rewrite" version "8.0.0"
+                      id "org.openrewrite.rewrite" version "7.0.0"
                   }
                   """,
                 """
                   plugins {
-                      /*~~(org.openrewrite.rewrite:8.0.0)~~>*/id "org.openrewrite.rewrite" version "8.0.0"
+                      /*~~(org.openrewrite.rewrite:7.0.0)~~>*/id "org.openrewrite.rewrite" version "7.0.0"
                   }
                   """
               )
@@ -74,6 +75,22 @@ class GradlePluginTest implements RewriteTest {
         void externalPluginWithoutVersion() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
+              settingsGradle(
+                """
+                  pluginManagement {
+                      plugins {
+                          id "org.openrewrite.rewrite" version "7.0.0"
+                      }
+                  }
+                  """,
+                """
+                  pluginManagement {
+                      plugins {
+                          /*~~(org.openrewrite.rewrite:7.0.0)~~>*/id "org.openrewrite.rewrite" version "7.0.0"
+                      }
+                  }
+                  """
+              ),
               buildGradle(
                 """
                   plugins {
@@ -96,12 +113,12 @@ class GradlePluginTest implements RewriteTest {
               buildGradle(
                 """
                   plugins {
-                      id "org.openrewrite.rewrite" version "8.0.0" apply false
+                      id "org.openrewrite.rewrite" version "7.0.0" apply false
                   }
                   """,
                 """
                   plugins {
-                      /*~~(org.openrewrite.rewrite:8.0.0:false)~~>*/id "org.openrewrite.rewrite" version "8.0.0" apply false
+                      /*~~(org.openrewrite.rewrite:7.0.0:false)~~>*/id "org.openrewrite.rewrite" version "7.0.0" apply false
                   }
                   """
               )
@@ -116,10 +133,10 @@ class GradlePluginTest implements RewriteTest {
                 """
                   buildscript {
                       repositories {
-                          mavenCentral()
+                          gradlePluginPortal()
                       }
                       dependencies {
-                          classpath "org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0"
+                          classpath "org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0"
                       }
                   }
                   apply plugin: "org.openrewrite.rewrite"
@@ -127,10 +144,10 @@ class GradlePluginTest implements RewriteTest {
                 """
                   buildscript {
                       repositories {
-                          mavenCentral()
+                          gradlePluginPortal()
                       }
                       dependencies {
-                          classpath "org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0"
+                          classpath "org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0"
                       }
                   }
                   /*~~>*/apply plugin: "org.openrewrite.rewrite"
@@ -143,7 +160,7 @@ class GradlePluginTest implements RewriteTest {
         void property() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
-              properties("rewritePluginVersion=8.0.0", spec -> spec.path("gradle.properties")),
+              properties("rewritePluginVersion=7.0.0", spec -> spec.path("gradle.properties")),
               buildGradle(
                 """
                   plugins {
@@ -172,7 +189,7 @@ class GradlePluginTest implements RewriteTest {
                           gradlePluginPortal()
                       }
                       dependencies {
-                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0")
+                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0")
                       }
                   }
                   apply plugin: org.openrewrite.gradle.RewritePlugin
@@ -183,7 +200,7 @@ class GradlePluginTest implements RewriteTest {
                           gradlePluginPortal()
                       }
                       dependencies {
-                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0")
+                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0")
                       }
                   }
                   /*~~>*/apply plugin: org.openrewrite.gradle.RewritePlugin
@@ -204,7 +221,7 @@ class GradlePluginTest implements RewriteTest {
                           gradlePluginPortal()
                       }
                       dependencies {
-                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0")
+                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0")
                       }
                   }
                   apply plugin: RewritePlugin
@@ -216,7 +233,7 @@ class GradlePluginTest implements RewriteTest {
                           gradlePluginPortal()
                       }
                       dependencies {
-                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0")
+                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0")
                       }
                   }
                   /*~~>*/apply plugin: RewritePlugin
@@ -287,13 +304,13 @@ class GradlePluginTest implements RewriteTest {
                 """
                   plugins {
                       id "java"
-                      id "org.openrewrite.rewrite" version "8.0.0"
+                      id "org.openrewrite.rewrite" version "7.0.0"
                   }
                   """,
                 """
                   plugins {
                       id "java"
-                      /*~~>*/id "org.openrewrite.rewrite" version "8.0.0"
+                      /*~~>*/id "org.openrewrite.rewrite" version "7.0.0"
                   }
                   """
               )
@@ -307,8 +324,9 @@ class GradlePluginTest implements RewriteTest {
               toml(
                 """
                   [plugins]
-                  openrewrite = { id = "org.openrewrite.rewrite", version = "8.0.0" }
-                  """
+                  openrewrite = { id = "org.openrewrite.rewrite", version = "7.0.0" }
+                  """,
+                spec -> spec.path("gradle/libs.versions.toml")
               ),
               buildGradle(
                 """
@@ -340,29 +358,6 @@ class GradlePluginTest implements RewriteTest {
                 """
                   plugins {
                       /*~~(com.gradle.develocity:4.0.2:true)~~>*/id "com.gradle.develocity" version "4.0.2"
-                  }
-                  """
-              )
-            );
-        }
-
-        @Test
-        void settingsPluginManagement() {
-            rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
-              settingsGradle(
-                """
-                  pluginManagement {
-                      plugins {
-                          id "org.openrewrite.rewrite" version "8.0.0"
-                      }
-                  }
-                  """,
-                """
-                  pluginManagement {
-                      plugins {
-                          /*~~(org.openrewrite.rewrite:8.0.0:false)~~>*/id "org.openrewrite.rewrite" version "8.0.0"
-                      }
                   }
                   """
               )
@@ -418,12 +413,12 @@ class GradlePluginTest implements RewriteTest {
               buildGradleKts(
                 """
                   plugins {
-                      id("org.openrewrite.rewrite") version "8.0.0"
+                      id("org.openrewrite.rewrite") version "7.0.0"
                   }
                   """,
                 """
                   plugins {
-                      /*~~(org.openrewrite.rewrite:8.0.0)~~>*/id("org.openrewrite.rewrite") version "8.0.0"
+                      /*~~(org.openrewrite.rewrite:7.0.0)~~>*/id("org.openrewrite.rewrite") version "7.0.0"
                   }
                   """
               )
@@ -434,6 +429,22 @@ class GradlePluginTest implements RewriteTest {
         void externalPluginWithoutVersion() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
+              settingsGradleKts(
+                """
+                  pluginManagement {
+                      plugins {
+                          id("org.openrewrite.rewrite") version "7.0.0"
+                      }
+                  }
+                  """,
+                """
+                  pluginManagement {
+                      plugins {
+                          /*~~(org.openrewrite.rewrite:7.0.0)~~>*/id("org.openrewrite.rewrite") version "7.0.0"
+                      }
+                  }
+                  """
+              ),
               buildGradleKts(
                 """
                   plugins {
@@ -456,12 +467,12 @@ class GradlePluginTest implements RewriteTest {
               buildGradleKts(
                 """
                   plugins {
-                      id("org.openrewrite.rewrite") version "8.0.0" apply false
+                      id("org.openrewrite.rewrite") version "7.0.0" apply false
                   }
                   """,
                 """
                   plugins {
-                      /*~~(org.openrewrite.rewrite:8.0.0:false)~~>*/id("org.openrewrite.rewrite") version "8.0.0" apply false
+                      /*~~(org.openrewrite.rewrite:7.0.0:false)~~>*/id("org.openrewrite.rewrite") version "7.0.0" apply false
                   }
                   """
               )
@@ -476,10 +487,10 @@ class GradlePluginTest implements RewriteTest {
                 """
                   buildscript {
                       repositories {
-                          mavenCentral()
+                          gradlePluginPortal()
                       }
                       dependencies {
-                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0")
+                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0")
                       }
                   }
                   apply(plugin="org.openrewrite.rewrite")
@@ -487,10 +498,10 @@ class GradlePluginTest implements RewriteTest {
                 """
                   buildscript {
                       repositories {
-                          mavenCentral()
+                          gradlePluginPortal()
                       }
                       dependencies {
-                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0")
+                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0")
                       }
                   }
                   /*~~>*/apply(plugin="org.openrewrite.rewrite")
@@ -522,6 +533,22 @@ class GradlePluginTest implements RewriteTest {
         void kotlinPluginWithoutVersion() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
+              settingsGradleKts(
+                """
+                  pluginManagement {
+                      plugins {
+                          kotlin("jvm") version "2.1.21"
+                      }
+                  }
+                  """,
+                """
+                  pluginManagement {
+                      plugins {
+                          /*~~(org.jetbrains.kotlin.jvm:2.1.21)~~>*/kotlin("jvm") version "2.1.21"
+                      }
+                  }
+                  """
+              ),
               buildGradleKts(
                 """
                   plugins {
@@ -538,25 +565,40 @@ class GradlePluginTest implements RewriteTest {
         }
 
         @Test
-        void property() {
+        void propertyViaSettings() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
-              properties("rewritePluginVersion=8.0.0", spec -> spec.path("gradle.properties")),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree()))))
+                .beforeRecipe(withToolingApi()),
+              properties("rewritePluginVersion=7.0.0", spec -> spec.path("gradle.properties")),
+              settingsGradleKts(
+                """
+                  pluginManagement {
+                      val rewritePluginVersion: String by settings
+                      plugins {
+                          id("org.openrewrite.rewrite") version "${rewritePluginVersion}"
+                      }
+                  }
+                  """,
+                """
+                  pluginManagement {
+                      val rewritePluginVersion: String by settings
+                      plugins {
+                          /*~~>*/id("org.openrewrite.rewrite") version "${rewritePluginVersion}"
+                      }
+                  }
+                  """
+              ),
               buildGradleKts(
                 """
                   plugins {
-                      val rewritePluginVersion by project
-                  
                       id("java")
-                      id("org.openrewrite.rewrite") version "$rewritePluginVersion"
+                      id("org.openrewrite.rewrite")
                   }
                   """,
                 """
                   plugins {
-                      val rewritePluginVersion by project
-                  
                       /*~~>*/id("java")
-                      /*~~>*/id("org.openrewrite.rewrite") version "$rewritePluginVersion"
+                      /*~~>*/id("org.openrewrite.rewrite")
                   }
                   """
               )
@@ -574,7 +616,7 @@ class GradlePluginTest implements RewriteTest {
                           gradlePluginPortal()
                       }
                       dependencies {
-                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0")
+                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0")
                       }
                   }
                   apply<org.openrewrite.gradle.RewritePlugin>()
@@ -585,7 +627,7 @@ class GradlePluginTest implements RewriteTest {
                           gradlePluginPortal()
                       }
                       dependencies {
-                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0")
+                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0")
                       }
                   }
                   /*~~>*/apply<org.openrewrite.gradle.RewritePlugin>()
@@ -606,7 +648,7 @@ class GradlePluginTest implements RewriteTest {
                           gradlePluginPortal()
                       }
                       dependencies {
-                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0")
+                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0")
                       }
                   }
                   apply<RewritePlugin>()
@@ -618,7 +660,7 @@ class GradlePluginTest implements RewriteTest {
                           gradlePluginPortal()
                       }
                       dependencies {
-                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:8.0.0")
+                          classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.0.0")
                       }
                   }
                   /*~~>*/apply<RewritePlugin>()
@@ -689,13 +731,13 @@ class GradlePluginTest implements RewriteTest {
                 """
                   plugins {
                       id("java")
-                      id("org.openrewrite.rewrite") version "8.0.0"
+                      id("org.openrewrite.rewrite") version "7.0.0"
                   }
                   """,
                 """
                   plugins {
                       id("java")
-                      /*~~>*/id("org.openrewrite.rewrite") version "8.0.0"
+                      /*~~>*/id("org.openrewrite.rewrite") version "7.0.0"
                   }
                   """
               )
@@ -709,8 +751,9 @@ class GradlePluginTest implements RewriteTest {
               toml(
                 """
                   [plugins]
-                  openrewrite = { id = "org.openrewrite.rewrite", version = "8.0.0" }
-                  """
+                  openrewrite = { id = "org.openrewrite.rewrite", version = "7.0.0" }
+                  """,
+                spec -> spec.path("gradle/libs.versions.toml")
               ),
               buildGradleKts(
                 """
@@ -742,29 +785,6 @@ class GradlePluginTest implements RewriteTest {
                 """
                   plugins {
                       /*~~(com.gradle.develocity:4.0.2:true)~~>*/id("com.gradle.develocity") version "4.0.2"
-                  }
-                  """
-              )
-            );
-        }
-
-        @Test
-        void settingsPluginManagement() {
-            rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
-              settingsGradleKts(
-                """
-                  pluginManagement {
-                      plugins {
-                          id("org.openrewrite.rewrite") version "8.0.0"
-                      }
-                  }
-                  """,
-                """
-                  pluginManagement {
-                      plugins {
-                          /*~~(org.openrewrite.rewrite:8.0.0:false)~~>*/id("org.openrewrite.rewrite") version "8.0.0"
-                      }
                   }
                   """
               )
