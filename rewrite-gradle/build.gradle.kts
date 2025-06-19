@@ -52,6 +52,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     compileOnly(project(":rewrite-test"))
     implementation(project(":rewrite-properties"))
+    implementation(project(":rewrite-toml"))
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())
