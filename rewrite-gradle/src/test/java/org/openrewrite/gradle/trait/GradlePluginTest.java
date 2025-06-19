@@ -26,7 +26,6 @@ import java.util.Collections;
 
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
-import static org.openrewrite.gradle.trait.Traits.plugin;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.toml.Assertions.toml;
 
@@ -36,7 +35,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void corePlugin() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradle(
                 """
                   plugins {
@@ -55,7 +54,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void externalPlugin() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
               buildGradle(
                 """
                   plugins {
@@ -74,7 +73,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void externalPluginWithoutVersion() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
               buildGradle(
                 """
                   plugins {
@@ -93,7 +92,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void externalPluginApplyFalse() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
               buildGradle(
                 """
                   plugins {
@@ -112,7 +111,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void apply() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradle(
                 """
                   buildscript {
@@ -143,7 +142,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void property() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               properties("rewritePluginVersion=8.0.0", spec -> spec.path("gradle.properties")),
               buildGradle(
                 """
@@ -165,7 +164,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void fullyQualifiedClassName() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradle(
                 """
                   buildscript {
@@ -196,7 +195,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void className() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradle(
                 """
                   import org.openrewrite.gradle.RewritePlugin
@@ -229,7 +228,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void markerId() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().pluginIdPattern("org.openrewrite.rewrite").acceptTransitive(true).asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().pluginIdPattern("org.openrewrite.rewrite").acceptTransitive(true).asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradle(
                 """
                   plugins {
@@ -256,7 +255,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void markerClass() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().pluginClass("org.openrewrite.gradle.GradlePlugin").acceptTransitive(true).asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().pluginClass("org.openrewrite.gradle.GradlePlugin").acceptTransitive(true).asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradle(
                 """
                   plugins {
@@ -283,7 +282,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void patternMatching() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().pluginIdPattern("org.openrewrite.*").asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().pluginIdPattern("org.openrewrite.*").asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradle(
                 """
                   plugins {
@@ -304,7 +303,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void alias() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               toml(
                 """
                   [plugins]
@@ -331,7 +330,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void settingsPlugin() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
               settingsGradle(
                 """
                   plugins {
@@ -350,7 +349,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void settingsPluginManagement() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
               settingsGradle(
                 """
                   pluginManagement {
@@ -376,7 +375,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void corePlugin() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradleKts(
                 """
                   plugins {
@@ -395,7 +394,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void corePluginShorthand() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree()))))
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree()))))
                 .beforeRecipe(withToolingApi()),
               buildGradleKts(
                 """
@@ -415,7 +414,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void externalPlugin() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
               buildGradleKts(
                 """
                   plugins {
@@ -434,7 +433,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void externalPluginWithoutVersion() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
               buildGradleKts(
                 """
                   plugins {
@@ -453,7 +452,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void externalPluginApplyFalse() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
               buildGradleKts(
                 """
                   plugins {
@@ -472,7 +471,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void apply() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradleKts(
                 """
                   buildscript {
@@ -503,7 +502,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void kotlinPlugin() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
               buildGradleKts(
                 """
                   plugins {
@@ -522,7 +521,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void kotlinPluginWithoutVersion() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion())))),
               buildGradleKts(
                 """
                   plugins {
@@ -541,7 +540,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void property() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               properties("rewritePluginVersion=8.0.0", spec -> spec.path("gradle.properties")),
               buildGradleKts(
                 """
@@ -567,7 +566,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void fullyQualifiedClassName() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradleKts(
                 """
                   buildscript {
@@ -598,7 +597,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void className() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradleKts(
                 """
                   import org.openrewrite.gradle.RewritePlugin
@@ -631,7 +630,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void markerId() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().pluginIdPattern("org.openrewrite.rewrite").acceptTransitive(true).asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().pluginIdPattern("org.openrewrite.rewrite").acceptTransitive(true).asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradle(
                 """
                   plugins {
@@ -658,7 +657,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void markerClass() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().pluginClass("org.openrewrite.gradle.GradlePlugin").acceptTransitive(true).asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().pluginClass("org.openrewrite.gradle.GradlePlugin").acceptTransitive(true).asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradle(
                 """
                   plugins {
@@ -685,7 +684,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void patternMatching() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().pluginIdPattern("org.openrewrite.*").asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().pluginIdPattern("org.openrewrite.*").asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               buildGradleKts(
                 """
                   plugins {
@@ -706,7 +705,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void alias() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree())))),
               toml(
                 """
                   [plugins]
@@ -733,7 +732,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void settingsPlugin() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
               settingsGradleKts(
                 """
                   plugins {
@@ -752,7 +751,7 @@ class GradlePluginTest implements RewriteTest {
         @Test
         void settingsPluginManagement() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> plugin().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new GradlePlugin.Matcher().asVisitor(plugin -> SearchResult.found(plugin.getTree(), plugin.getPluginId() + ":" + plugin.getVersion() + ":" + plugin.isApplied())))),
               settingsGradleKts(
                 """
                   pluginManagement {
