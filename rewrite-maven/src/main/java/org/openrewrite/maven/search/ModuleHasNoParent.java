@@ -28,37 +28,25 @@ import java.util.Set;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ModuleHasPlugin extends ScanningRecipe<ModuleHasPlugin.Accumulator> {
+public class ModuleHasNoParent extends ScanningRecipe<ModuleHasNoParent.Accumulator> {
 
     @Override
     public String getDisplayName() {
-        return "Module has plugin";
+        return "Module has no parent";
     }
 
     @Override
     public String getDescription() {
-        return "Searches for Maven modules that have a plugin matching the specified groupId and artifactId. " +
-               "Places a `SearchResult` marker on all sources within a module with a matching plugin. " +
+        return "Searches for Maven modules that have no parent. " +
+               "Places a `SearchResult` marker on all sources within a module that has no parent. " +
                "This recipe is intended to be used as a precondition for other recipes. " +
-               "For example this could be used to limit the application of a spring boot migration to only projects " +
-               "that apply the spring boot plugin, limiting unnecessary upgrading. " +
-               "If the search result you want is instead just the pom.xml file applying the plugin, " +
-               "use the `FindPlugins` recipe instead.";
+               "For example: " +
+               "this could be used to limit the application of recipes that add a parent to projects that currently don't have one.";
     }
-
-    @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
-            example = "org.openrewrite.maven")
-    String groupId;
-
-    @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
-            example = "rewrite-maven-plugin")
-    String artifactId;
 
     @Value
     public static class Accumulator {
-        Set<JavaProject> projectsWithDependency;
+        Set<JavaProject> projectsWithParent;
     }
 
     @Override
@@ -75,9 +63,9 @@ public class ModuleHasPlugin extends ScanningRecipe<ModuleHasPlugin.Accumulator>
                 tree.getMarkers()
                         .findFirst(JavaProject.class)
                         .ifPresent(jp -> {
-                            Tree t = new FindPlugin(groupId, artifactId).getVisitor().visit(tree, ctx);
+                            Tree t = new ParentPomInsight("*", "*", null, false).getVisitor().visit(tree, ctx);
                             if (t != tree) {
-                                acc.getProjectsWithDependency().add(jp);
+                                acc.getProjectsWithParent().add(jp);
                             }
                         });
                 return tree;
@@ -96,8 +84,8 @@ public class ModuleHasPlugin extends ScanningRecipe<ModuleHasPlugin.Accumulator>
                     return tree;
                 }
                 JavaProject jp = maybeJp.get();
-                if (acc.getProjectsWithDependency().contains(jp)) {
-                    return SearchResult.found(tree, "Module has plugin: " + groupId + ":" + artifactId);
+                if (!acc.getProjectsWithParent().contains(jp)) {
+                    return SearchResult.found(tree, "Module has no parent.");
                 }
                 return tree;
             }
