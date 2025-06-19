@@ -782,6 +782,28 @@ class LombokTest implements RewriteTest {
         }
 
         @Test
+        void genericMethod() {
+            rewriteRun(
+              java(
+                """
+                  import lombok.val;
+                  
+                  import java.util.function.Function;
+                  
+                  class A {
+                      <A, B> B methodWithGenerics(Function<A, B> f, A a) {
+                          return f.apply(a);
+                      }
+                      void m() {
+                          val foo = methodWithGenerics(a -> a + "", 2);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
         void parameter() {
             rewriteRun(
               java(
