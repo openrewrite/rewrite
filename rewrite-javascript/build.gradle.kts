@@ -57,7 +57,7 @@ extensions.configure<NodeExtension> {
 }
 
 val datedSnapshotVersion by extra {
-    if (System.getenv("CI")?.toBoolean() ?: false) {
+    if (System.getenv("CI") != null) {
         project.version.toString().replace(
             "SNAPSHOT",
             LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
