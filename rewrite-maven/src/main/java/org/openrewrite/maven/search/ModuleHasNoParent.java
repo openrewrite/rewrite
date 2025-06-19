@@ -18,7 +18,10 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.marker.SearchResult;
 
@@ -38,10 +41,10 @@ public class ModuleHasNoParent extends ScanningRecipe<ModuleHasNoParent.Accumula
     @Override
     public String getDescription() {
         return "Searches for Maven modules that have no parent. " +
-               "Places a `SearchResult` marker on all sources within a module that has no parent. " +
-               "This recipe is intended to be used as a precondition for other recipes. " +
-               "For example: " +
-               "this could be used to limit the application of recipes that add a parent to projects that currently don't have one.";
+                "Places a `SearchResult` marker on all sources within a module that has no parent. " +
+                "This recipe is intended to be used as a precondition for other recipes. " +
+                "For example: " +
+                "this could be used to limit the application of recipes that add a parent to projects that currently don't have one.";
     }
 
     @Value
