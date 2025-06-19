@@ -523,4 +523,224 @@ class ChangeDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dependencyPluginManagedDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("javax.validation", "validation-api", "jakarta.validation", "jakarta.validation-api", "3.0.x", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '3.5.0'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("javax.validation:validation-api")
+              }
+              
+              dependencyManagement {
+                  dependencies {
+                      dependency 'javax.validation:validation-api:2.0.1.Final'
+                      dependency group: 'javax.validation', name: 'validation-api', version: '2.0.1.Final'
+                      dependencySet('javax.validation:2.0.1.Final') {
+                          entry 'validation-api'
+                      }
+                      dependencySet(group:'javax.validation', version: '2.0.1.Final') {
+                          entry 'validation-api'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '3.5.0'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("jakarta.validation:jakarta.validation-api")
+              }
+              
+              dependencyManagement {
+                  dependencies {
+                      dependency 'jakarta.validation:jakarta.validation-api:3.0.2'
+                      dependency group: 'jakarta.validation', name: 'jakarta.validation-api', version: '3.0.2'
+                      dependencySet('jakarta.validation:3.0.2') {
+                          entry 'jakarta.validation-api'
+                      }
+                      dependencySet(group:'jakarta.validation', version: '3.0.2') {
+                          entry 'jakarta.validation-api'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDependencyPluginManagedDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("javax.validation", "validation-api", "jakarta.validation", "jakarta.validation-api", "3.0.x", null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+                  id("org.springframework.boot") version "3.5.0"
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("javax.validation:validation-api")
+              }
+              
+              dependencyManagement {
+                  dependencies {
+                      dependency("javax.validation:validation-api:2.0.1.Final")
+                      dependency(mapOf("group" to "javax.validation", "name" to "validation-api", "version" to "2.0.1.Final"))
+                      dependencySet("javax.validation:2.0.1.Final") {
+                          entry("validation-api")
+                      }
+                      dependencySet(mapOf("group" to "javax.validation", "version" to "2.0.1.Final")) {
+                          entry("validation-api")
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  java
+                  id("org.springframework.boot") version "3.5.0"
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("jakarta.validation:jakarta.validation-api")
+              }
+              
+              dependencyManagement {
+                  dependencies {
+                      dependency("jakarta.validation:jakarta.validation-api:3.0.2")
+                      dependency(mapOf("group" to "jakarta.validation", "name" to "jakarta.validation-api", "version" to "3.0.2"))
+                      dependencySet("jakarta.validation:3.0.2") {
+                          entry("jakarta.validation-api")
+                      }
+                      dependencySet(mapOf("group" to "jakarta.validation", "version" to "3.0.2")) {
+                          entry("jakarta.validation-api")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void makeChangesInDependencyManagementImports() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("io.moderne.recipe", "*", "org.openrewrite", "rewrite-core", "8.44.1", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation platform("io.moderne.recipe:rewrite-spring")
+              }
+              dependencyManagement {
+                  imports {
+                      mavenBom "io.moderne.recipe:moderne-recipe-bom:0.13.0"
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation platform("org.openrewrite:rewrite-core")
+              }
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.openrewrite:rewrite-core:8.44.1"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void makeChangesInKotlinDependencyManagementImports() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("io.moderne.recipe", "*", "org.openrewrite", "rewrite-core", "8.44.1", null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+                  id("org.springframework.boot") version "3.5.0"
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(platform("io.moderne.recipe:rewrite-spring"))
+              }
+              dependencyManagement {
+                  imports {
+                      mavenBom("io.moderne.recipe:moderne-recipe-bom:0.13.0")
+                  }
+              }
+              """,
+            """
+              plugins {
+                  java
+                  id("org.springframework.boot") version "3.5.0"
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(platform("org.openrewrite:rewrite-core"))
+              }
+              dependencyManagement {
+                  imports {
+                      mavenBom("org.openrewrite:rewrite-core:8.44.1")
+                  }
+              }
+              """
+          )
+        );
+    }
 }
