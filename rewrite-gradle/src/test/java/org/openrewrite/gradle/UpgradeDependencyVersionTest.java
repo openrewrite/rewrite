@@ -1298,6 +1298,81 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void updateDependencyManagementVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite", "rewrite-core", "8.55.3", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencyManagement {
+                  dependencies {
+                      dependency "org.openrewrite:rewrite-core:8.0.0"
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencyManagement {
+                  dependencies {
+                      dependency "org.openrewrite:rewrite-core:8.55.3"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateDependencyManagementVersionInPropertiesFile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite", "rewrite-core", "8.55.3", null)),
+          properties(
+            """
+              rewriteCore=8.0.0
+              """,
+            """
+              rewriteCore=8.55.3
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencyManagement {
+                  dependencies {
+                      dependency "org.openrewrite:rewrite-core:$rewriteCore"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void kotlinDslString() {
         rewriteRun(
           buildGradleKts(
@@ -1431,6 +1506,38 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                   val guavaVersion = "30.1.1-jre"
                   implementation("com.google.guava:guava:${guavaVersion}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinVersionInPropertiesFile() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              val guavaVersion: String by project
+              
+              dependencies {
+                implementation("com.google.guava:guava:$guavaVersion")
               }
               """
           )
