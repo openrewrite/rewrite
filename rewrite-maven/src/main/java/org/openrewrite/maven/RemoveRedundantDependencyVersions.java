@@ -28,6 +28,7 @@ import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestIntegration;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -173,7 +174,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     ResolvedDependency d = findDependency(tag);
                     if (d != null && matchesGroup(d) && matchesArtifact(d) && matchesVersion(d) && isNotExcepted(d)) {
                         Xml.Tag version = tag.getChild("version").orElse(null);
-                        return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                        return tag.withContent(withoutVersion(tag, version));
                     }
                 } else if (isManagedDependencyTag()) {
                     ResolvedManagedDependency managed = findManagedDependency(tag);
@@ -199,17 +200,30 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 return null;
                             }
                             // some other element is also declared (executions, configuration, dependencies…), so just remove the version
-                            return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                            return tag.withContent(withoutVersion(tag, version));
                         }
                     } else {
                         Plugin p = findPlugin(tag);
                         if (p != null && matchesGroup(p) && matchesArtifact(p) && matchesVersion(p)) {
                             Xml.Tag version = tag.getChild("version").orElse(null);
-                            return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                            return tag.withContent(withoutVersion(tag, version));
                         }
                     }
                 }
                 return super.visitTag(tag, ctx);
+            }
+
+            private @Nullable List<? extends Content> withoutVersion(Xml.Tag tag, Xml.@Nullable Tag version) {
+                return ListUtils.map(tag.getContent(), c -> {
+                    if (c == version) {
+                        if (((Xml.Tag) c).getValue().isPresent() && ((Xml.Tag) c).getValue().get().contains("${")) {
+                            final String propertyName = ((Xml.Tag) c).getValue().get().replace("${", "").replace("}", "");
+                            doAfterVisit(new RemoveUnusedProperties(propertyName).getVisitor());
+                        }
+                        return null;
+                    }
+                    return c;
+                });
             }
 
             private boolean matchesGroup(ResolvedManagedDependency d) {
