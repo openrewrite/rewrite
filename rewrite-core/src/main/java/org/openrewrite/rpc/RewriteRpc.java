@@ -263,9 +263,9 @@ public class RewriteRpc implements AutoCloseable {
         Map<String, Recipe> preparedRecipes = new HashMap<>();
         Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
 
-        jsonRpc.rpc("ClearObjectCaches", new JsonRpcMethod<ClearObjectCaches>() {
+        jsonRpc.rpc("ClearObjectMaps", new JsonRpcMethod<ClearObjectMaps>() {
             @Override
-            protected @Nullable Object handle(ClearObjectCaches request) {
+            protected @Nullable Object handle(ClearObjectMaps request) {
                 clearObjectCaches0();
                 return null;
             }
@@ -309,9 +309,9 @@ public class RewriteRpc implements AutoCloseable {
         return this;
     }
 
-    public void clearObjectCaches() {
+    public void clearObjectMaps() {
         clearObjectCaches0();
-        send("ClearObjectCaches", new ClearObjectCaches(), Void.class);
+        send("ClearObjectMaps", new ClearObjectMaps(), Void.class);
     }
 
     private void clearObjectCaches0() {

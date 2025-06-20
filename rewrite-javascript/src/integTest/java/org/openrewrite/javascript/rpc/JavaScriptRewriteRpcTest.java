@@ -111,8 +111,8 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void clearObjectCaches() {
-        client.clearObjectCaches();
+    void clearObjectMaps() {
+        client.clearObjectMaps();
     }
 
     @Test

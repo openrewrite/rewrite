@@ -15,5 +15,5 @@
  */
 package org.openrewrite.rpc.request;
 
-public class ClearObjectCaches implements RpcRequest {
+public class ClearObjectMaps implements RpcRequest {
 }

@@ -76,7 +76,7 @@ export class RewriteRpc {
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
-        connection.onRequest(new rpc.RequestType<any, void, Error>("ClearObjectCaches"), _request => {
+        connection.onRequest(new rpc.RequestType<any, void, Error>("ClearObjectMaps"), _request => {
             this.clearObjectCaches0();
         });
         InstallRecipes.handle(this.connection, ".rewrite", registry);
@@ -225,10 +225,10 @@ export class RewriteRpc {
         }
     }
 
-    public clearObjectCaches() {
+    public clearObjectMaps() {
         this.clearObjectCaches0();
         return this.connection.sendRequest(
-            new rpc.RequestType<any, RpcObjectData[], Error>("ClearObjectCaches"),
+            new rpc.RequestType<any, RpcObjectData[], Error>("ClearObjectMaps"),
             {}
         );
     }
