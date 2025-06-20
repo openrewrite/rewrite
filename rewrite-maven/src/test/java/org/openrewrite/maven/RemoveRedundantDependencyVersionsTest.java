@@ -1961,6 +1961,70 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unusedDependencyPropertiesAreNotRemovedForParentPoms() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.4</version>
+                    <relativePath/>
+                </parent>
+
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <properties>
+                    <spring-web.version>5.3.9</spring-web.version>
+                </properties>
+
+                <modelVersion>4.0.0</modelVersion>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-web</artifactId>
+                        <version>${spring-web.version}</version>
+                    </dependency>
+                </dependencies>
+            </project>
+            """,
+            """
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.4</version>
+                    <relativePath/>
+                </parent>
+    
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <properties>
+                    <spring-web.version>5.3.9</spring-web.version>
+                </properties>
+    
+                <modelVersion>4.0.0</modelVersion>
+    
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-web</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+            """
+          )
+        );
+    }
+
     @ParameterizedTest
     @CsvSource({ "GT,2.5.0", "GTE,2.5.0", "ANY,2.5.0", "EQ,2.5.1", "LTE,2.5.1", "GTE,2.5.1", "ANY,2.5.1", "LT,2.5.2", "LTE,2.5.2", "ANY,2.5.2" })
     void onlyIfManagedVersionIs_removals(String comparator, String projectVersion) {
