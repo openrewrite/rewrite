@@ -7,6 +7,7 @@ plugins {
 
 dependencies {
     implementation("org.assertj:assertj-core:latest.release")
+    implementation("com.google.guava:guava:latest.release") // included for `MethodDeclarationTest#parameterAnnotationsFromClasspath()`
     implementation(project(":rewrite-java"))
     implementation(project(":rewrite-java-test"))
     implementation(project(":rewrite-test"))
