@@ -26,7 +26,6 @@ class FindScmTest implements RewriteTest {
     void findsScmTag() {
         rewriteRun(
           spec -> spec.recipe(new FindScm()),
-          //language=xml
           pomXml(
             """
               <project>
@@ -58,7 +57,6 @@ class FindScmTest implements RewriteTest {
     void doesNotFindScmTag() {
         rewriteRun(
           spec -> spec.recipe(new FindScm()),
-          //language=xml
           pomXml(
             """
               <project>
