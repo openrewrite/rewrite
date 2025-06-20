@@ -102,13 +102,13 @@ export class RewriteRpc {
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
                 new GetObject(id, lastKnownId)
             );
-        }, this.options.traceGetObjectInput);
+        }, this.options.traceGetObjectInput, (refId: number) => this.getRef(refId));
 
         const remoteObject = await q.receive<P>(this.localObjects.get(id));
 
         const eof = (await q.take());
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
-            throw new Error("Expected END_OF_OBJECT");
+            throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
         }
 
         this.remoteObjects.set(id, remoteObject);

@@ -51,7 +51,7 @@ const textCodec: RpcCodec<PlainText> = {
         await q.getAndSend(after, p => p.text);
         await q.getAndSendList(after, a => a.snippets, s => s.id, async (snippet) => {
             await q.getAndSend(snippet, p => p.id);
-            await q.sendMarkers(after, p => p.markers);
+            await q.sendMarkers(snippet, p => p.markers);
             await q.getAndSend(snippet, p => p.text);
         });
     }

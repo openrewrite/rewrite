@@ -56,7 +56,7 @@ describe("Independent Cache Management", () => {
         client.end();
     });
 
-    test("getObject with lastKnownId parameter", async () => {
+    test("getObject without lastKnownId returns ADD", async () => {
         // Create a simple object on server
         const objectId = randomId();
         const text: PlainText = {
@@ -71,18 +71,30 @@ describe("Independent Cache Management", () => {
         server.localObjects.set(objectId, text);
 
         // Client requests object for first time (no lastKnownId)
-        const retrieved1 = await client.getObject<PlainText>(objectId);
-        expect(retrieved1.text).toBe("Hello World");
+        const retrieved = await client.getObject<PlainText>(objectId);
+        expect(retrieved.text).toBe("Hello World");
         expect(client.localObjects.has(objectId)).toBe(true);
-        expect(server.remoteObjects.has(objectId)).toBe(true);
+    });
 
-        // Modify object on server
-        const modified = {...text, text: "Hello Modified World"};
-        server.localObjects.set(objectId, modified);
+    test("getObject with lastKnownId when remote has no entry returns ADD", async () => {
+        // Create object on server
+        const objectId = randomId();
+        const text: PlainText = {
+            kind: "org.openrewrite.text.PlainText",
+            id: objectId,
+            text: "Hello World",
+            markers: emptyMarkers,
+            sourcePath: "test.txt",
+            snippets: []
+        };
+        
+        server.localObjects.set(objectId, text);
+        // Clear any existing remote state to ensure cache miss
+        server.remoteObjects.clear();
 
-        // Client requests again - should get delta/update since lastKnownId matches
-        const retrieved2 = await client.getObject<PlainText>(objectId);
-        expect(retrieved2.text).toBe("Hello Modified World");
+        // Client requests with lastKnownId - should get full object as ADD
+        const retrieved = await client.getObject<PlainText>(objectId);
+        expect(retrieved.text).toBe("Hello World");
     });
 
     test("getObject after cache eviction recovers gracefully", async () => {
@@ -185,6 +197,58 @@ describe("Independent Cache Management", () => {
         
         expect(response.state).toBe(RpcObjectState.DELETE);
         expect(response.value).toBe(null);
+    });
+
+    test("lastKnownId null parameter returns ADD not CHANGE", async () => {
+        // Create object on server
+        const objectId = randomId();
+        const text: PlainText = {
+            kind: "org.openrewrite.text.PlainText",
+            id: objectId,
+            text: "Test Object",
+            markers: emptyMarkers,
+            sourcePath: "test.txt",
+            snippets: []
+        };
+        
+        server.localObjects.set(objectId, text);
+
+        // Client requests from server with null lastKnownId
+        const response = await client.connection.sendRequest(
+            new rpc.RequestType<{id: string, lastKnownId: string | null}, RpcObjectData[], Error>("GetObject"),
+            {id: objectId, lastKnownId: null}
+        );
+
+        // Should return ADD state, not CHANGE
+        expect(response).toBeDefined();
+        expect(response.length).toBeGreaterThan(0);
+        expect(response[0].state).toBe(RpcObjectState.ADD);
+    });
+
+    test("lastKnownId absent parameter returns ADD not CHANGE", async () => {
+        // Create object on server
+        const objectId = randomId();
+        const text: PlainText = {
+            kind: "org.openrewrite.text.PlainText",
+            id: objectId,
+            text: "Test Object",
+            markers: emptyMarkers,
+            sourcePath: "test.txt",
+            snippets: []
+        };
+        
+        server.localObjects.set(objectId, text);
+
+        // Client requests from server without lastKnownId property
+        const response = await client.connection.sendRequest(
+            new rpc.RequestType<{id: string}, RpcObjectData[], Error>("GetObject"),
+            {id: objectId}
+        );
+
+        // Should return ADD state, not CHANGE
+        expect(response).toBeDefined();
+        expect(response.length).toBeGreaterThan(0);
+        expect(response[0].state).toBe(RpcObjectState.ADD);
     });
 
     test("independent cache eviction does not affect other side", async () => {

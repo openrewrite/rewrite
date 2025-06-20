@@ -249,7 +249,9 @@ export class RpcReceiveQueue {
     constructor(private readonly refs: Map<number, any>,
                 private readonly pull: () => Promise<RpcObjectData[]>,
                 private readonly logFile?: WriteStream,
-                private readonly getRef?: (refId: number) => Promise<any>) {
+                private readonly getRef: (refId: number) => Promise<any> = async (refId: number) => {
+                    throw new Error(`Reference ${refId} not found and no getRef function provided`);
+                }) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -288,15 +290,20 @@ export class RpcReceiveQueue {
                     return undefined as T;
                 case RpcObjectState.ADD:
                     ref = message.ref;
-                    if (ref !== undefined && this.refs.has(ref)) {
-                        return this.refs.get(ref);
-                    } else if (ref !== undefined && this.getRef) {
-                        // Ref was evicted from cache, fetch it
-                        const refObject = await this.getRef(ref);
-                        this.refs.set(ref, refObject);
-                        return refObject;
+                    if (ref !== undefined && message.valueType === undefined && message.value === undefined) {
+                        // This is a pure reference to an existing object
+                        if (this.refs.has(ref)) {
+                            return this.refs.get(ref);
+                        } else {
+                            // Ref was evicted from cache, fetch it
+                            const refObject = await this.getRef(ref);
+                            this.refs.set(ref, refObject);
+                            return refObject;
+                        }
+                    } else {
+                        // This is either a new object or a forward declaration with ref
+                        before = message.value ?? this.newObj(message.valueType!);
                     }
-                    before = message.value ?? this.newObj(message.valueType!);
                 // Intentional fall-through...
                 case RpcObjectState.CHANGE:
                     let after;

@@ -24,6 +24,7 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetRef;
+import org.openrewrite.rpc.request.GetRefResponse;
 
 import java.io.IOException;
 import java.io.PipedInputStream;
@@ -83,9 +84,11 @@ class GetRefRequestTest {
     void getRefRequestForMissingReference() {
         // Request a reference that doesn't exist
         GetRef getRefRequest = new GetRef("999");
-        RpcObjectData response = server.send("GetRef", getRefRequest, RpcObjectData.class);
+        GetRefResponse response = server.send("GetRef", getRefRequest, GetRefResponse.class);
         
-        assertThat(response.getState()).isEqualTo(RpcObjectData.State.DELETE);
+        assertThat(response).hasSize(2);
+        assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.DELETE);
+        assertThat(response.get(1).getState()).isEqualTo(RpcObjectData.State.END_OF_OBJECT);
     }
 
     @Test

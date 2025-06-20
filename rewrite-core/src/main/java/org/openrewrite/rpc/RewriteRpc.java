@@ -125,30 +125,7 @@ public class RewriteRpc implements AutoCloseable {
         Map<String, Recipe> preparedRecipes = new HashMap<>();
         Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
 
-        jsonRpc.rpc("GetRef", new JsonRpcMethod<GetRef>() {
-            @Override
-            protected RpcObjectData handle(GetRef request) {
-                try {
-                    Integer refIdInt = Integer.parseInt(request.getRefId());
-                    Object refObject = localRefs.entrySet().stream()
-                            .filter(e -> e.getValue().equals(refIdInt))
-                            .map(Map.Entry::getKey)
-                            .findFirst()
-                            .orElse(null);
-                    
-                    if (refObject == null) {
-                        // Return a DELETE to indicate the ref is not found
-                        return new RpcObjectData(RpcObjectData.State.DELETE, null, null, null, null);
-                    }
-                    
-                    // Always send full object for refs
-                    return new RpcObjectData(RpcObjectData.State.ADD, null, refObject, null, null);
-                } catch (NumberFormatException e) {
-                    // Invalid ref ID format
-                    return new RpcObjectData(RpcObjectData.State.DELETE, null, null, null, null);
-                }
-            }
-        });
+        jsonRpc.rpc("GetRef", new GetRef.Handler(localRefs));
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
@@ -399,9 +376,8 @@ public class RewriteRpc implements AutoCloseable {
         Object localObject = localObjects.get(id);
         String lastKnownId = localObject != null ? id : null;
         
-        // Use the 3-parameter constructor for now to avoid potential circular dependency issues
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
-                new GetObject(id, lastKnownId), GetObjectResponse.class));
+                new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
@@ -415,11 +391,31 @@ public class RewriteRpc implements AutoCloseable {
     }
     
     private Object getRef(Integer refId) {
-        RpcObjectData refData = send("GetRef", new GetRef(refId.toString()), RpcObjectData.class);
-        if (refData.getState() == RpcObjectData.State.DELETE) {
+        // Fetch the complete batch like getObject() does
+        List<RpcObjectData> completeBatch = send("GetRef", new GetRef(refId.toString()), GetRefResponse.class);
+        
+        // Create RpcReceiveQueue with the pre-fetched batch
+        // Use a simple function that throws for nested refs to avoid recursion
+        AtomicBoolean batchConsumed = new AtomicBoolean(false);
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> {
+            if (batchConsumed.getAndSet(true)) {
+                throw new IllegalStateException("GetRef batch already consumed");
+            }
+            return completeBatch;
+        }, nestedRefId -> {
+            throw new IllegalStateException("Nested ref calls not supported in GetRef: " + nestedRefId);
+        });
+        
+        // Process the ref object
+        Object ref = q.receive(null, null);
+        if (q.take().getState() != END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT");
+        }
+        
+        if (ref == null) {
             throw new IllegalStateException("Reference " + refId + " not found on remote");
         }
-        Object ref = refData.getValue();
+        
         remoteRefs.put(refId, ref);
         return ref;
     }
