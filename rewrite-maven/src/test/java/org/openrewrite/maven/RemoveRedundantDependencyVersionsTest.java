@@ -1853,28 +1853,28 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
             </project>
             """,
             """
-        <project>
-            <parent>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-parent</artifactId>
-                <version>2.5.4</version>
-                <relativePath/>
-            </parent>
-
-            <groupId>com.example</groupId>
-            <artifactId>test</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-
-            <modelVersion>4.0.0</modelVersion>
-
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework</groupId>
-                    <artifactId>spring-web</artifactId>
-                </dependency>
-            </dependencies>
-        </project>
-        """
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.4</version>
+                    <relativePath/>
+                </parent>
+    
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+    
+                <modelVersion>4.0.0</modelVersion>
+    
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-web</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+            """
           )
         );
     }
