@@ -40,10 +40,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -58,6 +55,27 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     private JavaScriptRewriteRpc(CloseableSupplier<JsonRpc> supplier, Environment marketplace, Duration timeout) {
         super(supplier.get(), marketplace, timeout);
         this.supplier = supplier;
+    }
+
+    private static final ThreadLocal<@Nullable JavaScriptRewriteRpc> THREAD_LOCAL = new ThreadLocal<>();
+
+    public static Optional<JavaScriptRewriteRpc> current() {
+        return Optional.ofNullable(THREAD_LOCAL.get());
+    }
+
+    public interface Scope extends AutoCloseable {
+        @Override
+        void close();
+    }
+
+    public static Scope bind(JavaScriptRewriteRpc rewriteRpc) {
+        JavaScriptRewriteRpc old = THREAD_LOCAL.get();
+        THREAD_LOCAL.set(rewriteRpc);
+        return () -> {
+            if (old != null) {
+                THREAD_LOCAL.set(old);
+            }
+        };
     }
 
     @Override

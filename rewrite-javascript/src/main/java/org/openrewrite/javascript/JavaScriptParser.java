@@ -22,7 +22,6 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
-import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
@@ -44,7 +43,7 @@ public class JavaScriptParser implements Parser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         // Registering `RewriteRpc` due to print-idempotence check
         // Scope is closed using `Stream#onClose()`
-        RewriteRpc.Scope scope = RewriteRpc.Context.current().with(rewriteRpc).attach();
+        JavaScriptRewriteRpc.Scope scope = JavaScriptRewriteRpc.bind(rewriteRpc);
         try {
             JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
             return rewriteRpc.parse(sources, relativeTo, this, ctx)

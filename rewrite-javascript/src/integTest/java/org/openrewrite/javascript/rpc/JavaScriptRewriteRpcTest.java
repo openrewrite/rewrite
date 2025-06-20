@@ -27,7 +27,6 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.marker.Markup;
-import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -52,7 +51,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     JavaScriptRewriteRpc client;
     PrintStream log;
-    RewriteRpc.Scope scope;
+    JavaScriptRewriteRpc.Scope scope;
 
     @BeforeEach
     void before() throws FileNotFoundException {
@@ -63,7 +62,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 //          .inspectAndBreak()
 //          .timeout(Duration.ofMinutes(10))
           .build();
-        this.scope = RewriteRpc.Context.current().with(client).attach();
+        this.scope = JavaScriptRewriteRpc.bind(client);
 
 //        client
 //          .traceGetObjectOutput()
