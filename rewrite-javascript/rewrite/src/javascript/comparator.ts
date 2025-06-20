@@ -745,6 +745,18 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         const otherImport = other as JS.Import;
 
+        // Compare modifiers
+        if (jsImport.modifiers.length !== otherImport.modifiers.length) {
+            this.abort();
+            return jsImport;
+        }
+
+        // Visit each modifier in lock step
+        for (let i = 0; i < jsImport.modifiers.length; i++) {
+            await this.visit(jsImport.modifiers[i].element, otherImport.modifiers[i].element);
+            if (!this.match) return jsImport;
+        }
+
         // Compare import clause
         if (!!jsImport.importClause !== !!otherImport.importClause) {
             this.abort();
