@@ -15,14 +15,26 @@
  */
 package org.openrewrite.maven.trait;
 
+/**
+ * @deprecated Use specific matchers like {@link MavenDependency.Matcher} or {@link MavenPlugin.Matcher} instead.
+ */
+@Deprecated
 public class Traits {
     private Traits() {
     }
 
+    /**
+     * @deprecated Use {@link MavenDependency.Matcher} instead.
+     */
+    @Deprecated
     public static MavenDependency.Matcher mavenDependency() {
         return new MavenDependency.Matcher();
     }
 
+    /**
+     * @deprecated Use {@link MavenPlugin.Matcher} instead.
+     */
+    @Deprecated
     public static MavenPlugin.Matcher mavenPlugin() {
         return new MavenPlugin.Matcher();
     }
