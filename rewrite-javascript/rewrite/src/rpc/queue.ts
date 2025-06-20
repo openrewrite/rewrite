@@ -248,7 +248,8 @@ export class RpcReceiveQueue {
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly pull: () => Promise<RpcObjectData[]>,
-                private readonly logFile?: WriteStream) {
+                private readonly logFile?: WriteStream,
+                private readonly getRef?: (refId: number) => Promise<any>) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -289,6 +290,11 @@ export class RpcReceiveQueue {
                     ref = message.ref;
                     if (ref !== undefined && this.refs.has(ref)) {
                         return this.refs.get(ref);
+                    } else if (ref !== undefined && this.getRef) {
+                        // Ref was evicted from cache, fetch it
+                        const refObject = await this.getRef(ref);
+                        this.refs.set(ref, refObject);
+                        return refObject;
                     }
                     before = message.value ?? this.newObj(message.valueType!);
                 // Intentional fall-through...

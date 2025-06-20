@@ -45,11 +45,11 @@ export class RewriteRpc {
     /* A reverse map of the objects back to their IDs */
     private readonly localObjectIds = new IdentityMap();
 
-    private readonly remoteObjects: Map<string, any> = new Map();
-    private readonly remoteRefs: Map<number, any> = new Map();
-    private readonly localRefs: ReferenceMap = new ReferenceMap();
+    readonly remoteObjects: Map<string, any> = new Map();
+    readonly remoteRefs: Map<number, any> = new Map();
+    readonly localRefs: ReferenceMap = new ReferenceMap();
 
-    constructor(private readonly connection: MessageConnection = rpc.createMessageConnection(
+    constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
                     new rpc.StreamMessageReader(process.stdin),
                     new rpc.StreamMessageWriter(process.stdout),
                 ),
@@ -76,8 +76,12 @@ export class RewriteRpc {
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
-        connection.onRequest(new rpc.RequestType<any, void, Error>("ClearObjectMaps"), _request => {
-            this.clearObjectCaches0();
+        connection.onRequest("GetRef", (request: {refId: string}) => {
+            const ref = this.localRefs.getByRefId(request.refId);
+            if (ref === undefined) {
+                return {state: RpcObjectState.DELETE, valueType: null, value: null, ref: null, trace: null};
+            }
+            return {state: RpcObjectState.ADD, valueType: null, value: ref, ref: null, trace: null};
         });
         InstallRecipes.handle(this.connection, ".rewrite", registry);
 
@@ -90,10 +94,13 @@ export class RewriteRpc {
     }
 
     async getObject<P>(id: string): Promise<P> {
+        const localObject = this.localObjects.get(id);
+        const lastKnownId = localObject ? id : undefined;
+        
         const q = new RpcReceiveQueue(this.remoteRefs, () => {
             return this.connection.sendRequest(
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
-                new GetObject(id)
+                new GetObject(id, lastKnownId)
             );
         }, this.options.traceGetObjectInput);
 
@@ -225,20 +232,17 @@ export class RewriteRpc {
         }
     }
 
-    public clearObjectMaps() {
-        this.clearObjectCaches0();
-        return this.connection.sendRequest(
-            new rpc.RequestType<any, RpcObjectData[], Error>("ClearObjectMaps"),
-            {}
+    private async getRef(refId: number): Promise<any> {
+        const refData = await this.connection.sendRequest(
+            new rpc.RequestType<{refId: string}, RpcObjectData, Error>("GetRef"),
+            {refId: refId.toString()}
         );
-    }
-
-    private clearObjectCaches0() {
-        this.remoteObjects.clear();
-        this.remoteRefs.clear();
-        this.localObjects.clear();
-        this.localObjectIds.clear();
-        this.localRefs.clear();
+        if (refData.state === RpcObjectState.DELETE) {
+            throw new Error(`Reference ${refId} not found on remote`);
+        }
+        const ref = refData.value;
+        this.remoteRefs.set(refId, ref);
+        return ref;
     }
 }
 

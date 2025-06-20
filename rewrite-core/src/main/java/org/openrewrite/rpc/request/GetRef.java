@@ -15,5 +15,14 @@
  */
 package org.openrewrite.rpc.request;
 
-public class ClearObjectMaps implements RpcRequest {
+public class GetRef implements RpcRequest {
+    private final String refId;
+
+    public GetRef(String refId) {
+        this.refId = refId;
+    }
+
+    public String getRefId() {
+        return refId;
+    }
 }

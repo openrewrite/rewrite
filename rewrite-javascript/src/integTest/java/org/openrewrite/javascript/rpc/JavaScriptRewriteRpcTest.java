@@ -109,10 +109,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
-    @Test
-    void clearObjectMaps() {
-        client.clearObjectMaps();
-    }
 
     @Test
     void printJava() {

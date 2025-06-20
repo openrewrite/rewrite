@@ -36,13 +36,20 @@ public class RpcReceiveQueue {
     private final Map<Integer, Object> refs;
     private final @Nullable PrintStream logFile;
     private final Supplier<List<RpcObjectData>> pull;
+    private final @Nullable Function<Integer, Object> getRef;
 
     public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
                            Supplier<List<RpcObjectData>> pull) {
+        this(refs, logFile, pull, null);
+    }
+
+    public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
+                           Supplier<List<RpcObjectData>> pull, @Nullable Function<Integer, Object> getRef) {
         this.refs = refs;
         this.batch = new ArrayList<>();
         this.logFile = logFile;
         this.pull = pull;
+        this.getRef = getRef;
     }
 
     public RpcObjectData take() {
@@ -116,9 +123,15 @@ public class RpcReceiveQueue {
                 return null;
             case ADD:
                 ref = message.getRef();
-                if (refs.containsKey(ref)) {
+                if (ref != null && refs.containsKey(ref)) {
                     //noinspection unchecked
                     return (T) refs.get(ref);
+                } else if (ref != null && getRef != null) {
+                    // Ref was evicted from cache, fetch it
+                    Object refObject = getRef.apply(ref);
+                    refs.put(ref, refObject);
+                    //noinspection unchecked
+                    return (T) refObject;
                 }
                 before = message.getValueType() == null ?
                         message.getValue() :
