@@ -499,7 +499,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     @Override
     public J.Assert visitAssert(J.Assert assert_, P p) {
         visitAndValidateNonNull(assert_.getCondition(), Expression.class, p);
-        visitAndValidate(assert_.getDetail() != null ? assert_.getDetail().getElement() : null, Expression.class, p);
+        visitAndValidate(assert_.getPadding().getDetail() != null ? assert_.getPadding().getDetail().getElement() : null, Expression.class, p);
         return assert_;
     }
 

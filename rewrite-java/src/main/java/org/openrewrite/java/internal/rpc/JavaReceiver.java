@@ -79,7 +79,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitAssert(J.Assert assertStmt, RpcReceiveQueue q) {
         return assertStmt
                 .withCondition(q.receive(assertStmt.getCondition(), c -> (Expression) visitNonNull(c, q)))
-                .withDetail(q.receive(assertStmt.getDetail(), d -> visitLeftPadded(d, q)));
+                .getPadding().withDetail(q.receive(assertStmt.getPadding().getDetail(), d -> visitLeftPadded(d, q)));
     }
 
     @Override
