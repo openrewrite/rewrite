@@ -162,7 +162,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 if (d != document) {
                     d = (Xml.Document) new RemoveEmptyDependenciesTags().visitNonNull(d, ctx);
                     d = (Xml.Document) new RemoveEmptyPluginsTags().visitNonNull(d, ctx);
-                    if (!versionPlaceholder.isEmpty()) {
+                    if (!versionPlaceholder.isEmpty() && getResolutionResult().getPom().getPackaging().equals("jar")) {
                         RemoveUnusedProperties removeUnusedProperties = new RemoveUnusedProperties("(" + String.join("|", versionPlaceholder) + ")");
                         RemoveUnusedProperties.Accumulator acc = removeUnusedProperties.getInitialValue(ctx);
                         removeUnusedProperties.getScanner(acc).visit(d, ctx);
