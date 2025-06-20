@@ -153,7 +153,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        ArrayList<String> versionPlaceholder = new ArrayList<>();
+        ArrayList<String> properties = new ArrayList<>();
         Comparator comparator = determineComparator();
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
@@ -162,8 +162,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 if (d != document) {
                     d = (Xml.Document) new RemoveEmptyDependenciesTags().visitNonNull(d, ctx);
                     d = (Xml.Document) new RemoveEmptyPluginsTags().visitNonNull(d, ctx);
-                    if (!versionPlaceholder.isEmpty() && getResolutionResult().getPom().getPackaging().equals("jar")) {
-                        RemoveUnusedProperties removeUnusedProperties = new RemoveUnusedProperties("(" + String.join("|", versionPlaceholder) + ")");
+                    if (!properties.isEmpty() && getResolutionResult().getPom().getPackaging().equals("jar")) {
+                        RemoveUnusedProperties removeUnusedProperties = new RemoveUnusedProperties("(" + String.join("|", properties) + ")");
                         RemoveUnusedProperties.Accumulator acc = removeUnusedProperties.getInitialValue(ctx);
                         removeUnusedProperties.getScanner(acc).visit(d, ctx);
                         d = (Xml.Document) removeUnusedProperties.getVisitor(acc).visitNonNull(d, ctx);
@@ -225,7 +225,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     if (c == version) {
                         if (((Xml.Tag) c).getValue().isPresent() && ((Xml.Tag) c).getValue().get().contains("${")) {
                             final String propertyName = ((Xml.Tag) c).getValue().get().replace("${", "").replace("}", "");
-                            versionPlaceholder.add(propertyName);
+                            properties.add(propertyName);
                         }
                         return null;
                     }
