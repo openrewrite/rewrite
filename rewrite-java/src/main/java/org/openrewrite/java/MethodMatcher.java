@@ -64,14 +64,30 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class MethodMatcher {
     //language=markdown
-    public static final String METHOD_PATTERN_DESCRIPTION = "A [method pattern](https://docs.openrewrite.org/reference/method-patterns) is used to find matching method invocations. " +
-                                                            "For example, to find all method invocations in the Guava library, use the pattern: " +
-                                                            "`com.google.common..*#*(..)`.<br/><br/>" +
-                                                            "The pattern format is `<PACKAGE>#<METHOD_NAME>(<ARGS>)`. <br/><br/>" +
-                                                            "`..*` includes all subpackages of `com.google.common`. <br/>" +
-                                                            "`*(..)` matches any method name with any number of arguments. <br/><br/>" +
-                                                            "For more specific queries, like Guava's `ImmutableMap`, use " +
-                                                            "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
+    public static final String METHOD_PATTERN_DECLARATIONS_DESCRIPTION =
+            "A [method pattern](https://docs.openrewrite.org/reference/method-patterns) is used to find matching method declarations. " +
+            "For example, to find all method declarations in the Guava library, use the pattern: " +
+            "`com.google.common..*#*(..)`.<br/><br/>" +
+            "The pattern format is `<PACKAGE>#<METHOD_NAME>(<ARGS>)`. <br/><br/>" +
+            "`..*` includes all subpackages of `com.google.common`. <br/>" +
+            "`*(..)` matches any method name with any number of arguments. <br/><br/>" +
+            "For more specific queries, like Guava's `ImmutableMap`, use " +
+            "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
+    //language=markdown
+    public static final String METHOD_PATTERN_INVOCATIONS_DESCRIPTION =
+            "A [method pattern](https://docs.openrewrite.org/reference/method-patterns) is used to find matching method invocations. " +
+            "For example, to find all method invocations in the Guava library, use the pattern: " +
+            "`com.google.common..*#*(..)`.<br/><br/>" +
+            "The pattern format is `<PACKAGE>#<METHOD_NAME>(<ARGS>)`. <br/><br/>" +
+            "`..*` includes all subpackages of `com.google.common`. <br/>" +
+            "`*(..)` matches any method name with any number of arguments. <br/><br/>" +
+            "For more specific queries, like Guava's `ImmutableMap`, use " +
+            "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
+    /**
+     * @deprecated Use {@link #METHOD_PATTERN_INVOCATIONS_DESCRIPTION} instead.
+     */
+    @Deprecated
+    public static final String METHOD_PATTERN_DESCRIPTION = METHOD_PATTERN_INVOCATIONS_DESCRIPTION;
 
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
     private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
