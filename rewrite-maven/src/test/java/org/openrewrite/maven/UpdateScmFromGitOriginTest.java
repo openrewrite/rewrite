@@ -31,7 +31,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new UpdateScmFromGitOrigin()),
           pomXml(
-            // before
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -46,7 +45,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                 </scm>
               </project>
               """,
-            // after
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -71,7 +69,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new UpdateScmFromGitOrigin()),
           pomXml(
-            // before
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -86,7 +83,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                 </scm>
               </project>
               """,
-            // after
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -111,7 +107,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new UpdateScmFromGitOrigin()),
           pomXml(
-            // before
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -126,7 +121,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                 </scm>
               </project>
               """,
-            // after
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -151,7 +145,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new UpdateScmFromGitOrigin()),
           pomXml(
-            // before
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven.utilities;
 
-public class ScmValues{
+public class ScmValues {
 
     private String url;
     private String connection;
