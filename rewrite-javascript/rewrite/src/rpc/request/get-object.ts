@@ -25,11 +25,11 @@ export class GetObject {
         connection: rpc.MessageConnection,
         remoteObjects: Map<string, any>,
         localObjects: Map<string, any>,
+        localRefs: ReferenceMap,
         batchSize: number,
         trace: boolean
     ): void {
         const pendingData = new Map<string, RpcObjectData[]>();
-        const localRefs = new ReferenceMap();
 
         connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
             if (!localObjects.has(request.id)) {

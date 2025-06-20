@@ -36,16 +36,18 @@ import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes"
 import {WriteStream} from "fs";
 import {ParserInput} from "../parser";
 import {randomId} from "../uuid";
+import {ReferenceMap} from "./reference";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
 
     readonly localObjects: Map<string, any> = new Map();
     /* A reverse map of the objects back to their IDs */
-    private readonly localObjectIds = new IdentityMap()
+    private readonly localObjectIds = new IdentityMap();
 
     private readonly remoteObjects: Map<string, any> = new Map();
     private readonly remoteRefs: Map<number, any> = new Map();
+    private readonly localRefs: ReferenceMap = new ReferenceMap();
 
     constructor(private readonly connection: MessageConnection = rpc.createMessageConnection(
                     new rpc.StreamMessageReader(process.stdin),
@@ -68,12 +70,15 @@ export class RewriteRpc {
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
-        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, options?.batchSize || 100,
+        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, this.localRefs, options?.batchSize || 100,
             !!options?.traceGetObjectOutput);
         GetRecipes.handle(this.connection, registry);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
+        connection.onRequest(new rpc.RequestType<any, void, Error>("ClearObjectCaches"), _request => {
+            this.clearObjectCaches0();
+        });
         InstallRecipes.handle(this.connection, ".rewrite", registry);
 
         this.connection.listen();
@@ -219,10 +224,26 @@ export class RewriteRpc {
             return cursorIds
         }
     }
+
+    public clearObjectCaches() {
+        this.clearObjectCaches0();
+        return this.connection.sendRequest(
+            new rpc.RequestType<any, RpcObjectData[], Error>("ClearObjectCaches"),
+            {}
+        );
+    }
+
+    private clearObjectCaches0() {
+        this.remoteObjects.clear();
+        this.remoteRefs.clear();
+        this.localObjects.clear();
+        this.localObjectIds.clear();
+        this.localRefs.clear();
+    }
 }
 
 class IdentityMap {
-    constructor(private readonly objectMap = new WeakMap<any, string>(),
+    constructor(private objectMap = new WeakMap<any, string>(),
                 private readonly primitiveMap = new Map<any, string>()) {
     }
 
@@ -248,5 +269,10 @@ class IdentityMap {
         } else {
             return this.primitiveMap.has(key);
         }
+    }
+
+    clear() {
+        this.objectMap = new WeakMap<any, string>();
+        this.primitiveMap.clear();
     }
 }

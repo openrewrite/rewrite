@@ -56,4 +56,9 @@ export class ReferenceMap {
         this.refs.set(obj, ref);
         return ref;
     }
+
+    clear() {
+        this.refs = new WeakMap<Reference, number>();
+        this.refCount = 0;
+    }
 }

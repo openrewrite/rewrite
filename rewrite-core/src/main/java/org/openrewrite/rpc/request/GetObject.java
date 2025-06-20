@@ -43,15 +43,14 @@ public class GetObject implements RpcRequest {
         private final AtomicInteger batchSize;
         private final Map<String, Object> remoteObjects;
         private final Map<String, Object> localObjects;
-        private final AtomicBoolean trace;
-
-        private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
-
         /**
          * Keeps track of objects that need to be referentially deduplicated, and
          * the ref IDs to look them up by on the remote.
          */
-        private final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+        private final IdentityHashMap<Object, Integer> localRefs;
+        private final AtomicBoolean trace;
+
+        private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
 
         @Override
         protected List<RpcObjectData> handle(GetObject request) throws Exception {

@@ -245,6 +245,8 @@ public class RewriteRpc implements AutoCloseable {
 
     private final Map<Integer, Object> remoteRefs = new HashMap<>();
 
+    private final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+
     /**
      * Creates a new RPC interface that can be used to communicate with a remote.
      *
@@ -261,11 +263,18 @@ public class RewriteRpc implements AutoCloseable {
         Map<String, Recipe> preparedRecipes = new HashMap<>();
         Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
 
+        jsonRpc.rpc("ClearObjectCaches", new JsonRpcMethod<ClearObjectCaches>() {
+            @Override
+            protected @Nullable Object handle(ClearObjectCaches request) {
+                clearObjectCaches0();
+                return null;
+            }
+        });
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject));
-        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, traceSendPackets));
+        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, localRefs, traceSendPackets));
         jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
@@ -298,6 +307,19 @@ public class RewriteRpc implements AutoCloseable {
     public RewriteRpc traceGetObjectInput(PrintStream log) {
         this.logFile = log;
         return this;
+    }
+
+    public void clearObjectCaches() {
+        clearObjectCaches0();
+        send("ClearObjectCaches", new ClearObjectCaches(), Void.class);
+    }
+
+    private void clearObjectCaches0() {
+        remoteObjects.clear();
+        remoteRefs.clear();
+        localObjects.clear();
+        localObjectIds.clear();
+        localRefs.clear();
     }
 
     @Override

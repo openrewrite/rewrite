@@ -111,6 +111,11 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void clearObjectCaches() {
+        client.clearObjectCaches();
+    }
+
+    @Test
     void printJava() {
         assertThat(client.installRecipes(new File("rewrite/dist/test/modify-all-trees.js")))
           .isEqualTo(1);
