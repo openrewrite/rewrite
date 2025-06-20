@@ -168,9 +168,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 }
                 if (!versionPlaceholder.isEmpty()) {
                     RemoveUnusedProperties removeUnusedProperties = new RemoveUnusedProperties("(" + String.join("|", versionPlaceholder) + ")");
-                    RemoveUnusedProperties.Accumulator context = removeUnusedProperties.getInitialValue(ctx);
-                    removeUnusedProperties.getScanner(context).visit(d, ctx);
-                    d = (Xml.Document) removeUnusedProperties.getVisitor(context).visitNonNull(d, ctx);
+                    RemoveUnusedProperties.Accumulator acc = removeUnusedProperties.getInitialValue(ctx);
+                    removeUnusedProperties.getScanner(acc).visit(d, ctx);
+                    d = (Xml.Document) removeUnusedProperties.getVisitor(acc).visitNonNull(d, ctx);
                 }
                 return d;
             }
