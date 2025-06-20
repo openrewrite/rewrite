@@ -1780,7 +1780,9 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                 <artifactId>test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
                 <properties>
-                    <my-kotlin.version>1.3.72</my-kotlin.version>
+                    <kotlin.major.version>1</kotlin.major.version>
+                    <kotlin.minor.version>3</kotlin.minor.version>
+                    <kotlin.patch.version>72</kotlin.patch.version>
                 </properties>
 
                 <modelVersion>4.0.0</modelVersion>
@@ -1789,7 +1791,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         <plugin>
                             <artifactId>kotlin-maven-plugin</artifactId>
                             <groupId>org.jetbrains.kotlin</groupId>
-                            <version>${my-kotlin.version}</version>
+                            <version>${kotlin.major.version}.${kotlin.minor.version}.${kotlin.patch.version}</version>
                         </plugin>
                     </plugins>
                 </build>

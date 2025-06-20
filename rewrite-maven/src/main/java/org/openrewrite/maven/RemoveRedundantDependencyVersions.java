@@ -223,9 +223,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             private @Nullable List<? extends Content> withoutVersion(Xml.Tag tag, Xml.@Nullable Tag version) {
                 return ListUtils.map(tag.getContent(), c -> {
                     if (c == version) {
-                        if (((Xml.Tag) c).getValue().isPresent() && ((Xml.Tag) c).getValue().get().contains("${")) {
-                            final String propertyName = ((Xml.Tag) c).getValue().get().replace("${", "").replace("}", "");
-                            properties.add(propertyName);
+                        Optional<String> value = ((Xml.Tag) c).getValue();
+                        if (value.isPresent() && isProperty(value.get())) {
+                            properties.addAll(ResolvedPom.placeholderHelper.getPlaceholders(value.get()));
                         }
                         return null;
                     }
