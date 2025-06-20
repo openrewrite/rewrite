@@ -1930,13 +1930,13 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     <version>2.5.4</version>
                     <relativePath/>
                 </parent>
-                <properties>
-                    <shared.version>5.3.1</shared.version>
-                </properties>
     
                 <groupId>com.example</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
+                <properties>
+                    <shared.version>5.3.1</shared.version>
+                </properties>
     
                 <modelVersion>4.0.0</modelVersion>
     

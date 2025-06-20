@@ -153,6 +153,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        ArrayList<String> versionPlaceholder = new ArrayList<>();
         Comparator comparator = determineComparator();
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
@@ -164,6 +165,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     if (comparator != Comparator.EQ) {
                         maybeUpdateModel();
                     }
+                }
+                if (!versionPlaceholder.isEmpty()) {
+                    RemoveUnusedProperties removeUnusedProperties = new RemoveUnusedProperties("(" + String.join("|", versionPlaceholder) + ")");
+                    RemoveUnusedProperties.Accumulator context = removeUnusedProperties.getInitialValue(ctx);
+                    removeUnusedProperties.getScanner(context).visit(d, ctx);
+                    d = (Xml.Document) removeUnusedProperties.getVisitor(context).visitNonNull(d, ctx);
                 }
                 return d;
             }
@@ -218,7 +225,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     if (c == version) {
                         if (((Xml.Tag) c).getValue().isPresent() && ((Xml.Tag) c).getValue().get().contains("${")) {
                             final String propertyName = ((Xml.Tag) c).getValue().get().replace("${", "").replace("}", "");
-                            doAfterVisit(new RemoveUnusedProperties(propertyName).getVisitor());
+                            versionPlaceholder.add(propertyName);
                         }
                         return null;
                     }
