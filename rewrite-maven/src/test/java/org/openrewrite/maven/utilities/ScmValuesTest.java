@@ -53,5 +53,4 @@ class ScmValuesTest {
         assertEquals("scm:git:ssh://git@github.com/username/repo.git", values.getConnection());
         assertEquals("scm:git:ssh://git@github.com/username/repo.git", values.getDeveloperConnection());
     }
-
 }
