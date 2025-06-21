@@ -569,7 +569,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitMultipleAssignmentDeclaration(G.DestructuringDeclaration m, PrintOutputCapture<P> p) {
+    public J visitDestructuringDeclaration(G.DestructuringDeclaration m, PrintOutputCapture<P> p) {
         beforeSyntax(m, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
         m.getModifiers().forEach(mod -> visit(mod, p));
         visitContainer("(", m.getPadding().getVariables(), GContainer.Location.LIST_LITERAL_ELEMENTS, ",", ")", p);

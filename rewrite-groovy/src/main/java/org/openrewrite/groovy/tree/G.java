@@ -1077,7 +1077,7 @@ public interface G extends J {
 
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
-            return v.visitMultipleAssignmentDeclaration(this, p);
+            return v.visitDestructuringDeclaration(this, p);
         }
 
 
