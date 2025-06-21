@@ -78,14 +78,14 @@ dependencies {
 
 // This seems to be the only way to get the groovy compiler to emit java-8 compatible bytecode
 // No option to explicitly target java-8 in the groovy compiler
-tasks.withType<GroovyCompile> {
+tasks.withType<GroovyCompile>().configureEach {
     this.javaLauncher.set(javaToolchains.launcherFor {
         languageVersion.set(JavaLanguageVersion.of(8))
     })
 }
 
 //Javadoc compiler will complain about the use of the internal types.
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     exclude(
         "**/GradleProject**",
         "**/GradleDependencyConfiguration**",

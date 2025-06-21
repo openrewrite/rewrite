@@ -31,7 +31,7 @@ java {
     }
 }
 
-tasks.withType<JavaCompile> {
+tasks.withType<JavaCompile>().configureEach {
     // allows --add-exports to in spite of the JDK's restrictions on this
     sourceCompatibility = JavaVersion.VERSION_21.toString()
     targetCompatibility = JavaVersion.VERSION_21.toString()
@@ -50,7 +50,7 @@ tasks.withType<JavaCompile> {
 }
 
 //Javadoc compiler will complain about the use of the internal types.
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     exclude(
         "**/ReloadableJava21JavadocVisitor**",
         "**/ReloadableJava21Parser**",

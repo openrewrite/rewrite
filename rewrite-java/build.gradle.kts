@@ -73,7 +73,7 @@ dependencies {
     testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
 
