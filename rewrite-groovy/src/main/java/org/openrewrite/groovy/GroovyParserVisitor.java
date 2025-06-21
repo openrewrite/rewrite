@@ -206,8 +206,8 @@ public class GroovyParserVisitor {
                 }
                 throw new GroovyParsingException(
                         "Failed to parse " + sourcePath + " at cursor position " + cursor +
-                        ". The next 10 characters in the original source are `" +
-                        source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
+                                ". The next 10 characters in the original source are `" +
+                                source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
             }
         }
 
@@ -756,9 +756,9 @@ public class GroovyParserVisitor {
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
             if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression &&
-                (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
-                 (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
-                  unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
+                    (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
+                            (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
+                                    unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
 
                 // Figure out the source-code ordering of the expressions
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
@@ -1051,7 +1051,7 @@ public class GroovyParserVisitor {
                 J expr = visit(statement);
                 if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
                     if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
-                                                                JavaType.Primitive.Void != typeMapping.type(((MethodNode) parent).getReturnType()))) {
+                            JavaType.Primitive.Void != typeMapping.type(((MethodNode) parent).getReturnType()))) {
                         expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
                                 expr.withPrefix(EMPTY));
                         expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
@@ -1091,8 +1091,8 @@ public class GroovyParserVisitor {
             // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
             // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
             if (Exception.class.getName().equals(param.getType().getName()) &&
-                !source.startsWith("Exception", cursor) &&
-                !source.startsWith("java.lang.Exception", cursor)) {
+                    !source.startsWith("Exception", cursor) &&
+                    !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
                         JavaType.ShallowClass.build(Exception.class.getName()), null);
             } else {
@@ -1418,13 +1418,31 @@ public class GroovyParserVisitor {
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(expression, classVisitor);
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
             List<J.Modifier> modifiers = getModifiers();
-            TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
+            TypeTree typeExpr;
 
             J.VariableDeclarations.NamedVariable namedVariable;
             if (expression.isMultipleAssignmentDeclaration()) {
-                // def (a, b) = [1, 2]
-                throw new UnsupportedOperationException("Parsing multiple assignment (e.g.: def (a, b) = [1, 2]) is not implemented");
+                Space prefixBeforeOpenParentheses = whitespace();
+                typeExpr = visitTupleExpressionType(expression.getTupleExpression());
+                JContainer<J.Identifier> identifiers = visit(expression.getTupleExpression());
+                List<JRightPadded<J.VariableDeclarations.NamedVariable>> namedVariables = identifiers.getPadding().getElements().stream()
+                        .map(this::createNamedVariable)
+                        .collect(toList());
+                Space beforeAssign = sourceBefore("=");
+                Expression initializer = visit(expression.getRightExpression());
+                G.MultipleAssignmentDeclaration multipleAssignmentDeclaration = new G.MultipleAssignmentDeclaration(
+                        randomId(),
+                        prefix,
+                        Markers.EMPTY,
+                        modifiers,
+                        typeExpr,
+                        padLeft(beforeAssign, initializer),
+                        JContainer.build(namedVariables).withBefore(prefixBeforeOpenParentheses)
+                );
+                queue.add(multipleAssignmentDeclaration);
+                return;
             } else {
+                typeExpr = visitVariableExpressionType(expression.getVariableExpression());
                 J.Identifier name = visit(expression.getVariableExpression());
                 namedVariable = new J.VariableDeclarations.NamedVariable(
                         randomId(),
@@ -1459,6 +1477,19 @@ public class GroovyParserVisitor {
             }
 
             queue.add(variableDeclarations);
+        }
+
+        private JRightPadded<J.VariableDeclarations.NamedVariable> createNamedVariable(JRightPadded<J.Identifier> identifier) {
+            J.VariableDeclarations.NamedVariable variable = new J.VariableDeclarations.NamedVariable(
+                    randomId(),
+                    identifier.getElement().getPrefix(),
+                    Markers.EMPTY,
+                    identifier.getElement().withPrefix(EMPTY),
+                    emptyList(),
+                    null,
+                    typeMapping.variableType(identifier.getElement().getSimpleName(), identifier.getElement().getType())
+            );
+            return padRight(variable, identifier.getAfter());
         }
 
         private Optional<MultiVariable> maybeMultiVariable() {
@@ -1887,7 +1918,7 @@ public class GroovyParserVisitor {
         public void visitReturnStatement(ReturnStatement return_) {
             Space fmt = sourceBefore("return");
             if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
-                (((ConstantExpression) return_.getExpression()).getValue() == null)) {
+                    (((ConstantExpression) return_.getExpression()).getValue() == null)) {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
             } else {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(return_.getExpression())));
@@ -2081,6 +2112,12 @@ public class GroovyParserVisitor {
             queue.add(new G.Unary(randomId(), fmt, Markers.EMPTY, JLeftPadded.build(G.Unary.Type.Spread), visit(spreadExpression.getExpression()), null));
         }
 
+        public TypeTree visitTupleExpressionType(TupleExpression expression) {
+            String typeName = "";
+            JavaType type = typeMapping.type(expression.getType());
+            return new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), typeName, type, null);
+        }
+
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
             if (!expression.isDynamicTyped() && expression.getOriginType().isArray()) {
                 return visitTypeTree(expression.getOriginType());
@@ -2092,7 +2129,7 @@ public class GroovyParserVisitor {
 
             if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
                 if (cursor + expression.getOriginType().getUnresolvedName().length() < source.length() &&
-                    !Character.isJavaIdentifierPart(source.charAt(cursor + expression.getOriginType().getUnresolvedName().length()))) {
+                        !Character.isJavaIdentifierPart(source.charAt(cursor + expression.getOriginType().getUnresolvedName().length()))) {
                     typeName = expression.getOriginType().getUnresolvedName();
                     skip(typeName);
                 }
@@ -2283,8 +2320,8 @@ public class GroovyParserVisitor {
                                 }
                                 Expression element = isImplicitValue ? expression :
                                         (new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
-                                        new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null),
-                                        padLeft(isSign, expression), null));
+                                                new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null),
+                                                padLeft(isSign, expression), null));
                                 return JRightPadded.build(element)
                                         .withAfter(arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","));
                             })
