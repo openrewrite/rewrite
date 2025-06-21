@@ -26,7 +26,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
     @Test
     void removeConfiguration() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginConfiguration("org.openrewrite.maven", "rewrite-maven-plugin", null)),
+          spec -> spec.recipe(new ChangePluginConfiguration("org.openrewrite.maven", "rewrite-maven-plugin", null, null)),
           pomXml(
             """
               <project>
@@ -77,7 +77,8 @@ class ChangePluginConfigurationTest implements RewriteTest {
           spec -> spec.recipe(new ChangePluginConfiguration(
             "org.openrewrite.maven",
             "rewrite-maven-plugin",
-            "<activeRecipes>\n<recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>\n</activeRecipes>")),
+            "<activeRecipes>\n<recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>\n</activeRecipes>",
+            null)),
           pomXml(
             """
               <project>
@@ -128,7 +129,8 @@ class ChangePluginConfigurationTest implements RewriteTest {
           spec -> spec.recipe(new ChangePluginConfiguration(
             "org.openrewrite.maven",
             "rewrite-maven-plugin",
-            "<activeRecipes>\n<recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>\n</activeRecipes>")),
+            "<activeRecipes>\n<recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>\n</activeRecipes>",
+            null)),
           pomXml(
             """
               <project>
@@ -180,6 +182,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
           spec -> spec.recipe(new ChangePluginConfiguration(
             "org.openrewrite.maven",
             "rewrite-maven-plugin",
+            null,
             null)),
           pomXml(
             """
@@ -194,6 +197,72 @@ class ChangePluginConfigurationTest implements RewriteTest {
                               <groupId>org.openrewrite.maven</groupId>
                               <artifactId>rewrite-maven-plugin</artifactId>
                               <version>4.1.5</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePluginConfiguration(
+            "org.openrewrite.maven",
+            "rewrite-maven-plugin",
+            "<activeRecipes>\n<recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>\n</activeRecipes>\n<configLocation>${maven.multiModuleProjectDirectory}/rewrite.yml</configLocation>",
+            true)),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+              
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <configuration>
+                                  <activeRecipes>
+                                      <recipe>org.openrewrite.java.cleanup.NoFinalizer</recipe>
+                                  </activeRecipes>
+                                  <plainTextMasks>
+                                      <mask>**/*.txt</mask>
+                                  </plainTextMasks>
+                                  <failOnDryRunResults>true</failOnDryRunResults>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+              
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <configuration>
+                                  <activeRecipes>
+                                      <recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>
+                                  </activeRecipes>
+                                  <plainTextMasks>
+                                      <mask>**/*.txt</mask>
+                                  </plainTextMasks>
+                                  <failOnDryRunResults>true</failOnDryRunResults>
+                                  <configLocation>${maven.multiModuleProjectDirectory}/rewrite.yml</configLocation>
+                              </configuration>
                           </plugin>
                       </plugins>
                   </build>
