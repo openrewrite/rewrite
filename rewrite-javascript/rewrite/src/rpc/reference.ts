@@ -41,6 +41,7 @@ export function isRef(obj?: any): obj is Reference {
 
 export class ReferenceMap {
     private refs = new WeakMap<Reference, number>();
+    private refsById = new Map<number, Reference>();
     private refCount = 0;
 
     has(obj: Reference): boolean {
@@ -51,14 +52,20 @@ export class ReferenceMap {
         return this.refs.get(obj);
     }
 
+    getByRefId(refId: string): Reference | undefined {
+        return this.refsById.get(parseInt(refId));
+    }
+
     create(obj: Reference): number {
         const ref = this.refCount++;
         this.refs.set(obj, ref);
+        this.refsById.set(ref, obj);
         return ref;
     }
 
     clear() {
         this.refs = new WeakMap<Reference, number>();
+        this.refsById = new Map<number, Reference>();
         this.refCount = 0;
     }
 }

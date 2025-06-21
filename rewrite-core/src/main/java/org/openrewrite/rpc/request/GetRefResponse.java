@@ -15,5 +15,9 @@
  */
 package org.openrewrite.rpc.request;
 
-public class ClearObjectMaps implements RpcRequest {
+import org.openrewrite.rpc.RpcObjectData;
+
+import java.util.ArrayList;
+
+public class GetRefResponse extends ArrayList<RpcObjectData> {
 }

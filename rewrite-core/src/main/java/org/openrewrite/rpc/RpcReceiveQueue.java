@@ -36,13 +36,15 @@ public class RpcReceiveQueue {
     private final Map<Integer, Object> refs;
     private final @Nullable PrintStream logFile;
     private final Supplier<List<RpcObjectData>> pull;
+    private final Function<Integer, Object> getRef;
 
     public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
-                           Supplier<List<RpcObjectData>> pull) {
+                           Supplier<List<RpcObjectData>> pull, Function<Integer, Object> getRef) {
         this.refs = refs;
         this.batch = new ArrayList<>();
         this.logFile = logFile;
         this.pull = pull;
+        this.getRef = getRef;
     }
 
     public RpcObjectData take() {
@@ -102,6 +104,7 @@ public class RpcReceiveQueue {
     @SuppressWarnings("DataFlowIssue")
     public <T> @Nullable T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
+        
         if (logFile != null && message.getTrace() != null) {
             logFile.println(message.withTrace(null));
             logFile.println("  " + message.getTrace());
@@ -116,13 +119,24 @@ public class RpcReceiveQueue {
                 return null;
             case ADD:
                 ref = message.getRef();
-                if (refs.containsKey(ref)) {
-                    //noinspection unchecked
-                    return (T) refs.get(ref);
+                if (ref != null && message.getValueType() == null && message.getValue() == null) {
+                    // This is a pure reference to an existing object
+                    if (refs.containsKey(ref)) {
+                        //noinspection unchecked
+                        return (T) refs.get(ref);
+                    } else {
+                        // Ref was evicted from cache, fetch it
+                        Object refObject = getRef.apply(ref);
+                        refs.put(ref, refObject);
+                        //noinspection unchecked
+                        return (T) refObject;
+                    }
+                } else {
+                    // This is either a new object or a forward declaration with ref
+                    before = message.getValueType() == null ?
+                            message.getValue() :
+                            newObj(message.getValueType());
                 }
-                before = message.getValueType() == null ?
-                        message.getValue() :
-                        newObj(message.getValueType());
                 // Intentional fall-through...
             case CHANGE:
                 T after;
