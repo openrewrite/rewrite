@@ -179,24 +179,25 @@ describe("Independent Cache Management", () => {
 
         // Test GetRef request directly using connection (client requests from server)
         const response = await client.connection.sendRequest(
-            new rpc.RequestType<{refId: string}, RpcObjectData, Error>("GetRef"),
+            new rpc.RequestType<{refId: string}, RpcObjectData[], Error>("GetRef"),
             {refId: refId.toString()}
         );
         
-        expect(response.state).toBe(RpcObjectState.ADD);
-        expect(response.value).toBeDefined();
-        expect(response.value.id).toBe(markers.id);
+        expect(response).toHaveLength(2);
+        expect(response[0].state).toBe(RpcObjectState.ADD);
+        expect(response[response.length - 1].state).toBe(RpcObjectState.END_OF_OBJECT);
     });
 
     test("getRef request for missing reference returns DELETE", async () => {
         // Request a reference that doesn't exist (client requests from server)
         const response = await client.connection.sendRequest(
-            new rpc.RequestType<{refId: string}, RpcObjectData, Error>("GetRef"),
+            new rpc.RequestType<{refId: string}, RpcObjectData[], Error>("GetRef"),
             {refId: "999"}
         );
         
-        expect(response.state).toBe(RpcObjectState.DELETE);
-        expect(response.value).toBe(null);
+        expect(response).toHaveLength(2);
+        expect(response[0].state).toBe(RpcObjectState.DELETE);
+        expect(response[1].state).toBe(RpcObjectState.END_OF_OBJECT);
     });
 
     test("lastKnownId null parameter returns ADD not CHANGE", async () => {

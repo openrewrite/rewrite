@@ -29,7 +29,7 @@ import {
     Visit,
     VisitResponse
 } from "./request";
-import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
+import {RpcObjectData, RpcObjectState, RpcReceiveQueue, RpcSendQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
@@ -76,12 +76,18 @@ export class RewriteRpc {
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
-        connection.onRequest("GetRef", (request: {refId: string}) => {
+        connection.onRequest("GetRef", async (request: {refId: string}) => {
             const ref = this.localRefs.getByRefId(request.refId);
             if (ref === undefined) {
-                return {state: RpcObjectState.DELETE, valueType: null, value: null, ref: null, trace: null};
+                return [
+                    {state: RpcObjectState.DELETE, valueType: null, value: null, ref: null, trace: null},
+                    {state: RpcObjectState.END_OF_OBJECT, valueType: null, value: null, ref: null, trace: null}
+                ];
             }
-            return {state: RpcObjectState.ADD, valueType: null, value: ref, ref: null, trace: null};
+            
+            // Use RpcSendQueue to serialize the object properly like GetObject does
+            const allData = await new RpcSendQueue(this.localRefs, false).generate(ref, undefined);
+            return allData;
         });
         InstallRecipes.handle(this.connection, ".rewrite", registry);
 

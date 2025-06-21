@@ -309,9 +309,9 @@ export class RpcReceiveQueue {
                     let after;
                     let codec;
                     if (onChange) {
-                        after = onChange(before!);
+                        after = await onChange(before!);
                     } else if ((codec = RpcCodecs.forInstance(before))) {
-                        after = codec.rpcReceive(before, this);
+                        after = await codec.rpcReceive(before, this);
                     } else if (message.value !== undefined) {
                         after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
                     } else {
