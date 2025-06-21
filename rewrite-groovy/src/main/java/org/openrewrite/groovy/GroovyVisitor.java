@@ -187,7 +187,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
     }
 
-    public J visitMultipleAssignmentDeclaration(G.MultipleAssignmentDeclaration multipleAssignmentDeclaration, P p) {
-        return multipleAssignmentDeclaration;
+    public J visitMultipleAssignmentDeclaration(G.DestructuringDeclaration destructuringDeclaration, P p) {
+        return destructuringDeclaration;
     }
 }

@@ -1025,7 +1025,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MultipleAssignmentDeclaration implements G, Statement {
+    final class DestructuringDeclaration implements G, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1057,22 +1057,22 @@ public interface G extends J {
         @With
         JLeftPadded<Expression> initializer;
 
-        JContainer<VariableDeclarations.NamedVariable> elements;
+        JContainer<VariableDeclarations.NamedVariable> variables;
 
         public Expression getInitializer() {
             return initializer.getElement();
         }
 
-        public G.MultipleAssignmentDeclaration withInitializer(Expression initializer) {
+        public DestructuringDeclaration withInitializer(Expression initializer) {
             return getPadding().withInitializer(this.initializer.withElement(initializer));
         }
 
-        public List<VariableDeclarations.NamedVariable> getElements() {
-            return elements.getElements();
+        public List<VariableDeclarations.NamedVariable> getVariables() {
+            return variables.getElements();
         }
 
-        public G.MultipleAssignmentDeclaration withElements(List<VariableDeclarations.NamedVariable> elements) {
-            return getPadding().withElements(JContainer.withElements(this.elements, elements));
+        public DestructuringDeclaration withVariables(List<VariableDeclarations.NamedVariable> elements) {
+            return getPadding().withVariables(JContainer.withElements(this.variables, elements));
         }
 
         @Override
@@ -1082,7 +1082,7 @@ public interface G extends J {
 
 
         public Padding getPadding() {
-            G.MultipleAssignmentDeclaration.Padding p;
+            DestructuringDeclaration.Padding p;
             if (this.padding == null) {
                 p = new Padding(this);
                 this.padding = new WeakReference<>(p);
@@ -1104,20 +1104,20 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final MultipleAssignmentDeclaration t;
+            private final DestructuringDeclaration t;
 
-            public JContainer<VariableDeclarations.NamedVariable> getDestructAssignments() {
-                return t.elements;
+            public JContainer<VariableDeclarations.NamedVariable> getVariables() {
+                return t.variables;
             }
 
-            public MultipleAssignmentDeclaration withElements(JContainer<VariableDeclarations.NamedVariable> elements) {
-                return t.elements == elements ? t : new MultipleAssignmentDeclaration(
-                        t.id, t.prefix, t.markers, t.modifiers, t.typeExpression, t.initializer, elements);
+            public DestructuringDeclaration withVariables(JContainer<VariableDeclarations.NamedVariable> variables) {
+                return t.variables == variables ? t : new DestructuringDeclaration(
+                        t.id, t.prefix, t.markers, t.modifiers, t.typeExpression, t.initializer, variables);
             }
 
-            public MultipleAssignmentDeclaration withInitializer(JLeftPadded<Expression> initializer) {
-                return t.initializer == initializer ? t : new MultipleAssignmentDeclaration(
-                        t.id, t.prefix, t.markers, t.modifiers, t.typeExpression, initializer, t.elements);
+            public DestructuringDeclaration withInitializer(JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new DestructuringDeclaration(
+                        t.id, t.prefix, t.markers, t.modifiers, t.typeExpression, initializer, t.variables);
             }
 
             public JLeftPadded<Expression> getInitializer() {

@@ -1430,7 +1430,7 @@ public class GroovyParserVisitor {
                         .collect(toList());
                 Space beforeAssign = sourceBefore("=");
                 Expression initializer = visit(expression.getRightExpression());
-                G.MultipleAssignmentDeclaration multipleAssignmentDeclaration = new G.MultipleAssignmentDeclaration(
+                G.DestructuringDeclaration destructuringDeclaration = new G.DestructuringDeclaration(
                         randomId(),
                         prefix,
                         Markers.EMPTY,
@@ -1439,7 +1439,7 @@ public class GroovyParserVisitor {
                         padLeft(beforeAssign, initializer),
                         JContainer.build(namedVariables).withBefore(prefixBeforeOpenParentheses)
                 );
-                queue.add(multipleAssignmentDeclaration);
+                queue.add(destructuringDeclaration);
                 return;
             } else {
                 typeExpr = visitVariableExpressionType(expression.getVariableExpression());
