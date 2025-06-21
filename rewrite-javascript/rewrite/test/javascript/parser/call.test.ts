@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J} from "../../../src/java";
 
 describe('call mapping', () => {
     const spec = new RecipeSpec();
@@ -50,14 +51,19 @@ describe('call mapping', () => {
         ));
 
     test('with optional chaining operator', () =>
-        spec.rewriteRun(
+        spec.rewriteRun({
             //language=typescript
-            typescript(`
-                 const func = (message: string) => message;
-                 const result1 = func/*a*/?./*b*/("TS"); // Invokes the function
-                 const result2 = func/*a*/?./*b*/call("TS"); // Invokes the function
-             `)
-        ));
+            ...typescript(`
+                const func = (message: string) => message;
+                const result1 = func/*a*/?./*b*/("TS"); // Invokes the function
+                const result2 = func/*a*/?./*b*/call("TS"); // Invokes the function
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const inits = [1, 2].map(i => (cu.statements[i].element as J.VariableDeclarations).variables[0].element.initializer!.element);
+                expect(inits[0].kind).toEqual(JS.Kind.FunctionCall);
+                expect(inits[1].kind).toEqual(J.Kind.MethodInvocation);
+            }
+        }));
 
     test('call expression with type parameters', () =>
         spec.rewriteRun(
@@ -90,7 +96,6 @@ describe('call mapping', () => {
                  function identity<T>(value: T): T {
                      return value;
                  }
- 
                  const result1 = identity<string>?.("Hello TypeScript");
                  const result2 = identity?.<string>("Hello TypeScript");
                  const result3 = identity?.call("Hello TypeScript");
