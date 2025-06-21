@@ -203,7 +203,6 @@ export class RpcSendQueue {
             if (ref) {
                 this.put({
                     state: RpcObjectState.ADD,
-                    valueType: this.getValueType(after),
                     ref
                 });
                 return;
@@ -302,7 +301,9 @@ export class RpcReceiveQueue {
                         }
                     } else {
                         // This is either a new object or a forward declaration with ref
-                        before = message.value ?? this.newObj(message.valueType!);
+                        before = message.valueType === undefined ?
+                            message.value :
+                            this.newObj(message.valueType);
                     }
                 // Intentional fall-through...
                 case RpcObjectState.CHANGE:
@@ -353,6 +354,9 @@ export class RpcReceiveQueue {
                     // The next message should be a CHANGE with a list of positions
                     const d = await this.take();
                     const positions = d.value as number[];
+                    if (!positions) {
+                        throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
+                    }
                     const after: T[] = new Array(positions.length);
                     for (let i = 0; i < positions.length; i++) {
                         const beforeIdx = positions[i];

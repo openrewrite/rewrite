@@ -161,7 +161,7 @@ public class RpcSendQueue {
         Integer ref = null;
         if (after instanceof Reference) {
             if (refs.containsKey(afterVal)) {
-                put(new RpcObjectData(ADD, getValueType(afterVal), null, refs.get(afterVal), trace ? Trace.traceSender() : null));
+                put(new RpcObjectData(ADD, null, null, refs.get(afterVal), trace ? Trace.traceSender() : null));
                 // No onChange call because the remote will be using an instance from its ref cache
                 return;
             }
