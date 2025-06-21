@@ -383,7 +383,7 @@ public interface G extends J {
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             J j = v.visit(getExpression(), p);
-            if(j instanceof ExpressionStatement) {
+            if (j instanceof ExpressionStatement) {
                 return j;
             } else if (j instanceof Expression) {
                 return withExpression((Expression) j);
@@ -418,7 +418,7 @@ public interface G extends J {
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            if(expression instanceof J.MethodInvocation) {
+            if (expression instanceof J.MethodInvocation) {
                 if (!(type instanceof JavaType.Method)) {
                     return (T) this;
                 }
@@ -1017,6 +1017,111 @@ public interface G extends J {
 
             public G.Unary withOperator(JLeftPadded<G.Unary.Type> operator) {
                 return t.operator == operator ? t : new G.Unary(t.id, t.prefix, t.markers, operator, t.expression, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class MultipleAssignmentDeclaration implements G, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        List<Modifier> modifiers;
+
+        @With
+        @Nullable
+        @Getter
+        TypeTree typeExpression;
+
+
+        @Getter
+        @With
+        JLeftPadded<Expression> initializer;
+
+        JContainer<VariableDeclarations.NamedVariable> elements;
+
+        public Expression getInitializer() {
+            return initializer.getElement();
+        }
+
+        public G.MultipleAssignmentDeclaration withInitializer(Expression initializer) {
+            return getPadding().withInitializer(this.initializer.withElement(initializer));
+        }
+
+        public List<VariableDeclarations.NamedVariable> getElements() {
+            return elements.getElements();
+        }
+
+        public G.MultipleAssignmentDeclaration withElements(List<VariableDeclarations.NamedVariable> elements) {
+            return getPadding().withElements(JContainer.withElements(this.elements, elements));
+        }
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitMultipleAssignmentDeclaration(this, p);
+        }
+
+
+        public Padding getPadding() {
+            G.MultipleAssignmentDeclaration.Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MultipleAssignmentDeclaration t;
+
+            public JContainer<VariableDeclarations.NamedVariable> getDestructAssignments() {
+                return t.elements;
+            }
+
+            public MultipleAssignmentDeclaration withElements(JContainer<VariableDeclarations.NamedVariable> elements) {
+                return t.elements == elements ? t : new MultipleAssignmentDeclaration(
+                        t.id, t.prefix, t.markers, t.modifiers, t.typeExpression, t.initializer, elements);
+            }
+
+            public MultipleAssignmentDeclaration withInitializer(JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new MultipleAssignmentDeclaration(
+                        t.id, t.prefix, t.markers, t.modifiers, t.typeExpression, initializer, t.elements);
+            }
+
+            public JLeftPadded<Expression> getInitializer() {
+                return t.initializer;
             }
         }
     }

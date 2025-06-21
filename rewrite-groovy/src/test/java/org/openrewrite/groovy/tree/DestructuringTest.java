@@ -36,7 +36,6 @@ class DestructuringTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void destructuringWithSpaces() {
         rewriteRun(
@@ -50,15 +49,26 @@ class DestructuringTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @Test
+    void destructuringWithoutSpaces() {
+        rewriteRun(
+          groovy(
+            """
+              def(key,value)="a1:b2".split(":")
+              println(key)
+              println(value)
+              """
+          )
+        );
+    }
+
     @Test
     void destructuringWithType() {
         rewriteRun(
           groovy(
             """
               def (String key, String value) = "a1:b2".split(":")
-              println(key)
-              println(value)
+              println("${key} ${value}")
               """
           )
         );
@@ -70,9 +80,19 @@ class DestructuringTest implements RewriteTest {
           groovy(
             """
               def (first, second, third) = [1, 2, 3]
-              println(first)
-              println(second)
-              println(third)
+              priintln("${first} ${second} ${third}")
+              """
+          )
+        );
+    }
+
+    @Test
+    void destructuringWithVariousSpacing() {
+        rewriteRun(
+          groovy(
+            """
+              def  (first,second,   third)   =     [1, 2, 3]
+              priintln("${first} ${second} ${third}")
               """
           )
         );

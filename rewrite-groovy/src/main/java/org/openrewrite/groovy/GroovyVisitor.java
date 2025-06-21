@@ -186,4 +186,8 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
                                                         GContainer.Location loc, P p) {
         return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
     }
+
+    public J visitMultipleAssignmentDeclaration(G.MultipleAssignmentDeclaration multipleAssignmentDeclaration, P p) {
+        return multipleAssignmentDeclaration;
+    }
 }
