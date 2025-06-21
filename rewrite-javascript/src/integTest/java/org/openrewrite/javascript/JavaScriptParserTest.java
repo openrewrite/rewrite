@@ -24,9 +24,9 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.config.Environment;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
-import org.openrewrite.rpc.RewriteRpc;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -44,17 +44,17 @@ class JavaScriptParserTest {
     JavaScriptRewriteRpc rewriteRpc;
     JavaScriptParser parser;
     ExecutionContext ctx;
-    RewriteRpc.Scope scope;
+    JavaScriptRewriteRpc.Scope scope;
 
     @BeforeEach
     void before() {
-        this.rewriteRpc = JavaScriptRewriteRpc.builder()
+        this.rewriteRpc = JavaScriptRewriteRpc.builder(Environment.builder().build())
           .nodePath(Path.of("node"))
           .installationDirectory(Path.of("./rewrite/dist"))
 //          .inspectAndBreak()
 //          .trace(true)
           .build();
-        this.scope = RewriteRpc.Context.current().with(rewriteRpc).attach();
+        this.scope = JavaScriptRewriteRpc.bind(rewriteRpc);
         this.parser = JavaScriptParser.builder().rewriteRpc(rewriteRpc).build();
         this.ctx = new InMemoryExecutionContext();
     }

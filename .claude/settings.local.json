@@ -3,7 +3,11 @@
     "allow": [
       "Bash(./gradlew:*)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(rm:*)",
+      "Bash(npm test:*)",
+      "Bash(timeout:*)",
+      "Bash(echo:*)"
     ],
     "deny": []
   }

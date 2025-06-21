@@ -48,15 +48,15 @@ program
 
 const options = program.opts() as ProgramOptions;
 
-const log: WriteStream = fs.createWriteStream(options.logFile ?? `${process.cwd()}/rpc.js.log`, {flags: 'w'});
-log.write(`[js-rewrite-rpc] starting\n\n`);
-
+const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;
 const logger: rpc.Logger = {
-    error: (msg: string) => log.write(`[Error] ${msg}\n`),
-    warn: (msg: string) => log.write(`[Warn] ${msg}\n`),
-    info: (msg: string) => options.verbose && log.write(`[Info] ${msg}\n`),
-    log: (msg: string) => options.verbose && log.write(`[Log] ${msg}\n`)
+    error: (msg: string) => log && log.write(`[Error] ${msg}\n`),
+    warn: (msg: string) => log && log.write(`[Warn] ${msg}\n`),
+    info: (msg: string) => options.verbose && log && log.write(`[Info] ${msg}\n`),
+    log: (msg: string) => options.verbose && log && log.write(`[Log] ${msg}\n`)
 };
+
+log && logger.log(`[js-rewrite-rpc] starting\n\n`);
 
 if (!options.port) {
 // Create the connection with the custom logger
@@ -68,19 +68,19 @@ if (!options.port) {
 
     connection.trace(rpc.Trace.Verbose, logger).catch(err => {
         // Handle any unexpected errors during trace configuration
-        log.write(`Failed to set trace: ${err}`);
+        logger.error(`Failed to set trace: ${err}`);
     });
 
     connection.onError(err => {
-        log.write(`[js-rewrite-rpc] error: ${err}\n\n`);
+        logger.error(`[js-rewrite-rpc] error: ${err}\n\n`);
     });
 
     connection.onClose(() => {
-        log.write(`[js-rewrite-rpc] connection closed\n\n`);
+        logger.log(`[js-rewrite-rpc] connection closed\n\n`);
     })
 
     connection.onDispose(() => {
-        log.write(`[js-rewrite-rpc] connection disposed\n\n`);
+        logger.log(`[js-rewrite-rpc] connection disposed\n\n`);
     });
 
     new RewriteRpc(connection, {
@@ -91,7 +91,7 @@ if (!options.port) {
 } else {
 // Create a TCP server
     const server: net.Server = net.createServer((socket: net.Socket) => {
-        log.write(`[js-rewrite-rpc] new client connected: ${socket.remoteAddress}:${socket.remotePort}\n`);
+        logger.log(`[js-rewrite-rpc] new client connected: ${socket.remoteAddress}:${socket.remotePort}\n`);
 
         // Create the connection with the custom logger using the socket streams
         const connection: rpc.MessageConnection = rpc.createMessageConnection(
@@ -102,27 +102,27 @@ if (!options.port) {
 
         connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
             // Handle any unexpected errors during trace configuration
-            log.write(`Failed to set trace: ${err}\n`);
+            logger.error(`Failed to set trace: ${err}\n`);
         });
 
         connection.onError((err: [Error, rpc.Message | undefined, number | undefined]) => {
-            log.write(`[js-rewrite-rpc] error: ${err[0]}\n\n`);
+            logger.error(`[js-rewrite-rpc] error: ${err[0]}\n\n`);
         });
 
         connection.onClose(() => {
-            log.write(`[js-rewrite-rpc] connection closed\n\n`);
+            logger.log(`[js-rewrite-rpc] connection closed\n\n`);
         });
 
         connection.onDispose(() => {
-            log.write(`[js-rewrite-rpc] connection disposed\n\n`);
+            logger.log(`[js-rewrite-rpc] connection disposed\n\n`);
         });
 
         socket.on('close', () => {
-            log.write(`[js-rewrite-rpc] socket closed: ${socket.remoteAddress}:${socket.remotePort}\n`);
+            logger.log(`[js-rewrite-rpc] socket closed: ${socket.remoteAddress}:${socket.remotePort}\n`);
         });
 
         socket.on('error', (err: Error) => {
-            log.write(`[js-rewrite-rpc] socket error: ${err.message}\n`);
+            logger.error(`[js-rewrite-rpc] socket error: ${err.message}\n`);
         });
 
         // Initialize the RPC mechanism
@@ -135,20 +135,20 @@ if (!options.port) {
 
 // Handle server errors
     server.on('error', (err: Error) => {
-        log.write(`[js-rewrite-rpc] server error: ${err.message}\n`);
+        logger.error(`[js-rewrite-rpc] server error: ${err.message}\n`);
         process.exit(1);
     });
 
 // Start the server
     server.listen(options.port, '127.0.0.1', () => {
-        log.write(`[js-rewrite-rpc] server listening on 127.0.0.1:${options.port}\n`);
+        logger.log(`[js-rewrite-rpc] server listening on 127.0.0.1:${options.port}\n`);
     });
 
 // Handle process termination
     process.on('SIGINT', () => {
-        log.write(`[js-rewrite-rpc] received SIGINT, shutting down\n`);
+        logger.log(`[js-rewrite-rpc] received SIGINT, shutting down\n`);
         server.close(() => {
-            log.write(`[js-rewrite-rpc] server closed\n`);
+            logger.log(`[js-rewrite-rpc] server closed\n`);
             process.exit(0);
         });
     });

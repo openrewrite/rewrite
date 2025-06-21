@@ -203,7 +203,6 @@ export class RpcSendQueue {
             if (ref) {
                 this.put({
                     state: RpcObjectState.ADD,
-                    valueType: this.getValueType(after),
                     ref
                 });
                 return;
@@ -248,7 +247,10 @@ export class RpcReceiveQueue {
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly pull: () => Promise<RpcObjectData[]>,
-                private readonly logFile?: WriteStream) {
+                private readonly logFile?: WriteStream,
+                private readonly getRef: (refId: number) => Promise<any> = async (refId: number) => {
+                    throw new Error(`Reference ${refId} not found and no getRef function provided`);
+                }) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -287,18 +289,30 @@ export class RpcReceiveQueue {
                     return undefined as T;
                 case RpcObjectState.ADD:
                     ref = message.ref;
-                    if (ref !== undefined && this.refs.has(ref)) {
-                        return this.refs.get(ref);
+                    if (ref !== undefined && message.valueType === undefined && message.value === undefined) {
+                        // This is a pure reference to an existing object
+                        if (this.refs.has(ref)) {
+                            return this.refs.get(ref);
+                        } else {
+                            // Ref was evicted from cache, fetch it
+                            const refObject = await this.getRef(ref);
+                            this.refs.set(ref, refObject);
+                            return refObject;
+                        }
+                    } else {
+                        // This is either a new object or a forward declaration with ref
+                        before = message.valueType === undefined ?
+                            message.value :
+                            this.newObj(message.valueType);
                     }
-                    before = message.value ?? this.newObj(message.valueType!);
                 // Intentional fall-through...
                 case RpcObjectState.CHANGE:
                     let after;
                     let codec;
                     if (onChange) {
-                        after = onChange(before!);
+                        after = await onChange(before!);
                     } else if ((codec = RpcCodecs.forInstance(before))) {
-                        after = codec.rpcReceive(before, this);
+                        after = await codec.rpcReceive(before, this);
                     } else if (message.value !== undefined) {
                         after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
                     } else {
@@ -340,6 +354,9 @@ export class RpcReceiveQueue {
                     // The next message should be a CHANGE with a list of positions
                     const d = await this.take();
                     const positions = d.value as number[];
+                    if (!positions) {
+                        throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
+                    }
                     const after: T[] = new Array(positions.length);
                     for (let i = 0; i < positions.length; i++) {
                         const beforeIdx = positions[i];
