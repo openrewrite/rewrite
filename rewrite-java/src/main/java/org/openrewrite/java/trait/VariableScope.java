@@ -584,6 +584,27 @@ public class VariableScope implements Trait<J.Block> {
             }
             return super.visitVariable(variable, p);
         }
+
+        @Override
+        public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, Integer p) {
+            // Handle instanceof pattern variables (Java 14+) - they shadow at the current lexical scope
+            if (instanceOf.getPattern() instanceof J.Identifier) {
+                J.Identifier patternVar = (J.Identifier) instanceOf.getPattern();
+                if (patternVar.getSimpleName().equals(targetVarName)) {
+                    shadowedAtDepth.add(lexicalScopeDepth);
+                }
+            }
+            // Also check if the pattern is wrapped in a VariableDeclarations
+            else if (instanceOf.getPattern() instanceof J.VariableDeclarations) {
+                J.VariableDeclarations varDecls = (J.VariableDeclarations) instanceOf.getPattern();
+                for (J.VariableDeclarations.NamedVariable var : varDecls.getVariables()) {
+                    if (var.getSimpleName().equals(targetVarName)) {
+                        shadowedAtDepth.add(lexicalScopeDepth);
+                    }
+                }
+            }
+            return super.visitInstanceOf(instanceOf, p);
+        }
     }
 
     /**
