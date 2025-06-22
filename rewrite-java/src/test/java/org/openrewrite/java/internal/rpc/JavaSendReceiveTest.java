@@ -25,7 +25,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
-import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.rpc.RewriteRpc;
@@ -52,21 +51,23 @@ class JavaSendReceiveTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        Environment env = Environment.builder().build();
+        server = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("server",
+          new HeaderDelimitedMessageHandler(serverIn, serverOut))))
+          .batchSize(1)
+          .timeout(Duration.ofSeconds(10))
+          .build();
 
-        JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
-          new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
-
-        JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
-          new HeaderDelimitedMessageHandler(clientIn, clientOut)));
-        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
+        client = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("client",
+          new HeaderDelimitedMessageHandler(clientIn, clientOut))))
+          .batchSize(1)
+          .timeout(Duration.ofSeconds(10))
+          .build();
     }
 
     @AfterEach
     void after() {
-        server.shutdown();
-        client.shutdown();
+        server.close();
+        client.close();
     }
 
     @Override

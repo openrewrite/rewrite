@@ -54,7 +54,7 @@ class JavaScriptParserTest {
 //          .inspectAndBreak()
 //          .trace(true)
           .build();
-        this.scope = RewriteRpc.current().withClient(rewriteRpc).attach();
+        this.scope = RewriteRpc.Context.current().with(rewriteRpc).attach();
         this.parser = JavaScriptParser.builder().rewriteRpc(rewriteRpc).build();
         this.ctx = new InMemoryExecutionContext();
     }
