@@ -96,10 +96,11 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Getter
     @Option(example = "https://services.gradle.org/distributions/gradle-8.5-bin.zip",
             displayName = "Wrapper URI",
-            description = "The URI of the Gradle wrapper distribution. " +
-                    "When specified, version and distribution CANNOT be specified and it is assumed that this uri is a reachable/valid wrapper distribution path." +
-                    "This is particularly useful in environments where the gradle services url is not reachable or where there are custom gradle wrappers in place. " +
-                    "The recipe will fetch gradle wrapper shell/bat files from the location and if the uri specified is not accessible, the repo will keep its current files in place as they are mostly compatible.",
+            description = "The URI of the Gradle wrapper distribution.\n" +
+                    "Specifies a custom location from which to download the Gradle wrapper scripts (gradlew, gradlew.bat, etc.). This is useful for setting up the Gradle wrapper without relying on Gradle's official distribution services.\n\n" +
+                    "When this option is set, the version and distribution fields must not be specified — only one source of truth is allowed. The URI should point to a valid and reachable Gradle wrapper distribution (typically a .zip archive containing the wrapper files).\n" +
+                    "This is particularly helpful in environments where access to Gradle's central services is restricted or where custom Gradle wrapper setups are required.\n" + 
+                    "If the URI is inaccessible, the recipe will leave the existing wrapper files in the repository unchanged, as they are generally compatible with various Gradle versions.",
             required = false)
     @Nullable
     final String wrapperUri;
