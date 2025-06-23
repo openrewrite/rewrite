@@ -475,7 +475,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
             if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
-                    return_.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
+                return_.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
                 visitSpace(return_.getPrefix(), Space.Location.RETURN_PREFIX, p);
                 visitMarkers(return_.getMarkers(), p);
                 visit(return_.getExpression(), p);
