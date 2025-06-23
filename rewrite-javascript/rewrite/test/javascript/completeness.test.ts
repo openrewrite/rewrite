@@ -58,7 +58,23 @@ describe('JS LST element tree', () => {
 
     test("JavaScriptVisitor.java", () => {
         const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/JavaScriptVisitor.java')
-            .matchAll(/public J (visit\w+)(?:[<][^(]+[>])?[(]JSX?[.]/gm), m => m[1])
+            .matchAll(/public J (visit\w+)(?:<[^(]+>)?[(]JSX?[.]/gm), m => m[1])
+            .sort();
+
+        expect(visitorJavascriptMethods).toEqual(javaVisitorMethods);
+    })
+
+    test("JavaScriptValidator.java", () => {
+        const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/internal/rpc/JavaScriptValidator.java')
+            .matchAll(/public [^ ]+ (visit\w+)(?:<[^(]+>)?[(]JSX?[.]/gm), m => m[1])
+            .sort();
+
+        expect(visitorJavascriptMethods).toEqual(javaVisitorMethods);
+    })
+
+    test("JavaScriptIsoVisitor.java", () => {
+        const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/JavaScriptIsoVisitor.java')
+            .matchAll(/public [^ ]+ (visit\w+)(?:<[^(]+>)?[(]JSX?[.]/gm), m => m[1])
             .sort();
 
         expect(visitorJavascriptMethods).toEqual(javaVisitorMethods);
