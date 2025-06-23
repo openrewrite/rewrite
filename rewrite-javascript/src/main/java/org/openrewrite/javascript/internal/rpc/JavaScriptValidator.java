@@ -111,7 +111,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public J visitFunctionCall(JS.FunctionCall functionCall, P p) {
+    public JS.FunctionCall visitFunctionCall(JS.FunctionCall functionCall, P p) {
         visitAndValidate(functionCall.getFunction(), Expression.class, p);
         visitAndValidate(functionCall.getTypeParameters(), Expression.class, p);
         visitAndValidate(functionCall.getArguments(), Expression.class, p);

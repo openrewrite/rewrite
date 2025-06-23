@@ -103,6 +103,11 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.FunctionCall visitFunctionCall(JS.FunctionCall functionCall, P p) {
+        return (JS.FunctionCall) super.visitFunctionCall(functionCall, p);
+    }
+
+    @Override
     public JS.FunctionType visitFunctionType(JS.FunctionType functionType, P p) {
         return (JS.FunctionType) super.visitFunctionType(functionType, p);
     }
