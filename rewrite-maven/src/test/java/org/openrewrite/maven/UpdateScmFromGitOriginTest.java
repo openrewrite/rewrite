@@ -130,7 +130,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                 <version>1</version>
                 <scm>
                   <url>https://new-server.example.com/username/repo</url>
-                  <connection>scm:git:git@new-server.example.com:username/repo.git</connection>
+                  <connection>scm:git:https://new-server.example.com/username/repo.git</connection>
                   <developerConnection>scm:git:git@new-server.example.com:username/repo.git</developerConnection>
                 </scm>
               </project>
