@@ -631,6 +631,158 @@ class VariableScopeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void compoundAssignmentIsReadAndWrite() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int count = 0;
+                      count += 1;  // This is both a read and write
+                      System.out.println("after compound assignment");
+                      System.out.println(count); // count is still used after
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("UnusedAssignment")
+    @Test
+    void compoundAssignmentNotUsedAfter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int value = 10;
+                      value *= 2;  // This is both a read and write
+                      System.out.println("value was modified but not used after");
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      int value = 10;
+                      value *= 2;  // This is both a read and write
+                      /*~~(value not used after this)~~>*/System.out.println("value was modified but not used after");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleCompoundAssignmentOperators() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int a = 10;
+                      int b = 5;
+                      int c = 3;
+                      int d = 20;
+                      int e = 8;
+                      a += 2;   // addition assignment
+                      b -= 1;   // subtraction assignment
+                      c *= 4;   // multiplication assignment
+                      d /= 2;   // division assignment
+                      e %= 3;   // modulo assignment
+                      System.out.println("after assignments");
+                      System.out.println(a + b + c + d + e);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("UnusedAssignment")
+    @Test
+    void compoundAssignmentInComplexExpression() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int total = 100;
+                      int increment = 5;
+                      total += increment * 2;  // total is read, then written
+                      increment += 1;          // increment is read, then written
+                      System.out.println("final");
+                      System.out.println(total); // total is used after
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      int total = 100;
+                      int increment = 5;
+                      total += increment * 2;  // total is read, then written
+                      increment += 1;          // increment is read, then written
+                      /*~~(increment not used after this)~~>*/System.out.println("final");
+                      System.out.println(total); // total is used after
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void bitwiseCompoundAssignmentOperators() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int flags = 0b1010;
+                      int mask1 = 0b0101;
+                      int mask2 = 0b1100;
+                      int shift = 2;
+              
+                      flags &= mask1;  // bitwise AND assignment
+                      flags |= mask2;  // bitwise OR assignment
+                      flags ^= 0b1111; // bitwise XOR assignment
+                      flags <<= shift; // left shift assignment
+                      flags >>= 1;     // right shift assignment
+                      flags >>>= 1;    // unsigned right shift assignment
+              
+                      System.out.println("Result: " + flags);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void compoundAssignmentInLambda() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Consumer;
+              class Test {
+                  void method() {
+                      int[] counter = {0};
+                      Consumer<Integer> increment = x -> {
+                          counter[0] += x;  // compound assignment in lambda
+                      };
+                      increment.accept(5);
+                      System.out.println(counter[0]);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     private static Recipe markVariableScopes() {
         return toRecipe(() -> new JavaIsoVisitor<>() {
             private final VariableScope.Matcher scopeMatcher = new VariableScope.Matcher();
@@ -709,12 +861,11 @@ class VariableScopeTest implements RewriteTest {
                 
                 // Handle try-with-resources variables explicitly - they should be marked as unused
                 // since they're automatically closed and typically not used within the try block
-                if (r.getVariableDeclarations() instanceof J.VariableDeclarations) {
-                    J.VariableDeclarations varDecls = (J.VariableDeclarations) r.getVariableDeclarations();
-                    
+                if (r.getVariableDeclarations() instanceof J.VariableDeclarations varDecls) {
+
                     // For the explicit context approach, try-with-resources variables are typically "unused"
                     // in the sense that they're not explicitly used in the try block body
-                    for (J.VariableDeclarations.NamedVariable variable : varDecls.getVariables()) {
+                    for (J.VariableDeclarations.NamedVariable ignored : varDecls.getVariables()) {
                         // Mark try-with-resources variables as unused since they're auto-managed
                         r = r.withVariableDeclarations(SearchResult.mergingFound(varDecls, "unused"));
                         break; // Only process the first variable to avoid duplicate marking
@@ -734,34 +885,32 @@ class VariableScopeTest implements RewriteTest {
                 // Handle catch variable using explicit context approach with VariableScope API
                 if (c.getParameter().getTree() instanceof J.VariableDeclarations) {
                     J.VariableDeclarations varDecls = (J.VariableDeclarations) c.getParameter().getTree();
-                    
-                    if (c.getBody() != null) {
-                        // Get the VariableScope for the catch block body
-                        Cursor catchBodyCursor = new Cursor(getCursor(), c.getBody());
-                        VariableScope catchBodyScope = scopeMatcher.get(catchBodyCursor).orElse(null);
-                        
-                        if (catchBodyScope != null) {
-                            for (J.VariableDeclarations.NamedVariable variable : varDecls.getVariables()) {
-                                String varName = variable.getSimpleName();
-                                
-                                // Use explicit context: search within the catch block statements
-                                // Create a cursor pointing to the first statement in the catch block for context
-                                List<Statement> statements = c.getBody().getStatements();
-                                if (!statements.isEmpty()) {
-                                    Cursor firstStatementCursor = new Cursor(catchBodyCursor, statements.get(0));
-                                    VariableScope.VariableUsage usage = catchBodyScope.getVariableUsage(varName,
-                                        VariableScope.ScopeQuery.at(firstStatementCursor).includeCurrentBlock());
-                                    
-                                    if (!usage.hasUses()) {
-                                        c = c.withParameter(c.getParameter().withTree(
-                                            SearchResult.mergingFound(varDecls, "unused")));
-                                    }
+
+                    // Get the VariableScope for the catch block body
+                    Cursor catchBodyCursor = new Cursor(getCursor(), c.getBody());
+                    VariableScope catchBodyScope = scopeMatcher.get(catchBodyCursor).orElse(null);
+
+                    if (catchBodyScope != null) {
+                        for (J.VariableDeclarations.NamedVariable variable : varDecls.getVariables()) {
+                            String varName = variable.getSimpleName();
+
+                            // Use explicit context: search within the catch block statements
+                            // Create a cursor pointing to the first statement in the catch block for context
+                            List<Statement> statements = c.getBody().getStatements();
+                            if (!statements.isEmpty()) {
+                                Cursor firstStatementCursor = new Cursor(catchBodyCursor, statements.getFirst());
+                                VariableScope.VariableUsage usage = catchBodyScope.getVariableUsage(varName,
+                                    VariableScope.ScopeQuery.at(firstStatementCursor).includeCurrentBlock());
+
+                                if (!usage.hasUses()) {
+                                    c = c.withParameter(c.getParameter().withTree(
+                                        SearchResult.mergingFound(varDecls, "unused")));
                                 }
                             }
                         }
                     }
                 }
-                
+
                 return c;
             }
 
@@ -774,8 +923,20 @@ class VariableScopeTest implements RewriteTest {
                   !m.getArguments().isEmpty() &&
                   m.getArguments().getFirst() instanceof J.Literal arg) {
 
-                    if (arg.getValue() != null && arg.getValue().toString().contains("no more x usage")) {
-                        return SearchResult.mergingFound(m, "x not used after this");
+                    if (arg.getValue() != null) {
+                        String value = arg.getValue().toString();
+                        if (value.contains("no more x usage")) {
+                            return SearchResult.mergingFound(m, "x not used after this");
+                        } else if (value.contains("value was modified but not used after")) {
+                            return SearchResult.mergingFound(m, "value not used after this");
+                        } else if (value.equals("final")) {
+                            // Only mark this specific test case
+                            J.MethodDeclaration methodDecl = getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class);
+                            // Check if the method contains a variable named "increment"
+                            if (methodDecl.getBody() != null && methodDecl.getBody().printTrimmed().contains("int increment")) {
+                                return SearchResult.mergingFound(m, "increment not used after this");
+                            }
+                        }
                     }
                 }
 

@@ -459,11 +459,9 @@ public class VariableScope implements Trait<J.Block> {
         public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
             // Only count it if it's not shadowed in current lexical scope
             if (identifier.getSimpleName().equals(targetVarName) && !shadowedAtDepth.contains(lexicalScopeDepth)) {
-                boolean isWrite = isVariableWrite(identifier);
-                boolean isRead = !isWrite;
-                
+
                 // Check if this usage type matches what we're looking for
-                if ((collectReads && isRead) || (collectWrites && isWrite)) {
+                if ((collectReads && isVariableRead(identifier)) || (collectWrites && isVariableWrite(identifier))) {
                     if (found != null) {
                         found.set(true);
                     }
@@ -474,7 +472,44 @@ public class VariableScope implements Trait<J.Block> {
             }
             return super.visitIdentifier(identifier, p);
         }
-        
+
+        private boolean isVariableRead(J.Identifier identifier) {
+            Cursor cursor = getCursor();
+
+            // Walk up the cursor to find the context
+            while (cursor != null) {
+                Object parent = cursor.getValue();
+
+                // Direct assignment: x = value
+                if (parent instanceof J.Assignment) {
+                    J.Assignment assignment = (J.Assignment) parent;
+                    if (assignment.getVariable() == identifier) {
+                        return false;
+                    }
+                }
+
+                // Variable declaration with initialization: int x = value
+                if (parent instanceof J.VariableDeclarations.NamedVariable) {
+                    J.VariableDeclarations.NamedVariable namedVar = (J.VariableDeclarations.NamedVariable) parent;
+                    if (namedVar.getName() == identifier) {
+                        return false;
+                    }
+                }
+
+                // Stop searching if we hit certain boundaries
+                if (parent instanceof J.MethodInvocation ||
+                        parent instanceof J.NewClass ||
+                        parent instanceof J.Lambda ||
+                        parent instanceof J.Block) {
+                    break;
+                }
+
+                cursor = cursor.getParent();
+            }
+
+            return true;
+        }
+
         /**
          * Determines if an identifier represents a write operation to a variable.
          * This includes assignments, increment/decrement operations, and method calls that modify the variable.
