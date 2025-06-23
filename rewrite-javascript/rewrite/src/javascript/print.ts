@@ -147,7 +147,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return spread;
     }
 
-    override async visitJsxExpression(expr: JSX.EmbeddedExpression, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitJsxEmbeddedExpression(expr: JSX.EmbeddedExpression, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(expr, p);
         p.append("{");
         if (expr.expression) {
@@ -961,7 +961,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return iat;
     }
 
-    override async visitIndexType(indexType: JS.IndexedAccessType.IndexType, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(indexType, p);
 
         p.append("[");
@@ -1053,7 +1053,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitLeftPaddedLocal("readonly", mappedType.hasReadonly, p);
         }
 
-        await this.visitKeysRemapping(mappedType.keysRemapping, p);
+        await this.visitMappedTypeKeysRemapping(mappedType.keysRemapping, p);
 
         if (mappedType.suffixToken) {
             await this.visitLeftPadded(mappedType.suffixToken, p);
@@ -1071,7 +1071,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return mappedType;
     }
 
-    override async visitKeysRemapping(mappedTypeKeys: JS.MappedType.KeysRemapping, p: PrintOutputCapture): Promise<J | undefined> {
+    override async visitMappedTypeKeysRemapping(mappedTypeKeys: JS.MappedType.KeysRemapping, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(mappedTypeKeys, p);
         p.append("[");
         await this.visitRightPadded(mappedTypeKeys.typeParameter, p);

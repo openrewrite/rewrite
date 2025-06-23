@@ -19,12 +19,13 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.javascript.tree.JSX;
 
 public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
 
     @Override
-    public JS.CompilationUnit visitCompilationUnit(JS.CompilationUnit cu, P p) {
-        return (JS.CompilationUnit) super.visitCompilationUnit(cu, p);
+    public JS.CompilationUnit visitJsCompilationUnit(JS.CompilationUnit cu, P p) {
+        return (JS.CompilationUnit) super.visitJsCompilationUnit(cu, p);
     }
 
     @Override
@@ -43,8 +44,8 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.AssignmentOperation visitAssignmentOperation(JS.AssignmentOperation assignOp, P p) {
-        return (JS.AssignmentOperation) super.visitAssignmentOperation(assignOp, p);
+    public JS.AssignmentOperation visitAssignmentOperationExtensions(JS.AssignmentOperation assignOp, P p) {
+        return (JS.AssignmentOperation) super.visitAssignmentOperationExtensions(assignOp, p);
     }
 
     @Override
@@ -108,13 +109,13 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.Binary visitBinary(JS.Binary binary, P p) {
-        return (JS.Binary) super.visitBinary(binary, p);
+    public JS.Binary visitBinaryExtensions(JS.Binary binary, P p) {
+        return (JS.Binary) super.visitBinaryExtensions(binary, p);
     }
 
     @Override
-    public JS.Import visitImport(JS.Import anImport, P p) {
-        return (JS.Import) super.visitImport(anImport, p);
+    public JS.Import visitImportDeclaration(JS.Import anImport, P p) {
+        return (JS.Import) super.visitImportDeclaration(anImport, p);
     }
 
     @Override
@@ -328,8 +329,8 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.Yield visitYield(JS.Yield yield, P p) {
-        return (JS.Yield) super.visitYield(yield, p);
+    public JS.Yield visitYield(J.Yield yield, P p) {
+        return (J.Yield) super.visitYield(yield, p);
     }
 
     // J overrides.
@@ -683,5 +684,30 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     @Override
     public J.Unknown.Source visitUnknownSource(J.Unknown.Source source, P p) {
         return (J.Unknown.Source) super.visitUnknownSource(source, p);
+    }
+
+    @Override
+    public JSX.Tag visitJsxTag(JSX.Tag tag, P p) {
+        return (JSX.Tag) super.visitJsxTag(tag, p);
+    }
+
+    @Override
+    public JSX.Attribute visitJsxAttribute(JSX.Attribute attribute, P p) {
+        return (JSX.Attribute) super.visitJsxAttribute(attribute, p);
+    }
+
+    @Override
+    public JSX.SpreadAttribute visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, P p) {
+        return (JSX.SpreadAttribute) super.visitJsxSpreadAttribute(spreadAttribute, p);
+    }
+
+    @Override
+    public JSX.EmbeddedExpression visitJsxEmbeddedExpression(JSX.EmbeddedExpression embeddedExpression, P p) {
+        return (JSX.EmbeddedExpression) super.visitJsxEmbeddedExpression(embeddedExpression, p);
+    }
+
+    @Override
+    public JSX.NamespacedName visitJsxNamespacedName(JSX.NamespacedName namespacedName, P p) {
+        return (JSX.NamespacedName) super.visitJsxNamespacedName(namespacedName, p);
     }
 }

@@ -45,7 +45,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         throw new UnsupportedOperationException("JS has a different structure for its compilation unit. See JS.CompilationUnit.");
     }
 
-    public J visitCompilationUnit(JS.CompilationUnit cu, P p) {
+    public J visitJsCompilationUnit(JS.CompilationUnit cu, P p) {
         JS.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
@@ -228,7 +228,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
-    public J visitBinary(JS.Binary binary, P p) {
+    public J visitBinaryExtensions(JS.Binary binary, P p) {
         JS.Binary b = binary;
         b = b.withPrefix(visitSpace(b.getPrefix(), JsSpace.Location.BINARY_PREFIX, p));
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
@@ -245,7 +245,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return b;
     }
 
-    public J visitImport(JS.Import jsImport, P p) {
+    public J visitImportDeclaration(JS.Import jsImport, P p) {
         JS.Import i = jsImport;
         i = i.withPrefix(visitSpace(i.getPrefix(), JsSpace.Location.IMPORT_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
@@ -990,7 +990,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return c;
     }
 
-    public J visitAssignmentOperation(JS.AssignmentOperation assignOp, P p) {
+    public J visitAssignmentOperationExtensions(JS.AssignmentOperation assignOp, P p) {
         JS.AssignmentOperation a = assignOp;
         a = a.withPrefix(visitSpace(a.getPrefix(), JsSpace.Location.ASSIGNMENT_OPERATION_PREFIX, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));

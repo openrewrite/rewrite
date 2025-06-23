@@ -191,7 +191,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitCompilationUnit(this, p);
+            return v.visitJsCompilationUnit(this, p);
         }
 
         @Override
@@ -1210,7 +1210,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitImport(this, p);
+            return v.visitImportDeclaration(this, p);
         }
 
         @Override
@@ -1767,7 +1767,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitBinary(this, p);
+            return v.visitBinaryExtensions(this, p);
         }
 
         @Transient
@@ -4924,7 +4924,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitAssignmentOperation(this, p);
+            return v.visitAssignmentOperationExtensions(this, p);
         }
 
         @Override
