@@ -49,7 +49,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.CompilationUnit visitCompilationUnit(JS.CompilationUnit compilationUnit, P p) {
+    public JS.CompilationUnit visitJsCompilationUnit(JS.CompilationUnit compilationUnit, P p) {
         ListUtils.map(compilationUnit.getImports(), el -> visitAndValidateNonNull(el, J.Import.class, p));
         ListUtils.map(compilationUnit.getStatements(), el -> visitAndValidateNonNull(el, Statement.class, p));
         return compilationUnit;
@@ -134,7 +134,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.Import visitImport(JS.Import import_, P p) {
+    public JS.Import visitImportDeclaration(JS.Import import_, P p) {
         visitAndValidate(import_.getImportClause(), JS.ImportClause.class, p);
         visitAndValidate(import_.getModuleSpecifier(), Expression.class, p);
         visitAndValidate(import_.getAttributes(), JS.ImportAttributes.class, p);
@@ -182,7 +182,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.Binary visitBinary(JS.Binary binary, P p) {
+    public JS.Binary visitBinaryExtensions(JS.Binary binary, P p) {
         visitAndValidateNonNull(binary.getLeft(), Expression.class, p);
         visitAndValidateNonNull(binary.getRight(), Expression.class, p);
         return binary;
@@ -456,7 +456,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.AssignmentOperation visitAssignmentOperation(JS.AssignmentOperation assignmentOperation, P p) {
+    public JS.AssignmentOperation visitAssignmentOperationExtensions(JS.AssignmentOperation assignmentOperation, P p) {
         visitAndValidateNonNull(assignmentOperation.getVariable(), Expression.class, p);
         visitAndValidateNonNull(assignmentOperation.getAssignment(), Expression.class, p);
         return assignmentOperation;
