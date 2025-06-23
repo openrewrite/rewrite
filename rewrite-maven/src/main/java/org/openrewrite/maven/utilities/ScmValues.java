@@ -15,17 +15,14 @@
  */
 package org.openrewrite.maven.utilities;
 
+import lombok.Value;
+
+@Value
 public class ScmValues {
 
-    private String url;
-    private String connection;
-    private String developerConnection;
-
-    ScmValues(String url, String connection, String developerConnection) {
-        this.url = url;
-        this.connection = connection;
-        this.developerConnection = developerConnection;
-    }
+    String url;
+    String connection;
+    String developerConnection;
 
     public static ScmValues fromOrigin(String origin) {
         String cleanOrigin = origin.replaceAll("\\.git$", "");
@@ -55,17 +52,5 @@ public class ScmValues {
         }
 
         return new ScmValues(url, connection, developerConnection);
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public String getConnection() {
-        return connection;
-    }
-
-    public String getDeveloperConnection() {
-        return developerConnection;
     }
 }
