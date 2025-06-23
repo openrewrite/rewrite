@@ -16,12 +16,14 @@
 package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class FindScmTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findsScmTag() {
         rewriteRun(
@@ -47,6 +49,35 @@ class FindScmTest implements RewriteTest {
                 <!--~~>--><scm>
                   <url>https://github.com/example/demo</url>
                 </scm>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotFindScmNotAtRoot() {
+        rewriteRun(
+          spec -> spec.recipe(new FindScm()),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>1.0</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.example</groupId>
+                      <artifactId>example-plugin</artifactId>
+                      <version>1.0</version>
+                      <configuration>
+                        <scm>github</scm>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
               </project>
               """
           )
