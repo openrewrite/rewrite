@@ -599,15 +599,15 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         const otherFunctionCall = other as JS.FunctionCall;
 
-        // Compare select
-        if ((functionCall.select === undefined) !== (otherFunctionCall.select === undefined)) {
+        // Compare function
+        if ((functionCall.function === undefined) !== (otherFunctionCall.function === undefined)) {
             this.abort();
             return functionCall;
         }
 
-        // Visit select if present
-        if (functionCall.select && otherFunctionCall.select) {
-            await this.visit(functionCall.select.element, otherFunctionCall.select.element);
+        // Visit function if present
+        if (functionCall.function && otherFunctionCall.function) {
+            await this.visit(functionCall.function.element, otherFunctionCall.function.element);
             if (!this.match) return functionCall;
         }
 

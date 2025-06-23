@@ -653,7 +653,7 @@ export namespace JS {
      */
     export interface FunctionCall extends JS, Expression {
         readonly kind: typeof Kind.FunctionCall;
-        readonly select?: J.RightPadded<Expression>;
+        readonly function?: J.RightPadded<Expression>;
         readonly typeParameters?: J.Container<Expression>;
         readonly arguments: J.Container<Expression>;
         readonly functionType?: JavaType.Method;

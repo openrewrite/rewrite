@@ -1855,7 +1855,7 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix,
                 markers: emptyMarkers,
-                select,
+                function: select,
                 typeParameters: typeArguments,
                 arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
                 functionType: this.mapMethodType(node)

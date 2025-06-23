@@ -615,7 +615,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitFunctionCall(functionCall: JS.FunctionCall, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(functionCall, p);
 
-        functionCall.select && await this.visitRightPadded(functionCall.select, p);
+        functionCall.function && await this.visitRightPadded(functionCall.function, p);
 
         functionCall.typeParameters && await this.visitContainerLocal("<", functionCall.typeParameters, ",", ">", p);
         await this.visitContainerLocal("(", functionCall.arguments, ",", ")", p);

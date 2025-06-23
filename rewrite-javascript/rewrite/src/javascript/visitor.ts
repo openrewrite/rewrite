@@ -240,7 +240,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         functionCall = statement as JS.FunctionCall;
 
         return this.produceJava<JS.FunctionCall>(functionCall, p, async draft => {
-            draft.select = await this.visitOptionalRightPadded(functionCall.select, p);
+            draft.function = await this.visitOptionalRightPadded(functionCall.function, p);
             draft.typeParameters = await this.visitOptionalContainer(functionCall.typeParameters, p);
             draft.arguments = await this.visitContainer(functionCall.arguments, p);
             draft.functionType = await this.visitType(functionCall.functionType, p) as JavaType.Method | undefined;
