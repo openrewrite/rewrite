@@ -23,8 +23,8 @@ import org.openrewrite.javascript.tree.JS;
 public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
 
     @Override
-    public JS.CompilationUnit visitCompilationUnit(JS.CompilationUnit cu, P p) {
-        return (JS.CompilationUnit) super.visitCompilationUnit(cu, p);
+    public JS.CompilationUnit visitJsCompilationUnit(JS.CompilationUnit cu, P p) {
+        return (JS.CompilationUnit) super.visitJsCompilationUnit(cu, p);
     }
 
     @Override
@@ -43,8 +43,8 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.AssignmentOperation visitAssignmentOperation(JS.AssignmentOperation assignOp, P p) {
-        return (JS.AssignmentOperation) super.visitAssignmentOperation(assignOp, p);
+    public JS.AssignmentOperation visitAssignmentOperationExtensions(JS.AssignmentOperation assignOp, P p) {
+        return (JS.AssignmentOperation) super.visitAssignmentOperationExtensions(assignOp, p);
     }
 
     @Override
@@ -108,13 +108,13 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.Binary visitBinary(JS.Binary binary, P p) {
-        return (JS.Binary) super.visitBinary(binary, p);
+    public JS.Binary visitBinaryExtensions(JS.Binary binary, P p) {
+        return (JS.Binary) super.visitBinaryExtensions(binary, p);
     }
 
     @Override
-    public JS.Import visitImport(JS.Import anImport, P p) {
-        return (JS.Import) super.visitImport(anImport, p);
+    public JS.Import visitImportDeclaration(JS.Import anImport, P p) {
+        return (JS.Import) super.visitImportDeclaration(anImport, p);
     }
 
     @Override
