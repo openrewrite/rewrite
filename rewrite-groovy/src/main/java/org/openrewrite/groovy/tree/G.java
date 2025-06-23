@@ -1052,9 +1052,6 @@ public interface G extends J {
         @Getter
         TypeTree typeExpression;
 
-
-        @Getter
-        @With
         JLeftPadded<Expression> initializer;
 
         JContainer<VariableDeclarations.NamedVariable> variables;
@@ -1080,7 +1077,6 @@ public interface G extends J {
             return v.visitDestructuringDeclaration(this, p);
         }
 
-
         public Padding getPadding() {
             DestructuringDeclaration.Padding p;
             if (this.padding == null) {
@@ -1095,7 +1091,6 @@ public interface G extends J {
             }
             return p;
         }
-
 
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
