@@ -16,16 +16,17 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.test.RewriteTest;
 
-import java.time.Instant;
 import java.util.UUID;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpdateScmFromGitOriginTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void updatesScmFromGitOriginUsingHttps() {
         rewriteRun(
@@ -34,7 +35,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                  
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -48,7 +49,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                  
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -59,7 +60,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                 </scm>
               </project>
               """,
-            spec -> spec.markers(sampleGitProvenance("https://new-server.example.com/username/repo.git"))
+            spec -> spec.markers(gitProvenance("https://new-server.example.com/username/repo.git"))
           )
         );
     }
@@ -72,7 +73,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                  
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -86,7 +87,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                  
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -97,7 +98,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                 </scm>
               </project>
               """,
-            spec -> spec.markers(sampleGitProvenance("http://new-server.example.com/username/repo.git"))
+            spec -> spec.markers(gitProvenance("http://new-server.example.com/username/repo.git"))
           )
         );
     }
@@ -110,7 +111,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                  
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -124,7 +125,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                  
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -135,7 +136,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                 </scm>
               </project>
               """,
-            spec -> spec.markers(sampleGitProvenance("git@new-server.example.com:username/repo.git"))
+            spec -> spec.markers(gitProvenance("git@new-server.example.com:username/repo.git"))
           )
         );
     }
@@ -148,18 +149,18 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                  
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            spec -> spec.markers(sampleGitProvenance("git@new-server.example.com:username/repo.git"))
+            spec -> spec.markers(gitProvenance("git@new-server.example.com:username/repo.git"))
           )
         );
     }
 
-    private GitProvenance sampleGitProvenance(String origin) {
+    private GitProvenance gitProvenance(String origin) {
         return new GitProvenance(UUID.randomUUID(), origin, null, null, null, null, null);
     }
 }
