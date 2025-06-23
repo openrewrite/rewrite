@@ -94,13 +94,12 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     final Boolean addIfMissing;
 
     @Getter
-    @Option(example = "https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip",
+    @Option(example = "https://services.gradle.org/distributions/gradle-8.5-bin.zip",
             displayName = "Wrapper URI",
             description = "The URI of the Gradle wrapper distribution. " +
-                          "Lookup of available versions still requires access to https://services.gradle.org " +
-                          "When this is specified the exact literal values supplied for `version` and `distribution` " +
-                          "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively. " +
-                          "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
+                          "When specified, version and distribution CANNOT be specified, and it is assumed that this uri is a reachable/valid wrapper distribution." +
+                          "This is particularly useful in environments where the gradle services url is not reachable. " +
+                          "The recipe will fetch gradle wrapper shell/bat files from the zip location and if the uri specified is not valid, the repo will keep its current files in place as they are mostly compatible.",
             required = false)
     @Nullable
     final String wrapperUri;
