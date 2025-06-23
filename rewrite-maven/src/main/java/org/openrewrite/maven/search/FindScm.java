@@ -30,7 +30,7 @@ public class FindScm extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Checks if the pom.xml has <scm> tag.";
+        return "Finds any `<scm>` tag directly inside the `<project>` root of a Maven pom.xml file.";
     }
 
     @Override
@@ -38,10 +38,12 @@ public class FindScm extends Recipe {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if ("scm".equals(tag.getName())) {
+                if ("project".equals(tag.getName())) {
+                    return super.visitTag(tag, ctx);
+                } else if ("scm".equals(tag.getName())) {
                     return SearchResult.found(tag);
                 }
-                return super.visitTag(tag, ctx);
+                return tag;
             }
         };
     }
