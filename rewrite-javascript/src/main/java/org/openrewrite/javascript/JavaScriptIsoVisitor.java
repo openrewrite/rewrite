@@ -19,6 +19,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.javascript.tree.JSX;
 
 public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
 
@@ -333,8 +334,8 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.Yield visitYield(JS.Yield yield, P p) {
-        return (JS.Yield) super.visitYield(yield, p);
+    public JS.Yield visitYield(J.Yield yield, P p) {
+        return (J.Yield) super.visitYield(yield, p);
     }
 
     // J overrides.
@@ -688,5 +689,30 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     @Override
     public J.Unknown.Source visitUnknownSource(J.Unknown.Source source, P p) {
         return (J.Unknown.Source) super.visitUnknownSource(source, p);
+    }
+
+    @Override
+    public JSX.Tag visitJsxTag(JSX.Tag tag, P p) {
+        return (JSX.Tag) super.visitJsxTag(tag, p);
+    }
+
+    @Override
+    public JSX.Attribute visitJsxAttribute(JSX.Attribute attribute, P p) {
+        return (JSX.Attribute) super.visitJsxAttribute(attribute, p);
+    }
+
+    @Override
+    public JSX.SpreadAttribute visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, P p) {
+        return (JSX.SpreadAttribute) super.visitJsxSpreadAttribute(spreadAttribute, p);
+    }
+
+    @Override
+    public JSX.EmbeddedExpression visitJsxEmbeddedExpression(JSX.EmbeddedExpression embeddedExpression, P p) {
+        return (JSX.EmbeddedExpression) super.visitJsxEmbeddedExpression(embeddedExpression, p);
+    }
+
+    @Override
+    public JSX.NamespacedName visitJsxNamespacedName(JSX.NamespacedName namespacedName, P p) {
+        return (JSX.NamespacedName) super.visitJsxNamespacedName(namespacedName, p);
     }
 }
