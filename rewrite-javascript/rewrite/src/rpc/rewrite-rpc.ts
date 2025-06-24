@@ -78,7 +78,6 @@ export class RewriteRpc {
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
-        GetRef.handle(this.connection, this.localRefs, false);
         InstallRecipes.handle(this.connection, ".rewrite", registry);
 
         this.connection.listen();

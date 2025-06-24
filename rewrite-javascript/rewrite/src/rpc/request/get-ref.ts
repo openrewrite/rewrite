@@ -26,7 +26,7 @@ export class GetRef {
         localRefs: ReferenceMap,
         trace: boolean
     ): void {
-        connection.onRequest(new rpc.RequestType<GetRef, any, Error>("GetObject"), async request => {
+        connection.onRequest(new rpc.RequestType<GetRef, any, Error>("GetRef"), async request => {
             const ref = localRefs.getByRefId(request.refId);
             if (ref === undefined) {
                 // Return DELETE + END_OF_OBJECT like Java implementation
