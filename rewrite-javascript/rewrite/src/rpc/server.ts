@@ -16,6 +16,7 @@
  */
 import * as net from 'net';
 import * as rpc from "vscode-jsonrpc/node";
+import {Trace, Tracer} from "vscode-jsonrpc/node";
 import {RewriteRpc} from "./rewrite-rpc";
 import * as fs from "fs";
 import {Command} from 'commander';
@@ -41,7 +42,7 @@ program
     .option('--port <number>', 'port number')
     .option('--log-file <path>', 'log file path')
     .option('-v, --verbose', 'enable verbose output')
-    .option('--batch-size [size]', 'sets the batch size (default is 100)', s => parseInt(s, 10), 100)
+    .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 200)
     .option('--trace-get-object-output', 'enable `GetObject` output tracing')
     .option('--trace-get-object-input', 'enable `GetObject` input tracing')
     .parse();
@@ -53,11 +54,11 @@ const log: Writable | undefined = options.logFile ? fs.createWriteStream(options
 const logger: rpc.Logger = {
     error: (msg: string) => log && log.write(`[Error] ${msg}\n`),
     warn: (msg: string) => log && log.write(`[Warn] ${msg}\n`),
-    info: (msg: string) => options.verbose && log && log.write(`[Info] ${msg}\n`),
-    log: (msg: string) => log && log.write(`[Log] ${msg}\n`)
+    info: (msg: string) => log && options.verbose && log.write(`[Info] ${msg}\n`),
+    log: (msg: string) => log && options.verbose && log.write(`[Log] ${msg}\n`)
 };
 
-log && logger.log(`[js-rewrite-rpc] starting\n\n`);
+logger.log(`[js-rewrite-rpc] starting\n\n`);
 
 if (!options.port) {
 // Create the connection with the custom logger
@@ -67,10 +68,14 @@ if (!options.port) {
         logger
     );
 
-    connection.trace(rpc.Trace.Verbose, logger).catch(err => {
+    if (options.verbose) {
+        connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
         // Handle any unexpected errors during trace configuration
-        logger.error(`Failed to set trace: ${err}`);
+            logger.error(`Failed to set trace: ${err}\n`);
     });
+    } else {
+        connection.trace(Trace.Off, {} as Tracer);
+    }
 
     connection.onError(err => {
         logger.error(`[js-rewrite-rpc] error: ${err}\n\n`);
@@ -101,13 +106,17 @@ if (!options.port) {
             logger
         );
 
+        if (options.verbose) {
         connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
             // Handle any unexpected errors during trace configuration
             logger.error(`Failed to set trace: ${err}\n`);
         });
+        } else {
+            connection.trace(Trace.Off, {} as Tracer);
+        }
 
         connection.onError((err: [Error, rpc.Message | undefined, number | undefined]) => {
-            logger.error(`[js-rewrite-rpc] error: ${err[0]}\n\n`);
+            logger.error(`[js-rewrite-rpc] error: ${err[0]}\n${err[0].stack}\n\n`);
         });
 
         connection.onClose(() => {

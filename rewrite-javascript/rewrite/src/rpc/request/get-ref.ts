@@ -47,9 +47,12 @@ export class GetRef {
                 // Determine what the remote has cached
                 let before = undefined;
 
+                // TODO not quite right as it will now register it as a new ref
+                localRefs.deleteByRefId(request.ref);
                 allData = await new RpcSendQueue(localRefs, trace).generate(after, before);
                 pendingData.set(request.ref, allData);
 
+                localRefs.set(ref, request.ref);
                 remoteRefs.set(request.ref, after);
             }
 

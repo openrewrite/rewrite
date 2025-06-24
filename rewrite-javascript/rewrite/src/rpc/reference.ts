@@ -68,4 +68,17 @@ export class ReferenceMap {
         this.refsById = new Map<number, Reference>();
         this.refCount = 0;
     }
+
+    deleteByRefId(refId: number) {
+        const obj = this.refsById.get(refId);
+        if (obj) {
+            this.refs.delete(obj);
+            this.refsById.delete(refId);
+        }
+    }
+
+    set(ref: Reference, refId: number) {
+        this.refs.set(ref, refId);
+        this.refsById.set(refId, ref);
+    }
 }

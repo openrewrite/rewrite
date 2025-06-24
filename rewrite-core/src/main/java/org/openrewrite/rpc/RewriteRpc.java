@@ -84,7 +84,7 @@ public class RewriteRpc implements AutoCloseable {
 
     private final JsonRpc jsonRpc;
 
-    private final AtomicInteger batchSize = new AtomicInteger(100);
+    private final AtomicInteger batchSize = new AtomicInteger(200);
     private final Duration timeout;
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
     private @Nullable PrintStream logFile;

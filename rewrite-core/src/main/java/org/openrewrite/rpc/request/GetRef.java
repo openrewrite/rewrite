@@ -65,6 +65,8 @@ public class GetRef implements RpcRequest {
             BlockingQueue<List<RpcObjectData>> q = inProgress.computeIfAbsent(request.getRef(), id -> {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
 
+                // TODO not quite right as it will now register it as a new ref
+                localRefs.remove(after);
                 RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, trace.get());
                 forkJoin.submit(() -> {
                     try {
@@ -77,6 +79,7 @@ public class GetRef implements RpcRequest {
                     } catch (Throwable ignored) {
                         // TODO do something with this exception
                     } finally {
+                        localRefs.put(after, id);
                         sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null, null));
                         sendQueue.flush();
                     }
