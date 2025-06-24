@@ -15,6 +15,8 @@
  */
 package org.openrewrite.rpc;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
 import org.openrewrite.marker.Markers;
@@ -31,7 +33,18 @@ import java.util.function.UnaryOperator;
 import static java.util.Objects.requireNonNull;
 
 public class RpcReceiveQueue {
-    private final ObjenesisStd objenesis = new ObjenesisStd();
+    private static final ObjenesisStd objenesis = new ObjenesisStd();
+    private static final LoadingCache<String, Object> instanceCache = Caffeine.newBuilder()
+            .maximumSize(1_000)
+            .build((String key) -> {
+                try {
+                    Class<?> clazz = Class.forName(key);
+                    return objenesis.newInstance(clazz);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
     private final List<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
     private final @Nullable PrintStream logFile;
@@ -189,13 +202,8 @@ public class RpcReceiveQueue {
     }
 
     private <T> T newObj(String type) {
-        try {
-            Class<?> clazz = Class.forName(type);
-            //noinspection unchecked
-            return (T) objenesis.newInstance(clazz);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
+        //noinspection unchecked
+        return (T) requireNonNull(instanceCache.get(type));
     }
 
     /**
