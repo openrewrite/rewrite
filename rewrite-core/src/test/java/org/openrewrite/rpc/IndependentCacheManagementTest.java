@@ -60,7 +60,7 @@ class IndependentCacheManagementTest {
         
         // First data should be ADD state
         assertThat(response).isNotEmpty();
-        assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.ADD);
+        assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.ADD);
     }
 
     @Test
@@ -90,7 +90,7 @@ class IndependentCacheManagementTest {
         
         // Should return ADD since remote has no entry for this ID
         assertThat(response).isNotEmpty();
-        assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.ADD);
+        assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.ADD);
     }
 
     @Test
@@ -120,7 +120,7 @@ class IndependentCacheManagementTest {
         
         // Should return NO_CHANGE since objects are identical
         assertThat(response).isNotEmpty();
-        assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.NO_CHANGE);
+        assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.NO_CHANGE);
     }
 
     @Test
@@ -153,11 +153,12 @@ class IndependentCacheManagementTest {
         
         // Should return CHANGE since objects are different
         assertThat(response).isNotEmpty();
-        assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.CHANGE);
+        assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.CHANGE);
     }
 
     @Test
-    void getRefRequest_whenRefExists_returnsCorrectObject() {
+    void getRefRequest_whenRefExists_returnsCorrectObject() throws InterruptedException {
+        Map<Integer, Object> remoteRefs = new HashMap<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
         // Create a reference on server
@@ -168,31 +169,32 @@ class IndependentCacheManagementTest {
                 .sourcePath(Paths.get("ref.txt"))
                 .build();
         
-        Integer refId = 42;
+        int refId = 42;
         localRefs.put(text, refId);
 
         // Test GetRef request
-        GetRef.Handler handler = new GetRef.Handler(localRefs);
-        List<RpcObjectData> response = handler.handle(new GetRef(refId.toString()));
+        GetRef.Handler handler = new GetRef.Handler(remoteRefs, localRefs, new AtomicInteger(1000), new AtomicBoolean(false));
+        List<RpcObjectData> response = handler.handle(new GetRef(refId));
         
         assertThat(response).isNotEmpty();
-        assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.ADD);
+        assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.ADD);
         // For RpcCodec objects like PlainText, the first RpcObjectData has null value 
         // and the actual data is in subsequent RpcObjectData objects
-        assertThat((Object) response.get(0).getValue()).isNull();
-        assertThat(response.get(0).getValueType()).isEqualTo("org.openrewrite.text.PlainText");
+        assertThat((Object) response.getFirst().getValue()).isNull();
+        assertThat(response.getFirst().getValueType()).isEqualTo("org.openrewrite.text.PlainText");
         
         // Should end with END_OF_OBJECT
-        assertThat(response.get(response.size() - 1).getState()).isEqualTo(RpcObjectData.State.END_OF_OBJECT);
+        assertThat(response.getLast().getState()).isEqualTo(RpcObjectData.State.END_OF_OBJECT);
     }
 
     @Test
-    void getRefRequest_whenRefDoesNotExist_returnsDELETE() {
+    void getRefRequest_whenRefDoesNotExist_returnsDELETE() throws InterruptedException {
+        Map<Integer, Object> remoteRefs = new HashMap<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
         // Test GetRef request for non-existent reference
-        GetRef.Handler handler = new GetRef.Handler(localRefs);
-        List<RpcObjectData> response = handler.handle(new GetRef("999"));
+        GetRef.Handler handler = new GetRef.Handler(remoteRefs, localRefs, new AtomicInteger(1), new AtomicBoolean(false));
+        List<RpcObjectData> response = handler.handle(new GetRef(999));
         
         assertThat(response).hasSize(2); // DELETE + END_OF_OBJECT
         assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.DELETE);
@@ -200,12 +202,13 @@ class IndependentCacheManagementTest {
     }
 
     @Test
-    void getRefRequest_whenInvalidRefId_returnsDELETE() {
+    void getRefRequest_whenInvalidRefId_returnsDELETE() throws InterruptedException {
+        Map<Integer, Object> remoteRefs = new HashMap<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
         // Test GetRef request with invalid ref ID format
-        GetRef.Handler handler = new GetRef.Handler(localRefs);
-        List<RpcObjectData> response = handler.handle(new GetRef("not-a-number"));
+        GetRef.Handler handler = new GetRef.Handler(remoteRefs, localRefs, new AtomicInteger(1), new AtomicBoolean(false));
+        List<RpcObjectData> response = handler.handle(new GetRef(-1));
         
         assertThat(response).hasSize(2); // DELETE + END_OF_OBJECT
         assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.DELETE);

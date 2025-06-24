@@ -74,7 +74,7 @@ export class RewriteRpc {
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects, this.localRefs, options?.batchSize || 100,
             !!options?.traceGetObjectOutput);
         GetRecipes.handle(this.connection, registry);
-        GetRef.handle(this.connection, this.localRefs, !!options?.traceGetObjectOutput);
+        GetRef.handle(this.connection, this.remoteRefs, this.localRefs, options?.batchSize || 100, !!options?.traceGetObjectOutput);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);

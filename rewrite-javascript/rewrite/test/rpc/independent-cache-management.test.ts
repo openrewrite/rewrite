@@ -20,6 +20,7 @@ import {PlainText} from "../../src/text";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../example-recipe";
+import {GetObject, GetRef} from "../../src/rpc/request";
 
 describe("Independent Cache Management", () => {
     let server: RewriteRpc;
@@ -175,12 +176,12 @@ describe("Independent Cache Management", () => {
         // Debug: check that it was actually stored
         expect(server.localRefs.has(asRef(markers))).toBe(true);
         expect(server.localRefs.get(asRef(markers))).toBe(refId);
-        expect(server.localRefs.getByRefId(refId.toString())).toBeDefined();
+        expect(server.localRefs.getByRefId(refId)).toBeDefined();
 
         // Test GetRef request directly using connection (client requests from server)
         const response = await client.connection.sendRequest(
-            new rpc.RequestType<{refId: string}, RpcObjectData[], Error>("GetRef"),
-            {refId: refId.toString()}
+            new rpc.RequestType<GetRef, RpcObjectData[], Error>("GetRef"),
+            new GetRef(refId)
         );
         
         expect(response).toHaveLength(2);
@@ -191,8 +192,8 @@ describe("Independent Cache Management", () => {
     test("getRef request for missing reference returns DELETE", async () => {
         // Request a reference that doesn't exist (client requests from server)
         const response = await client.connection.sendRequest(
-            new rpc.RequestType<{refId: string}, RpcObjectData[], Error>("GetRef"),
-            {refId: "999"}
+            new rpc.RequestType<GetRef, RpcObjectData[], Error>("GetRef"),
+            new GetRef(999)
         );
         
         expect(response).toHaveLength(2);
@@ -216,8 +217,8 @@ describe("Independent Cache Management", () => {
 
         // Client requests from server with null lastKnownId
         const response = await client.connection.sendRequest(
-            new rpc.RequestType<{id: string, lastKnownId: string | null}, RpcObjectData[], Error>("GetObject"),
-            {id: objectId, lastKnownId: null}
+            new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
+            new GetObject(objectId, undefined)
         );
 
         // Should return ADD state, not CHANGE
@@ -242,8 +243,8 @@ describe("Independent Cache Management", () => {
 
         // Client requests from server without lastKnownId property
         const response = await client.connection.sendRequest(
-            new rpc.RequestType<{id: string}, RpcObjectData[], Error>("GetObject"),
-            {id: objectId}
+            new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
+            new GetObject(objectId)
         );
 
         // Should return ADD state, not CHANGE
@@ -394,9 +395,9 @@ describe("Independent Cache Management", () => {
         expect(server.localRefs.get(asRef(markers))).toBe(refId);
         
         // Test reverse lookup
-        expect(server.localRefs.getByRefId(refId.toString())).toBe(markers);
+        expect(server.localRefs.getByRefId(refId)).toBe(markers);
         
         // Test non-existent lookup
-        expect(server.localRefs.getByRefId("999")).toBeUndefined();
+        expect(server.localRefs.getByRefId(999)).toBeUndefined();
     });
 });

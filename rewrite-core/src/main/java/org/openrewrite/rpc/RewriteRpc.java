@@ -125,7 +125,7 @@ public class RewriteRpc implements AutoCloseable {
         Map<String, Recipe> preparedRecipes = new HashMap<>();
         Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
 
-        jsonRpc.rpc("GetRef", new GetRef.Handler(localRefs));
+        jsonRpc.rpc("GetRef", new GetRef.Handler(remoteRefs, localRefs, batchSize, traceSendPackets));
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
@@ -391,22 +391,11 @@ public class RewriteRpc implements AutoCloseable {
     }
     
     private Object getRef(Integer refId) {
-        // Fetch the complete batch like getObject() does
-        List<RpcObjectData> completeBatch = send("GetRef", new GetRef(refId.toString()), GetRefResponse.class);
-        
-        // Create RpcReceiveQueue with the pre-fetched batch
-        // Use a simple function that throws for nested refs to avoid recursion
-        AtomicBoolean batchConsumed = new AtomicBoolean(false);
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> {
-            if (batchConsumed.getAndSet(true)) {
-                throw new IllegalStateException("GetRef batch already consumed");
-            }
-            return completeBatch;
-        }, nestedRefId -> {
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetRef",
+                new GetRef(refId), GetRefResponse.class), nestedRefId -> {
             throw new IllegalStateException("Nested ref calls not supported in GetRef: " + nestedRefId);
         });
-        
-        // Process the ref object
+
         Object ref = q.receive(null, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
@@ -417,6 +406,8 @@ public class RewriteRpc implements AutoCloseable {
         }
         
         remoteRefs.put(refId, ref);
+        localRefs.put(ref, refId);
+
         return ref;
     }
 

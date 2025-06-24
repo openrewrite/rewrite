@@ -71,19 +71,9 @@ class GetRefRequestTest {
     }
 
     @Test
-    void getRefRequestHandling() {
-        // For now, just test that the GetRef constructor works and we can send the request
-        GetRef getRefRequest = new GetRef("123");
-        assertThat(getRefRequest.getRefId()).isEqualTo("123");
-        
-        // The full integration test is more complex due to RPC setup
-        // This test validates the basic structure is in place
-    }
-
-    @Test
     void getRefRequestForMissingReference() {
         // Request a reference that doesn't exist
-        GetRef getRefRequest = new GetRef("999");
+        GetRef getRefRequest = new GetRef(999);
         GetRefResponse response = server.send("GetRef", getRefRequest, GetRefResponse.class);
         
         assertThat(response).hasSize(2);

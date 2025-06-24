@@ -18,16 +18,20 @@ import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../reference";
 
 export class GetRef {
-    constructor(private readonly refId: string) {
+    constructor(private readonly ref: number) {
     }
 
     static handle(
         connection: rpc.MessageConnection,
+        remoteRefs: Map<number, any>,
         localRefs: ReferenceMap,
+        batchSize: number,
         trace: boolean
     ): void {
+        const pendingData = new Map<number, RpcObjectData[]>();
+
         connection.onRequest(new rpc.RequestType<GetRef, any, Error>("GetRef"), async request => {
-            const ref = localRefs.getByRefId(request.refId);
+            const ref = localRefs.getByRefId(request.ref);
             if (ref === undefined) {
                 // Return DELETE + END_OF_OBJECT like Java implementation
                 return [
@@ -35,12 +39,27 @@ export class GetRef {
                     {state: RpcObjectState.END_OF_OBJECT, valueType: null, value: null, ref: null, trace: null}
                 ];
             }
-            
-            // Use RpcSendQueue to serialize the object properly like Java does
-            const tempRefMap = new ReferenceMap();
-            const sendQueue = new RpcSendQueue(tempRefMap, trace);
-            const batch = await sendQueue.generate(ref, undefined);
-            
+
+            let allData = pendingData.get(request.ref);
+            if (!allData) {
+                const after = ref;
+
+                // Determine what the remote has cached
+                let before = undefined;
+
+                allData = await new RpcSendQueue(localRefs, trace).generate(after, before);
+                pendingData.set(request.ref, allData);
+
+                remoteRefs.set(request.ref, after);
+            }
+
+            const batch = allData.splice(0, batchSize);
+
+            // If we've sent all data, remove from pending
+            if (allData.length === 0) {
+                pendingData.delete(request.ref);
+            }
+
             return batch;
         });
     }

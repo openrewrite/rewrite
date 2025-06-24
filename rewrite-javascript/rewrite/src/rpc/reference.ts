@@ -52,8 +52,8 @@ export class ReferenceMap {
         return this.refs.get(obj);
     }
 
-    getByRefId(refId: string): Reference | undefined {
-        return this.refsById.get(parseInt(refId));
+    getByRefId(refId: number): Reference | undefined {
+        return this.refsById.get(refId);
     }
 
     create(obj: Reference): number {
