@@ -190,7 +190,7 @@ public class LatestRelease implements VersionComparator {
             case "sp":
                 return 7;
             default:
-                return 0;
+                return 8;
         }
     }
 
@@ -198,8 +198,15 @@ public class LatestRelease implements VersionComparator {
         if (suffix == null) {
             return "";
         }
-        int endIdx = Math.max(suffix.lastIndexOf('.'), suffix.lastIndexOf('-'));
-        return suffix.substring(1, endIdx > 0 ? endIdx : suffix.length());
+        StringBuilder builder = new StringBuilder();
+        for (int i = 1; i < suffix.length(); i++) {
+            if (Character.isLetter(suffix.charAt(i))) {
+                builder.append(Character.toLowerCase(suffix.charAt(i)));
+            } else {
+                break;
+            }
+        }
+        return builder.toString();
     }
 
     public static Validated<LatestRelease> buildLatestRelease(String toVersion, @Nullable String metadataPattern) {

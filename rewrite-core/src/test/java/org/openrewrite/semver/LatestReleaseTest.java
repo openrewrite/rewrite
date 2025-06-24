@@ -132,7 +132,7 @@ class LatestReleaseTest {
         assertThat(latestRelease.compare(null, "1.2.3.sp", "1.2.3")).isPositive();
         assertThat(latestRelease.compare(null, "1.2.3.sp", "1.2.3.final")).isPositive();
 
-        assertThat(latestRelease.compare(null, "1.2.3.mr", "1.2.3")).isNegative();
+        assertThat(latestRelease.compare(null, "1.2.3.mr", "1.2.3")).isPositive();
     }
 
     @Test
@@ -196,8 +196,8 @@ class LatestReleaseTest {
         assertThat(latestRelease.compare(null, "3.5.0", "3.5.0-RC1")).isGreaterThan(0);
         assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0-RC2")).isLessThan(0);
         assertThat(latestRelease.compare(null, "3.5.0-alpha", "3.5.0-beta")).isLessThan(0);
-        // String comparison: "beta" > "RC1" lexicographically
-        assertThat(latestRelease.compare(null, "3.5.0-beta", "3.5.0-RC1")).isGreaterThan(0);
-        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0-beta")).isLessThan(0);
+        // "RC" is a known qualifier and "beta" is not
+        assertThat(latestRelease.compare(null, "3.5.0-beta", "3.5.0-RC1")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0-beta")).isGreaterThan(0);
     }
 }
