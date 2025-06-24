@@ -95,13 +95,15 @@ public class FindDependency extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (DEPENDENCY_MANAGEMENT_METHODS.contains(method.getSimpleName())) {
                     if (StringUtils.isBlank(configuration) || method.getSimpleName().equals(configuration)) {
-                        List<Expression> depArgs = method.getArguments();
-                        if (depArgs.get(0) instanceof J.Literal &&
-                                groupArtifactMatches((J.Literal) depArgs.get(0))) {
-                            return SearchResult.found(method);
-                        } else if (depArgs.get(0) instanceof G.GString &&
-                                groupArtifactMatches((J.Literal) ((G.GString) depArgs.get(0)).getStrings().get(0))) {
-                            return SearchResult.found(method);
+                        if (!isWithinConstraintsBlock()) {
+                            List<Expression> depArgs = method.getArguments();
+                            if (depArgs.get(0) instanceof J.Literal &&
+                                    groupArtifactMatches((J.Literal) depArgs.get(0))) {
+                                return SearchResult.found(method);
+                            } else if (depArgs.get(0) instanceof G.GString &&
+                                    groupArtifactMatches((J.Literal) ((G.GString) depArgs.get(0)).getStrings().get(0))) {
+                                return SearchResult.found(method);
+                            }
                         }
                     }
                 }
@@ -114,6 +116,23 @@ public class FindDependency extends Recipe {
                 String[] parts = gav.split(":");
                 if (parts.length >= 2) {
                     return StringUtils.matchesGlob(parts[0], groupId) && StringUtils.matchesGlob(parts[1], artifactId);
+                }
+                return false;
+            }
+
+            boolean isWithinConstraintsBlock() {
+                Cursor cursor = getCursor();
+                while (cursor != null) {
+                    Object parent = cursor.getValue();
+                    if (parent instanceof J.MethodInvocation) {
+                        J.MethodInvocation parentMethod = (J.MethodInvocation) parent;
+                        if ("constraints".equals(parentMethod.getSimpleName())) {
+                            return true;
+                        } else if ("dependencies".equals(parentMethod.getSimpleName())) {
+                            return false;
+                        }
+                    }
+                    cursor = cursor.getParent();
                 }
                 return false;
             }

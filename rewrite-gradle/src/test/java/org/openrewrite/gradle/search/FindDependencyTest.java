@@ -207,4 +207,58 @@ class FindDependencyTest implements RewriteTest {
         }
 
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5599")
+    void ignoreConstraints() {
+        rewriteRun(spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", "implementation")),
+          buildGradle(
+            //language=gradle
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1') 
+                  }
+              }
+              """));
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5599")
+    void constraintsVsRegularDependencies() {
+        rewriteRun(spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", null)),
+          buildGradle(
+            //language=gradle
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
+                  testImplementation 'junit:junit:4.13.2'
+                  
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
+                      api('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
+                  }
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  /*~~>*/implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
+                  testImplementation 'junit:junit:4.13.2'
+                  
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
+                      api('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
+                  }
+              }
+              """));
+    }
 }
