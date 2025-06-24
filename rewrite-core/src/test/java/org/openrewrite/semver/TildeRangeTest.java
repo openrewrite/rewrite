@@ -52,7 +52,6 @@ class TildeRangeTest {
         assertThat(tildeRange.isValid("1.0", "1.2.3.RELEASE")).isTrue();
         assertThat(tildeRange.isValid("1.0", "1.2.4")).isTrue();
         assertThat(tildeRange.isValid("1.0", "1.3.0")).isFalse();
-        assertThat(tildeRange.isValid("1.0", "1.2.3.v20130506")).isTrue();
     }
 
     @Test

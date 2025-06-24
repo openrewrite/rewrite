@@ -117,18 +117,19 @@ public class LatestRelease implements VersionComparator {
             nv1 = nv1Builder.toString();
         }
 
-        Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(nv1);
-        Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(nv2);
-
-        v1Gav.find();
-        v2Gav.find();
-
         // Remove the metadata pattern from the normalized versions, this only impacts the comparison when all version
         // parts are the same:
         //
         // HyphenRange [25-28] should include "28-jre" and "28-android" as possible candidates.
         String normalized1 = metadataPattern == null ? nv1 : nv1.replaceAll(metadataPattern, "");
         String normalized2 = metadataPattern == null ? nv2 : nv2.replaceAll(metadataPattern, "");
+
+        Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(normalized1);
+        Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(normalized2);
+
+        v1Gav.find();
+        v2Gav.find();
+
         try {
             for (int i = 1; i <= Math.max(vp1, vp2); i++) {
                 String v1Part = v1Gav.group(i);
