@@ -72,7 +72,7 @@ public class ChangeTaskToTasksRegister extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (!"task".equals(m.getSimpleName()) || m.getSelect() != null) {
+            if (!isTaskDeclaration(m)) {
                 return m;
             }
 
@@ -112,13 +112,15 @@ public class ChangeTaskToTasksRegister extends Recipe {
             }
 
             String template;
+            Expression select = m.getSelect();
+            String prefix = select == null ? "" : select.print(getCursor()) + ".";
             String name = inner.getSimpleName();
             String lambda = taskLambda != null ? taskLambda.print(getCursor().getParentOrThrow()) : "";
             if (taskType != null) {
                 String type = taskType.withPrefix(Space.EMPTY).print(getCursor().getParentOrThrow());
-                template = "tasks.register(\"" + name + "\", " + type + ")" + lambda;
+                template = prefix + "tasks.register(\"" + name + "\", " + type + ")" + lambda;
             } else {
-                template = "tasks.register(\"" + name + "\")" + lambda;
+                template = prefix + "tasks.register(\"" + name + "\")" + lambda;
             }
 
             SourceFile parsed = GRADLE_PARSER.parse(ctx, template)
@@ -134,6 +136,42 @@ public class ChangeTaskToTasksRegister extends Recipe {
             }
             return cu.getStatements().get(0).withPrefix(m.getPrefix()).withMarkers(m.getMarkers());
         }
+
+        private boolean isTaskDeclaration(J.MethodInvocation method) {
+            if (!"task".equals(method.getSimpleName())) {
+                return false;
+            }
+
+            Expression select = method.getSelect();
+            if (select == null) {
+                return true;
+            }
+
+            if (select instanceof J.Identifier) {
+                String selectName = ((J.Identifier) select).getSimpleName();
+
+                if ("project".equals(selectName) || "it".equals(selectName)) {
+                    return true;
+                }
+
+                J.Lambda enclosingLambda = getCursor().firstEnclosing(J.Lambda.class);
+                if (enclosingLambda != null) {
+                    for (J param : enclosingLambda.getParameters().getParameters()) {
+                        if (param instanceof J.VariableDeclarations) {
+                            J.VariableDeclarations varDecls = (J.VariableDeclarations) param;
+                            if (!varDecls.getVariables().isEmpty() &&
+                              varDecls.getVariables().get(0).getName().getSimpleName().equals(selectName)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                return false;
+            }
+
+            return false;
+        }
     }
 
     private static class KotlinVisitor extends KotlinIsoVisitor<ExecutionContext> {
@@ -141,8 +179,20 @@ public class ChangeTaskToTasksRegister extends Recipe {
         @Override
         public K.MethodInvocation visitMethodInvocation(K.MethodInvocation method, ExecutionContext ctx) {
             K.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (!m.getSimpleName().equals("task") || m.getSelect() != null) {
+            if (!"task".equals(m.getSimpleName())) {
                 return m;
+            }
+
+            Expression select = method.getSelect();
+            if (select != null) {
+                if (select instanceof J.Identifier) {
+                    String selectName = ((J.Identifier) select).getSimpleName();
+                    if (!"project".equals(selectName)) {
+                        return m;
+                    }
+                } else {
+                    return m;
+                }
             }
 
             List<Expression> args = m.getArguments();
@@ -166,13 +216,14 @@ public class ChangeTaskToTasksRegister extends Recipe {
             }
 
             String template;
+            String prefix = select == null ? "" : select.print(getCursor()) + ".";
             String name = (String) taskName.getValue();
             String lambda = taskLambda != null ? taskLambda.print(getCursor().getParentOrThrow()) : "";
             if (taskType != null) {
                 String type = taskType.print(getCursor().getParentOrThrow());
-                template = "tasks.register<" + type + ">(\"" + name + "\")" + lambda;
+                template = prefix + "tasks.register<" + type + ">(\"" + name + "\")" + lambda;
             } else {
-                template = "tasks.register(\"" + name + "\")" + lambda;
+                template = prefix + "tasks.register(\"" + name + "\")" + lambda;
             }
 
             GradleParser.Input input = new GradleParser.Input(
