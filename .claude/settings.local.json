@@ -2,12 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(./gradlew:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
       "Bash(rm:*)",
       "Bash(npm test:*)",
       "Bash(timeout:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": []
   }

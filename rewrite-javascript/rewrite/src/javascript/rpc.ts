@@ -200,7 +200,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return mappedType;
     }
 
-    override async visitKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, q: RpcSendQueue): Promise<J | undefined> {
+    override async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(keysRemapping, el => el.typeParameter, el => this.visitRightPadded(el, q));
         await q.getAndSend(keysRemapping, el => el.nameType, el => this.visitRightPadded(el, q));
         return keysRemapping;
@@ -314,7 +314,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return indexedAccessType;
     }
 
-    override async visitIndexType(indexType: JS.IndexedAccessType.IndexType, q: RpcSendQueue): Promise<J | undefined> {
+    override async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(indexType, el => el.element, el => this.visitRightPadded(el, q));
         await q.getAndSend(indexType, el => asRef(el.type), el => this.visitType(el, q));
         return indexType;
@@ -399,7 +399,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return spreadAttribute;
     }
 
-    override async visitJsxExpression(embeddedExpression: JSX.EmbeddedExpression, q: RpcSendQueue): Promise<J | undefined> {
+    override async visitJsxEmbeddedExpression(embeddedExpression: JSX.EmbeddedExpression, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(embeddedExpression, el => el.expression, el => this.visitRightPadded(el, q));
         return embeddedExpression;
     }
@@ -741,7 +741,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, q: RpcReceiveQueue): Promise<J | undefined> {
+    override async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(keysRemapping);
         draft.typeParameter = await q.receive(draft.typeParameter, el => this.visitRightPadded(el, q));
         draft.nameType = await q.receive(draft.nameType, el => this.visitRightPadded(el, q));
@@ -872,7 +872,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitIndexType(indexType: JS.IndexedAccessType.IndexType, q: RpcReceiveQueue): Promise<J | undefined> {
+    override async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(indexType);
         draft.element = await q.receive(draft.element, el => this.visitRightPadded(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
@@ -970,7 +970,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitJsxExpression(embeddedExpression: JSX.EmbeddedExpression, q: RpcReceiveQueue): Promise<J | undefined> {
+    override async visitJsxEmbeddedExpression(embeddedExpression: JSX.EmbeddedExpression, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(embeddedExpression);
         draft.expression = await q.receive(draft.expression, el => this.visitRightPadded(el, q));
         return finishDraft(draft);
