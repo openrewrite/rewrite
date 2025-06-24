@@ -167,7 +167,7 @@ class ChangeTaskToTasksRegisterTest implements RewriteTest {
     }
 
     @Test
-    void groovyTaskInSelect() {
+    void groovyTaskWithSelect() {
         rewriteRun(
           buildGradle(
             """
@@ -177,6 +177,120 @@ class ChangeTaskToTasksRegisterTest implements RewriteTest {
               def helper = new TaskHelper()
               helper.task(type: Copy) {
                   // This is not a standard Gradle task definition
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTaskWithCustomPluginConfiguration() {
+        rewriteRun(
+          buildGradle(
+            """
+              customPluginConfiguration.task taskName(type: Copy) {
+                  from 'src/main/resources'
+                  into 'build/generated-resources'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTaskWithProject() {
+        rewriteRun(
+          buildGradle(
+            """
+              project.task taskName {
+                   doLast {
+                       println "Running 'This works' task in root project"
+                   }
+              }
+              """,
+            """
+              project.tasks.register("taskName") {
+                   doLast {
+                       println "Running 'This works' task in root project"
+                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTaskInSubprojectsWithIt() {
+        rewriteRun(
+          buildGradle(
+            """
+              subprojects {
+                  it.task subTask {
+                      doLast {
+                          println "Running in subproject"
+                      }
+                  }
+              }
+              """,
+            """
+              subprojects {
+                  it.tasks.register("subTask") {
+                      doLast {
+                          println "Running in subproject"
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTaskInSubprojectsImplicitThis() {
+        rewriteRun(
+          buildGradle(
+            """
+              subprojects {
+                  task subTask {
+                      doLast {
+                          println "Running in subproject"
+                      }
+                  }
+              }
+              """,
+            """
+              subprojects {
+                  tasks.register("subTask") {
+                      doLast {
+                          println "Running in subproject"
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTaskInSubprojectsWithNamedParameter() {
+        rewriteRun(
+          buildGradle(
+            """
+              subprojects { p ->
+                  p.task subTask {
+                      doLast {
+                          println "Running in subproject"
+                      }
+                  }
+              }
+              """,
+            """
+              subprojects { p ->
+                  p.tasks.register("subTask") {
+                      doLast {
+                          println "Running in subproject"
+                      }
+                  }
               }
               """
           )
@@ -269,6 +383,66 @@ class ChangeTaskToTasksRegisterTest implements RewriteTest {
               tasks.register<Copy>("taskName") {
                     from("src")
                     into("dest")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinTaskWithCustomPluginConfiguration() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              customPluginConfiguration.task<Copy>("taskName") {
+                    from("src")
+                    into("dest")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinTaskWithProject() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              project.task<Copy>("taskName") {
+                   from("src")
+                   into("dest")
+              }
+              """,
+            """
+              project.tasks.register<Copy>("taskName") {
+                   from("src")
+                   into("dest")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinTaskInSubprojectsImplicitThis() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              subprojects {
+                  task("subTask") {
+                      doLast {
+                          println("Running in subproject")
+                      }
+                  }
+              }
+              """,
+            """
+              subprojects {
+                  tasks.register("subTask") {
+                      doLast {
+                          println("Running in subproject")
+                      }
+                  }
               }
               """
           )
