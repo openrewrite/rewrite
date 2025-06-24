@@ -431,7 +431,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     override async visitForOfLoop(forOfLoop: JS.ForOfLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(forOfLoop, el => el.await);
+        await q.getAndSend(forOfLoop, el => el.await, space => this.visitSpace(space, q));
         await q.getAndSend(forOfLoop, el => el.loop, el => this.visit(el, q));
         return forOfLoop;
     }
@@ -1007,7 +1007,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitForOfLoop(forOfLoop: JS.ForOfLoop, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(forOfLoop);
-        draft.await = await q.receive(draft.await);
+        draft.await = await q.receive(draft.await, space => this.visitSpace(space, q));
         draft.loop = await q.receive(draft.loop, el => this.visitDefined<J.ForEachLoop>(el, q));
         return finishDraft(draft);
     }
