@@ -18,30 +18,9 @@ package org.openrewrite.semver;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.regex.Matcher;
 
 public class LatestRelease implements VersionComparator {
-
-    private static final Map<String, Integer> QUALIFIER_PRIORITY = new HashMap<>();
-
-    static {
-        QUALIFIER_PRIORITY.put("alpha", 1);
-        QUALIFIER_PRIORITY.put("a", 1);
-        QUALIFIER_PRIORITY.put("beta", 2);
-        QUALIFIER_PRIORITY.put("b", 2);
-        QUALIFIER_PRIORITY.put("milestone", 3);
-        QUALIFIER_PRIORITY.put("m", 3);
-        QUALIFIER_PRIORITY.put("rc", 4);
-        QUALIFIER_PRIORITY.put("cr", 4);
-        QUALIFIER_PRIORITY.put("snapshot", 5);
-        QUALIFIER_PRIORITY.put("", 6);
-        QUALIFIER_PRIORITY.put("ga", 6);
-        QUALIFIER_PRIORITY.put("final", 6);
-        QUALIFIER_PRIORITY.put("release", 6);
-        QUALIFIER_PRIORITY.put("sp", 7);
-    }
 
     @Nullable
     private final String metadataPattern;
@@ -174,11 +153,8 @@ public class LatestRelease implements VersionComparator {
         // When all numeric parts are equal, we need to handle pre-release versions properly
         // A pre-release version should be considered less than a release version
         // e.g., "3.5.0-RC1" < "3.5.0"
-        String v1Qualifier = extractQualifier(v1Gav.group(6));
-        String v2Qualifier = extractQualifier(v2Gav.group(6));
-
-        int v1Prio = QUALIFIER_PRIORITY.getOrDefault(v1Qualifier, 0);
-        int v2Prio = QUALIFIER_PRIORITY.getOrDefault(v2Qualifier, 0);
+        int v1Prio = qualifierPriority(v1Gav.group(6));
+        int v2Prio = qualifierPriority(v2Gav.group(6));
 
         if (v1Prio != v2Prio) {
             return Integer.compare(v1Prio, v2Prio);
@@ -186,6 +162,35 @@ public class LatestRelease implements VersionComparator {
 
         // Both are either pre-release or release versions, do string comparison
         return normalized1.compareTo(normalized2);
+    }
+
+    private static int qualifierPriority(@Nullable String suffix) {
+        String qualifier = extractQualifier(suffix);
+        switch (qualifier) {
+            case "alpha":
+            case "a":
+                return 1;
+            case "beta":
+            case "b":
+                return 2;
+            case "milestone":
+            case "m":
+                return 3;
+            case "rc":
+            case "cr":
+                return 4;
+            case "snapshot":
+                return 5;
+            case "":
+            case "ga":
+            case "final":
+            case "release":
+                return 6;
+            case "sp":
+                return 7;
+            default:
+                return 0;
+        }
     }
 
     private static String extractQualifier(@Nullable String suffix) {
