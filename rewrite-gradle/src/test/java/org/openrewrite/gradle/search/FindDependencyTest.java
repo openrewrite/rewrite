@@ -223,7 +223,8 @@ class FindDependencyTest implements RewriteTest {
                       implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1') 
                   }
               }
-              """));
+              """
+          ));
     }
 
     @Test
@@ -259,6 +260,7 @@ class FindDependencyTest implements RewriteTest {
                       api('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
                   }
               }
-              """));
+              """
+          ));
     }
 }
