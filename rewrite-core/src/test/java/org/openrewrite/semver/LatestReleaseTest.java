@@ -120,6 +120,22 @@ class LatestReleaseTest {
     }
 
     @Test
+    void compareQualifiers() {
+        assertThat(latestRelease.compare(null, "1.2.3.final", "1.2.3")).isEqualTo(0);
+        assertThat(latestRelease.compare(null, "1.2.3.ga", "1.2.3")).isEqualTo(0);
+        assertThat(latestRelease.compare(null, "1.2.3.release", "1.2.3")).isEqualTo(0);
+
+        assertThat(latestRelease.compare(null, "1.2.3.alpha-1", "1.2.3")).isNegative();
+        assertThat(latestRelease.compare(null, "1.2.3.alpha-1", "1.2.3.alpha-2")).isNegative();
+        assertThat(latestRelease.compare(null, "1.2.3.m", "1.2.3")).isNegative();
+
+        assertThat(latestRelease.compare(null, "1.2.3.sp", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3.sp", "1.2.3.final")).isPositive();
+
+        assertThat(latestRelease.compare(null, "1.2.3.mr", "1.2.3")).isNegative();
+    }
+
+    @Test
     void latestKeywordIsNewerThanReleaseKeyword() {
         assertThat(latestRelease.compare(null, "RELEASE", "LATEST")).isNegative();
         assertThat(latestRelease.compare(null, "LATEST", "RELEASE")).isPositive();

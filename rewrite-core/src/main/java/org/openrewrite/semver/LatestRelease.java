@@ -18,9 +18,31 @@ package org.openrewrite.semver;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 
 public class LatestRelease implements VersionComparator {
+
+    private static final Map<String, Integer> QUALIFIER_PRIORITY = new HashMap<>();
+
+    static {
+        QUALIFIER_PRIORITY.put("alpha", 1);
+        QUALIFIER_PRIORITY.put("a", 1);
+        QUALIFIER_PRIORITY.put("beta", 2);
+        QUALIFIER_PRIORITY.put("b", 2);
+        QUALIFIER_PRIORITY.put("milestone", 3);
+        QUALIFIER_PRIORITY.put("m", 3);
+        QUALIFIER_PRIORITY.put("rc", 4);
+        QUALIFIER_PRIORITY.put("cr", 4);
+        QUALIFIER_PRIORITY.put("snapshot", 5);
+        QUALIFIER_PRIORITY.put("", 6);
+        QUALIFIER_PRIORITY.put("ga", 6);
+        QUALIFIER_PRIORITY.put("final", 6);
+        QUALIFIER_PRIORITY.put("release", 6);
+        QUALIFIER_PRIORITY.put("sp", 7);
+    }
+
     @Nullable
     private final String metadataPattern;
 
@@ -152,17 +174,26 @@ public class LatestRelease implements VersionComparator {
         // When all numeric parts are equal, we need to handle pre-release versions properly
         // A pre-release version should be considered less than a release version
         // e.g., "3.5.0-RC1" < "3.5.0"
-        boolean v1IsPreRelease = v1Gav.group(6) != null && PRE_RELEASE_ENDING.matcher(v1Gav.group(6)).find();
-        boolean v2IsPreRelease = v2Gav.group(6) != null && PRE_RELEASE_ENDING.matcher(v2Gav.group(6)).find();
-        
-        if (v1IsPreRelease && !v2IsPreRelease) {
-            return -1; // v1 is pre-release, v2 is not, so v1 < v2
-        } else if (!v1IsPreRelease && v2IsPreRelease) {
-            return 1;  // v1 is not pre-release, v2 is, so v1 > v2
+        String v1Qualifier = extractQualifier(v1Gav.group(6));
+        String v2Qualifier = extractQualifier(v2Gav.group(6));
+
+        int v1Prio = QUALIFIER_PRIORITY.getOrDefault(v1Qualifier, 0);
+        int v2Prio = QUALIFIER_PRIORITY.getOrDefault(v2Qualifier, 0);
+
+        if (v1Prio != v2Prio) {
+            return Integer.compare(v1Prio, v2Prio);
         }
-        
+
         // Both are either pre-release or release versions, do string comparison
         return normalized1.compareTo(normalized2);
+    }
+
+    private static String extractQualifier(@Nullable String suffix) {
+        if (suffix == null) {
+            return "";
+        }
+        int endIdx = Math.max(suffix.lastIndexOf('.'), suffix.lastIndexOf('-'));
+        return suffix.substring(1, endIdx > 0 ? endIdx : suffix.length());
     }
 
     public static Validated<LatestRelease> buildLatestRelease(String toVersion, @Nullable String metadataPattern) {
