@@ -2,6 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(./gradlew:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
       "Bash(rm:*)",
