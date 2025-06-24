@@ -18,7 +18,6 @@ import * as net from 'net';
 import * as rpc from "vscode-jsonrpc/node";
 import {RewriteRpc} from "./rewrite-rpc";
 import * as fs from "fs";
-import {WriteStream} from "fs";
 import {Command} from 'commander';
 
 // Include all languages you want this server to support.
@@ -26,6 +25,7 @@ import "../text";
 import "../json";
 import "../java";
 import "../javascript";
+import {Writable} from "node:stream";
 
 interface ProgramOptions {
     port?: number;
@@ -48,12 +48,13 @@ program
 
 const options = program.opts() as ProgramOptions;
 
-const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;
+const log: Writable | undefined = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) :
+    (options.port ? process.stdout : undefined);
 const logger: rpc.Logger = {
     error: (msg: string) => log && log.write(`[Error] ${msg}\n`),
     warn: (msg: string) => log && log.write(`[Warn] ${msg}\n`),
     info: (msg: string) => options.verbose && log && log.write(`[Info] ${msg}\n`),
-    log: (msg: string) => options.verbose && log && log.write(`[Log] ${msg}\n`)
+    log: (msg: string) => log && log.write(`[Log] ${msg}\n`)
 };
 
 log && logger.log(`[js-rewrite-rpc] starting\n\n`);
@@ -76,11 +77,11 @@ if (!options.port) {
     });
 
     connection.onClose(() => {
-        logger.log(`[js-rewrite-rpc] connection closed\n\n`);
+        logger.info(`[js-rewrite-rpc] connection closed\n\n`);
     })
 
     connection.onDispose(() => {
-        logger.log(`[js-rewrite-rpc] connection disposed\n\n`);
+        logger.info(`[js-rewrite-rpc] connection disposed\n\n`);
     });
 
     new RewriteRpc(connection, {
@@ -91,7 +92,7 @@ if (!options.port) {
 } else {
 // Create a TCP server
     const server: net.Server = net.createServer((socket: net.Socket) => {
-        logger.log(`[js-rewrite-rpc] new client connected: ${socket.remoteAddress}:${socket.remotePort}\n`);
+        logger.info(`[js-rewrite-rpc] new client connected: ${socket.remoteAddress}:${socket.remotePort}\n`);
 
         // Create the connection with the custom logger using the socket streams
         const connection: rpc.MessageConnection = rpc.createMessageConnection(
@@ -110,15 +111,15 @@ if (!options.port) {
         });
 
         connection.onClose(() => {
-            logger.log(`[js-rewrite-rpc] connection closed\n\n`);
+            logger.info(`[js-rewrite-rpc] connection closed\n\n`);
         });
 
         connection.onDispose(() => {
-            logger.log(`[js-rewrite-rpc] connection disposed\n\n`);
+            logger.info(`[js-rewrite-rpc] connection disposed\n\n`);
         });
 
         socket.on('close', () => {
-            logger.log(`[js-rewrite-rpc] socket closed: ${socket.remoteAddress}:${socket.remotePort}\n`);
+            logger.info(`[js-rewrite-rpc] socket closed: ${socket.remoteAddress}:${socket.remotePort}\n`);
         });
 
         socket.on('error', (err: Error) => {
@@ -133,22 +134,22 @@ if (!options.port) {
         });
     });
 
-// Handle server errors
+    // Handle server errors
     server.on('error', (err: Error) => {
         logger.error(`[js-rewrite-rpc] server error: ${err.message}\n`);
         process.exit(1);
     });
 
-// Start the server
+    // Start the server
     server.listen(options.port, '127.0.0.1', () => {
-        logger.log(`[js-rewrite-rpc] server listening on 127.0.0.1:${options.port}\n`);
+        logger.info(`[js-rewrite-rpc] server listening on 127.0.0.1:${options.port}\n`);
     });
 
-// Handle process termination
+    // Handle process termination
     process.on('SIGINT', () => {
-        logger.log(`[js-rewrite-rpc] received SIGINT, shutting down\n`);
+        logger.info(`[js-rewrite-rpc] received SIGINT, shutting down\n`);
         server.close(() => {
-            logger.log(`[js-rewrite-rpc] server closed\n`);
+            logger.info(`[js-rewrite-rpc] server closed\n`);
             process.exit(0);
         });
     });

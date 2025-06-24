@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 import {emptyMarkers, Marker, Markers} from "../markers";
-import {WriteStream} from "fs";
 import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
 import {asRef, isRef, Reference, ReferenceMap} from "./reference";
+import {Writable} from "node:stream";
 
 /**
  * Interface representing an RPC codec that defines methods
@@ -247,7 +247,7 @@ export class RpcReceiveQueue {
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly pull: () => Promise<RpcObjectData[]>,
-                private readonly logFile?: WriteStream,
+                private readonly logFile?: Writable,
                 private readonly getRef: (refId: number) => Promise<any> = async (refId: number) => {
                     throw new Error(`Reference ${refId} not found and no getRef function provided`);
                 }) {

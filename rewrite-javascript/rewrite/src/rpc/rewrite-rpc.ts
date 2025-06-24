@@ -30,14 +30,14 @@ import {
     Visit,
     VisitResponse
 } from "./request";
-import {RpcObjectData, RpcObjectState, RpcReceiveQueue, RpcSendQueue} from "./queue";
+import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
-import {WriteStream} from "fs";
 import {ParserInput} from "../parser";
 import {randomId} from "../uuid";
 import {ReferenceMap} from "./reference";
+import {Writable} from "node:stream";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
@@ -58,7 +58,7 @@ export class RewriteRpc {
                     batchSize?: number,
                     registry?: RecipeRegistry,
                     traceGetObjectOutput?: boolean,
-                    traceGetObjectInput?: WriteStream
+                    traceGetObjectInput?: Writable
                 }) {
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
@@ -74,6 +74,7 @@ export class RewriteRpc {
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects, this.localRefs, options?.batchSize || 100,
             !!options?.traceGetObjectOutput);
         GetRecipes.handle(this.connection, registry);
+        GetRef.handle(this.connection, this.localRefs, !!options?.traceGetObjectOutput);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);

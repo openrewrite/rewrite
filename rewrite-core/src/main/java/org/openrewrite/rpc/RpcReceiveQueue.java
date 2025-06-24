@@ -22,10 +22,7 @@ import org.objenesis.ObjenesisStd;
 import org.openrewrite.marker.Markers;
 
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -45,7 +42,7 @@ public class RpcReceiveQueue {
                 }
             });
 
-    private final List<RpcObjectData> batch;
+    private final Deque<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
     private final @Nullable PrintStream logFile;
     private final Supplier<List<RpcObjectData>> pull;
@@ -54,7 +51,7 @@ public class RpcReceiveQueue {
     public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
                            Supplier<List<RpcObjectData>> pull, Function<Integer, Object> getRef) {
         this.refs = refs;
-        this.batch = new ArrayList<>();
+        this.batch = new ArrayDeque<>();
         this.logFile = logFile;
         this.pull = pull;
         this.getRef = getRef;
@@ -65,7 +62,7 @@ public class RpcReceiveQueue {
             List<RpcObjectData> data = pull.get();
             batch.addAll(data);
         }
-        return batch.remove(0);
+        return batch.remove();
     }
 
     /**
@@ -80,7 +77,7 @@ public class RpcReceiveQueue {
      * @return The received and converted value. When the received state is NO_CHANGE then the
      * before value will be returned.
      */
-    @SuppressWarnings({"DataFlowIssue", "ConstantValue", "unchecked"})
+    @SuppressWarnings({"DataFlowIssue", "unchecked"})
     public <T, U> T receiveAndGet(@Nullable T before, Function<U, @Nullable T> mapping) {
         T after = receive(before, null);
         return after != null && after != before ? mapping.apply((U) after) : after;
@@ -179,10 +176,8 @@ public class RpcReceiveQueue {
         RpcObjectData msg = take();
         switch (msg.getState()) {
             case NO_CHANGE:
-                //noinspection DataFlowIssue
                 return before;
             case DELETE:
-                //noinspection DataFlowIssue
                 return null;
             case ADD:
                 before = new ArrayList<>();
