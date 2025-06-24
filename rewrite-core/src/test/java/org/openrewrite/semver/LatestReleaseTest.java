@@ -173,4 +173,15 @@ class LatestReleaseTest {
     void matchCustomMetadata() {
         assertThat(new LatestRelease(".Final-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
     }
+
+    @Test
+    void preReleaseVersionsShouldBeLessThanReleaseVersions() {
+        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0", "3.5.0-RC1")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0-RC2")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0-alpha", "3.5.0-beta")).isLessThan(0);
+        // String comparison: "beta" > "RC1" lexicographically
+        assertThat(latestRelease.compare(null, "3.5.0-beta", "3.5.0-RC1")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0-beta")).isLessThan(0);
+    }
 }
