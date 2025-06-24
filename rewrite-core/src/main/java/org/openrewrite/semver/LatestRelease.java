@@ -149,6 +149,19 @@ public class LatestRelease implements VersionComparator {
             throw new IllegalStateException("Illegal state while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]", exception);
         }
 
+        // When all numeric parts are equal, we need to handle pre-release versions properly
+        // A pre-release version should be considered less than a release version
+        // e.g., "3.5.0-RC1" < "3.5.0"
+        boolean v1IsPreRelease = v1Gav.group(6) != null && PRE_RELEASE_ENDING.matcher(v1Gav.group(6)).find();
+        boolean v2IsPreRelease = v2Gav.group(6) != null && PRE_RELEASE_ENDING.matcher(v2Gav.group(6)).find();
+        
+        if (v1IsPreRelease && !v2IsPreRelease) {
+            return -1; // v1 is pre-release, v2 is not, so v1 < v2
+        } else if (!v1IsPreRelease && v2IsPreRelease) {
+            return 1;  // v1 is not pre-release, v2 is, so v1 > v2
+        }
+        
+        // Both are either pre-release or release versions, do string comparison
         return normalized1.compareTo(normalized2);
     }
 
