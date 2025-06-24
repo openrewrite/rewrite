@@ -1815,10 +1815,10 @@ export class JavaScriptParserVisitor {
                     draft.markers.markers.push({
                         kind: JS.Markers.Optional,
                         id: randomId(),
-                        prefix: this.suffix(node.expression)
+                        prefix: emptySpace,
                     } as Optional);
                 }),
-                emptySpace
+                this.suffix(node.expression)
             )
         } else if (ts.isPropertyAccessExpression(node.expression)) {
             select = this.rightPadded(this.visit(node.expression.expression), this.suffix(node.expression.expression));
@@ -1827,9 +1827,8 @@ export class JavaScriptParserVisitor {
                     draft!.element.markers.markers.push({
                         kind: JS.Markers.Optional,
                         id: randomId(),
-                        prefix: draft.after
+                        prefix: emptySpace
                     } as Optional);
-                    draft.after = emptySpace;
                 });
             }
             name = this.visit(node.expression.name);

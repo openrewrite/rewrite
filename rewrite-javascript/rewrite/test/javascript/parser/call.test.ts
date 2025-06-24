@@ -55,13 +55,21 @@ describe('call mapping', () => {
             //language=typescript
             ...typescript(`
                 const func = (message: string) => message;
-                const result1 = func/*a*/?./*b*/("TS"); // Invokes the function
-                const result2 = func/*a*/?./*b*/call("TS"); // Invokes the function
+                const result0 = func/*a*/?./*b*/("TS");
+                const result1 = func/*a*/?./*b*/call("TS");
+                const result2 = "hi"/*a*/./*b*/toUpperCase(); // usual call without optional chaining
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const inits = [1, 2].map(i => (cu.statements[i].element as J.VariableDeclarations).variables[0].element.initializer!.element);
+                const inits = [1, 2, 3].map(i => (cu.statements[i].element as J.VariableDeclarations).variables[0].element.initializer!.element);
                 expect(inits[0].kind).toEqual(JS.Kind.FunctionCall);
                 expect(inits[1].kind).toEqual(J.Kind.MethodInvocation);
+                expect(inits[2].kind).toEqual(J.Kind.MethodInvocation);
+
+                // TODO assert that the comments are placed properly:
+                //      /*a*/ to go into after of select/function,
+                //      /*b*/ to go into prefix of name
+                // Currently it's broken, comments go into whitespace!
+
             }
         }));
 
