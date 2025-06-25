@@ -158,8 +158,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @DocumentExample
-    void IncludedDefaultConfigurationsReceiveRuntimeConstraints() {
+    void includedDefaultConfigurationsReceiveRuntimeConstraints() {
         rewriteRun(
           spec -> spec
             .recipe(new UpgradeTransitiveDependencyVersion(
