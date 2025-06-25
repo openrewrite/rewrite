@@ -153,7 +153,7 @@ describe('import mapping', () => {
             //language=typescript
             typescript(`
                 import * as i from "immer";
-                /*1*/ export /*2*/ import cd = i.createDraft;
+                /*1*/ export /*2*/ import /*3*/ cd /*4*/ = i.createDraft;
             `)
         ));
 });

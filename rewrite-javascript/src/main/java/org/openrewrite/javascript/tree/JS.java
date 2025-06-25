@@ -1174,7 +1174,7 @@ public interface JS extends J {
 
         @Getter
         @With
-        List<JRightPadded<J.Modifier>> modifiers;
+        List<J.Modifier> modifiers;
 
         @With
         @Getter

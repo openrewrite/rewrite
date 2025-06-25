@@ -753,7 +753,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Visit each modifier in lock step
         for (let i = 0; i < jsImport.modifiers.length; i++) {
-            await this.visit(jsImport.modifiers[i].element, otherImport.modifiers[i].element);
+            await this.visit(jsImport.modifiers[i], otherImport.modifiers[i]);
             if (!this.match) return jsImport;
         }
 

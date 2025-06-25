@@ -3252,13 +3252,14 @@ export class JavaScriptParserVisitor {
     }
 
     visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.Import {
+        let exportModifierSuffix: J.Space | undefined = undefined;
         return {
             kind: JS.Kind.Import,
             id: randomId(),
-            prefix: this.prefix(node),
             modifiers: ( () => {
                 const exportModifier = node.modifiers?.find(m => m.kind === ts.SyntaxKind.ExportKeyword);
-                return exportModifier ? [this.rightPadded({
+                exportModifierSuffix = exportModifier && this.suffix(exportModifier);
+                return exportModifier ? [{
                     kind: J.Kind.Modifier,
                     id: randomId(),
                     prefix: this.prefix(exportModifier),
@@ -3266,8 +3267,9 @@ export class JavaScriptParserVisitor {
                     keyword: 'export',
                     type: J.ModifierType.LanguageExtension,
                     annotations: []
-                }, this.suffix(exportModifier)) as J.RightPadded<J.Modifier> | undefined] : [];
+                } as J.Modifier] : [];
             })(),
+            prefix: exportModifierSuffix ? exportModifierSuffix : this.prefix(node),
             importClause: {
                 kind: JS.Kind.ImportClause,
                 id: randomId(),
