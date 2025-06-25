@@ -4216,12 +4216,23 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
     // let previousSibling = getPreviousSibling(node);
     let leadingWhitespacePos = node.getStart();
 
-    // Step 1: Use forEachLeadingCommentRange to extract comments
-    ts.forEachLeadingCommentRange(text, nodeStart, (pos, end, kind) => {
+    // Step 1: Get all comments
+    const commentRanges = [
+        ...(ts.getTrailingCommentRanges(text, nodeStart) || []),
+        ...(ts.getLeadingCommentRanges(text, nodeStart) || []),
+    ].filter(range => range.pos < node.getStart())
+        .sort((a, b) => a.pos - b.pos)
+        // filter out duplicate ranges
+        .filter((range, index, self) => index === 0 || range.pos !== self[index - 1].pos);
+
+    commentRanges.forEach(range => {
+        const pos = range.pos;
+        const end = range.end;
+        const kind = range.kind;
         leadingWhitespacePos = Math.min(leadingWhitespacePos, pos);
 
         const isMultiline = kind === ts.SyntaxKind.MultiLineCommentTrivia;
-        const commentStart = isMultiline ? pos + 2 : pos + 2;  // Skip `/*` or `//`
+        const commentStart = pos + 2;  // Skip `/*` or `//`
         const commentEnd = isMultiline ? end - 2 : end;  // Exclude closing `*/` or nothing for `//`
 
         // Step 2: Capture suffix (whitespace after the comment)
@@ -4248,8 +4259,7 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
         whitespace = text.slice(nodeStart, leadingWhitespacePos);
     }
 
-    // Step 4: Return the Space object with comments and leading whitespace
-    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace.length > 0 ? whitespace : ""};
+    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace};
 }
 
 class FlowSyntaxNotSupportedError extends SyntaxError {
