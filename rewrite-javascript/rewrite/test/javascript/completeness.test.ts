@@ -56,27 +56,34 @@ describe('JS LST element tree', () => {
         expect(comparatorTsMethods).toEqual(visitorMethods);
     })
 
-    test("JavaScriptVisitor.java", () => {
-        const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/JavaScriptVisitor.java')
-            .matchAll(/public J (visit\w+)(?:<[^(]+>)?[(]JSX?[.]/gm), m => m[1])
-            .sort();
-
-        expect(visitorJavascriptMethods).toEqual(javaVisitorMethods);
-    })
-
-    test("JavaScriptValidator.java", () => {
-        const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/internal/rpc/JavaScriptValidator.java')
+    test.each([
+        "JavaScriptVisitor.java",
+        "internal/rpc/JavaScriptValidator.java",
+        "JavaScriptIsoVisitor.java",
+        "internal/rpc/JavaScriptReceiver.java",
+        "internal/rpc/JavaScriptSender.java",
+    ])("%s", (path) => {
+        const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/' + path)
             .matchAll(/public [^ ]+ (visit\w+)(?:<[^(]+>)?[(]JSX?[.]/gm), m => m[1])
             .sort();
 
         expect(visitorJavascriptMethods).toEqual(javaVisitorMethods);
     })
 
-    test("JavaScriptIsoVisitor.java", () => {
-        const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/JavaScriptIsoVisitor.java')
-            .matchAll(/public [^ ]+ (visit\w+)(?:<[^(]+>)?[(]JSX?[.]/gm), m => m[1])
+    const rpcTsContentByClass = new Map(readFileToString('javascript/rpc.ts').split("class ")
+        .map(classCode =>
+            [classCode.split(" ")[0], classCode]
+        ));
+
+    test.each([
+        "JavaScriptReceiver",
+        "JavaScriptSender",
+    ])("rpc.ts / %s", (className) => {
+        const rpcTsMethods = Array.from(rpcTsContentByClass.get(className)!
+            .matchAll(/override async (visit\w+)[(<]/gm), m => m[1])
+            .filter(m => !excused.includes(m))
             .sort();
 
-        expect(visitorJavascriptMethods).toEqual(javaVisitorMethods);
+        expect(rpcTsMethods).toEqual(visitorJavascriptMethods);
     })
 });
