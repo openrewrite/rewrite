@@ -23,7 +23,7 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
-import org.openrewrite.gradle.trait.Traits;
+import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -164,7 +164,7 @@ public class ChangeManagedDependency extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                return Traits.springDependencyManagementPluginEntry().groupId(oldGroupId).artifactId(oldArtifactId)
+                return new SpringDependencyManagementPluginEntry.Matcher().groupId(oldGroupId).artifactId(oldArtifactId)
                         .get(getCursor())
                         .map(dep -> dep.withGroupArtifactVersion(depMatcher, newGroupId, newArtifactId, newVersion, versionPattern, metadataFailures, ctx))
                         .map(Trait::getTree)
