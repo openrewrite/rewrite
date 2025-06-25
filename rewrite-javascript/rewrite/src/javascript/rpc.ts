@@ -19,7 +19,7 @@ import {isJavaScript, JS, JSX} from "./tree";
 import {Expression, J, JavaType, Statement, TypedTree, TypeTree} from "../java";
 import {createDraft, finishDraft} from "immer";
 import {JavaReceiver, JavaSender} from "../java/rpc";
-import {Cursor, Tree} from "../tree";
+import {Cursor, Tree, TreeKind} from "../tree";
 import ComputedPropertyName = JS.ComputedPropertyName;
 
 class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
@@ -1132,5 +1132,7 @@ const javaScriptCodec: RpcCodec<JS> = {
 
 // Register codec for all JavaScript AST node types
 Object.values(JS.Kind).forEach(kind => {
-    RpcCodecs.registerCodec(kind, javaScriptCodec);
+    if (!Object.values(TreeKind).includes(kind as any)) {
+        RpcCodecs.registerCodec(kind, javaScriptCodec);
+    }
 });

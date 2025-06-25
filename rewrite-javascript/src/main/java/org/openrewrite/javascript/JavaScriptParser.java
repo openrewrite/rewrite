@@ -19,10 +19,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
-import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
@@ -44,7 +44,7 @@ public class JavaScriptParser implements Parser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         // Registering `RewriteRpc` due to print-idempotence check
         // Scope is closed using `Stream#onClose()`
-        RewriteRpc.Scope scope = RewriteRpc.Context.current().with(rewriteRpc).attach();
+        ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope = JavaScriptRewriteRpc.current().using(rewriteRpc);
         try {
             JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
             return rewriteRpc.parse(sources, relativeTo, this, ctx)
