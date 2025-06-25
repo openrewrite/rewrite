@@ -436,7 +436,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other JSX expression to compare with
      * @returns The visited JSX expression, or undefined if the visit was aborted
      */
-    override async visitJsxExpression(expr: JSX.EmbeddedExpression, other: J): Promise<J | undefined> {
+    override async visitJsxEmbeddedExpression(expr: JSX.EmbeddedExpression, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.JsxEmbeddedExpression) {
             this.abort();
             return expr;
@@ -744,6 +744,18 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         const otherImport = other as JS.Import;
+
+        // Compare modifiers
+        if (jsImport.modifiers.length !== otherImport.modifiers.length) {
+            this.abort();
+            return jsImport;
+        }
+
+        // Visit each modifier in lock step
+        for (let i = 0; i < jsImport.modifiers.length; i++) {
+            await this.visit(jsImport.modifiers[i], otherImport.modifiers[i]);
+            if (!this.match) return jsImport;
+        }
 
         // Compare import clause
         if (!!jsImport.importClause !== !!otherImport.importClause) {
@@ -1100,7 +1112,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other keys remapping to compare with
      * @returns The visited keys remapping, or undefined if the visit was aborted
      */
-    override async visitKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, other: J): Promise<J | undefined> {
+    override async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.MappedTypeKeysRemapping) {
             this.abort();
             return keysRemapping;
@@ -1661,7 +1673,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other index type to compare with
      * @returns The visited index type, or undefined if the visit was aborted
      */
-    override async visitIndexType(indexType: JS.IndexedAccessType.IndexType, other: J): Promise<J | undefined> {
+    override async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, other: J): Promise<J | undefined> {
         if (!this.match || other.kind !== JS.Kind.IndexType) {
             this.abort();
             return indexType;

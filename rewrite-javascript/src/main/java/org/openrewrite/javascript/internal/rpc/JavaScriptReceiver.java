@@ -61,7 +61,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
+    public J visitJsCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
         return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
                 .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
@@ -151,7 +151,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitImport(JS.Import anImport, RpcReceiveQueue q) {
+    public J visitImportDeclaration(JS.Import anImport, RpcReceiveQueue q) {
         return anImport
                 .withImportClause(q.receive(anImport.getImportClause(), el -> (JS.ImportClause) visitNonNull(el, q)))
                 .getPadding().withModuleSpecifier(q.receive(anImport.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q)))
@@ -205,7 +205,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitBinary(JS.Binary binary, RpcReceiveQueue q) {
+    public J visitBinaryExtensions(JS.Binary binary, RpcReceiveQueue q) {
         return binary
                 .withLeft(q.receive(binary.getLeft(), expr -> (Expression) visitNonNull(expr, q)))
                 .getPadding().withOperator(q.receive(binary.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.Binary.Type.class))))
@@ -347,7 +347,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitAssignmentOperation(JS.AssignmentOperation assignmentOperation, RpcReceiveQueue q) {
+    public J visitAssignmentOperationExtensions(JS.AssignmentOperation assignmentOperation, RpcReceiveQueue q) {
         return assignmentOperation
                 .withVariable(q.receive(assignmentOperation.getVariable(), expr -> (Expression) visitNonNull(expr, q)))
                 .getPadding().withOperator(q.receive(assignmentOperation.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.AssignmentOperation.Type.class))))

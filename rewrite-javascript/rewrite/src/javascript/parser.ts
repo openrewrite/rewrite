@@ -3252,10 +3252,24 @@ export class JavaScriptParserVisitor {
     }
 
     visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.Import {
+        let exportModifierSuffix: J.Space | undefined = undefined;
         return {
             kind: JS.Kind.Import,
             id: randomId(),
-            prefix: this.prefix(node),
+            modifiers: ( () => {
+                const exportModifier = node.modifiers?.find(m => m.kind === ts.SyntaxKind.ExportKeyword);
+                exportModifierSuffix = exportModifier && this.suffix(exportModifier);
+                return exportModifier ? [{
+                    kind: J.Kind.Modifier,
+                    id: randomId(),
+                    prefix: this.prefix(exportModifier),
+                    markers: emptyMarkers,
+                    keyword: 'export',
+                    type: J.ModifierType.LanguageExtension,
+                    annotations: []
+                } as J.Modifier] : [];
+            })(),
+            prefix: exportModifierSuffix ? exportModifierSuffix : this.prefix(node),
             importClause: {
                 kind: JS.Kind.ImportClause,
                 id: randomId(),
@@ -3290,6 +3304,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
+            modifiers: [],
             importClause: node.importClause && this.visit(node.importClause),
             moduleSpecifier: this.leftPadded(node.importClause ? this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!) : emptySpace, this.visit(node.moduleSpecifier)),
             attributes: node.attributes && this.visit(node.attributes)
@@ -4216,12 +4231,23 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
     // let previousSibling = getPreviousSibling(node);
     let leadingWhitespacePos = node.getStart();
 
-    // Step 1: Use forEachLeadingCommentRange to extract comments
-    ts.forEachLeadingCommentRange(text, nodeStart, (pos, end, kind) => {
+    // Step 1: Get all comments
+    const commentRanges = [
+        ...(ts.getTrailingCommentRanges(text, nodeStart) || []),
+        ...(ts.getLeadingCommentRanges(text, nodeStart) || []),
+    ].filter(range => range.pos < node.getStart())
+        .sort((a, b) => a.pos - b.pos)
+        // filter out duplicate ranges
+        .filter((range, index, self) => index === 0 || range.pos !== self[index - 1].pos);
+
+    commentRanges.forEach(range => {
+        const pos = range.pos;
+        const end = range.end;
+        const kind = range.kind;
         leadingWhitespacePos = Math.min(leadingWhitespacePos, pos);
 
         const isMultiline = kind === ts.SyntaxKind.MultiLineCommentTrivia;
-        const commentStart = isMultiline ? pos + 2 : pos + 2;  // Skip `/*` or `//`
+        const commentStart = pos + 2;  // Skip `/*` or `//`
         const commentEnd = isMultiline ? end - 2 : end;  // Exclude closing `*/` or nothing for `//`
 
         // Step 2: Capture suffix (whitespace after the comment)
@@ -4248,8 +4274,7 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
         whitespace = text.slice(nodeStart, leadingWhitespacePos);
     }
 
-    // Step 4: Return the Space object with comments and leading whitespace
-    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace.length > 0 ? whitespace : ""};
+    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace};
 }
 
 class FlowSyntaxNotSupportedError extends SyntaxError {
