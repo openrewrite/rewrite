@@ -3252,10 +3252,24 @@ export class JavaScriptParserVisitor {
     }
 
     visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.Import {
+        let exportModifierSuffix: J.Space | undefined = undefined;
         return {
             kind: JS.Kind.Import,
             id: randomId(),
-            prefix: this.prefix(node),
+            modifiers: ( () => {
+                const exportModifier = node.modifiers?.find(m => m.kind === ts.SyntaxKind.ExportKeyword);
+                exportModifierSuffix = exportModifier && this.suffix(exportModifier);
+                return exportModifier ? [{
+                    kind: J.Kind.Modifier,
+                    id: randomId(),
+                    prefix: this.prefix(exportModifier),
+                    markers: emptyMarkers,
+                    keyword: 'export',
+                    type: J.ModifierType.LanguageExtension,
+                    annotations: []
+                } as J.Modifier] : [];
+            })(),
+            prefix: exportModifierSuffix ? exportModifierSuffix : this.prefix(node),
             importClause: {
                 kind: JS.Kind.ImportClause,
                 id: randomId(),
@@ -3290,6 +3304,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
+            modifiers: [],
             importClause: node.importClause && this.visit(node.importClause),
             moduleSpecifier: this.leftPadded(node.importClause ? this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!) : emptySpace, this.visit(node.moduleSpecifier)),
             attributes: node.attributes && this.visit(node.attributes)
