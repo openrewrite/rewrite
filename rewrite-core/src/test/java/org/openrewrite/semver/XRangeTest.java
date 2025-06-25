@@ -110,4 +110,20 @@ class XRangeTest {
     void matchCustomMetadata() {
         assertThat(new XRange("3", "2", "*", "", ".Final-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
     }
+
+    @Test
+    void compareRCVersion() {
+        XRange xRange = XRange.build("3.5.x", null).getValue();
+        assertThat(xRange).isNotNull();
+        assertThat(xRange.upgrade("3.5.0-RC1", java.util.Arrays.asList("3.5.0")).orElse(null)).isEqualTo("3.5.0");
+    }
+
+    @Test
+    void rcVersionsShouldBeValidForXRange() {
+        XRange xRange = XRange.build("3.5.x", null).getValue();
+        assertThat(xRange).isNotNull();
+        assertThat(xRange.isValid("3.5.0-RC1", "3.5.0-RC1")).isTrue();
+        assertThat(xRange.isValid("3.5.0-RC1", "3.5.0")).isTrue();
+        assertThat(xRange.isValid("3.5.0", "3.5.1-RC1")).isTrue();
+    }
 }

@@ -38,6 +38,7 @@ describe("recipes", () => {
                     description: "Text to change to",
                     displayName: "Text",
                     name: "text",
+                    required: true,
                     value: undefined
                 }
             ],
