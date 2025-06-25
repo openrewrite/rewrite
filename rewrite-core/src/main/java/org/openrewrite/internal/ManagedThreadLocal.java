@@ -98,10 +98,10 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
     }
 
     /**
-     * Temporarily replace the resource, returning an AutoCloseable that restores the original.
+     * Temporarily replace the resource, returning a Scope that restores the original.
      * <p>
-     * Use this when you need to temporarily use a different resource within a scope.
-     * The original resource is automatically restored when the returned AutoCloseable is closed.
+     * Use this when you need to temporarily use a different resource within a scope but can't use try-with-resources.
+     * The original resource is automatically restored when the returned Scope is closed.
      * <p>
      * Note: This does NOT close the temporary resource - you're responsible for its lifecycle.
      *
