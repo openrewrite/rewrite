@@ -69,4 +69,21 @@ describe('JS LST element tree', () => {
 
         expect(visitorJavascriptMethods).toEqual(javaVisitorMethods);
     })
+
+    const rpcTsContentByClass = new Map(readFileToString('javascript/rpc.ts').split("class ")
+        .map(classCode =>
+            [classCode.split(" ")[0], classCode]
+        ));
+
+    test.each([
+        "JavaScriptReceiver",
+        "JavaScriptSender",
+    ])("rpc.ts / %s", (className) => {
+        const rpcTsMethods = Array.from(rpcTsContentByClass.get(className)!
+            .matchAll(/override async (visit\w+)[(<]/gm), m => m[1])
+            .filter(m => !excused.includes(m))
+            .sort();
+
+        expect(rpcTsMethods).toEqual(visitorJavascriptMethods);
+    })
 });
