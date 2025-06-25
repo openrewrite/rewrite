@@ -411,6 +411,48 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void addAnnotationIfRepeatable() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.c.A1", "a.b.d.A2", true)),
+          java("package a.b.c;\npublic @interface A1 {String key() default \"\";}"),
+          java("package a.b.d;\nimport java.lang.annotation.Repeatable;\n@Repeatable\npublic @interface A2 {String key() default \"\";}"),
+          java(
+            """
+              import a.b.d.A2;
+              
+              @a.b.c.A1(key="field1") @A2(key="field2") public class B {}
+              """,
+            """
+              import a.b.d.A2;
+              
+              @A2(key="field1") @A2(key="field2") public class B {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeAnnotationIfNotRepeatable() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.c.A1", "a.b.d.A2", true)),
+          java("package a.b.c;\npublic @interface A1 {String field1() default \"\";String field2() default \"\";String field3() default \"\";}"),
+          java("package a.b.d;\npublic @interface A2 {String field1() default \"\";String field2() default \"\";String field3() default \"\";}"),
+          java(
+            """
+              import a.b.d.A2;
+              
+              @a.b.c.A1(field1="donotuse", field2="use") @A2(field1="use", field3="use") public class B {}
+              """,
+            """
+              import a.b.d.A2;
+              
+              @A2(field1="use", field2="use", field3="use") public class B {}
+              """
+          )
+        );
+    }
+
+    @Test
     void array2() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("com.acme.product.Pojo", "com.acme.product.v2.Pojo", true)),
