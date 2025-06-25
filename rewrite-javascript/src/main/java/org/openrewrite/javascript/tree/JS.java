@@ -31,7 +31,6 @@ import org.openrewrite.javascript.internal.rpc.JavaScriptReceiver;
 import org.openrewrite.javascript.internal.rpc.JavaScriptSender;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.rpc.request.Print;
@@ -201,16 +200,11 @@ public interface JS extends J {
                 @Override
                 public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
                     return JavaScriptRewriteRpc.current()
+                            .getOrCreateManaged(JavaScriptRewriteRpc.bundledInstallation(Environment.builder().build())::build)
                             .map(rpc -> {
                                 Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
                                 p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
                                 return tree;
-                            }).orElseGet(() -> {
-                                try (RewriteRpc localRpc = JavaScriptRewriteRpc.bundledInstallation(Environment.builder().build()).build()) {
-                                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                                    p.append(localRpc.print(tree, cursor, mappedMarkerPrinter));
-                                    return tree;
-                                }
                             });
                 }
             };

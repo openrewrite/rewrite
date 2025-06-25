@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -51,7 +52,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     JavaScriptRewriteRpc client;
     PrintStream log;
-    JavaScriptRewriteRpc.Scope scope;
+    ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope;
 
     @BeforeEach
     void before() throws FileNotFoundException {
@@ -62,7 +63,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 //          .inspectAndBreak()
 //          .timeout(Duration.ofMinutes(10))
           .build();
-        this.scope = JavaScriptRewriteRpc.bind(client);
+        this.scope = JavaScriptRewriteRpc.current().using(client);
 
 //        client
 //          .traceGetObjectOutput()

@@ -30,6 +30,7 @@ import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.Environment;
+import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.rpc.RewriteRpc;
 
 import java.io.*;
@@ -57,25 +58,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         this.supplier = supplier;
     }
 
-    private static final ThreadLocal<@Nullable JavaScriptRewriteRpc> THREAD_LOCAL = new ThreadLocal<>();
+    private static final ManagedThreadLocal<JavaScriptRewriteRpc> THREAD_LOCAL = new ManagedThreadLocal<>();
 
-    public static Optional<JavaScriptRewriteRpc> current() {
-        return Optional.ofNullable(THREAD_LOCAL.get());
-    }
-
-    public interface Scope extends AutoCloseable {
-        @Override
-        void close();
-    }
-
-    public static Scope bind(JavaScriptRewriteRpc rewriteRpc) {
-        JavaScriptRewriteRpc old = THREAD_LOCAL.get();
-        THREAD_LOCAL.set(rewriteRpc);
-        return () -> {
-            if (old != null) {
-                THREAD_LOCAL.set(old);
-            }
-        };
+    public static ManagedThreadLocal<JavaScriptRewriteRpc> current() {
+        return THREAD_LOCAL;
     }
 
     @Override
