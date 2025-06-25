@@ -56,24 +56,14 @@ describe('JS LST element tree', () => {
         expect(comparatorTsMethods).toEqual(visitorMethods);
     })
 
-    test("JavaScriptVisitor.java", () => {
-        const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/JavaScriptVisitor.java')
-            .matchAll(/public J (visit\w+)(?:<[^(]+>)?[(]JSX?[.]/gm), m => m[1])
-            .sort();
-
-        expect(visitorJavascriptMethods).toEqual(javaVisitorMethods);
-    })
-
-    test("JavaScriptValidator.java", () => {
-        const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/internal/rpc/JavaScriptValidator.java')
-            .matchAll(/public [^ ]+ (visit\w+)(?:<[^(]+>)?[(]JSX?[.]/gm), m => m[1])
-            .sort();
-
-        expect(visitorJavascriptMethods).toEqual(javaVisitorMethods);
-    })
-
-    test("JavaScriptIsoVisitor.java", () => {
-        const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/JavaScriptIsoVisitor.java')
+    test.each([
+        "JavaScriptVisitor.java",
+        "internal/rpc/JavaScriptValidator.java",
+        "JavaScriptIsoVisitor.java",
+        "internal/rpc/JavaScriptReceiver.java",
+        "internal/rpc/JavaScriptSender.java",
+    ])("%s", (path) => {
+        const javaVisitorMethods = Array.from(readFileToString('../../src/main/java/org/openrewrite/javascript/' + path)
             .matchAll(/public [^ ]+ (visit\w+)(?:<[^(]+>)?[(]JSX?[.]/gm), m => m[1])
             .sort();
 
