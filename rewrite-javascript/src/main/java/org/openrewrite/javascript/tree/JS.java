@@ -1172,6 +1172,10 @@ public interface JS extends J {
         @With
         Markers markers;
 
+        @Getter
+        @With
+        List<J.Modifier> modifiers;
+
         @With
         @Getter
         @Nullable
@@ -1239,7 +1243,7 @@ public interface JS extends J {
             }
 
             public JS.Import withModuleSpecifier(@Nullable JLeftPadded<Expression> moduleSpecifier) {
-                return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, moduleSpecifier, t.attributes, t.initializer);
+                return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.modifiers, t.importClause, moduleSpecifier, t.attributes, t.initializer);
             }
 
             public @Nullable JLeftPadded<Expression> getInitializer() {
@@ -1247,7 +1251,7 @@ public interface JS extends J {
             }
 
             public JS.Import withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                return t.initializer == initializer ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, t.moduleSpecifier, t.attributes, initializer);
+                return t.initializer == initializer ? t : new JS.Import(t.id, t.prefix, t.markers, t.modifiers, t.importClause, t.moduleSpecifier, t.attributes, initializer);
             }
 
         }
