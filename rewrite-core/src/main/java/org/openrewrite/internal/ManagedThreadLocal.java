@@ -32,7 +32,7 @@ import java.util.function.Supplier;
  * Typical usage:
  * <pre>
  * // At entry point (e.g., request handler)
- * try (var managed = DatabaseConnection.current().getOrCreateManaged(() -> new DatabaseConnection(...))) {
+ * try (var managed = DatabaseConnection.current().requireOrCreate(() -> new DatabaseConnection(...))) {
  *     // Application code can use require() throughout call chain
  *     processRequest();
  * } // Automatic cleanup of both ThreadLocal and resource
@@ -77,7 +77,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
      * @param factory supplier to create the resource if none exists
      * @return a Scope that provides access to the resource and handles cleanup
      */
-    public Scope<T> getOrCreateManaged(Supplier<T> factory) {
+    public Scope<T> requireOrCreate(Supplier<T> factory) {
         T existing = threadLocal.get();
         if (existing != null) {
             // Return existing value with no-op cleanup
@@ -86,24 +86,13 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         }
 
         T newValue = factory.get();
-        T previousValue = threadLocal.get(); // This will be null since existing was null
         threadLocal.set(newValue);
 
         return new Scope<>(newValue, () -> {
             try {
-                // Restore previous ThreadLocal state
-                if (previousValue != null) {
-                    threadLocal.set(previousValue);
-                } else {
-                    threadLocal.remove();
-                }
+                threadLocal.remove();
             } finally {
-                try {
-                    newValue.close(); // Close the resource
-                } catch (Exception e) {
-                    // Log appropriately in real implementation
-                    System.err.println("Error closing managed resource: " + e.getMessage());
-                }
+                newValue.close(); // Close the resource
             }
         });
     }
@@ -136,7 +125,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
      * Provides access to the underlying ThreadLocal for advanced use cases.
      * <p>
      * Use with caution - direct ThreadLocal manipulation bypasses the managed
-     * resource lifecycle. Prefer the managed methods (require, getOrCreateManaged, using)
+     * resource lifecycle. Prefer the managed methods (require, requireOrCreate, using)
      * for typical usage.
      *
      * @return the underlying ThreadLocal instance
@@ -157,7 +146,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
     /**
      * A scoped resource that provides both the resource value and automatic cleanup.
      * <p>
-     * This is returned by getOrCreateManaged() and using(). It handles both ThreadLocal
+     * This is returned by requireOrCreate() and using(). It handles both ThreadLocal
      * restoration and resource cleanup when the scope is closed.
      */
     @RequiredArgsConstructor
@@ -174,7 +163,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
          * <p>
          * Example usage:
          * <pre>
-         * try (var scope = DatabaseConnection.current().getOrCreateManaged(...)) {
+         * try (var scope = DatabaseConnection.current().requireOrCreate(...)) {
          *     String result = scope.map(conn -> {
          *         conn.executeQuery("SELECT ...");
          *         return conn.getLastResult();

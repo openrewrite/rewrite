@@ -22,6 +22,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
@@ -199,13 +200,14 @@ public interface JS extends J {
             return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
                 @Override
                 public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
-                    return JavaScriptRewriteRpc.current()
-                            .getOrCreateManaged(JavaScriptRewriteRpc.bundledInstallation(Environment.builder().build())::build)
-                            .map(rpc -> {
-                                Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                                p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                                return tree;
-                            });
+                    try (ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope = JavaScriptRewriteRpc.current()
+                            .requireOrCreate(JavaScriptRewriteRpc.bundledInstallation(Environment.builder().build())::build)) {
+                        return scope.map(rpc -> {
+                            Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                            p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
+                            return tree;
+                        });
+                    }
                 }
             };
         }
