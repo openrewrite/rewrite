@@ -105,7 +105,8 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         T existing = threadLocal.get();
         if (existing != null) {
             // Return existing value with no-op cleanup
-            return new Scope<>(existing, () -> {});
+            return new Scope<>(existing, () -> {
+            });
         }
 
         // No existing resource - set up lazy creation
