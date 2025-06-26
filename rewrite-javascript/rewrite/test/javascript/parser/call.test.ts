@@ -65,11 +65,16 @@ describe('call mapping', () => {
                 expect(inits[1].kind).toEqual(J.Kind.MethodInvocation);
                 expect(inits[2].kind).toEqual(J.Kind.MethodInvocation);
 
-                // TODO assert that the comments are placed properly:
-                //      /*a*/ to go into after of select/function,
-                //      /*b*/ to go into prefix of name
-                // Currently it's broken, comments go into whitespace!
+                for (let i = 0; i <= 2; i++) {
+                    const select = i == 0 ? (inits[i] as JS.FunctionCall).function! : (inits[i] as J.MethodInvocation).select!;
+                    expect(select.after.whitespace).toEqual("");
+                    expect(select.after.comments.length).toEqual(1);
+                    expect((select.after.comments[0] as TextComment).text).toEqual("a");
+                }
 
+                expect(((inits[0] as JS.FunctionCall).arguments.before.comments[0] as J.TextComment).text).toEqual("b");
+                expect(((inits[1] as J.MethodInvocation).name.prefix.comments[0] as J.TextComment).text).toEqual("b");
+                expect(((inits[2] as J.MethodInvocation).name.prefix.comments[0] as J.TextComment).text).toEqual("b");
             }
         }));
 
