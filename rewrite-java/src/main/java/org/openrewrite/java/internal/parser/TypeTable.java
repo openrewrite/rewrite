@@ -368,9 +368,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                     }
                 });
                 future.complete(classesDir);
-            } catch (
-                    Exception e) {
+            } catch (Exception e) {
                 future.completeExceptionally(e);
+                classesDirByArtifact.remove(gav);
             }
         }
 
