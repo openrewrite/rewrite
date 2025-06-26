@@ -67,7 +67,7 @@ class DestructuringTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def (String key, String value) = "a1:b2".split(":")
+              def (String key, java.lang.String value) = "a1:b2".split(":")
               println("${key} ${value}")
               """
           )
@@ -80,7 +80,7 @@ class DestructuringTest implements RewriteTest {
           groovy(
             """
               def (first, second, third) = [1, 2, 3]
-              priintln("${first} ${second} ${third}")
+              println("${first} ${second} ${third}")
               """
           )
         );
@@ -91,8 +91,8 @@ class DestructuringTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def  (first,second,   third)   =     [1, 2, 3]
-              priintln("${first} ${second} ${third}")
+              def  (first,  int           second,   third)   =     [1, 2, 3]
+              println("${first} ${second} ${third}")
               """
           )
         );

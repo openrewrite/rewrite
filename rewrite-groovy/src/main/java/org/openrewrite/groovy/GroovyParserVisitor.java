@@ -1483,7 +1483,7 @@ public class GroovyParserVisitor {
             J.VariableDeclarations.NamedVariable variable = new J.VariableDeclarations.NamedVariable(
                     randomId(),
                     identifier.getElement().getPrefix(),
-                    Markers.EMPTY,
+                    identifier.getElement().getMarkers(),
                     identifier.getElement().withPrefix(EMPTY),
                     emptyList(),
                     null,
@@ -2127,7 +2127,7 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
             String typeName = "";
 
-            if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
+            if (!expression.isDynamicTyped() && sourceStartsWith(expression.getOriginType().getUnresolvedName())) {
                 if (cursor + expression.getOriginType().getUnresolvedName().length() < source.length() &&
                     !Character.isJavaIdentifierPart(source.charAt(cursor + expression.getOriginType().getUnresolvedName().length()))) {
                     typeName = expression.getOriginType().getUnresolvedName();
@@ -2157,9 +2157,16 @@ public class GroovyParserVisitor {
                     type = typeMapping.type(staticType((org.codehaus.groovy.ast.expr.Expression) expression));
                 }
 
+                Markers markers = Markers.EMPTY;
+                if (sourceStartsWith(expression.getOriginType().getUnresolvedName() + " ")) {
+                    markers = markers.add(new DestructuringType(randomId(), fmt, expression.getOriginType().getUnresolvedName()));
+                    fmt = whitespace();
+                    skip(expression.getOriginType().getUnresolvedName());
+                }
+
                 return new J.Identifier(randomId(),
                         fmt.withWhitespace(fmt.getWhitespace() + sourceBefore(expression.getName()).getWhitespace()),
-                        Markers.EMPTY,
+                        markers,
                         emptyList(),
                         expression.getName(),
                         type, null);
