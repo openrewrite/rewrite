@@ -113,7 +113,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         AtomicReference<@Nullable T> resourceRef = new AtomicReference<>();
 
         return new Scope<>(
-                () -> {
+                (Supplier<T>) () -> {
                     T resource = resourceRef.get();
                     if (resource == null) {
                         resource = factory.get();
@@ -183,7 +183,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         AtomicReference<@Nullable T> resourceRef = new AtomicReference<>();
 
         return new Scope<>(
-                () -> {
+                (Supplier<T>) () -> {
                     T resource = resourceRef.get();
                     if (resource == null) {
                         resource = factory.get();
