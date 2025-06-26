@@ -1416,4 +1416,69 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotMisMatchWhenUsingFieldReferenceOnNamedAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "name",
+              "newValue",
+              "oldValue",
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(name = A.OTHER_VALUE)
+              public class A {
+                  public static final String OTHER_VALUE = "otherValue";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotMisMatchOnMissingNamedAttributeWhenOldAttributeValueShouldMatch() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "name",
+              "newValue",
+              "oldValue",
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(value = "oldValue")
+              public class A {}
+              """
+          )
+        );
+    }
 }

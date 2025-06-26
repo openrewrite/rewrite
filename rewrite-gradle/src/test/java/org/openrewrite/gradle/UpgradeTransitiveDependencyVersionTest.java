@@ -957,6 +957,41 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void canUseAnyWildcardForMultipleMatchingArtifactIds() {
+        rewriteRun(spec ->
+            spec.recipe(new UpgradeTransitiveDependencyVersion("org.apache.tomcat.embed", "*", "10.1.42", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-tomcat:3.3.12'
+              }
+              """,
+            """
+              plugins {
+                id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation('org.apache.tomcat.embed:tomcat-embed-core:10.1.42')
+                      implementation('org.apache.tomcat.embed:tomcat-embed-el:10.1.42')
+                      implementation('org.apache.tomcat.embed:tomcat-embed-websocket:10.1.42')
+                  }
+              
+                  implementation 'org.springframework.boot:spring-boot-starter-tomcat:3.3.12'
+              }
+              """
+          )
+        );
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false)
     public static class ScanningAccumulatedUpgradeRecipe extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {

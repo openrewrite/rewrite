@@ -43,20 +43,25 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public @Nullable J visit(@Nullable Tree tree, RpcReceiveQueue p) {
-        if (tree instanceof JS)
+        if (tree instanceof JS) {
             return super.visit(tree, p);
+        }
         return delegate.visit(tree, p);
     }
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
+        if (j instanceof JS.ExpressionStatement || j instanceof JS.StatementExpression) {
+            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
+            return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)));
+        }
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
     }
 
     @Override
-    public J visitCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
+    public J visitJsCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
         return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
                 .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
@@ -146,11 +151,12 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitImport(JS.Import anImport, RpcReceiveQueue q) {
+    public J visitImportDeclaration(JS.Import anImport, RpcReceiveQueue q) {
         return anImport
                 .withImportClause(q.receive(anImport.getImportClause(), el -> (JS.ImportClause) visitNonNull(el, q)))
                 .getPadding().withModuleSpecifier(q.receive(anImport.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q)))
-                .withAttributes(q.receive(anImport.getAttributes(), el -> (JS.ImportAttributes) visitNonNull(el, q)));
+                .withAttributes(q.receive(anImport.getAttributes(), el -> (JS.ImportAttributes) visitNonNull(el, q)))
+                .getPadding().withInitializer(q.receive(anImport.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
     }
 
     @Override
@@ -199,7 +205,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitBinary(JS.Binary binary, RpcReceiveQueue q) {
+    public J visitBinaryExtensions(JS.Binary binary, RpcReceiveQueue q) {
         return binary
                 .withLeft(q.receive(binary.getLeft(), expr -> (Expression) visitNonNull(expr, q)))
                 .getPadding().withOperator(q.receive(binary.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.Binary.Type.class))))
@@ -241,13 +247,13 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, RpcReceiveQueue q) {
-        return objectBindingDeclarations
-                .withLeadingAnnotations(q.receiveList(objectBindingDeclarations.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
-                .withModifiers(q.receiveList(objectBindingDeclarations.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .withTypeExpression(q.receive(objectBindingDeclarations.getTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
-                .getPadding().withBindings(q.receive(objectBindingDeclarations.getPadding().getBindings(), el -> visitContainer(el, q)))
-                .getPadding().withInitializer(q.receive(objectBindingDeclarations.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
+    public J visitObjectBindingPattern(JS.ObjectBindingPattern objectBindingPattern, RpcReceiveQueue q) {
+        return objectBindingPattern
+                .withLeadingAnnotations(q.receiveList(objectBindingPattern.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
+                .withModifiers(q.receiveList(objectBindingPattern.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
+                .withTypeExpression(q.receive(objectBindingPattern.getTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
+                .getPadding().withBindings(q.receive(objectBindingPattern.getPadding().getBindings(), el -> visitContainer(el, q)))
+                .getPadding().withInitializer(q.receive(objectBindingPattern.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
     }
 
     @Override
@@ -270,7 +276,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitScopedVariableDeclarations(JS.ScopedVariableDeclarations scopedVariableDeclarations, RpcReceiveQueue q) {
         return scopedVariableDeclarations
                 .withModifiers(q.receiveList(scopedVariableDeclarations.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .getPadding().withScope(q.receive(scopedVariableDeclarations.getPadding().getScope(), el -> visitLeftPadded(el, q, toEnum(JS.ScopedVariableDeclarations.Scope.class))))
                 .getPadding().withVariables(q.receiveList(scopedVariableDeclarations.getPadding().getVariables(), el -> visitRightPadded(el, q)));
     }
 
@@ -342,7 +347,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitAssignmentOperation(JS.AssignmentOperation assignmentOperation, RpcReceiveQueue q) {
+    public J visitAssignmentOperationExtensions(JS.AssignmentOperation assignmentOperation, RpcReceiveQueue q) {
         return assignmentOperation
                 .withVariable(q.receive(assignmentOperation.getVariable(), expr -> (Expression) visitNonNull(expr, q)))
                 .getPadding().withOperator(q.receive(assignmentOperation.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.AssignmentOperation.Type.class))))

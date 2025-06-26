@@ -2094,4 +2094,75 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5443")
+    @Test
+    void parsingIncorrectJavadocValueReference2() {
+        rewriteRun(
+          spec-> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          // language=java
+          java(
+            """
+            public class Foo {
+                /**
+                 * The {@value DEFAULT_TABLE_NAME} default name for the locks table in the DynamoDB.
+                 */
+                public static final String DEFAULT_TABLE_NAME = "SpringIntegrationLockRegistry";
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5196")
+    void unclosedBraceOnLink() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                 /**   
+                  * {@link int
+                  * Some other text.
+                  * See {@link java.lang.String}
+                  * @param arg description
+                  */                  
+                  void method(String arg) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    void badlyClosedXmlTags() {
+        rewriteRun(
+          java(
+            """
+            /**
+             * <!--Optional:->
+             * <urn:portalId>?</urn:portalId-->
+             */
+            class Test { }
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    void spaceStarAfterStartOfJavaDoc() {
+        rewriteRun(
+          java(
+            """
+            /** *
+             * @author x
+             */
+            class Test { }
+            """
+          )
+        );
+    }
 }

@@ -818,7 +818,7 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipes(
             toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     return method.withSelect(null);
                 }
             }),
@@ -858,8 +858,8 @@ class AddImportTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  method = super.visitMethodDeclaration(method, executionContext);
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  method = super.visitMethodDeclaration(method, ctx);
                   method = JavaTemplate.builder("List<Builder> list = new ArrayList<>();")
                     .imports("java.util.ArrayList", "java.util.List")
                     .staticImports("java.util.Calendar.Builder")
@@ -916,7 +916,7 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipes(
             toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if (method.getName().getSimpleName().equals("emptyList")) {
                         return method.withSelect(null);
                     }

@@ -45,7 +45,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         throw new UnsupportedOperationException("JS has a different structure for its compilation unit. See JS.CompilationUnit.");
     }
 
-    public J visitCompilationUnit(JS.CompilationUnit cu, P p) {
+    public J visitJsCompilationUnit(JS.CompilationUnit cu, P p) {
         JS.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
@@ -144,7 +144,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             d = (JS.Delete) temp;
         }
-        d = d.withType(visitType(d.getType(), p));
         return d;
     }
 
@@ -229,7 +228,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
-    public J visitBinary(JS.Binary binary, P p) {
+    public J visitBinaryExtensions(JS.Binary binary, P p) {
         JS.Binary b = binary;
         b = b.withPrefix(visitSpace(b.getPrefix(), JsSpace.Location.BINARY_PREFIX, p));
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
@@ -246,7 +245,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return b;
     }
 
-    public J visitImport(JS.Import jsImport, P p) {
+    public J visitImportDeclaration(JS.Import jsImport, P p) {
         JS.Import i = jsImport;
         i = i.withPrefix(visitSpace(i.getPrefix(), JsSpace.Location.IMPORT_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
@@ -257,8 +256,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             i = (JS.Import) temp;
         }
         i = i.withImportClause(visitAndCast(i.getImportClause(), p));
-        i = i.getPadding().withModuleSpecifier(requireNonNull(visitLeftPadded(i.getPadding().getModuleSpecifier(), JsLeftPadded.Location.IMPORT_MODULE_SPECIFIER, p)));
+        i = i.getPadding().withModuleSpecifier(visitLeftPadded(i.getPadding().getModuleSpecifier(), JsLeftPadded.Location.IMPORT_MODULE_SPECIFIER, p));
         i = i.withAttributes(visitAndCast(i.getAttributes(), p));
+        i = i.getPadding().withInitializer(visitLeftPadded(i.getPadding().getInitializer(), JsLeftPadded.Location.IMPORT_INITIALIZER, p));
         return i;
     }
 
@@ -388,15 +388,15 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
-    public J visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, P p) {
-        JS.ObjectBindingDeclarations o = objectBindingDeclarations;
+    public J visitObjectBindingPattern(JS.ObjectBindingPattern objectBindingPattern, P p) {
+        JS.ObjectBindingPattern o = objectBindingPattern;
         o = o.withPrefix(visitSpace(o.getPrefix(), JsSpace.Location.OBJECT_BINDING_DECLARATIONS_PREFIX, p));
         o = o.withMarkers(visitMarkers(o.getMarkers(), p));
         Expression temp = (Expression) visitExpression(o, p);
-        if (!(temp instanceof JS.ObjectBindingDeclarations)) {
+        if (!(temp instanceof JS.ObjectBindingPattern)) {
             return temp;
         } else {
-            o = (JS.ObjectBindingDeclarations) temp;
+            o = (JS.ObjectBindingPattern) temp;
         }
         o = o.withLeadingAnnotations(requireNonNull(ListUtils.map(o.getLeadingAnnotations(), a -> visitAndCast(a, p))));
         o = o.withModifiers(requireNonNull(ListUtils.map(o.getModifiers(), e -> visitAndCast(e, p))));
@@ -453,7 +453,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             vd = (JS.ScopedVariableDeclarations) temp;
         }
         vd = vd.withModifiers(requireNonNull(ListUtils.map(vd.getModifiers(), e -> visitAndCast(e, p))));
-        vd = vd.getPadding().withScope(visitLeftPadded(vd.getPadding().getScope(), JsLeftPadded.Location.SCOPED_VARIABLE_DECLARATIONS_SCOPE, p));
         vd = vd.getPadding().withVariables(requireNonNull(ListUtils.map(vd.getPadding().getVariables(), e -> visitRightPadded(e, JsRightPadded.Location.SCOPED_VARIABLE_DECLARATIONS_VARIABLE, p))));
         return vd;
     }
@@ -991,7 +990,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return c;
     }
 
-    public J visitAssignmentOperation(JS.AssignmentOperation assignOp, P p) {
+    public J visitAssignmentOperationExtensions(JS.AssignmentOperation assignOp, P p) {
         JS.AssignmentOperation a = assignOp;
         a = a.withPrefix(visitSpace(a.getPrefix(), JsSpace.Location.ASSIGNMENT_OPERATION_PREFIX, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));

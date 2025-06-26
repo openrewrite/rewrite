@@ -16,7 +16,7 @@
 import {ExecutionContext} from "./execution";
 import {SourceFile} from "./tree";
 import fs, {readFileSync} from "node:fs";
-import {relative} from "path";
+import {isAbsolute, relative} from "path";
 import {ParseError, ParseErrorKind} from "./parse-error";
 import {markers, MarkersKind, ParseExceptionResult} from "./markers";
 import {randomId} from "./uuid";
@@ -55,13 +55,11 @@ export abstract class Parser {
     protected ctx: ExecutionContext;
     protected readonly relativeTo?: string;
 
-    abstract parse(...sourcePaths: ParserInput[]): Promise<SourceFile[]>
+    abstract parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile>
 
     protected relativePath(sourcePath: ParserInput): string {
-        if (typeof sourcePath === "string") {
-            return relative(this.relativeTo || "", sourcePath);
-        }
-        return relative(this.relativeTo || "", sourcePath.sourcePath);
+        const path = typeof sourcePath === "string" ? sourcePath : sourcePath.sourcePath;
+        return isAbsolute(path) && this.relativeTo ? relative(this.relativeTo, path) : path;
     }
 
     protected error(input: ParserInput, e: Error): ParseError {

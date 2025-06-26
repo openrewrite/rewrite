@@ -74,7 +74,7 @@ export class JavaScriptParser extends Parser {
     private readonly compilerOptions: ts.CompilerOptions;
     private readonly styles?: NamedStyles[];
     private oldProgram?: ts.Program;
-    private sourceFileCache: Map<string, ts.SourceFile>;
+    private sourceFileCache?: Map<string, ts.SourceFile>;
 
     constructor(
         {
@@ -95,17 +95,17 @@ export class JavaScriptParser extends Parser {
             jsx: ts.JsxEmit.Preserve
         };
         this.styles = styles;
-        this.sourceFileCache = sourceFileCache || new Map();
+        this.sourceFileCache = sourceFileCache;
     }
 
     // noinspection JSUnusedGlobalSymbols
     reset(): this {
-        this.sourceFileCache.clear();
+        this.sourceFileCache && this.sourceFileCache.clear();
         this.oldProgram = undefined;
         return this;
     }
 
-    override async parse(...inputs: ParserInput[]): Promise<SourceFile[]> {
+    override async *parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
         const inputFiles = new Map<SourcePath, ParserInput>();
 
         // Populate inputFiles map and remove from cache if necessary
@@ -113,7 +113,7 @@ export class JavaScriptParser extends Parser {
             const sourcePath = parserInputFile(input);
             inputFiles.set(sourcePath, input);
             // Remove from cache if previously cached
-            this.sourceFileCache.delete(sourcePath);
+            this.sourceFileCache && this.sourceFileCache.delete(sourcePath);
         }
 
         // Create a new CompilerHost within parseInputs
@@ -122,7 +122,7 @@ export class JavaScriptParser extends Parser {
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
             // Check if the SourceFile is in the cache
-            let sourceFile = this.sourceFileCache.get(fileName);
+            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(fileName);
             if (sourceFile) {
                 return sourceFile;
             }
@@ -142,7 +142,7 @@ export class JavaScriptParser extends Parser {
             if (sourceText !== undefined) {
                 sourceFile = ts.createSourceFile(fileName, sourceText, languageVersion, true);
                 // Cache the SourceFile if it's a dependency
-                if (!input) {
+                if (!input && this.sourceFileCache) {
                     this.sourceFileCache.set(fileName, sourceFile);
                 }
                 return sourceFile;
@@ -171,42 +171,39 @@ export class JavaScriptParser extends Parser {
 
         const typeChecker = program.getTypeChecker();
 
-        const result: SourceFile[] = [];
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
             const sourceFile = program.getSourceFile(filePath);
             if (!sourceFile) {
-                result.push(this.error(input, new Error('Parser returned undefined')));
+                yield this.error(input, new Error('Parser returned undefined'));
                 continue;
             }
 
             if (hasFlowAnnotation(sourceFile)) {
-                result.push(this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported")));
+                yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
                 continue;
             }
 
             const syntaxErrors = checkSyntaxErrors(program, sourceFile);
             if (syntaxErrors.length > 0) {
                 let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                result.push(this.error(input, new SyntaxError(`Compiler error(s): ${errors}`)))
+                yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
                 continue;
             }
 
             try {
-                result.push(produce(
+                yield produce(
                     new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
                             draft.markers.markers = draft.markers.markers.concat(this.styles);
                         }
-                    }));
+                    });
             } catch (error) {
-                result.push(this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error)));
+                yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
             }
         }
-
-        return result;
     }
 }
 
@@ -831,7 +828,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitPropertySignature(node: ts.PropertySignature) {
+    visitPropertySignature(node: ts.PropertySignature): J.VariableDeclarations {
         // FIXME We are mapping the literals in things like type ascii = { " ": 32; "!": 33; } to
         //  named variables, which is not a good use of this construct.
         return {
@@ -1562,7 +1559,7 @@ export class JavaScriptParserVisitor {
     // FIXME these should not be mapped as VariableDeclarations since the names can never be accessed
     //  and this would potentially just trip up flow analyses. The names exist purely for documentation purposes,
     //  they has no semantics. See https://stackoverflow.com/questions/63629315/what-are-named-or-labeled-tuples-in-typescript.
-    visitNamedTupleMember(node: ts.NamedTupleMember) {
+    visitNamedTupleMember(node: ts.NamedTupleMember): J.VariableDeclarations {
         return {
             kind: J.Kind.VariableDeclarations,
             id: randomId(),
@@ -1655,9 +1652,9 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitObjectBindingPattern(node: ts.ObjectBindingPattern): JS.ObjectBindingDeclarations {
+    visitObjectBindingPattern(node: ts.ObjectBindingPattern): JS.ObjectBindingPattern {
         return {
-            kind: JS.Kind.ObjectBindingDeclarations,
+            kind: JS.Kind.ObjectBindingPattern,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
@@ -1941,6 +1938,7 @@ export class JavaScriptParserVisitor {
             lambda: {
                 kind: J.Kind.Lambda,
                 id: randomId(),
+                prefix: emptySpace,
                 markers: emptyMarkers,
                 parameters: {
                     kind: J.Kind.LambdaParameters,
@@ -1956,7 +1954,7 @@ export class JavaScriptParserVisitor {
                 arrow: this.prefix(node.equalsGreaterThanToken),
                 body: this.convert(node.body),
                 type: this.mapType(node)
-            } as J.Lambda,
+            },
             returnTypeExpression: this.mapTypeInfo(node)
         };
     }
@@ -2314,19 +2312,25 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitYieldExpression(node: ts.YieldExpression): J.Yield {
+    visitYieldExpression(node: ts.YieldExpression): JS.StatementExpression {
         return {
-            kind: J.Kind.Yield,
+            kind: JS.Kind.StatementExpression,
             id: randomId(),
-            prefix: this.prefix(node),
-            markers: node.asteriskToken ?
-                markers({
-                    kind: JS.Markers.DelegatedYield,
-                    id: randomId(),
-                    prefix: this.prefix(node.asteriskToken)
-                } as DelegatedYield) : emptyMarkers,
-            value: node.expression && this.visit(node.expression),
-            implicit: false
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            statement: {
+                kind: J.Kind.Yield,
+                id: randomId(),
+                prefix: this.prefix(node),
+                markers: node.asteriskToken ?
+                    markers({
+                        kind: JS.Markers.DelegatedYield,
+                        id: randomId(),
+                        prefix: this.prefix(node.asteriskToken)
+                    } as DelegatedYield) : emptyMarkers,
+                value: node.expression && this.visit(node.expression),
+                implicit: false
+            } as J.Yield
         };
     }
 
@@ -2391,7 +2395,7 @@ export class JavaScriptParserVisitor {
         return this.newEmpty(this.prefix(node));
     }
 
-    visitExpressionWithTypeArguments(node: ts.ExpressionWithTypeArguments) {
+    visitExpressionWithTypeArguments(node: ts.ExpressionWithTypeArguments): JS.ExpressionWithTypeArguments | Expression {
         if (node.typeArguments) {
             return {
                 kind: JS.Kind.ExpressionWithTypeArguments,
@@ -2489,9 +2493,11 @@ export class JavaScriptParserVisitor {
         return this.newEmpty(this.prefix(node));
     }
 
-    visitVariableStatement(node: ts.VariableStatement) {
+    visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations | J.VariableDeclarations {
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
-            draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            if (node.modifiers) {
+                draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            }
             draft.prefix = this.prefix(node);
         });
     }
@@ -2605,7 +2611,7 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 markers: emptyMarkers,
                 init: [node.initializer ?
-                    (ts.isVariableDeclarationList(node.initializer) ? this.rightPadded(this.visit(node.initializer), emptySpace) :
+                    (ts.isVariableDeclarationList(node.initializer) ? this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)) :
                         this.rightPadded(ts.isStatement(node.initializer) ? this.visit(node.initializer) : {
                             kind: JS.Kind.ExpressionStatement,
                             id: randomId(),
@@ -2647,7 +2653,20 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 markers: emptyMarkers,
-                variable: this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)),
+                variable: (() => {
+                    if (ts.isIdentifier(node.initializer)) {
+                        const ident = this.visit(node.initializer);
+                        return this.rightPadded({
+                            kind: JS.Kind.ExpressionStatement,
+                            id: randomId(),
+                            expression: ident,
+                            markers: emptyMarkers,
+                            prefix: emptySpace
+                        } as JS.ExpressionStatement, this.suffix(node.initializer));
+                    } else {
+                        return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
+                    }
+                })(),
                 iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
             },
             body: this.rightPadded(
@@ -2678,7 +2697,53 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                     markers: emptyMarkers,
-                    variable: this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)),
+                    variable: (() => {
+                        if (ts.isIdentifier(node.initializer)) {
+                            const ident = this.visit(node.initializer);
+                            return this.rightPadded({
+                                kind: JS.Kind.ExpressionStatement,
+                                id: randomId(),
+                                expression: ident,
+                                markers: emptyMarkers,
+                                prefix: emptySpace
+                            } as JS.ExpressionStatement, this.suffix(node.initializer));
+                        } else if (ts.isArrayLiteralExpression(node.initializer)) {
+                            return this.rightPadded({
+                                kind: JS.Kind.ArrayBindingPattern,
+                                id: randomId(),
+                                elements: {
+                                    kind: J.Kind.Container,
+                                    id: randomId(),
+                                    before: emptySpace,
+                                    elements: node.initializer.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
+                                    markers: emptyMarkers
+                                } as J.Container<Expression>,
+                                markers: emptyMarkers,
+                                prefix: emptySpace
+                            } as JS.ArrayBindingPattern, this.suffix(node.initializer))
+                        } else if (ts.isObjectLiteralExpression(node.initializer)) {
+                            return this.rightPadded({
+                                kind: JS.Kind.ObjectBindingPattern,
+                                id: randomId(),
+                                leadingAnnotations: [],
+                                modifiers: [],
+                                typeExpression: undefined,
+                                initializer: undefined,
+                                bindings: {
+                                    kind: J.Kind.Container,
+                                    id: randomId(),
+                                    before: emptySpace,
+                                    elements: node.initializer.properties.map(p => this.rightPadded(this.visit(p) as Expression, this.suffix(p))),
+                                    markers: emptyMarkers
+                                } as J.Container<Expression>,
+                                markers: emptyMarkers,
+                                prefix: emptySpace
+                            } as JS.ObjectBindingPattern, this.suffix(node.initializer))
+                        }
+                        else {
+                            return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
+                        }
+                    })(),
                     iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
                 },
                 body: this.rightPadded(
@@ -2842,13 +2907,13 @@ export class JavaScriptParserVisitor {
         } as J.VariableDeclarations.NamedVariable;
     }
 
-    visitVariableDeclarationList(node: ts.VariableDeclarationList): JS.ScopedVariableDeclarations {
+    visitVariableDeclarationList(node: ts.VariableDeclarationList): J.VariableDeclarations | JS.ScopedVariableDeclarations {
         let kind = node.getFirstToken();
 
         // to parse the declaration case: await using db = ...
-        let modifier;
+        let modifiers: J.Modifier[] = [];
         if (kind?.kind === ts.SyntaxKind.AwaitKeyword) {
-            modifier = {
+            modifiers.push({
                 kind: J.Kind.Modifier,
                 id: randomId(),
                 prefix: this.prefix(kind),
@@ -2856,43 +2921,83 @@ export class JavaScriptParserVisitor {
                 keyword: 'await',
                 type: J.ModifierType.LanguageExtension,
                 annotations: []
-            };
+            });
             kind = node.getChildAt(1);
         }
 
-        return {
-            kind: JS.Kind.ScopedVariableDeclarations,
-            id: randomId(),
-            prefix: emptySpace,
-            markers: emptyMarkers,
-            modifiers: modifier ? [modifier] : [],
-            scope: this.leftPadded(
-                kind ? this.prefix(kind) : this.prefix(node),
-                kind?.kind === ts.SyntaxKind.LetKeyword
-                    ? JS.ScopedVariableDeclarations.Scope.Let
-                    : kind?.kind === ts.SyntaxKind.ConstKeyword
-                        ? JS.ScopedVariableDeclarations.Scope.Const
-                        : kind?.kind === ts.SyntaxKind.UsingKeyword
-                            ? JS.ScopedVariableDeclarations.Scope.Using
-                            : JS.ScopedVariableDeclarations.Scope.Var
-            ),
-            variables: node.declarations.map((declaration) => {
-                // FIXME this is suspect... we are creating a whole VariableDeclarations for each declaration?
-                return this.rightPadded(
-                    {
-                        kind: J.Kind.VariableDeclarations,
-                        id: randomId(),
-                        prefix: this.prefix(declaration),
-                        markers: emptyMarkers,
-                        leadingAnnotations: [],
-                        modifiers: [],
-                        typeExpression: this.mapTypeInfo(declaration),
-                        variables: [this.rightPadded(this.visit(declaration), emptySpace)]
-                    },
-                    this.suffix(declaration)
-                );
-            })
-        };
+        if (kind?.kind === ts.SyntaxKind.VarKeyword ||
+            kind?.kind === ts.SyntaxKind.LetKeyword ||
+            kind?.kind === ts.SyntaxKind.ConstKeyword ||
+            kind?.kind === ts.SyntaxKind.UsingKeyword) {
+            modifiers.push({
+                kind: J.Kind.Modifier,
+                id: randomId(),
+                prefix: this.prefix(kind),
+                markers: emptyMarkers,
+                annotations: [],
+                keyword: kind.kind === ts.SyntaxKind.VarKeyword ? 'var' :
+                    kind.kind === ts.SyntaxKind.LetKeyword ? 'let' :
+                        kind.kind === ts.SyntaxKind.ConstKeyword ? 'const' : 'using',
+                type: kind.kind == ts.SyntaxKind.ConstKeyword ? J.ModifierType.Final : J.ModifierType.LanguageExtension
+            } as J.Modifier);
+        }
+        const isMulti = node.declarations.length > 1;
+        const varDecls = node.declarations.map(declaration => {
+            return this.rightPadded({
+                kind: J.Kind.VariableDeclarations,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                leadingAnnotations: [],
+                modifiers: modifiers,
+                typeExpression: this.mapTypeInfo(declaration),
+                variables: [this.rightPadded({
+                            kind: J.Kind.NamedVariable,
+                            id: randomId(),
+                            prefix: this.prefix(declaration),
+                            markers: produce(emptyMarkers, draft => {
+                                if (declaration.exclamationToken) {
+                                    draft.markers.push({
+                                        kind: JS.Markers.NonNullAssertion,
+                                        id: randomId(),
+                                        prefix: this.suffix(declaration.name)
+                                    } as NonNullAssertion);
+                                }
+                            }),
+                            name: this.visit(declaration.name),
+                            dimensionsAfterName: [],
+                            initializer: ( () => {
+                                if (declaration.initializer) {
+                                    const equalSign = declaration.getChildren().find(c => c.kind == ts.SyntaxKind.EqualsToken)
+                                    const prefix = equalSign && this.prefix(equalSign);
+                                    return this.leftPadded(prefix ?? emptySpace, this.visit(declaration.initializer) as Expression)
+                                } else {
+                                    return undefined;
+                                }
+                            })(),
+                            variableType: this.mapVariableType(declaration)
+                        } as J.VariableDeclarations.NamedVariable, emptySpace)]
+            } as J.VariableDeclarations, isMulti ? this.suffix(declaration) : emptySpace)});
+
+        if (varDecls.length === 1) {
+            return varDecls[0].element;
+        } else {
+            return {
+                kind: JS.Kind.ScopedVariableDeclarations,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                modifiers: [],
+                scope: undefined,
+                variables: varDecls.map((v, idx) => {
+                    return produce(v, draft => {
+                        if (idx > 0) {
+                            draft.element.modifiers = [];
+                        }
+                    });
+                })
+            } as JS.ScopedVariableDeclarations;
+        }
     }
 
     visitFunctionDeclaration(node: ts.FunctionDeclaration): J.MethodDeclaration {
@@ -3174,7 +3279,7 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitNamespaceExportDeclaration(node: ts.NamespaceExportDeclaration) {
+    visitNamespaceExportDeclaration(node: ts.NamespaceExportDeclaration): JS.NamespaceDeclaration {
         return {
             kind: JS.Kind.NamespaceDeclaration,
             id: randomId(),
@@ -3205,48 +3310,46 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.ScopedVariableDeclarations {
-        const kind = this.findChildNode(node, ts.SyntaxKind.ImportKeyword)!;
-
+    visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.Import {
+        let exportModifierSuffix: J.Space | undefined = undefined;
         return {
-            kind: JS.Kind.ScopedVariableDeclarations,
+            kind: JS.Kind.Import,
             id: randomId(),
-            prefix: this.prefix(node),
-            markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
-            scope: this.leftPadded(
-                this.prefix(kind),
-                JS.ScopedVariableDeclarations.Scope.Import
-            ),
-            variables: [
-                this.rightPadded({
-                    kind: J.Kind.VariableDeclarations,
+            modifiers: ( () => {
+                const exportModifier = node.modifiers?.find(m => m.kind === ts.SyntaxKind.ExportKeyword);
+                exportModifierSuffix = exportModifier && this.suffix(exportModifier);
+                return exportModifier ? [{
+                    kind: J.Kind.Modifier,
                     id: randomId(),
-                    prefix: emptySpace,
+                    prefix: this.prefix(exportModifier),
                     markers: emptyMarkers,
-                    leadingAnnotations: [],
-                    modifiers: node.isTypeOnly ? [{
-                        kind: J.Kind.Modifier,
-                        id: randomId(),
-                        prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!),
-                        markers: emptyMarkers,
-                        keyword: "type",
-                        type: J.ModifierType.LanguageExtension,
-                        annotations: []
-                    }] : [],
-                    variables: [this.rightPadded({
-                        kind: J.Kind.NamedVariable,
-                        id: randomId(),
-                        prefix: emptySpace,
-                        markers: emptyMarkers,
-                        name: this.visit(node.name),
-                        dimensionsAfterName: [],
-                        initializer: this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference)),
-                        variableType: this.mapVariableType(node)
-                    }, emptySpace)]
-                }, emptySpace)
-            ]
-        }
+                    keyword: 'export',
+                    type: J.ModifierType.LanguageExtension,
+                    annotations: []
+                } as J.Modifier] : [];
+            })(),
+            prefix: exportModifierSuffix ? exportModifierSuffix : this.prefix(node),
+            importClause: {
+                kind: JS.Kind.ImportClause,
+                id: randomId(),
+                prefix: (() => {
+                    if (node.isTypeOnly) {
+                        const typeKeyword = node.getChildren().find(n => n.kind === ts.SyntaxKind.TypeKeyword);
+                        return this.prefix(typeKeyword!);
+                    } else {
+                        return emptySpace;
+                    }
+                })(),
+                markers: emptyMarkers,
+                typeOnly: node.isTypeOnly,
+                name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
+                namedBindings: undefined
+            },
+            markers: emptyMarkers,
+            moduleSpecifier: undefined,
+            attributes: undefined,
+            initializer: this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference))
+        } as JS.Import;
     }
 
     visitImportKeyword(node: ts.ImportExpression): J.Identifier {
@@ -3260,6 +3363,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
+            modifiers: [],
             importClause: node.importClause && this.visit(node.importClause),
             moduleSpecifier: this.leftPadded(node.importClause ? this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!) : emptySpace, this.visit(node.moduleSpecifier)),
             attributes: node.attributes && this.visit(node.attributes)
@@ -3399,7 +3503,7 @@ export class JavaScriptParserVisitor {
         return this.visitUnknown(node);
     }
 
-    visitExternalModuleReference(node: ts.ExternalModuleReference) {
+    visitExternalModuleReference(node: ts.ExternalModuleReference): J.MethodInvocation {
         return {
             kind: J.Kind.MethodInvocation,
             id: randomId(),
@@ -3700,7 +3804,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitEnumMember(node: ts.EnumMember) {
+    visitEnumMember(node: ts.EnumMember): J.EnumValue {
         return {
             kind: J.Kind.EnumValue,
             id: randomId(),
@@ -3951,7 +4055,7 @@ export class JavaScriptParserVisitor {
     }
 
     private mapType(node: ts.Node): JavaType | undefined {
-        return this.typeMapping.type(node);
+        return Object.freeze(this.typeMapping.type(node));
     }
 
     private mapPrimitiveType(node: ts.Node): JavaType.Primitive {
@@ -4186,12 +4290,23 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
     // let previousSibling = getPreviousSibling(node);
     let leadingWhitespacePos = node.getStart();
 
-    // Step 1: Use forEachLeadingCommentRange to extract comments
-    ts.forEachLeadingCommentRange(text, nodeStart, (pos, end, kind) => {
+    // Step 1: Get all comments
+    const commentRanges = [
+        ...(ts.getTrailingCommentRanges(text, nodeStart) || []),
+        ...(ts.getLeadingCommentRanges(text, nodeStart) || []),
+    ].filter(range => range.pos < node.getStart())
+        .sort((a, b) => a.pos - b.pos)
+        // filter out duplicate ranges
+        .filter((range, index, self) => index === 0 || range.pos !== self[index - 1].pos);
+
+    commentRanges.forEach(range => {
+        const pos = range.pos;
+        const end = range.end;
+        const kind = range.kind;
         leadingWhitespacePos = Math.min(leadingWhitespacePos, pos);
 
         const isMultiline = kind === ts.SyntaxKind.MultiLineCommentTrivia;
-        const commentStart = isMultiline ? pos + 2 : pos + 2;  // Skip `/*` or `//`
+        const commentStart = pos + 2;  // Skip `/*` or `//`
         const commentEnd = isMultiline ? end - 2 : end;  // Exclude closing `*/` or nothing for `//`
 
         // Step 2: Capture suffix (whitespace after the comment)
@@ -4218,8 +4333,7 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
         whitespace = text.slice(nodeStart, leadingWhitespacePos);
     }
 
-    // Step 4: Return the Space object with comments and leading whitespace
-    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace.length > 0 ? whitespace : ""};
+    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace};
 }
 
 class FlowSyntaxNotSupportedError extends SyntaxError {

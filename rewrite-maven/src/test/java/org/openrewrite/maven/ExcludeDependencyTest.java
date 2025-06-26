@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -197,8 +196,7 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void excludeAlsoWhereConflictOmitted() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
+          spec -> spec.recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
           pomXml(
             """
               <project>

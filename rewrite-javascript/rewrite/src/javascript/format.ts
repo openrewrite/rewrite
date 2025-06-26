@@ -53,16 +53,6 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
 export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
     // called NormalizeFormat in Java
 
-    protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: P): Promise<J | undefined> {
-        const ret = await super.visitScopedVariableDeclarations(scopedVariableDeclarations, p) as JS.ScopedVariableDeclarations;
-        return produce(ret, draft => {
-            if (draft.scope) {
-                this.concatenatePrefix(draft, draft.scope!.before);
-                draft.scope!.before = emptySpace;
-            }
-        });
-    }
-
     private concatenatePrefix(node: Draft<J>, right: J.Space) {
         // TODO look at https://github.com/openrewrite/rewrite/commit/990a366fab9e5656812d81d0eb15ecb6bfd2fde0#diff-ec2e977fe8f1e189735e71b817f8f1ebaf79c1490c0210652e8a559f7f7877de
         // and possibly incorporate it here - some special logic needed to merge comments better (?)
@@ -206,11 +196,10 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         return produceAsync(ret, async draft => {
             draft.control.prefix.whitespace = this.style.beforeParentheses.forParentheses ? " " : "";
             draft.control.init = await Promise.all(draft.control.init.map(async (oneInit, index) => {
-                if (oneInit.element.kind === JS.Kind.ScopedVariableDeclarations) {
-                    const scopedVD = oneInit.element as Draft<JS.ScopedVariableDeclarations>;
-                    if (scopedVD.scope != undefined) {
-                        scopedVD.scope.before.whitespace = "";
-                        scopedVD.variables[scopedVD.variables.length - 1].after.whitespace = "";
+                if (oneInit.element.kind === J.Kind.VariableDeclarations) {
+                    const vd = oneInit.element as Draft<J.VariableDeclarations>;
+                    if (vd.modifiers && vd.modifiers.length > 0) {
+                        vd.modifiers[0].prefix.whitespace = "";
                     }
                 }
                 oneInit.after.whitespace = "";
@@ -808,16 +797,6 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
             });
         }
         return r;
-    }
-
-    protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: P): Promise<J | undefined> {
-        const ret = await super.visitScopedVariableDeclarations(scopedVariableDeclarations, p) as JS.ScopedVariableDeclarations;
-        return ret.scope && produce(ret, draft => {
-            if (draft.scope && draft.modifiers.length > 0) {
-                this.ensureSpace(draft.scope.before);
-            }
-            this.ensureSpace(draft.variables[0].element.prefix);
-        });
     }
 
     protected async visitThrow(thrown: J.Throw, p: P): Promise<J | undefined> {
