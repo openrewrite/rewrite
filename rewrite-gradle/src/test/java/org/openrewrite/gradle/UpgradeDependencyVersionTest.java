@@ -1972,4 +1972,37 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void ignoreVersionDefinedInExtraPropertiesWithConcatenatedReferenceInDependenciesGradleWhenConcatenationLeftIsNotADependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'com.google.guava:' + 'guava:' + guavaVersion
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+              }
+              
+              plugins {
+                  id("java")
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
 }
