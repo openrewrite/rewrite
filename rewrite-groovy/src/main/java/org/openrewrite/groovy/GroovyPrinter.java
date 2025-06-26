@@ -318,15 +318,6 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
-            variable.getMarkers().findFirst(DestructuringType.class).ifPresent(it -> {
-                visitSpace(it.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
-                p.append(it.getName());
-            });
-            return super.visitVariable(variable, p);
-        }
-
-        @Override
         public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
             beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
             LambdaStyle ls = lambda.getMarkers().findFirst(LambdaStyle.class)

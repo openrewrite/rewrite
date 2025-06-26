@@ -1054,7 +1054,7 @@ public interface G extends J {
 
         JLeftPadded<Expression> initializer;
 
-        JContainer<VariableDeclarations.NamedVariable> variables;
+        JContainer<VariableDeclarations> variables;
 
         public Expression getInitializer() {
             return initializer.getElement();
@@ -1064,11 +1064,11 @@ public interface G extends J {
             return getPadding().withInitializer(this.initializer.withElement(initializer));
         }
 
-        public List<VariableDeclarations.NamedVariable> getVariables() {
+        public List<VariableDeclarations> getVariables() {
             return variables.getElements();
         }
 
-        public DestructuringDeclaration withVariables(List<VariableDeclarations.NamedVariable> elements) {
+        public DestructuringDeclaration withVariables(List<VariableDeclarations> elements) {
             return getPadding().withVariables(JContainer.withElements(this.variables, elements));
         }
 
@@ -1101,11 +1101,11 @@ public interface G extends J {
         public static class Padding {
             private final DestructuringDeclaration t;
 
-            public JContainer<VariableDeclarations.NamedVariable> getVariables() {
+            public JContainer<VariableDeclarations> getVariables() {
                 return t.variables;
             }
 
-            public DestructuringDeclaration withVariables(JContainer<VariableDeclarations.NamedVariable> variables) {
+            public DestructuringDeclaration withVariables(JContainer<VariableDeclarations> variables) {
                 return t.variables == variables ? t : new DestructuringDeclaration(
                         t.id, t.prefix, t.markers, t.modifiers, t.typeExpression, t.initializer, variables);
             }

@@ -75,6 +75,18 @@ class DestructuringTest implements RewriteTest {
     }
 
     @Test
+    void destructuringWithTypeAndSpaces() {
+        rewriteRun(
+          groovy(
+            """
+              def (   String key  , java.lang.String value  ) = "a1:b2".split(":")
+              println("${key} ${value}")
+              """
+          )
+        );
+    }
+
+    @Test
     void destructuringWithList() {
         rewriteRun(
           groovy(
