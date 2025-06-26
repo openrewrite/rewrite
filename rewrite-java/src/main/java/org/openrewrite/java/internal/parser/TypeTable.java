@@ -166,11 +166,6 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         private final ExecutionContext ctx;
 
-        private static String[] splitUnescaped(String input, char delimiter) {
-            if (input.isEmpty()) return new String[0];
-            // Use negative lookbehind to split on delimiter not preceded by backslash
-            return input.split("(?<!\\\\)" + Pattern.quote(String.valueOf(delimiter)));
-        }
 
         public void read(InputStream is, Collection<String> artifactNames) throws IOException {
             if (artifactNames.isEmpty()) {
@@ -219,7 +214,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         fields[5].isEmpty() ? null : fields[5],
                                         fields[6].isEmpty() ? null : fields[6],
                                         fields[7].isEmpty() ? null : fields[7].split("\\|"),
-                                        fields.length > 14 && !fields[14].isEmpty() ? splitUnescaped(fields[14], '|') : null,
+                                        fields.length > 14 && !fields[14].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[14], '|') : null,
                                         fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null
                                 ));
                         int lastIndexOf$ = className.lastIndexOf('$');
@@ -238,7 +233,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     fields[11].isEmpty() ? null : fields[11],
                                     fields[12].isEmpty() ? null : fields[12].split("\\|"),
                                     fields[13].isEmpty() ? null : fields[13].split("\\|"),
-                                    fields.length > 14 && !fields[14].isEmpty() ? splitUnescaped(fields[14], '|') : null,
+                                    fields.length > 14 && !fields[14].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[14], '|') : null,
                                     fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null
                             ));
                         }

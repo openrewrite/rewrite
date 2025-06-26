@@ -315,6 +315,95 @@ class TypeTableTest implements RewriteTest {
         );
     }
 
+    @Test
+    void writeReadWithSpecialCharacterAnnotations() throws IOException, URISyntaxException {
+        // Find the directory containing the compiled classes
+        URL classUrl = TypeTableTest.class.getResource("TypeTableTest.class");
+        Path classesDir = Paths.get(classUrl.toURI()).getParent().getParent().getParent().getParent().getParent().getParent();
+        Path dataDir = classesDir.resolve("org/openrewrite/java/internal/parser/data");
+
+        // Create a temporary jar file
+        Path jarFile = temp.resolve("special-char-annotations-1.jar");
+
+        // Create jar file from the compiled classes
+        try (FileSystem zipfs = FileSystems.newFileSystem(
+          jarFile,
+          Map.of("create", "true"))) {
+
+            Files.walk(dataDir)
+              .filter(Files::isRegularFile)
+              .filter(p -> p.toString().endsWith(".class"))
+              .forEach(classFile -> {
+                  try {
+                      Path pathInZip = zipfs.getPath("/").resolve(
+                        classesDir.relativize(classFile).toString());
+                      Files.createDirectories(pathInZip.getParent());
+                      Files.copy(classFile, pathInZip);
+                  } catch (IOException e) {
+                      throw new RuntimeException(e);
+                  }
+              });
+        }
+
+        // Write the jar to the type table
+        try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
+            writeJar(jarFile, writer);
+        }
+
+        // Load the type table
+        TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("special-char-annotations"));
+        Path loadedClassesDir = table.load("special-char-annotations");
+        assertThat(loadedClassesDir).isNotNull();
+
+        // Test that we can use the annotations with special characters in code
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()
+            .classpath(List.of(loadedClassesDir))),
+          java(
+            """
+              import org.openrewrite.java.internal.parser.data.*;
+              
+              @BasicAnnotation
+              @StringAnnotation  
+              @SpecialCharAnnotation
+              class SpecialCharTestClass {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                // Verify that annotations with special characters are properly loaded
+                J.ClassDeclaration clazz = cu.getClasses().get(0);
+                List<J.Annotation> annotations = clazz.getLeadingAnnotations();
+
+                // Verify BasicAnnotation  
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.BasicAnnotation",
+                  "intValue", "42");
+
+                // Verify StringAnnotation - this tests that string values with special characters
+                // like unicode are properly handled through the TSV serialization/deserialization
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.StringAnnotation",
+                  "value", "Default value");
+                  
+                // Also verify the unicode attribute to test special character handling
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.StringAnnotation",
+                  "unicode", "Unicode: © ® ™");
+                  
+                // Verify SpecialCharAnnotation with pipe characters
+                // This is the core functionality we implemented - ensuring pipe characters
+                // in annotation default values are properly handled through TSV serialization
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.SpecialCharAnnotation",
+                  "withPipes", "Hello|World|Test");
+                  
+                // Verify other special characters are handled correctly
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.SpecialCharAnnotation",
+                  "withBackslashes", "Path\\To\\|File");
+                  
+                verifyAnnotation(annotations, "org.openrewrite.java.internal.parser.data.SpecialCharAnnotation",
+                  "withQuotes", "He said \"Hello World\"");
+            })
+          )
+        );
+    }
+
     private void verifyAnnotation(List<J.Annotation> annotations, String fqn, String attributeName, String... expectedValues) {
         J.Annotation annotation = annotations.stream()
           .filter(a -> {

@@ -611,6 +611,82 @@ class AnnotationDeserializer {
 }
 
 /**
+ * Utility methods for handling TSV escaping in annotation contexts.
+ */
+class TsvEscapeUtils {
+    
+    /**
+     * Splits a string by the given delimiter, respecting escape sequences and returning unescaped values.
+     * TSV escaping is only for transport - the results are unescaped to get back original values.
+     * 
+     * @param input the input string to split
+     * @param delimiter the delimiter character to split on
+     * @return array of unescaped string segments
+     */
+    @org.jetbrains.annotations.VisibleForTesting
+    static String[] splitAnnotationList(String input, char delimiter) {
+        if (input.isEmpty()) return new String[0];
+        
+        List<String> result = new ArrayList<>();
+        StringBuilder current = null; // Lazy allocation
+        boolean escaped = false;
+        int segmentStart = 0;
+        
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            
+            if (escaped) {
+                // Previous character was backslash, so this character is escaped
+                if (current == null) {
+                    // First escape found - allocate StringBuilder and copy previous content
+                    current = new StringBuilder();
+                    current.append(input, segmentStart, i - 1); // Exclude the backslash
+                }
+                // Append the unescaped character (remove the escape)
+                current.append(c);
+                escaped = false;
+            } else if (c == '\\') {
+                // This is an escape character - don't append, just set flag
+                escaped = true;
+            } else if (c == delimiter) {
+                // Unescaped delimiter - split here
+                if (current == null) {
+                    // No escapes in this segment - use substring for efficiency
+                    result.add(input.substring(segmentStart, i));
+                } else {
+                    result.add(current.toString());
+                    current = null;
+                }
+                segmentStart = i + 1;
+            } else if (current != null) {
+                // Regular character and we're building escaped content
+                current.append(c);
+            }
+            // If current == null and it's a regular character, do nothing (will use substring later)
+        }
+        
+        // Handle trailing backslash (malformed escape)
+        if (escaped) {
+            if (current == null) {
+                current = new StringBuilder();
+                current.append(input, segmentStart, input.length() - 1);
+            }
+            current.append('\\');
+        }
+        
+        // Add the last segment
+        if (current == null) {
+            // No escapes in final segment - use substring
+            result.add(input.substring(segmentStart));
+        } else {
+            result.add(current.toString());
+        }
+        
+        return result.toArray(new String[0]);
+    }
+}
+
+/**
  * Serializes Java annotations to a string format for storage in the TypeTable.
  */
 class AnnotationSerializer {
