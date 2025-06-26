@@ -69,7 +69,7 @@ import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
  *     <li>parameterNames</li>
  *     <li>exceptions[]</li>
  *     <li>annotations[]</li>
- *     <li>annotationDefaultValue</li>
+ *     <li>constantValue</li>
  * </ul>
  * <p>
  * Descriptor and signature are in <a href="https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.3">JVMS 4.3</a> format.
@@ -317,11 +317,11 @@ public class TypeTable implements JavaParserClasspathLoader {
                                 }
                             }
 
-                            if (member.getAnnotationDefaultValue() != null) {
+                            if (member.getConstantValue() != null) {
                                 AnnotationVisitor annotationDefaultVisitor = mv.visitAnnotationDefault();
                                 AnnotationSerializer.processAnnotationDefaultValue(
                                         annotationDefaultVisitor,
-                                        AnnotationDeserializer.parseValue(member.getAnnotationDefaultValue())
+                                        AnnotationDeserializer.parseValue(member.getConstantValue())
                                 );
                                 annotationDefaultVisitor.visitEnd();
                             }
@@ -329,13 +329,25 @@ public class TypeTable implements JavaParserClasspathLoader {
                             writeMethodBody(member, mv);
                             mv.visitEnd();
                         } else {
+                            // Determine the constant value for static final fields
+                            // Only set constantValue for bytecode if it's a valid ConstantValue attribute type
+                            Object constantValue = null;
+                            if ((member.getAccess() & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL) 
+                                && member.getConstantValue() != null) {
+                                Object parsedValue = AnnotationDeserializer.parseValue(member.getConstantValue());
+                                // Only primitive types and strings can be ConstantValue attributes
+                                if (isValidConstantValueType(parsedValue)) {
+                                    constantValue = parsedValue;
+                                }
+                            }
+                            
                             FieldVisitor fv = classWriter
                                     .visitField(
                                             member.getAccess(),
                                             member.getName(),
                                             member.getDescriptor(),
                                             member.getSignature(),
-                                            null
+                                            constantValue
                                     );
 
                             // Apply annotations to the field
@@ -415,6 +427,17 @@ public class TypeTable implements JavaParserClasspathLoader {
                 mv.visitMaxs(0, 0);
             }
         }
+        
+        private static boolean isValidConstantValueType(@Nullable Object value) {
+            if (value == null) {
+                return false; // null values cannot be ConstantValue attributes
+            }
+            return value instanceof String || 
+                   value instanceof Integer || value instanceof Long || 
+                   value instanceof Float || value instanceof Double ||
+                   value instanceof Boolean || value instanceof Character ||
+                   value instanceof Byte || value instanceof Short;
+        }
     }
 
     private static Path getClassesDir(ExecutionContext ctx, GroupArtifactVersion gav) {
@@ -465,7 +488,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         public Writer(OutputStream out) throws IOException {
             this.deflater = new GZIPOutputStream(out);
             this.out = new PrintStream(deflater);
-            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\tannotations\tannotationDefaultValue");
+            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\tannotations\tconstantValue");
         }
 
         public Jar jar(String groupId, String artifactId, String version) {
@@ -527,6 +550,13 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
                                         if (classDefinition != null) {
                                             Writer.Member member = new Writer.Member(access, name, descriptor, signature, null, null);
+                                            
+                                            // Check if this is a static final field with a constant value
+                                            if ((access & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) {
+                                                // Store all compile-time constant values in TSV, even if they can't be ConstantValue attributes
+                                                member.constantValue = convertAnnotationValueToString(value);
+                                            }
+                                            
                                             return new FieldVisitor(Opcodes.ASM9) {
                                                 @Override
                                                 public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
@@ -576,7 +606,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                     return new AnnotationVisitor(Opcodes.ASM9) {
                                                         @Override
                                                         public void visit(String name, Object value) {
-                                                            member.annotationDefaultValue = convertAnnotationValueToString(value);
+                                                            member.constantValue = convertAnnotationValueToString(value);
                                                         }
 
                                                         @Override
@@ -591,14 +621,14 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                                                 @Override
                                                                 public void visitEnd() {
-                                                                    member.annotationDefaultValue = "{" + String.join(",", arrayValues) + "}";
+                                                                    member.constantValue = "{" + String.join(",", arrayValues) + "}";
                                                                 }
                                                             };
                                                         }
 
                                                         @Override
                                                         public void visitEnum(String name, String descriptor, String value) {
-                                                            member.annotationDefaultValue = descriptor + "." + value;
+                                                            member.constantValue = descriptor + "." + value;
                                                         }
 
                                                         @Override
@@ -609,7 +639,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                         @Override
                                                         public void visitEnd() {
                                                             if (!nested.isEmpty()) {
-                                                                member.annotationDefaultValue = serializeArray(nested.toArray(new String[0]));
+                                                                member.constantValue = serializeArray(nested.toArray(new String[0]));
                                                             }
                                                         }
                                                     };
@@ -669,7 +699,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
                             -1, "", "", "", "", "",
                             classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations.stream().map(AnnotationSerializer::escapeDelimiters).toArray(String[]::new)),
-                            ""); // Empty annotation default values for class row
+                            ""); // Empty constant values for class row
 
                     for (Writer.Member member : members) {
                         member.writeMember(jar, this);
@@ -701,7 +731,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             @Nullable
             @NonFinal
-            String annotationDefaultValue;
+            String constantValue;
 
             private void writeMember(Jar jar, ClassDefinition classDefinition) {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
@@ -717,7 +747,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
                             annotations.isEmpty() ? "" : String.join("|", annotations.stream().map(AnnotationSerializer::escapeDelimiters).toArray(String[]::new)),
-                            annotationDefaultValue == null ? "" : annotationDefaultValue
+                            constantValue == null ? "" : constantValue
                     );
                 }
             }
@@ -748,7 +778,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         String @Nullable [] annotations;
 
         @Nullable
-        String annotationDefaultValue;
+        String constantValue;
 
         @NonFinal
         @Nullable
@@ -782,6 +812,6 @@ public class TypeTable implements JavaParserClasspathLoader {
         String @Nullable [] annotations;
 
         @Nullable
-        String annotationDefaultValue;
+        String constantValue;
     }
 }
