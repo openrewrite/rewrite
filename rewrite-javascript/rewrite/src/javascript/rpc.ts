@@ -104,7 +104,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return expressionWithTypeArguments;
     }
 
-    protected async visitFunctionCall(functionCall: JS.FunctionCall, q: RpcSendQueue): Promise<J | undefined> {
+    override async visitFunctionCall(functionCall: JS.FunctionCall, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(functionCall, m => m.function, f => this.visitRightPadded(f, q));
         await q.getAndSend(functionCall, m => m.typeParameters, params => this.visitContainer(params, q));
         await q.getAndSend(functionCall, m => m.arguments, args => this.visitContainer(args, q));
@@ -640,7 +640,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitFunctionCall(functionCall: JS.FunctionCall, q: RpcReceiveQueue): Promise<J | undefined> {
+    override async visitFunctionCall(functionCall: JS.FunctionCall, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(functionCall);
 
         draft.function = await q.receive(functionCall.function, select => this.visitRightPadded(select, q));
