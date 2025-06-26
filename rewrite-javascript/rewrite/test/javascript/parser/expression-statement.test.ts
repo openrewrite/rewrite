@@ -97,7 +97,7 @@ describe('expression statement mapping', () => {
             }
 
             const user = getUser(1);
-            const length = user  !.profile?.username  !.length /*test*/;
+            const length2 = user  !.profile?.username  !.length /*test*/;
             const username2 = getUser(1) !.profile?.username; // test;
             const username = user!.profile?.username ?? 'Guest';
         `)

@@ -94,7 +94,12 @@ export class CreateText extends ScanningRecipe<{ exists: boolean }> {
         if (acc.exists) {
             return [];
         }
-        return new PlainTextParser().parse({text: this.text, sourcePath: this.sourcePath});
+
+        const results: SourceFile[] = [];
+        for await (const file of new PlainTextParser().parse({text: this.text, sourcePath: this.sourcePath})) {
+            results.push(file);
+        }
+        return results;
     }
 }
 

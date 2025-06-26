@@ -621,11 +621,14 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         methodRefType
                 );
             } else {
+                if (qualifier == null) {
+                    return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name.getSimpleName(), qualifierType, fieldRefType);
+                }
                 return new J.MemberReference(
                         randomId(),
-                        qualifier == null ? Space.EMPTY : qualifier.getPrefix(),
+                        qualifier.getPrefix(),
                         Markers.EMPTY,
-                        JRightPadded.build(qualifier == null ? null : qualifier.withPrefix(Space.EMPTY)),
+                        JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
                         JContainer.empty(),
                         JLeftPadded.build(name),
                         null,

@@ -227,7 +227,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     }
                                     return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
                                 } else if (exp instanceof J.FieldAccess) {
-                                    if (Boolean.TRUE.equals(addOnly)) {
+                                    if (Boolean.TRUE.equals(addOnly) || oldAttributeValue != null) {
                                         return it;
                                     }
                                     int index = finalA.getArguments().indexOf(as);
@@ -369,8 +369,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (newArgs != currentArgs) {
                         a = a.withArguments(newArgs);
                     }
-                    if (!foundOrSetAttributeWithDesiredValue.get() && !attributeValIsAlreadyPresent(newArgs, newAttributeValue)) {
-                        // There was no existing value to update, so add a new value into the argument list
+                    if (!foundOrSetAttributeWithDesiredValue.get() && !attributeValIsAlreadyPresent(newArgs, newAttributeValue) && oldAttributeValue == null) {
+                        // There was no existing value to update and no requirements on a pre-existing old value, so add a new value into the argument list
                         String effectiveName = (attributeName == null) ? "value" : attributeName;
                         //noinspection ConstantConditions
                         J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")

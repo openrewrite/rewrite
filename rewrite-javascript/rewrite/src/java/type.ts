@@ -1,3 +1,5 @@
+import {asRef} from "../rpc";
+
 export interface JavaType {
     readonly kind: string;
 }
@@ -15,7 +17,6 @@ export namespace JavaType {
         Primitive: "org.openrewrite.java.tree.JavaType$Primitive",
         ShallowClass: "org.openrewrite.java.tree.JavaType$ShallowClass",
         Union: "org.openrewrite.java.tree.JavaType$MultiCatch",
-        UniqueSymbol: "org.openrewrite.java.tree.JavaType$UniqueSymbol",
         Unknown: "org.openrewrite.java.tree.JavaType$Unknown",
         Variable: "org.openrewrite.java.tree.JavaType$Variable",
     }
@@ -161,13 +162,9 @@ export namespace JavaType {
         readonly kind: typeof Kind.ShallowClass;
     }
 
-    export interface UniqueSymbol extends JavaType {
-        readonly kind: typeof Kind.UniqueSymbol;
-    }
-
-    export const unknownType: JavaType = {
+    export const unknownType: JavaType = asRef({
         kind: JavaType.Kind.Unknown
-    };
+    });
 
     export function isPrimitive(type?: JavaType): type is JavaType.Primitive {
         return type?.kind === JavaType.Kind.Primitive;
