@@ -112,7 +112,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         // No existing resource - set up lazy creation
         AtomicReference<@Nullable T> resourceRef = new AtomicReference<>();
 
-        return new Scope<T>(
+        return new Scope<>(
                 () -> {
                     T resource = resourceRef.get();
                     if (resource == null) {
@@ -182,7 +182,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         T previousValue = threadLocal.get();
         AtomicReference<@Nullable T> resourceRef = new AtomicReference<>();
 
-        return new Scope<T>(
+        return new Scope<>(
                 () -> {
                     T resource = resourceRef.get();
                     if (resource == null) {
