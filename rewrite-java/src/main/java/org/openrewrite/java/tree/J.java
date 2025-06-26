@@ -2294,13 +2294,16 @@ public interface J extends Tree, RpcCodec<J> {
             @Getter
             Markers markers;
 
-            JRightPadded<VariableDeclarations> variable;
+            // If used to be VariableDeclarations, but got widened to Statement for JS/TS sake as one can
+            // have other statements there. For instance, use a variable defined before the loop.
+            // Keeping the "variable" name as this is the most prominent usage anyway and backward compatibility of LSTs.
+            JRightPadded<Statement> variable;
 
-            public VariableDeclarations getVariable() {
+            public Statement getVariable() {
                 return variable.getElement();
             }
 
-            public Control withVariable(VariableDeclarations variable) {
+            public Control withVariable(Statement variable) {
                 return getPadding().withVariable(this.variable.withElement(variable));
             }
 
@@ -2343,11 +2346,11 @@ public interface J extends Tree, RpcCodec<J> {
             public static class Padding {
                 private final Control t;
 
-                public JRightPadded<VariableDeclarations> getVariable() {
+                public JRightPadded<Statement> getVariable() {
                     return t.variable;
                 }
 
-                public Control withVariable(JRightPadded<VariableDeclarations> variable) {
+                public Control withVariable(JRightPadded<Statement> variable) {
                     return t.variable == variable ? t : new Control(t.id, t.prefix, t.markers, variable, t.iterable);
                 }
 
