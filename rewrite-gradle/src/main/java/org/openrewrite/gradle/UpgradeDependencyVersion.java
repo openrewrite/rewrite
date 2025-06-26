@@ -236,7 +236,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         try {
                             String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                     .select(new GroupArtifact(declaredGroupId, declaredArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
-                            //acc.versionPropNameToGA.put(versionVariableName, ga);
                             acc.versionPropNameToGA
                                     .computeIfAbsent(versionVariableName, k -> new HashMap<>())
                                     .computeIfAbsent(ga, k -> new HashSet<>())
@@ -310,7 +309,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         try {
                             String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                     .select(new GroupArtifact(declaredGroupId, declaredArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
-                            //acc.versionPropNameToGA.put(versionVariableName, ga);
                             acc.versionPropNameToGA
                                     .computeIfAbsent(versionVariableName, k -> new HashMap<>())
                                     .computeIfAbsent(ga, k -> new HashSet<>())
@@ -378,7 +376,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                         .select(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 if (resolvedVersion != null) {
-                                    //acc.versionPropNameToGA.put(versionVariableName, ga);
                                     acc.versionPropNameToGA
                                             .computeIfAbsent(versionVariableName, k -> new HashMap<>())
                                             .computeIfAbsent(ga, k -> new HashSet<>())
