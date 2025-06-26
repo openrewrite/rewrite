@@ -212,7 +212,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
                             visitTypeName((JRightPadded<NameTree>) (JRightPadded<?>) f.getPadding().getFunction(), p));
         }
         if (f.getPadding().getFunction() != null) {
-            f = f.getPadding().withFunction(visitRightPadded(f.getPadding().getFunction(), JRightPadded.Location.METHOD_SELECT, p));
+            f = f.getPadding().withFunction(visitRightPadded(f.getPadding().getFunction(), JsRightPadded.Location.FUNCTION_CALL_FUNCTION, p));
         }
         if (f.getPadding().getTypeParameters() != null) {
             f = f.getPadding().withTypeParameters(visitContainer(f.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
