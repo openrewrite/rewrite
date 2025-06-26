@@ -92,13 +92,17 @@ public class TypeTable implements JavaParserClasspathLoader {
      */
     public static final String VERIFY_CLASS_WRITING = "org.openrewrite.java.TypeTableClassWritingVerification";
 
-    public static final String DEFAULT_RESOURCE_PATH = "META-INF/rewrite/classpath.tsv.zip";
+    public static final String DEFAULT_RESOURCE_PATH = "META-INF/rewrite/classpath.tsv.gz";
 
     private static final Map<GroupArtifactVersion, CompletableFuture<Path>> classesDirByArtifact = new ConcurrentHashMap<>();
 
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
         try {
             Enumeration<URL> resources = findCaller().getClassLoader().getResources(DEFAULT_RESOURCE_PATH);
+            if (resources.hasMoreElements()) {
+                return new TypeTable(ctx, resources, artifactNames);
+            }
+            resources = findCaller().getClassLoader().getResources(DEFAULT_RESOURCE_PATH.replace(".gz", ".zip"));
             if (resources.hasMoreElements()) {
                 return new TypeTable(ctx, resources, artifactNames);
             }
@@ -698,7 +702,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classSuperclassName,
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
                             -1, "", "", "", "", "",
-                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations.stream().map(AnnotationSerializer::escapeDelimiters).toArray(String[]::new)),
+                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations),
                             ""); // Empty constant values for class row
 
                     for (Writer.Member member : members) {
@@ -746,7 +750,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             signature == null ? "" : signature,
                             parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
-                            annotations.isEmpty() ? "" : String.join("|", annotations.stream().map(AnnotationSerializer::escapeDelimiters).toArray(String[]::new)),
+                            annotations.isEmpty() ? "" : String.join("|", annotations),
                             constantValue == null ? "" : constantValue
                     );
                 }

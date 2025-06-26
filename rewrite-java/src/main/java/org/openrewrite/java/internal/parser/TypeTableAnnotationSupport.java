@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.internal.parser;
 
+import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Opcodes;
@@ -50,7 +51,7 @@ class AnnotationApplier {
 
         AnnotationDeserializer.AnnotationInfo annotationInfo = AnnotationDeserializer.parseAnnotation(annotationStr);
         AnnotationVisitor av = visitAnnotation.create(annotationInfo.getDescriptor(), true);
-        
+
         if (av != null) {
             AnnotationAttributeApplier.applyAttributes(av, annotationInfo.getAttributes());
             av.visitEnd();
@@ -114,10 +115,10 @@ class AnnotationAttributeApplier {
     /**
      * Applies a nested annotation to an annotation visitor.
      */
-    private static void applyNestedAnnotation(AnnotationVisitor av, @Nullable String attributeName, 
-                                            AnnotationDeserializer.AnnotationInfo nestedAnnotationInfo) {
+    private static void applyNestedAnnotation(AnnotationVisitor av, @Nullable String attributeName,
+                                              AnnotationDeserializer.AnnotationInfo nestedAnnotationInfo) {
         AnnotationVisitor nestedAv = av.visitAnnotation(attributeName, nestedAnnotationInfo.getDescriptor());
-        
+
         if (nestedAv != null) {
             applyAttributes(nestedAv, nestedAnnotationInfo.getAttributes());
             nestedAv.visitEnd();
@@ -129,7 +130,7 @@ class AnnotationAttributeApplier {
      */
     private static void applyArrayAttribute(AnnotationVisitor av, @Nullable String attributeName, Object[] arrayValues) {
         AnnotationVisitor arrayVisitor = av.visitArray(attributeName);
-        
+
         if (arrayVisitor != null) {
             for (Object arrayValue : arrayValues) {
                 applyParsedValue(arrayVisitor, null, arrayValue);
@@ -149,9 +150,9 @@ class AnnotationCollectorHelper {
      */
     static AnnotationVisitor createCollector(String annotationDescriptor, List<String> collectedAnnotations) {
         return new AnnotationValueCollector(result -> {
-            String serializedAnnotation = result.isEmpty() 
-                ? AnnotationSerializer.serializeSimpleAnnotation(annotationDescriptor)
-                : AnnotationSerializer.serializeAnnotationWithAttributes(annotationDescriptor, result.toArray(new String[0]));
+            String serializedAnnotation = result.isEmpty()
+                    ? AnnotationSerializer.serializeSimpleAnnotation(annotationDescriptor)
+                    : AnnotationSerializer.serializeAnnotationWithAttributes(annotationDescriptor, result.toArray(new String[0]));
             collectedAnnotations.add(serializedAnnotation);
         });
     }
@@ -184,8 +185,8 @@ class AnnotationCollectorHelper {
         public AnnotationVisitor visitAnnotation(@Nullable String name, String nestedAnnotationDescriptor) {
             return new AnnotationValueCollector(result -> {
                 String nestedAnnotation = result.isEmpty()
-                    ? AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationDescriptor)
-                    : AnnotationSerializer.serializeAnnotationWithAttributes(nestedAnnotationDescriptor, result.toArray(new String[0]));
+                        ? AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationDescriptor)
+                        : AnnotationSerializer.serializeAnnotationWithAttributes(nestedAnnotationDescriptor, result.toArray(new String[0]));
                 addCollectedValue(name, nestedAnnotation);
             });
         }
@@ -238,8 +239,8 @@ class AnnotationCollectorHelper {
         public AnnotationVisitor visitAnnotation(@Nullable String name, String descriptor) {
             return new AnnotationValueCollector(result -> {
                 String annotation = result.isEmpty()
-                    ? AnnotationSerializer.serializeSimpleAnnotation(descriptor)
-                    : AnnotationSerializer.serializeAnnotationWithAttributes(descriptor, result.toArray(new String[0]));
+                        ? AnnotationSerializer.serializeSimpleAnnotation(descriptor)
+                        : AnnotationSerializer.serializeAnnotationWithAttributes(descriptor, result.toArray(new String[0]));
                 arrayValues.add(annotation);
             });
         }
@@ -265,7 +266,7 @@ class AnnotationCollectorHelper {
 class AnnotationDeserializer {
 
     private static final int MAX_NESTING_DEPTH = 32;
-    
+
     // JVM type descriptors: V=void, Z=boolean, C=char, B=byte, S=short, I=int, F=float, J=long, D=double
     private static final String JVM_PRIMITIVE_DESCRIPTORS = "VZCBSIFJD";
 
@@ -286,7 +287,7 @@ class AnnotationDeserializer {
         String annotationName = annotationStr.substring(1, parenIndex);
         String attributesStr = annotationStr.substring(parenIndex + 1, annotationStr.length() - 1);
         List<AttributeInfo> attributes = parseAttributes(attributesStr);
-        
+
         return new AnnotationInfo(annotationName, attributes);
     }
 
@@ -396,7 +397,7 @@ class AnnotationDeserializer {
         if (isPrimitiveTypeDescriptor(value)) return new ClassConstant(value);
         if (isArrayTypeDescriptor(value)) return new ClassConstant(value);
         if (isAnnotation(value)) return parseAnnotation(value);
-        
+
         // Try parsing as numeric, fallback to string
         return parseNumericValue(value);
     }
@@ -446,8 +447,8 @@ class AnnotationDeserializer {
     private static Object parseEnumConstant(String value) {
         int semicolonIndex = value.indexOf(';');
         return new EnumConstant(
-            value.substring(0, semicolonIndex + 1), 
-            value.substring(semicolonIndex + 1)
+                value.substring(0, semicolonIndex + 1),
+                value.substring(semicolonIndex + 1)
         );
     }
 
@@ -470,26 +471,31 @@ class AnnotationDeserializer {
 
     private static char parseCharValue(String value) {
         String charContent = value.substring(1, value.length() - 1);
-        
+
         if (charContent.length() == 1) {
             return charContent.charAt(0);
         } else if (charContent.startsWith("\\") && charContent.length() == 2) {
             return parseCharEscapeSequence(charContent.charAt(1));
         } else {
             throw new IllegalArgumentException(
-                "Invalid character literal '" + value + "'. Expected format: 'c' or escape sequence like '\\n'"
+                    "Invalid character literal '" + value + "'. Expected format: 'c' or escape sequence like '\\n'"
             );
         }
     }
 
     private static char parseCharEscapeSequence(char escapeChar) {
         switch (escapeChar) {
-            case '\'': return '\'';
-            case '\\': return '\\';
-            case 'n': return '\n';
-            case 'r': return '\r';
-            case 't': return '\t';
-            default: 
+            case '\'':
+                return '\'';
+            case '\\':
+                return '\\';
+            case 'n':
+                return '\n';
+            case 'r':
+                return '\r';
+            case 't':
+                return '\t';
+            default:
                 // Allow other escape sequences to pass through (like unicode escapes)
                 return escapeChar;
         }
@@ -513,13 +519,26 @@ class AnnotationDeserializer {
 
             if (escaped) {
                 switch (c) {
-                    case '"': sb.append('"'); break;
-                    case '\\': sb.append('\\'); break;
-                    case 'n': sb.append('\n'); break;
-                    case 'r': sb.append('\r'); break;
-                    case 't': sb.append('\t'); break;
-                    case '|': sb.append('|'); break; // TypeTable-specific escape
-                    default: sb.append(c); // Pass through unknown escapes
+                    case '"':
+                        sb.append('"');
+                        break;
+                    case '\\':
+                        sb.append('\\');
+                        break;
+                    case 'n':
+                        sb.append('\n');
+                        break;
+                    case 'r':
+                        sb.append('\r');
+                        break;
+                    case 't':
+                        sb.append('\t');
+                        break;
+                    case '|':
+                        sb.append('|');
+                        break; // TypeTable-specific escape
+                    default:
+                        sb.append(c); // Pass through unknown escapes
                 }
                 escaped = false;
             } else if (c == '\\') {
@@ -534,7 +553,7 @@ class AnnotationDeserializer {
 
     private static Object[] parseArrayValue(String value, int depth) {
         String arrayContent = value.substring(1, value.length() - 1).trim();
-        
+
         if (arrayContent.isEmpty()) {
             return new Object[0];
         }
@@ -559,8 +578,13 @@ class AnnotationDeserializer {
             this.attributes = attributes;
         }
 
-        public String getDescriptor() { return descriptor; }
-        public @Nullable List<AttributeInfo> getAttributes() { return attributes; }
+        public String getDescriptor() {
+            return descriptor;
+        }
+
+        public @Nullable List<AttributeInfo> getAttributes() {
+            return attributes;
+        }
     }
 
     public static class AttributeInfo {
@@ -572,15 +596,25 @@ class AnnotationDeserializer {
             this.value = value;
         }
 
-        public String getName() { return name; }
-        public String getValue() { return value; }
+        public String getName() {
+            return name;
+        }
+
+        public String getValue() {
+            return value;
+        }
     }
 
     public static class ClassConstant {
         private final String descriptor;
 
-        public ClassConstant(String descriptor) { this.descriptor = descriptor; }
-        public String getDescriptor() { return descriptor; }
+        public ClassConstant(String descriptor) {
+            this.descriptor = descriptor;
+        }
+
+        public String getDescriptor() {
+            return descriptor;
+        }
     }
 
     public static class EnumConstant {
@@ -592,8 +626,13 @@ class AnnotationDeserializer {
             this.constantName = constantName;
         }
 
-        public String getEnumDescriptor() { return enumDescriptor; }
-        public String getConstantName() { return constantName; }
+        public String getEnumDescriptor() {
+            return enumDescriptor;
+        }
+
+        public String getConstantName() {
+            return constantName;
+        }
     }
 
     public static class FieldConstant {
@@ -605,8 +644,13 @@ class AnnotationDeserializer {
             this.fieldName = fieldName;
         }
 
-        public String getClassName() { return className; }
-        public String getFieldName() { return fieldName; }
+        public String getClassName() {
+            return className;
+        }
+
+        public String getFieldName() {
+            return fieldName;
+        }
     }
 }
 
@@ -614,27 +658,27 @@ class AnnotationDeserializer {
  * Utility methods for handling TSV escaping in annotation contexts.
  */
 class TsvEscapeUtils {
-    
+
     /**
      * Splits a string by the given delimiter, respecting escape sequences and returning unescaped values.
      * TSV escaping is only for transport - the results are unescaped to get back original values.
-     * 
+     *
      * @param input the input string to split
      * @param delimiter the delimiter character to split on
      * @return array of unescaped string segments
      */
-    @org.jetbrains.annotations.VisibleForTesting
+    @VisibleForTesting
     static String[] splitAnnotationList(String input, char delimiter) {
         if (input.isEmpty()) return new String[0];
-        
+
         List<String> result = new ArrayList<>();
         StringBuilder current = null; // Lazy allocation
         boolean escaped = false;
         int segmentStart = 0;
-        
+
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
-            
+
             if (escaped) {
                 // Previous character was backslash, so this character is escaped
                 if (current == null) {
@@ -664,7 +708,7 @@ class TsvEscapeUtils {
             }
             // If current == null and it's a regular character, do nothing (will use substring later)
         }
-        
+
         // Handle trailing backslash (malformed escape)
         if (escaped) {
             if (current == null) {
@@ -673,7 +717,7 @@ class TsvEscapeUtils {
             }
             current.append('\\');
         }
-        
+
         // Add the last segment
         if (current == null) {
             // No escapes in final segment - use substring
@@ -681,7 +725,7 @@ class TsvEscapeUtils {
         } else {
             result.add(current.toString());
         }
-        
+
         return result.toArray(new String[0]);
     }
 }
@@ -703,12 +747,23 @@ class AnnotationSerializer {
         StringBuilder sb = new StringBuilder();
         sb.append('\'');
         switch (value) {
-            case '\'': sb.append("\\'"); break;
-            case '\\': sb.append("\\\\"); break;
-            case '\n': sb.append("\\n"); break;
-            case '\r': sb.append("\\r"); break;
-            case '\t': sb.append("\\t"); break;
-            default: sb.append(value);
+            case '\'':
+                sb.append("\\'");
+                break;
+            case '\\':
+                sb.append("\\\\");
+                break;
+            case '\n':
+                sb.append("\\n");
+                break;
+            case '\r':
+                sb.append("\\r");
+                break;
+            case '\t':
+                sb.append("\\t");
+                break;
+            default:
+                sb.append(value);
         }
         sb.append('\'');
         return sb.toString();
@@ -728,25 +783,6 @@ class AnnotationSerializer {
 
     public static String serializeDouble(double value) {
         return Double.toString(value);
-    }
-
-    public static String serializeString(String value) {
-        StringBuilder sb = new StringBuilder();
-        sb.append('"');
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                case '|': sb.append("\\|"); break;
-                default: sb.append(c);
-            }
-        }
-        sb.append('"');
-        return sb.toString();
     }
 
     public static String serializeClassConstant(Type type) {
@@ -794,26 +830,22 @@ class AnnotationSerializer {
     }
 
     static String serializeValue(Object value) {
-        return serializeValueInternal(value, false);
+        return serializeValueInternal(value);
     }
 
     public static String convertAnnotationValueToString(Object value) {
-        return serializeValueInternal(value, true);
+        return serializeValueInternal(value);
     }
 
-    private static String serializeValueInternal(@Nullable Object value, boolean typeTableFormat) {
+    private static String serializeValueInternal(@Nullable Object value) {
         if (value == null) {
             return "null";
         } else if (value instanceof String) {
-            return typeTableFormat ? 
-                "\"" + escapeDelimiters(value.toString()) + "\"" : 
-                serializeString((String) value);
+            return "\"" + escapeStringContentForTsv(value.toString()) + "\"";
         } else if (value instanceof Type) {
-            return typeTableFormat ? 
-                ((Type) value).getDescriptor() : 
-                serializeClassConstant((Type) value);
+            return serializeClassConstant((Type) value);
         } else if (value.getClass().isArray()) {
-            return serializeArrayValue(value, typeTableFormat);
+            return serializeArrayValue(value);
         } else if (value instanceof Boolean) {
             return serializeBoolean((Boolean) value);
         } else if (value instanceof Character) {
@@ -825,25 +857,78 @@ class AnnotationSerializer {
         }
     }
 
-    private static String serializeArrayValue(Object value, boolean typeTableFormat) {
+    /**
+     * Escapes string content for TSV storage. Unlike escapeDelimiters(), this method
+     * does NOT escape quotes since they're part of the string structure in TypeTable format.
+     * It escapes backslashes, pipe characters (TSV delimiters), and control characters
+     * using Java source code escape sequences.
+     */
+    private static String escapeStringContentForTsv(String content) {
+        StringBuilder sb = null; // Lazy allocation
+        int start = 0;
+
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            String replacement = null;
+
+            switch (c) {
+                case '\\':
+                    replacement = "\\\\";
+                    break;
+                case '|':
+                    replacement = "\\|";
+                    break;
+                case '\n':
+                    replacement = "\\n";
+                    break;
+                case '\r':
+                    replacement = "\\r";
+                    break;
+                case '\t':
+                    replacement = "\\t";
+                    break;
+                case '\b':
+                    replacement = "\\b";
+                    break;
+                case '\f':
+                    replacement = "\\f";
+                    break;
+            }
+
+            if (replacement != null) {
+                if (sb == null) {
+                    // First escape found - allocate StringBuilder and copy previous content
+                    sb = new StringBuilder();
+                    sb.append(content, start, i);
+                }
+                sb.append(replacement);
+            } else if (sb != null) {
+                // We're building escaped content and this is a regular character
+                sb.append(c);
+            }
+        }
+
+        // If no escaping was needed, return the original string
+        return sb == null ? content : sb.toString();
+    }
+
+    private static String serializeArrayValue(Object value) {
         List<String> elements = new ArrayList<>();
-        
+
         if (value instanceof Object[]) {
             Object[] array = (Object[]) value;
             for (Object element : array) {
-                elements.add(serializeValueInternal(element, typeTableFormat));
+                elements.add(serializeValueInternal(element));
             }
         } else {
             int length = java.lang.reflect.Array.getLength(value);
             for (int i = 0; i < length; i++) {
                 Object element = java.lang.reflect.Array.get(value, i);
-                elements.add(serializeValueInternal(element, typeTableFormat));
+                elements.add(serializeValueInternal(element));
             }
         }
-        
-        return typeTableFormat ? 
-            "{" + String.join(",", elements) + "}" : 
-            serializeArray(elements.toArray(new String[0]));
+
+        return "{" + String.join(",", elements) + "}";
     }
 
     private static String serializeNumericValue(Number value) {
