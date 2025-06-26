@@ -23,8 +23,14 @@ import org.objectweb.asm.Type;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.Objects.requireNonNull;
-import static org.openrewrite.java.internal.parser.AnnotationSerializer.*;
+/**
+ * Functional interface for creating an AnnotationVisitor.
+ */
+@FunctionalInterface
+interface AnnotationVisitorCreator {
+    @Nullable
+    AnnotationVisitor create(String descriptor, boolean visible);
+}
 
 /**
  * Helper class for applying annotations to classes, methods, and fields using ASM.
@@ -42,249 +48,153 @@ class AnnotationApplier {
             return;
         }
 
-        // Parse the annotation using AnnotationDeserializer
         AnnotationDeserializer.AnnotationInfo annotationInfo = AnnotationDeserializer.parseAnnotation(annotationStr);
-        String annotationDescriptor = annotationInfo.getDescriptor();
-
-        AnnotationVisitor av = visitAnnotation.create(annotationDescriptor, true);
+        AnnotationVisitor av = visitAnnotation.create(annotationInfo.getDescriptor(), true);
+        
         if (av != null) {
-            // Apply annotation attributes if present
-            if (annotationInfo.getAttributes() != null && !annotationInfo.getAttributes().isEmpty()) {
-                for (AnnotationDeserializer.AttributeInfo attribute : annotationInfo.getAttributes()) {
-                    String attributeName = attribute.getName();
-                    String attributeValue = attribute.getValue();
-                    Object parsedValue = AnnotationDeserializer.parseValue(attributeValue);
-
-                    if (parsedValue instanceof Boolean) {
-                        av.visit(attributeName, parsedValue);
-                    } else if (parsedValue instanceof Character) {
-                        av.visit(attributeName, parsedValue);
-                    } else if (parsedValue instanceof Number) {
-                        av.visit(attributeName, parsedValue);
-                    } else if (parsedValue instanceof String) {
-                        // Remove quotes from string values
-                        String stringValue = (String) parsedValue;
-                        if (stringValue.startsWith("\"") && stringValue.endsWith("\"")) {
-                            stringValue = stringValue.substring(1, stringValue.length() - 1);
-                        }
-                        av.visit(attributeName, stringValue);
-                    } else if (parsedValue instanceof AnnotationDeserializer.ClassConstant) {
-                        String classDescriptor = ((AnnotationDeserializer.ClassConstant) parsedValue).getDescriptor();
-                        av.visit(attributeName, org.objectweb.asm.Type.getType(classDescriptor));
-                    } else if (parsedValue instanceof AnnotationDeserializer.EnumConstant) {
-                        AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) parsedValue;
-                        String enumDescriptor = enumConstant.getEnumDescriptor();
-                        String constantName = enumConstant.getConstantName();
-                        av.visitEnum(attributeName, enumDescriptor, constantName);
-                    } else if (parsedValue instanceof AnnotationDeserializer.AnnotationInfo) {
-                        // Handle nested annotations
-                        AnnotationDeserializer.AnnotationInfo nestedAnnotationInfo = (AnnotationDeserializer.AnnotationInfo) parsedValue;
-                        String nestedAnnotationDescriptor = nestedAnnotationInfo.getDescriptor();
-                        AnnotationVisitor nestedAv = av.visitAnnotation(attributeName, nestedAnnotationDescriptor);
-
-                        if (nestedAv != null && nestedAnnotationInfo.getAttributes() != null && !nestedAnnotationInfo.getAttributes().isEmpty()) {
-                            for (AnnotationDeserializer.AttributeInfo nestedAttribute : nestedAnnotationInfo.getAttributes()) {
-                                String nestedAttributeName = nestedAttribute.getName();
-                                String nestedAttributeValue = nestedAttribute.getValue();
-                                Object nestedParsedValue = AnnotationDeserializer.parseValue(nestedAttributeValue);
-
-                                if (nestedParsedValue instanceof Boolean) {
-                                    nestedAv.visit(nestedAttributeName, nestedParsedValue);
-                                } else if (nestedParsedValue instanceof Character) {
-                                    nestedAv.visit(nestedAttributeName, nestedParsedValue);
-                                } else if (nestedParsedValue instanceof Number) {
-                                    nestedAv.visit(nestedAttributeName, nestedParsedValue);
-                                } else if (nestedParsedValue instanceof String) {
-                                    // Remove quotes from string values
-                                    String stringValue = (String) nestedParsedValue;
-                                    if (stringValue.startsWith("\"") && stringValue.endsWith("\"")) {
-                                        stringValue = stringValue.substring(1, stringValue.length() - 1);
-                                    }
-                                    nestedAv.visit(nestedAttributeName, stringValue);
-                                } else if (nestedParsedValue instanceof AnnotationDeserializer.ClassConstant) {
-                                    String classDescriptor = ((AnnotationDeserializer.ClassConstant) nestedParsedValue).getDescriptor();
-                                    nestedAv.visit(nestedAttributeName, org.objectweb.asm.Type.getObjectType(classDescriptor));
-                                } else if (nestedParsedValue instanceof AnnotationDeserializer.EnumConstant) {
-                                    AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) nestedParsedValue;
-                                    String enumType = enumConstant.getEnumDescriptor();
-                                    String constantName = enumConstant.getConstantName();
-                                    nestedAv.visitEnum(nestedAttributeName, enumType, constantName);
-                                }
-                                // We don't handle nested annotations within nested annotations or arrays within nested annotations
-                            }
-                            nestedAv.visitEnd();
-                        }
-                    } else if (parsedValue instanceof Object[]) {
-                        // Handle array attributes
-                        Object[] arrayValues = (Object[]) parsedValue;
-                        AnnotationVisitor arrayVisitor = av.visitArray(attributeName);
-                        if (arrayVisitor != null) {
-                            for (Object arrayValue : arrayValues) {
-                                if (arrayValue instanceof Boolean) {
-                                    arrayVisitor.visit(null, arrayValue);
-                                } else if (arrayValue instanceof Character) {
-                                    arrayVisitor.visit(null, arrayValue);
-                                } else if (arrayValue instanceof Number) {
-                                    arrayVisitor.visit(null, arrayValue);
-                                } else if (arrayValue instanceof String) {
-                                    // Remove quotes from string values
-                                    String stringValue = (String) arrayValue;
-                                    if (stringValue.startsWith("\"") && stringValue.endsWith("\"")) {
-                                        stringValue = stringValue.substring(1, stringValue.length() - 1);
-                                    }
-                                    arrayVisitor.visit(null, stringValue);
-                                } else if (arrayValue instanceof AnnotationDeserializer.ClassConstant) {
-                                    String classDescriptor = ((AnnotationDeserializer.ClassConstant) arrayValue).getDescriptor();
-                                    arrayVisitor.visit(null, org.objectweb.asm.Type.getObjectType(classDescriptor));
-                                } else if (arrayValue instanceof AnnotationDeserializer.EnumConstant) {
-                                    AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) arrayValue;
-                                    String enumDescriptor = enumConstant.getEnumDescriptor();
-                                    String constantName = enumConstant.getConstantName();
-                                    arrayVisitor.visitEnum(null, enumDescriptor, constantName);
-                                }
-                            }
-                            arrayVisitor.visitEnd();
-                        }
-                    }
-                }
-            }
-
+            AnnotationAttributeApplier.applyAttributes(av, annotationInfo.getAttributes());
             av.visitEnd();
         }
-
     }
-
-    /**
-     * Functional interface for creating an AnnotationVisitor.
-     */
-    @FunctionalInterface
-    public interface AnnotationVisitorCreator {
-        @Nullable
-        AnnotationVisitor create(String descriptor, boolean visible);
-    }
-
 }
 
 /**
- * Helper class to create reusable annotation visitors, eliminating code duplication.
+ * Handles the application of annotation attributes to ASM AnnotationVisitors.
+ * Centralizes the value handling logic that was previously duplicated.
+ */
+class AnnotationAttributeApplier {
+
+    /**
+     * Applies a list of attributes to an annotation visitor.
+     */
+    public static void applyAttributes(AnnotationVisitor av, @Nullable List<AnnotationDeserializer.AttributeInfo> attributes) {
+        if (attributes == null || attributes.isEmpty()) {
+            return;
+        }
+
+        for (AnnotationDeserializer.AttributeInfo attribute : attributes) {
+            applyAttribute(av, attribute.getName(), attribute.getValue());
+        }
+    }
+
+    /**
+     * Applies a single attribute to an annotation visitor.
+     */
+    private static void applyAttribute(AnnotationVisitor av, String attributeName, String attributeValue) {
+        Object parsedValue = AnnotationDeserializer.parseValue(attributeValue);
+        applyParsedValue(av, attributeName, parsedValue);
+    }
+
+    /**
+     * Applies a parsed value to an annotation visitor.
+     * This method centralizes all the value handling logic that was previously duplicated.
+     */
+    public static void applyParsedValue(AnnotationVisitor av, @Nullable String attributeName, Object parsedValue) {
+        if (parsedValue instanceof Boolean || parsedValue instanceof Character || parsedValue instanceof Number) {
+            av.visit(attributeName, parsedValue);
+        } else if (parsedValue instanceof String) {
+            String stringValue = (String) parsedValue;
+            if (stringValue.startsWith("\"") && stringValue.endsWith("\"")) {
+                stringValue = stringValue.substring(1, stringValue.length() - 1);
+            }
+            av.visit(attributeName, stringValue);
+        } else if (parsedValue instanceof AnnotationDeserializer.ClassConstant) {
+            String classDescriptor = ((AnnotationDeserializer.ClassConstant) parsedValue).getDescriptor();
+            av.visit(attributeName, Type.getType(classDescriptor));
+        } else if (parsedValue instanceof AnnotationDeserializer.EnumConstant) {
+            AnnotationDeserializer.EnumConstant enumConstant = (AnnotationDeserializer.EnumConstant) parsedValue;
+            av.visitEnum(attributeName, enumConstant.getEnumDescriptor(), enumConstant.getConstantName());
+        } else if (parsedValue instanceof AnnotationDeserializer.AnnotationInfo) {
+            applyNestedAnnotation(av, attributeName, (AnnotationDeserializer.AnnotationInfo) parsedValue);
+        } else if (parsedValue instanceof Object[]) {
+            applyArrayAttribute(av, attributeName, (Object[]) parsedValue);
+        }
+    }
+
+    /**
+     * Applies a nested annotation to an annotation visitor.
+     */
+    private static void applyNestedAnnotation(AnnotationVisitor av, @Nullable String attributeName, 
+                                            AnnotationDeserializer.AnnotationInfo nestedAnnotationInfo) {
+        AnnotationVisitor nestedAv = av.visitAnnotation(attributeName, nestedAnnotationInfo.getDescriptor());
+        
+        if (nestedAv != null) {
+            applyAttributes(nestedAv, nestedAnnotationInfo.getAttributes());
+            nestedAv.visitEnd();
+        }
+    }
+
+    /**
+     * Applies an array attribute to an annotation visitor.
+     */
+    private static void applyArrayAttribute(AnnotationVisitor av, @Nullable String attributeName, Object[] arrayValues) {
+        AnnotationVisitor arrayVisitor = av.visitArray(attributeName);
+        
+        if (arrayVisitor != null) {
+            for (Object arrayValue : arrayValues) {
+                applyParsedValue(arrayVisitor, null, arrayValue);
+            }
+            arrayVisitor.visitEnd();
+        }
+    }
+}
+
+/**
+ * Helper class to create reusable annotation visitors for collecting annotation data.
  */
 class AnnotationCollectorHelper {
 
     /**
      * Creates an annotation visitor that collects annotation values into a serialized string format.
-     *
-     * @param annotationDescriptor The descriptor of the annotation
-     * @param collectedAnnotations The list to which the serialized annotation will be added
-     * @return An annotation visitor that collects annotation values
      */
     static AnnotationVisitor createCollector(String annotationDescriptor, List<String> collectedAnnotations) {
-        String baseAnnotation = serializeSimpleAnnotation(annotationDescriptor);
-
-        return new AnnotationValueCollector(annotationDescriptor, null, result -> {
-            if (result.isEmpty()) {
-                collectedAnnotations.add(baseAnnotation);
-            } else {
-                String annotationWithAttributes = serializeAnnotationWithAttributes(
-                        annotationDescriptor,
-                        result.toArray(new String[0])
-                );
-                collectedAnnotations.add(annotationWithAttributes);
-            }
+        return new AnnotationValueCollector(result -> {
+            String serializedAnnotation = result.isEmpty() 
+                ? AnnotationSerializer.serializeSimpleAnnotation(annotationDescriptor)
+                : AnnotationSerializer.serializeAnnotationWithAttributes(annotationDescriptor, result.toArray(new String[0]));
+            collectedAnnotations.add(serializedAnnotation);
         });
     }
 
     /**
-     * A reusable annotation visitor that collects annotation values and supports nesting.
-     * This class handles nested annotations and arrays properly by creating new instances
-     * of itself for nested structures.
+     * A reusable annotation visitor that collects annotation values.
      */
     static class AnnotationValueCollector extends AnnotationVisitor {
-        private final String annotationName;
-        private final @Nullable String attributeName;
         private final ResultCallback callback;
         private final List<String> collectedValues = new ArrayList<>();
 
-        /**
-         * Creates a new annotation value collector.
-         *
-         * @param annotationDescriptor The name of the annotation being collected
-         * @param attributeName The name of the attribute being collected (null for array elements)
-         * @param callback The callback to invoke with the collected result
-         */
-        AnnotationValueCollector(String annotationDescriptor, @Nullable String attributeName, ResultCallback callback) {
+        AnnotationValueCollector(ResultCallback callback) {
             super(Opcodes.ASM9);
-            this.annotationName = annotationDescriptor;
-            this.attributeName = attributeName;
             this.callback = callback;
         }
 
         @Override
         public void visit(@Nullable String name, Object value) {
-            String attributeValue = serializeValue(value);
-            if (attributeName == null && name == null) {
-                // This is an array element
-                collectedValues.add(attributeValue);
-            } else {
-                // This is a named attribute
-                collectedValues.add(serializeAttribute(
-                        name != null ? name : attributeName,
-                        attributeValue
-                ));
-            }
+            String serializedValue = AnnotationSerializer.serializeValue(value);
+            addCollectedValue(name, serializedValue);
         }
 
         @Override
         public void visitEnum(@Nullable String name, String descriptor, String value) {
-            String attributeValue = serializeEnumConstant(descriptor, value);
-            if (name == null && attributeName == null) {
-                // This is an array element
-                collectedValues.add(attributeValue);
-            } else {
-                // This is a named attribute
-                collectedValues.add(serializeAttribute(
-                        name != null ? name : attributeName,
-                        attributeValue
-                ));
-            }
+            String serializedValue = AnnotationSerializer.serializeEnumConstant(descriptor, value);
+            addCollectedValue(name, serializedValue);
         }
 
         @Override
         public AnnotationVisitor visitAnnotation(@Nullable String name, String nestedAnnotationDescriptor) {
-
-            // Create a new collector for the nested annotation
-            return new AnnotationValueCollector(nestedAnnotationDescriptor, name, result -> {
-                String nestedAnnotation;
-                if (result.isEmpty()) {
-                    nestedAnnotation = serializeSimpleAnnotation(nestedAnnotationDescriptor);
-                } else {
-                    nestedAnnotation = serializeAnnotationWithAttributes(
-                            nestedAnnotationDescriptor,
-                            result.toArray(new String[0])
-                    );
-                }
-
-                if (attributeName == null && name == null) {
-                    // This is an array element
-                    collectedValues.add(nestedAnnotation);
-                } else {
-                    // This is a named attribute
-                    collectedValues.add(serializeAttribute(
-                            name != null ? name : attributeName,
-                            nestedAnnotation
-                    ));
-                }
+            return new AnnotationValueCollector(result -> {
+                String nestedAnnotation = result.isEmpty()
+                    ? AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationDescriptor)
+                    : AnnotationSerializer.serializeAnnotationWithAttributes(nestedAnnotationDescriptor, result.toArray(new String[0]));
+                addCollectedValue(name, nestedAnnotation);
             });
         }
 
         @Override
         public AnnotationVisitor visitArray(@Nullable String name) {
-            // Create a new collector for the array elements
-            return new AnnotationValueCollector(annotationName, null, result -> {
-                String arrayValue = serializeArray(result.toArray(new String[0]));
-                collectedValues.add(serializeAttribute(
-                        name != null ? name : requireNonNull(attributeName),
-                        arrayValue
-                ));
+            return new ArrayValueCollector(arrayValues -> {
+                String arrayValue = AnnotationSerializer.serializeArray(arrayValues.toArray(new String[0]));
+                addCollectedValue(name, arrayValue);
             });
         }
 
@@ -292,10 +202,56 @@ class AnnotationCollectorHelper {
         public void visitEnd() {
             callback.onResult(collectedValues);
         }
+
+        private void addCollectedValue(@Nullable String name, String value) {
+            if (name == null) {
+                collectedValues.add(value);
+            } else {
+                collectedValues.add(AnnotationSerializer.serializeAttribute(name, value));
+            }
+        }
     }
 
     /**
-     * Callback interface for receiving the result of annotation value collection.
+     * Specialized collector for array values.
+     */
+    static class ArrayValueCollector extends AnnotationVisitor {
+        private final List<String> arrayValues = new ArrayList<>();
+        private final ResultCallback callback;
+
+        ArrayValueCollector(ResultCallback callback) {
+            super(Opcodes.ASM9);
+            this.callback = callback;
+        }
+
+        @Override
+        public void visit(@Nullable String name, Object value) {
+            arrayValues.add(AnnotationSerializer.serializeValue(value));
+        }
+
+        @Override
+        public void visitEnum(@Nullable String name, String descriptor, String value) {
+            arrayValues.add(AnnotationSerializer.serializeEnumConstant(descriptor, value));
+        }
+
+        @Override
+        public AnnotationVisitor visitAnnotation(@Nullable String name, String descriptor) {
+            return new AnnotationValueCollector(result -> {
+                String annotation = result.isEmpty()
+                    ? AnnotationSerializer.serializeSimpleAnnotation(descriptor)
+                    : AnnotationSerializer.serializeAnnotationWithAttributes(descriptor, result.toArray(new String[0]));
+                arrayValues.add(annotation);
+            });
+        }
+
+        @Override
+        public void visitEnd() {
+            callback.onResult(arrayValues);
+        }
+    }
+
+    /**
+     * Callback interface for receiving collection results.
      */
     @FunctionalInterface
     interface ResultCallback {
@@ -305,49 +261,37 @@ class AnnotationCollectorHelper {
 
 /**
  * Deserializes annotation strings from the TypeTable format back into Java objects.
- * This class handles parsing of different types of annotation values:
- * - Primitive types (boolean, char, byte, short, int, long, float, double)
- * - String values
- * - Class constants
- * - Field constants
- * - Enum constants
- * - Arrays and nested arrays
- * - Nested annotations
  */
 class AnnotationDeserializer {
 
+    private static final int MAX_NESTING_DEPTH = 32;
+    
+    // JVM type descriptors: V=void, Z=boolean, C=char, B=byte, S=short, I=int, F=float, J=long, D=double
+    private static final String JVM_PRIMITIVE_DESCRIPTORS = "VZCBSIFJD";
+
     /**
      * Parses a serialized annotation string.
-     *
-     * @param annotationStr The serialized annotation string
-     * @return The annotation name and attributes (if any)
      */
     public static AnnotationInfo parseAnnotation(String annotationStr) {
         if (!annotationStr.startsWith("@")) {
             throw new IllegalArgumentException("Invalid annotation format: " + annotationStr);
         }
 
-        // Extract annotation name and attributes
         int parenIndex = annotationStr.indexOf('(');
-        String annotationName;
         if (parenIndex == -1) {
-            // Simple annotation without attributes
-            annotationName = annotationStr.substring(1);
+            String annotationName = annotationStr.substring(1);
             return new AnnotationInfo(annotationName, null);
         }
 
-        annotationName = annotationStr.substring(1, parenIndex);
+        String annotationName = annotationStr.substring(1, parenIndex);
         String attributesStr = annotationStr.substring(parenIndex + 1, annotationStr.length() - 1);
-
         List<AttributeInfo> attributes = parseAttributes(attributesStr);
+        
         return new AnnotationInfo(annotationName, attributes);
     }
 
     /**
      * Parses a string containing serialized attributes.
-     *
-     * @param attributesStr The serialized attributes string
-     * @return A list of attribute name-value pairs
      */
     private static List<AttributeInfo> parseAttributes(String attributesStr) {
         List<AttributeInfo> attributes = new ArrayList<>();
@@ -355,16 +299,12 @@ class AnnotationDeserializer {
             return attributes;
         }
 
-        // Split by commas, but respect nested structures
         List<String> attributeStrings = splitRespectingNestedStructures(attributesStr, ',');
-
         for (String attributeStr : attributeStrings) {
             int equalsIndex = attributeStr.indexOf('=');
             if (equalsIndex == -1) {
-                // Single unnamed attribute (e.g., "value")
                 attributes.add(new AttributeInfo("value", attributeStr.trim()));
             } else {
-                // Named attribute (e.g., "name=value")
                 String name = attributeStr.substring(0, equalsIndex).trim();
                 String value = attributeStr.substring(equalsIndex + 1).trim();
                 attributes.add(new AttributeInfo(name, value));
@@ -375,12 +315,7 @@ class AnnotationDeserializer {
     }
 
     /**
-     * Splits a string by a delimiter, respecting nested structures like parentheses,
-     * braces, and quotes.
-     *
-     * @param str The string to split
-     * @param delimiter The delimiter character
-     * @return A list of substrings
+     * Splits a string by a delimiter, respecting nested structures.
      */
     private static List<String> splitRespectingNestedStructures(String str, char delimiter) {
         List<String> result = new ArrayList<>();
@@ -405,25 +340,31 @@ class AnnotationDeserializer {
 
             if (c == '"' && !inQuotes) {
                 inQuotes = true;
-            } else if (c == '"') {
+            } else if (c == '"' && inQuotes) {
                 inQuotes = false;
             } else if (!inQuotes) {
-                if (c == '(') {
-                    parenDepth++;
-                } else if (c == ')') {
-                    parenDepth--;
-                } else if (c == '{') {
-                    braceDepth++;
-                } else if (c == '}') {
-                    braceDepth--;
-                } else if (c == delimiter && parenDepth == 0 && braceDepth == 0) {
-                    result.add(str.substring(start, i).trim());
-                    start = i + 1;
+                switch (c) {
+                    case '(':
+                        parenDepth++;
+                        break;
+                    case ')':
+                        parenDepth--;
+                        break;
+                    case '{':
+                        braceDepth++;
+                        break;
+                    case '}':
+                        braceDepth--;
+                        break;
+                    default:
+                        if (c == delimiter && parenDepth == 0 && braceDepth == 0) {
+                            result.add(str.substring(start, i).trim());
+                            start = i + 1;
+                        }
                 }
             }
         }
 
-        // Add the last segment
         if (start < str.length()) {
             result.add(str.substring(start).trim());
         }
@@ -433,156 +374,152 @@ class AnnotationDeserializer {
 
     /**
      * Determines the type of a serialized value and returns it in the appropriate format.
-     *
-     * @param value The serialized value
-     * @return The value in the appropriate format
      */
     public static Object parseValue(String value) {
+        return parseValue(value, 0);
+    }
+
+    private static Object parseValue(String value, int depth) {
+        if (depth > MAX_NESTING_DEPTH) {
+            throw new IllegalArgumentException("Maximum nesting depth of " + MAX_NESTING_DEPTH + " exceeded while parsing: " + value);
+        }
+
         value = value.trim();
 
-        // Boolean
-        if ("true".equals(value) || "false".equals(value)) {
-            return Boolean.parseBoolean(value);
-        }
+        // Handle different value types in order of specificity
+        if (isBoolean(value)) return Boolean.parseBoolean(value);
+        if (isCharLiteral(value)) return parseCharValue(value);
+        if (isStringLiteral(value)) return parseStringValue(value);
+        if (isArrayLiteral(value)) return parseArrayValue(value, depth + 1);
+        if (isClassConstant(value)) return parseClassConstant(value);
+        if (isEnumConstant(value)) return parseEnumConstant(value);
+        if (isPrimitiveTypeDescriptor(value)) return new ClassConstant(value);
+        if (isArrayTypeDescriptor(value)) return new ClassConstant(value);
+        if (isAnnotation(value)) return parseAnnotation(value);
+        
+        // Try parsing as numeric, fallback to string
+        return parseNumericValue(value);
+    }
 
-        // Character
-        if (value.startsWith("'") && value.endsWith("'")) {
-            return parseCharValue(value);
-        }
+    // Type checking helper methods
+    private static boolean isBoolean(String value) {
+        return "true".equals(value) || "false".equals(value);
+    }
 
-        // String
-        if (value.startsWith("\"") && value.endsWith("\"")) {
-            return parseStringValue(value);
-        }
+    private static boolean isCharLiteral(String value) {
+        return value.startsWith("'") && value.endsWith("'");
+    }
 
-        // Array
-        if (value.startsWith("{") && value.endsWith("}")) {
-            return parseArrayValue(value);
-        }
+    private static boolean isStringLiteral(String value) {
+        return value.startsWith("\"") && value.endsWith("\"");
+    }
 
-        // Class constant
-        if (value.startsWith("L") && value.endsWith(";")) {
-            return new ClassConstant(value);
-        }
+    private static boolean isArrayLiteral(String value) {
+        return value.startsWith("{") && value.endsWith("}");
+    }
 
-        // Constant
-        if (value.startsWith("L")) {
-            int semicolonIndex = value.indexOf(';');
-            return new EnumConstant(value.substring(0, semicolonIndex + 1), value.substring(semicolonIndex + 1));
-        }
+    private static boolean isClassConstant(String value) {
+        return value.startsWith("L") && value.endsWith(";");
+    }
 
-        // primitive types
-        if (value.length() == 1 && "VZCBSIFJD".contains(value)) {
-            return new ClassConstant(value);
-        }
+    private static boolean isEnumConstant(String value) {
+        return value.startsWith("L") && value.contains(";") && !value.endsWith(";");
+    }
 
-        // array types
-        if (value.startsWith("[")) {
-            return new ClassConstant(value);
-        }
+    private static boolean isPrimitiveTypeDescriptor(String value) {
+        return value.length() == 1 && JVM_PRIMITIVE_DESCRIPTORS.contains(value);
+    }
 
-        // Nested annotation
-        if (value.startsWith("@")) {
-            return parseAnnotation(value);
-        }
+    private static boolean isArrayTypeDescriptor(String value) {
+        return value.startsWith("[");
+    }
 
-        // Numeric values
+    private static boolean isAnnotation(String value) {
+        return value.startsWith("@");
+    }
+
+    // Value parsing helper methods
+    private static Object parseClassConstant(String value) {
+        return new ClassConstant(value);
+    }
+
+    private static Object parseEnumConstant(String value) {
+        int semicolonIndex = value.indexOf(';');
+        return new EnumConstant(
+            value.substring(0, semicolonIndex + 1), 
+            value.substring(semicolonIndex + 1)
+        );
+    }
+
+    private static Object parseNumericValue(String value) {
         try {
-            // Long
             if (value.endsWith("L") || value.endsWith("l")) {
                 return Long.parseLong(value.substring(0, value.length() - 1));
             }
-
-            // Float
             if (value.endsWith("F") || value.endsWith("f")) {
                 return Float.parseFloat(value.substring(0, value.length() - 1));
             }
-
-            // Double
             if (value.endsWith("D") || value.endsWith("d") || value.contains(".")) {
                 return Double.parseDouble(value);
             }
-
-            // Integer (or other numeric types that fit in an int)
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
-            // If it's not a recognized format, return it as a string
             return value;
         }
     }
 
-    /**
-     * Parses a serialized character value.
-     *
-     * @param value The serialized character value
-     * @return The character value
-     */
     private static char parseCharValue(String value) {
-        // Remove the surrounding quotes
         String charContent = value.substring(1, value.length() - 1);
-
+        
         if (charContent.length() == 1) {
             return charContent.charAt(0);
-        } else if (charContent.startsWith("\\")) {
-            // Handle escape sequences
-            char escapeChar = charContent.charAt(1);
-            switch (escapeChar) {
-                case '\'':
-                    return '\'';
-                case '\\':
-                    return '\\';
-                case 'n':
-                    return '\n';
-                case 'r':
-                    return '\r';
-                case 't':
-                    return '\t';
-                default:
-                    return escapeChar;
-            }
+        } else if (charContent.startsWith("\\") && charContent.length() == 2) {
+            return parseCharEscapeSequence(charContent.charAt(1));
         } else {
-            throw new IllegalArgumentException("Invalid character format: " + value);
+            throw new IllegalArgumentException(
+                "Invalid character literal '" + value + "'. Expected format: 'c' or escape sequence like '\\n'"
+            );
         }
     }
 
-    /**
-     * Parses a serialized string value.
-     *
-     * @param value The serialized string value
-     * @return The string value
-     */
-    private static String parseStringValue(String value) {
-        // Remove the surrounding quotes
-        String stringContent = value.substring(1, value.length() - 1);
+    private static char parseCharEscapeSequence(char escapeChar) {
+        switch (escapeChar) {
+            case '\'': return '\'';
+            case '\\': return '\\';
+            case 'n': return '\n';
+            case 'r': return '\r';
+            case 't': return '\t';
+            default: 
+                // Allow other escape sequences to pass through (like unicode escapes)
+                return escapeChar;
+        }
+    }
 
+    private static String parseStringValue(String value) {
+        String stringContent = value.substring(1, value.length() - 1);
+        return processStringEscapes(stringContent);
+    }
+
+    /**
+     * Processes escape sequences in string content.
+     * Handles standard escapes (\", \\, \n, \r, \t) and TypeTable-specific escapes (\|).
+     */
+    private static String processStringEscapes(String content) {
         StringBuilder sb = new StringBuilder();
         boolean escaped = false;
 
-        for (int i = 0; i < stringContent.length(); i++) {
-            char c = stringContent.charAt(i);
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
 
             if (escaped) {
                 switch (c) {
-                    case '"':
-                        sb.append('"');
-                        break;
-                    case '\\':
-                        sb.append('\\');
-                        break;
-                    case 'n':
-                        sb.append('\n');
-                        break;
-                    case 'r':
-                        sb.append('\r');
-                        break;
-                    case 't':
-                        sb.append('\t');
-                        break;
-                    case '|':
-                        sb.append('|');
-                        break;
-                    default:
-                        sb.append(c);
+                    case '"': sb.append('"'); break;
+                    case '\\': sb.append('\\'); break;
+                    case 'n': sb.append('\n'); break;
+                    case 'r': sb.append('\r'); break;
+                    case 't': sb.append('\t'); break;
+                    case '|': sb.append('|'); break; // TypeTable-specific escape
+                    default: sb.append(c); // Pass through unknown escapes
                 }
                 escaped = false;
             } else if (c == '\\') {
@@ -595,16 +532,9 @@ class AnnotationDeserializer {
         return sb.toString();
     }
 
-    /**
-     * Parses a serialized array value.
-     *
-     * @param value The serialized array value
-     * @return An array of values
-     */
-    private static Object[] parseArrayValue(String value) {
-        // Remove the surrounding braces
+    private static Object[] parseArrayValue(String value, int depth) {
         String arrayContent = value.substring(1, value.length() - 1).trim();
-
+        
         if (arrayContent.isEmpty()) {
             return new Object[0];
         }
@@ -613,15 +543,13 @@ class AnnotationDeserializer {
         Object[] result = new Object[elements.size()];
 
         for (int i = 0; i < elements.size(); i++) {
-            result[i] = parseValue(elements.get(i));
+            result[i] = parseValue(elements.get(i), depth);
         }
 
         return result;
     }
 
-    /**
-     * Represents an annotation with its name and attributes.
-     */
+    // Value classes for different types of constants
     public static class AnnotationInfo {
         private final String descriptor;
         private final @Nullable List<AttributeInfo> attributes;
@@ -631,18 +559,10 @@ class AnnotationDeserializer {
             this.attributes = attributes;
         }
 
-        public String getDescriptor() {
-            return descriptor;
-        }
-
-        public @Nullable List<AttributeInfo> getAttributes() {
-            return attributes;
-        }
+        public String getDescriptor() { return descriptor; }
+        public @Nullable List<AttributeInfo> getAttributes() { return attributes; }
     }
 
-    /**
-     * Represents an annotation attribute with its name and value.
-     */
     public static class AttributeInfo {
         private final String name;
         private final String value;
@@ -652,33 +572,17 @@ class AnnotationDeserializer {
             this.value = value;
         }
 
-        public String getName() {
-            return name;
-        }
-
-        public String getValue() {
-            return value;
-        }
+        public String getName() { return name; }
+        public String getValue() { return value; }
     }
 
-    /**
-     * Represents a class constant.
-     */
     public static class ClassConstant {
         private final String descriptor;
 
-        public ClassConstant(String descriptor) {
-            this.descriptor = descriptor;
-        }
-
-        public String getDescriptor() {
-            return descriptor;
-        }
+        public ClassConstant(String descriptor) { this.descriptor = descriptor; }
+        public String getDescriptor() { return descriptor; }
     }
 
-    /**
-     * Represents an enum constant.
-     */
     public static class EnumConstant {
         private final String enumDescriptor;
         private final String constantName;
@@ -688,18 +592,10 @@ class AnnotationDeserializer {
             this.constantName = constantName;
         }
 
-        public String getEnumDescriptor() {
-            return enumDescriptor;
-        }
-
-        public String getConstantName() {
-            return constantName;
-        }
+        public String getEnumDescriptor() { return enumDescriptor; }
+        public String getConstantName() { return constantName; }
     }
 
-    /**
-     * Represents a field constant.
-     */
     public static class FieldConstant {
         private final String className;
         private final String fieldName;
@@ -709,186 +605,82 @@ class AnnotationDeserializer {
             this.fieldName = fieldName;
         }
 
-        public String getClassName() {
-            return className;
-        }
-
-        public String getFieldName() {
-            return fieldName;
-        }
+        public String getClassName() { return className; }
+        public String getFieldName() { return fieldName; }
     }
 }
 
 /**
  * Serializes Java annotations to a string format for storage in the TypeTable.
- * This class handles serialization of different types of annotation values:
- * - Primitive types (boolean, char, byte, short, int, long, float, double)
- * - String values
- * - Class constants
- * - Field constants
- * - Enum constants
- * - Arrays and nested arrays
- * - Nested annotations
  */
 class AnnotationSerializer {
 
-    /**
-     * Serializes a simple annotation without attributes.
-     *
-     * @param annotationDescriptor The fully qualified name of the annotation
-     * @return The serialized annotation string
-     */
     public static String serializeSimpleAnnotation(String annotationDescriptor) {
         return "@" + annotationDescriptor;
     }
 
-    /**
-     * Serializes a boolean value.
-     *
-     * @param value The boolean value
-     * @return The serialized boolean value
-     */
     public static String serializeBoolean(boolean value) {
         return Boolean.toString(value);
     }
 
-    /**
-     * Serializes a character value.
-     *
-     * @param value The character value
-     * @return The serialized character value
-     */
     public static String serializeChar(char value) {
         StringBuilder sb = new StringBuilder();
         sb.append('\'');
         switch (value) {
-            case '\'':
-                sb.append("\\'");
-                break;
-            case '\\':
-                sb.append("\\\\");
-                break;
-            case '\n':
-                sb.append("\\n");
-                break;
-            case '\r':
-                sb.append("\\r");
-                break;
-            case '\t':
-                sb.append("\\t");
-                break;
-            default:
-                sb.append(value);
+            case '\'': sb.append("\\'"); break;
+            case '\\': sb.append("\\\\"); break;
+            case '\n': sb.append("\\n"); break;
+            case '\r': sb.append("\\r"); break;
+            case '\t': sb.append("\\t"); break;
+            default: sb.append(value);
         }
         sb.append('\'');
         return sb.toString();
     }
 
-    /**
-     * Serializes a numeric value (byte, short, int).
-     *
-     * @param value The numeric value
-     * @return The serialized numeric value
-     */
     public static String serializeNumber(Number value) {
         return value.toString();
     }
 
-    /**
-     * Serializes a long value.
-     *
-     * @param value The long value
-     * @return The serialized long value
-     */
     public static String serializeLong(long value) {
         return value + "L";
     }
 
-    /**
-     * Serializes a float value.
-     *
-     * @param value The float value
-     * @return The serialized float value
-     */
     public static String serializeFloat(float value) {
         return value + "F";
     }
 
-    /**
-     * Serializes a double value.
-     *
-     * @param value The double value
-     * @return The serialized double value
-     */
     public static String serializeDouble(double value) {
         return Double.toString(value);
     }
 
-    /**
-     * Serializes a string value.
-     *
-     * @param value The string value
-     * @return The serialized string value
-     */
     public static String serializeString(String value) {
         StringBuilder sb = new StringBuilder();
         sb.append('"');
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
             switch (c) {
-                case '"':
-                    sb.append("\\\"");
-                    break;
-                case '\\':
-                    sb.append("\\\\");
-                    break;
-                case '\n':
-                    sb.append("\\n");
-                    break;
-                case '\r':
-                    sb.append("\\r");
-                    break;
-                case '\t':
-                    sb.append("\\t");
-                    break;
-                case '|':
-                    sb.append("\\|");
-                    break;
-                default:
-                    sb.append(c);
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                case '|': sb.append("\\|"); break;
+                default: sb.append(c);
             }
         }
         sb.append('"');
         return sb.toString();
     }
 
-    /**
-     * Serializes a class constant.
-     *
-     * @param type The type
-     * @return The serialized class constant
-     */
     public static String serializeClassConstant(Type type) {
         return type.getDescriptor();
     }
 
-    /**
-     * Serializes an enum constant.
-     *
-     * @param enumDescriptor The enum type descriptor
-     * @param enumConstant The name of the enum constant
-     * @return The serialized enum constant
-     */
     public static String serializeEnumConstant(String enumDescriptor, String enumConstant) {
         return enumDescriptor + enumConstant;
     }
 
-    /**
-     * Serializes an array of values.
-     *
-     * @param values The array of serialized values
-     * @return The serialized array
-     */
     public static String serializeArray(String[] values) {
         if (values.length == 0) {
             return "{}";
@@ -905,13 +697,6 @@ class AnnotationSerializer {
         return sb.toString();
     }
 
-    /**
-     * Serializes an annotation with attributes.
-     *
-     * @param annotationDescriptor The fully qualified name of the annotation
-     * @param attributes The array of serialized attribute name-value pairs
-     * @return The serialized annotation
-     */
     public static String serializeAnnotationWithAttributes(String annotationDescriptor, String[] attributes) {
         if (attributes.length == 0) {
             return serializeSimpleAnnotation(annotationDescriptor);
@@ -928,13 +713,6 @@ class AnnotationSerializer {
         return sb.toString();
     }
 
-    /**
-     * Serializes an annotation attribute.
-     *
-     * @param name The name of the attribute
-     * @param value The serialized value of the attribute
-     * @return The serialized attribute
-     */
     public static String serializeAttribute(String name, String value) {
         return name + "=" + value;
     }
@@ -943,91 +721,71 @@ class AnnotationSerializer {
         return serializeValueInternal(value, false);
     }
 
-    /**
-     * Converts annotation values to their string representation for TypeTable serialization.
-     * This method handles the specific format requirements for TypeTable, including
-     * delimiter escaping and compact array formatting.
-     *
-     * @param value The annotation value to convert
-     * @return The serialized string representation
-     */
     public static String convertAnnotationValueToString(Object value) {
         return serializeValueInternal(value, true);
     }
 
-    /**
-     * Internal method for serializing values with options for different formatting styles.
-     *
-     * @param value The value to serialize
-     * @param typeTableFormat If true, uses TypeTable format (delimiter escaping, compact arrays)
-     * @return The serialized string representation
-     */
     private static String serializeValueInternal(@Nullable Object value, boolean typeTableFormat) {
         if (value == null) {
             return "null";
         } else if (value instanceof String) {
-            if (typeTableFormat) {
-                return "\"" + escapeDelimiters(value.toString()) + "\"";
-            } else {
-                return serializeString((String) value);
-            }
+            return typeTableFormat ? 
+                "\"" + escapeDelimiters(value.toString()) + "\"" : 
+                serializeString((String) value);
         } else if (value instanceof Type) {
-            if (typeTableFormat) {
-                return ((Type) value).getDescriptor();
-            } else {
-                return serializeClassConstant((Type) value);
-            }
+            return typeTableFormat ? 
+                ((Type) value).getDescriptor() : 
+                serializeClassConstant((Type) value);
         } else if (value.getClass().isArray()) {
-            // Handle primitive arrays and object arrays
-            List<String> elements = new ArrayList<>();
-            if (value instanceof Object[]) {
-                Object[] array = (Object[]) value;
-                for (Object element : array) {
-                    elements.add(serializeValueInternal(element, typeTableFormat));
-                }
-            } else {
-                // Handle primitive arrays
-                int length = java.lang.reflect.Array.getLength(value);
-                for (int i = 0; i < length; i++) {
-                    Object element = java.lang.reflect.Array.get(value, i);
-                    elements.add(serializeValueInternal(element, typeTableFormat));
-                }
-            }
-            if (typeTableFormat) {
-                return "{" + String.join(",", elements) + "}";
-            } else {
-                return serializeArray(elements.toArray(new String[0]));
-            }
+            return serializeArrayValue(value, typeTableFormat);
         } else if (value instanceof Boolean) {
             return serializeBoolean((Boolean) value);
         } else if (value instanceof Character) {
             return serializeChar((Character) value);
         } else if (value instanceof Number) {
-            if (value instanceof Long) {
-                return serializeLong((Long) value);
-            } else if (value instanceof Float) {
-                return serializeFloat((Float) value);
-            } else if (value instanceof Double) {
-                return serializeDouble((Double) value);
-            } else {
-                return serializeNumber((Number) value);
-            }
+            return serializeNumericValue((Number) value);
         } else {
             return String.valueOf(value);
         }
     }
 
-    /**
-     * Escapes delimiter characters for TypeTable serialization.
-     * This is specifically used for string values in annotation default values.
-     *
-     * @param value The string value to escape
-     * @return The escaped string value, or null if input is null
-     */
+    private static String serializeArrayValue(Object value, boolean typeTableFormat) {
+        List<String> elements = new ArrayList<>();
+        
+        if (value instanceof Object[]) {
+            Object[] array = (Object[]) value;
+            for (Object element : array) {
+                elements.add(serializeValueInternal(element, typeTableFormat));
+            }
+        } else {
+            int length = java.lang.reflect.Array.getLength(value);
+            for (int i = 0; i < length; i++) {
+                Object element = java.lang.reflect.Array.get(value, i);
+                elements.add(serializeValueInternal(element, typeTableFormat));
+            }
+        }
+        
+        return typeTableFormat ? 
+            "{" + String.join(",", elements) + "}" : 
+            serializeArray(elements.toArray(new String[0]));
+    }
+
+    private static String serializeNumericValue(Number value) {
+        if (value instanceof Long) {
+            return serializeLong((Long) value);
+        } else if (value instanceof Float) {
+            return serializeFloat((Float) value);
+        } else if (value instanceof Double) {
+            return serializeDouble((Double) value);
+        } else {
+            return serializeNumber(value);
+        }
+    }
+
     static String escapeDelimiters(String value) {
-        return value.replace("\\", "\\\\")  // Escape backslashes first
-                .replace("|", "\\|")    // Escape pipes
-                .replace("\"", "\\\""); // Escape quotes
+        return value.replace("\\", "\\\\")
+                .replace("|", "\\|")
+                .replace("\"", "\\\"");
     }
 
     static String unescapeDelimiters(String value) {
@@ -1036,21 +794,13 @@ class AnnotationSerializer {
                 .replace("\\\\", "\\");
     }
 
-    /**
-     * Processes an annotation default value and applies it to the provided annotation visitor.
-     * This method handles different types of annotation values including arrays, class constants,
-     * enum constants, and field constants.
-     *
-     * @param annotationDefaultVisitor The annotation visitor to apply the default value to
-     * @param value The default value
-     */
     public static void processAnnotationDefaultValue(AnnotationVisitor annotationDefaultVisitor, Object value) {
         if (value.getClass().isArray()) {
-            AnnotationVisitor annotationVisitor = annotationDefaultVisitor.visitArray(null);
+            AnnotationVisitor arrayVisitor = annotationDefaultVisitor.visitArray(null);
             for (Object v : ((Object[]) value)) {
-                processAnnotationDefaultValue(annotationVisitor, v);
+                processAnnotationDefaultValue(arrayVisitor, v);
             }
-            annotationVisitor.visitEnd();
+            arrayVisitor.visitEnd();
         } else if (value instanceof AnnotationDeserializer.ClassConstant) {
             annotationDefaultVisitor.visit(null, Type.getType(((AnnotationDeserializer.ClassConstant) value).getDescriptor()));
         } else if (value instanceof AnnotationDeserializer.EnumConstant) {
@@ -1061,14 +811,9 @@ class AnnotationSerializer {
             annotationDefaultVisitor.visitEnum(null, fieldConstant.getClassName(), fieldConstant.getFieldName());
         } else if (value instanceof AnnotationDeserializer.AnnotationInfo) {
             AnnotationDeserializer.AnnotationInfo annotationInfo = (AnnotationDeserializer.AnnotationInfo) value;
-            AnnotationVisitor annotationVisitor = annotationDefaultVisitor.visitAnnotation(null, annotationInfo.getDescriptor());
-            if (annotationInfo.getAttributes() != null) {
-                annotationInfo.getAttributes().forEach(attribute -> {
-                    // FIXME call correct visit method
-                    annotationVisitor.visit(attribute.getName(), attribute.getValue());
-                });
-            }
-            annotationVisitor.visitEnd();
+            AnnotationVisitor nestedVisitor = annotationDefaultVisitor.visitAnnotation(null, annotationInfo.getDescriptor());
+            AnnotationAttributeApplier.applyAttributes(nestedVisitor, annotationInfo.getAttributes());
+            nestedVisitor.visitEnd();
         } else {
             annotationDefaultVisitor.visit(null, value);
         }

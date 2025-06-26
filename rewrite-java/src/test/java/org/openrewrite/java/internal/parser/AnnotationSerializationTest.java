@@ -317,9 +317,7 @@ class AnnotationSerializationTest {
         // Create an AnnotationValueCollector
         AnnotationCollectorHelper.AnnotationValueCollector collector = 
             new AnnotationCollectorHelper.AnnotationValueCollector(
-                "org.junit.jupiter.api.Test", 
-                null, 
-                result -> {
+              result -> {
                     if (result.isEmpty()) {
                         collectedAnnotations.add("@org/junit/jupiter/api/Test");
                     } else {
@@ -348,9 +346,7 @@ class AnnotationSerializationTest {
         // Create an AnnotationValueCollector
         AnnotationCollectorHelper.AnnotationValueCollector collector = 
             new AnnotationCollectorHelper.AnnotationValueCollector(
-                "Lorg/junit/jupiter/api/Test;",
-                null, 
-                result -> {
+              result -> {
                     if (result.isEmpty()) {
                         collectedAnnotations.add("@Lorg/junit/jupiter/api/Test;");
                     } else {
@@ -388,9 +384,7 @@ class AnnotationSerializationTest {
         // Create an AnnotationValueCollector
         AnnotationCollectorHelper.AnnotationValueCollector collector = 
             new AnnotationCollectorHelper.AnnotationValueCollector(
-                "Lorg/example/OuterAnnotation;",
-                null, 
-                result -> {
+              result -> {
                     if (result.isEmpty()) {
                         collectedAnnotations.add("@Lorg/example/OuterAnnotation;");
                     } else {
@@ -432,9 +426,7 @@ class AnnotationSerializationTest {
         // Create an AnnotationValueCollector
         AnnotationCollectorHelper.AnnotationValueCollector collector = 
             new AnnotationCollectorHelper.AnnotationValueCollector(
-                "Lorg/example/ArrayAnnotation;",
-                null, 
-                result -> {
+              result -> {
                     if (result.isEmpty()) {
                         collectedAnnotations.add("@Lorg/example/ArrayAnnotation;");
                     } else {
