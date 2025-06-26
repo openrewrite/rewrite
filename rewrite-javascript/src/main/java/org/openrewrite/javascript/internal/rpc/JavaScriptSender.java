@@ -496,7 +496,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitForOfLoop(JS.ForOfLoop forOfLoop, RpcSendQueue q) {
-        q.getAndSend(forOfLoop, JS.ForOfLoop::getAwait);
+        q.getAndSend(forOfLoop, JS.ForOfLoop::getAwait, space -> visitSpace(space, q));
         q.getAndSend(forOfLoop, JS.ForOfLoop::getLoop, el -> visit(el, q));
         return forOfLoop;
     }

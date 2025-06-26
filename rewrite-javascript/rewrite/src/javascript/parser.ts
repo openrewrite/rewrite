@@ -2675,7 +2675,20 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 markers: emptyMarkers,
-                variable: this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)),
+                variable: (() => {
+                    if (ts.isIdentifier(node.initializer)) {
+                        const ident = this.visit(node.initializer);
+                        return this.rightPadded({
+                            kind: JS.Kind.ExpressionStatement,
+                            id: randomId(),
+                            expression: ident,
+                            markers: emptyMarkers,
+                            prefix: emptySpace
+                        } as JS.ExpressionStatement, this.suffix(node.initializer));
+                    } else {
+                        return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
+                    }
+                })(),
                 iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
             },
             body: this.rightPadded(
@@ -2706,7 +2719,53 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                     markers: emptyMarkers,
-                    variable: this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)),
+                    variable: (() => {
+                        if (ts.isIdentifier(node.initializer)) {
+                            const ident = this.visit(node.initializer);
+                            return this.rightPadded({
+                                kind: JS.Kind.ExpressionStatement,
+                                id: randomId(),
+                                expression: ident,
+                                markers: emptyMarkers,
+                                prefix: emptySpace
+                            } as JS.ExpressionStatement, this.suffix(node.initializer));
+                        } else if (ts.isArrayLiteralExpression(node.initializer)) {
+                            return this.rightPadded({
+                                kind: JS.Kind.ArrayBindingPattern,
+                                id: randomId(),
+                                elements: {
+                                    kind: J.Kind.Container,
+                                    id: randomId(),
+                                    before: emptySpace,
+                                    elements: node.initializer.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
+                                    markers: emptyMarkers
+                                } as J.Container<Expression>,
+                                markers: emptyMarkers,
+                                prefix: emptySpace
+                            } as JS.ArrayBindingPattern, this.suffix(node.initializer))
+                        } else if (ts.isObjectLiteralExpression(node.initializer)) {
+                            return this.rightPadded({
+                                kind: JS.Kind.ObjectBindingPattern,
+                                id: randomId(),
+                                leadingAnnotations: [],
+                                modifiers: [],
+                                typeExpression: undefined,
+                                initializer: undefined,
+                                bindings: {
+                                    kind: J.Kind.Container,
+                                    id: randomId(),
+                                    before: emptySpace,
+                                    elements: node.initializer.properties.map(p => this.rightPadded(this.visit(p) as Expression, this.suffix(p))),
+                                    markers: emptyMarkers
+                                } as J.Container<Expression>,
+                                markers: emptyMarkers,
+                                prefix: emptySpace
+                            } as JS.ObjectBindingPattern, this.suffix(node.initializer))
+                        }
+                        else {
+                            return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
+                        }
+                    })(),
                     iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
                 },
                 body: this.rightPadded(
@@ -3274,10 +3333,24 @@ export class JavaScriptParserVisitor {
     }
 
     visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.Import {
+        let exportModifierSuffix: J.Space | undefined = undefined;
         return {
             kind: JS.Kind.Import,
             id: randomId(),
-            prefix: this.prefix(node),
+            modifiers: ( () => {
+                const exportModifier = node.modifiers?.find(m => m.kind === ts.SyntaxKind.ExportKeyword);
+                exportModifierSuffix = exportModifier && this.suffix(exportModifier);
+                return exportModifier ? [{
+                    kind: J.Kind.Modifier,
+                    id: randomId(),
+                    prefix: this.prefix(exportModifier),
+                    markers: emptyMarkers,
+                    keyword: 'export',
+                    type: J.ModifierType.LanguageExtension,
+                    annotations: []
+                } as J.Modifier] : [];
+            })(),
+            prefix: exportModifierSuffix ? exportModifierSuffix : this.prefix(node),
             importClause: {
                 kind: JS.Kind.ImportClause,
                 id: randomId(),
@@ -3312,6 +3385,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
+            modifiers: [],
             importClause: node.importClause && this.visit(node.importClause),
             moduleSpecifier: this.leftPadded(node.importClause ? this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!) : emptySpace, this.visit(node.moduleSpecifier)),
             attributes: node.attributes && this.visit(node.attributes)
@@ -4238,12 +4312,23 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
     // let previousSibling = getPreviousSibling(node);
     let leadingWhitespacePos = node.getStart();
 
-    // Step 1: Use forEachLeadingCommentRange to extract comments
-    ts.forEachLeadingCommentRange(text, nodeStart, (pos, end, kind) => {
+    // Step 1: Get all comments
+    const commentRanges = [
+        ...(ts.getTrailingCommentRanges(text, nodeStart) || []),
+        ...(ts.getLeadingCommentRanges(text, nodeStart) || []),
+    ].filter(range => range.pos < node.getStart())
+        .sort((a, b) => a.pos - b.pos)
+        // filter out duplicate ranges
+        .filter((range, index, self) => index === 0 || range.pos !== self[index - 1].pos);
+
+    commentRanges.forEach(range => {
+        const pos = range.pos;
+        const end = range.end;
+        const kind = range.kind;
         leadingWhitespacePos = Math.min(leadingWhitespacePos, pos);
 
         const isMultiline = kind === ts.SyntaxKind.MultiLineCommentTrivia;
-        const commentStart = isMultiline ? pos + 2 : pos + 2;  // Skip `/*` or `//`
+        const commentStart = pos + 2;  // Skip `/*` or `//`
         const commentEnd = isMultiline ? end - 2 : end;  // Exclude closing `*/` or nothing for `//`
 
         // Step 2: Capture suffix (whitespace after the comment)
@@ -4270,8 +4355,7 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
         whitespace = text.slice(nodeStart, leadingWhitespacePos);
     }
 
-    // Step 4: Return the Space object with comments and leading whitespace
-    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace.length > 0 ? whitespace : ""};
+    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace};
 }
 
 class FlowSyntaxNotSupportedError extends SyntaxError {

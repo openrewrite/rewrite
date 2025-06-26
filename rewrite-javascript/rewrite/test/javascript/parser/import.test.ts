@@ -145,6 +145,15 @@ describe('import mapping', () => {
             //language=typescript
             typescript(`
                 import   type my = require('my-library');
+                `)
+        ));
+
+    test('export import', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                import * as i from "immer";
+                /*1*/ export /*2*/ import /*3*/ cd /*4*/ = i.createDraft;
             `)
         ));
 });

@@ -168,8 +168,14 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     override async visitImportDeclaration(jsImport: JS.Import, p: PrintOutputCapture): Promise<J | undefined> {
+
+        for (const it of jsImport.modifiers) {
+            await this.visitDefined(it, p);
+        }
         await this.beforeSyntax(jsImport, p);
+
         p.append("import");
+
         jsImport.importClause && await this.visit(jsImport.importClause, p);
 
         await this.visitLeftPaddedLocal(jsImport.importClause ? "from" : "", jsImport.moduleSpecifier, p);
