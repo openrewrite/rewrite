@@ -88,7 +88,7 @@ class AnnotationSerializationTest {
     @Test
     void annotationWithStringAttribute() {
         // Test serialization
-        String attributeValue = AnnotationSerializer.serializeString("Hello, World!");
+        String attributeValue = AnnotationSerializer.serializeValue("Hello, World!");
         String attribute = AnnotationSerializer.serializeAttribute("value", attributeValue);
         String serialized = AnnotationSerializer.serializeAnnotationWithAttributes(
           "Lorg/example/StringAnnotation;",
@@ -189,7 +189,7 @@ class AnnotationSerializationTest {
     @Test
     void annotationWithMultipleAttributes() {
         // Test serialization
-        String nameAttribute = AnnotationSerializer.serializeAttribute("name", AnnotationSerializer.serializeString("test"));
+        String nameAttribute = AnnotationSerializer.serializeAttribute("name", AnnotationSerializer.serializeValue("test"));
         String valueAttribute = AnnotationSerializer.serializeAttribute("value", AnnotationSerializer.serializeNumber(42));
         String serialized = AnnotationSerializer.serializeAnnotationWithAttributes(
           "Lorg/example/MultiAttributeAnnotation;",
@@ -254,7 +254,7 @@ class AnnotationSerializationTest {
         @Test
         void pipe() {
             // Test serialization with pipe character
-            String attributeValue = AnnotationSerializer.serializeString("Hello|World");
+            String attributeValue = AnnotationSerializer.serializeValue("Hello|World");
             String attribute = AnnotationSerializer.serializeAttribute("value", attributeValue);
             String serialized = AnnotationSerializer.serializeAnnotationWithAttributes(
               "Lorg/example/SpecialCharAnnotation;",
@@ -279,7 +279,7 @@ class AnnotationSerializationTest {
         @Test
         void tab() {
             // Test serialization with pipe character
-            String attributeValue = AnnotationSerializer.serializeString("Hello\tWorld");
+            String attributeValue = AnnotationSerializer.serializeValue("Hello\tWorld");
             String attribute = AnnotationSerializer.serializeAttribute("value", attributeValue);
             String serialized = AnnotationSerializer.serializeAnnotationWithAttributes(
               "Lorg/example/SpecialCharAnnotation;",
