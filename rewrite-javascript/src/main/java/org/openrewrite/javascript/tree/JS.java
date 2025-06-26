@@ -897,14 +897,6 @@ public interface JS extends J {
             throw new UnsupportedOperationException("To change the return type of this function call, use withFunctionType(..)");
         }
 
-        public FunctionCall withDeclaringType(JavaType.FullyQualified type) {
-            if (this.functionType == null) {
-                return this;
-            } else {
-                return withMethodType(this.functionType.withDeclaringType(type));
-            }
-        }
-
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
             return v.visitFunctionCall(this, p);
