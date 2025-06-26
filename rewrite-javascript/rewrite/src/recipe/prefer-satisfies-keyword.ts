@@ -33,7 +33,8 @@ export class PreferSatisfiesKeyword extends Recipe {
     get editor(): TreeVisitor<any, ExecutionContext> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
             protected async visitBinaryExtensions(jsBinary: JS.Binary, p: ExecutionContext): Promise<JS.Binary | JS.SatisfiesExpression | undefined> {
-                if (jsBinary.operator.element === JS.Binary.Type.As) {
+                const constAsRight = jsBinary.right.kind == J.Kind.Identifier && (jsBinary.right as J.Identifier).simpleName == "const";
+                if (jsBinary.operator.element === JS.Binary.Type.As && !constAsRight) {
                     return {
                         kind: JS.Kind.SatisfiesExpression,
                         id: randomId(),

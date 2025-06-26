@@ -39,4 +39,13 @@ describe("prefer-satisfies-keyword", () => {
             `)
         )
     })
+
+    test("don't touch as const", () => {
+        return spec.rewriteRun(
+            typescript(
+                `
+            const arr = [1, 2, 3] as const;
+            `)
+        )
+    })
 });
