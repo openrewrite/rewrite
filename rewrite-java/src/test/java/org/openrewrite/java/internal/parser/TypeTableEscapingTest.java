@@ -95,13 +95,10 @@ class TypeTableEscapingTest {
         
         // Escape using the serializer
         String escaped = AnnotationSerializer.escapeDelimiters(original);
-        System.out.println("Original: " + original);
-        System.out.println("Escaped: " + escaped);
-        
+
         // Unescape using the serializer
         String unescaped = AnnotationSerializer.unescapeDelimiters(escaped);
-        System.out.println("Unescaped: " + unescaped);
-        
+
         assertThat(unescaped).isEqualTo(original);
     }
 }
