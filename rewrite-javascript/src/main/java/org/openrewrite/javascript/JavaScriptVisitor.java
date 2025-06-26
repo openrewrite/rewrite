@@ -205,7 +205,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             f = (JS.FunctionCall) temp2;
         }
         if (f.getPadding().getFunction() != null && f.getPadding().getFunction().getElement() instanceof NameTree &&
-                functionCall.getMethodType() != null && functionCall.getMethodType().hasFlags(Flag.Static)) {
+                f.getMethodType() != null && f.getMethodType().hasFlags(Flag.Static)) {
             //noinspection unchecked
             f = f.getPadding().withFunction(
                     (JRightPadded<Expression>) (JRightPadded<?>)
