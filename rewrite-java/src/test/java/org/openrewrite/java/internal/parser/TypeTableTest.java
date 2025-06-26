@@ -173,8 +173,8 @@ class TypeTableTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 // Assert that the JavaType.Class has the annotation
-                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
-                JavaType.Class assertFalseType = (JavaType.Class) field.getLeadingAnnotations().get(0).getType();
+                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                JavaType.Class assertFalseType = (JavaType.Class) field.getLeadingAnnotations().getFirst().getType();
                 assertThat(assertFalseType).isNotNull();
                 assertThat(assertFalseType.getFullyQualifiedName()).isEqualTo("jakarta.validation.constraints.AssertFalse");
                 assertThat(assertFalseType.getAnnotations().size()).isEqualTo(5);
@@ -273,11 +273,11 @@ class TypeTableTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 // Verify that all annotations are properly loaded with their attributes
-                J.ClassDeclaration clazz = cu.getClasses().get(0);
+                J.ClassDeclaration clazz = cu.getClasses().getFirst();
 
-                JavaType.Class annotatedClass = (JavaType.Class) ((J.VariableDeclarations) clazz.getBody().getStatements().get(0)).getTypeExpression().getType();
+                JavaType.Class annotatedClass = (JavaType.Class) ((J.VariableDeclarations) clazz.getBody().getStatements().getFirst()).getTypeExpression().getType();
                 JavaType.Variable field = annotatedClass.getMembers().stream().filter(m -> m.getName().equals("field")).findFirst().get();
-                JavaType.Annotation.SingleElementValue value = (JavaType.Annotation.SingleElementValue) ((JavaType.Annotation) field.getAnnotations().get(0)).getValues().get(0);
+                JavaType.Annotation.SingleElementValue value = (JavaType.Annotation.SingleElementValue) ((JavaType.Annotation) field.getAnnotations().getFirst()).getValues().getFirst();
                 assertThat(value.getConstantValue()).isEqualTo(1000);
 
                 List<J.Annotation> annotations = clazz.getLeadingAnnotations();
@@ -371,7 +371,7 @@ class TypeTableTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 // Verify that annotations with special characters are properly loaded
-                J.ClassDeclaration clazz = cu.getClasses().get(0);
+                J.ClassDeclaration clazz = cu.getClasses().getFirst();
                 List<J.Annotation> annotations = clazz.getLeadingAnnotations();
 
                 // Verify BasicAnnotation  

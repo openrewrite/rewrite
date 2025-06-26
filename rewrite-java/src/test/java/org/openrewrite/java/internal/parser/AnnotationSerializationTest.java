@@ -62,8 +62,8 @@ class AnnotationSerializationTest {
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/BooleanAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
-        assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("true");
+        assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("true");
     }
 
     @Test
@@ -81,8 +81,8 @@ class AnnotationSerializationTest {
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/CharAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
-        assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("'c'");
+        assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("'c'");
     }
 
     @Test
@@ -100,8 +100,8 @@ class AnnotationSerializationTest {
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/StringAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
-        assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("\"Hello, World!\"");
+        assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("\"Hello, World!\"");
     }
 
     @Test
@@ -119,11 +119,11 @@ class AnnotationSerializationTest {
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/ClassAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
-        assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("Ljava/lang/String;");
+        assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("Ljava/lang/String;");
 
         // Parse the value
-        Object value = AnnotationDeserializer.parseValue(info.getAttributes().get(0).getValue());
+        Object value = AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
         assertThat(value).isInstanceOf(ClassConstant.class);
         assertThat(((ClassConstant) value).getDescriptor()).isEqualTo("Ljava/lang/String;");
     }
@@ -143,11 +143,11 @@ class AnnotationSerializationTest {
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/EnumAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
-        assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("Ljava/time/DayOfWeek;MONDAY");
+        assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("Ljava/time/DayOfWeek;MONDAY");
 
         // Parse the value
-        Object value = AnnotationDeserializer.parseValue(info.getAttributes().get(0).getValue());
+        Object value = AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
         assertThat(value).isInstanceOf(EnumConstant.class);
         assertThat(((EnumConstant) value).getEnumDescriptor()).isEqualTo("Ljava/time/DayOfWeek;");
         assertThat(((EnumConstant) value).getConstantName()).isEqualTo("MONDAY");
@@ -173,11 +173,11 @@ class AnnotationSerializationTest {
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/ArrayAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
-        assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("{1,2,3}");
+        assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("{1,2,3}");
 
         // Parse the value
-        Object value = AnnotationDeserializer.parseValue(info.getAttributes().get(0).getValue());
+        Object value = AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
         assertThat(value).isInstanceOf(Object[].class);
         Object[] array = (Object[]) value;
         assertThat(array).hasSize(3);
@@ -235,17 +235,17 @@ class AnnotationSerializationTest {
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/OuterAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
-        assertThat(info.getAttributes().get(0).getName()).isEqualTo("nested");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo("@Lorg/example/InnerAnnotation;(value=42)");
+        assertThat(info.getAttributes().getFirst().getName()).isEqualTo("nested");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("@Lorg/example/InnerAnnotation;(value=42)");
 
         // Parse the nested annotation
-        Object value = AnnotationDeserializer.parseValue(info.getAttributes().get(0).getValue());
+        Object value = AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
         assertThat(value).isInstanceOf(AnnotationInfo.class);
         AnnotationInfo nestedInfo = (AnnotationInfo) value;
         assertThat(nestedInfo.getDescriptor()).isEqualTo("Lorg/example/InnerAnnotation;");
         assertThat(nestedInfo.getAttributes()).hasSize(1);
-        assertThat(nestedInfo.getAttributes().get(0).getName()).isEqualTo("value");
-        assertThat(nestedInfo.getAttributes().get(0).getValue()).isEqualTo("42");
+        assertThat(nestedInfo.getAttributes().getFirst().getName()).isEqualTo("value");
+        assertThat(nestedInfo.getAttributes().getFirst().getValue()).isEqualTo("42");
     }
 
     @Nested
@@ -268,11 +268,11 @@ class AnnotationSerializationTest {
             AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
             assertThat(info.getDescriptor()).isEqualTo("Lorg/example/SpecialCharAnnotation;");
             assertThat(info.getAttributes()).hasSize(1);
-            assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-            assertThat(info.getAttributes().get(0).getValue()).isEqualTo("\"Hello\\|World\"");
+            assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
+            assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("\"Hello\\|World\"");
 
             // Parse the value and verify the pipe character is preserved
-            String value = (String) AnnotationDeserializer.parseValue(info.getAttributes().get(0).getValue());
+            String value = (String) AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
             assertThat(value).isEqualTo("Hello|World");
         }
 
@@ -293,11 +293,11 @@ class AnnotationSerializationTest {
             AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
             assertThat(info.getDescriptor()).isEqualTo("Lorg/example/SpecialCharAnnotation;");
             assertThat(info.getAttributes()).hasSize(1);
-            assertThat(info.getAttributes().get(0).getName()).isEqualTo("value");
-            assertThat(info.getAttributes().get(0).getValue()).isEqualTo("\"Hello\\tWorld\"");
+            assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
+            assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("\"Hello\\tWorld\"");
 
             // Parse the value and verify the pipe character is preserved
-            String value = (String) AnnotationDeserializer.parseValue(info.getAttributes().get(0).getValue());
+            String value = (String) AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
             assertThat(value).isEqualTo("Hello\tWorld");
         }
     }
@@ -335,7 +335,7 @@ class AnnotationSerializationTest {
 
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
-        assertThat(collectedAnnotations.get(0)).isEqualTo("@org/junit/jupiter/api/Test");
+        assertThat(collectedAnnotations.getFirst()).isEqualTo("@org/junit/jupiter/api/Test");
     }
 
     @Test
@@ -368,7 +368,7 @@ class AnnotationSerializationTest {
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
         // With our test setup, the actual output is:
-        assertThat(collectedAnnotations.get(0)).isEqualTo("@Lorg/junit/jupiter/api/Test;(timeout=1000L)");
+        assertThat(collectedAnnotations.getFirst()).isEqualTo("@Lorg/junit/jupiter/api/Test;(timeout=1000L)");
 
         // Note: The actual output is "@org/junit/jupiter/api/Test(1000L)" because the name parameter
         // is only used if attributeName is not null, and we're creating the collector with attributeName=null.
@@ -412,7 +412,7 @@ class AnnotationSerializationTest {
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
         // With our test setup, the actual output is:
-        assertThat(collectedAnnotations.get(0)).isEqualTo("@Lorg/example/OuterAnnotation;(nested=@Lorg/example/InnerAnnotation;(value=42))");
+        assertThat(collectedAnnotations.getFirst()).isEqualTo("@Lorg/example/OuterAnnotation;(nested=@Lorg/example/InnerAnnotation;(value=42))");
 
         // Note: The actual output is missing the attribute name "nested=" because the name parameter
         // is only used if attributeName is not null, and we're creating the collector with attributeName=null.
@@ -455,6 +455,6 @@ class AnnotationSerializationTest {
 
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
-        assertThat(collectedAnnotations.get(0)).isEqualTo("@Lorg/example/ArrayAnnotation;(value={1,2,3})");
+        assertThat(collectedAnnotations.getFirst()).isEqualTo("@Lorg/example/ArrayAnnotation;(value={1,2,3})");
     }
 }
