@@ -15,3 +15,4 @@
  */
 
 export {OrderImports} from "./order-imports";
+export {PreferSatisfiesKeyword} from "./prefer-satisfies-keyword";
