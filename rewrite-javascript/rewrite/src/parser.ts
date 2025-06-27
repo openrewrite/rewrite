@@ -68,10 +68,11 @@ export abstract class Parser {
             id: randomId(),
             markers: markers({
                 kind: MarkersKind.ParseExceptionResult,
+                id: randomId(),
                 parserType: this.constructor.name,
                 exceptionType: e.name,
                 message: e.message + ':\n' + e.stack,
-            } as ParseExceptionResult),
+            } satisfies ParseExceptionResult as ParseExceptionResult),
             text: parserInputRead(input),
             sourcePath: this.relativePath(input),
         }
