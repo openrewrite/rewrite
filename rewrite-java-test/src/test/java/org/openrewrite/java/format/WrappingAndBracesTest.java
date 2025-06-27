@@ -28,7 +28,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -89,7 +89,7 @@ class WrappingAndBracesTest implements RewriteTest {
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
-              Arrays.asList(
+              List.of(
                 spaces.apply(IntelliJ.spaces()),
                 wrapping.apply(IntelliJ.wrappingAndBraces())
               )
