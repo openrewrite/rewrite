@@ -25,6 +25,24 @@ describe("prefer-satisfies-keyword", () => {
     test("basic", () => {
         return spec.rewriteRun(
             typescript(
+                `
+            const modifier = {
+                    kind: J.Kind.Modifier,
+                    id: randomId()
+                };
+            `,
+                `
+            const modifier = {
+                    kind: J.Kind.Modifier,
+                    id: randomId()
+                } satisfies J.Modifier;
+            `)
+        )
+    })
+
+    test("already existing `as`", () => {
+        return spec.rewriteRun(
+            typescript(
             `
             const modifier = {
                     kind: J.Kind.Modifier,
@@ -40,7 +58,7 @@ describe("prefer-satisfies-keyword", () => {
         )
     })
 
-    test("don't touch as const", () => {
+    test("don't touch `as const`", () => {
         return spec.rewriteRun(
             typescript(
                 `

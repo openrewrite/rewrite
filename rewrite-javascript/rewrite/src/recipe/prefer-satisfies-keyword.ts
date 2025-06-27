@@ -15,12 +15,10 @@
  */
 
 import {Recipe} from "../recipe";
-import {produceAsync, TreeVisitor} from "../visitor";
+import {TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 import {JavaScriptVisitor, JS} from "../javascript";
-import {emptySpace, J} from "../java";
-import {Draft, produce} from "immer";
-import {AutoformatVisitor} from "../javascript/format";
+import {emptySpace, J, space} from "../java";
 import {randomId} from "../uuid";
 import {emptyMarkers} from "../markers";
 
@@ -32,29 +30,37 @@ export class PreferSatisfiesKeyword extends Recipe {
 
     get editor(): TreeVisitor<any, ExecutionContext> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
-            protected async visitBinaryExtensions(jsBinary: JS.Binary, p: ExecutionContext): Promise<JS.Binary | JS.SatisfiesExpression | undefined> {
-                const constAsRight = jsBinary.right.kind == J.Kind.Identifier && (jsBinary.right as J.Identifier).simpleName == "const";
-                const newClassAsLeft = jsBinary.left.kind == J.Kind.NewClass;
-                if (jsBinary.operator.element === JS.Binary.Type.As && !constAsRight && newClassAsLeft) {
-                    return produce(jsBinary, (draft: Draft<JS.Binary>) => {
-                       draft.left = {
-                           kind: JS.Kind.SatisfiesExpression,
-                           id: randomId(),
-                           prefix: emptySpace,
-                           markers: emptyMarkers,
-                           expression: jsBinary.left,
-                           satisfiesType: {
-                               kind: J.Kind.LeftPadded,
-                               before: jsBinary.operator.before,
-                               element: jsBinary.right,
-                               markers: emptyMarkers
-                           }
-                       } satisfies JS.SatisfiesExpression as JS.SatisfiesExpression;
-                    });
 
-
+            protected async visitNewClass(newClass: J.NewClass, p: ExecutionContext): Promise<J | undefined> {
+                const ret = await super.visitNewClass(newClass, p);
+                const alreadyWrappedInSatisfies = this.cursor.parent?.value?.kind === JS.Kind.SatisfiesExpression;
+                const kindProperty = newClass.body?.statements?.map(x => x.element)
+                    .filter(x => x.kind == JS.Kind.PropertyAssignment)
+                    .map(x => x as JS.PropertyAssignment)
+                    .find(pa => pa.name.element.kind === J.Kind.Identifier && (pa.name.element as J.Identifier).simpleName === "kind");
+                if (!alreadyWrappedInSatisfies && kindProperty) {
+                    return {
+                        kind: JS.Kind.SatisfiesExpression,
+                        id: randomId(),
+                        prefix: emptySpace,
+                        markers: emptyMarkers,
+                        expression: newClass,
+                        satisfiesType: {
+                            kind: J.Kind.LeftPadded,
+                            before: space(" "),
+                            markers: emptyMarkers,
+                            element: {
+                                kind: J.Kind.FieldAccess,
+                                id: randomId(),
+                                prefix: space(" "),
+                                markers: emptyMarkers,
+                                target: ((kindProperty.initializer as J.FieldAccess).target as J.FieldAccess).target,
+                                name: (kindProperty.initializer as J.FieldAccess).name,
+                                } satisfies J.FieldAccess as J.FieldAccess,
+                            } satisfies J.LeftPadded<J.FieldAccess> as J.LeftPadded<J.FieldAccess>
+                    } satisfies JS.SatisfiesExpression as JS.SatisfiesExpression;
                 } else {
-                    return await super.visitBinaryExtensions(jsBinary, p) as JS.Binary | undefined;
+                    return ret;
                 }
             }
         }
