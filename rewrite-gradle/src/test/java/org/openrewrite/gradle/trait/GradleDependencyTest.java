@@ -86,15 +86,52 @@ class GradleDependencyTest implements RewriteTest {
       "featureImplementation",
       "annotationProcessor",
       "kapt",
-      "ksp",
+      "ksp"
+    })
+    void methods(String method) {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  %s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method),
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  /*~~(com.google.guava:guava:28.2-jre)~~>*/%s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
       "compile", // deprecated
       "runtime", // deprecated
       "testCompile", // deprecated
       "testRuntime" // deprecated
     })
-    void methods(String method) {
+    void decprecatedMethods(String method) {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi("7.6.5")),
+          spec -> spec.beforeRecipe(withToolingApi("6.9.4")),
           buildGradle(
             """
               plugins {
