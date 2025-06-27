@@ -121,11 +121,13 @@ class XRangeTest {
     }
 
     @Test
-    void allowSameMetadataUpgrade() {
+    void allowSpecificMetadataUpgrade() {
         XRange xRange = XRange.build("3.5.x", "-beta").getValue();
         assertThat(xRange).isNotNull();
         assertThat(xRange.isValid(null, "3.5.0-beta")).isTrue();
         assertThat(xRange.upgrade("3.4.0-beta", List.of("3.5.1", "3.5.1-beta")).orElse(null)).isEqualTo("3.5.1-beta");
+        assertThat(xRange.upgrade("3.4.0-RC1", List.of("3.5.1", "3.5.1-beta")).orElse(null)).isEqualTo("3.5.1-beta");
+        assertThat(xRange.upgrade("3.4.0", List.of("3.5.2", "3.5.1", "3.5.1-beta")).orElse(null)).isEqualTo("3.5.1-beta");
     }
 
     @Test
