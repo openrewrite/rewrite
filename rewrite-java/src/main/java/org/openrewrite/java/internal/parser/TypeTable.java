@@ -98,13 +98,18 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
         try {
-            Enumeration<URL> resources = findCaller().getClassLoader().getResources(DEFAULT_RESOURCE_PATH);
-            if (resources.hasMoreElements()) {
-                return new TypeTable(ctx, resources, artifactNames);
+            ClassLoader classLoader = findCaller().getClassLoader();
+            Vector<URL> combinedResources = new Vector<>();
+            for (Enumeration<URL> e = classLoader.getResources(DEFAULT_RESOURCE_PATH); e.hasMoreElements(); ) {
+                combinedResources.add(e.nextElement());
             }
-            resources = findCaller().getClassLoader().getResources(DEFAULT_RESOURCE_PATH.replace(".gz", ".zip"));
-            if (resources.hasMoreElements()) {
-                return new TypeTable(ctx, resources, artifactNames);
+            // TO-BE-REMOVED(2025-10-31) In the future we only want to support the `.gz` extension
+            for (Enumeration<URL> e = classLoader.getResources(DEFAULT_RESOURCE_PATH.replace(".gz", ".zip")); e.hasMoreElements(); ) {
+                combinedResources.add(e.nextElement());
+            }
+
+            if (!combinedResources.isEmpty()) {
+                return new TypeTable(ctx, combinedResources.elements(), artifactNames);
             }
             return null;
         } catch (IOException e) {
@@ -164,9 +169,9 @@ public class TypeTable implements JavaParserClasspathLoader {
     @RequiredArgsConstructor
     static class Reader {
         private static final int NESTED_TYPE_ACCESS_MASK = Opcodes.ACC_PUBLIC | Opcodes.ACC_PRIVATE | Opcodes.ACC_PROTECTED |
-                                                           Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_INTERFACE |
-                                                           Opcodes.ACC_ABSTRACT | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_ANNOTATION |
-                                                           Opcodes.ACC_ENUM;
+                Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_INTERFACE |
+                Opcodes.ACC_ABSTRACT | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_ANNOTATION |
+                Opcodes.ACC_ENUM;
 
         private final ExecutionContext ctx;
 
@@ -336,15 +341,15 @@ public class TypeTable implements JavaParserClasspathLoader {
                             // Determine the constant value for static final fields
                             // Only set constantValue for bytecode if it's a valid ConstantValue attribute type
                             Object constantValue = null;
-                            if ((member.getAccess() & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL) 
-                                && member.getConstantValue() != null) {
+                            if ((member.getAccess() & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)
+                                    && member.getConstantValue() != null) {
                                 Object parsedValue = AnnotationDeserializer.parseValue(member.getConstantValue());
                                 // Only primitive types and strings can be ConstantValue attributes
                                 if (isValidConstantValueType(parsedValue)) {
                                     constantValue = parsedValue;
                                 }
                             }
-                            
+
                             FieldVisitor fv = classWriter
                                     .visitField(
                                             member.getAccess(),
@@ -431,17 +436,18 @@ public class TypeTable implements JavaParserClasspathLoader {
                 mv.visitMaxs(0, 0);
             }
         }
-        
-        private static boolean isValidConstantValueType(@Nullable Object value) {
-            if (value == null) {
-                return false; // null values cannot be ConstantValue attributes
-            }
-            return value instanceof String || 
-                   value instanceof Integer || value instanceof Long || 
-                   value instanceof Float || value instanceof Double ||
-                   value instanceof Boolean || value instanceof Character ||
-                   value instanceof Byte || value instanceof Short;
+
+    }
+
+    private static boolean isValidConstantValueType(@Nullable Object value) {
+        if (value == null) {
+            return false; // null values cannot be ConstantValue attributes
         }
+        return value instanceof String ||
+                value instanceof Integer || value instanceof Long ||
+                value instanceof Float || value instanceof Double ||
+                value instanceof Boolean || value instanceof Character ||
+                value instanceof Byte || value instanceof Short;
     }
 
     private static Path getClassesDir(ExecutionContext ctx, GroupArtifactVersion gav) {
@@ -554,13 +560,13 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
                                         if (classDefinition != null) {
                                             Writer.Member member = new Writer.Member(access, name, descriptor, signature, null, null);
-                                            
-                                            // Check if this is a static final field with a constant value
-                                            if ((access & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) {
-                                                // Store all compile-time constant values in TSV, even if they can't be ConstantValue attributes
+
+                                            // Only store constant values that can be ConstantValue attributes in bytecode
+                                            if ((access & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)
+                                                    && isValidConstantValueType(value)) {
                                                 member.constantValue = convertAnnotationValueToString(value);
                                             }
-                                            
+
                                             return new FieldVisitor(Opcodes.ASM9) {
                                                 @Override
                                                 public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
@@ -585,7 +591,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                                                @Nullable String signature, String @Nullable [] exceptions) {
                                         // Repeating check from `writeMethod()` for performance reasons
                                         if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
-                                            name != null && !"<clinit>".equals(name)) {
+                                                name != null && !"<clinit>".equals(name)) {
                                             Writer.Member member = new Writer.Member(access, name, descriptor, signature, exceptions, null);
                                             return new MethodVisitor(Opcodes.ASM9) {
                                                 @Override
