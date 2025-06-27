@@ -222,6 +222,35 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void updateVersionInVariableToRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot", "3.5.x", null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              def springBootVersion = '3.1.5'
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation ("org.springframework.boot:spring-boot:$springBootVersion")
+              }
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .containsPattern("def springBootVersion = '3.5.\\d+'")
+                .actual()
+            )
+          )
+        );
+    }
+
+    @Test
     void deeplyNestedProjectDependency() {
         rewriteRun(
           buildGradle(
