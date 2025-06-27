@@ -119,7 +119,7 @@ public class RecipeSpec {
     }
 
     public RecipeSpec recipes(Recipe... recipes) {
-        this.recipe = new CompositeRecipe(Arrays.asList(recipes));
+        this.recipe = new CompositeRecipe(List.of(recipes));
         return this;
     }
 

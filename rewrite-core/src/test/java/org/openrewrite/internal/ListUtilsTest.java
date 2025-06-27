@@ -18,7 +18,6 @@ package org.openrewrite.internal;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -37,14 +36,14 @@ class ListUtilsTest {
 
         @Test
         void flatMapWithNoChangeShouldHaveReferenceEquality() {
-            var before = Arrays.asList(1, 2, 3);
+            var before = List.of(1, 2, 3);
             var after = ListUtils.flatMap(before, Collections::singletonList);
             assertThat(after).isSameAs(before);
         }
 
         @Test
         void flatMapWithNoChangeShouldHaveReferenceEqualityIncludingNulls() {
-            var before = Arrays.asList(1, null, 3);
+            var before = List.of(1, null, 3);
             var after = ListUtils.flatMap(before, Collections::singletonList);
             assertThat(after).isSameAs(before);
         }
@@ -82,22 +81,22 @@ class ListUtilsTest {
     class Map {
         @Test
         void identityMap() {
-            var l = Arrays.asList(1, 2, 3);
+            var l = List.of(1, 2, 3);
             assertThat(ListUtils.map(l, (i, e) -> e)).isSameAs(l);
         }
         @Test
         void identityMapWithNulls() {
-            var l = Arrays.asList(1, null, 3);
+            var l = List.of(1, null, 3);
             assertThat(ListUtils.map(l, (i, e) -> e)).isSameAs(l);
         }
         @Test
         void removeElements() {
-            var l = Arrays.asList(1, 2, 3);
+            var l = List.of(1, 2, 3);
             assertThat(ListUtils.map(l, (i, e) -> i % 2 == 0 ? null : e)).isEqualTo(List.of(2));
         }
         @Test
         void removeElementsWithNulls() {
-            var l = Arrays.asList(0, 1, 2, null, 4, 5);
+            var l = List.of(0, 1, 2, null, 4, 5);
             assertThat(ListUtils.map(l, (i, e) -> i == 4 ? null : e)).isEqualTo(List.of(0, 1, 2, 5));
         }
     }
