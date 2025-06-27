@@ -388,15 +388,25 @@ class AnnotationDeserializer {
         value = value.trim();
 
         // Handle different value types in order of specificity
-        if (isBoolean(value)) return Boolean.parseBoolean(value);
-        if (isCharLiteral(value)) return parseCharValue(value);
-        if (isStringLiteral(value)) return parseStringValue(value);
-        if (isArrayLiteral(value)) return parseArrayValue(value, depth + 1);
-        if (isClassConstant(value)) return parseClassConstant(value);
-        if (isEnumConstant(value)) return parseEnumConstant(value);
-        if (isPrimitiveTypeDescriptor(value)) return new ClassConstant(value);
-        if (isArrayTypeDescriptor(value)) return new ClassConstant(value);
-        if (isAnnotation(value)) return parseAnnotation(value);
+        if (isBoolean(value)) {
+            return Boolean.parseBoolean(value);
+        } else if (isCharLiteral(value)) {
+            return parseCharValue(value);
+        } else if (isStringLiteral(value)) {
+            return parseStringValue(value);
+        } else if (isArrayLiteral(value)) {
+            return parseArrayValue(value, depth + 1);
+        } else if (isClassConstant(value)) {
+            return parseClassConstant(value);
+        } else if (isEnumConstant(value)) {
+            return parseEnumConstant(value);
+        } else if (isPrimitiveTypeDescriptor(value)) {
+            return parseClassConstant(value);
+        } else if (isArrayTypeDescriptor(value)) {
+            return parseClassConstant(value);
+        } else if (isAnnotation(value)) {
+            return parseAnnotation(value);
+        }
 
         // Try parsing as numeric, fallback to string
         return parseNumericValue(value);

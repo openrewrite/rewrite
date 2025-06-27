@@ -31,9 +31,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for the serialization and deserialization of annotations.
+ * Tests for the serialization and deserialization of annotations in TypeTable TSV format.
  */
-class AnnotationSerializationTest {
+class TypeTableAnnotationSerializationTest {
 
     @Test
     void simpleAnnotation() {
