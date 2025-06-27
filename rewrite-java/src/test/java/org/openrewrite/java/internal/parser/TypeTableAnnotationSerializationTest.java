@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Tests for the serialization and deserialization of annotations in TypeTable TSV format.
@@ -63,7 +64,7 @@ class TypeTableAnnotationSerializationTest {
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/BooleanAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
-        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("true");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo(true);
     }
 
     @Test
@@ -82,7 +83,7 @@ class TypeTableAnnotationSerializationTest {
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/CharAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
-        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("'c'");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo('c');
     }
 
     @Test
@@ -101,7 +102,7 @@ class TypeTableAnnotationSerializationTest {
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/StringAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
-        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("\"Hello, World!\"");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("Hello, World!");
     }
 
     @Test
@@ -120,10 +121,10 @@ class TypeTableAnnotationSerializationTest {
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/ClassAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
-        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("Ljava/lang/String;");
+        assertThat(((AnnotationDeserializer.ClassConstant) (info.getAttributes().getFirst().getValue())).getDescriptor()).isEqualTo("Ljava/lang/String;");
 
         // Parse the value
-        Object value = AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
+        Object value = info.getAttributes().getFirst().getValue();
         assertThat(value).isInstanceOf(ClassConstant.class);
         assertThat(((ClassConstant) value).getDescriptor()).isEqualTo("Ljava/lang/String;");
     }
@@ -144,10 +145,9 @@ class TypeTableAnnotationSerializationTest {
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/EnumAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
-        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("Ljava/time/DayOfWeek;MONDAY");
 
         // Parse the value
-        Object value = AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
+        Object value = info.getAttributes().getFirst().getValue();
         assertThat(value).isInstanceOf(EnumConstant.class);
         assertThat(((EnumConstant) value).getEnumDescriptor()).isEqualTo("Ljava/time/DayOfWeek;");
         assertThat(((EnumConstant) value).getConstantName()).isEqualTo("MONDAY");
@@ -174,10 +174,10 @@ class TypeTableAnnotationSerializationTest {
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/ArrayAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
-        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("{1,2,3}");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo(new Object[] {1,2,3});
 
         // Parse the value
-        Object value = AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
+        Object value = info.getAttributes().getFirst().getValue();
         assertThat(value).isInstanceOf(Object[].class);
         Object[] array = (Object[]) value;
         assertThat(array).hasSize(3);
@@ -195,7 +195,7 @@ class TypeTableAnnotationSerializationTest {
           "Lorg/example/MultiAttributeAnnotation;",
           new String[]{nameAttribute, valueAttribute}
         );
-        assertThat(serialized).isEqualTo("@Lorg/example/MultiAttributeAnnotation;(name=\"test\", value=42)");
+        assertThat(serialized).isEqualTo("@Lorg/example/MultiAttributeAnnotation;(name=\"test\",value=42)");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -207,10 +207,10 @@ class TypeTableAnnotationSerializationTest {
         AttributeInfo valueAttr = findAttributeByName(info.getAttributes(), "value");
 
         assertThat(nameAttr).isNotNull();
-        assertThat(nameAttr.getValue()).isEqualTo("\"test\"");
+        assertThat(nameAttr.getValue()).isEqualTo("test");
 
         assertThat(valueAttr).isNotNull();
-        assertThat(valueAttr.getValue()).isEqualTo("42");
+        assertThat(valueAttr.getValue()).isEqualTo(42);
     }
 
     @Test
@@ -236,16 +236,15 @@ class TypeTableAnnotationSerializationTest {
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/OuterAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().getFirst().getName()).isEqualTo("nested");
-        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("@Lorg/example/InnerAnnotation;(value=42)");
 
         // Parse the nested annotation
-        Object value = AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
+        Object value = info.getAttributes().getFirst().getValue();
         assertThat(value).isInstanceOf(AnnotationInfo.class);
         AnnotationInfo nestedInfo = (AnnotationInfo) value;
         assertThat(nestedInfo.getDescriptor()).isEqualTo("Lorg/example/InnerAnnotation;");
         assertThat(nestedInfo.getAttributes()).hasSize(1);
         assertThat(nestedInfo.getAttributes().getFirst().getName()).isEqualTo("value");
-        assertThat(nestedInfo.getAttributes().getFirst().getValue()).isEqualTo("42");
+        assertThat(nestedInfo.getAttributes().getFirst().getValue()).isEqualTo(42);
     }
 
     @Nested
@@ -269,10 +268,10 @@ class TypeTableAnnotationSerializationTest {
             assertThat(info.getDescriptor()).isEqualTo("Lorg/example/SpecialCharAnnotation;");
             assertThat(info.getAttributes()).hasSize(1);
             assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
-            assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("\"Hello\\|World\"");
+            assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("Hello|World");
 
             // Parse the value and verify the pipe character is preserved
-            String value = (String) AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
+            String value = (String) info.getAttributes().getFirst().getValue();
             assertThat(value).isEqualTo("Hello|World");
         }
 
@@ -294,19 +293,19 @@ class TypeTableAnnotationSerializationTest {
             assertThat(info.getDescriptor()).isEqualTo("Lorg/example/SpecialCharAnnotation;");
             assertThat(info.getAttributes()).hasSize(1);
             assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
-            assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("\"Hello\\tWorld\"");
+            assertThat(info.getAttributes().getFirst().getValue()).isEqualTo("Hello\tWorld");
 
             // Parse the value and verify the pipe character is preserved
-            String value = (String) AnnotationDeserializer.parseValue(info.getAttributes().getFirst().getValue());
+            String value = (String) info.getAttributes().getFirst().getValue();
             assertThat(value).isEqualTo("Hello\tWorld");
         }
     }
 
     private @Nullable AttributeInfo findAttributeByName(List<AttributeInfo> attributes, String name) {
         return attributes.stream()
-                .filter(attr -> attr.getName().equals(name))
-                .findFirst()
-                .orElse(null);
+          .filter(attr -> attr.getName().equals(name))
+          .findFirst()
+          .orElse(null);
     }
 
     @Test
@@ -315,20 +314,20 @@ class TypeTableAnnotationSerializationTest {
         List<String> collectedAnnotations = new ArrayList<>();
 
         // Create an AnnotationValueCollector
-        AnnotationCollectorHelper.AnnotationValueCollector collector = 
-            new AnnotationCollectorHelper.AnnotationValueCollector(
-              result -> {
-                    if (result.isEmpty()) {
-                        collectedAnnotations.add("@org/junit/jupiter/api/Test");
-                    } else {
-                        String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
-                                "org.junit.jupiter.api.Test",
-                                result.toArray(new String[0])
-                        );
-                        collectedAnnotations.add(annotationWithAttributes);
-                    }
+        AnnotationCollectorHelper.AnnotationValueCollector collector =
+          new AnnotationCollectorHelper.AnnotationValueCollector(
+            result -> {
+                if (result.isEmpty()) {
+                    collectedAnnotations.add("@org/junit/jupiter/api/Test");
+                } else {
+                    String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
+                      "org.junit.jupiter.api.Test",
+                      result.toArray(new String[0])
+                    );
+                    collectedAnnotations.add(annotationWithAttributes);
                 }
-            );
+            }
+          );
 
         // Call visitEnd to trigger the callback
         collector.visitEnd();
@@ -344,20 +343,20 @@ class TypeTableAnnotationSerializationTest {
         List<String> collectedAnnotations = new ArrayList<>();
 
         // Create an AnnotationValueCollector
-        AnnotationCollectorHelper.AnnotationValueCollector collector = 
-            new AnnotationCollectorHelper.AnnotationValueCollector(
-              result -> {
-                    if (result.isEmpty()) {
-                        collectedAnnotations.add("@Lorg/junit/jupiter/api/Test;");
-                    } else {
-                        String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
-                                "Lorg/junit/jupiter/api/Test;",
-                                result.toArray(new String[0])
-                        );
-                        collectedAnnotations.add(annotationWithAttributes);
-                    }
+        AnnotationCollectorHelper.AnnotationValueCollector collector =
+          new AnnotationCollectorHelper.AnnotationValueCollector(
+            result -> {
+                if (result.isEmpty()) {
+                    collectedAnnotations.add("@Lorg/junit/jupiter/api/Test;");
+                } else {
+                    String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
+                      "Lorg/junit/jupiter/api/Test;",
+                      result.toArray(new String[0])
+                    );
+                    collectedAnnotations.add(annotationWithAttributes);
                 }
-            );
+            }
+          );
 
         // Add an attribute
         collector.visit("timeout", 1000L);
@@ -382,20 +381,20 @@ class TypeTableAnnotationSerializationTest {
         List<String> collectedAnnotations = new ArrayList<>();
 
         // Create an AnnotationValueCollector
-        AnnotationCollectorHelper.AnnotationValueCollector collector = 
-            new AnnotationCollectorHelper.AnnotationValueCollector(
-              result -> {
-                    if (result.isEmpty()) {
-                        collectedAnnotations.add("@Lorg/example/OuterAnnotation;");
-                    } else {
-                        String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
-                                "Lorg/example/OuterAnnotation;",
-                                result.toArray(new String[0])
-                        );
-                        collectedAnnotations.add(annotationWithAttributes);
-                    }
+        AnnotationCollectorHelper.AnnotationValueCollector collector =
+          new AnnotationCollectorHelper.AnnotationValueCollector(
+            result -> {
+                if (result.isEmpty()) {
+                    collectedAnnotations.add("@Lorg/example/OuterAnnotation;");
+                } else {
+                    String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
+                      "Lorg/example/OuterAnnotation;",
+                      result.toArray(new String[0])
+                    );
+                    collectedAnnotations.add(annotationWithAttributes);
                 }
-            );
+            }
+          );
 
         // Create a nested annotation visitor
         AnnotationVisitor nestedVisitor = collector.visitAnnotation("nested", "Lorg/example/InnerAnnotation;");
@@ -424,20 +423,20 @@ class TypeTableAnnotationSerializationTest {
         List<String> collectedAnnotations = new ArrayList<>();
 
         // Create an AnnotationValueCollector
-        AnnotationCollectorHelper.AnnotationValueCollector collector = 
-            new AnnotationCollectorHelper.AnnotationValueCollector(
-              result -> {
-                    if (result.isEmpty()) {
-                        collectedAnnotations.add("@Lorg/example/ArrayAnnotation;");
-                    } else {
-                        String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
-                                "Lorg/example/ArrayAnnotation;",
-                                result.toArray(new String[0])
-                        );
-                        collectedAnnotations.add(annotationWithAttributes);
-                    }
+        AnnotationCollectorHelper.AnnotationValueCollector collector =
+          new AnnotationCollectorHelper.AnnotationValueCollector(
+            result -> {
+                if (result.isEmpty()) {
+                    collectedAnnotations.add("@Lorg/example/ArrayAnnotation;");
+                } else {
+                    String annotationWithAttributes = AnnotationSerializer.serializeAnnotationWithAttributes(
+                      "Lorg/example/ArrayAnnotation;",
+                      result.toArray(new String[0])
+                    );
+                    collectedAnnotations.add(annotationWithAttributes);
                 }
-            );
+            }
+          );
 
         // Create an array visitor
         AnnotationVisitor arrayVisitor = collector.visitArray("value");
@@ -456,5 +455,30 @@ class TypeTableAnnotationSerializationTest {
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
         assertThat(collectedAnnotations.getFirst()).isEqualTo("@Lorg/example/ArrayAnnotation;(value={1,2,3})");
+    }
+
+    @Test
+    void testParserErrorPositioning() {
+        // Test malformed annotation - missing closing parenthesis
+        assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/springframework/retry/annotation/Backoff;("))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("at position 48, but reached end of input")
+            .hasMessageContaining("Input string: @Lorg/springframework/retry/annotation/Backoff;(")
+            .hasMessageContaining("Position indicator:                                           ^");
+
+        // Test malformed annotation - invalid character at specific position
+        assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=123$)"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("at position 29")
+            .hasMessageContaining("but found '$'")
+            .hasMessageContaining("Input string: @Lorg/example/Test;(value=123$)")
+            .hasMessageContaining("Position indicator:                        ^");
+
+        // Test missing attribute value
+        assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(name=)"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("at position 25")
+            .hasMessageContaining("Input string: @Lorg/example/Test;(name=)")
+            .hasMessageContaining("Position indicator:                    ^");
     }
 }

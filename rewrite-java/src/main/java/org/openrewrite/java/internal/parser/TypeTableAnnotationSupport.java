@@ -74,17 +74,10 @@ class AnnotationAttributeApplier {
         }
 
         for (AnnotationDeserializer.AttributeInfo attribute : attributes) {
-            applyAttribute(av, attribute.getName(), attribute.getValue());
+            applyParsedValue(av, attribute.getName(), attribute.getValue());
         }
     }
 
-    /**
-     * Applies a single attribute to an annotation visitor.
-     */
-    private static void applyAttribute(AnnotationVisitor av, String attributeName, String attributeValue) {
-        Object parsedValue = AnnotationDeserializer.parseValue(attributeValue);
-        applyParsedValue(av, attributeName, parsedValue);
-    }
 
     /**
      * Applies a parsed value to an annotation visitor.
@@ -271,6 +264,419 @@ class AnnotationDeserializer {
     private static final String JVM_PRIMITIVE_DESCRIPTORS = "VZCBSIFJD";
 
     /**
+     * Cursor-based parser for efficient annotation string parsing.
+     */
+    private static class Parser {
+        private final String input;
+        private int pos = 0;
+
+        Parser(String input) {
+            this.input = input;
+        }
+
+        private char peek() {
+            return pos < input.length() ? input.charAt(pos) : '\0';
+        }
+
+        private char consume() {
+            return pos < input.length() ? input.charAt(pos++) : '\0';
+        }
+
+        private void expect(char expected) {
+            int errorPos = pos; // Save position before consuming
+            char actual = consume();
+            if (actual != expected) {
+                // Create a helpful error message with context
+                StringBuilder errorMsg = new StringBuilder();
+                errorMsg.append("Expected '").append(expected).append("' at position ").append(errorPos);
+                if (actual == '\0') {
+                    errorMsg.append(", but reached end of input");
+                } else {
+                    errorMsg.append(", but found '").append(actual).append("'");
+                }
+                errorMsg.append("\nInput string: ").append(input);
+                
+                // Add a visual indicator of the error position
+                errorMsg.append("\nPosition indicator: ");
+                for (int i = 0; i < errorPos - 6; i++) {
+                    errorMsg.append(' ');
+                }
+                errorMsg.append('^');
+                
+                // Add some context around the error position
+                int contextStart = Math.max(0, errorPos - 20);
+                int contextEnd = Math.min(input.length(), errorPos + 20);
+                if (contextStart > 0 || contextEnd < input.length()) {
+                    errorMsg.append("\nContext: ");
+                    if (contextStart > 0) errorMsg.append("...");
+                    errorMsg.append(input, contextStart, contextEnd);
+                    if (contextEnd < input.length()) errorMsg.append("...");
+                }
+                
+                throw new IllegalArgumentException(errorMsg.toString());
+            }
+        }
+
+        private List<AttributeInfo> parseAttributes() {
+            List<AttributeInfo> attributes = new ArrayList<>();
+            
+            while (pos < input.length()) {
+
+                // Parse attribute name (identifier)
+                String attributeName = parseIdentifier();
+                if (attributeName.isEmpty()) break;
+                
+                // Check for '=' - if not found, this is a value-only attribute
+                expect('=');
+                Object attributeValue = parseValue(0);
+
+                attributes.add(new AttributeInfo(attributeName, attributeValue));
+                
+                // Check for comma separator
+                if (peek() == ',') {
+                    consume(); // consume ','
+                } else {
+                    // No comma means we're done with attributes
+                    break;
+                }
+            }
+
+            return attributes;
+        }
+        
+        private String parseIdentifier() {
+            int start = pos;
+            
+            // Parse a simple identifier (letters, digits, underscores)
+            while (pos < input.length()) {
+                char c = peek();
+                if (Character.isLetterOrDigit(c) || c == '_') {
+                    consume();
+                } else {
+                    break;
+                }
+            }
+            
+            return input.substring(start, pos);
+        }
+        
+        private Object[] parseArrayValue(int depth) {
+            // Parse array elements directly without creating new parser instances
+            List<Object> elements = new ArrayList<>();
+            expect('{');
+            while (pos < input.length()) {
+                // Parse the next array element value directly
+                Object element = parseValue(depth);
+                elements.add(element);
+
+                // Check if we have more elements (comma) or end of array
+                if (peek() == ',') {
+                    consume(); // consume comma
+                } else {
+                    // No comma means end of array
+                    break;
+                }
+            }
+            expect('}');
+            return elements.toArray();
+        }
+        
+        private AnnotationInfo parseNestedAnnotationValue(int depth) {
+            if (depth > MAX_NESTING_DEPTH) {
+                throw new IllegalArgumentException("Maximum nesting depth of " + MAX_NESTING_DEPTH + " exceeded while parsing nested annotation: " + input);
+            }
+            
+            expect('@');
+            ClassConstant annotationName = parseClassConstantValue();
+            if (peek() != '(') {
+                // No attributes
+                return new AnnotationInfo(annotationName.getDescriptor(), null);
+            }
+            
+            expect('(');
+            // Parse attributes directly without extracting substring first
+            List<AttributeInfo> attributes = parseAttributes();
+            expect(')');
+            
+            return new AnnotationInfo(annotationName.getDescriptor(), attributes);
+        }
+
+        private Object parseValue(int depth) {
+            if (depth > MAX_NESTING_DEPTH) {
+                throw new IllegalArgumentException("Maximum nesting depth of " + MAX_NESTING_DEPTH + " exceeded while parsing: " + input);
+            }
+
+            // Handle different value types using cursor-based parsing
+            if (isBoolean()) {
+                return parseBooleanValue();
+            } else if (isCharLiteral()) {
+                return parseCharValue();
+            } else if (isStringLiteral()) {
+                return parseStringValue();
+            } else if (isArrayLiteral()) {
+                return parseArrayValue(depth);
+            } else if (isAnnotation()) {
+                return parseNestedAnnotationValue(depth + 1);
+            } else if (isEnumConstant()) {
+                return parseEnumConstantValue();
+            } else if (isClassConstant()) {
+                return parseClassConstantValue();
+            } else if (isPrimitiveTypeDescriptor()) {
+                return parseClassConstantValue(); // Primitive type descriptors are also class constants
+            } else if (isArrayTypeDescriptor()) {
+                return parseClassConstantValue(); // Array type descriptors are also class constants
+            }
+
+            // Try parsing as numeric, fallback to string
+            return parseNumericValue();
+        }
+        
+        private Object parseBooleanValue() {
+            if (matchesAtPosition("true")) {
+                pos += 4; // consume "true"
+                return Boolean.TRUE;
+            } else if (matchesAtPosition("false")) {
+                pos += 5; // consume "false"
+                return Boolean.FALSE;
+            }
+            throw new IllegalArgumentException("Expected boolean value at position " + pos);
+        }
+        
+        private Object parseCharValue() {
+            expect('\'');
+            char result;
+            if (peek() == '\\') {
+                consume(); // consume backslash
+                result = parseCharEscapeSequence(consume());
+            } else {
+                result = consume();
+            }
+            expect('\'');
+            return result;
+        }
+        
+        private Object parseStringValue() {
+            expect('"');
+            StringBuilder sb = new StringBuilder();
+            boolean escaped = false;
+            
+            while (pos < input.length()) {
+                char c = peek();
+                if (escaped) {
+                    // Process escape sequences directly
+                    switch (c) {
+                        case '"':
+                            sb.append('"');
+                            break;
+                        case '\\':
+                            sb.append('\\');
+                            break;
+                        case 'n':
+                            sb.append('\n');
+                            break;
+                        case 'r':
+                            sb.append('\r');
+                            break;
+                        case 't':
+                            sb.append('\t');
+                            break;
+                        case '|':
+                            sb.append('|');
+                            break; // TypeTable-specific escape
+                        default:
+                            sb.append(c); // Pass through unknown escapes
+                    }
+                    escaped = false;
+                } else if (c == '\\') {
+                    escaped = true;
+                } else if (c == '"') {
+                    consume(); // consume closing quote
+                    return sb.toString();
+                } else {
+                    sb.append(c);
+                }
+                consume();
+            }
+            
+            throw new IllegalArgumentException("Unterminated string at position " + (pos - sb.length()));
+        }
+        
+        private ClassConstant parseClassConstantValue() {
+            int start = pos;
+            // Parse class descriptor: L...;, [L...;, [I, etc.
+            if (peek() == '[') {
+                // Array type descriptor
+                while (pos < input.length() && peek() == '[') {
+                    consume();
+                }
+            }
+            if (peek() == 'L') {
+                consume(); // consume 'L'
+                while (pos < input.length() && peek() != ';') {
+                    consume();
+                }
+                if (pos < input.length()) {
+                    consume(); // consume ';'
+                }
+            } else if (isPrimitiveTypeDescriptor()) {
+                consume(); // consume primitive type character
+            }
+            
+            String descriptor = input.substring(start, pos);
+            return new ClassConstant(descriptor);
+        }
+        
+        private Object parseEnumConstantValue() {
+            int start = pos;
+            // Parse enum constant: L...;CONSTANT_NAME
+            consume(); // consume 'L'
+            while (pos < input.length() && peek() != ';') {
+                consume();
+            }
+            if (pos < input.length()) {
+                consume(); // consume ';'
+            }
+            int semicolonPos = pos - 1;
+            
+            // Parse constant name
+            while (pos < input.length() && peek() != ',' && peek() != ')' && peek() != '}') {
+                consume();
+            }
+            
+            String enumDescriptor = input.substring(start, semicolonPos + 1);
+            String constantName = input.substring(semicolonPos + 1, pos);
+            
+            return new EnumConstant(enumDescriptor, constantName);
+        }
+        
+        private Object parseNumericValue() {
+            int start = pos;
+            
+            // Parse until we hit a delimiter
+            while (pos < input.length()) {
+                char c = peek();
+                if (!Character.isDigit(c) && c != '.' && c != 'L' && c != 'F' && c != 'E' && c != '-') {
+                    break;
+                }
+                consume();
+            }
+            
+            String value = input.substring(start, pos);
+            if (value.isEmpty()) {
+                expect('0');
+            }
+            
+            try {
+                if (value.endsWith("L")) {
+                    return Long.parseLong(value.substring(0, value.length() - 1));
+                }
+                if (value.endsWith("F")) {
+                    return Float.parseFloat(value.substring(0, value.length() - 1));
+                }
+                if (value.endsWith("D") || value.endsWith("d") || value.contains(".")) {
+                    return Double.parseDouble(value);
+                }
+                return Integer.parseInt(value);
+            } catch (NumberFormatException e) {
+                expect('0'); // for a better error message
+            }
+            throw new IllegalStateException("Unreachable code reached while parsing numeric value: " + value);
+        }
+
+        // Type checking helper methods that use the current cursor position
+        private boolean isBoolean() {
+            return matchesAtPosition("true") || matchesAtPosition("false");
+        }
+
+        private boolean isCharLiteral() {
+            return peek() == '\'';
+        }
+
+        private boolean isStringLiteral() {
+            return peek() == '"';
+        }
+
+        private boolean isArrayLiteral() {
+            return peek() == '{';
+        }
+
+        private boolean isClassConstant() {
+            return peek() == 'L';
+        }
+
+        private boolean isEnumConstant() {
+            // This requires looking ahead to see if we have L...;IDENTIFIER
+            if (peek() != 'L') return false;
+            int savedPos = pos;
+            try {
+                consume(); // consume 'L'
+                // Look for semicolon followed by valid identifier
+                while (pos < input.length() && peek() != ';') {
+                    consume();
+                }
+                if (pos >= input.length() || peek() != ';') return false;
+                consume(); // consume ';'
+                
+                // Check if what follows is a valid identifier (enum constant name)
+                if (pos >= input.length()) return false;
+                char first = peek();
+                if (!Character.isJavaIdentifierStart(first)) return false;
+                
+                // Check that we have a complete identifier
+                int identifierStart = pos;
+                while (pos < input.length() && Character.isJavaIdentifierPart(peek())) {
+                    consume();
+                }
+                
+                // Must have consumed at least one character and stopped at a delimiter
+                return pos > identifierStart && 
+                       (pos >= input.length() || peek() == ',' || peek() == ')' || peek() == '}');
+            } finally {
+                pos = savedPos; // restore position
+            }
+        }
+
+        private boolean isPrimitiveTypeDescriptor() {
+            char c = peek();
+            return JVM_PRIMITIVE_DESCRIPTORS.indexOf(c) != -1;
+        }
+
+        private boolean isArrayTypeDescriptor() {
+            return peek() == '[';
+        }
+
+        private boolean isAnnotation() {
+            return peek() == '@';
+        }
+        
+        private boolean matchesAtPosition(String text) {
+            if (pos + text.length() > input.length()) {
+                return false;
+            }
+            return input.startsWith(text, pos);
+        }
+
+        private static char parseCharEscapeSequence(char escapeChar) {
+            switch (escapeChar) {
+                case '\'':
+                    return '\'';
+                case '\\':
+                    return '\\';
+                case 'n':
+                    return '\n';
+                case 'r':
+                    return '\r';
+                case 't':
+                    return '\t';
+                default:
+                    // Allow other escape sequences to pass through (like unicode escapes)
+                    return escapeChar;
+            }
+        }
+
+    }
+
+    /**
      * Parses a serialized annotation string.
      */
     public static AnnotationInfo parseAnnotation(String annotationStr) {
@@ -278,305 +684,32 @@ class AnnotationDeserializer {
             throw new IllegalArgumentException("Invalid annotation format: " + annotationStr);
         }
 
-        int parenIndex = annotationStr.indexOf('(');
-        if (parenIndex == -1) {
-            String annotationName = annotationStr.substring(1);
-            return new AnnotationInfo(annotationName, null);
+        Parser parser = new Parser(annotationStr);
+        parser.expect('@');
+
+        ClassConstant annotationName = parser.parseClassConstantValue();
+        if (parser.peek() != '(') {
+            // No attributes
+            return new AnnotationInfo(annotationName.getDescriptor(), null);
         }
-
-        String annotationName = annotationStr.substring(1, parenIndex);
-        String attributesStr = annotationStr.substring(parenIndex + 1, annotationStr.length() - 1);
-        List<AttributeInfo> attributes = parseAttributes(attributesStr);
-
-        return new AnnotationInfo(annotationName, attributes);
+        
+        parser.expect('(');
+        // Parse attributes directly without extracting substring first
+        List<AttributeInfo> attributes = parser.parseAttributes();
+        parser.expect(')');
+        return new AnnotationInfo(annotationName.getDescriptor(), attributes);
     }
 
-    /**
-     * Parses a string containing serialized attributes.
-     */
-    private static List<AttributeInfo> parseAttributes(String attributesStr) {
-        List<AttributeInfo> attributes = new ArrayList<>();
-        if (attributesStr.isEmpty()) {
-            return attributes;
-        }
-
-        List<String> attributeStrings = splitRespectingNestedStructures(attributesStr, ',');
-        for (String attributeStr : attributeStrings) {
-            int equalsIndex = attributeStr.indexOf('=');
-            if (equalsIndex == -1) {
-                attributes.add(new AttributeInfo("value", attributeStr.trim()));
-            } else {
-                String name = attributeStr.substring(0, equalsIndex).trim();
-                String value = attributeStr.substring(equalsIndex + 1).trim();
-                attributes.add(new AttributeInfo(name, value));
-            }
-        }
-
-        return attributes;
-    }
-
-    /**
-     * Splits a string by a delimiter, respecting nested structures.
-     */
-    private static List<String> splitRespectingNestedStructures(String str, char delimiter) {
-        List<String> result = new ArrayList<>();
-        int start = 0;
-        int parenDepth = 0;
-        int braceDepth = 0;
-        boolean inQuotes = false;
-        boolean escaped = false;
-
-        for (int i = 0; i < str.length(); i++) {
-            char c = str.charAt(i);
-
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-
-            if (c == '\\') {
-                escaped = true;
-                continue;
-            }
-
-            if (c == '"' && !inQuotes) {
-                inQuotes = true;
-            } else if (c == '"' && inQuotes) {
-                inQuotes = false;
-            } else if (!inQuotes) {
-                switch (c) {
-                    case '(':
-                        parenDepth++;
-                        break;
-                    case ')':
-                        parenDepth--;
-                        break;
-                    case '{':
-                        braceDepth++;
-                        break;
-                    case '}':
-                        braceDepth--;
-                        break;
-                    default:
-                        if (c == delimiter && parenDepth == 0 && braceDepth == 0) {
-                            result.add(str.substring(start, i).trim());
-                            start = i + 1;
-                        }
-                }
-            }
-        }
-
-        if (start < str.length()) {
-            result.add(str.substring(start).trim());
-        }
-
-        return result;
-    }
 
     /**
      * Determines the type of a serialized value and returns it in the appropriate format.
+     * This is a public API method that creates a new parser for the complete value string.
      */
     public static Object parseValue(String value) {
-        return parseValue(value, 0);
+        Parser parser = new Parser(value);
+        return parser.parseValue(0);
     }
 
-    private static Object parseValue(String value, int depth) {
-        if (depth > MAX_NESTING_DEPTH) {
-            throw new IllegalArgumentException("Maximum nesting depth of " + MAX_NESTING_DEPTH + " exceeded while parsing: " + value);
-        }
-
-        value = value.trim();
-
-        // Handle different value types in order of specificity
-        if (isBoolean(value)) {
-            return Boolean.parseBoolean(value);
-        } else if (isCharLiteral(value)) {
-            return parseCharValue(value);
-        } else if (isStringLiteral(value)) {
-            return parseStringValue(value);
-        } else if (isArrayLiteral(value)) {
-            return parseArrayValue(value, depth + 1);
-        } else if (isClassConstant(value)) {
-            return parseClassConstant(value);
-        } else if (isEnumConstant(value)) {
-            return parseEnumConstant(value);
-        } else if (isPrimitiveTypeDescriptor(value)) {
-            return parseClassConstant(value);
-        } else if (isArrayTypeDescriptor(value)) {
-            return parseClassConstant(value);
-        } else if (isAnnotation(value)) {
-            return parseAnnotation(value);
-        }
-
-        // Try parsing as numeric, fallback to string
-        return parseNumericValue(value);
-    }
-
-    // Type checking helper methods
-    private static boolean isBoolean(String value) {
-        return "true".equals(value) || "false".equals(value);
-    }
-
-    private static boolean isCharLiteral(String value) {
-        return value.startsWith("'") && value.endsWith("'");
-    }
-
-    private static boolean isStringLiteral(String value) {
-        return value.startsWith("\"") && value.endsWith("\"");
-    }
-
-    private static boolean isArrayLiteral(String value) {
-        return value.startsWith("{") && value.endsWith("}");
-    }
-
-    private static boolean isClassConstant(String value) {
-        return value.startsWith("L") && value.endsWith(";");
-    }
-
-    private static boolean isEnumConstant(String value) {
-        return value.startsWith("L") && value.contains(";") && !value.endsWith(";");
-    }
-
-    private static boolean isPrimitiveTypeDescriptor(String value) {
-        return value.length() == 1 && JVM_PRIMITIVE_DESCRIPTORS.contains(value);
-    }
-
-    private static boolean isArrayTypeDescriptor(String value) {
-        return value.startsWith("[");
-    }
-
-    private static boolean isAnnotation(String value) {
-        return value.startsWith("@");
-    }
-
-    // Value parsing helper methods
-    private static Object parseClassConstant(String value) {
-        return new ClassConstant(value);
-    }
-
-    private static Object parseEnumConstant(String value) {
-        int semicolonIndex = value.indexOf(';');
-        return new EnumConstant(
-                value.substring(0, semicolonIndex + 1),
-                value.substring(semicolonIndex + 1)
-        );
-    }
-
-    private static Object parseNumericValue(String value) {
-        try {
-            if (value.endsWith("L") || value.endsWith("l")) {
-                return Long.parseLong(value.substring(0, value.length() - 1));
-            }
-            if (value.endsWith("F") || value.endsWith("f")) {
-                return Float.parseFloat(value.substring(0, value.length() - 1));
-            }
-            if (value.endsWith("D") || value.endsWith("d") || value.contains(".")) {
-                return Double.parseDouble(value);
-            }
-            return Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            return value;
-        }
-    }
-
-    private static char parseCharValue(String value) {
-        String charContent = value.substring(1, value.length() - 1);
-
-        if (charContent.length() == 1) {
-            return charContent.charAt(0);
-        } else if (charContent.startsWith("\\") && charContent.length() == 2) {
-            return parseCharEscapeSequence(charContent.charAt(1));
-        } else {
-            throw new IllegalArgumentException(
-                    "Invalid character literal '" + value + "'. Expected format: 'c' or escape sequence like '\\n'"
-            );
-        }
-    }
-
-    private static char parseCharEscapeSequence(char escapeChar) {
-        switch (escapeChar) {
-            case '\'':
-                return '\'';
-            case '\\':
-                return '\\';
-            case 'n':
-                return '\n';
-            case 'r':
-                return '\r';
-            case 't':
-                return '\t';
-            default:
-                // Allow other escape sequences to pass through (like unicode escapes)
-                return escapeChar;
-        }
-    }
-
-    private static String parseStringValue(String value) {
-        String stringContent = value.substring(1, value.length() - 1);
-        return processStringEscapes(stringContent);
-    }
-
-    /**
-     * Processes escape sequences in string content.
-     * Handles standard escapes (\", \\, \n, \r, \t) and TypeTable-specific escapes (\|).
-     */
-    private static String processStringEscapes(String content) {
-        StringBuilder sb = new StringBuilder();
-        boolean escaped = false;
-
-        for (int i = 0; i < content.length(); i++) {
-            char c = content.charAt(i);
-
-            if (escaped) {
-                switch (c) {
-                    case '"':
-                        sb.append('"');
-                        break;
-                    case '\\':
-                        sb.append('\\');
-                        break;
-                    case 'n':
-                        sb.append('\n');
-                        break;
-                    case 'r':
-                        sb.append('\r');
-                        break;
-                    case 't':
-                        sb.append('\t');
-                        break;
-                    case '|':
-                        sb.append('|');
-                        break; // TypeTable-specific escape
-                    default:
-                        sb.append(c); // Pass through unknown escapes
-                }
-                escaped = false;
-            } else if (c == '\\') {
-                escaped = true;
-            } else {
-                sb.append(c);
-            }
-        }
-
-        return sb.toString();
-    }
-
-    private static Object[] parseArrayValue(String value, int depth) {
-        String arrayContent = value.substring(1, value.length() - 1).trim();
-
-        if (arrayContent.isEmpty()) {
-            return new Object[0];
-        }
-
-        List<String> elements = splitRespectingNestedStructures(arrayContent, ',');
-        Object[] result = new Object[elements.size()];
-
-        for (int i = 0; i < elements.size(); i++) {
-            result[i] = parseValue(elements.get(i), depth);
-        }
-
-        return result;
-    }
 
     // Value classes for different types of constants
     public static class AnnotationInfo {
@@ -599,9 +732,9 @@ class AnnotationDeserializer {
 
     public static class AttributeInfo {
         private final String name;
-        private final String value;
+        private final Object value;
 
-        public AttributeInfo(String name, String value) {
+        public AttributeInfo(String name, Object value) {
             this.name = name;
             this.value = value;
         }
@@ -610,7 +743,7 @@ class AnnotationDeserializer {
             return name;
         }
 
-        public String getValue() {
+        public Object getValue() {
             return value;
         }
     }
@@ -670,12 +803,12 @@ class AnnotationDeserializer {
 class TsvEscapeUtils {
 
     /**
-     * Splits a string by the given delimiter, respecting escape sequences and returning unescaped values.
-     * TSV escaping is only for transport - the results are unescaped to get back original values.
+     * Splits a string by the given delimiter, respecting escape sequences and only unescaping \| sequences.
+     * Other escape sequences are preserved as-is since they're part of the content format.
      *
      * @param input the input string to split
      * @param delimiter the delimiter character to split on
-     * @return array of unescaped string segments
+     * @return array of string segments with \| unescaped to |
      */
     @VisibleForTesting
     static String[] splitAnnotationList(String input, char delimiter) {
@@ -694,13 +827,19 @@ class TsvEscapeUtils {
                 if (current == null) {
                     // First escape found - allocate StringBuilder and copy previous content
                     current = new StringBuilder();
-                    current.append(input, segmentStart, i - 1); // Exclude the backslash
+                    current.append(input, segmentStart, i - 1); // Exclude the backslash from previous content
                 }
-                // Append the unescaped character (remove the escape)
-                current.append(c);
+                
+                if (c == '|') {
+                    // Unescape \| to just |
+                    current.append('|');
+                } else {
+                    // For all other escapes, preserve the backslash and character
+                    current.append('\\').append(c);
+                }
                 escaped = false;
             } else if (c == '\\') {
-                // This is an escape character - don't append, just set flag
+                // This is an escape character - set flag but don't append yet
                 escaped = true;
             } else if (c == delimiter) {
                 // Unescaped delimiter - split here
@@ -827,7 +966,7 @@ class AnnotationSerializer {
         sb.append("@").append(annotationDescriptor).append("(");
         for (int i = 0; i < attributes.length; i++) {
             if (i > 0) {
-                sb.append(", ");
+                sb.append(",");
             }
             sb.append(attributes[i]);
         }
@@ -851,7 +990,7 @@ class AnnotationSerializer {
         if (value == null) {
             return "null";
         } else if (value instanceof String) {
-            return "\"" + escapeStringContentForTsv(value.toString()) + "\"";
+            return "\"" + escapeStringContentForTsv((String) value) + "\"";
         } else if (value instanceof Type) {
             return serializeClassConstant((Type) value);
         } else if (value.getClass().isArray()) {
@@ -903,6 +1042,9 @@ class AnnotationSerializer {
                 case '\f':
                     replacement = "\\f";
                     break;
+                case '"':
+                    replacement = "\\\"";
+                    break;
             }
 
             if (replacement != null) {
@@ -923,22 +1065,29 @@ class AnnotationSerializer {
     }
 
     private static String serializeArrayValue(Object value) {
-        List<String> elements = new ArrayList<>();
+        StringBuilder elements = new StringBuilder();
+        elements.append('{');
 
         if (value instanceof Object[]) {
             Object[] array = (Object[]) value;
-            for (Object element : array) {
-                elements.add(serializeValueInternal(element));
+            for (int i = 0; i < array.length; i++) {
+                if (i > 0) {
+                    elements.append(',');
+                }
+                elements.append(serializeValueInternal(array[i]));
             }
         } else {
             int length = java.lang.reflect.Array.getLength(value);
             for (int i = 0; i < length; i++) {
-                Object element = java.lang.reflect.Array.get(value, i);
-                elements.add(serializeValueInternal(element));
+                if (i > 0) {
+                    elements.append(',');
+                }
+                elements.append(serializeValueInternal(java.lang.reflect.Array.get(value, i)));
             }
         }
 
-        return "{" + String.join(",", elements) + "}";
+        elements.append('}');
+        return elements.toString();
     }
 
     private static String serializeNumericValue(Number value) {
@@ -951,18 +1100,6 @@ class AnnotationSerializer {
         } else {
             return serializeNumber(value);
         }
-    }
-
-    static String escapeDelimiters(String value) {
-        return value.replace("\\", "\\\\")
-                .replace("|", "\\|")
-                .replace("\"", "\\\"");
-    }
-
-    static String unescapeDelimiters(String value) {
-        return value.replace("\\|", "|")
-                .replace("\\\"", "\"")
-                .replace("\\\\", "\\");
     }
 
     public static void processAnnotationDefaultValue(AnnotationVisitor annotationDefaultVisitor, Object value) {

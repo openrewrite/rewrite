@@ -288,7 +288,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                     // Apply annotations to the class
                     if (classDef.getAnnotations() != null) {
                         for (String annotation : classDef.getAnnotations()) {
-                            AnnotationApplier.applyAnnotation(unescapeDelimiters(annotation), classWriter::visitAnnotation);
+                            AnnotationApplier.applyAnnotation(annotation, classWriter::visitAnnotation);
                         }
                     }
 
@@ -315,7 +315,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             // Apply annotations to the method
                             if (member.getAnnotations() != null) {
                                 for (String annotation : member.getAnnotations()) {
-                                    AnnotationApplier.applyAnnotation(unescapeDelimiters(annotation), mv::visitAnnotation);
+                                    AnnotationApplier.applyAnnotation(annotation, mv::visitAnnotation);
                                 }
                             }
 
@@ -362,7 +362,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             // Apply annotations to the field
                             if (member.getAnnotations() != null) {
                                 for (String annotation : member.getAnnotations()) {
-                                    AnnotationApplier.applyAnnotation(unescapeDelimiters(annotation), fv::visitAnnotation);
+                                    AnnotationApplier.applyAnnotation(annotation, fv::visitAnnotation);
                                 }
                             }
 
@@ -379,7 +379,6 @@ public class TypeTable implements JavaParserClasspathLoader {
                 future.complete(classesDir);
             } catch (Exception e) {
                 future.completeExceptionally(e);
-                classesDirByArtifact.remove(gav);
             }
         }
 
