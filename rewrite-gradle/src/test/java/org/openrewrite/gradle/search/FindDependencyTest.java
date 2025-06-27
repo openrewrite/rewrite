@@ -69,7 +69,7 @@ class FindDependencyTest implements RewriteTest {
             //language=gradle
             """
               plugins {
-                  'java-library'
+                  `java-library`
               }
               repositories {
                   mavenCentral()
@@ -80,7 +80,7 @@ class FindDependencyTest implements RewriteTest {
               """,
             """
               plugins {
-                  'java-library'
+                  `java-library`
               }
               repositories {
                   mavenCentral()
