@@ -34,20 +34,25 @@ export class PreferSatisfiesKeyword extends Recipe {
         return new class extends JavaScriptVisitor<ExecutionContext> {
             protected async visitBinaryExtensions(jsBinary: JS.Binary, p: ExecutionContext): Promise<JS.Binary | JS.SatisfiesExpression | undefined> {
                 const constAsRight = jsBinary.right.kind == J.Kind.Identifier && (jsBinary.right as J.Identifier).simpleName == "const";
-                if (jsBinary.operator.element === JS.Binary.Type.As && !constAsRight) {
-                    return {
-                        kind: JS.Kind.SatisfiesExpression,
-                        id: randomId(),
-                        prefix: jsBinary.prefix,
-                        markers: jsBinary.markers,
-                        expression: jsBinary.left,
-                        satisfiesType: {
-                            kind: J.Kind.LeftPadded,
-                            before: jsBinary.operator.before,
-                            element: jsBinary.right,
-                            markers: emptyMarkers
-                        }
-                    } satisfies JS.SatisfiesExpression; // <--- Satisfying, isn't it?
+                const newClassAsLeft = jsBinary.left.kind == J.Kind.NewClass;
+                if (jsBinary.operator.element === JS.Binary.Type.As && !constAsRight && newClassAsLeft) {
+                    return produce(jsBinary, (draft: Draft<JS.Binary>) => {
+                       draft.left = {
+                           kind: JS.Kind.SatisfiesExpression,
+                           id: randomId(),
+                           prefix: emptySpace,
+                           markers: emptyMarkers,
+                           expression: jsBinary.left,
+                           satisfiesType: {
+                               kind: J.Kind.LeftPadded,
+                               before: jsBinary.operator.before,
+                               element: jsBinary.right,
+                               markers: emptyMarkers
+                           }
+                       } satisfies JS.SatisfiesExpression as JS.SatisfiesExpression;
+                    });
+
+
                 } else {
                     return await super.visitBinaryExtensions(jsBinary, p) as JS.Binary | undefined;
                 }

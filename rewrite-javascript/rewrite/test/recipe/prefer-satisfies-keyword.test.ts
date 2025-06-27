@@ -35,7 +35,7 @@ describe("prefer-satisfies-keyword", () => {
             const modifier = {
                     kind: J.Kind.Modifier,
                     id: randomId()
-                } satisfies J.Modifier;
+                } satisfies J.Modifier as J.Modifier;
             `)
         )
     })
