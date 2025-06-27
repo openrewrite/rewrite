@@ -44,9 +44,7 @@ public class XRange extends LatestRelease {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        // For X-range patterns, we need to check if the version matches the pattern
-        // but we should not exclude it just because it's a pre-release version
-        if (!VersionComparator.checkVersion(version, getMetadataPattern(), false)) {
+        if (!super.isValid(currentVersion, version)) {
             return false;
         }
 
