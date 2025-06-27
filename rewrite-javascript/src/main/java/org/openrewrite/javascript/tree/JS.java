@@ -852,8 +852,12 @@ public interface JS extends J {
         }
 
         @Nullable
-        @With
         JContainer<Expression> typeParameters;
+
+        public FunctionCall withTypeParameters(@Nullable List<Expression> typeParameters) {
+            return new FunctionCall(this.id, this.prefix, this.markers, this.function,
+                    JContainer.withElementsNullable(this.typeParameters, typeParameters), this.arguments, this.functionType);
+        }
 
         public @Nullable List<Expression> getTypeParameters() {
             return typeParameters == null ? null : typeParameters.getElements();
