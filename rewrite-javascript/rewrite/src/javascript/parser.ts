@@ -887,7 +887,7 @@ export class JavaScriptParserVisitor {
                     dimensionsAfterName: [],
                     initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
                     variableType: this.mapVariableType(node)
-                } satisfies J.VariableDeclarations.NamedVariable as J.VariableDeclarations.NamedVariable,
+                },
                 emptySpace
             )]
         };
@@ -911,7 +911,7 @@ export class JavaScriptParserVisitor {
                 }),
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 methodType: this.mapMethodType(node)
-            } satisfies JS.ComputedPropertyMethodDeclaration as JS.ComputedPropertyMethodDeclaration;
+            };
         }
 
         let name: J.Identifier = !node.name
@@ -935,7 +935,7 @@ export class JavaScriptParserVisitor {
             }),
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             methodType: this.mapMethodType(node)
-        } satisfies J.MethodDeclaration as J.MethodDeclaration;
+        };
     }
 
     visitMethodDeclaration(node: ts.MethodDeclaration): J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration {
@@ -969,7 +969,7 @@ export class JavaScriptParserVisitor {
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
                 methodType: this.mapMethodType(node)
-            } satisfies JS.ComputedPropertyMethodDeclaration as JS.ComputedPropertyMethodDeclaration;
+            };
         }
 
         return {
@@ -986,7 +986,7 @@ export class JavaScriptParserVisitor {
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
-        } satisfies J.MethodDeclaration as J.MethodDeclaration;
+        };
     }
 
     private mapTypeInfo(node: ts.MethodDeclaration | ts.PropertyDeclaration | ts.VariableDeclaration | ts.ParameterDeclaration
@@ -1054,7 +1054,7 @@ export class JavaScriptParserVisitor {
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
                 methodType: this.mapMethodType(node)
-            } satisfies JS.ComputedPropertyMethodDeclaration as JS.ComputedPropertyMethodDeclaration;
+            };
         }
 
         return {
@@ -1070,7 +1070,7 @@ export class JavaScriptParserVisitor {
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
-        } satisfies J.MethodDeclaration as J.MethodDeclaration;
+        };
     }
 
     visitSetAccessor(node: ts.SetAccessorDeclaration): J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration {
@@ -1087,7 +1087,7 @@ export class JavaScriptParserVisitor {
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
                 methodType: this.mapMethodType(node)
-            } satisfies JS.ComputedPropertyMethodDeclaration as JS.ComputedPropertyMethodDeclaration;
+            };
         }
 
         return {
@@ -1102,7 +1102,7 @@ export class JavaScriptParserVisitor {
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
-        } satisfies J.MethodDeclaration as J.MethodDeclaration;
+        };
     }
 
     visitCallSignature(node: ts.CallSignatureDeclaration): J.MethodDeclaration {
@@ -1484,7 +1484,7 @@ export class JavaScriptParserVisitor {
                     value: undefined, // FIXME verify
                     valueSource: node.readonlyToken!.getText(),
                     type: this.mapPrimitiveType(node.readonlyToken!)
-                } satisfies J.Literal as J.Literal
+                }
             ) : undefined,
             hasReadonly: node.readonlyToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.ReadonlyKeyword)!), true) : this.leftPadded(emptySpace, false),
             keysRemapping: {
@@ -1514,7 +1514,7 @@ export class JavaScriptParserVisitor {
                     value: undefined, // FIXME verify
                     valueSource: node.questionToken!.getText(),
                     type: this.mapPrimitiveType(node.questionToken!)
-                } satisfies J.Literal as J.Literal
+                }
             ) : undefined,
             hasQuestionToken: node.questionToken ? this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.QuestionToken)!), true) : this.leftPadded(emptySpace, false),
             valueType: node.type ? {
@@ -1586,7 +1586,7 @@ export class JavaScriptParserVisitor {
                     }),
                     dimensionsAfterName: [],
                     variableType: this.mapVariableType(node),
-                } satisfies J.VariableDeclarations.NamedVariable as J.VariableDeclarations.NamedVariable,
+                },
                 this.suffix(node.name)
             )],
         };
@@ -2662,7 +2662,7 @@ export class JavaScriptParserVisitor {
                             expression: ident,
                             markers: emptyMarkers,
                             prefix: emptySpace
-                        } satisfies JS.ExpressionStatement as JS.ExpressionStatement, this.suffix(node.initializer));
+                        }, this.suffix(node.initializer));
                     } else {
                         return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
                     }
@@ -2706,7 +2706,7 @@ export class JavaScriptParserVisitor {
                                 expression: ident,
                                 markers: emptyMarkers,
                                 prefix: emptySpace
-                            } satisfies JS.ExpressionStatement as JS.ExpressionStatement, this.suffix(node.initializer));
+                            }, this.suffix(node.initializer));
                         } else if (ts.isArrayLiteralExpression(node.initializer)) {
                             return this.rightPadded({
                                 kind: JS.Kind.ArrayBindingPattern,
@@ -2719,7 +2719,7 @@ export class JavaScriptParserVisitor {
                                 } satisfies J.Container<Expression> as J.Container<Expression>,
                                 markers: emptyMarkers,
                                 prefix: emptySpace
-                            } satisfies JS.ArrayBindingPattern as JS.ArrayBindingPattern, this.suffix(node.initializer))
+                            }, this.suffix(node.initializer))
                         } else if (ts.isObjectLiteralExpression(node.initializer)) {
                             return this.rightPadded({
                                 kind: JS.Kind.ObjectBindingPattern,
@@ -2733,10 +2733,10 @@ export class JavaScriptParserVisitor {
                                     before: emptySpace,
                                     elements: node.initializer.properties.map(p => this.rightPadded(this.visit(p) as Expression, this.suffix(p))),
                                     markers: emptyMarkers
-                                } satisfies J.Container<Expression> as J.Container<Expression>,
+                                },
                                 markers: emptyMarkers,
                                 prefix: emptySpace
-                            } satisfies JS.ObjectBindingPattern as JS.ObjectBindingPattern, this.suffix(node.initializer))
+                            }, this.suffix(node.initializer))
                         }
                         else {
                             return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
@@ -2902,7 +2902,7 @@ export class JavaScriptParserVisitor {
             dimensionsAfterName: [],
             initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)),
             variableType: this.mapVariableType(node),
-        } satisfies J.VariableDeclarations.NamedVariable as J.VariableDeclarations.NamedVariable;
+        };
     }
 
     visitVariableDeclarationList(node: ts.VariableDeclarationList): J.VariableDeclarations | JS.ScopedVariableDeclarations {
@@ -2937,7 +2937,7 @@ export class JavaScriptParserVisitor {
                     kind.kind === ts.SyntaxKind.LetKeyword ? 'let' :
                         kind.kind === ts.SyntaxKind.ConstKeyword ? 'const' : 'using',
                 type: kind.kind == ts.SyntaxKind.ConstKeyword ? J.ModifierType.Final : J.ModifierType.LanguageExtension
-            } satisfies J.Modifier as J.Modifier);
+            });
         }
         const isMulti = node.declarations.length > 1;
         const varDecls = node.declarations.map(declaration => {
@@ -2993,7 +2993,7 @@ export class JavaScriptParserVisitor {
                         }
                     });
                 })
-            } satisfies JS.ScopedVariableDeclarations as JS.ScopedVariableDeclarations;
+            };
         }
     }
 
@@ -3323,7 +3323,7 @@ export class JavaScriptParserVisitor {
                     keyword: 'export',
                     type: J.ModifierType.LanguageExtension,
                     annotations: []
-                } satisfies J.Modifier as J.Modifier] : [];
+                }] : [];
             })(),
             prefix: exportModifierSuffix ? exportModifierSuffix : this.prefix(node),
             importClause: {
@@ -3346,7 +3346,7 @@ export class JavaScriptParserVisitor {
             moduleSpecifier: undefined,
             attributes: undefined,
             initializer: this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference))
-        } satisfies JS.Import as JS.Import;
+        };
     }
 
     visitImportKeyword(node: ts.ImportExpression): J.Identifier {
@@ -3419,7 +3419,7 @@ export class JavaScriptParserVisitor {
                     markers: emptyMarkers,
                     propertyName: this.rightPadded(this.convert(node.propertyName), this.suffix(node.propertyName)),
                     alias: this.convert(node.name)
-                } satisfies JS.Alias as JS.Alias
+                }
                 : this.convert(node.name) as J.Identifier,
             type: this.mapType(node),
         };
