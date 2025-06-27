@@ -16,6 +16,8 @@
 package org.openrewrite.gradle.trait;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
@@ -65,6 +67,60 @@ class GradleDependencyTest implements RewriteTest {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:28.2-jre"
               }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "api",
+      "implementation",
+      "compileOnly",
+      "runtimeOnly",
+      "testImplementation",
+      "testCompileOnly",
+      "testRuntimeOnly",
+      "debugImplementation",
+      "releaseImplementation",
+      "androidTestImplementation",
+      "featureImplementation",
+      "annotationProcessor",
+      "kapt",
+      "ksp",
+      "compile", // deprecated
+      "runtime", // deprecated
+      "testCompile", // deprecated
+      "testRuntime" // deprecated
+    })
+    void methods(String method) {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  %s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method),
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  /*~~(com.google.guava:guava:28.2-jre)~~>*/%s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method)
           )
         );
     }
