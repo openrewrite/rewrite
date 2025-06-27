@@ -30,50 +30,50 @@ class ListUtilsTest {
     class FlatMap {
         @Test
         void flatMap() {
-            var l = List.of(1.0, 2.0, 3.0);
-            assertThat(ListUtils.flatMap(l, l2 -> l2.intValue() % 2 == 0 ? List.of(2.0, 2.1, 2.2) : l2))
+            var l = Arrays.asList(1.0, 2.0, 3.0);
+            assertThat(ListUtils.flatMap(l, l2 -> l2.intValue() % 2 == 0 ? Arrays.asList(2.0, 2.1, 2.2) : l2))
               .containsExactly(1.0, 2.0, 2.1, 2.2, 3.0);
         }
 
         @Test
         void flatMapWithNoChangeShouldHaveReferenceEquality() {
-            var before = List.of(1, 2, 3);
+            var before = Arrays.asList(1, 2, 3);
             var after = ListUtils.flatMap(before, Collections::singletonList);
             assertThat(after).isSameAs(before);
         }
 
         @Test
         void flatMapWithNoChangeShouldHaveReferenceEqualityIncludingNulls() {
-            var before = List.of(1, null, 3);
+            var before = Arrays.asList(1, null, 3);
             var after = ListUtils.flatMap(before, Collections::singletonList);
             assertThat(after).isSameAs(before);
         }
 
         @Test
         void replaceSingleWithMultipleAtPosition0() {
-            var l = List.of(1);
-            assertThat(ListUtils.flatMap(l, l2 -> List.of(2, 3)))
+            var l = Arrays.asList(1);
+            assertThat(ListUtils.flatMap(l, l2 -> Arrays.asList(2, 3)))
               .containsExactly(2, 3);
         }
 
         @Test
         void removeSingleItem() {
-            var l = List.of(1, 2, 3);
+            var l = Arrays.asList(1, 2, 3);
             assertThat(ListUtils.flatMap(l, l1 -> l1.equals(2) ? null : l1))
               .containsExactly(1, 3);
         }
 
         @Test
         void replaceItemWithCollectionThenRemoveNextItem() {
-            var l = List.of(2, 0);
-            assertThat(ListUtils.flatMap(l, l1 -> l1.equals(2) ? List.of(10, 11) : null))
+            var l = Arrays.asList(2, 0);
+            assertThat(ListUtils.flatMap(l, l1 -> l1.equals(2) ? Arrays.asList(10, 11) : null))
               .containsExactly(10, 11);
         }
 
         @Test
         void removeByAddingEmptyCollection() {
-            var l = List.of(2, 0);
-            assertThat(ListUtils.flatMap(l, l1 -> l1.equals(2) ? List.of(10, 11) : List.of()))
+            var l = Arrays.asList(2, 0);
+            assertThat(ListUtils.flatMap(l, l1 -> l1.equals(2) ? Arrays.asList(10, 11) : Arrays.asList()))
               .containsExactly(10, 11);
         }
     }
@@ -82,23 +82,23 @@ class ListUtilsTest {
     class Map {
         @Test
         void identityMap() {
-            var l = List.of(1, 2, 3);
+            var l = Arrays.asList(1, 2, 3);
             assertThat(ListUtils.map(l, (i, e) -> e)).isSameAs(l);
         }
         @Test
         void identityMapWithNulls() {
-            var l = List.of(1, null, 3);
+            var l = Arrays.asList(1, null, 3);
             assertThat(ListUtils.map(l, (i, e) -> e)).isSameAs(l);
         }
         @Test
         void removeElements() {
-            var l = List.of(1, 2, 3);
-            assertThat(ListUtils.map(l, (i, e) -> i % 2 == 0 ? null : e)).isEqualTo(List.of(2));
+            var l = Arrays.asList(1, 2, 3);
+            assertThat(ListUtils.map(l, (i, e) -> i % 2 == 0 ? null : e)).isEqualTo(Arrays.asList(2));
         }
         @Test
         void removeElementsWithNulls() {
-            var l = List.of(0, 1, 2, null, 4, 5);
-            assertThat(ListUtils.map(l, (i, e) -> i == 4 ? null : e)).isEqualTo(List.of(0, 1, 2, 5));
+            var l = Arrays.asList(0, 1, 2, null, 4, 5);
+            assertThat(ListUtils.map(l, (i, e) -> i == 4 ? null : e)).isEqualTo(Arrays.asList(0, 1, 2, 5));
         }
     }
 }
