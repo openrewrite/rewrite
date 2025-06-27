@@ -31,7 +31,6 @@ class GradleDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withToolingApi())
           .recipe(RewriteTest.toRecipe(() -> gradleDependency().asVisitor(dep ->
             SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
     }
@@ -40,6 +39,7 @@ class GradleDependencyTest implements RewriteTest {
     @Test
     void literal() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
@@ -94,6 +94,7 @@ class GradleDependencyTest implements RewriteTest {
     })
     void methods(String method) {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi("7.6.5")),
           buildGradle(
             """
               plugins {
@@ -128,6 +129,7 @@ class GradleDependencyTest implements RewriteTest {
     @Test
     void groovyString() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
@@ -164,6 +166,7 @@ class GradleDependencyTest implements RewriteTest {
     @Test
     void groovyMapEntry() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
@@ -198,6 +201,7 @@ class GradleDependencyTest implements RewriteTest {
     @Test
     void platform() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
@@ -232,6 +236,7 @@ class GradleDependencyTest implements RewriteTest {
     @Test
     void enforcedPlatform() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
