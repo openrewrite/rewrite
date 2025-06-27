@@ -696,4 +696,40 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeRepeatedDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+                  implementation("org.openrewrite:rewrite-core:8.55.0")
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+              }
+              """
+          )
+        );
+    }
 }
