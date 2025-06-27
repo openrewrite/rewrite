@@ -294,27 +294,33 @@ class AnnotationDeserializer {
                 } else {
                     errorMsg.append(", but found '").append(actual).append("'");
                 }
-                errorMsg.append("\nInput string: ").append(input);
-                
-                // Add a visual indicator of the error position
-                errorMsg.append("\nPosition indicator: ");
-                for (int i = 0; i < errorPos - 6; i++) {
-                    errorMsg.append(' ');
-                }
-                errorMsg.append('^');
-                
-                // Add some context around the error position
-                int contextStart = Math.max(0, errorPos - 20);
-                int contextEnd = Math.min(input.length(), errorPos + 20);
-                if (contextStart > 0 || contextEnd < input.length()) {
-                    errorMsg.append("\nContext: ");
-                    if (contextStart > 0) errorMsg.append("...");
-                    errorMsg.append(input, contextStart, contextEnd);
-                    if (contextEnd < input.length()) errorMsg.append("...");
-                }
-                
+                errorMsg.append(inputWithErrorIndicator(errorPos));
+
                 throw new IllegalArgumentException(errorMsg.toString());
             }
+        }
+
+        private String inputWithErrorIndicator(int errorPos) {
+            StringBuilder errorMsg = new StringBuilder();
+            errorMsg.append("\nInput string: ").append(input);
+
+            // Add a visual indicator of the error position
+            errorMsg.append("\nPosition indicator: ");
+            for (int i = 0; i < errorPos - 6; i++) {
+                errorMsg.append(' ');
+            }
+            errorMsg.append('^');
+
+            // Add some context around the error position
+            int contextStart = Math.max(0, errorPos - 20);
+            int contextEnd = Math.min(input.length(), errorPos + 20);
+            if (contextStart > 0 || contextEnd < input.length()) {
+                errorMsg.append("\nContext: ");
+                if (contextStart > 0) errorMsg.append("...");
+                errorMsg.append(input, contextStart, contextEnd);
+                if (contextEnd < input.length()) errorMsg.append("...");
+            }
+            return errorMsg.toString();
         }
 
         private List<AttributeInfo> parseAttributes() {
@@ -348,9 +354,12 @@ class AnnotationDeserializer {
             int start = pos;
             
             // Parse a simple identifier (letters, digits, underscores)
+            if (!Character.isJavaIdentifierStart(peek())) {
+                throw new IllegalArgumentException("Expected identifier at position " + pos + " but found '" + peek() + "'" + inputWithErrorIndicator(pos));
+            }
             while (pos < input.length()) {
                 char c = peek();
-                if (Character.isLetterOrDigit(c) || c == '_') {
+                if (Character.isJavaIdentifierPart(c)) {
                     consume();
                 } else {
                     break;
@@ -364,7 +373,7 @@ class AnnotationDeserializer {
             // Parse array elements directly without creating new parser instances
             List<Object> elements = new ArrayList<>();
             expect('{');
-            while (pos < input.length()) {
+            while (pos < input.length() && peek() != '}') {
                 // Parse the next array element value directly
                 Object element = parseValue(depth);
                 elements.add(element);
@@ -529,24 +538,14 @@ class AnnotationDeserializer {
         private Object parseEnumConstantValue() {
             int start = pos;
             // Parse enum constant: L...;CONSTANT_NAME
-            consume(); // consume 'L'
+            expect('L');
             while (pos < input.length() && peek() != ';') {
                 consume();
             }
-            if (pos < input.length()) {
-                consume(); // consume ';'
-            }
+            expect(';');
             int semicolonPos = pos - 1;
             
-            // Parse constant name
-            while (pos < input.length() && peek() != ',' && peek() != ')' && peek() != '}') {
-                consume();
-            }
-            
-            String enumDescriptor = input.substring(start, semicolonPos + 1);
-            String constantName = input.substring(semicolonPos + 1, pos);
-            
-            return new EnumConstant(enumDescriptor, constantName);
+            return new EnumConstant(input.substring(start, semicolonPos + 1), parseIdentifier());
         }
         
         private Object parseNumericValue() {
@@ -563,7 +562,7 @@ class AnnotationDeserializer {
             
             String value = input.substring(start, pos);
             if (value.isEmpty()) {
-                expect('0');
+                throw new IllegalArgumentException("Expected numeric value." + inputWithErrorIndicator(pos));
             }
             
             try {
@@ -578,9 +577,8 @@ class AnnotationDeserializer {
                 }
                 return Integer.parseInt(value);
             } catch (NumberFormatException e) {
-                expect('0'); // for a better error message
+                throw new IllegalArgumentException("Illegal numeric value: " + value + "." + inputWithErrorIndicator(pos), e);
             }
-            throw new IllegalStateException("Unreachable code reached while parsing numeric value: " + value);
         }
 
         // Type checking helper methods that use the current cursor position

@@ -477,8 +477,15 @@ class TypeTableAnnotationSerializationTest {
         // Test missing attribute value
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(name=)"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("at position 25")
+            .hasMessageContaining("Expected numeric value")
             .hasMessageContaining("Input string: @Lorg/example/Test;(name=)")
             .hasMessageContaining("Position indicator:                    ^");
+
+        // Test missing attribute value
+        assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(0name=)"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Expected identifier at position 20 but found '0'")
+            .hasMessageContaining("Input string: @Lorg/example/Test;(0name=)")
+            .hasMessageContaining("Position indicator:               ^");
     }
 }
