@@ -9,7 +9,7 @@ OpenRewrite is an automated refactoring ecosystem for source code that eliminate
 ### Core Architecture
 
 - **Recipe**: Defines what transformation to perform (`org.openrewrite.Recipe`)
-- **LST (Lossless Semantic Tree)**: Preserves all formatting and comments during transformations
+- **LST (Lossless Semantic Tree)**: AST preserving all formatting, comments, and type attribution during transformations
 - **TreeVisitor**: Implements how to traverse and modify LSTs (`org.openrewrite.TreeVisitor`)  
 - **SourceFile**: Represents parsed source code as an LST (`org.openrewrite.SourceFile`)
 - **Markers**: Attach metadata to LST nodes without modifying the tree structure
@@ -75,16 +75,19 @@ OpenRewrite is an automated refactoring ecosystem for source code that eliminate
 ### Language Parsers
 - **`rewrite-java`**: Main Java language support with comprehensive AST model
 - **`rewrite-java-8/11/17/21`**: Java version-specific features and compatibility
-- **`rewrite-groovy/kotlin/javascript`**: Other JVM and web languages
+- **`rewrite-groovy/kotlin/javascript`**: Other JVM and web languages extending the `J` model from `rewrite-java`
 
 ### Format Parsers  
 - **`rewrite-maven`**: Maven POM manipulation and dependency management
 - **`rewrite-gradle`**: Gradle build script parsing (Groovy/Kotlin DSL)
-- **`rewrite-json/yaml/xml/properties/toml`**: Configuration file formats
+- **`rewrite-json/yaml/xml/hcl/properties/toml/protobuf`**: Configuration and data formats
 
 ### Supporting Modules
-- **`rewrite-java-tck`**: Technology Compatibility Kit for parser validation
+- **`rewrite-java-tck`**: Technology Compatibility Kit for Java parser validation
+- **`rewrite-java-test`**: Java-specific testing utilities and infrastructure
+- **`rewrite-java-lombok`**: Lombok-specific Java support
 - **`rewrite-benchmarks`**: JMH performance benchmarks
+- **`tools/language-parser-builder`**: Template tool for generating new language parsers
 
 ## Development Patterns
 
@@ -95,6 +98,7 @@ Recipes extend `org.openrewrite.Recipe` and typically contain one or more `TreeV
 - Use `TreeVisitor<SourceFile, ExecutionContext>` for cross-cutting concerns
 - Use language-specific visitors (e.g., `JavaIsoVisitor`) for language transformations
 - Always return modified trees; don't mutate in place
+- Return `null` from a visitor method to delete an element
 
 ### Testing Recipes
 Use `RewriteTest` interface with `@Test` methods that call `rewriteRun()`:
@@ -120,3 +124,8 @@ The project supports selective module loading via `IDE.properties` to improve ID
 
 ### Quality Checks
 The build enforces license headers on all source files and runs OWASP dependency vulnerability scanning. Always run `./gradlew licenseFormat` before committing code changes.
+
+## Important Conventions
+
+### Nullability Annotations
+The project uses JSpecify nullability annotations.

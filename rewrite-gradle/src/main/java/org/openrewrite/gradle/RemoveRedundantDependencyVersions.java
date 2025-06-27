@@ -30,16 +30,10 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedManagedDependency;
-import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestIntegration;
 import org.openrewrite.semver.Semver;
@@ -58,7 +52,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class RemoveRedundantDependencyVersions extends Recipe {
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                    "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                          "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.*",
             required = false)
     @Nullable
@@ -66,7 +60,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                    "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                          "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava*",
             required = false)
     @Nullable
@@ -74,8 +68,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Only if managed version is ...",
             description = "Only remove the explicit version if the managed version has the specified comparative relationship to the explicit version. " +
-                    "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
-                    "Default `eq`.",
+                          "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
+                          "Default `eq`.",
             valid = {"ANY", "EQ", "LT", "LTE", "GT", "GTE"},
             required = false)
     @Nullable
@@ -142,7 +136,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             .artifactId(artifactPattern)
                                             .get(getCursor())
                                             .ifPresent(it ->
-                                                directDependencies.computeIfAbsent(m.getSimpleName(), k -> new ArrayList<>()).add(it.getResolvedDependency()));
+                                                    directDependencies.computeIfAbsent(m.getSimpleName(), k -> new ArrayList<>()).add(it.getResolvedDependency()));
 
                                     if (!m.getSimpleName().equals("platform") && !m.getSimpleName().equals("enforcedPlatform")) {
                                         return m;
@@ -162,8 +156,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
                                         for (Expression arg : m.getArguments()) {
                                             if (!(arg instanceof G.MapEntry &&
-                                                    ((G.MapEntry) arg).getKey().getType() == JavaType.Primitive.String &&
-                                                    ((G.MapEntry) arg).getValue().getType() == JavaType.Primitive.String)) {
+                                                  ((G.MapEntry) arg).getKey().getType() == JavaType.Primitive.String &&
+                                                  ((G.MapEntry) arg).getValue().getType() == JavaType.Primitive.String)) {
                                                 continue;
                                             }
 
@@ -198,10 +192,66 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 @Override
                                 public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                                    if (m.getSimpleName().equals("constraints")) {
+                                    if (m.getSimpleName().equals("dependencies")) {
+                                        // Gradle tolerates multiple declarations of the same dependency, but only the one with the newest version is used
+                                        // Filter out duplicates
+                                        Map<GroupArtifactVersion, J.MethodInvocation> requestedToDeclaration = new HashMap<>();
+                                        Map<GroupArtifact, List<String>> gaToRequested = new HashMap<>();
+                                        new JavaIsoVisitor<ExecutionContext>() {
+                                            @Override
+                                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                                                J.MethodInvocation m1 = super.visitMethodInvocation(method, executionContext);
+                                                new GradleDependency.Matcher().get(getCursor()).ifPresent(it -> {
+                                                    if (it.getResolvedDependency().getRequested().getVersion() != null) {
+                                                        requestedToDeclaration.put(it.getResolvedDependency().getRequested().getGav(), m1);
+                                                        gaToRequested.computeIfAbsent(it.getResolvedDependency().getGav().asGroupArtifact(), (groupArtifact -> new ArrayList<>()))
+                                                                .add(it.getResolvedDependency().getRequested().getVersion());
+                                                    }
+                                                });
+                                                return m1;
+                                            }
+                                        }.visit(m.getArguments().get(0), ctx, getCursor());
+
+                                        Set<J.MethodInvocation> toBeRemoved = new HashSet<>();
+                                        for (Map.Entry<GroupArtifact, List<String>> gaToRequestedVersions : gaToRequested.entrySet()) {
+                                            GroupArtifact ga = gaToRequestedVersions.getKey();
+                                            List<String> requested = gaToRequestedVersions.getValue();
+                                            if (requested.size() < 2) {
+                                                continue;
+                                            }
+                                            // The newest version number is relevant, others are redundant and can be removed
+                                            requested.stream()
+                                                    .sorted(VERSION_COMPARATOR.reversed())
+                                                    .skip(1)
+                                                    .forEach(redundant -> toBeRemoved.add(requestedToDeclaration.get(new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), redundant))));
+                                        }
+
+                                        // With the list of redundant declarations in-hand, remove them from the dependencies block
+                                        //noinspection NullableProblems
+                                        m = (J.MethodInvocation) new JavaIsoVisitor<ExecutionContext>() {
+                                            @Override
+                                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                                                J.MethodInvocation m1 = super.visitMethodInvocation(method, executionContext);
+                                                if (toBeRemoved.contains(m1)) {
+                                                    //noinspection DataFlowIssue
+                                                    return null;
+                                                }
+                                                return m1;
+                                            }
+
+                                            @Override
+                                            public J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
+                                                J.Return r = super.visitReturn(_return, ctx);
+                                                if (r.getExpression() == null) {
+                                                    return null;
+                                                }
+                                                return r;
+                                            }
+                                        }.visit(m, ctx, getCursor().getParentTreeCursor());
+                                    } else if (m.getSimpleName().equals("constraints")) {
                                         if (m.getArguments().isEmpty() ||
-                                                !(m.getArguments().get(0) instanceof J.Lambda) ||
-                                                !(((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block)) {
+                                            !(m.getArguments().get(0) instanceof J.Lambda) ||
+                                            !(((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block)) {
                                             return m;
                                         }
                                         if (((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
@@ -210,8 +260,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         return m;
                                     } else {
                                         if (!isDependencyManagmentMethod(m.getSimpleName()) ||
-                                                m.getArguments().isEmpty() ||
-                                                m.getArguments().get(0).getType() != JavaType.Primitive.String) {
+                                            m.getArguments().isEmpty() ||
+                                            m.getArguments().get(0).getType() != JavaType.Primitive.String) {
                                             return m;
                                         }
                                         String value = (String) ((J.Literal) m.getArguments().get(0)).getValue();
@@ -247,7 +297,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
                                 private boolean shouldRemoveRedundantDependency(Dependency dependency, String configurationName) {
                                     if ((groupPattern != null && !matchesGlob(dependency.getGroupId(), groupPattern)) ||
-                                            (artifactPattern != null && !matchesGlob(dependency.getArtifactId(), artifactPattern))) {
+                                        (artifactPattern != null && !matchesGlob(dependency.getArtifactId(), artifactPattern))) {
                                         return false;
                                     }
 
@@ -276,8 +326,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
                                             ResolvedDependency resolvedDependency = d.findDependency(dependency.getGroupId(), dependency.getArtifactId());
                                             if (resolvedDependency != null && (dependency.getVersion() == null ||
-                                                    (dependencyManagedVersion == null && matchesConfiguration(configurationName, entry.getKey()) && dependency.getVersion().equals(resolvedDependency.getVersion())) ||
-                                                    (dependencyManagedVersion != null && VERSION_COMPARATOR.compare(dependency.getVersion(), dependencyManagedVersion) <= 0))) {
+                                                                               (dependencyManagedVersion == null && matchesConfiguration(configurationName, entry.getKey()) && dependency.getVersion().equals(resolvedDependency.getVersion())) ||
+                                                                               (dependencyManagedVersion != null && VERSION_COMPARATOR.compare(dependency.getVersion(), dependencyManagedVersion) <= 0))) {
                                                 return true;
                                             }
                                         }
@@ -306,7 +356,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         return false;
                                     }
                                     if ((groupPattern != null && !matchesGlob(constraint.getGroupId(), groupPattern)) ||
-                                            (artifactPattern != null && !matchesGlob(constraint.getArtifactId(), artifactPattern))) {
+                                        (artifactPattern != null && !matchesGlob(constraint.getArtifactId(), artifactPattern))) {
                                         return false;
                                     }
 
