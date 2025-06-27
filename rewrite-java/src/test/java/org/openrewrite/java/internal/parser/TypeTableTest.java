@@ -28,6 +28,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParserExecutionContextView;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 
 import javax.tools.JavaCompiler;
@@ -506,9 +508,138 @@ class TypeTableTest implements RewriteTest {
                 .isDirectoryRecursivelyContaining("glob:**/TestValidation.class");
         }
 
-        // TODO: Add comprehensive integration test that verifies annotation attribute values 
-        // are preserved through the complete TypeTable roundtrip when used with JavaParser.
-        // Currently blocked by type attribution issues in the test setup.
+        @Test
+        void annotationAttributeValuesPreservedThroughTypeTableRoundtrip() throws Exception {
+            // Create annotation with various default values to test escaping and preservation
+            //language=java
+            String annotationSource = """
+                package test.annotations;
+                
+                import java.lang.annotation.*;
+                
+                @Retention(RetentionPolicy.RUNTIME)
+                @Target({ElementType.TYPE, ElementType.FIELD})
+                public @interface ValidationRule {
+                    String message() default "{validation.rule.message}";
+                    String[] values() default {"text/plain;charset=UTF-8", "application/json"};
+                    String specialChars() default "line1\\nline2\\ttab\\rcarriage";
+                    int priority() default 100;
+                    boolean enabled() default true;
+                }
+                """;
+
+            Path[] classFiles = compileToClassFiles(
+                annotationSource, "test.annotations.ValidationRule"
+            );
+            Path testJar = createJarFromClasses("validation-rules.jar", classFiles);
+            
+            // Write through TypeTable
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
+                writer.jar("test.group", "validation-rules", "1.0").write(testJar);
+            }
+
+            // Load back via TypeTable
+            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("validation-rules"));
+            Path classesDir = table.load("validation-rules");
+            assertThat(classesDir).isNotNull();
+
+            // Test that JavaParser can parse code using the annotation 
+            // This validates that TypeTable preserved the annotation structure correctly
+            rewriteRun(
+              spec -> spec.parser(JavaParser.fromJavaVersion()
+                .classpath(List.of(classesDir)).logCompilationWarningsAndErrors(true)),
+              java(
+                """
+                  import test.annotations.ValidationRule;
+                  
+                  @ValidationRule
+                  class TestClass {
+                      @ValidationRule(message = "custom message")
+                      private String field;
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // Verify that the annotation types are properly resolved
+                    J.ClassDeclaration clazz = cu.getClasses().getFirst();
+                    J.Annotation classAnnotation = clazz.getLeadingAnnotations().getFirst();
+                    JavaType.Class annotationType = (JavaType.Class) classAnnotation.getType();
+                    
+                    assertThat(annotationType).isNotNull();
+                    assertThat(annotationType.getFullyQualifiedName()).isEqualTo("test.annotations.ValidationRule");
+                    
+                    // Verify the annotation has the expected methods (proving structure is preserved)
+                    assertThat(annotationType.getMethods()).hasSize(5);
+                    assertThat(annotationType.getMethods().stream().map(m -> m.getName()))
+                      .containsExactlyInAnyOrder("message", "values", "specialChars", "priority", "enabled");
+                      
+                    // Verify all default values are preserved through the TypeTable roundtrip
+                    assertThat(annotationType.getMethods().stream()
+                      .filter(m -> m.getName().equals("message"))
+                      .findFirst())
+                      .isPresent()
+                      .get()
+                      .satisfies(method -> 
+                        assertThat(method.getDefaultValue()).containsExactly("{validation.rule.message}")
+                      );
+                    
+                    assertThat(annotationType.getMethods().stream()
+                      .filter(m -> m.getName().equals("values"))
+                      .findFirst())
+                      .isPresent()
+                      .get()
+                      .satisfies(method -> 
+                        assertThat(method.getDefaultValue()).containsExactly("text/plain;charset=UTF-8", "application/json")
+                      );
+                      
+                    assertThat(annotationType.getMethods().stream()
+                      .filter(m -> m.getName().equals("specialChars"))
+                      .findFirst())
+                      .isPresent()
+                      .get()
+                      .satisfies(method -> 
+                        assertThat(method.getDefaultValue()).containsExactly("line1\nline2\ttab\rcarriage")
+                      );
+                      
+                    assertThat(annotationType.getMethods().stream()
+                      .filter(m -> m.getName().equals("priority"))
+                      .findFirst())
+                      .isPresent()
+                      .get()
+                      .satisfies(method -> 
+                        assertThat(method.getDefaultValue()).containsExactly("100")
+                      );
+                      
+                    assertThat(annotationType.getMethods().stream()
+                      .filter(m -> m.getName().equals("enabled"))
+                      .findFirst())
+                      .isPresent()
+                      .get()
+                      .satisfies(method -> 
+                        assertThat(method.getDefaultValue()).containsExactly("true")
+                      );
+
+                    // Verify field-level annotation is also properly typed with same default values
+                    J.VariableDeclarations field = (J.VariableDeclarations) clazz.getBody().getStatements().getFirst();
+                    J.Annotation fieldAnnotation = field.getLeadingAnnotations().getFirst();
+                    JavaType.Class fieldAnnotationType = (JavaType.Class) fieldAnnotation.getType();
+                    
+                    assertThat(fieldAnnotationType).isNotNull();
+                    assertThat(fieldAnnotationType.getFullyQualifiedName()).isEqualTo("test.annotations.ValidationRule");
+                    
+                    // Field annotation should have the same type information (including default values)
+                    // even when explicitly overriding some attributes
+                    assertThat(fieldAnnotationType.getMethods().stream()
+                      .filter(m -> m.getName().equals("message"))
+                      .findFirst())
+                      .isPresent()
+                      .get()
+                      .satisfies(method -> 
+                        assertThat(method.getDefaultValue()).containsExactly("{validation.rule.message}")
+                      );
+                })
+              )
+            );
+        }
 
     }
 
