@@ -21,6 +21,7 @@ import {JavaScriptVisitor, JS} from "../javascript";
 import {emptySpace, J, space} from "../java";
 import {randomId} from "../uuid";
 import {emptyMarkers} from "../markers";
+import {produce} from "immer";
 
 export class PreferSatisfiesKeyword extends Recipe {
     name = "org.openrewrite.PreferSatisfiesKeyword";
@@ -38,7 +39,12 @@ export class PreferSatisfiesKeyword extends Recipe {
                     .filter(x => x.kind == JS.Kind.PropertyAssignment)
                     .map(x => x as JS.PropertyAssignment)
                     .find(pa => pa.name.element.kind === J.Kind.Identifier && (pa.name.element as J.Identifier).simpleName === "kind");
-                if (!alreadyWrappedInSatisfies && kindProperty) {
+                if (!alreadyWrappedInSatisfies && kindProperty && ((kindProperty.initializer as J.FieldAccess).target).kind == J.Kind.FieldAccess) {
+                    const satisfiesClass = (((kindProperty.initializer as J.FieldAccess).target) as J.FieldAccess).name.element.simpleName;
+                    const satisfiesTypeSimpleName = (kindProperty.initializer as J.FieldAccess).name.element.simpleName;
+                    if (["LeftPadded", "RightPadded", "Container"].includes(satisfiesTypeSimpleName) || "Markers" === satisfiesClass) {
+                        return ret;
+                    }
                     return {
                         kind: JS.Kind.SatisfiesExpression,
                         id: randomId(),
@@ -54,8 +60,12 @@ export class PreferSatisfiesKeyword extends Recipe {
                                 id: randomId(),
                                 prefix: space(" "),
                                 markers: emptyMarkers,
-                                target: ((kindProperty.initializer as J.FieldAccess).target as J.FieldAccess).target,
-                                name: (kindProperty.initializer as J.FieldAccess).name,
+                                target: produce(((kindProperty.initializer as J.FieldAccess).target as J.FieldAccess).target, draft => {
+                                    draft.id = randomId()
+                                    }),
+                                name: produce((kindProperty.initializer as J.FieldAccess).name, draft => {
+                                    draft.element.id = randomId()
+                                })
                                 } satisfies J.FieldAccess as J.FieldAccess,
                             } satisfies J.LeftPadded<J.FieldAccess> as J.LeftPadded<J.FieldAccess>
                     } satisfies JS.SatisfiesExpression as JS.SatisfiesExpression;
