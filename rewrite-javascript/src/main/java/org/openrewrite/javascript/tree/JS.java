@@ -21,6 +21,8 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.config.Environment;
+import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
@@ -30,7 +32,6 @@ import org.openrewrite.javascript.internal.rpc.JavaScriptReceiver;
 import org.openrewrite.javascript.internal.rpc.JavaScriptSender;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.rpc.request.Print;
@@ -191,7 +192,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitCompilationUnit(this, p);
+            return v.visitJsCompilationUnit(this, p);
         }
 
         @Override
@@ -199,18 +200,14 @@ public interface JS extends J {
             return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
                 @Override
                 public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
-                    return RewriteRpc.Context.current().get(JavaScriptRewriteRpc.class)
-                            .map(rpc -> {
-                                Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                                p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                                return tree;
-                            }).orElseGet(() -> {
-                                try (RewriteRpc localRpc = JavaScriptRewriteRpc.bundledInstallation().build()) {
-                                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                                    p.append(localRpc.print(tree, cursor, mappedMarkerPrinter));
-                                    return tree;
-                                }
-                            });
+                    try (ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope = JavaScriptRewriteRpc.current()
+                            .requireOrCreate(JavaScriptRewriteRpc.bundledInstallation(Environment.builder().build())::build)) {
+                        return scope.map(rpc -> {
+                            Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                            p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
+                            return tree;
+                        });
+                    }
                 }
             };
         }
@@ -1175,6 +1172,10 @@ public interface JS extends J {
         @With
         Markers markers;
 
+        @Getter
+        @With
+        List<J.Modifier> modifiers;
+
         @With
         @Getter
         @Nullable
@@ -1210,7 +1211,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitImport(this, p);
+            return v.visitImportDeclaration(this, p);
         }
 
         @Override
@@ -1242,7 +1243,7 @@ public interface JS extends J {
             }
 
             public JS.Import withModuleSpecifier(@Nullable JLeftPadded<Expression> moduleSpecifier) {
-                return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, moduleSpecifier, t.attributes, t.initializer);
+                return t.moduleSpecifier == moduleSpecifier ? t : new JS.Import(t.id, t.prefix, t.markers, t.modifiers, t.importClause, moduleSpecifier, t.attributes, t.initializer);
             }
 
             public @Nullable JLeftPadded<Expression> getInitializer() {
@@ -1250,7 +1251,7 @@ public interface JS extends J {
             }
 
             public JS.Import withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                return t.initializer == initializer ? t : new JS.Import(t.id, t.prefix, t.markers, t.importClause, t.moduleSpecifier, t.attributes, initializer);
+                return t.initializer == initializer ? t : new JS.Import(t.id, t.prefix, t.markers, t.modifiers, t.importClause, t.moduleSpecifier, t.attributes, initializer);
             }
 
         }
@@ -1767,7 +1768,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitBinary(this, p);
+            return v.visitBinaryExtensions(this, p);
         }
 
         @Transient
@@ -4924,7 +4925,7 @@ public interface JS extends J {
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitAssignmentOperation(this, p);
+            return v.visitAssignmentOperationExtensions(this, p);
         }
 
         @Override
