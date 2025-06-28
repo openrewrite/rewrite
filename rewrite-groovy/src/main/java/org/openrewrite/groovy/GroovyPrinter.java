@@ -36,7 +36,6 @@ import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 import static org.openrewrite.groovy.internal.Delimiter.DOUBLE_QUOTE_STRING;
-import static org.openrewrite.groovy.tree.G.Unary.Type.Spread;
 
 public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private final GroovyJavaPrinter delegate = new GroovyJavaPrinter();
@@ -453,7 +452,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                     } else {
                         p.append('(');
                     }
-                }  else if (hasParentheses && omitParensCurrElem) { // first trailing lambda, eg: `stage('Build..') {}`, should close the method
+                } else if (hasParentheses && omitParensCurrElem) { // first trailing lambda, eg: `stage('Build..') {}`, should close the method
                     if (applyTrailingLambdaParenthese) { // apply once, to support multiple closures: `foo("baz") {} {}
                         p.append(')');
                         applyTrailingLambdaParenthese = false;
@@ -567,5 +566,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
+    }
+
+    @Override
+    public J visitDestructuringDeclaration(G.DestructuringDeclaration m, PrintOutputCapture<P> p) {
+        beforeSyntax(m, GSpace.Location.DESTRUCTURING_DECLARATION_PREFIX, p);
+        m.getModifiers().forEach(mod -> visit(mod, p));
+        visitContainer("(", m.getPadding().getVariables(), GContainer.Location.DESTRUCT_ASSIGNMENTS, ",", ")", p);
+        visitSpace(m.getPadding().getInitializer().getBefore(), Space.Location.ASSIGNMENT_PREFIX, p);
+        p.append('=');
+        visit(m.getInitializer(), p);
+        return m;
     }
 }

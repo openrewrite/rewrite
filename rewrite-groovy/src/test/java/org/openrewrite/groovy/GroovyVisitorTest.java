@@ -141,7 +141,21 @@ class GroovyVisitorTest implements RewriteTest {
             class A {
                 static void main(String[] argv) {
                     def l = [1,2,3]
-                    System.out.printf("%d, %d, %d", *l);
+                    System.out.printf("%d, %d, %d", *l)
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void destructuring() {
+        rewriteRun(groovy(
+          """
+            class A {
+                static void main(String[] argv) {
+                    def (first, second, third) = [1, 2, 3]
+                    System.out.printf("$first, $second, $third")
                 }
             }
             """
