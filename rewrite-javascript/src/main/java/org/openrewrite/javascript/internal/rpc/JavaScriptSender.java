@@ -120,6 +120,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return expressionWithTypeArguments;
     }
 
+
     @Override
     public J visitFunctionType(JS.FunctionType functionType, RpcSendQueue q) {
         q.getAndSendList(functionType, JS.FunctionType::getModifiers, J.Modifier::getId, el -> visit(el, q));
@@ -569,6 +570,15 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(exportSpecifier, JS.ExportSpecifier::getSpecifier, el -> visit(el, q));
         q.getAndSend(exportSpecifier, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return exportSpecifier;
+    }
+
+    @Override
+    public J visitFunctionCall(JS.FunctionCall functionCall, RpcSendQueue q) {
+        q.getAndSend(functionCall, m -> m.getPadding().getFunction(), select -> visitRightPadded(select, q));
+        q.getAndSend(functionCall, m -> m.getPadding().getTypeParameters(), typeParams -> visitContainer(typeParams, q));
+        q.getAndSend(functionCall, m -> m.getPadding().getArguments(), args -> visitContainer(args, q));
+        q.getAndSend(functionCall, m -> asRef(m.getMethodType()), type -> visitType(getValueNonNull(type), q));
+        return functionCall;
     }
 
     private <T> void visitLeftPadded(JLeftPadded<T> left, RpcSendQueue q) {
