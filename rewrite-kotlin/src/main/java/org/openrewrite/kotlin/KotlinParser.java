@@ -96,7 +96,7 @@ import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.LINK_VIA_SIGNATURES;
-import static org.jetbrains.kotlin.incremental.IncrementalFirJvmCompilerRunnerKt.configureBaseRoots;
+import static org.jetbrains.kotlin.incremental.IncrementalFirJvmCompilerRunnerKt.*;
 import static org.openrewrite.kotlin.KotlinParser.SourcePathFromSourceTextResolver.determinePath;
 
 @SuppressWarnings("CommentedOutCode")
@@ -272,7 +272,7 @@ public class KotlinParser implements Parser {
         private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
-        private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_2_1;
+        private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_2_2;
         private boolean isKotlinScript = false;
 
         public Builder() {
@@ -433,14 +433,15 @@ public class KotlinParser implements Parser {
             for (File jvmContentFile : jvmContentFiles) {
                 jvmContentPaths.add(jvmContentFile.toPath());
             }
-            builder.dependencies(jvmContentPaths);
+//            builder.dependencies(jvmContentPaths); //TODO how to replace this?
 
             List<File> jvmModularFiles = JvmContentRootsKt.getJvmModularRoots(compilerConfiguration);
             List<Path> jvmModularPaths = new ArrayList<>(jvmModularFiles.size());
             for (File jvmModularFile : jvmModularFiles) {
                 jvmModularPaths.add(jvmModularFile.toPath());
             }
-            builder.dependencies(jvmModularPaths);
+//            builder.dependencies(jvmModularPaths); //TODO how to replace this?
+
             return Unit.INSTANCE;
         };
 
@@ -530,7 +531,7 @@ public class KotlinParser implements Parser {
         configureKlibPaths(compilerConfiguration, arguments);
         configureContentRootsFromClassPath(compilerConfiguration, arguments);
         configureJdkClasspathRoots(compilerConfiguration);
-        configureBaseRoots(compilerConfiguration, arguments);
+//        configureBaseRoots(compilerConfiguration, arguments); //TODO how to replace this?
 
         ModuleChunk moduleChunk = configureModuleChunk(compilerConfiguration, arguments, null);
         return moduleChunk.getModules()
@@ -563,6 +564,7 @@ public class KotlinParser implements Parser {
         KOTLIN_1_9,
         KOTLIN_2_0,
         KOTLIN_2_1,
+        KOTLIN_2_2,
     }
 
     private CompilerConfiguration compilerConfiguration() {
@@ -612,6 +614,8 @@ public class KotlinParser implements Parser {
                 return LanguageVersion.KOTLIN_2_0;
             case KOTLIN_2_1:
                 return LanguageVersion.KOTLIN_2_1;
+            case KOTLIN_2_2:
+                return LanguageVersion.KOTLIN_2_2;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
@@ -643,6 +647,8 @@ public class KotlinParser implements Parser {
                 return ApiVersion.KOTLIN_2_0;
             case KOTLIN_2_1:
                 return ApiVersion.KOTLIN_2_1;
+            case KOTLIN_2_2:
+                return ApiVersion.KOTLIN_2_2;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }

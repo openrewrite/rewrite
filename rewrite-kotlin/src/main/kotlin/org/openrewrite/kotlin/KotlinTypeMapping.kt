@@ -25,7 +25,6 @@ import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.analysis.checkers.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.analysis.checkers.modality
-import org.jetbrains.kotlin.fir.analysis.checkers.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
@@ -33,6 +32,7 @@ import org.jetbrains.kotlin.fir.declarations.utils.isStatic
 import org.jetbrains.kotlin.fir.declarations.utils.modality
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.expressions.*
+import org.jetbrains.kotlin.fir.expressions.impl.FirResolvedArgumentList
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
@@ -62,7 +62,6 @@ import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.methodName
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.variableName
-import kotlin.collections.ArrayList
 
 @Suppress("DuplicatedCode")
 class KotlinTypeMapping(
@@ -211,6 +210,10 @@ class KotlinTypeMapping(
                 javaElement(type, signature)
             }
 
+            is FirResolvedArgumentList -> {
+                type(type.source, parent, signature)
+            }
+
             else -> {
                 println("Unsupported type: $type")
                 Unknown.getInstance()
@@ -304,7 +307,7 @@ class KotlinTypeMapping(
         return gtv
     }
 
-    @OptIn(SymbolInternals::class)
+    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class)
     private fun classType(type: Any, parent: Any?, signature: String): FullyQualified {
         val fqn = signatureBuilder.classSignature(type)
         val fq: FullyQualified? = typeCache.get(fqn)
@@ -497,7 +500,7 @@ class KotlinTypeMapping(
         return clazz
     }
 
-    @OptIn(SymbolInternals::class)
+    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class)
     fun methodDeclarationType(enumEntry: FirEnumEntry): Method? {
         val type = when (val fir = enumEntry.symbol.getContainingClassSymbol()?.fir) {
             is FirClass -> {
@@ -687,7 +690,7 @@ class KotlinTypeMapping(
     @OptIn(SymbolInternals::class)
     fun methodInvocationType(function: FirFunctionCall, signature: String): Method? {
         val sym = function.calleeReference.toResolvedBaseSymbol() ?: return null
-        val receiver = if (sym is FirFunctionSymbol<*>) sym.receiverParameter else null
+        val receiver = if (sym is FirFunctionSymbol<*>) sym.receiverParameterSymbol else null
         val paramNames: MutableList<String>? = when {
             sym is FirFunctionSymbol<*> && (receiver != null ||
                     sym.valueParameterSymbols.isNotEmpty()) -> {
@@ -781,8 +784,8 @@ class KotlinTypeMapping(
         }
         val returnType = type(function.resolvedType)
 
-        if (function.toResolvedCallableSymbol()?.receiverParameter != null) {
-            paramTypes!!.add(type(function.toResolvedCallableSymbol()?.receiverParameter!!.typeRef))
+        if (function.toResolvedCallableSymbol()?.receiverParameterSymbol != null) {
+            paramTypes!!.add(type(function.toResolvedCallableSymbol()?.receiverParameterSymbol!!.resolvedType))
         }
         val mapNames = function.arguments.any { it is FirNamedArgumentExpression }
         var args: MutableMap<String, FirNamedArgumentExpression>? = null

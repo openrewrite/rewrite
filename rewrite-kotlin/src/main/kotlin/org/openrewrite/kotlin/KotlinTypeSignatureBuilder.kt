@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.classId
 import org.jetbrains.kotlin.fir.expressions.*
+import org.jetbrains.kotlin.fir.expressions.impl.FirResolvedArgumentList
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.FirSuperReference
@@ -46,6 +47,7 @@ import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
 import java.util.*
 import kotlin.collections.HashMap
+import kotlin.math.sign
 
 @Suppress("DuplicatedCode")
 class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val firFile: FirFile) :
@@ -194,6 +196,9 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 } else {
                     classSignature(type.fir)
                 }
+            }
+            is FirResolvedArgumentList -> {
+                type.arguments.joinToString { signature(it, parent) }
             }
             else -> {
                 println("Undefined type: $type")
@@ -420,8 +425,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     @OptIn(SymbolInternals::class)
     private fun methodCallArgumentSignature(function: FirFunctionCall): String {
         val genericArgumentTypes = StringJoiner(",", "[", "]")
-        if (function.toResolvedCallableSymbol()?.receiverParameter != null) {
-            genericArgumentTypes.add(signature(function.toResolvedCallableSymbol()?.receiverParameter!!.typeRef))
+        if (function.toResolvedCallableSymbol()?.receiverParameterSymbol != null) {
+            genericArgumentTypes.add(signature(function.toResolvedCallableSymbol()?.receiverParameterSymbol!!.resolvedType))
         }
         val mapNames = function.arguments.any { it is FirNamedArgumentExpression }
         var args: MutableMap<String, FirNamedArgumentExpression>? = null

@@ -15,12 +15,12 @@
  */
 package org.openrewrite.kotlin
 
+import org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibility
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyConstructor
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazySimpleFunction
-import org.jetbrains.kotlin.ir.backend.js.utils.valueArguments
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrConstructorImpl
 import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionImpl
@@ -352,6 +352,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         return methodDeclarationType(function, signature)
     }
 
+    @OptIn(DeprecatedForRemovalCompilerApi::class)
     private fun methodDeclarationType(function: IrFunction, signature: String): JavaType.Method {
         val paramNames: MutableList<String>? =
             if (function.valueParameters.isEmpty()) null else ArrayList(function.valueParameters.size)
@@ -424,8 +425,9 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         }
     }
 
+    @OptIn(DeprecatedForRemovalCompilerApi::class)
     fun methodInvocationType(type: IrCall, signature: String): JavaType.Method {
-        val paramNames: MutableList<String> = ArrayList(type.valueArguments.size)
+        val paramNames: MutableList<String> = ArrayList(type.valueArgumentsCount)
 
         for (v in type.symbol.owner.valueParameters) {
             paramNames.add(v.name.asString())
@@ -450,12 +452,13 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         }
         val returnType = type(type.symbol.owner.returnType)
         val paramTypes: MutableList<JavaType>? =
-            if (type.valueArguments.isNotEmpty() || type.extensionReceiver != null) ArrayList(type.valueArguments.size + (if (type.extensionReceiver != null) 1 else 0))
+            if (type.valueArgumentsCount > 0 || type.extensionReceiver != null) ArrayList(type.valueArgumentsCount + (if (type.extensionReceiver != null) 1 else 0))
             else null
         if (type.extensionReceiver != null) {
             paramTypes!!.add(type(type.extensionReceiver!!.type))
         }
-        for (param: IrExpression? in type.valueArguments) {
+        for (i in 0 until type.valueArgumentsCount) {
+            val param: IrExpression? = type.getValueArgument(i)
             if (param != null) {
                 paramTypes!!.add(type(param.type))
             }
@@ -468,8 +471,9 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         return method
     }
 
+    @OptIn(DeprecatedForRemovalCompilerApi::class)
     fun methodInvocationType(type: IrConstructorCall, signature: String): JavaType.Method {
-        val paramNames: MutableList<String> = ArrayList(type.valueArguments.size)
+        val paramNames: MutableList<String> = ArrayList(type.valueArgumentsCount)
 
         for (v in type.symbol.owner.valueParameters) {
             paramNames.add(v.name.asString())
@@ -494,12 +498,14 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         }
         val returnType = declaringType
         val paramTypes: MutableList<JavaType>? =
-            if (type.valueArguments.isNotEmpty() || type.extensionReceiver != null) ArrayList(type.valueArguments.size + (if (type.extensionReceiver != null) 1 else 0))
+            if (type.valueArgumentsCount > 0 || type.extensionReceiver != null) ArrayList(type.valueArgumentsCount + (if (type.extensionReceiver != null) 1 else 0))
             else null
         if (type.extensionReceiver != null) {
             paramTypes!!.add(type(type.extensionReceiver!!.type))
         }
-        for (param: IrExpression? in type.valueArguments) {
+                for (i in 0 until type.valueArgumentsCount) {
+            val param: IrExpression? = type.getValueArgument(i)
+
             if (param != null) {
                 paramTypes!!.add(type(param.type))
             }
@@ -720,10 +726,12 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         return true
     }
 
+    @OptIn(DeprecatedForRemovalCompilerApi::class)
     private fun isSourceRetention(annotation: IrConstructorCall): Boolean {
         val sig = signatureBuilder.classSignature(annotation.type)
         if (sig == "kotlin.annotation.Retention" || sig == "java.lang.annotation") {
-            for (args in annotation.valueArguments) {
+            for (i in 0.. annotation.valueArgumentsCount) {
+                val args = annotation.getValueArgument(i)
                 if (args is IrDeclarationReference && args.symbol.owner is IrDeclarationWithName) {
                     return (args.symbol.owner as IrDeclarationWithName).name.asString() == "SOURCE"
                 }
