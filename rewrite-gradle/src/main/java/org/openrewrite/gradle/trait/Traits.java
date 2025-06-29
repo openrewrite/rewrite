@@ -15,14 +15,26 @@
  */
 package org.openrewrite.gradle.trait;
 
+/**
+ * @deprecated Use specific matchers like {@link GradleDependency.Matcher} or {@link JvmTestSuite.Matcher} instead.
+ */
+@Deprecated
 public class Traits {
     private Traits() {
     }
 
+    /**
+     * @deprecated Use {@link GradleDependency.Matcher} instead.
+     */
+    @Deprecated
     public static GradleDependency.Matcher gradleDependency() {
         return new GradleDependency.Matcher();
     }
 
+    /**
+     * @deprecated Use {@link JvmTestSuite.Matcher} instead.
+     */
+    @Deprecated
     public static JvmTestSuite.Matcher jvmTestSuite() {
         return new JvmTestSuite.Matcher();
     }

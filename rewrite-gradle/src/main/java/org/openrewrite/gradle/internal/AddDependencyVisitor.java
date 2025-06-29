@@ -54,7 +54,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.ENFORCED_PLATFORM;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.PLATFORM;
-import static org.openrewrite.gradle.trait.Traits.gradleDependency;
 
 @RequiredArgsConstructor
 public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -135,7 +134,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 return m;
             }
 
-            Optional<GradleDependency> maybeDependency = gradleDependency()
+            Optional<GradleDependency> maybeDependency = new GradleDependency.Matcher()
                     .configuration(configuration)
                     .groupId(groupId)
                     .artifactId(artifactId)

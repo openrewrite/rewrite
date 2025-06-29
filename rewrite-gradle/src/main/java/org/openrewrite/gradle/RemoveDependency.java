@@ -22,7 +22,6 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -77,7 +76,7 @@ public class RemoveDependency extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
-            final GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency()
+            final GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
                     .configuration(configuration)
                     .groupId(groupId)
                     .artifactId(artifactId);
