@@ -588,7 +588,7 @@ public class MavenPomDownloader {
 
                         if (pomFileExists) {
                             try (FileInputStream fis = new FileInputStream(pomFile)) {
-                                RawPom rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
+                                RawPom rawPom = RawPom.parse(inputPath, fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
                                 Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
 
                                 if (pom.getPackaging() == null || pom.hasJarPackaging()) {
@@ -625,7 +625,7 @@ public class MavenPomDownloader {
                             byte[] pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
 
                             Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
-                            RawPom rawPom = RawPom.parse(
+                            RawPom rawPom = RawPom.parse(inputPath,
                                     new ByteArrayInputStream(pomResponseBody),
                                     Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
                             );

@@ -150,7 +150,7 @@ public class RawPom {
         this.subprojects = subprojects;
     }
 
-    public static RawPom parse(InputStream inputStream, @Nullable String snapshotVersion) {
+    public static RawPom parse(Path pomPath, InputStream inputStream, @Nullable String snapshotVersion) {
         try {
             RawPom pom = MavenXmlMapper.readMapper().readValue(inputStream, RawPom.class);
             if (snapshotVersion != null) {
@@ -158,7 +158,7 @@ public class RawPom {
             }
             return pom;
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to parse pom", e);
+            throw new UncheckedIOException("Failed to parse pom " + pomPath, e);
         }
     }
 
