@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
@@ -22,7 +23,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.maven.search.FindScm;
-import org.openrewrite.maven.utilities.ScmValues;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -75,5 +75,43 @@ public class UpdateScmFromGitOrigin extends Recipe {
                 return super.visitTag(tag, ctx);
             }
         });
+    }
+
+    @Value
+    private static class ScmValues {
+
+        String url;
+        String connection;
+        String developerConnection;
+
+        static ScmValues fromOrigin(String origin) {
+            String cleanOrigin = origin.replaceAll("\\.git$", "");
+
+            String url;
+            String connection;
+            String developerConnection;
+
+            if (origin.startsWith("git@")) {
+                // SSH origin
+                String hostAndPath = cleanOrigin.substring("git@".length()).replaceFirst(":", "/");
+                url = "https://" + hostAndPath;
+                connection = "scm:git:https://" + hostAndPath + ".git";
+                developerConnection = "scm:git:" + origin;
+            } else if (origin.startsWith("http://") || origin.startsWith("https://")) {
+                // HTTPS origin
+                url = cleanOrigin;
+                connection = "scm:git:" + origin;
+                String sshPath = cleanOrigin
+                        .replaceFirst("^https?://", "") // github.com/user/repo
+                        .replaceFirst("/", ":");        // github.com:user/repo
+                developerConnection = "scm:git:git@" + sshPath + ".git";
+            } else {
+                url = cleanOrigin;
+                connection = "scm:git:" + origin;
+                developerConnection = "scm:git:" + origin;
+            }
+
+            return new ScmValues(url, connection, developerConnection);
+        }
     }
 }
