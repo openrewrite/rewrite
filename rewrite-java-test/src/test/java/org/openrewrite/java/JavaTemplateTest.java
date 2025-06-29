@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
@@ -1519,6 +1521,52 @@ class JavaTemplateTest implements RewriteTest {
               
                   abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
                   abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest(name = "Keep template prefix for block argument when template is \"{0}\"")
+    @CsvSource({"#{}", "#{any()}"})
+    void keepTemplatePrefixForBlock(String argument) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitIf(J.If if_, ExecutionContext ctx) {
+                  String template = """
+                    switch (#{any()}) {
+                        case null -> %s;
+                    }
+                    """.formatted(argument);
+                  return JavaTemplate.apply(template, getCursor(), if_.getCoordinates().replace(), ((J.Binary) if_.getIfCondition().getTree()).getLeft(), if_.getThenPart());
+              }
+          }).withMaxCycles(1)),
+          java(
+            """
+              class Test {
+                  static String formatter(Object obj) {
+                      String formatted = "initialValue";
+                      if (obj == null) {
+                          String str = "String";
+                          formatted = String.format("%s %s", "null", str);
+                      }
+                      return formatted;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  static String formatter(Object obj) {
+                      String formatted = "initialValue";
+                      switch (obj) {
+                          case null -> {
+                              String str = "String";
+                              formatted = String.format("%s %s", "null", str);
+                          }
+                      }
+                      return formatted;
+                  }
               }
               """
           )
