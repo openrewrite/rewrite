@@ -157,7 +157,7 @@ export class JavaScriptTypeMapping {
                             annotations: [],
                             defaultValue: [], // TODO
                             declaredFormalTypeNames: [] // TODO
-                        } as JavaType.Method));
+                        } satisfies JavaType.Method as JavaType.Method));
                     } else {
                         result.members.push(asRef({
                             kind: JavaType.Kind.Variable,
@@ -165,7 +165,7 @@ export class JavaScriptTypeMapping {
                             owner: result,
                             type: this.getType(memberType),
                             annotations: []
-                        } as JavaType.Variable));
+                        } satisfies JavaType.Variable as JavaType.Variable));
                     }
                 });
                 return result;
@@ -174,7 +174,7 @@ export class JavaScriptTypeMapping {
                 const result = asRef({
                     kind: JavaType.Kind.Method,
                     declaringType: JavaType.unknownType, // TODO
-                    name: objectType.getSymbol()?.getName(),
+                    name: objectType.getSymbol()?.getName()!,
                     returnType: this.getType(callSignature.getReturnType()),
                     parameterNames: callSignature.parameters.map(s => s.getName()),
                     parameterTypes: callSignature.parameters.map(s => this.getType(this.checker.getTypeOfSymbol(s))),
@@ -182,7 +182,7 @@ export class JavaScriptTypeMapping {
                     annotations: [],
                     defaultValue: undefined, // TODO
                     declaredFormalTypeNames: []
-                } as JavaType.Method);
+                } satisfies JavaType.Method as JavaType.Method);
                 this.typeCache.set(cacheKey, result);
                 return result;
             } else if (objectType.objectFlags & ts.ObjectFlags.Reference) {

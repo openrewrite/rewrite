@@ -196,8 +196,7 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void excludeAlsoWhereConflictOmitted() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
+          spec -> spec.recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
           pomXml(
             """
               <project>

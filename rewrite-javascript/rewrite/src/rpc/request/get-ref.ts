@@ -17,55 +17,53 @@ import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../reference";
 
-export class GetObject {
-    constructor(private readonly id: string, private readonly lastKnownId?: string) {
+export class GetRef {
+    constructor(private readonly ref: number) {
     }
 
     static handle(
         connection: rpc.MessageConnection,
-        remoteObjects: Map<string, any>,
-        localObjects: Map<string, any>,
+        remoteRefs: Map<number, any>,
         localRefs: ReferenceMap,
         batchSize: number,
         trace: boolean
     ): void {
-        const pendingData = new Map<string, RpcObjectData[]>();
+        const pendingData = new Map<number, RpcObjectData[]>();
 
-        connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
-            if (!localObjects.has(request.id)) {
+        connection.onRequest(new rpc.RequestType<GetRef, any, Error>("GetRef"), async request => {
+            const ref = localRefs.getByRefId(request.ref);
+            if (ref === undefined) {
+                // Return DELETE + END_OF_OBJECT like Java implementation
                 return [
-                    {state: RpcObjectState.DELETE},
-                    {state: RpcObjectState.END_OF_OBJECT}
+                    {state: RpcObjectState.DELETE, valueType: null, value: null, ref: null, trace: null},
+                    {state: RpcObjectState.END_OF_OBJECT, valueType: null, value: null, ref: null, trace: null}
                 ];
             }
 
-            let allData = pendingData.get(request.id);
+            let allData = pendingData.get(request.ref);
             if (!allData) {
-                const after = localObjects.get(request.id);
-                
+                const after = ref;
+
                 // Determine what the remote has cached
                 let before = undefined;
-                if (request.lastKnownId) {
-                    before = remoteObjects.get(request.lastKnownId);
-                    if (before === undefined) {
-                        // Remote had something cached, but we've evicted it - must send full object
-                        remoteObjects.delete(request.lastKnownId);
-                    }
-                }
 
+                // TODO not quite right as it will now register it as a new ref
+                localRefs.deleteByRefId(request.ref);
                 allData = await new RpcSendQueue(localRefs, trace).generate(after, before);
-                pendingData.set(request.id, allData);
+                pendingData.set(request.ref, allData);
 
-                remoteObjects.set(request.id, after);
+                localRefs.set(ref, request.ref);
+                remoteRefs.set(request.ref, after);
             }
 
             const batch = allData.splice(0, batchSize);
 
             // If we've sent all data, remove from pending
             if (allData.length === 0) {
-                pendingData.delete(request.id);
+                pendingData.delete(request.ref);
             }
 
             return batch;
         });
-    }}
+    }
+}

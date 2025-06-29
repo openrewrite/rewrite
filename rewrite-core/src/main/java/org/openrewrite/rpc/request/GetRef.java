@@ -15,10 +15,8 @@
  */
 package org.openrewrite.rpc.request;
 
-import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcSendQueue;
 
@@ -30,33 +28,32 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.openrewrite.rpc.RpcObjectData.State.*;
+import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
+import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 @Value
-public class GetObject implements RpcRequest {
-    String id;
-    @Nullable
-    String lastKnownId;
+public class GetRef implements RpcRequest {
+    int ref;
 
     @RequiredArgsConstructor
-    public static class Handler extends JsonRpcMethod<GetObject> {
+    public static class Handler extends io.moderne.jsonrpc.JsonRpcMethod<GetRef> {
         private static final ExecutorService forkJoin = ForkJoinPool.commonPool();
 
-        private final AtomicInteger batchSize;
-        private final Map<String, Object> remoteObjects;
-        private final Map<String, Object> localObjects;
-        /**
-         * Keeps track of objects that need to be referentially deduplicated, and
-         * the ref IDs to look them up by on the remote.
-         */
+        private final Map<Integer, Object> remoteRefs;
         private final IdentityHashMap<Object, Integer> localRefs;
+        private final AtomicInteger batchSize;
         private final AtomicBoolean trace;
 
-        private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
+        private final Map<Integer, BlockingQueue<List<RpcObjectData>>> inProgress = new ConcurrentHashMap<>();
 
         @Override
-        protected List<RpcObjectData> handle(GetObject request) throws Exception {
-            Object after = localObjects.get(request.getId());
+        public List<RpcObjectData> handle(GetRef request) throws InterruptedException {
+            Integer refId = request.getRef();
+            Object after = localRefs.entrySet().stream()
+                    .filter(e -> e.getValue().equals(refId))
+                    .map(Map.Entry::getKey)
+                    .findFirst()
+                    .orElse(null);
 
             if (after == null) {
                 List<RpcObjectData> deleted = new ArrayList<>(2);
@@ -65,32 +62,24 @@ public class GetObject implements RpcRequest {
                 return deleted;
             }
 
-            BlockingQueue<List<RpcObjectData>> q = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
+            BlockingQueue<List<RpcObjectData>> q = inProgress.computeIfAbsent(request.getRef(), id -> {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
-                
-                // Determine what the remote has cached
-                Object before = null;
-                if (request.getLastKnownId() != null) {
-                    before = remoteObjects.get(request.getLastKnownId());
-                    if (before == null) {
-                        // Remote had something cached, but we've evicted it - must send full object
-                        remoteObjects.remove(request.getLastKnownId());
-                    }
-                }
 
+                // TODO not quite right as it will now register it as a new ref
+                localRefs.remove(after);
                 RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, trace.get());
-                Object beforeFinal = before;
                 forkJoin.submit(() -> {
                     try {
-                        sendQueue.send(after, beforeFinal, null);
+                        sendQueue.send(after, null, null);
 
                         // All the data has been sent, and the remote should have received
                         // the full tree, so update our understanding of the remote state
                         // of this tree.
-                        remoteObjects.put(id, after);
+                        remoteRefs.put(id, after);
                     } catch (Throwable ignored) {
                         // TODO do something with this exception
                     } finally {
+                        localRefs.put(after, id);
                         sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null, null));
                         sendQueue.flush();
                     }
@@ -101,7 +90,7 @@ public class GetObject implements RpcRequest {
 
             List<RpcObjectData> batch = q.take();
             if (batch.get(batch.size() - 1).getState() == END_OF_OBJECT) {
-                inProgressGetRpcObjects.remove(request.getId());
+                inProgress.remove(request.getRef());
             }
 
             return batch;

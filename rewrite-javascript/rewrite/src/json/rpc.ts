@@ -18,6 +18,7 @@ import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc"
 import {Json} from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft} from "immer";
+import {TreeKind} from "../tree";
 
 class JsonSender extends JsonVisitor<RpcSendQueue> {
 
@@ -194,5 +195,7 @@ const jsonCodec: RpcCodec<Json> = {
 }
 
 Object.values(Json.Kind).forEach(kind => {
-    RpcCodecs.registerCodec(kind, jsonCodec);
+    if (!Object.values(TreeKind).includes(kind as any)) {
+        RpcCodecs.registerCodec(kind, jsonCodec);
+    }
 });

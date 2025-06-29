@@ -38,7 +38,8 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class ChangeProjectVersion extends Recipe {
     // there are several implicitly defined version properties that we should never attempt to update
     private static final Collection<String> implicitlyDefinedVersionProperties = Arrays.asList(
-            "${version}", "${project.version}", "${pom.version}", "${project.parent.version}"
+            "${version}", "${project.version}", "${pom.version}", "${project.parent.version}",
+            "${revision}", "${sha1}", "${changelist}"
     );
 
     @Option(displayName = "Group",
@@ -97,13 +98,16 @@ public class ChangeProjectVersion extends Recipe {
                             String oldVersion = resolvedPom.getValue(versionTagValue);
                             assert oldVersion != null;
 
-                            if (!oldVersion.equals(newVersion)) {
-                                if (versionTagValue.startsWith("${") && !implicitlyDefinedVersionProperties.contains(versionTagValue)) {
-                                    doAfterVisit(new ChangePropertyValue(versionTagValue.substring(2, versionTagValue.length() - 1), newVersion, false, false).getVisitor());
-                                } else {
-                                    doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
+                            // Skip if the current version tag value is already equal to the new version
+                            if (!versionTagValue.equals(newVersion)) {
+                                if (!oldVersion.equals(newVersion)) {
+                                    if (versionTagValue.startsWith("${") && !implicitlyDefinedVersionProperties.contains(versionTagValue)) {
+                                        doAfterVisit(new ChangePropertyValue(versionTagValue.substring(2, versionTagValue.length() - 1), newVersion, false, false).getVisitor());
+                                    } else {
+                                        doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
+                                    }
+                                    maybeUpdateModel();
                                 }
-                                maybeUpdateModel();
                             }
                         } else if (Boolean.TRUE.equals(overrideParentVersion)) {
                             // if the version is not present and the override parent version is set,

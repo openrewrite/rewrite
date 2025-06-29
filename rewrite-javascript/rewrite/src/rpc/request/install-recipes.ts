@@ -17,7 +17,7 @@ export class InstallRecipes {
     constructor(private readonly recipes: string | { packageName: string, version?: string }) {
     }
 
-    static handle(connection: rpc.MessageConnection, relativeInstallDir: string, registry: RecipeRegistry): void {
+    static handle(connection: rpc.MessageConnection, installDir: string, registry: RecipeRegistry): void {
         connection.onRequest(new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"), async (request) => {
             const beforeInstall = registry.all.size;
             let resolvedPath;
@@ -25,12 +25,12 @@ export class InstallRecipes {
 
             if (typeof request.recipes === "object") {
                 const recipePackage = request.recipes;
-                const installDir = path.join(process.cwd(), relativeInstallDir);
+                const absoluteInstallDir = path.isAbsolute(installDir) ? installDir : path.join(process.cwd(), installDir);
                 await new Promise<void>((resolve, reject) => {
 
-                    if (!fs.existsSync(installDir)) {
-                        fs.mkdirSync(installDir, {recursive: true});
-                        fs.writeFileSync(path.join(installDir, "package.json"),
+                    if (!fs.existsSync(absoluteInstallDir)) {
+                        fs.mkdirSync(absoluteInstallDir, {recursive: true});
+                        fs.writeFileSync(path.join(absoluteInstallDir, "package.json"),
                             `{"name": "please-work"}`)
                     }
 
@@ -38,7 +38,7 @@ export class InstallRecipes {
                     // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
                     const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");
                     const installer = spawn("npm", ["install", packageSpec], {
-                        cwd: installDir
+                        cwd: absoluteInstallDir
                     });
                     // installer.stdout.on("data", (data: any) => {
                     //     // TODO write this to rpc log instead
@@ -57,7 +57,7 @@ export class InstallRecipes {
                         }
                     });
                 });
-                resolvedPath = require.resolve(path.join(installDir, "node_modules", recipePackage.packageName));
+                resolvedPath = require.resolve(path.join(absoluteInstallDir, "node_modules", recipePackage.packageName));
                 recipesName = request.recipes.packageName;
             } else {
                 resolvedPath = request.recipes;

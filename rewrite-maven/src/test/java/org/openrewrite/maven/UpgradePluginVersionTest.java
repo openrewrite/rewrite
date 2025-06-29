@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -776,6 +777,66 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void doNotBumpToPreReleaseUnintentionally() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpgradePluginVersion(
+              "org.apache.maven.plugins",
+              "maven-failsafe-plugin",
+              "3.1.x",
+              null,
+              null,
+              null
+            ),
+            new UpgradePluginVersion(
+              "org.apache.maven.plugins",
+              "maven-checkstyle-plugin",
+              "3.6.x",
+              null,
+              null,
+              null
+            )
+          ),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <version.maven.plugin.failsafe>3.0.0-M8</version.maven.plugin.failsafe>
+                  <version.maven.plugin.checkstyle>3.1.2</version.maven.plugin.checkstyle>
+                </properties>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-failsafe-plugin</artifactId>
+                      <version>${version.maven.plugin.failsafe}</version>
+                    </plugin>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-checkstyle-plugin</artifactId>
+                      <version>${version.maven.plugin.checkstyle}</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .containsPattern("<version.maven.plugin.failsafe>3.1.\\d+</version.maven.plugin.failsafe>")
+                .containsPattern("<version.maven.plugin.checkstyle>3.6.\\d+</version.maven.plugin.checkstyle>")
+                .actual()
+              )
           )
         );
     }

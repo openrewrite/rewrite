@@ -14,3 +14,4 @@ IDE.properties
 # ASDF https://asdf-vm.com/
 .tool-versions
 .aider*
+/worktrees

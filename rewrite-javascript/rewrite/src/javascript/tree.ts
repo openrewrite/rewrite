@@ -222,6 +222,7 @@ export namespace JS {
      */
     export interface Import extends JS, Statement {
         readonly kind: typeof Kind.Import;
+        readonly modifiers: J.Modifier[];
         readonly importClause?: ImportClause;
         readonly moduleSpecifier?: J.LeftPadded<Expression>;
         readonly attributes?: ImportAttributes;

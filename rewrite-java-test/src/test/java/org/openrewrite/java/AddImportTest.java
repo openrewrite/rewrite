@@ -31,7 +31,6 @@ import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -563,14 +562,14 @@ class AddImportTest implements RewriteTest {
 
     @Test
     void importsAddedInAlphabeticalOrder() {
-        List<String> otherPackages = Arrays.asList("c", "c.c", "c.c.c");
+        List<String> otherPackages = List.of("c", "c.c", "c.c.c");
         List<SourceSpecs> otherImports = new ArrayList<>();
         for (int i = 0; i < otherPackages.size(); i++) {
             String pkg = otherPackages.get(i);
             otherImports.add(java("package " + pkg + ";\npublic class C" + i + " {}", SourceSpec::skip));
         }
 
-        List<String> packages = Arrays.asList("b", "c.b", "c.c.b");
+        List<String> packages = List.of("b", "c.b", "c.c.b");
         for (int order = 0; order < packages.size(); order++) {
             String pkg = packages.get(order);
 

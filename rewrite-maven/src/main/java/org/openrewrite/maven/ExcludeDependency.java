@@ -86,7 +86,7 @@ public class ExcludeDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new MavenVisitor<ExecutionContext>() {
+        return Repeat.repeatUntilStable(() -> new MavenVisitor<ExecutionContext>() {
             @Nullable
             private final Scope scope = ExcludeDependency.this.scope == null ? null : Scope.fromName(ExcludeDependency.this.scope);
 
@@ -94,7 +94,7 @@ public class ExcludeDependency extends Recipe {
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml xml = super.visitDocument(document, ctx);
                 if (xml != document) {
-                    maybeUpdateModel();
+                    xml = new UpdateMavenModel<>().visitNonNull(xml, ctx);
                 }
                 return xml;
             }
@@ -120,6 +120,7 @@ public class ExcludeDependency extends Recipe {
                                         "<artifactId>" + artifactId + "</artifactId>\n" +
                                         "</exclusion>"))
                                         .visitNonNull(exclusions, ctx, getCursor());
+                                //noinspection unchecked
                                 tag = tag.withContent(ListUtils.map((List<Content>) tag.getContent(), t -> t == exclusions ? newExclusions : t));
                             }
                         } else {
@@ -137,6 +138,6 @@ public class ExcludeDependency extends Recipe {
                 }
                 return super.visitTag(tag, ctx);
             }
-        };
+        });
     }
 }

@@ -23,7 +23,7 @@ declare module "./tree" {
 } as const;
 
 export interface Semicolon extends Marker {
-    readonly kind: typeof J.Markers.Semicolon
+    readonly kind: typeof J.Markers.Semicolon;
 }
 
 export interface TrailingComma extends Marker {
@@ -49,3 +49,25 @@ RpcCodecs.registerCodec(J.Markers.TrailingComma, {
         await q.getAndSend(after, a => a.suffix);
     }
 });
+
+/**
+ * Registers an RPC codec for any marker without additional properties.
+ */
+export function registerMarkerCodec<M extends Marker>(
+    kind: M["kind"]
+) {
+    RpcCodecs.registerCodec(kind, {
+        async rpcReceive(before: M, q: RpcReceiveQueue): Promise<M> {
+            const draft = createDraft(before);
+            draft.id = await q.receive(before.id);
+            return finishDraft(draft) as M;
+        },
+
+        async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
+            await q.getAndSend(after, a => a.id);
+        }
+    });
+}
+
+registerMarkerCodec(J.Markers.Semicolon);
+registerMarkerCodec(J.Markers.OmitParentheses);

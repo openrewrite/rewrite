@@ -48,25 +48,25 @@ class LatestPatchTest {
     @Test
     void upgrade() {
         var upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.0"));
-        assertThat(upgrade.isPresent()).isFalse();
+        assertThat(upgrade).isEmpty();
 
         upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.11.0"));
-        assertThat(upgrade.isPresent()).isFalse();
+        assertThat(upgrade).isEmpty();
         upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.9"));
-        assertThat(upgrade.isPresent()).isFalse();
+        assertThat(upgrade).isEmpty();
 
         upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.11"));
-        assertThat(upgrade.isPresent()).isTrue();
+        assertThat(upgrade).isPresent();
         assertThat(upgrade.get()).isEqualTo("2.10.11");
 
         upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.10.3.23"));
-        assertThat(upgrade.isPresent()).isFalse();
+        assertThat(upgrade).isEmpty();
 
         upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.10.2.25"));
-        assertThat(upgrade.isPresent()).isFalse();
+        assertThat(upgrade).isEmpty();
 
         upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.10.3.25"));
-        assertThat(upgrade.isPresent()).isTrue();
+        assertThat(upgrade).isPresent();
         assertThat(upgrade.get()).isEqualTo("2.10.10.3.25");
     }
 
@@ -86,25 +86,25 @@ class LatestPatchTest {
     @Test
     void metadataUpgrade() {
         var upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", List.of("2.10.0-fred"));
-        assertThat(upgrade.isPresent()).isFalse();
+        assertThat(upgrade).isEmpty();
 
         upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", List.of("2.11.0-fred"));
-        assertThat(upgrade.isPresent()).isFalse();
+        assertThat(upgrade).isEmpty();
         upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", List.of("2.10.9-fred"));
-        assertThat(upgrade.isPresent()).isFalse();
+        assertThat(upgrade).isEmpty();
 
         upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", List.of("2.10.11-fred"));
-        assertThat(upgrade.isPresent()).isTrue();
+        assertThat(upgrade).isPresent();
         assertThat(upgrade.get()).isEqualTo("2.10.11-fred");
 
         upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", List.of("2.10.10.3.23-fred"));
-        assertThat(upgrade.isPresent()).isFalse();
+        assertThat(upgrade).isEmpty();
 
         upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", List.of("2.10.10.2.25-fred"));
-        assertThat(upgrade.isPresent()).isFalse();
+        assertThat(upgrade).isEmpty();
 
         upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", List.of("2.10.10.3.25-fred"));
-        assertThat(upgrade.isPresent()).isTrue();
+        assertThat(upgrade).isPresent();
         assertThat(upgrade.get()).isEqualTo("2.10.10.3.25-fred");
     }
 

@@ -946,7 +946,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     @Override
     public JSX.Tag visitJsxTag(JSX.Tag tag, P p) {
         visitAndValidateNonNull(tag.getOpenName(), NameTree.class, p);
-        ListUtils.map(tag.getChildren(), el -> visitAndValidateNonNull(el, Statement.class, p));
+        ListUtils.map(tag.getChildren(), el -> visitAndValidateNonNull(el, Expression.class, p));
         ListUtils.map(tag.getAttributes(), el -> visitAndValidateNonNull(el, JSX.class, p));
         return tag;
     }
@@ -972,8 +972,8 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
 
     @Override
     public JSX.NamespacedName visitJsxNamespacedName(JSX.NamespacedName namespacedName, P p) {
-        visitAndValidateNonNull(namespacedName.getNamespace(), Expression.class, p);
-        visitAndValidateNonNull(namespacedName.getName(), Expression.class, p);
+        visitAndValidateNonNull(namespacedName.getNamespace(), J.Identifier.class, p);
+        visitAndValidateNonNull(namespacedName.getName(), J.Identifier.class, p);
         return namespacedName;
     }
 }
