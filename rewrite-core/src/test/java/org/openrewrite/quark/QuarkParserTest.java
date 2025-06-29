@@ -41,10 +41,11 @@ class QuarkParserTest implements RewriteTest {
 
     @Test
     void allOthers() {
+        ExecutionContext ctx = new InMemoryExecutionContext();
         rewriteRun(
           spec -> spec.beforeRecipe(sources -> {
               try {
-                  List<SourceFile> quarks = QuarkParser.parseAllOtherFiles(Paths.get("../"), sources).toList();
+                  List<SourceFile> quarks = QuarkParser.parseAllOtherFiles(Paths.get("../"), sources, ctx).toList();
                   assertThat(quarks).isNotEmpty();
                   assertThat(quarks.stream().map(SourceFile::getSourcePath))
                     .doesNotContain(Paths.get("build.gradle.kts"));

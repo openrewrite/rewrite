@@ -134,6 +134,7 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     default void rewriteRun(Consumer<RecipeSpec> spec, SourceSpec<?>... sourceSpecs) {
+        InMemoryExecutionContext.unsafeSetInTest(false);
         RecipeSpec testClassSpec = RecipeSpec.defaults();
         defaults(testClassSpec);
 
@@ -160,6 +161,7 @@ public interface RewriteTest extends SourceSpecs {
 
         PrintOutputCapture<ExecutionContext> out = new PrintOutputCapture<>(ctx, markerPrinter);
 
+        InMemoryExecutionContext.unsafeSetInTest(true);
         Recipe recipe = testMethodSpec.recipe == null ?
                 testClassSpec.recipe == null ? Recipe.noop() : testClassSpec.recipe :
                 testMethodSpec.recipe;
@@ -380,7 +382,7 @@ public interface RewriteTest extends SourceSpecs {
                 cycles,
                 expectedCyclesThatMakeChanges + 1
         );
-
+        InMemoryExecutionContext.unsafeSetInTest(false);
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
         }
