@@ -587,6 +587,11 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         delegate.visitSpace(space, q);
     }
 
+    @Override
+    public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcSendQueue q) {
+        return delegate.visitType(javaType, q);
+    }
+
     private static class JavaScriptSenderDelegate extends JavaSender {
         private final JavaScriptSender delegate;
 

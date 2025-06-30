@@ -30,7 +30,6 @@ import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.function.Function;
 
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 /**
@@ -594,9 +593,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType,
-                              RpcReceiveQueue rpcReceiveQueue) {
-        return requireNonNull(super.visitType(javaType, rpcReceiveQueue));
+    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType, RpcReceiveQueue q) {
+        return delegate.visitType(javaType, q);
     }
 
     private static class JavaScriptReceiverDelegate extends JavaReceiver {
