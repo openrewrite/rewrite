@@ -1483,7 +1483,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
-    void doNotAddOrRemoveValueWhenOldAtrributeValueDoesNotMatchAndAttributeNameIsNotValue() {
+    void doNotAddOrRemoveValueWhenOldAttributeValueDoesNotMatchAndAttributeNameIsNotValue() {
         rewriteRun(
           spec -> spec.recipe(
             new AddOrUpdateAnnotationAttribute(
@@ -1519,7 +1519,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
 
     @Test
-    void doNotAddOrRemoveValueWhenOldAtrributeValueDoesMatchAndAttributeNameIsValue() {
+    void doNotAddOrRemoveValueWhenOldAttributeValueDoesMatchAndAttributeNameIsValue() {
         rewriteRun(
           spec -> spec.recipe(
             new AddOrUpdateAnnotationAttribute(
@@ -1547,6 +1547,50 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               public class A {}
               
               @Foo(value = "newValue")
+              public class B {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doAddValueWhenOldAttributeValueIsNullAndAttributeNameIsNotValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "name",
+              "aName",
+              null,
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("someValue")
+              public class A {}
+              
+              @Foo(value = "someValue")
+              public class B {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(name = "aName", value = "someValue")
+              public class A {}
+        
+              @Foo(name = "aName", value = "someValue")
               public class B {}
               """
           )
