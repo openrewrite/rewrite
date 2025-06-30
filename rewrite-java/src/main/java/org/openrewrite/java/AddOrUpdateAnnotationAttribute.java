@@ -250,7 +250,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     return it;
                                 }
                                 return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
-                            } else {
+                            } else if (oldAttributeValue == null) {
                                 // Make the attribute name explicit, before we add the new value below
                                 //noinspection ConstantConditions
                                 return ((J.Annotation) JavaTemplate.builder("value = #{}")

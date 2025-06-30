@@ -1481,4 +1481,75 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotAddOrRemoveValueWhenOldAtrributeValueDoesNotMatchAndAttributeNameIsNotValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "name",
+              "newValue",
+              "oldValue",
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("oldValue")
+              public class A {}
+              
+              @Foo(value = "oldExplicitValue")
+              public class B {}
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void doNotAddOrRemoveValueWhenOldAtrributeValueDoesMatchAndAttributeNameIsValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "value",
+              "newValue",
+              "oldValue",
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("oldValue")
+              public class A {}
+              
+              @Foo(value = "oldValue")
+              public class B {}
+              """
+          )
+        );
+    }
 }
