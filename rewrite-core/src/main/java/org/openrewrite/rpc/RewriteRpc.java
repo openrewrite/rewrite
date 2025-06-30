@@ -87,7 +87,7 @@ public class RewriteRpc implements AutoCloseable {
     private final AtomicInteger batchSize = new AtomicInteger(200);
     private final Duration timeout;
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
-    private @Nullable PrintStream logFile;
+    private @Nullable PrintStream traceFile;
 
     /**
      * Keeps track of the local and remote state of objects that are used in
@@ -161,7 +161,7 @@ public class RewriteRpc implements AutoCloseable {
     }
 
     public RewriteRpc traceGetObjectInput(PrintStream log) {
-        this.logFile = log;
+        this.traceFile = log;
         return this;
     }
 
@@ -376,7 +376,7 @@ public class RewriteRpc implements AutoCloseable {
         Object localObject = localObjects.get(id);
         String lastKnownId = localObject != null ? id : null;
         
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
                 new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
@@ -391,7 +391,7 @@ public class RewriteRpc implements AutoCloseable {
     }
     
     private Object getRef(Integer refId) {
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetRef",
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetRef",
                 new GetRef(refId), GetRefResponse.class), nestedRefId -> {
             throw new IllegalStateException("Nested ref calls not supported in GetRef: " + nestedRefId);
         });
