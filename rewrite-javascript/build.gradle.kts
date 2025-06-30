@@ -157,6 +157,7 @@ val npmInstallTemp = tasks.register<NpmTask>("npmInstallTemp") {
     val tempInstallDir = layout.buildDirectory.file("tmp/npmInstall")
     inputs.files(npmPack)
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(tempInstallDir)
     dependsOn(npmInitTemp)
 
     // Use a provider to defer evaluation until execution time
@@ -164,47 +165,29 @@ val npmInstallTemp = tasks.register<NpmTask>("npmInstallTemp") {
     workingDir.set(tempInstallDir)
 }
 
-sourceSets {
-    main {
-        resources {
-            srcDir("src/main/generated-resources")
-        }
-    }
-}
-
-afterEvaluate {
-    tasks.named("licenseMain") {
-        dependsOn(createProductionPackage)
-    }
-}
-
-tasks.named<Jar>("sourcesJar") {
-    dependsOn("createProductionPackage")
-    exclude("production-package.zip")
-}
-
-tasks.named("processResources") {
-    dependsOn(createProductionPackage)
-}
-
 // Creates a production-ready package; writing it to `src/main/generated-resources` so that it will be included by IDEA
 val createProductionPackage by tasks.register<Zip>("createProductionPackage") {
     // Configure the tar output
     archiveFileName.set("production-package.zip")
-    destinationDirectory.set(layout.projectDirectory.dir("src/main/generated-resources"))
+    destinationDirectory.set(layout.buildDirectory.dir("generated/resources/distributions/"))
 
-    dependsOn(npmInstallTemp)
-
-    // Reference the actual directory where npm packages are installed
-    from(layout.buildDirectory.dir("tmp/npmInstall")) {
+    from(npmInstallTemp) {
         // Optionally exclude unnecessary files like package-lock.json, etc.
         // exclude("package-lock.json", ".npmrc")
     }
 }
 
 // Include production-ready package into jar
-tasks.named<Jar>("jar") {
-    from(createProductionPackage)
+sourceSets {
+    main {
+        resources {
+            srcDir(createProductionPackage.destinationDirectory)
+        }
+    }
+}
+
+tasks.named<ProcessResources>("processResources") {
+    dependsOn(createProductionPackage)
 }
 
 tasks.named("integrationTest") {
