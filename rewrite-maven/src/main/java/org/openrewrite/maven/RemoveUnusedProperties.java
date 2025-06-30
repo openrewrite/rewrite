@@ -19,11 +19,14 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.binary.Binary;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.quark.Quark;
+import org.openrewrite.remote.Remote;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.text.PlainTextVisitor;
@@ -97,6 +100,9 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof Quark || tree instanceof Remote || tree instanceof Binary) {
+                    return tree;
+                }
                 if (tree instanceof SourceFile) {
                     SourceFile sf = (SourceFile) tree;
                     if (findPomUsagesVisitor.isAcceptable(sf, ctx)) { // ie: is a pom
@@ -232,7 +238,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
             if (resourceMatcher.matches(getCursor())) {
                 String directory = tag.getChildValue("directory").orElse(null);
                 if (tag.getChildValue("filtering").map(Boolean::valueOf).orElse(false) &&
-                    directory != null) {
+                        directory != null) {
                     Path path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
                     try {
                         acc.filteredResourcePathsToDeclaringPoms.put(path.getParent().resolve(directory), getResolutionResult());

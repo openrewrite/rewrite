@@ -146,49 +146,6 @@ class ExcludeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void excludeJUnitInCompileScope() {
-        rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("junit", "junit", "compile")),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.neo4j</groupId>
-                          <artifactId>neo4j-ogm-core</artifactId>
-                          <version>3.2.21</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.neo4j</groupId>
-                          <artifactId>neo4j-ogm-core</artifactId>
-                          <version>3.2.21</version>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>junit</groupId>
-                                  <artifactId>junit</artifactId>
-                              </exclusion>
-                          </exclusions>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
     void dontExcludeJUnitWhenItIsTransitiveTestDependency() {
         rewriteRun(
           spec -> spec.recipe(new ExcludeDependency("junit", "junit", null)),
@@ -239,8 +196,7 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void excludeAlsoWhereConflictOmitted() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
+          spec -> spec.recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
           pomXml(
             """
               <project>

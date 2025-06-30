@@ -23,14 +23,14 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
 /**
- * Every model object that is transferred via the tooling API must implement {@link Serializable}, including
+ * Every model object that is transferred via the tooling API must implement {@link java.io.Serializable}, including
  * certain maven model objects that are shared by rewrite-gradle.
  */
 class OpenRewriteModelSerializableTest {
 
     @Test
     void mavenRepository() throws IOException {
-        MavenRepository mavenRepository = new MavenRepository("id", "url", null, null, null, null);
+        MavenRepository mavenRepository = new MavenRepository("id", "url", null, null, null, null, null);
         ObjectOutputStream os = new ObjectOutputStream(new ByteArrayOutputStream());
         os.writeObject(mavenRepository);
     }

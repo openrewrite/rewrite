@@ -1,0 +1,11 @@
+---
+name: stale
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: 36 4 * * 1
+
+jobs:
+  build:
+    uses: openrewrite/gh-automation/.github/workflows/stale.yml@main

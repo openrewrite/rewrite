@@ -93,10 +93,10 @@ public class RemoveExclusion extends Recipe {
                                 if (e.getContent() != null) {
                                     e = e.withContent(ListUtils.map(e.getContent(), child2 -> {
                                         if (child2 instanceof Xml.Tag && "exclusion".equals(((Xml.Tag) child2).getName())) {
-                                            Xml.Tag exclusion = (Xml.Tag) child2;
-                                            if (exclusion.getChildValue("groupId").map(g -> matchesGlob(g, exclusionGroupId)).orElse(false) &&
-                                                exclusion.getChildValue("artifactId").map(g -> matchesGlob(g, exclusionArtifactId)).orElse(false) &&
-                                                !(isEffectiveExclusion(tag, groupArtifact(exclusion)) && Boolean.TRUE.equals(onlyIneffective))) {
+                                            GroupArtifact exclusion = getResolutionResult().getPom().getValues(groupArtifact((Xml.Tag) child2));
+                                            if (matchesGlob(exclusion.getGroupId(), exclusionGroupId) &&
+                                                matchesGlob(exclusion.getArtifactId(), exclusionArtifactId) &&
+                                                !(isEffectiveExclusion(tag, exclusion) && Boolean.TRUE.equals(onlyIneffective))) {
                                                 return null;
                                             }
                                         }

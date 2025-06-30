@@ -94,13 +94,13 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     final Boolean addIfMissing;
 
     @Getter
-    @Option(example = "https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip",
+    @Option(example = "https://services.gradle.org/distributions/gradle-8.5-bin.zip",
             displayName = "Wrapper URI",
-            description = "The URI of the Gradle wrapper distribution. " +
-                          "Lookup of available versions still requires access to https://services.gradle.org " +
-                          "When this is specified the exact literal values supplied for `version` and `distribution` " +
-                          "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively. " +
-                          "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
+            description = "The URI of the Gradle wrapper distribution.\n" +
+                    "Specifies a custom location from which to download the Gradle wrapper scripts (gradlew, gradlew.bat, etc.). This is useful for setting up the Gradle wrapper without relying on Gradle's official distribution services.\n\n" +
+                    "When this option is set, the version and distribution fields must not be specified — only one source of truth is allowed. The URI should point to a valid and reachable Gradle wrapper distribution (typically a .zip archive containing the wrapper files).\n" +
+                    "This is particularly helpful in environments where access to Gradle's central services is restricted or where custom Gradle wrapper setups are required.\n" + 
+                    "If the URI is inaccessible, the recipe will leave the existing wrapper files in the repository unchanged, as they are generally compatible with various Gradle versions.",
             required = false)
     @Nullable
     final String wrapperUri;
@@ -222,8 +222,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
                         String currentDistributionUrl = entry.getValue().getText();
 
-                        GradleWrapper gradleWrpr = getGradleWrapper(ctx);
-                        if (StringUtils.isBlank(gradleWrpr.getDistributionUrl()) && !StringUtils.isBlank(version) &&
+                        if (gradleWrapper == null) {
+                            getGradleWrapper(ctx);
+                        }
+                        if (StringUtils.isBlank(gradleWrapper.getDistributionUrl()) && !StringUtils.isBlank(version) &&
                             Semver.validate(version, null).getValue() instanceof ExactVersion) {
                             String newDownloadUrl = currentDistributionUrl.replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
@@ -231,13 +233,13 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));
                         }
                         String wrapperHost = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf("/")) + "/gradle-";
-                        if (StringUtils.isBlank(wrapperUri) && !StringUtils.isBlank(gradleWrpr.getDistributionUrl()) &&
-                            !gradleWrpr.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
-                            String newDownloadUrl = gradleWrpr.getDistributionUrl()
+                        if (StringUtils.isBlank(wrapperUri) && !StringUtils.isBlank(gradleWrapper.getDistributionUrl()) &&
+                            !gradleWrapper.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
+                            String newDownloadUrl = gradleWrapper.getDistributionUrl()
                                     .replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
                                             wrapperHost + gradleWrapper.getVersion() + "$3");
-                            gradleWrapper = new GradleWrapper(gradleWrpr.getVersion(), new DistributionInfos(newDownloadUrl, null, null));
+                            gradleWrapper = new GradleWrapper(gradleWrapper.getVersion(), new DistributionInfos(newDownloadUrl, null, null));
                         }
 
                         if (!gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
@@ -359,6 +361,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (!(tree instanceof SourceFile)) {
+                    //noinspection DataFlowIssue
                     return tree;
                 }
 

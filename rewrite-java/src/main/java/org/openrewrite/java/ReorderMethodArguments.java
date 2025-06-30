@@ -43,7 +43,7 @@ public class ReorderMethodArguments extends Recipe {
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method invocations.",
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "com.yourorg.A foo(String, Integer, Integer)")
     String methodPattern;
 
@@ -90,6 +90,11 @@ public class ReorderMethodArguments extends Recipe {
     @Override
     public String getDescription() {
         return "Reorder method arguments into the specified order.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
     }
 
     @Override

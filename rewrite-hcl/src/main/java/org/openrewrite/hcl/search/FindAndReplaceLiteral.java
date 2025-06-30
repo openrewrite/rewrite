@@ -64,7 +64,8 @@ public class FindAndReplaceLiteral extends Recipe {
     Boolean regex;
 
     @Option(displayName = "Case sensitive",
-            description = "If `true` the search will be sensitive to case. Default `false`.", required = false)
+            description = "If `true` the search will be sensitive to case. Default `false`.",
+            required = false)
     @Nullable
     Boolean caseSensitive;
 
@@ -88,6 +89,9 @@ public class FindAndReplaceLiteral extends Recipe {
                     patternOptions |= Pattern.CASE_INSENSITIVE;
                 }
                 Pattern pattern = Pattern.compile(searchStr, patternOptions);
+                if (literal.getValue() == null) {
+                    return literal;
+                }
                 Matcher matcher = pattern.matcher(literal.getValue().toString());
                 if (!matcher.find()) {
                     return literal;

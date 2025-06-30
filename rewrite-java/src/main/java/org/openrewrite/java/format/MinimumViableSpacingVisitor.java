@@ -201,7 +201,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
-        if (!(firstEnclosing instanceof J.Lambda)) {
+        if (!(firstEnclosing instanceof J.Lambda.Parameters)) {
             if (Space.firstPrefix(v.getVariables()).isEmpty()) {
                 v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
                         v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));
@@ -209,6 +209,20 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return v;
+    }
+
+    @Override
+    public J.Case visitCase(J.Case _case, P p) {
+        J.Case c = super.visitCase(_case, p);
+
+        if (c.getGuard() != null) {
+            // At a minimum, we need a space between the guard and the case label
+            JContainer.Padding<J> padding = c.getPadding().getCaseLabels().getPadding();
+            return c.getPadding().withCaseLabels(padding.withElements(ListUtils.mapLast(padding.getElements(),
+                    last -> last != null && last.getAfter().isEmpty() ? last.withAfter(Space.SINGLE_SPACE) : last)));
+        }
+
+        return c;
     }
 
     @Override

@@ -35,7 +35,8 @@ class DeclaresTypeTest implements RewriteTest {
                 """
         package com.sample;
         public class Foo{}
-        """, """
+        """,
+                """
         package com.sample;
         /*~~>*/public class Foo{}
         """));

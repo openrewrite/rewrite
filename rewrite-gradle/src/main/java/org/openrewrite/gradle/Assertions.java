@@ -21,9 +21,13 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.UncheckedConsumer;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Paths;
 import java.util.List;
@@ -35,7 +39,8 @@ public class Assertions {
     }
 
     private static final Parser.Builder gradleParser = GradleParser.builder()
-            .groovyParser(GroovyParser.builder().logCompilationWarningsAndErrors(true));
+            .groovyParser(GroovyParser.builder().logCompilationWarningsAndErrors(true))
+            .kotlinParser(KotlinParser.builder().logCompilationWarningsAndErrors(true));
 
     /**
      * @param version      The Gradle version to use.
@@ -101,6 +106,31 @@ public class Assertions {
         return gradle;
     }
 
+    public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before) {
+        return buildGradleKts(before, s -> {
+        });
+    }
+
+    public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, null);
+        gradle.path(Paths.get("build.gradle.kts"));
+        spec.accept(gradle);
+        return gradle;
+    }
+
+    public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after) {
+        return buildGradleKts(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after,
+                                          Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
+        gradle.path("build.gradle.kts");
+        spec.accept(gradle);
+        return gradle;
+    }
+
     public static SourceSpecs settingsGradle(@Language("groovy") @Nullable String before) {
         return settingsGradle(before, s -> {
         });
@@ -124,5 +154,55 @@ public class Assertions {
         gradle.path("settings.gradle");
         spec.accept(gradle);
         return gradle;
+    }
+
+    public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before) {
+        return settingsGradleKts(before, s -> {
+        });
+    }
+
+    public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, null);
+        gradle.path(Paths.get("settings.gradle.kts"));
+        spec.accept(gradle);
+        return gradle;
+    }
+
+    public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after) {
+        return settingsGradleKts(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after,
+                                             Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
+        gradle.path("settings.gradle.kts");
+        spec.accept(gradle);
+        return gradle;
+    }
+
+    public static SourceSpecs lockfile(@Nullable String before) {
+        return lockfile(before, s -> {
+        });
+    }
+
+    public static SourceSpecs lockfile(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> lockFile = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, null);
+        lockFile.path("gradle.lockfile");
+        spec.accept(lockFile);
+        return lockFile;
+    }
+
+    public static SourceSpecs lockfile(@Nullable String before, @Nullable String after) {
+        return lockfile(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs lockfile(@Nullable String before, @Nullable String after,
+                                       Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> lockFile = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, s-> after);
+        lockFile.path("gradle.lockfile");
+        spec.accept(lockFile);
+        return lockFile;
     }
 }

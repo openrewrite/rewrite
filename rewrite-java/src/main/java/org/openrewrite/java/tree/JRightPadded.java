@@ -47,6 +47,7 @@ public class JRightPadded<T> {
         BLOCK_STATEMENT(Space.Location.BLOCK_STATEMENT_SUFFIX),
         CASE(Space.Location.CASE_SUFFIX),
         CASE_EXPRESSION(Space.Location.CASE_EXPRESSION),
+        CASE_LABEL(Space.Location.CASE_LABEL),
         CASE_BODY(Space.Location.CASE_BODY),
         CATCH_ALTERNATIVE(Space.Location.CATCH_ALTERNATIVE_SUFFIX),
         DIMENSION(Space.Location.DIMENSION_SUFFIX),
@@ -60,6 +61,7 @@ public class JRightPadded<T> {
         IF_ELSE(Space.Location.IF_ELSE_SUFFIX),
         IF_THEN(Space.Location.IF_THEN_SUFFIX),
         IMPLEMENTS(Space.Location.IMPLEMENTS_SUFFIX),
+        DECONSTRUCTION_PATTERN_NESTED(Space.Location.DECONSTRUCTION_PATTERN_NESTED_SUFFIX),
         PERMITS(Space.Location.PERMITS_SUFFIX),
         IMPORT(Space.Location.IMPORT_SUFFIX),
         INSTANCEOF(Space.Location.INSTANCEOF_SUFFIX),
@@ -83,7 +85,9 @@ public class JRightPadded<T> {
         TRY_RESOURCE(Space.Location.TRY_RESOURCE_SUFFIX),
         TYPE_PARAMETER(Space.Location.TYPE_PARAMETER_SUFFIX),
         TYPE_BOUND(Space.Location.TYPE_BOUND_SUFFIX),
-        WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX);
+        WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX),
+        ANY(Space.Location.ANY)
+        ;
 
         private final Space.Location afterLocation;
 

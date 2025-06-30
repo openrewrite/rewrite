@@ -71,7 +71,8 @@ class TernaryTest implements RewriteTest {
                 """
             (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
             (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
-            """)
+            """
+          )
         );
     }
 

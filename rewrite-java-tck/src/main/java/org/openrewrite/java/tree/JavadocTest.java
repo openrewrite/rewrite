@@ -15,13 +15,14 @@
  */
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({"JavadocDeclaration", "TrailingWhitespacesInTextBlock", "TextBlockMigration", "RedundantThrows", "ConcatenationWithEmptyString"})
@@ -655,10 +656,45 @@ class JavadocTest implements RewriteTest {
           java(
             """
               /**
-               *   {@link #test() }
+               *   {@link #test(Integer) }
                */
               class Test {
-                  void test() {}
+                  void test(Integer a) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void thisConstructorLink() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * {@link #Test(Integer) }
+               */
+              class Test {
+                  Test(Integer a) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void thisConstructorLinkInnerClass() {
+        rewriteRun(
+          java(
+            """
+              class Outer {
+                  class Test {
+                      Test(Integer a) {}
+                      /**
+                       * Use: {@link #Test(Integer) }
+                       */
+                      Test of(Integer a) {}
+                  }
               }
               """
           )
@@ -1049,6 +1085,89 @@ class JavadocTest implements RewriteTest {
     }
 
     @Test
+    void seeWithRefInInterface() {
+        rewriteRun(
+          java(
+            """
+                import javax.swing.text.html.HTML.Tag;
+                
+                interface HtmlMarkup {
+                    Tag H1 = Tag.H1;
+                }
+                """
+          ),
+          java(
+            """
+              interface Test extends HtmlMarkup {
+                  /**
+                   * @see #H1
+                   */
+                 void onSectionTitle();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void seeWithRefInSuperclass() {
+        rewriteRun(
+          java(
+            """
+                import javax.swing.text.html.HTML.Tag;
+                
+                abstract class HtmlMarkup {
+                    Tag H1 = Tag.H1;
+                }
+                """
+          ),
+          java(
+            """
+              class Test extends HtmlMarkup {
+                  /**
+                   * @see #H1
+                   */
+                  void onSectionTitle() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void seeWithRefInSuperclassBecauseSuperclassFieldsTakesPresenceOverInterfaceFields() {
+        rewriteRun(
+          java(
+            """
+                import javax.swing.text.html.HTML.Tag;
+                
+                interface HtmlMarkupI {
+                    Tag H1 = Tag.H1;
+                }
+                
+                abstract class HtmlMarkup2 implements HtmlMarkupI {
+                    String H1 = "aa";
+                }
+                
+                abstract class HtmlMarkup extends HtmlMarkup2 implements HtmlMarkupI {
+                }
+                """
+          ),
+          java(
+            """
+              class Test extends HtmlMarkup implements HtmlMarkupI {
+                  /**
+                    * @see #H1
+                    */
+                    void onSectionTitle() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertTrue(TypeUtils.isAssignableTo("java.lang.String", cu.getTypesInUse().getVariables().iterator().next().getType())))
+          )
+        );
+    }
+
+    @Test
     void methodFound() {
         rewriteRun(
           java(
@@ -1060,6 +1179,88 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void methodFoundInInterface() {
+        rewriteRun(
+          java(
+            """
+                interface SomeInterface {
+                  boolean test();
+                }
+                """
+          ),
+          java(
+            """
+              interface Test extends SomeInterface {
+                  /**
+                   * @see #test()
+                   */
+                 void method();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodFoundInSuperclass() {
+        rewriteRun(
+          java(
+            """
+                class SomeParent {
+                    boolean test() {}
+                }
+                """
+          ),
+          java(
+            """
+              class Test extends SomeParent {
+                  /**
+                   * @see #test()
+                   */
+                  void method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodFoundInSuperclassBecauseSuperclassFieldsTakesPresenceOverInterfaceFields() {
+        rewriteRun(
+          java(
+            """
+                import javax.swing.text.html.HTML.Tag;
+                
+                interface SomeInterface {
+                    int test();
+                }
+                
+                abstract class SomeParent2 implements SomeInterface {
+                    abstract boolean test();
+                }
+                
+                abstract class SomeParent extends SomeParent2 implements SomeInterface {
+                }
+                """
+          ),
+          java(
+            """
+              class Test extends SomeParent implements SomeInterface {
+                  /**
+                    * @see #test()
+                    */
+                    void method() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertEquals("test", cu.getTypesInUse().getUsedMethods().iterator().next().getName());
+                assertEquals("SomeParent2", cu.getTypesInUse().getUsedMethods().iterator().next().getDeclaringType().getFullyQualifiedName());
+            })
           )
         );
     }
@@ -1808,7 +2009,6 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3650")
     void unicodeEscape() {
@@ -1817,11 +2017,151 @@ class JavadocTest implements RewriteTest {
             """
               interface Test {
               	/**
-              	 * Return the {@code \\u0000} codepoint.
+              	 * <p>Ř\\u00e9t\\u00FBrn:</p>
+              	 * 
+              	 * {@code \\u0040Override
+                 * public void method() {}
+                 * }
               	 */
               	int foo();
               }
               """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5444")
+    void whitespaceInGenericTypesInJavadocTags() {
+        rewriteRun(
+          java(
+            """
+            import java.util.Optional;
+
+            public class Foo {
+                private void bar(Optional<String> b) {}
+
+                /**
+                 * This has an extra whitespace {@link #bar(Optional <String>)}
+                 * This has 3 extra whitespaces {@link #bar(Optional   <String>)}
+                 * This has no extra whitespace {@link #bar(Optional<String>)}
+                 */
+                public void foo() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5411")
+    void multilineHtmlCommentInJavadoc() {
+        rewriteRun(
+          java(
+            """
+              /** 
+              * First line of comment
+              * <!-- comment 
+              *   Second line of comment
+              * -->
+              * <!-- another comment -->
+              * Final comment line
+              */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5443")
+    @Test
+    void parsingIncorrectJavadocValueReference() {
+        rewriteRun(
+          spec-> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          // language=java
+          java(
+            """
+            public class Foo {
+                private static final String BAR = "bar";
+
+                /**
+                This is an incorrect reference {@value BAR}
+                */
+                public void foo() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5443")
+    @Test
+    void parsingIncorrectJavadocValueReference2() {
+        rewriteRun(
+          spec-> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          // language=java
+          java(
+            """
+            public class Foo {
+                /**
+                 * The {@value DEFAULT_TABLE_NAME} default name for the locks table in the DynamoDB.
+                 */
+                public static final String DEFAULT_TABLE_NAME = "SpringIntegrationLockRegistry";
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5196")
+    void unclosedBraceOnLink() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                 /**   
+                  * {@link int
+                  * Some other text.
+                  * See {@link java.lang.String}
+                  * @param arg description
+                  */                  
+                  void method(String arg) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    void badlyClosedXmlTags() {
+        rewriteRun(
+          java(
+            """
+            /**
+             * <!--Optional:->
+             * <urn:portalId>?</urn:portalId-->
+             */
+            class Test { }
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    void spaceStarAfterStartOfJavaDoc() {
+        rewriteRun(
+          java(
+            """
+            /** *
+             * @author x
+             */
+            class Test { }
+            """
           )
         );
     }

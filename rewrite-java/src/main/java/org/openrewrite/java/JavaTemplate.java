@@ -25,6 +25,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.template.SourceTemplate;
@@ -33,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -79,21 +81,24 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
     @Getter
     private final String code;
+    @Getter
+    private final Set<String> genericTypes;
 
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, Set<String> imports,
-                         Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
-        this(code, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports));
+    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, String bindType, Set<String> imports,
+                         Set<String> genericTypes, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+        this(code, genericTypes, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports, bindType));
     }
 
     private static JavaParser.Builder<?, ?> augmentClasspath(JavaParser.Builder<?, ?> parserBuilder) {
         return parserBuilder.addClasspathEntry(getTemplateClasspathDir());
     }
 
-    protected JavaTemplate(String code, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {
+    protected JavaTemplate(String code, Set<String> genericTypes, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {
         this.code = code;
+        this.genericTypes = genericTypes;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.templateParser = templateParser;
     }
@@ -110,13 +115,17 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
         //noinspection ConstantConditions
-        return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
+        J2 result = (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
                 .getMixin()
                 .visit(scope.getValue(), 0, scope.getParentOrThrow());
+
+        return result != scope.getValue() && result instanceof Expression ?
+                (J2) ParenthesizeVisitor.maybeParenthesize((Expression) result, scope) :
+                result;
     }
 
     protected Substitutions substitutions(Object[] parameters) {
-        return new Substitutions(code, parameters);
+        return new Substitutions(code, genericTypes, parameters);
     }
 
     @Incubating(since = "8.0.0")
@@ -169,8 +178,10 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         private final String code;
         private final Set<String> imports = new HashSet<>();
+        private final Set<String> genericTypes = new HashSet<>();
 
         private boolean contextSensitive;
+        private String bindType = "Object";
 
         private JavaParser.Builder<?, ?> parser = org.openrewrite.java.JavaParser.fromJavaVersion();
 
@@ -202,6 +213,25 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             return this;
         }
 
+        /**
+         * In context-free templates involving generic types, the type often cannot be inferred automatically.
+         * <p>
+         * Common examples include:
+         * <ul>
+         *   <li>{@code new ArrayList<>()}</li>
+         *   <li>{@code Collections.emptyList()}</li>
+         *   <li>{@code String::valueOf}</li>
+         * </ul>
+         * In such cases, the type must be specified manually.
+         */
+        public Builder bindType(String bindType) {
+            if (StringUtils.isBlank(bindType)) {
+                throw new IllegalArgumentException("Type must not be blank");
+            }
+            this.bindType = bindType;
+            return this;
+        }
+
         public Builder imports(String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
                 validateImport(typeName);
@@ -215,6 +245,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 validateImport(typeName);
                 this.imports.add("import static " + typeName + ";\n");
             }
+            return this;
+        }
+
+        public Builder genericTypes(String... genericTypes) {
+            Collections.addAll(this.genericTypes, genericTypes);
             return this;
         }
 
@@ -244,7 +279,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(contextSensitive, parser.clone(), code, imports,
+            return new JavaTemplate(contextSensitive, parser.clone(), code, bindType, imports, genericTypes,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }

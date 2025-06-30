@@ -53,7 +53,9 @@ public class Checkstyle extends NamedStyles {
                         noWhitespaceBeforeStyle(),
                         operatorWrapStyle(),
                         typecastParenPadStyle(),
-                        unnecessaryParentheses()
+                        unnecessaryParentheses(),
+                        customImportOrderStyle(),
+                        unusedImportsStyle()
                 ));
     }
 
@@ -73,7 +75,7 @@ public class Checkstyle extends NamedStyles {
     public static final EmptyBlockStyle.BlockPolicy defaultBlockPolicy = EmptyBlockStyle.BlockPolicy.TEXT;
 
     public static EmptyBlockStyle emptyBlock() {
-        return new EmptyBlockStyle(defaultBlockPolicy, true, true, true, true,
+        return new EmptyBlockStyle(EmptyBlockStyle.BlockPolicy.TEXT, true, true, true, true,
                 true, true, true, true, true, true, true, true);
     }
 
@@ -118,7 +120,7 @@ public class Checkstyle extends NamedStyles {
     public static final OperatorWrapStyle.WrapOption defaultOperatorWrapStyleOption = OperatorWrapStyle.WrapOption.NL;
 
     public static OperatorWrapStyle operatorWrapStyle() {
-        return new OperatorWrapStyle(defaultOperatorWrapStyleOption, true, true, true, true, true,
+        return new OperatorWrapStyle(OperatorWrapStyle.WrapOption.NL, true, true, true, true, true,
                 true, true, true, true, true, true, true, true, true, true,
                 true, true, true, true, true, true, true, true,
                 false, false, false, false, false, false,
@@ -146,5 +148,16 @@ public class Checkstyle extends NamedStyles {
 
     public static MethodParamPadStyle methodParamPadStyle() {
         return new MethodParamPadStyle(false, false);
+    }
+
+    public static CustomImportOrderStyle customImportOrderStyle() {
+        return new CustomImportOrderStyle(Arrays.asList(new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.STATIC, null),
+                new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.STANDARD_JAVA_PACKAGE, null),
+                new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.THIRD_PARTY_PACKAGE, null)),
+                true, false, "^$", "^(java|javax)\\.", ".*");
+    }
+
+    private static UnusedImportsStyle unusedImportsStyle() {
+        return new UnusedImportsStyle(false);
     }
 }

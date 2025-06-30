@@ -34,25 +34,12 @@ import org.openrewrite.maven.internal.RawRepositories;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ProfileActivation;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.Key;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.function.UnaryOperator;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
@@ -98,8 +85,10 @@ public class MavenSettings {
 
     public static @Nullable MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
-            return new Interpolator().interpolate(
+            MavenSettings settings = new Interpolator().interpolate(
                     MavenXmlMapper.readMapper().readValue(source.getSource(ctx), MavenSettings.class));
+            settings.maybeDecryptPasswords(ctx);
+            return settings;
         } catch (IOException e) {
             ctx.getOnError().accept(new IOException("Failed to parse " + source.getPath(), e));
             return null;
@@ -107,7 +96,7 @@ public class MavenSettings {
     }
 
     public static @Nullable MavenSettings parse(Path settingsPath, ExecutionContext ctx) {
-        return parse(new Parser.Input(settingsPath, () -> {
+        MavenSettings settings = parse(new Parser.Input(settingsPath, () -> {
             try {
                 return Files.newInputStream(settingsPath);
             } catch (IOException e) {
@@ -115,6 +104,12 @@ public class MavenSettings {
                 return null;
             }
         }), ctx);
+
+        if (settings != null) {
+            settings.maybeDecryptPasswords(ctx);
+        }
+
+        return settings;
     }
 
     public static @Nullable MavenSettings readMavenSettingsFromDisk(ExecutionContext ctx) {

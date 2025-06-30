@@ -25,11 +25,12 @@ import org.openrewrite.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextVisitor;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
@@ -112,6 +113,91 @@ class RewriteTestTest implements RewriteTest {
               """, "org.openrewrite.RefersToNonExistentRecipe")
           ));
     }
+
+    @Test
+    void rejectExecutionContextMutation() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new MutateExecutionContext()),
+            text("irrelevant")
+          ));
+    }
+
+    @Test
+    void rejectScannerEdit() {
+        assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.recipe(new ScannerEdit()),
+          text("foo")
+        ));
+    }
+
+    @Test
+    void allowScannerEdit() {
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.builder().immutableScanning(false).build())
+            .recipe(new ScannerEdit()),
+          text("foo")
+        );
+    }
+}
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
+
+    @Override
+    public String getDisplayName() {
+        return "Attempts mutation during getScanner()";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Any changes attempted by a visitor returned from getScanner() should be an error during test execution.";
+    }
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return text.withText("mutated");
+            }
+        };
+    }
+}
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+class MutateExecutionContext extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Mutate execution context";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Mutates the execution context to trigger a validation failure.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                ctx.putMessage("mutated", true);
+                return tree;
+            }
+        };
+    }
 }
 
 @Value
@@ -183,7 +269,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
             return emptyList();
         }
         Path duplicatePath = Paths.get("duplicate.txt");
-        return Arrays.asList(PlainText.builder()
+        return List.of(PlainText.builder()
             .text("duplicate")
             .sourcePath(duplicatePath)
             .build(),

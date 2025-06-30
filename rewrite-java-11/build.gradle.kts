@@ -6,9 +6,11 @@ plugins {
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
+    implementation(project(":rewrite-java-lombok"))
 
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
@@ -20,13 +22,23 @@ dependencies {
     "javaTck"(project(":rewrite-java-tck"))
 }
 
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "org.assertj" && requested.name == "assertj-core") {
+                useVersion("3.+") // Pin to latest 3.+ version as AssertJ 4 requires Java 17
+            }
+        }
+    }
+}
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(11))
     }
 }
 
-tasks.withType<JavaCompile> {
+tasks.withType<JavaCompile>().configureEach {
     // allows --add-exports to in spite of the JDK's restrictions on this
     sourceCompatibility = JavaVersion.VERSION_11.toString()
     targetCompatibility = JavaVersion.VERSION_11.toString()
@@ -45,7 +57,7 @@ tasks.withType<JavaCompile> {
 }
 
 //Javadoc compiler will complain about the use of the internal types.
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     exclude(
         "**/ReloadableJava11JavadocVisitor**",
         "**/ReloadableJava11Parser**",
@@ -71,9 +83,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        useJUnitPlatform {
-                            excludeTags("java17", "java21")
-                        }
+                        useJUnitPlatform()
                         testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)

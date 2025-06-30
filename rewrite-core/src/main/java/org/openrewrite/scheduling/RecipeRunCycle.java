@@ -19,17 +19,22 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.marker.Generated;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.RecipesThatMadeChanges;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,6 +43,7 @@ import java.util.function.UnaryOperator;
 
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.Recipe.PANIC;
 
 @RequiredArgsConstructor
@@ -60,7 +66,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     RecipeRunStats recipeRunStats;
     SourcesFileResults sourcesFileResults;
     SourcesFileErrors errorsTable;
-    BiFunction<LSS, UnaryOperator<SourceFile>, LSS> sourceSetEditor;
+    BiFunction<LSS, UnaryOperator<@Nullable SourceFile>, LSS> sourceSetEditor;
 
     RecipeStack allRecipeStack = new RecipeStack();
     long cycleStartTime = System.nanoTime();
@@ -74,75 +80,92 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     public LSS scanSources(LSS sourceSet) {
-        return sourceSetEditor.apply(sourceSet, sourceFile ->
-                allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
-                    Recipe recipe = recipeStack.peek();
-                    if (source == null) {
-                        return null;
-                    }
-
-                    SourceFile after = source;
-
-                    if (recipe instanceof ScanningRecipe) {
-                        try {
-                            //noinspection unchecked
-                            ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                            Object acc = scanningRecipe.getAccumulator(rootCursor, ctx);
-                            recipeRunStats.recordScan(recipe, () -> {
-                                TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
-                                if (scanner.isAcceptable(source, ctx)) {
-                                    scanner.visit(source, ctx, rootCursor);
-                                }
-                                return source;
-                            });
-                        } catch (Throwable t) {
-                            after = handleError(recipe, source, after, t);
-                            // We don't normally consider anything the scanning phase does to be a change
-                            // But this simplifies error reporting so that exceptions can all be handled the same
-                            assert after != null;
-                            after = addRecipesThatMadeChanges(recipeStack, after);
+        if (isScanningRequired()) {
+            return sourceSetEditor.apply(sourceSet, sourceFile ->
+                    allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
+                        Recipe recipe = recipeStack.peek();
+                        if (source == null) {
+                            return null;
                         }
-                    }
-                    return after;
-                }, sourceFile)
-        );
+
+                        SourceFile after = source;
+
+                        if (recipe instanceof ScanningRecipe) {
+                            try {
+                                //noinspection unchecked
+                                ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
+                                Object acc = scanningRecipe.getAccumulator(rootCursor, ctx);
+                                recipeRunStats.recordScan(recipe, () -> {
+                                    TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
+                                    if (scanner.isAcceptable(source, ctx)) {
+                                        Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
+                                        assert maybeMutated == source || !ctx.getMessage(SCANNING_MUTATION_VALIDATION, false) :
+                                                "Edits made from within ScanningRecipe.getScanner() are discarded. " +
+                                                "The purpose of a scanner is to aggregate information for use in subsequent phases. " +
+                                                "Use ScanningRecipe.getVisitor() for making edits. " +
+                                                "To disable this warning set TypeValidation.immutableScanning to false in your tests.";
+                                    }
+                                    return source;
+                                });
+                            } catch (Throwable t) {
+                                after = handleError(recipe, source, after, t);
+                                // We don't normally consider anything the scanning phase does to be a change
+                                // But this simplifies error reporting so that exceptions can all be handled the same
+                                assert after != null;
+                                after = addRecipesThatMadeChanges(recipeStack, after);
+                            }
+                        }
+                        return after;
+                    }, sourceFile)
+            );
+        }
+        return sourceSet;
     }
 
     public LSS generateSources(LSS sourceSet) {
-        List<SourceFile> generatedInThisCycle = allRecipeStack.reduce(sourceSet, recipe, ctx, (acc, recipeStack) -> {
-            Recipe recipe = recipeStack.peek();
-            if (recipe instanceof ScanningRecipe) {
-                //noinspection unchecked
-                ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                // If some sources have already been generated by prior recipes, scan them now
-                // This helps to avoid recipes having inconsistent knowledge of which files exist
-                if (!acc.isEmpty()) {
-                    for (SourceFile source : acc) {
-                        try {
-                            recipeRunStats.recordScan(recipe, () -> {
-                                TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(scanningRecipe.getAccumulator(rootCursor, ctx));
-                                if (scanner.isAcceptable(source, ctx)) {
-                                    scanner.visit(source, ctx, rootCursor);
-                                }
-                                return source;
-                            });
-                        } catch (Throwable t) {
-                            handleError(recipe, source, source, t);
+        if (isScanningRequired()) {
+            List<SourceFile> generatedInThisCycle = allRecipeStack.reduce(sourceSet, recipe, ctx, (acc, recipeStack) -> {
+                Recipe recipe = recipeStack.peek();
+                if (recipe instanceof ScanningRecipe) {
+                    assert acc != null;
+                    //noinspection unchecked
+                    ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
+                    // If some sources have already been generated by prior recipes, scan them now
+                    // This helps to avoid recipes having inconsistent knowledge of which files exist
+                    if (!acc.isEmpty()) {
+                        for (SourceFile source : acc) {
+                            try {
+                                recipeRunStats.recordScan(recipe, () -> {
+                                    TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(scanningRecipe.getAccumulator(rootCursor, ctx));
+                                    if (scanner.isAcceptable(source, ctx)) {
+                                        scanner.visit(source, ctx, rootCursor);
+                                    }
+                                    return source;
+                                });
+                            } catch (Throwable t) {
+                                handleError(recipe, source, source, t);
+                            }
                         }
                     }
+                    try {
+                        List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
+                        generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
+                        if (!generated.isEmpty()) {
+                            acc.addAll(generated);
+                            generated.forEach(source -> recordSourceFileResult(null, source, recipeStack, ctx));
+                            madeChangesInThisCycle.add(recipe);
+                        }
+                    } catch (Throwable t) {
+                        handleError(recipe, new Quark(Tree.randomId(), Paths.get("error during generation"), Markers.EMPTY, null, null), null, t);
+                    }
                 }
-                List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
-                generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
-                acc.addAll(generated);
-                if (!generated.isEmpty()) {
-                    madeChangesInThisCycle.add(recipe);
-                }
-            }
-            return acc;
-        }, new ArrayList<>());
+                return acc;
+            }, new ArrayList<>());
 
-        // noinspection unchecked
-        return (LSS) sourceSet.generate(generatedInThisCycle);
+            // noinspection unchecked
+            return (LSS) sourceSet.generate(generatedInThisCycle);
+        }
+        return sourceSet;
     }
 
     public LSS editSources(LSS sourceSet) {
@@ -151,65 +174,67 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         // skip edits made to generated source files so that they don't show up in a diff
         // that later fails to apply on a freshly cloned repository
         // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-        return sourceSetEditor.apply(sourceSet, sourceFile ->
-                allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
-                    Recipe recipe = recipeStack.peek();
-                    if (source == null) {
-                        return null;
-                    }
-
-                    SourceFile after = source;
-
-                    try {
-                        Duration duration = Duration.ofNanos(System.nanoTime() - cycleStartTime);
-                        if (duration.compareTo(ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4))) > 0) {
-                            if (thrownErrorOnTimeout.compareAndSet(false, true)) {
-                                RecipeTimeoutException t = new RecipeTimeoutException(recipe);
-                                ctx.getOnError().accept(t);
-                                ctx.getOnTimeout().accept(t, ctx);
-                            }
-                            return source;
+        return sourceSetEditor.apply(sourceSet, sourceFile -> {
+                    recipeRunStats.recordSourceVisited(sourceFile);
+                    return allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
+                        Recipe recipe = recipeStack.peek();
+                        if (source == null) {
+                            return null;
                         }
 
-                        if (ctx.getMessage(PANIC) != null) {
-                            return source;
-                        }
+                        SourceFile after = source;
 
-                        TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
-                        // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
-                        visitor.setCursor(rootCursor);
-
-                        after = recipeRunStats.recordEdit(recipe, () -> {
-                            if (visitor.isAcceptable(source, ctx)) {
-                                // propagate shared root cursor
-                                //noinspection DataFlowIssue
-                                return (SourceFile) visitor.visit(source, ctx, rootCursor);
-                            }
-                            return source;
-                        });
-
-                        if (after != source) {
-                            madeChangesInThisCycle.add(recipe);
-                            recordSourceFileResult(source, after, recipeStack, ctx);
-                            if (source.getMarkers().findFirst(Generated.class).isPresent()) {
-                                // skip edits made to generated source files so that they don't show up in a diff
-                                // that later fails to apply on a freshly cloned repository
+                        try {
+                            Duration duration = Duration.ofNanos(System.nanoTime() - cycleStartTime);
+                            if (duration.compareTo(ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4))) > 0) {
+                                if (thrownErrorOnTimeout.compareAndSet(false, true)) {
+                                    RecipeTimeoutException t = new RecipeTimeoutException(recipe);
+                                    ctx.getOnError().accept(t);
+                                    ctx.getOnTimeout().accept(t, ctx);
+                                }
                                 return source;
                             }
-                            recipeRunStats.recordSourceFileChanged(source, after);
-                        } else if (ctx.hasNewMessages()) {
-                            // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-                            madeChangesInThisCycle.add(recipe);
-                            ctx.resetHasNewMessages();
+
+                            if (ctx.getMessage(PANIC) != null) {
+                                return source;
+                            }
+
+                            TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
+                            // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
+                            visitor.setCursor(rootCursor);
+
+                            after = recipeRunStats.recordEdit(recipe, () -> {
+                                if (visitor.isAcceptable(source, ctx)) {
+                                    // propagate shared root cursor
+                                    //noinspection DataFlowIssue
+                                    return (SourceFile) visitor.visit(source, ctx, rootCursor);
+                                }
+                                return source;
+                            });
+
+                            if (after != source) {
+                                madeChangesInThisCycle.add(recipe);
+                                recordSourceFileResult(source, after, recipeStack, ctx);
+                                if (source.getMarkers().findFirst(Generated.class).isPresent()) {
+                                    // skip edits made to generated source files so that they don't show up in a diff
+                                    // that later fails to apply on a freshly cloned repository
+                                    return source;
+                                }
+                                recipeRunStats.recordSourceFileChanged(source, after);
+                            } else if (ctx.hasNewMessages()) {
+                                // consider any recipes adding new messages as a changing recipe (which can request another cycle)
+                                madeChangesInThisCycle.add(recipe);
+                                ctx.resetHasNewMessages();
+                            }
+                        } catch (Throwable t) {
+                            after = handleError(recipe, source, after, t);
                         }
-                    } catch (Throwable t) {
-                        after = handleError(recipe, source, after, t);
-                    }
-                    if (after != null && after != source) {
-                        after = addRecipesThatMadeChanges(recipeStack, after);
-                    }
-                    return after;
-                }, sourceFile)
+                        if (after != null && after != source) {
+                            after = addRecipesThatMadeChanges(recipeStack, after);
+                        }
+                        return after;
+                    }, sourceFile);
+        }
         );
     }
 
@@ -217,7 +242,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();
         String afterPath = (after == null) ? "" : after.getSourcePath().toString();
         Recipe recipe = recipeStack.peek();
-        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null) ? 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
+        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
+                0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
+
         String parentName = "";
         boolean hierarchical = recipeStack.size() > 1;
         if (hierarchical) {
@@ -287,5 +314,37 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     return r1;
                 })
         );
+    }
+
+    @NonFinal
+    @Nullable
+    transient Boolean isScanningRecipe;
+    private boolean isScanningRequired() {
+        if (isScanningRecipe == null) {
+            isScanningRecipe = isScanningRequired(recipe);
+        }
+        return isScanningRecipe;
+    }
+
+    private static boolean isScanningRequired(Recipe recipe) {
+        if (recipe instanceof ScanningRecipe) {
+            // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
+            // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
+            if(recipe instanceof DeclarativeRecipe) {
+                for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
+                    if (isScanningRequired(precondition)) {
+                        return true;
+                    }
+                }
+            } else {
+                return true;
+            }
+        }
+        for (Recipe r : recipe.getRecipeList()) {
+            if (isScanningRequired(r)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

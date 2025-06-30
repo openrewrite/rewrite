@@ -35,7 +35,7 @@ public class Autodetect {
     }
 
     public static GeneralFormatStyle generalFormat(Yaml yaml) {
-        FindLineFormatJavaVisitor<Integer> findLineFormat = new FindLineFormatJavaVisitor<>();
+        FindLineFormatYamlVisitor<Integer> findLineFormat = new FindLineFormatYamlVisitor<>();
 
         //noinspection ConstantConditions
         findLineFormat.visit(yaml, 0);
@@ -43,7 +43,7 @@ public class Autodetect {
         return new GeneralFormatStyle(!findLineFormat.isIndentedWithLFNewLines());
     }
 
-    private static class FindLineFormatJavaVisitor<P> extends YamlIsoVisitor<P> {
+    private static class FindLineFormatYamlVisitor<P> extends YamlIsoVisitor<P> {
         private int linesWithCRLFNewLines = 0;
         private int linesWithLFNewLines = 0;
 

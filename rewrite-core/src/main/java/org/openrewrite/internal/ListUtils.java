@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
@@ -261,6 +262,7 @@ public final class ListUtils {
     /**
      * For backwards compatibility; prefer {@link #map(List, Function)}.
      */
+    @Contract("null, _ -> null; !null, _ -> !null")
     public static <T> @Nullable List<T> map(@Nullable List<T> ls, UnaryOperator<@Nullable T> map) {
         return map(ls, (Function<T, T>) map);
     }
@@ -348,8 +350,39 @@ public final class ListUtils {
      * @return A new list with expanded or modified elements, or the original list if unchanged.
      */
     @Contract("null, _ -> null; !null, _ -> !null")
-    public static <T> @Nullable List<T> flatMap(@Nullable List<T> ls, Function<T, Object> flatMap) {
+    public static <T> @Nullable List<T> flatMap(@Nullable List<T> ls, Function<T, @Nullable Object> flatMap) {
         return flatMap(ls, (i, t) -> flatMap.apply(t));
+    }
+
+    /**
+     * Filters a list based on the given predicate. If no elements are removed, the original list is returned.
+     *
+     * @param ls        The list to filter.
+     * @param predicate The predicate to test each element.
+     * @param <T>       The type of elements in the list.
+     * @return A new list with filtered elements, or the original list if unchanged.
+     */
+    @Contract("null, _ -> null; !null, _ -> !null")
+    public static <T> @Nullable List<T> filter(@Nullable List<T> ls, Predicate<T> predicate) {
+        if (ls == null || ls.isEmpty()) {
+            //noinspection ConstantConditions
+            return ls;
+        }
+
+        List<T> newLs = ls;
+        int j = 0;
+        for (int i = 0; i < ls.size(); i++, j++) {
+            T elem = ls.get(i);
+            if (!predicate.test(elem)) {
+                if (newLs == ls) {
+                    newLs = new ArrayList<>(ls);
+                }
+                newLs.remove(j);
+                j--;
+            }
+        }
+
+        return newLs;
     }
 
     /**

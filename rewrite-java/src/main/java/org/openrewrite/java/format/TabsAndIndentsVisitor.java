@@ -21,24 +21,29 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 
 import java.util.Iterator;
 import java.util.List;
 
+import static org.openrewrite.java.format.ColumnPositionCalculator.computeColumnPosition;
+
 public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
     private final TabsAndIndentsStyle style;
+    private final SpacesStyle spacesStyle;
 
-    public TabsAndIndentsVisitor(TabsAndIndentsStyle style) {
-        this(style, null);
+    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle) {
+        this(style, spacesStyle, null);
     }
 
-    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, @Nullable Tree stopAfter) {
+    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle,  @Nullable Tree stopAfter) {
         this.style = style;
+        this.spacesStyle = spacesStyle;
         this.stopAfter = stopAfter;
     }
 
@@ -143,18 +148,18 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         // block spaces are always aligned to their parent
         Object value = getCursor().getValue();
-        boolean alignBlockPrefixToParent = loc.equals(Space.Location.BLOCK_PREFIX) && space.getWhitespace().contains("\n") &&
+        boolean alignBlockPrefixToParent = loc == Space.Location.BLOCK_PREFIX && space.getWhitespace().contains("\n") &&
                 // ignore init blocks.
                 (value instanceof J.Block && !(getCursor().getParentTreeCursor().getValue() instanceof J.Block));
 
-        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END) ||
-                loc.equals(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX) ||
-                loc.equals(Space.Location.CATCH_PREFIX) ||
-                loc.equals(Space.Location.TRY_FINALLY) ||
-                loc.equals(Space.Location.ELSE_PREFIX);
+        boolean alignBlockToParent = loc == Space.Location.BLOCK_END ||
+                loc == Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX ||
+                loc == Space.Location.CATCH_PREFIX ||
+                loc == Space.Location.TRY_FINALLY ||
+                loc == Space.Location.ELSE_PREFIX;
 
-        if ((loc.equals(Space.Location.EXTENDS) && space.getWhitespace().contains("\n")) ||
-                Space.Location.EXTENDS.equals(getCursor().getParent().getMessage("lastLocation"))) {
+        if ((loc == Space.Location.EXTENDS && space.getWhitespace().contains("\n")) ||
+                Space.Location.EXTENDS == getCursor().getParent().getMessage("lastLocation")) {
             indentType = IndentType.CONTINUATION_INDENT;
         }
 
@@ -226,30 +231,27 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         }
                         JContainer<J> container = getCursor().getParentOrThrow().getValue();
                         List<J> elements = container.getElements();
-                        J firstArg = elements.iterator().next();
                         J lastArg = elements.get(elements.size() - 1);
-                        if (style.getMethodDeclarationParameters().getAlignWhenMultiple()) {
+                        if (elements.size() > 1 && style.getMethodDeclarationParameters().getAlignWhenMultiple()) {
                             J.MethodDeclaration method = getCursor().firstEnclosing(J.MethodDeclaration.class);
                             if (method != null) {
-                                int alignTo;
-                                if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
-                                    alignTo = getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
+                                int alignTo = computeFirstParameterColumn(method);
+                                if (alignTo != -1) {
+                                    getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
+                                    elem = visitAndCast(elem, p);
+                                    getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                                    after = indentTo(right.getAfter(), t == lastArg ? indent : alignTo, loc.getAfterLocation());
                                 } else {
-                                    String source = method.print(getCursor());
-                                    int firstArgIndex = source.indexOf(firstArg.print(getCursor()));
-                                    int lineBreakIndex = source.lastIndexOf('\n', firstArgIndex);
-                                    alignTo = (firstArgIndex - (lineBreakIndex == -1 ? 0 : lineBreakIndex)) - 1;
+                                    after = right.getAfter();
                                 }
-                                getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
-                                elem = visitAndCast(elem, p);
-                                getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                                after = indentTo(right.getAfter(), t == lastArg ? indent : alignTo, loc.getAfterLocation());
                             } else {
                                 after = right.getAfter();
                             }
-                        } else {
+                        } else if (elements.size() > 1) {
                             elem = visitAndCast(elem, p);
                             after = indentTo(right.getAfter(), t == lastArg ? indent : style.getContinuationIndent(), loc.getAfterLocation());
+                        } else {
+                            after = right.getAfter();
                         }
                         break;
                     }
@@ -294,6 +296,40 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         }
 
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        break;
+                    case TRY_RESOURCE:
+                        // Align subsequent resources with the first resource in try-with-resources
+                        JContainer<J> resources = getCursor().getParentOrThrow().getValue();
+                        List<JRightPadded<J>> resourceElements = resources.getPadding().getElements();
+                        if (resourceElements.size() > 1 && resourceElements.get(0) != right && elem.getPrefix().getLastWhitespace().contains("\n")) {
+                            // For resources after the first one, align with the first resource
+                            J firstResource = resourceElements.get(0).getElement();
+                            if (!firstResource.getPrefix().getLastWhitespace().contains("\n")) {
+                                // First resource is on the same line as try(
+                                // We need to calculate the indent based on the try statement position
+                                // For now, let's use a simplified approach - align with the opening parenthesis
+                                // Count the column position by looking at the try statement prefix and "try ("
+                                J.Try tryStatement = getCursor().firstEnclosing(J.Try.class);
+                                String tryPrefix = tryStatement.getPrefix().getWhitespace();
+                                int tryIndent = getLengthOfWhitespace(tryPrefix.substring(tryPrefix.lastIndexOf('\n') + 1));
+                                // Add 3 for "try" and 1 for "(" and optionally one for space in between
+                                int firstResourceColumn = tryIndent + 4 + (spacesStyle.getBeforeParentheses().getTryParentheses() ? 1 : 0);
+                                elem = elem.withPrefix(indentTo(elem.getPrefix(), firstResourceColumn, Space.Location.TRY_RESOURCE));
+                                elem = visitAndCast(elem, p);
+                                after = right.getAfter();
+                            } else {
+                                // First resource is on a new line, align with it
+                                String firstResourcePrefix = firstResource.getPrefix().getWhitespace();
+                                int firstResourceIndent = getLengthOfWhitespace(firstResourcePrefix.substring(firstResourcePrefix.lastIndexOf('\n') + 1));
+                                elem = elem.withPrefix(indentTo(elem.getPrefix(), firstResourceIndent, Space.Location.TRY_RESOURCE));
+                                elem = visitAndCast(elem, p);
+                                after = right.getAfter();
+                            }
+                        } else {
+                            // For the first resource or single resource, use default handling
+                            elem = visitAndCast(elem, p);
+                            after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        }
                         break;
                     default:
                         elem = visitAndCast(elem, p);
@@ -353,8 +389,26 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
+    private int computeFirstParameterColumn(J.MethodDeclaration method) {
+        List<JRightPadded<Statement>> arguments = method.getPadding().getParameters().getPadding().getElements();
+        J firstArg = arguments.isEmpty() ? null : arguments.get(0).getElement();
+        if (firstArg == null || firstArg instanceof J.Empty) {
+            return -1;
+        }
+
+        if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
+            return getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
+        } else {
+            return computeColumnPosition(method, firstArg, getCursor());
+        }
+    }
+
     @Override
-    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, JContainer.Location loc, P p) {
+    public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
+        if (container == null) {
+            return null;
+        }
+
         setCursor(new Cursor(getCursor(), container));
 
         Space before;

@@ -178,4 +178,111 @@ class AddAnnotationProcessorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addAnnotationWithOlderVersionAsMavenProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddAnnotationProcessor(
+            "org.projectlombok",
+            "lombok-mapstruct-binding",
+            "0.2.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <version.lombok.mapstruct.binding>0.1.0</version.lombok.mapstruct.binding>
+                  </properties>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.projectlombok</groupId>
+                                          <artifactId>lombok-mapstruct-binding</artifactId>
+                                          <version>${version.lombok.mapstruct.binding}</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <version.lombok.mapstruct.binding>0.2.0</version.lombok.mapstruct.binding>
+                  </properties>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.projectlombok</groupId>
+                                          <artifactId>lombok-mapstruct-binding</artifactId>
+                                          <version>${version.lombok.mapstruct.binding}</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void addAnnotationWithSameVersionAsMavenProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddAnnotationProcessor(
+            "org.projectlombok",
+            "lombok-mapstruct-binding",
+            "0.2.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <version.lombok.mapstruct.binding>0.2.0</version.lombok.mapstruct.binding>
+                  </properties>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.projectlombok</groupId>
+                                          <artifactId>lombok-mapstruct-binding</artifactId>
+                                          <version>${version.lombok.mapstruct.binding}</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
 }

@@ -8,11 +8,12 @@ COMMA           : ',';
 LBRACK          : '<';
 RBRACK          : '>';
 WILDCARD        : '?';
+LSBRACK         : '[';
+RSBRACK         : ']';
+AND             : '&';
 
-Variance
-    :   'extends'
-    |   'super'
-    ;
+Extends    :   'extends';
+Super      :   'super';
 
 FullyQualifiedName
     :   'boolean'

@@ -62,10 +62,10 @@ public class GroovyParser implements Parser {
 
     @Override
     public Stream<SourceFile> parse(@Language("groovy") String... sources) {
-        Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
+        Pattern packagePattern = Pattern.compile("\\bpackage\\s+([.\\w]+)");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
-        Function<String, String> simpleName = sourceStr -> {
+        Function<String, @Nullable String> simpleName = sourceStr -> {
             Matcher classMatcher = classPattern.matcher(sourceStr);
             return classMatcher.find() ? classMatcher.group(3) : null;
         };
@@ -121,7 +121,7 @@ public class GroovyParser implements Parser {
                         );
 
                         pctx.getParsingListener().startedParsing(input);
-                        CompilationUnit compUnit = new CompilationUnit(configuration, null, classLoader, classLoader);
+                        CompilationUnit compUnit = new LessAstTransformationsCompilationUnit(configuration, null, classLoader, classLoader);
                         compUnit.addSource(unit);
                         compUnit.compile(Phases.CANONICALIZATION);
                         ModuleNode ast = unit.getAST();
@@ -145,7 +145,7 @@ public class GroovyParser implements Parser {
                                 ctx
                         );
                         G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
-                        if (warnings.size() > 0) {
+                        if (!warnings.isEmpty()) {
                             Markers m = gcu.getMarkers();
                             for (ParseWarning warning : warnings) {
                                 m = m.add(warning);
@@ -234,7 +234,7 @@ public class GroovyParser implements Parser {
             return this;
         }
 
-        public Builder classpath(@Nullable String... artifactNames) {
+        public Builder classpath(String... artifactNames) {
             this.artifactNames = Arrays.asList(artifactNames);
             this.classpath = null;
             return this;
@@ -243,6 +243,19 @@ public class GroovyParser implements Parser {
         public Builder classpathFromResource(ExecutionContext ctx, String... artifactNamesWithVersions) {
             this.artifactNames = null;
             this.classpath = JavaParser.dependenciesFromResources(ctx, artifactNamesWithVersions);
+            return this;
+        }
+
+        /**
+         * This is an internal API which is subject to removal or change.
+         */
+        public Builder addClasspathEntry(Path entry) {
+            if (classpath.isEmpty()) {
+                classpath = Collections.singletonList(entry);
+            } else if (!classpath.contains(entry)) {
+                classpath = new ArrayList<>(classpath);
+                classpath.add(entry);
+            }
             return this;
         }
 
@@ -287,6 +300,13 @@ public class GroovyParser implements Parser {
         @Override
         public String getDslName() {
             return "groovy";
+        }
+
+        @Override
+        public GroovyParser.Builder clone() {
+            GroovyParser.Builder clone = (GroovyParser.Builder) super.clone();
+            clone.typeCache = this.typeCache.clone();
+            return clone;
         }
     }
 }

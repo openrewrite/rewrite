@@ -22,9 +22,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.search.FindCompileErrors;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -39,15 +41,80 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.TypeValidation.all;
 
 /**
  * @author Alex Boyko
  */
 class JavaParserTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void erroneousVariableDeclarations() {
+        rewriteRun(
+          spec -> spec.recipe(new FindCompileErrors())
+            .typeValidationOptions(all().erroneous(false)),
+          java(
+            """
+              package com.example.demo;
+              class Foo {
+                  /pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Foo {
+                  /*~~>*///*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Bar {
+                  pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Bar {
+                  /*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Baz {
+                  -pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Baz {
+                  /*~~>*/-/*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void incompleteAssignment() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(all().erroneous(false)),
           java(
             """
               @Deprecated(since=)
@@ -70,7 +137,7 @@ class JavaParserTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
+              assertThat(cu.getClasses().getFirst().getLeadingAnnotations()).hasSize(2))
           )
         );
     }
@@ -87,7 +154,7 @@ class JavaParserTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
+              assertThat(cu.getClasses().getFirst().getLeadingAnnotations()).hasSize(2))
           )
         );
     }
@@ -178,6 +245,70 @@ class JavaParserTest implements RewriteTest {
         assertFalse(JavaParser.fromJavaVersion().build().accept(Path.of("src/main/java/foo/module-info.java")));
     }
 
+    @ParameterizedTest
+    //language=java
+    @ValueSource(strings = {
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test() {
+              ownerR
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int num string msg) {
+              String a;
+              System.out.println();
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test() {
+              String a; this.ownerR
+              System.out.println();
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int num) {
+              String a; this.ownerR // comment
+              System.out.println();
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int num) {
+              // comment
+              this.ownerR
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int param ) {
+              this.ownerR
+              // comment
+            }
+        }
+        """
+    })
+    void erroneousExpressionStatements(@Language("java") String source) {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(all().erroneous(false)),
+          java(source)
+        );
+    }
+
     @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4624")
     void shouldParseComments() {
@@ -199,7 +330,7 @@ class JavaParserTest implements RewriteTest {
                    */
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getBody().getEnd().getComments())
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().getFirst().getBody().getEnd().getComments())
               .extracting("text")
               .containsExactly(
                 """
@@ -229,11 +360,11 @@ class JavaParserTest implements RewriteTest {
 
     @Test
     void filterArtifacts() {
-        List<URI> classpath = List.of(
-          URI.create("file:/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar"),
-          URI.create("file:/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"),
-          URI.create("file:/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"),
-          URI.create("file:/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar")
+        List<Path> classpath = List.of(
+          Paths.get(URI.create("file:/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar")),
+          Paths.get(URI.create("file:/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar")),
+          Paths.get(URI.create("file:/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar")),
+          Paths.get(URI.create("file:/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"))
         );
         assertThat(JavaParser.filterArtifacts("threeten-extra", classpath))
           .containsOnly(Paths.get("/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"));
@@ -244,4 +375,65 @@ class JavaParserTest implements RewriteTest {
         assertThat(JavaParser.filterArtifacts("rewrite-java", classpath))
           .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
     }
+
+    @Test
+    void emptyEnum() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+            package com.helloworld;
+            import java.time.Instant;
+            public class InstallationStatus {
+              public enum InstallationFeatures {}
+              public InstallationStatus create(Instant updateTime) {
+                return null;
+              }
+            }
+            """
+          ));
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5445")
+    void parseSwitchBlock() {
+        rewriteRun(
+          java(
+            """
+            public class Foo {
+              private String foo(final int i) {
+                return switch (i) {
+                  case 200:
+                    {
+                      yield "I'm in a block";
+                    }
+                  case 250, 300 -> {
+                      yield "another block";
+                  }
+                  case 400:
+                    yield "single line yield";
+                  default:
+                    yield "default";
+                };
+              }
+              private String mapFoo(final int i) {
+                String temp;
+                switch (i) {
+                  case 100: {
+                    temp = "value in block";
+                    break;
+                  }
+                  case 200, 300-> {
+                    temp = "another value in block";
+                  }
+                  default: temp = "default value";
+                }
+                return temp;
+              }
+            }
+            """
+          )
+        );
+    }
+
 }

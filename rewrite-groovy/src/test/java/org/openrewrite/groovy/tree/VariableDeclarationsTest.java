@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -83,10 +82,10 @@ class VariableDeclarationsTest implements RewriteTest {
               List<? extends String> l
               """,
             spec -> spec.beforeRecipe(cu -> {
-                var varDecl = (J.VariableDeclarations) cu.getStatements().get(0);
+                var varDecl = (J.VariableDeclarations) cu.getStatements().getFirst();
                 assertThat(varDecl.getTypeExpression()).isInstanceOf(J.ParameterizedType.class);
                 var typeExpression = requireNonNull(requireNonNull((J.ParameterizedType) varDecl.getTypeExpression())
-                  .getTypeParameters()).get(0);
+                  .getTypeParameters()).getFirst();
                 assertThat(typeExpression).isInstanceOf(J.Wildcard.class);
                 assertThat(((J.Wildcard) typeExpression).getBound()).isEqualTo(J.Wildcard.Bound.Extends);
             })
@@ -125,11 +124,11 @@ class VariableDeclarationsTest implements RewriteTest {
           def d2 = 10_000D
           def f1 = 10_000f
           def f2 = 10_000.0F
-          """)
+          """
+          )
         );
     }
 
-    @Disabled
     @Test
     void singleTypeMultipleVariableDeclaration() {
         rewriteRun(
@@ -137,7 +136,6 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void multipleTypeMultipleVariableDeclaration() {
         rewriteRun(
@@ -183,14 +181,13 @@ class VariableDeclarationsTest implements RewriteTest {
                         return SearchResult.found(multiVariable);
                     }
                 }, cu, new ArrayList<>(), J.VariableDeclarations.class, v -> v);
-                assertThat(variables.get(0).getLeadingAnnotations()).hasSize(1);
+                assertThat(variables.getFirst().getLeadingAnnotations()).hasSize(1);
             })
           )
         );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4702")
-    @Disabled
     @Test
     void nestedTypeParameters() {
         rewriteRun(
@@ -212,6 +209,18 @@ class VariableDeclarationsTest implements RewriteTest {
             """
               def /*int*/ int one = 1
               def /*Object*/ Object two = 2
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4877")
+    @Test
+    void defVariableStartsWithDef() {
+        rewriteRun(
+          groovy(
+            """
+              def defaultPublicStaticFinal = 0
               """
           )
         );

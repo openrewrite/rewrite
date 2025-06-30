@@ -69,7 +69,7 @@ public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
                 (JavaType.FullyQualified) visit(method.getDeclaringType(), p),
                 visit(method.getReturnType(), p),
                 mapInPlace(method.getParameterTypes().toArray(EMPTY_JAVA_TYPE_ARRAY), pt -> visit(pt, p)),
-                mapInPlace(method.getThrownExceptions().toArray(EMPTY_FULLY_QUALIFIED_ARRAY), t -> (JavaType.FullyQualified) visit(t, p)),
+                mapInPlace(method.getThrownExceptions().toArray(EMPTY_JAVA_TYPE_ARRAY), t -> visit(t, p)),
                 mapInPlace(method.getAnnotations().toArray(EMPTY_FULLY_QUALIFIED_ARRAY), a -> (JavaType.FullyQualified) visit(a, p))
         );
     }

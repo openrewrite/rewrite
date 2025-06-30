@@ -52,11 +52,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
-    // there are several implicitly defined version properties that we should never attempt to update
-    private static final Collection<String> implicitlyDefinedVersionProperties = Arrays.asList(
-            "${version}", "${project.version}", "${pom.version}", "${project.parent.version}"
-    );
-
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
             example = "com.fasterxml.jackson*")
@@ -156,8 +151,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 Optional<Xml.Tag> version = tag.getChild("version");
                                 if (version.isPresent()) {
                                     String requestedVersion = d.getRequested().getVersion();
-                                    if (requestedVersion != null && requestedVersion.startsWith("${") &&
-                                        !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
+                                    if (isProperty(requestedVersion)) {
                                         String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
                                         if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
                                             storeParentPomProperty(getResolutionResult().getParent(), propertyName, newerVersion);
@@ -180,8 +174,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
              * @param propertyName the name of the property to update, if found in any the parent pom source file
              * @param newerVersion the resolved newer version that any matching parent pom property should be updated to
              */
-            private void storeParentPomProperty(
-                    @Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName, String newerVersion) {
+            private void storeParentPomProperty(@Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName, String newerVersion) {
                 if (currentMavenResolutionResult == null) {
                     return; // No parent contained the property; might then be in the same source file, or an import BOM
                 }
@@ -242,7 +235,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                 if (t != tag && isProjectTag()) {
                     maybeUpdateModel();
-                    doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
+                    doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, null, null).getVisitor());
                 }
 
                 return t;
@@ -257,10 +250,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
                                 retainVersions();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, retainVersions).getVisitor());
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, retainVersions).getVisitor());
                                 doAfterVisit(upgradeManagedDependency);
                                 maybeUpdateModel();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
                             }
                         }
                     } catch (MavenDownloadingException e) {
@@ -270,10 +263,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
 
                 private void retainVersions() {
-                    for (Recipe retainVersionRecipe : RetainVersions.plan(this, retainVersions == null ?
-                            emptyList() : retainVersions)) {
-                        doAfterVisit(retainVersionRecipe.getVisitor());
-                    }
+                    RetainVersions.plan(this, retainVersions == null ? emptyList() : retainVersions)
+                            .forEach(it -> doAfterVisit(it.getVisitor()));
                 }
             }
 
@@ -284,26 +275,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     // as a source file, attempt to find a new version.
                     String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                     if (newerVersion != null) {
-                        Optional<Xml.Tag> version = t.getChild("version");
-                        if (version.isPresent()) {
-                            String requestedVersion = d.getRequested().getVersion();
-                            if (requestedVersion != null && requestedVersion.startsWith("${") && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
-                                String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
-                                if (getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
-                                    doAfterVisit(new ChangePropertyValue(propertyName, newerVersion, overrideManagedVersion, false).getVisitor());
-                                }
-                            } else {
-                                t = (Xml.Tag) new ChangeTagValueVisitor<>(version.get(), newerVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
-                            }
+                        if (t.getChild("version").isPresent()) {
+                            t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
                         } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
                             ResolvedManagedDependency dm = findManagedDependency(t);
                             // if a managed dependency is expressed as a property, change the property value
                             // do this only when a requested bom is absent, otherwise changing property has no effect
-                            if (dm != null &&
-                                dm.getRequested().getVersion() != null &&
-                                dm.getRequested().getVersion().startsWith("${") &&
-                                !implicitlyDefinedVersionProperties.contains(dm.getRequested().getVersion()) &&
-                                dm.getRequestedBom() == null) {
+                            if (dm != null && isProperty(dm.getRequested().getVersion()) && dm.getRequestedBom() == null) {
                                 doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
                                         dm.getRequested().getVersion().length() - 1),
                                         newerVersion, overrideManagedVersion, false).getVisitor());
@@ -359,20 +337,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (groupId != null && artifactId != null && version != null) {
                     String newerVersion = findNewerVersion(groupId, artifactId, resolveVersion(version), ctx);
                     if (newerVersion != null) {
-                        if (version.startsWith("${") && !implicitlyDefinedVersionProperties.contains(version)) {
-                            doAfterVisit(new ChangePropertyValue(version.substring(2, version.length() - 1), newerVersion, overrideManagedVersion, false).getVisitor());
-                        } else {
-                            Optional<Xml.Tag> versionTag = t.getChild("version");
-                            assert versionTag.isPresent();
-                            t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), newerVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
-                        }
+                        t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
                     }
                 }
                 return t;
             }
 
             private String resolveVersion(String version) {
-                if (version.startsWith("${") && !implicitlyDefinedVersionProperties.contains(version)) {
+                if (isProperty(version)) {
                     Map<String, String> properties = getResolutionResult().getPom().getProperties();
                     String property = version.substring(2, version.length() - 1);
                     return properties.getOrDefault(property, version);
@@ -384,7 +356,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 String newerVersion = findNewerVersion(groupId, artifactId, version2, ctx);
                 if (newerVersion == null) {
                     return null;
-                } else if (requestedVersion != null && requestedVersion.startsWith("${")) {
+                } else if (isProperty(requestedVersion)) {
                     //noinspection unchecked
                     return (TreeVisitor<Xml, ExecutionContext>) new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false)
                             .getVisitor();

@@ -17,10 +17,8 @@ package org.openrewrite.marker;
 
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Value;
-import lombok.With;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.GitRemote;
@@ -34,6 +32,7 @@ import org.openrewrite.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.IncompleteGitConfigException;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
+import org.openrewrite.rpc.Reference;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,12 +43,14 @@ import java.time.LocalDate;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
 @AllArgsConstructor(access = AccessLevel.PACKAGE) // required for @With and tests
 @With
-public class GitProvenance implements Marker {
+public class GitProvenance extends Reference implements Marker {
     UUID id;
 
     /**
@@ -96,6 +97,11 @@ public class GitProvenance implements Marker {
         this.autocrlf = autocrlf;
         this.eol = eol;
         this.committers = committers;
+    }
+
+    @Override
+    public Object getValue() {
+        return this;
     }
 
     public @Nullable GitRemote getGitRemote() {
@@ -187,7 +193,7 @@ public class GitProvenance implements Marker {
      */
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
                                                                @Nullable BuildEnvironment environment,
-            GitRemote.@Nullable Parser gitRemoteParser) {
+                                                               GitRemote.@Nullable Parser gitRemoteParser) {
         if (gitRemoteParser == null) {
             gitRemoteParser = new GitRemote.Parser();
         }
@@ -247,7 +253,10 @@ public class GitProvenance implements Marker {
         }
     }
 
-    private static GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset, GitRemote.Parser gitRemoteParser) {
+    private static @Nullable GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset, GitRemote.Parser gitRemoteParser) {
+        if (repository.isBare()) {
+            return null;
+        }
         if (branch == null) {
             branch = resolveBranchFromGitConfig(repository);
         }
@@ -311,7 +320,7 @@ public class GitProvenance implements Marker {
             List<RemoteConfig> remotes = git.remoteList().call();
             for (RemoteConfig remote : remotes) {
                 if (remoteBranch.startsWith(remote.getName()) &&
-                    (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
+                        (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
                     branch = remoteBranch.substring(remote.getName().length() + 1); // +1 for the forward slash
                 }
             }
@@ -371,16 +380,22 @@ public class GitProvenance implements Marker {
                 head = headRef.getObjectId();
             }
 
-            Map<String, Committer> committers = new TreeMap<>();
+            Map<String, String> committerName = new HashMap<>();
+            Map<String, NavigableMap<LocalDate, Integer>> commitMap = new HashMap<>();
             for (RevCommit commit : git.log().add(head).call()) {
                 PersonIdent who = commit.getAuthorIdent();
-                Committer committer = committers.computeIfAbsent(who.getEmailAddress(),
-                        email -> new Committer(who.getName(), email, new TreeMap<>()));
-                committer.getCommitsByDay().compute(who.getWhen().toInstant().atZone(who.getTimeZone().toZoneId())
+                committerName.putIfAbsent(who.getEmailAddress(), who.getName());
+                commitMap.computeIfAbsent(who.getEmailAddress(),
+                        email -> new TreeMap<>()).compute(who.getWhen().toInstant().atZone(who.getTimeZone().toZoneId())
                                 .toLocalDate(),
                         (day, count) -> count == null ? 1 : count + 1);
             }
-            return new ArrayList<>(committers.values());
+            return committerName.entrySet().stream()
+                    .map(c -> new Committer(
+                            c.getValue(),
+                            c.getKey(),
+                            commitMap.get(c.getKey()))
+                    ).collect(toList());
         } catch (IOException | GitAPIException e) {
             return emptyList();
         }
@@ -419,10 +434,47 @@ public class GitProvenance implements Marker {
     }
 
     @Value
-    @With
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     public static class Committer {
+
+        @With
         String name;
+
+        @With
         String email;
-        NavigableMap<LocalDate, Integer> commitsByDay;
+
+        @Getter(AccessLevel.PRIVATE)
+        int[] data;
+
+        @JsonCreator
+        static Committer from(
+                @JsonProperty("name") String name, @JsonProperty("email") String email,
+                @JsonProperty("dates") int @Nullable [] data,
+                @Nullable @JsonProperty("commitsByDay") NavigableMap<LocalDate, Integer> commitsByDay) {
+            if (commitsByDay != null) {
+                return new Committer(name, email, commitsByDay);
+            } else {
+                return new Committer(name, email, requireNonNull(data));
+            }
+        }
+
+        public Committer(String name, String email, NavigableMap<LocalDate, Integer> commitsByDay) {
+            this.name = name;
+            this.email = email;
+            this.data = new int[commitsByDay.size() * 2];
+            int i = 0;
+            for (Map.Entry<LocalDate, Integer> entry : commitsByDay.entrySet()) {
+                data[i++] = (int) entry.getKey().toEpochDay();
+                data[i++] = entry.getValue();
+            }
+        }
+
+        public NavigableMap<LocalDate, Integer> getCommitsByDay() {
+            TreeMap<LocalDate, Integer> commitsByDay = new TreeMap<>();
+            for (int i = 0; i < data.length; ) {
+                commitsByDay.put(LocalDate.ofEpochDay(data[i++]), data[i++]);
+            }
+            return commitsByDay;
+        }
     }
 }
