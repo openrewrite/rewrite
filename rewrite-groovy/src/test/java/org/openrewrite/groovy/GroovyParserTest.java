@@ -117,4 +117,15 @@ class GroovyParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void variableDeclarationWithArrayInstantiationAsTheLastStatement() {
+        rewriteRun(
+          groovy(
+            """
+            def arr = new String[2]
+            """
+          )
+        );
+    }
 }
