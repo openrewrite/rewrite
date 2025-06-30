@@ -1543,10 +1543,10 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             """
               import org.example.Foo;
               
-              @Foo("oldValue")
+              @Foo("newValue")
               public class A {}
               
-              @Foo(value = "oldValue")
+              @Foo(value = "newValue")
               public class B {}
               """
           )
