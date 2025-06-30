@@ -47,8 +47,11 @@ class MavenMetadataTest {
           """;
 
         MavenMetadata parsed = MavenMetadata.parse(metadata.getBytes());
-        assertThat(parsed.getVersioning().getVersions()).hasSize(2);
-        assertThat(parsed.getVersioning().getLastUpdated()).isEqualTo(ZonedDateTime.of(2021, 1, 15, 4, 27, 54, 0, UTC));
+        MavenMetadata.Versioning versioning = parsed.getVersioning();
+        assertThat(versioning.getVersions()).hasSize(2);
+        assertThat(versioning.getLastUpdated()).isEqualTo(ZonedDateTime.of(2021, 1, 15, 4, 27, 54, 0, UTC));
+        assertThat(versioning.getLatest()).isEqualTo("2.4.2");
+        assertThat(versioning.getRelease()).isEqualTo("2.4.2");
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -88,9 +91,9 @@ class MavenMetadataTest {
         assertThat(versioning.getSnapshot().getBuildNumber()).isEqualTo("223");
         assertThat(versioning.getVersions()).isNotNull();
         assertThat(versioning.getSnapshotVersions()).hasSize(2);
-        assertThat(versioning.getSnapshotVersions().get(0).getExtension()).isNotNull();
-        assertThat(versioning.getSnapshotVersions().get(0).getValue()).isNotNull();
-        assertThat(versioning.getSnapshotVersions().get(0).getUpdated()).isNotNull();
+        assertThat(versioning.getSnapshotVersions().getFirst().getExtension()).isNotNull();
+        assertThat(versioning.getSnapshotVersions().getFirst().getValue()).isNotNull();
+        assertThat(versioning.getSnapshotVersions().getFirst().getUpdated()).isNotNull();
     }
 
 

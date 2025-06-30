@@ -22,10 +22,10 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
-import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -35,6 +35,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 
@@ -52,6 +53,10 @@ import java.util.Optional;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangePlugin extends Recipe {
+
+    @EqualsAndHashCode.Exclude
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
     @Option(displayName = "Plugin ID",
             description = "The current Gradle plugin id.",
             example = "org.openrewrite.rewrite")
@@ -176,7 +181,7 @@ public class ChangePlugin extends Recipe {
 
                         if (!StringUtils.isBlank(newVersion)) {
                             try {
-                                String resolvedVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
+                                String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
                                         .select(new GroupArtifact(newPluginId, newPluginId + ".gradle.plugin"), "classpath", newVersion, null, ctx);
                                 if (resolvedVersion == null) {
                                     return m;

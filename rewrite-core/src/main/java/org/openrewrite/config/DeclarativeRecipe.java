@@ -25,13 +25,14 @@ import org.openrewrite.*;
 import java.net.URI;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
 
 @RequiredArgsConstructor
-public class DeclarativeRecipe extends Recipe {
+public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumulator> {
     @Getter
     private final String name;
 
@@ -41,6 +42,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @Getter
     @Language("markdown")
+    @Nullable // in YAML the description is not always present
     private final String description;
 
     @Getter
@@ -68,6 +70,7 @@ public class DeclarativeRecipe extends Recipe {
 
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
 
+    @Getter
     @Setter
     private List<Recipe> preconditions = new ArrayList<>();
 
@@ -79,7 +82,7 @@ public class DeclarativeRecipe extends Recipe {
     private Validated<Object> validation = Validated.none();
 
     @JsonIgnore
-    private Validated<Object> initValidation = null;
+    private Validated<Object> initValidation = Validated.none();
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
@@ -88,21 +91,25 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
-        initValidation = Validated.none();
+        Map<String, Recipe> recipeMap = new HashMap<>();
+        availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
+        initialize(uninitializedRecipes, recipeList, recipeMap::get, recipeToContributors);
+        initialize(uninitializedPreconditions, preconditions, recipeMap::get, recipeToContributors);
+    }
+
+    public void initialize(Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         initialize(uninitializedRecipes, recipeList, availableRecipes, recipeToContributors);
         initialize(uninitializedPreconditions, preconditions, availableRecipes, recipeToContributors);
     }
 
-    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         initialized.clear();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
-                Optional<Recipe> next = availableRecipes.stream()
-                        .filter(r -> recipeFqn.equals(r.getName())).findAny();
-                if (next.isPresent()) {
-                    Recipe subRecipe = next.get();
+                Recipe subRecipe = availableRecipes.apply(recipeFqn);
+                if (subRecipe != null) {
                     if (subRecipe instanceof DeclarativeRecipe) {
                         ((DeclarativeRecipe) subRecipe).initialize(availableRecipes, recipeToContributors);
                     }
@@ -125,6 +132,45 @@ public class DeclarativeRecipe extends Recipe {
         }
     }
 
+    @SuppressWarnings("NotNullFieldNotInitialized")
+    @JsonIgnore
+    private transient Accumulator accumulator;
+
+    @Override
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        Accumulator acc = new Accumulator();
+        for (Recipe precondition : preconditions) {
+            if (precondition instanceof ScanningRecipe && isScanningRequired(precondition)) {
+                acc.recipeToAccumulator.put(precondition, ((ScanningRecipe<?>) precondition).getInitialValue(ctx));
+            }
+        }
+        accumulator = acc;
+        return acc;
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                for (Recipe precondition : preconditions) {
+                    if (precondition instanceof ScanningRecipe && isScanningRequired(precondition)) {
+                        ScanningRecipe preconditionRecipe = (ScanningRecipe) precondition;
+                        Object preconditionAcc = acc.recipeToAccumulator.get(precondition);
+                        preconditionRecipe.getScanner(preconditionAcc)
+                                .visit(tree, ctx);
+                    }
+                }
+                return tree;
+            }
+        };
+    }
+
+    public static class Accumulator {
+        Map<Recipe, Object> recipeToAccumulator = new HashMap<>();
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false)
     @RequiredArgsConstructor
@@ -138,7 +184,7 @@ public class DeclarativeRecipe extends Recipe {
         @Override
         public String getDescription() {
             return "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
-                   "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends. ";
+                   "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
         }
 
         Supplier<TreeVisitor<?, ExecutionContext>> precondition;
@@ -149,7 +195,7 @@ public class DeclarativeRecipe extends Recipe {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
-                TreeVisitor<?, ExecutionContext> p = precondition.get();
+                final TreeVisitor<?, ExecutionContext> p = precondition.get();
 
                 @Override
                 public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -250,6 +296,11 @@ public class DeclarativeRecipe extends Recipe {
         public boolean causesAnotherCycle() {
             return delegate.causesAnotherCycle();
         }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
+        }
     }
 
     @Override
@@ -260,13 +311,9 @@ public class DeclarativeRecipe extends Recipe {
 
         List<Supplier<TreeVisitor<?, ExecutionContext>>> andPreconditions = new ArrayList<>();
         for (Recipe precondition : preconditions) {
-            if (isScanningRecipe(precondition)) {
-                throw new IllegalArgumentException(
-                        getName() + " declares the ScanningRecipe " + precondition.getName() + " as a precondition." +
-                        "ScanningRecipe cannot be used as Preconditions.");
-            }
             andPreconditions.add(() -> orVisitors(precondition));
         }
+        //noinspection unchecked
         PreconditionBellwether bellwether = new PreconditionBellwether(Preconditions.and(andPreconditions.toArray(new Supplier[]{})));
         List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
         recipeListWithBellwether.add(bellwether);
@@ -274,41 +321,58 @@ public class DeclarativeRecipe extends Recipe {
         return recipeListWithBellwether;
     }
 
-    private static TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
-        if (recipe.getRecipeList().isEmpty()) {
-            return recipe.getVisitor();
-        }
+    private TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
         List<TreeVisitor<?, ExecutionContext>> conditions = new ArrayList<>();
-        conditions.add(recipe.getVisitor());
+        if(recipe instanceof ScanningRecipe) {
+            //noinspection rawtypes
+            ScanningRecipe scanning = (ScanningRecipe) recipe;
+            //noinspection unchecked
+            conditions.add(scanning.getVisitor(accumulator.recipeToAccumulator.get(scanning)));
+        } else {
+            conditions.add(recipe.getVisitor());
+        }
         for (Recipe r : recipe.getRecipeList()) {
             conditions.add(orVisitors(r));
+        }
+        if (conditions.size() == 1) {
+            return conditions.get(0);
         }
         //noinspection unchecked
         return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
     }
 
-    private static boolean isScanningRecipe(Recipe recipe) {
-        if (recipe instanceof ScanningRecipe) {
-            return true;
-        }
-        for (Recipe r : recipe.getRecipeList()) {
-            if (isScanningRecipe(r)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {
         List<Recipe> mappedRecipeList = new ArrayList<>(recipeList.size());
         for (Recipe recipe : recipeList) {
-            if (recipe instanceof ScanningRecipe) {
+            if (recipe instanceof ScanningRecipe && isScanningRequired(recipe)) {
                 mappedRecipeList.add(new BellwetherDecoratedScanningRecipe<>(bellwether, (ScanningRecipe<?>) recipe));
             } else {
                 mappedRecipeList.add(new BellwetherDecoratedRecipe(bellwether, recipe));
             }
         }
         return mappedRecipeList;
+    }
+
+    private static boolean isScanningRequired(Recipe recipe) {
+        if (recipe instanceof ScanningRecipe) {
+            // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
+            // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
+            if(recipe instanceof DeclarativeRecipe) {
+                for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
+                    if (isScanningRequired(precondition)) {
+                        return true;
+                    }
+                }
+            } else {
+                return true;
+            }
+        }
+        for (Recipe r : recipe.getRecipeList()) {
+            if (isScanningRequired(r)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void addUninitialized(Recipe recipe) {
@@ -368,7 +432,7 @@ public class DeclarativeRecipe extends Recipe {
         for (Recipe childRecipe : getRecipeList()) {
             recipeList.add(childRecipe.getDescriptor());
         }
-        return new RecipeDescriptor(getName(), getDisplayName(), getDescription(),
+        return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
                 getExamples(), source);
@@ -384,7 +448,7 @@ public class DeclarativeRecipe extends Recipe {
     public List<Contributor> getContributors() {
         if (contributors == null) {
             Map<NameEmail, Integer> contributorToLineCount = new HashMap<>();
-            contributors = new ArrayList<>();
+            List<Contributor> combined = new ArrayList<>();
             for (Recipe recipe : getRecipeList()) {
                 for (Contributor contributor : recipe.getContributors()) {
                     NameEmail nameEmail = new NameEmail(contributor.getName(), contributor.getEmail());
@@ -392,10 +456,30 @@ public class DeclarativeRecipe extends Recipe {
                 }
             }
             for (Map.Entry<NameEmail, Integer> contributorEntry : contributorToLineCount.entrySet()) {
-                contributors.add(new Contributor(contributorEntry.getKey().getName(), contributorEntry.getKey().getEmail(), contributorEntry.getValue()));
+                combined.add(new Contributor(contributorEntry.getKey().getName(), contributorEntry.getKey().getEmail(), contributorEntry.getValue()));
             }
-            contributors.sort(Comparator.comparing(Contributor::getLineCount).reversed());
+            combined.sort(Comparator.comparing(Contributor::getLineCount).reversed());
+            contributors = combined;
         }
         return contributors;
+    }
+
+    @Override
+    public List<DataTableDescriptor> getDataTableDescriptors() {
+        List<DataTableDescriptor> dataTableDescriptors = null;
+        for (Recipe recipe : getRecipeList()) {
+            List<DataTableDescriptor> dtds = recipe.getDataTableDescriptors();
+            if (!dtds.isEmpty()) {
+                if (dataTableDescriptors == null) {
+                    dataTableDescriptors = new ArrayList<>();
+                }
+                for (DataTableDescriptor dtd : dtds) {
+                    if (!dataTableDescriptors.contains(dtd)) {
+                        dataTableDescriptors.add(dtd);
+                    }
+                }
+            }
+        }
+        return dataTableDescriptors == null ? super.getDataTableDescriptors() : dataTableDescriptors;
     }
 }

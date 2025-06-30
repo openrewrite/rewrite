@@ -30,9 +30,11 @@ rewrite-gradle
 rewrite-groovy
 rewrite-hcl
 rewrite-json
+rewrite-kotlin
 rewrite-maven
 rewrite-properties
 rewrite-protobuf
+rewrite-toml
 rewrite-xml
 rewrite-yaml
 

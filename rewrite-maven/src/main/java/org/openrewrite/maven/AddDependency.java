@@ -220,19 +220,22 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 }
 
                 // If the dependency is already in compile scope it will be available everywhere, no need to continue
-                for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
-                    if (hasAcceptableTransitivity(d, acc) &&
-                        groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
-                        return maven;
+                Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
+                if (dependencies.get(Scope.Compile) != null) {
+                    for (ResolvedDependency d : dependencies.get(Scope.Compile)) {
+                        if (hasAcceptableTransitivity(d, acc) &&
+                            groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                            return maven;
+                        }
                     }
                 }
 
                 String resolvedScope = scope == null ? maybeScope : scope;
                 Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
-                if (resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) {
-                    for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScopeEnum)) {
+                if ((resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) && dependencies.get(resolvedScopeEnum) != null) {
+                    for (ResolvedDependency d : dependencies.get(resolvedScopeEnum)) {
                         if (hasAcceptableTransitivity(d, acc) &&
-                            groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                             return maven;
                         }
                     }
@@ -276,6 +279,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     }
 
     private boolean hasAcceptableTransitivity(ResolvedDependency d, Scanned acc) {
-        return d.isDirect() || Boolean.TRUE.equals(acceptTransitive) && !acc.scopeByProject.isEmpty();
+        return d.isDirect() || Boolean.TRUE.equals(acceptTransitive) && (onlyIfUsing == null || !acc.scopeByProject.isEmpty());
     }
 }

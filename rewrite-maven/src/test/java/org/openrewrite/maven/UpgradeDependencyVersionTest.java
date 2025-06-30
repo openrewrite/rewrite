@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -31,12 +32,58 @@ import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void updateManagedDependencyVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.7.2", null,
+            null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                              <version>5.6.2</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                              <version>5.7.2</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
 
     @Test
     void doNotOverrideImplicitProperty() {
@@ -127,51 +174,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           <version>4.2.9</version>
                       </dependency>
                   </dependencies>
-              </project>
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void updateManagedDependencyVersion() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.7.2", null,
-            null, null)),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.junit.jupiter</groupId>
-                              <artifactId>junit-jupiter-api</artifactId>
-                              <version>5.6.2</version>
-                              <scope>test</scope>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.junit.jupiter</groupId>
-                              <artifactId>junit-jupiter-api</artifactId>
-                              <version>5.7.2</version>
-                              <scope>test</scope>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
               </project>
               """
           )
@@ -422,6 +424,40 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void upgradeVersionToRelease() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new UpgradeDependencyVersion("org.springframework.boot", "spring-boot", "3.5.x", null, null, null)
+          ),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <spring-boot.version>3.1.5</spring-boot.version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot</artifactId>
+                    <version>${spring-boot.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .containsPattern("<spring-boot.version>3.5.\\d+</spring-boot.version>")
+                .actual()
+            )
           )
         );
     }
@@ -1952,6 +1988,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Disabled("Service Unavailable")
     @Test
     void exactVersionMissingInMavenMetadata() {
         rewriteRun(
@@ -2007,4 +2044,44 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradeVersionWithGroupIdAndArtifactIdDefinedAsMavenConfigProperty() {
+        rewriteRun(
+          spec -> spec
+            .parser(MavenParser.builder()
+              .property("quarkus.platform.group-id", "io.quarkus")
+              .property("quarkus.platform.artifact-id", "quarkus-bom")
+              .property("quarkus.platform.version", "1.11.7.Final"))
+            .recipe(new UpgradeDependencyVersion("io.quarkus", "quarkus-universe-bom", "1.13.7.Final", null,
+              null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>${quarkus.platform.group-id}</groupId>
+                              <artifactId>${quarkus.platform.artifact-id}</artifactId>
+                              <version>${quarkus.platform.version}</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  // `maven.config` properties are read-only at the moment, so version stays te same
+                  assertThat(results.getPom().getProperties().get("quarkus.platform.version")).isEqualTo("1.11.7.Final");
+              }
+            )
+          )
+        );
+    }
+
 }

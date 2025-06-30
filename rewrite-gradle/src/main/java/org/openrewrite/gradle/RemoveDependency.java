@@ -22,11 +22,14 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.HashMap;
@@ -73,8 +76,8 @@ public class RemoveDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
-            final GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+            final GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency()
                     .configuration(configuration)
                     .groupId(groupId)
                     .artifactId(artifactId);
@@ -83,19 +86,28 @@ public class RemoveDependency extends Recipe {
             GradleProject gradleProject;
 
             @Override
-            public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
-                if (!maybeGp.isPresent()) {
-                    return cu;
-                }
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile instanceof G.CompilationUnit || sourceFile instanceof K.CompilationUnit;
+            }
 
-                gradleProject = maybeGp.get();
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile sourceFile = (JavaSourceFile) tree;
+                    Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
+                    if (!maybeGp.isPresent()) {
+                        return sourceFile;
+                    }
 
-                G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
-                if (g != cu) {
-                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject)));
+                    gradleProject = maybeGp.get();
+
+                    sourceFile = (JavaSourceFile) super.visit(sourceFile, ctx);
+                    if (sourceFile != tree) {
+                        sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject)));
+                    }
+                    return sourceFile;
                 }
-                return g;
+                return super.visit(tree, ctx);
             }
 
             @Override

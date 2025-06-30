@@ -35,7 +35,7 @@ class DocumentTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(y -> {
                 assertThat(y.getDocuments()).hasSize(2);
-                assertThat(y.getDocuments().get(0).isExplicit()).isTrue();
+                assertThat(y.getDocuments().getFirst().isExplicit()).isTrue();
             })
           )
         );
@@ -55,7 +55,7 @@ class DocumentTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(y -> {
                 assertThat(y.getDocuments()).hasSize(2);
-                assertThat(y.getDocuments().get(0).getEnd().isExplicit()).isTrue();
+                assertThat(y.getDocuments().getFirst().getEnd().isExplicit()).isTrue();
             })
           )
         );
@@ -68,7 +68,7 @@ class DocumentTest implements RewriteTest {
             "type: specs.openrewrite.org/v1beta/visitor",
             spec -> spec.afterRecipe(y -> {
                 assertThat(y.getDocuments()).hasSize(1);
-                assertThat(y.getDocuments().get(0).isExplicit()).isFalse();
+                assertThat(y.getDocuments().getFirst().isExplicit()).isFalse();
             })
           )
         );
@@ -81,7 +81,7 @@ class DocumentTest implements RewriteTest {
             "type: specs.openrewrite.org/v1beta/visitor",
             spec -> spec.afterRecipe(y -> {
                 assertThat(y.getDocuments()).hasSize(1);
-                assertThat(y.getDocuments().get(0).getEnd().isExplicit()).isFalse();
+                assertThat(y.getDocuments().getFirst().getEnd().isExplicit()).isFalse();
             })
           )
         );

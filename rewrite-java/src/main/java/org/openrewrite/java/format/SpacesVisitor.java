@@ -869,7 +869,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 spaceAfter(m.getPadding().getContaining(), style.getAroundOperators().getMethodReferenceDoubleColon())
         );
         if (m.getPadding().getTypeParameters() != null) {
-            m.getPadding().withTypeParameters(spaceBefore(m.getPadding().getTypeParameters(), style.getAroundOperators().getMethodReferenceDoubleColon()));
+            m = m.getPadding().withTypeParameters(spaceBefore(m.getPadding().getTypeParameters(), style.getAroundOperators().getMethodReferenceDoubleColon()));
         } else {
             m = m.getPadding().withReference(
                     spaceBefore(m.getPadding().getReference(), style.getAroundOperators().getMethodReferenceDoubleColon())

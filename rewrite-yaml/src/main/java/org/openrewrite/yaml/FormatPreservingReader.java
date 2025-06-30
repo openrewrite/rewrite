@@ -104,7 +104,7 @@ class FormatPreservingReader extends Reader {
             end = indexes[end + 1] - 1;
         }
 
-        int length = end - start + 1;
+        int length = Math.min(end - start + 1, buffer.size() - start + bufferIndex);
         char[] readBuff = new char[length];
         for (int i = 0; i < length; i++) {
             int bufferOffset = start + i - bufferIndex;
@@ -119,7 +119,7 @@ class FormatPreservingReader extends Reader {
         if (read > 0) {
             buffer.ensureCapacity(buffer.size() + read);
             for (int i = 0; i < read; i++) {
-                char e = cbuf[i];
+                char e = cbuf[off + i];
                 buffer.add(e);
             }
         }

@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.marker.ci.GithubActionsBuildEnvironment;
 import org.openrewrite.maven.search.FindPlugin;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
@@ -155,7 +154,7 @@ public class UpgradePluginVersion extends Recipe {
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId,
                                                                 String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
-                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadPluginMetadata(groupId, artifactId, ctx));
                 Collection<String> availableVersions = new ArrayList<>();
                 for (String v : mavenMetadata.getVersioning().getVersions()) {
                     if (versionComparator.isValid(currentVersion, v)) {

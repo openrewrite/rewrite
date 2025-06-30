@@ -38,6 +38,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.style.Style;
 
 import java.nio.file.Paths;
 import java.util.Optional;
@@ -158,7 +159,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     GradleSettings gradleSettings = maybeGradleSettings.get();
 
                     try {
-                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, null, gradleSettings), ctx);
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(metadataFailures, null, gradleSettings), ctx);
                         if (newVersion == null) {
                             return cu;
                         }
@@ -183,7 +184,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     GradleProject gradleProject = maybeGradleProject.get();
 
                     try {
-                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, gradleProject, null), ctx);
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(metadataFailures, gradleProject, null), ctx);
                         if (newVersion == null) {
                             return cu;
                         }
@@ -314,7 +315,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
     }
 
     private static String getIndent(G.CompilationUnit cu) {
-        TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class, IntelliJ.tabsAndIndents());
+        TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
         if (style.getUseTabCharacter()) {
             return "\t";
         } else {

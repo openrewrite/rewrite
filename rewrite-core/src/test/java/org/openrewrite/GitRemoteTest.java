@@ -51,6 +51,8 @@ public class GitRemoteTest {
       https://org@dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
       https://dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
       git@ssh.dev.azure.com:v3/org/project/repo, dev.azure.com, org/project/repo, org/project, repo
+      
+      https://github.com/group/repo with spaces, github.com, group/repo with spaces, group, repo with spaces
       """)
     void parseKnownRemotes(String cloneUrl, String expectedOrigin, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
         GitRemote.Parser parser = new GitRemote.Parser();

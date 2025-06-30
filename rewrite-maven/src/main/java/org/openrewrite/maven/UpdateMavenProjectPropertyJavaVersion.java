@@ -1,11 +1,11 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Moderne Source Available License (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://docs.moderne.io/licensing/moderne-source-available-license
+ * https://www.apache.org/licenses/LICENSE-2.0
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -86,7 +87,28 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 Xml.Document d = super.visitDocument(document, ctx);
 
                 // Return early if the parent appears to be within the current repository, as properties defined there will be updated
-                if (getResolutionResult().parentPomIsProjectPom()) {
+                if (getResolutionResult().getParent() != null && getResolutionResult().parentPomIsProjectPom()) {
+                    // Unless the plugin config in the parent defines source/target/release with a property
+                    for (Plugin plugin : getResolutionResult().getParent().getPom().getPlugins()) {
+                        if (plugin.getGroupId().equals("org.apache.maven.plugins") && plugin.getArtifactId().equals("maven-compiler-plugin") && plugin.getConfiguration() != null) {
+                            for (String property : JAVA_VERSION_PROPERTIES) {
+                                if (getResolutionResult().getPom().getProperties().get(property) != null) {
+                                    try {
+                                        float parsed = Float.parseFloat(getResolutionResult().getPom().getProperties().get(property));
+                                        if (parsed < version &&
+                                            ((plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
+                                            (plugin.getConfiguration().get("target") != null && plugin.getConfiguration().get("target").textValue().contains(property)) ||
+                                            (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property)))) {
+                                            d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
+                                                    .visitNonNull(d, ctx);
+                                            maybeUpdateModel();
+                                        }
+                                    } catch (NumberFormatException ignored) {
+                                    }
+                                }
+                            }
+                        }
+                    }
                     return d;
                 }
 

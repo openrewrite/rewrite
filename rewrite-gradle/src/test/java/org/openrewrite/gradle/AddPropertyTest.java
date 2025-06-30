@@ -111,4 +111,75 @@ class AddPropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addOnlyToSpecifiedFilePatternWithDotSlashPrefix() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty("org.gradle.caching", "true", true, "./gradle.properties")),
+          buildGradle("plugins { id 'java' }"),
+          properties(
+            //language=properties
+            """
+            aaa=true
+            zzz=true
+            """,
+            //language=properties
+            """
+              aaa=true
+              org.gradle.caching=true
+              zzz=true
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          dir("project1",
+            properties(
+              "project1.prop=true",
+              spec -> spec.path("gradle.properties")
+            )
+          ),
+          dir("project2",
+            properties(
+              "project2.prop=true",
+              spec -> spec.path("gradle.properties")
+            )
+          )
+        );
+    }
+
+    @Test
+    void addPropertyAfterDeleteProperty() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: org.openrewrite.testsuite.AddPropertyAfterDeleteProperty
+                displayName: test
+                description: test.
+                recipeList:
+                  - org.openrewrite.properties.DeleteProperty:
+                      propertyKey: dog
+                  - org.openrewrite.gradle.AddProperty:
+                      key: cat
+                      value: true
+                      overwrite: true
+              """,
+            "org.openrewrite.testsuite.AddPropertyAfterDeleteProperty"),
+          buildGradle("plugins { id 'java' }"),
+          properties(
+            //language=properties
+            """
+              aaa=true
+              dog=false
+              dog=true
+              zzz=true
+              """,
+            //language=properties
+            """
+              aaa=true
+              cat=true
+              zzz=true
+              """,
+            spec -> spec.path("gradle.properties")
+          ));
+    }
 }

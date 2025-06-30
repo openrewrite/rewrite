@@ -26,16 +26,34 @@ import org.openrewrite.test.RewriteTest;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.Assertions.addTypesToSourceSet;
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.srcMainJava;
-import static org.openrewrite.java.Assertions.version;
+import static org.openrewrite.java.Assertions.*;
 
 class OrderImportsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new OrderImports(false));
+    }
+
+    @DocumentExample
+    @Test
+    void foldIntoStar() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+              import java.util.regex.Pattern;
+              import java.util.Objects;
+              import java.util.Set;
+              import java.util.Map;
+              """,
+            """
+              import java.util.*;
+              import java.util.regex.Pattern;
+              """
+          )
+        );
     }
 
     @Test
@@ -55,27 +73,6 @@ class OrderImportsTest implements RewriteTest {
               import java.util.List;
               
               class Test {}
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void foldIntoStar() {
-        rewriteRun(
-          java(
-            """
-              import java.util.List;
-              import java.util.ArrayList;
-              import java.util.regex.Pattern;
-              import java.util.Objects;
-              import java.util.Set;
-              import java.util.Map;
-              """,
-            """
-              import java.util.*;
-              import java.util.regex.Pattern;
               """
           )
         );

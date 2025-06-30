@@ -16,15 +16,18 @@
 package org.openrewrite.xml.style;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.table.XmlStyleReport;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
 
 import static java.util.Objects.requireNonNull;
 
@@ -50,7 +53,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
         private TabsAndIndentsStyle overallProjectStyle;
         TabsAndIndentsStyle overallProjectStyle() {
             if(overallProjectStyle == null) {
-                overallProjectStyle = requireNonNull(NamedStyles.merge(TabsAndIndentsStyle.class, Collections.singletonList(overallDetector.build())));
+                overallProjectStyle = requireNonNull(overallDetector.build().getStyle(TabsAndIndentsStyle.class));
             }
             return overallProjectStyle;
         }
@@ -109,7 +112,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Autodetect.Detector detector = new Autodetect.Detector();
                 detector.sample(document);
-                currentDocumentStyle = requireNonNull(NamedStyles.merge(TabsAndIndentsStyle.class, Collections.singletonList(detector.build())));
+                currentDocumentStyle = requireNonNull(detector.build().getStyle(TabsAndIndentsStyle.class));
                 super.visitDocument(document, ctx);
 
                 report.insertRow(ctx, new XmlStyleReport.Row(

@@ -65,6 +65,24 @@ class SwitchPatternMatchingTest implements RewriteTest {
     }
 
     @Test
+    void shouldSupportParsingNullSwitchCombined() {
+        rewriteRun(
+          java(
+            //language=java
+            """
+              class Test {
+                void fooBarWithNull(String s) {
+                    switch (s) {
+                        case "Foo", "Bar" -> System.out.println("Great");
+                        case null, default -> System.out.println("Ok");
+                    }
+                }
+              }
+              """
+          ));
+    }
+
+    @Test
     void shouldParseJava21EnumSupportInSwitch() {
         rewriteRun(
           java(
@@ -146,6 +164,29 @@ class SwitchPatternMatchingTest implements RewriteTest {
                            case Integer j when (j - 1) > -1 -> System.out.println("pos");
                            case Integer j -> System.out.println("others");
                        }
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void shouldParseRecordPatternMatchingInSwitch() {
+        rewriteRun(
+          java(
+            //language=java
+            """
+              class Test {
+                  public interface Printable {}
+                  record A(String A) implements Printable {}
+                  record B(Integer B) implements Printable {}
+              
+                  void integerTester(Printable prt) {
+                      switch (prt) {
+                          case A(String a) -> System.out.println(a);
+                          case B(Integer b) -> System.out.println(b);
+                          default -> throw new IllegalStateException("Unexpected value: " + prt);
+                      }
                   }
               }
               """

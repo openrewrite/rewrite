@@ -158,8 +158,8 @@ class FindTypesTest implements RewriteTest {
           spec -> spec.recipe(new FindTypes("java.util.Collection", true))
             .dataTable(TypeUses.Row.class, rows -> {
                 assertThat(rows).hasSize(1);
-                assertThat(rows.get(0).getConcreteType()).isEqualTo("java.util.List");
-                assertThat(rows.get(0).getCode()).isEqualTo("List<String>");
+                assertThat(rows.getFirst().getConcreteType()).isEqualTo("java.util.List");
+                assertThat(rows.getFirst().getCode()).isEqualTo("List<String>");
             }),
           java(
             """

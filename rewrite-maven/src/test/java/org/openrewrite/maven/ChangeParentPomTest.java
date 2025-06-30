@@ -81,7 +81,7 @@ class ChangeParentPomTest implements RewriteTest {
     }
 
     @Test
-    void changeParentShouldResolveDependenciesMangementWithMavenProperties() {
+    void changeParentShouldResolveDependenciesManagementWithMavenProperties() {
         rewriteRun(
           spec -> spec.recipe(new ChangeParentPom(
             "org.jenkins-ci.plugins",
@@ -128,6 +128,11 @@ class ChangeParentPomTest implements RewriteTest {
                  </dependencies>
                   <repositories>
                       <repository>
+                        <id>central</id>
+                        <name>Central Repository</name>
+                        <url>https://repo.maven.apache.org/maven2</url>
+                      </repository>
+                      <repository>
                           <id>repo.jenkins-ci.org</id>
                           <url>https://repo.jenkins-ci.org/public/</url>
                       </repository>
@@ -166,6 +171,11 @@ class ChangeParentPomTest implements RewriteTest {
                      </dependency>
                  </dependencies>
                   <repositories>
+                      <repository>
+                        <id>central</id>
+                        <name>Central Repository</name>
+                        <url>https://repo.maven.apache.org/maven2</url>
+                      </repository>
                       <repository>
                           <id>repo.jenkins-ci.org</id>
                           <url>https://repo.jenkins-ci.org/public/</url>
@@ -1246,6 +1256,64 @@ class ChangeParentPomTest implements RewriteTest {
             );
         }
 
+        @Test
+        void preservesOwnDefinedProperty() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeParentPom(
+                "org.springframework.boot", "org.springframework.boot",
+                "spring-boot-dependencies", "spring-boot-dependencies",
+                "3.2.4",
+                null, null, null, null)),
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany</groupId>
+                      <artifactId>child</artifactId>
+                      <version>1.0.0-SNAPSHOT</version>
+                      <parent>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-dependencies</artifactId>
+                          <version>2.4.0</version>
+                      </parent>
+                      <properties>
+                          <servlet-api.version>4.0.0</servlet-api.version>
+                      </properties>
+                      <dependencies>
+                        <dependency>
+                          <groupId>javax.servlet</groupId>
+                          <artifactId>javax.servlet-api</artifactId>
+                          <version>${servlet-api.version}</version>
+                        </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany</groupId>
+                      <artifactId>child</artifactId>
+                      <version>1.0.0-SNAPSHOT</version>
+                      <parent>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-dependencies</artifactId>
+                          <version>3.2.4</version>
+                      </parent>
+                      <properties>
+                          <servlet-api.version>4.0.0</servlet-api.version>
+                      </properties>
+                      <dependencies>
+                        <dependency>
+                          <groupId>javax.servlet</groupId>
+                          <artifactId>javax.servlet-api</artifactId>
+                          <version>${servlet-api.version}</version>
+                        </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
 
         @Test
         void bringsDownRemovedProperty() {
@@ -1298,7 +1366,8 @@ class ChangeParentPomTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                   </project>
-                  """)
+                  """
+              )
             );
         }
 
@@ -1357,7 +1426,8 @@ class ChangeParentPomTest implements RewriteTest {
                         </dependency>
                       </dependencies>
                   </project>
-                  """)
+                  """
+              )
             );
         }
     }
@@ -1529,7 +1599,8 @@ class ChangeParentPomTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>
-              """)
+              """
+          )
         );
     }
 
@@ -1553,6 +1624,11 @@ class ChangeParentPomTest implements RewriteTest {
                       <jenkins.version>2.387.3</jenkins.version>
                   </properties>
                   <repositories>
+                    <repository>
+                        <id>central</id>
+                        <name>Central Repository</name>
+                        <url>https://repo.maven.apache.org/maven2</url>
+                    </repository>
                       <repository>
                           <id>repo.jenkins-ci.org</id>
                           <url>https://repo.jenkins-ci.org/public/</url>
@@ -1597,6 +1673,11 @@ class ChangeParentPomTest implements RewriteTest {
                       <jenkins.version>2.387.3</jenkins.version>
                   </properties>
                   <repositories>
+                    <repository>
+                        <id>central</id>
+                        <name>Central Repository</name>
+                        <url>https://repo.maven.apache.org/maven2</url>
+                    </repository>
                       <repository>
                           <id>repo.jenkins-ci.org</id>
                           <url>https://repo.jenkins-ci.org/public/</url>
@@ -1628,53 +1709,6 @@ class ChangeParentPomTest implements RewriteTest {
               </project>
               """
           ));
-    }
-
-    @Test
-    void doesNotAddMavenDefaultProperties() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
-          pomXml(
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>org.sample</groupId>
-                <artifactId>sample</artifactId>
-                <version>1.0.0</version>
-              
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.7.17</version>
-                </parent>
-              
-                <properties>
-                  <my-cool-prop>${project.build.directory}</my-cool-prop>
-                </properties>
-              </project>
-              """,
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>org.sample</groupId>
-                <artifactId>sample</artifactId>
-                <version>1.0.0</version>
-              
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.7.18</version>
-                </parent>
-              
-                <properties>
-                  <my-cool-prop>${project.build.directory}</my-cool-prop>
-                </properties>
-              </project>
-              """
-          )
-        );
     }
 
     @Test

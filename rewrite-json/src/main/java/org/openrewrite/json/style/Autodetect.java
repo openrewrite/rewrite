@@ -20,13 +20,16 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.json.JsonVisitor;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
-import org.openrewrite.json.tree.Json;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
@@ -51,13 +54,16 @@ public class Autodetect extends NamedStyles {
 
         private final IndentStatistics indentStatistics = new IndentStatistics();
         private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
+        private final WrappingStatistics wrappingStatistics = new WrappingStatistics();
         private final FindIndentJsonVisitor findIndentVisitor = new FindIndentJsonVisitor();
         private final FindLineFormatJsonVisitor findLineFormatVisitor = new FindLineFormatJsonVisitor();
+        private final ClassifyWrappingJsonVisitor classifyWrappingVisitor = new ClassifyWrappingJsonVisitor();
 
         public Detector sample(SourceFile json) {
             if(json instanceof Json.Document) {
                 findIndentVisitor.visit(json, indentStatistics);
                 findLineFormatVisitor.visit(json, generalFormatStatistics);
+                classifyWrappingVisitor.visit(json, wrappingStatistics);
             }
             return this;
         }
@@ -65,7 +71,9 @@ public class Autodetect extends NamedStyles {
         public Autodetect build() {
             return new Autodetect(Tree.randomId(), Arrays.asList(
                     indentStatistics.getTabsAndIndentsStyle(),
-                    generalFormatStatistics.getFormatStyle()));
+                    generalFormatStatistics.getFormatStyle(),
+                    wrappingStatistics.getWrappingAndBracesStyle()
+                    ));
         }
     }
 
@@ -74,6 +82,40 @@ public class Autodetect extends NamedStyles {
 
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
             return indentFrequencies.getTabsAndIndentsStyle();
+        }
+    }
+
+    private static class GeneralFormatStatistics {
+        private int linesWithCRLFNewLines = 0;
+        private int linesWithLFNewLines = 0;
+
+        public boolean isIndentedWithLFNewLines() {
+            return linesWithLFNewLines >= linesWithCRLFNewLines;
+        }
+
+        public GeneralFormatStyle getFormatStyle() {
+            boolean useCRLF = !isIndentedWithLFNewLines();
+
+            return new GeneralFormatStyle(useCRLF);
+        }
+    }
+
+    private static class WrappingStatistics {
+        private Map<Boolean, AtomicInteger> arraysWrapped = new HashMap<>();
+        private Map<Boolean, AtomicInteger> objectsWrapped = new HashMap<>();
+
+        private WrappingStatistics() {
+            arraysWrapped.put(Boolean.FALSE, new AtomicInteger());
+            arraysWrapped.put(Boolean.TRUE, new AtomicInteger());
+            objectsWrapped.put(Boolean.FALSE, new AtomicInteger());
+            objectsWrapped.put(Boolean.TRUE, new AtomicInteger());
+        }
+
+        private WrappingAndBracesStyle getWrappingAndBracesStyle() {
+            return new WrappingAndBracesStyle(
+                    objectsWrapped.get(Boolean.TRUE).get() >= objectsWrapped.get(Boolean.FALSE).get() ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap,
+                    arraysWrapped.get(Boolean.TRUE).get() >= arraysWrapped.get(Boolean.FALSE).get() ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap
+            );
         }
     }
 
@@ -219,19 +261,25 @@ public class Autodetect extends NamedStyles {
             }
         }
     }
+    private static class ClassifyWrappingJsonVisitor extends JsonVisitor<WrappingStatistics> {
 
-    private static class GeneralFormatStatistics {
-        private int linesWithCRLFNewLines = 0;
-        private int linesWithLFNewLines = 0;
 
-        public boolean isIndentedWithLFNewLines() {
-            return linesWithLFNewLines >= linesWithCRLFNewLines;
+        @Override
+        public Json visitArray(Json.Array array, WrappingStatistics wrappingStatistics) {
+            for (JsonValue value: array.getValues()) {
+                boolean isWrapped = value.getPrefix().getWhitespace().contains("\n");
+                wrappingStatistics.arraysWrapped.get(isWrapped).incrementAndGet();
+            }
+            return super.visitArray(array, wrappingStatistics);
         }
 
-        public GeneralFormatStyle getFormatStyle() {
-            boolean useCRLF = !isIndentedWithLFNewLines();
-
-            return new GeneralFormatStyle(useCRLF);
+        @Override
+        public Json visitObject(Json.JsonObject obj, WrappingStatistics wrappingStatistics) {
+            for (Json member: obj.getMembers()) {
+                boolean isWrapped = member.getPrefix().getWhitespace().contains("\n");
+                wrappingStatistics.objectsWrapped.get(isWrapped).incrementAndGet();
+            }
+            return super.visitObject(obj, wrappingStatistics);
         }
     }
 }

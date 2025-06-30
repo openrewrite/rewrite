@@ -16,42 +16,48 @@
 package org.openrewrite.json.format;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
+import org.openrewrite.json.style.WrappingAndBracesStyle;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.json.tree.Space;
+import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.LineWrapSetting;
 
-import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.List;
+import java.util.Optional;
+
+import static java.util.Collections.emptyList;
 
 public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
-
-    private final TabsAndIndentsStyle style;
+    private final String singleIndent;
+    private final GeneralFormatStyle generalFormatStyle;
+    private final WrappingAndBracesStyle wrappingAndBracesStyle;
 
     @Nullable
     private final Tree stopAfter;
 
-    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, @Nullable Tree stopAfter) {
-        this.style = style;
+    public TabsAndIndentsVisitor(WrappingAndBracesStyle wrappingAndBracesStyle,
+                                 TabsAndIndentsStyle tabsAndIndentsStyle,
+                                 GeneralFormatStyle generalFormatStyle,
+                                 @Nullable Tree stopAfter) {
         this.stopAfter = stopAfter;
+
+        this.singleIndent = tabsAndIndentsStyle.singleIndent();
+        this.wrappingAndBracesStyle = wrappingAndBracesStyle;
+        this.generalFormatStyle = generalFormatStyle;
     }
 
     @Override
     public Json preVisit(Json tree, P p) {
         Json json = super.preVisit(tree, p);
-        if (json != null) {
-            final String ws = json.getPrefix().getWhitespace();
-            if (ws.contains("\n")) {
-                int indentMultiple = (int) getCursor().getPathAsStream().filter(Json.JsonObject.class::isInstance).count();
-                String shiftedPrefix = createIndent(ws, indentMultiple);
-                if (!shiftedPrefix.equals(ws)) {
-                    return json.withPrefix(json.getPrefix().withWhitespace(shiftedPrefix));
-                }
-            }
+        if (tree instanceof Json.JsonObject || tree instanceof Json.Array) {
+            String newIndent = getCurrentIndent() + this.singleIndent;
+            getCursor().putMessage("indentToUse", newIndent);
         }
         return json;
     }
@@ -69,21 +75,75 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Json) tree;
         }
-        return super.visit(tree, p);
-    }
+        Json json = super.visit(tree, p);
 
-    private String createIndent(String ws, int indentMultiple) {
-        StringBuilder shiftedPrefixBuilder = new StringBuilder(ws.substring(0, ws.lastIndexOf('\n') + 1));
-        for (int i = 0; i < indentMultiple; i++) {
-            if (style.getUseTabCharacter()) {
-                shiftedPrefixBuilder.append("\t");
-            } else {
-                for (int j = 0; j < style.getIndentSize(); j++) {
-                    shiftedPrefixBuilder.append(" ");
+        final String relativeIndent = getCurrentIndent();
+
+        if (json != null) {
+            final String ws = json.getPrefix().getWhitespace();
+            if (ws.contains("\n")) {
+                String shiftedPrefix = combineIndent(ws, relativeIndent);
+                if (!shiftedPrefix.equals(ws)) {
+                    json = json.withPrefix(json.getPrefix().withWhitespace(shiftedPrefix));
                 }
             }
         }
+        if (json instanceof Json.JsonObject) {
+            Json.JsonObject obj = (Json.JsonObject) json;
+            List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
+            LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapObjects();
+            if (!WrappingAndBracesVisitor.isEmpty(members)) {
+                members = applyWrappingStyleToLastChildSuffix(members, wrappingSetting, relativeIndent);
+            }
+            json = obj.getPadding().withMembers(members);
+        }
 
-        return shiftedPrefixBuilder.toString();
+        if (json instanceof Json.Array) {
+            Json.Array array = (Json.Array) json;
+            List<JsonRightPadded<JsonValue>> members = array.getPadding().getValues();
+            LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapArrays();
+            if (!WrappingAndBracesVisitor.isEmpty(members)) {
+                members = applyWrappingStyleToLastChildSuffix(members, wrappingSetting, relativeIndent);
+            }
+            json = array.getPadding().withValues(members);
+        }
+
+        return json;
+    }
+
+    private <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToLastChildSuffix(List<JsonRightPadded<JS>> elements, LineWrapSetting wrapping, String relativeIndent) {
+        return ListUtils.mapLast(elements, elem -> {
+            String currentAfter = elem.getAfter().getWhitespace();
+            final String newAfter;
+            if (wrapping == LineWrapSetting.DoNotWrap) {
+                newAfter = "";
+            } else if (wrapping == LineWrapSetting.WrapAlways) {
+                newAfter = this.generalFormatStyle.newLine() + relativeIndent;
+            } else {
+                throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
+            }
+            if (!newAfter.equals(currentAfter) && elem.getAfter().getComments().isEmpty()) {
+                return elem.withAfter(Space.build(newAfter, emptyList()));
+            } else {
+                return elem;
+            }
+        });
+    }
+
+    private String getCurrentIndent() {
+        String ret = getCursor().getNearestMessage("indentToUse");
+        if (ret == null) {
+            // This is basically the first object we visit, not necessarily the root-level object as we might be
+            // visiting only partial tree.
+            Optional<Json> containingNode = getCursor().getPathAsStream().filter(obj ->
+                    (obj instanceof Json) && ((Json) obj).getPrefix().getWhitespace().contains("\n")
+            ).findFirst().map(obj -> (Json) obj);
+            return containingNode.map(node -> node.getPrefix().getWhitespaceIndent()).orElse("");
+        }
+        return ret;
+    }
+
+    private String combineIndent(String oldWs, String relativeIndent) {
+        return oldWs.substring(0, oldWs.lastIndexOf('\n') + 1) + relativeIndent;
     }
 }

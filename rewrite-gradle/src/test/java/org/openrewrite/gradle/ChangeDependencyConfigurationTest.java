@@ -388,4 +388,69 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void onlyIfConfigurationMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyConfiguration("*", "*", "testImplementation", "testRuntimeOnly")),
+          mavenProject("root",
+            settingsGradle(
+              """
+                rootProject.name = "root"
+                
+                include "project1"
+                include "project2"
+                """
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    implementation 'org.openrewrite:rewrite-maven:latest.release'
+                    implementation project(':project1')
+                    testRuntimeOnly 'org.openrewrite:rewrite-gradle:latest.release'
+                    testRuntimeOnly project(':project2')
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    implementation 'org.openrewrite:rewrite-maven:latest.release'
+                    implementation project(':project1')
+                    testImplementation 'org.openrewrite:rewrite-gradle:latest.release'
+                    testImplementation project(':project2')
+                }
+                """
+            ),
+            mavenProject("project1",
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                  }
+                  """
+              )
+            ),
+            mavenProject("project2",
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                  }
+                  """
+              )
+            )
+          )
+        );
+    }
 }

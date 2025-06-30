@@ -79,11 +79,8 @@ public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLo
                     throw new UncheckedIOException(e);
                 }
             }
-            return null;
         }
-
         return null;
-
     }
 
     /**

@@ -39,15 +39,13 @@ class DependencyInsightTest implements RewriteTest {
     void findTransitiveDependency() {
         rewriteRun(
           buildGradle(
-                """
+            """
               plugins {
                   id 'java-library'
               }
-                            
               repositories {
                   mavenCentral()
               }
-                            
               dependencies {
                   implementation 'com.google.guava:guava:31.1-jre'
               }
@@ -56,11 +54,9 @@ class DependencyInsightTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                            
               repositories {
                   mavenCentral()
               }
-                            
               dependencies {
                   /*~~(com.google.guava:failureaccess:1.0.1)~~>*/implementation 'com.google.guava:guava:31.1-jre'
               }
@@ -72,33 +68,34 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findPluginDependencyAndAddToDependencyClosure() {
         rewriteRun(
-          buildGradle("""
-            plugins {
-                id 'groovy-gradle-plugin'
-            }
-            repositories {
-                gradlePluginPortal()
-            }
-              """, spec -> spec.path("buildSrc/build.gradle")),
-          groovy(
-                """
-            plugins{
-                id "java"
-            }
-            dependencies{
-                implementation 'com.google.guava:guava:31.1-jre'
-            }
-            """, spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
           buildGradle(
-                """
+            """
+              plugins {
+                  id 'groovy-gradle-plugin'
+              }
+              repositories {
+                  gradlePluginPortal()
+              }
+              """,
+            spec -> spec.path("buildSrc/build.gradle")),
+          groovy(
+            """
+              plugins{
+                  id "java"
+              }
+              dependencies{
+                  implementation 'com.google.guava:guava:31.1-jre'
+              }
+              """,
+            spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
+          buildGradle(
+            """
               plugins {
                   id 'convention-plugin'
               }
-                            
               repositories {
                   mavenCentral()
               }
-                            
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:8.0.0'
               }
@@ -107,11 +104,9 @@ class DependencyInsightTest implements RewriteTest {
               plugins {
                   id 'convention-plugin'
               }
-                            
               repositories {
                   mavenCentral()
               }
-                            
               /*~~(com.google.guava:failureaccess:1.0.1)~~>*/dependencies {
                   implementation 'org.openrewrite:rewrite-java:8.0.0'
               }
@@ -123,29 +118,31 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findPluginDependencyAndAddToRoot() {
         rewriteRun(
-          buildGradle("""
-            plugins {
-                id 'groovy-gradle-plugin'
-            }
-            repositories {
-                gradlePluginPortal()
-            }
-              """, spec -> spec.path("buildSrc/build.gradle")),
-          groovy(
-                """
-            plugins{
-                id "java"
-            }
-            dependencies{
-                implementation 'com.google.guava:guava:31.1-jre'
-            }
-            """, spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
           buildGradle(
-                """
+            """
+              plugins {
+                  id 'groovy-gradle-plugin'
+              }
+              repositories {
+                  gradlePluginPortal()
+              }
+              """,
+            spec -> spec.path("buildSrc/build.gradle")),
+          groovy(
+            """
+              plugins{
+                  id "java"
+              }
+              dependencies{
+                  implementation 'com.google.guava:guava:31.1-jre'
+              }
+              """,
+            spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
+          buildGradle(
+            """
               plugins {
                   id 'convention-plugin'
               }
-                            
               repositories {
                   mavenCentral()
               }
@@ -154,7 +151,6 @@ class DependencyInsightTest implements RewriteTest {
               /*~~(com.google.guava:failureaccess:1.0.1)~~>*/plugins {
                   id 'convention-plugin'
               }
-                            
               repositories {
                   mavenCentral()
               }
@@ -168,19 +164,17 @@ class DependencyInsightTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("doesnotexist", "doesnotexist", null, null)),
           buildGradle(
-                """
-            plugins {
-                id 'java-library'
-            }
-                          
-            repositories {
-                mavenCentral()
-            }
-                          
-            dependencies {
-                implementation 'io.grpc:grpc-services:1.59.0'
-            }
             """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'io.grpc:grpc-services:1.59.0'
+              }
+              """
           )
         );
     }
@@ -191,21 +185,19 @@ class DependencyInsightTest implements RewriteTest {
           spec -> spec.recipe(new DependencyInsight("*", "jackson-core", null, null))
             .dataTable(DependenciesInUse.Row.class, rows -> {
                 assertThat(rows).isNotEmpty();
-                DependenciesInUse.Row row = rows.get(0);
+                DependenciesInUse.Row row = rows.getFirst();
                 assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.core");
                 assertThat(row.getArtifactId()).isEqualTo("jackson-core");
                 assertThat(row.getVersion()).isEqualTo("2.13.4");
             }),
           buildGradle(
-                """
+            """
               plugins {
                   id 'java-library'
               }
-                            
               repositories {
                   mavenCentral()
               }
-                            
               dependencies {
                   implementation 'org.openrewrite:rewrite-core:7.39.1'
               }
@@ -214,11 +206,9 @@ class DependencyInsightTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                            
               repositories {
                   mavenCentral()
               }
-                            
               dependencies {
                   /*~~(com.fasterxml.jackson.core:jackson-core:2.13.4)~~>*/implementation 'org.openrewrite:rewrite-core:7.39.1'
               }
@@ -232,15 +222,13 @@ class DependencyInsightTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("org.openrewrite", "*", "7.0.0", null)),
           buildGradle(
-                """
+            """
               plugins {
                   id 'java-library'
               }
-                            
               repositories {
                   mavenCentral()
               }
-                            
               dependencies {
                   implementation 'org.openrewrite:rewrite-yaml:7.0.0'
                   implementation 'org.openrewrite:rewrite-java:8.0.0'
@@ -250,14 +238,209 @@ class DependencyInsightTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                            
               repositories {
                   mavenCentral()
               }
-                            
               dependencies {
                   /*~~(org.openrewrite:rewrite-yaml:7.0.0)~~>*/implementation 'org.openrewrite:rewrite-yaml:7.0.0'
                   implementation 'org.openrewrite:rewrite-java:8.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedDependenciesAreTransitivelySearchedForMatchingDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("org.springframework.boot", "*", null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                assertThat(rows).isNotEmpty();
+                DependenciesInUse.Row row = rows.getFirst();
+                assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-web");
+                assertThat(row.getDepth()).isEqualTo(0);
+                row = rows.get(4);
+                assertThat(row.getArtifactId()).isEqualTo("spring-boot");
+                assertThat(row.getDepth()).isEqualTo(4);
+            }),
+          buildGradle(
+            """
+              buildscript {
+              	    ext {
+              	    	springBootVersion = '2.6.6'
+              	    }
+              	    dependencies {
+              	        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
+              	    }
+              	    repositories {
+              	        mavenCentral()
+              	    }
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+              apply plugin: 'java'
+              
+              java {
+                  sourceCompatibility = '11'
+              }
+              
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-web'
+                  implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
+                  implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+              }
+              """,
+            """
+              buildscript {
+              	    ext {
+              	    	springBootVersion = '2.6.6'
+              	    }
+              	    dependencies {
+              	        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
+              	    }
+              	    repositories {
+              	        mavenCentral()
+              	    }
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+              apply plugin: 'java'
+              
+              java {
+                  sourceCompatibility = '11'
+              }
+              
+              dependencies {
+                  /*~~(org.springframework.boot:spring-boot-starter-web:2.6.6,org.springframework.boot:spring-boot-starter:2.6.6,org.springframework.boot:spring-boot-autoconfigure:2.6.6,org.springframework.boot:spring-boot-starter-json:2.6.6,org.springframework.boot:spring-boot:2.6.6,org.springframework.boot:spring-boot-starter-tomcat:2.6.6,org.springframework.boot:spring-boot-starter-logging:2.6.6)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
+                  /*~~(org.springframework.boot:spring-boot-starter-actuator:2.6.4,org.springframework.boot:spring-boot-starter:2.6.6,org.springframework.boot:spring-boot-autoconfigure:2.6.6,org.springframework.boot:spring-boot:2.6.6,org.springframework.boot:spring-boot-actuator-autoconfigure:2.6.6,org.springframework.boot:spring-boot-starter-logging:2.6.6,org.springframework.boot:spring-boot-actuator:2.6.6)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
+                  /*~~(org.springframework.boot:spring-boot-dependencies:2.6.15,org.springframework.boot:spring-boot:2.6.6)~~>*/implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void jacksonIsFoundInternally() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("com.fasterxml.jackson.*", "*", null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                assertThat(rows).isNotEmpty();
+                DependenciesInUse.Row row = rows.getFirst();
+                assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.datatype");
+                assertThat(row.getArtifactId()).isEqualTo("jackson-datatype-jsr310");
+                assertThat(row.getDepth()).isEqualTo(2);
+                row = rows.get(4);
+                assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.core");
+                assertThat(row.getArtifactId()).isEqualTo("jackson-core");
+                assertThat(row.getDepth()).isEqualTo(3);
+            }),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = '2.6.6'
+                  }
+                  dependencies {
+                      classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+              apply plugin: 'java'
+              
+              java {
+                  sourceCompatibility = '11'
+              }
+              
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-web'
+                  implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
+                  implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+              }
+              """,
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = '2.6.6'
+                  }
+                  dependencies {
+                      classpath("org.springframework.boot:spring-boot-gradle-plugin:2.6.6")
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+              apply plugin: 'java'
+              
+              java {
+                  sourceCompatibility = '11'
+              }
+              
+              dependencies {
+                  /*~~(com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
+                  /*~~(com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
+                  /*~~(com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void duplicateDependencies() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()).recipe(new DependencyInsight("org.projectlombok", "lombok", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  compileOnly("org.projectlombok:lombok:1.18.38")
+                  annotationProcessor("org.projectlombok:lombok:1.18.38")
+              
+                  testCompileOnly("org.projectlombok:lombok:1.18.38")
+                  testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  /*~~(org.projectlombok:lombok:1.18.38)~~>*/compileOnly("org.projectlombok:lombok:1.18.38")
+                  /*~~(org.projectlombok:lombok:1.18.38)~~>*/annotationProcessor("org.projectlombok:lombok:1.18.38")
+              
+                  /*~~(org.projectlombok:lombok:1.18.38)~~>*/testCompileOnly("org.projectlombok:lombok:1.18.38")
+                  /*~~(org.projectlombok:lombok:1.18.38)~~>*/testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
               }
               """
           )

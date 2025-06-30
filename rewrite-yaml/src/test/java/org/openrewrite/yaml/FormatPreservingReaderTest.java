@@ -25,38 +25,78 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FormatPreservingReaderTest {
 
     @Test
-    void allInCurrentBuffer() throws IOException {
-        var text = "0123456789";
-        var formatPreservingReader = new FormatPreservingReader(text);
+    void readWithOffset() throws IOException {
+        try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
+            char[] charArray = new char[10];
+            formatPreservingReader.read(charArray, 3, 5);
+            assertThat(formatPreservingReader.prefix(0, 5)).isEqualTo("01234");
+        }
+    }
 
-        char[] charArray = new char[10];
-        formatPreservingReader.read(charArray, 0, 10);
-        assertThat(formatPreservingReader.prefix(0, 3)).isEqualTo("012");
+    @Test
+    void allInCurrentBuffer() throws IOException {
+        try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
+            char[] charArray = new char[10];
+            formatPreservingReader.read(charArray, 0, 10);
+            assertThat(formatPreservingReader.prefix(0, 3)).isEqualTo("012");
+        }
+    }
+
+    @Test
+    void stringAllInCurrentBuffer() throws IOException {
+        try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
+            char[] charArray = new char[10];
+            formatPreservingReader.read(charArray, 0, 10);
+            assertThat(formatPreservingReader.readStringFromBuffer(0, 3)).isEqualTo("0123");
+        }
+    }
+
+    @Test
+    void stringAtEndOfCurrentBuffer() throws IOException {
+        try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
+            char[] charArray = new char[10];
+            formatPreservingReader.read(charArray, 0, 10);
+            assertThat(formatPreservingReader.readStringFromBuffer(8, 10)).isEqualTo("89");
+        }
     }
 
     @Test
     void allInPreviousBuffer() throws IOException {
-        var text = "0123456789";
-        var formatPreservingReader = new FormatPreservingReader(text);
+        try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
+            char[] charArray = new char[10];
+            formatPreservingReader.read(charArray, 0, 5);
+            formatPreservingReader.read(charArray, 0, 5);
+            assertThat(formatPreservingReader.prefix(0, 3)).isEqualTo("012");
+        }
+    }
 
-        char[] charArray = new char[10];
-
-        formatPreservingReader.read(charArray, 0, 5);
-        formatPreservingReader.read(charArray, 0, 5);
-
-        assertThat(formatPreservingReader.prefix(0, 3)).isEqualTo("012");
+    @Test
+    void stringAllInPreviousBuffer() throws IOException {
+        try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
+            char[] charArray = new char[10];
+            formatPreservingReader.read(charArray, 0, 5);
+            formatPreservingReader.read(charArray, 0, 5);
+            assertThat(formatPreservingReader.readStringFromBuffer(0, 3)).isEqualTo("0123");
+        }
     }
 
     @Test
     void splitBetweenPrevAndCurrentBuffer() throws IOException {
-        var text = "0123456789";
-        var formatPreservingReader = new FormatPreservingReader(text);
+        try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
+            char[] charArray = new char[10];
+            formatPreservingReader.read(charArray, 0, 1);
+            formatPreservingReader.read(charArray, 0, 9);
+            assertThat(formatPreservingReader.prefix(0, 3)).isEqualTo("012");
+        }
+    }
 
-        char[] charArray = new char[10];
-
-        formatPreservingReader.read(charArray, 0, 1);
-        formatPreservingReader.read(charArray, 0, 9);
-
-        assertThat(formatPreservingReader.prefix(0, 3)).isEqualTo("012");
+    @Test
+    void stringSplitBetweenPrevAndCurrentBuffer() throws IOException {
+        try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
+            char[] charArray = new char[10];
+            formatPreservingReader.read(charArray, 0, 1);
+            formatPreservingReader.read(charArray, 0, 9);
+            assertThat(formatPreservingReader.readStringFromBuffer(0, 3)).isEqualTo("0123");
+        }
     }
 }

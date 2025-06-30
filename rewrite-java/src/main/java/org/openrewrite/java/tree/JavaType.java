@@ -15,12 +15,10 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.annotation.*;
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -48,6 +46,7 @@ public interface JavaType {
     Method[] EMPTY_METHOD_ARRAY = new Method[0];
     String[] EMPTY_STRING_ARRAY = new String[0];
     JavaType[] EMPTY_JAVA_TYPE_ARRAY = new JavaType[0];
+    Annotation.ElementValue[] EMPTY_ANNOTATION_VALUE_ARRAY = new Annotation.ElementValue[0];
 
     // TODO: To be removed with OpenRewrite 9
     default @Nullable Integer getManagedReference() {
@@ -360,6 +359,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With(AccessLevel.NONE)
@@ -629,11 +629,159 @@ public interface JavaType {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    class Annotation extends FullyQualified {
+
+        @Getter
+        @With
+        final FullyQualified type;
+
+        final ElementValue @Nullable [] values;
+
+        public Annotation(FullyQualified type, List<ElementValue> values) {
+            this(type, arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY));
+        }
+
+        @JsonCreator
+        Annotation(FullyQualified type, ElementValue @Nullable [] values) {
+            this.type = type;
+            this.values = nullIfEmpty(values);
+        }
+
+        public List<ElementValue> getValues() {
+            return values == null ? emptyList() : Arrays.asList(values);
+        }
+
+        public Annotation withValues(@Nullable List<ElementValue> values) {
+            ElementValue[] valuesArray = arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY);
+            if (Arrays.equals(valuesArray, this.values)) {
+                return this;
+            }
+            return new Annotation(type, valuesArray);
+        }
+
+        @Override
+        public String getFullyQualifiedName() {
+            return type.getFullyQualifiedName();
+        }
+
+        @Override
+        public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
+            return withType(type.withFullyQualifiedName(fullyQualifiedName));
+        }
+
+        @Override
+        public List<FullyQualified> getAnnotations() {
+            return type.getAnnotations();
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return type.hasFlags(test);
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return type.getFlags();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return type.getInterfaces();
+        }
+
+        @Override
+        public Kind getKind() {
+            return type.getKind();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return type.getMembers();
+        }
+
+        @Override
+        public List<Method> getMethods() {
+            return type.getMethods();
+        }
+
+        @Override
+        public List<JavaType> getTypeParameters() {
+            return type.getTypeParameters();
+        }
+
+        @Override
+        public @Nullable FullyQualified getOwningClass() {
+            return type.getOwningClass();
+        }
+
+        @Override
+        public @Nullable FullyQualified getSupertype() {
+            return type.getSupertype();
+        }
+
+        @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c", include = JsonTypeInfo.As.PROPERTY)
+        public interface ElementValue {
+            JavaType getElement();
+
+            Object getValue();
+        }
+
+        @Value
+        public static class SingleElementValue implements ElementValue {
+            JavaType element;
+
+            @Nullable
+            Object constantValue;
+
+            @Nullable
+            JavaType referenceValue;
+
+            public static SingleElementValue from(JavaType element, Object value) {
+                if (value instanceof JavaType) {
+                    return new SingleElementValue(element, null, (JavaType) value);
+                } else {
+                    return new SingleElementValue(element, value, null);
+                }
+            }
+
+            @Override
+            public Object getValue() {
+                return constantValue != null ? constantValue : referenceValue;
+            }
+        }
+
+        @Value
+        public static class ArrayElementValue implements ElementValue {
+            JavaType element;
+            Object @Nullable [] constantValues;
+            JavaType @Nullable [] referenceValues;
+
+            public static ArrayElementValue from(JavaType element, Object[] values) {
+                if (values.length > 0 && values[0] instanceof JavaType) {
+                    return new ArrayElementValue(element, null, (JavaType[]) values);
+                } else {
+                    return new ArrayElementValue(element, values, null);
+                }
+            }
+
+            @Override
+            public Object getValue() {
+                return getValues();
+            }
+
+            public List<?> getValues() {
+                return Arrays.asList(constantValues != null ? constantValues : referenceValues);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     class Parameterized extends FullyQualified {
         @Getter
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With
@@ -780,6 +928,7 @@ public interface JavaType {
         @Getter
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With
@@ -874,6 +1023,7 @@ public interface JavaType {
         @Getter
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @NonFinal
@@ -906,7 +1056,7 @@ public interface JavaType {
             if (Arrays.equals(annotationsArray, this.annotations)) {
                 return this;
             }
-            return new Array(this.managedReference, this.elemType, this.annotations);
+            return new Array(this.managedReference, this.elemType, annotationsArray);
         }
 
         @Override
@@ -1081,6 +1231,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With(AccessLevel.PRIVATE)
@@ -1141,24 +1292,6 @@ public interface JavaType {
         @With
         @NonFinal
         String @Nullable [] declaredFormalTypeNames;
-
-        @Deprecated
-        public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
-                      @Nullable JavaType returnType, @Nullable List<String> parameterNames,
-                      @Nullable List<JavaType> parameterTypes, @Nullable List<JavaType> thrownExceptions,
-                      @Nullable List<FullyQualified> annotations) {
-            this(managedReference, flagsBitMap, declaringType, name, returnType, parameterNames, parameterTypes,
-                    thrownExceptions, annotations, null);
-        }
-
-        @Deprecated
-        public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
-                      @Nullable JavaType returnType, @Nullable List<String> parameterNames,
-                      @Nullable List<JavaType> parameterTypes, @Nullable List<JavaType> thrownExceptions,
-                      @Nullable List<FullyQualified> annotations, @Nullable List<String> defaultValue) {
-            this(managedReference, flagsBitMap, declaringType, name, returnType, parameterNames, parameterTypes,
-                    thrownExceptions, annotations, defaultValue, null);
-        }
 
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
@@ -1239,6 +1372,15 @@ public interface JavaType {
             return "<constructor>".equals(name);
         }
 
+        public @Nullable String getConstructorName() {
+            if (!isConstructor()) {
+                return null;
+            }
+            String className = ((JavaType.Class) getReturnType()).getClassName();
+            int beginIndex = className.lastIndexOf(".");
+            return beginIndex == -1 ? className : className.substring(beginIndex + 1);
+        }
+
         public FullyQualified getDeclaringType() {
             return declaringType;
         }
@@ -1250,6 +1392,11 @@ public interface JavaType {
 
             Stack<FullyQualified> interfaces = new Stack<>();
             interfaces.addAll(declaringType.getInterfaces());
+            FullyQualified supertype = declaringType.getSupertype();
+            while (supertype != null) {
+                interfaces.add(supertype);
+                supertype = supertype.getSupertype();
+            }
 
             while (!interfaces.isEmpty()) {
                 FullyQualified declaring = interfaces.pop();
@@ -1423,6 +1570,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With(AccessLevel.PRIVATE)

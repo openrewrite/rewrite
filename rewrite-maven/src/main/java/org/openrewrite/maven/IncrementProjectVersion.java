@@ -17,14 +17,19 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.marker.AlreadyIncremented;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.ChangeTagValue;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 

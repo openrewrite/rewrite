@@ -17,9 +17,6 @@ package org.openrewrite.semver;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.StringUtils;
-
-import java.util.regex.Matcher;
 
 public class LatestIntegration extends LatestRelease {
 
@@ -32,24 +29,7 @@ public class LatestIntegration extends LatestRelease {
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(version);
-        if (!matcher.matches()) {
-            return false;
-        }
-        boolean requireMeta = !StringUtils.isNullOrEmpty(metadataPattern);
-        String versionMeta = matcher.group(6);
-        if (requireMeta) {
-            return versionMeta != null && versionMeta.matches(metadataPattern);
-        } else if (versionMeta == null) {
-            return true;
-        }
-        String lowercaseVersionMeta = versionMeta.toLowerCase();
-        for (String suffix : RELEASE_SUFFIXES) {
-            if (suffix.equals(lowercaseVersionMeta)) {
-                return true;
-            }
-        }
-        return PRE_RELEASE_ENDING.matcher(lowercaseVersionMeta).matches();
+        return VersionComparator.checkVersion(version, getMetadataPattern(), false);
     }
 
     @Override

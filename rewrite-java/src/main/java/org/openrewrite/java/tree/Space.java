@@ -211,7 +211,7 @@ public class Space {
             last = c;
         }
         // If a file ends with a single-line comment there may be no terminating newline
-        if (comment.length() > 0) {
+        if (comment.length() > 0 || inSingleLineComment) {
             comments.add(new TextComment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
             prefix.setLength(0);
         }
@@ -234,7 +234,7 @@ public class Space {
 
     @SuppressWarnings("ConstantConditions")
     public static <J2 extends J> @Nullable List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,
-                                                                         Space suffix) {
+                                                                                   Space suffix) {
         if (trees == null) {
             return null;
         }
@@ -336,6 +336,9 @@ public class Space {
         COMPILATION_UNIT_PREFIX,
         CONTINUE_PREFIX,
         CONTROL_PARENTHESES_PREFIX,
+        DECONSTRUCTION_PATTERN_PREFIX,
+        DECONSTRUCTION_PATTERN_NESTED,
+        DECONSTRUCTION_PATTERN_NESTED_SUFFIX,
         DIMENSION,
         DIMENSION_PREFIX,
         DIMENSION_SUFFIX,

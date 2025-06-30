@@ -5,11 +5,6 @@ plugins {
     id("jvm-test-suite")
 }
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
-    }
-}
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
@@ -17,7 +12,7 @@ val javaTck = configurations.create("javaTck") {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
-    runtimeOnly(project(":rewrite-java-lombok"))
+    implementation(project(":rewrite-java-lombok"))
 
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
@@ -26,35 +21,42 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation("org.antlr:antlr4-runtime:4.13.2")
     "javaTck"(project(":rewrite-java-tck"))
 }
 
-tasks.withType<JavaCompile> {
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
     // allows --add-exports to in spite of the JDK's restrictions on this
     sourceCompatibility = JavaVersion.VERSION_21.toString()
     targetCompatibility = JavaVersion.VERSION_21.toString()
 
     options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
     options.compilerArgs.addAll(
-            listOf(
-                    "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
-                    "--add-exports", "jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
-                    "--add-exports", "jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
-                    "--add-exports", "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
-                    "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
-                    "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
-            )
+        listOf(
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
+        )
     )
 }
 
 //Javadoc compiler will complain about the use of the internal types.
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     exclude(
-            "**/ReloadableJava21JavadocVisitor**",
-            "**/ReloadableJava21Parser**",
-            "**/ReloadableJava21ParserVisitor**",
-            "**/ReloadableJava21TypeMapping**",
-            "**/ReloadableJava21TypeSignatureBuilder**"
+        "**/ReloadableJava21JavadocVisitor**",
+        "**/ReloadableJava21Parser**",
+        "**/ReloadableJava21ParserVisitor**",
+        "**/ReloadableJava21TypeMapping**",
+        "**/ReloadableJava21TypeSignatureBuilder**"
     )
 }
 

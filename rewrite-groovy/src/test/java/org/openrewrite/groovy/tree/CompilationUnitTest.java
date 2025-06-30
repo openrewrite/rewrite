@@ -89,6 +89,19 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void multilineCommentWithUrl() {
+        rewriteRun(
+          groovy(
+            """
+              class Foo {
+              /* https://foo.bar */
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void scriptImportsCanBeAnywhere() {
         rewriteRun(
           spec -> spec.parser(GroovyParser.builder().compilerCustomizers(config -> {

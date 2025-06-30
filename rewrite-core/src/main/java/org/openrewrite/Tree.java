@@ -101,6 +101,9 @@ public interface Tree {
     }
 
     default boolean isScope(@Nullable Tree tree) {
+        if (tree == this) {
+            return true;
+        }
         //noinspection ConstantConditions
         return tree != null && tree.getId() != null && tree.getId().equals(getId());
     }

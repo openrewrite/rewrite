@@ -16,7 +16,7 @@ dependencies {
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
 
-    implementation("org.antlr:antlr4-runtime:4.11.1")
+    implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("dev.failsafe:failsafe:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
@@ -43,7 +43,7 @@ dependencies {
     testImplementation("org.mapdb:mapdb:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
 }
 
@@ -59,7 +59,7 @@ tasks.register<JavaExec>("generateAntlrSources") {
     classpath = sourceSets["main"].runtimeClasspath
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
 
@@ -70,7 +70,7 @@ tasks.withType<Javadoc> {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/VersionRangeParser**", "**/AddDependency**")
+    exclude("**/VersionRangeParser**", "**/AddDependency**", "**/MavenResolutionResult**")
 }
 
 configure<LicenseExtension> {

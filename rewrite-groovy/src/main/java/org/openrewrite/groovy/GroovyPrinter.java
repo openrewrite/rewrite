@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
+import org.openrewrite.groovy.internal.Delimiter;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.groovy.tree.GContainer;
@@ -33,6 +34,9 @@ import org.openrewrite.marker.Markers;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
+
+import static org.openrewrite.groovy.internal.Delimiter.DOUBLE_QUOTE_STRING;
+import static org.openrewrite.groovy.tree.G.Unary.Type.Spread;
 
 public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private final GroovyJavaPrinter delegate = new GroovyJavaPrinter();
@@ -73,18 +77,14 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitGString(G.GString gString, PrintOutputCapture<P> p) {
         beforeSyntax(gString, GSpace.Location.GSTRING, p);
-        String delimiter = gString.getDelimiter();
+        Delimiter delimiter = Delimiter.of(gString.getDelimiter());
         if (delimiter == null) {
             // For backwards compatibility with ASTs before we collected this field
-            delimiter = "\"";
+            delimiter = DOUBLE_QUOTE_STRING;
         }
-        p.append(delimiter);
+        p.append(delimiter.open);
         visit(gString.getStrings(), p);
-        if ("$/".equals(delimiter)) {
-            p.append("/$");
-        } else {
-            p.append(delimiter);
-        }
+        p.append(delimiter.close);
         afterSyntax(gString, p);
         return gString;
     }
@@ -134,6 +134,21 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitUnary(G.Unary unary, PrintOutputCapture<P> p) {
+        beforeSyntax(unary, Space.Location.UNARY_PREFIX, p);
+        switch (unary.getOperator()) {
+            case Spread:
+                p.append("*");
+                visit(unary.getExpression(), p);
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown unary operator.");
+        }
+        afterSyntax(unary, p);
+        return unary;
+    }
+
+    @Override
     public J visitBinary(G.Binary binary, PrintOutputCapture<P> p) {
         String keyword = "";
         switch (binary.getOperator()) {
@@ -148,6 +163,15 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 break;
             case In:
                 keyword = "in";
+                break;
+            case NotIn:
+                keyword = "!in";
+                break;
+            case Spaceship:
+                keyword = "<=>";
+                break;
+            case ElvisAssignment:
+                keyword = "?=";
                 break;
         }
         beforeSyntax(binary, GSpace.Location.BINARY_PREFIX, p);
@@ -372,15 +396,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             for (J.Modifier m : method.getModifiers()) {
                 visitModifier(m, p);
             }
-            J.TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
-            if (typeParameters != null) {
-                visit(typeParameters.getAnnotations(), p);
-                visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
-                visitMarkers(typeParameters.getMarkers(), p);
-                p.append('<');
-                visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
-                p.append('>');
-            }
+            visit(method.getAnnotations().getTypeParameters(), p);
             method.getMarkers().findFirst(RedundantDef.class).ifPresent(def -> {
                 visitSpace(def.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append("def");

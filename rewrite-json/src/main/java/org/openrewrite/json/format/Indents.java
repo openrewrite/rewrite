@@ -21,10 +21,10 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.style.Autodetect;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
+import org.openrewrite.json.style.WrappingAndBracesStyle;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.style.NamedStyles;
-
-import static java.util.Collections.singletonList;
+import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
 
 public class Indents extends Recipe {
     @Override
@@ -45,12 +45,11 @@ public class Indents extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends JsonIsoVisitor<ExecutionContext> {
         @Override
         public Json. Document visitDocument(Json.Document docs, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = docs.getStyle(TabsAndIndentsStyle.class);
-            if (style == null) {
-                style = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(Autodetect.detector().sample(docs).build()));
-                assert(style != null);
-            }
-            doAfterVisit(new TabsAndIndentsVisitor<>(style, null));
+            Autodetect autodetected = Autodetect.detector().sample(docs).build();
+            TabsAndIndentsStyle tabsAndIndentsStyle = Style.from(TabsAndIndentsStyle.class, docs, () -> autodetected.getStyle(TabsAndIndentsStyle.class));
+            WrappingAndBracesStyle wrappingAndBracesStyle = Style.from(WrappingAndBracesStyle.class, docs, () -> autodetected.getStyle(WrappingAndBracesStyle.class));
+            GeneralFormatStyle generalFormatStyle = Style.from(GeneralFormatStyle.class, docs, () -> autodetected.getStyle(GeneralFormatStyle.class));
+            doAfterVisit(new TabsAndIndentsVisitor<>(wrappingAndBracesStyle, tabsAndIndentsStyle, generalFormatStyle,null));
             return docs;
         }
     }
