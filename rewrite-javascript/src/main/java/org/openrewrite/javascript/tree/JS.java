@@ -608,31 +608,19 @@ public interface JS extends J {
         UUID id;
 
         @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
         Expression expression;
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
             return v.visitExpressionStatement(this, p);
-        }
-
-        @Override
-        public <J2 extends J> J2 withPrefix(Space space) {
-            return (J2) withExpression(expression.withPrefix(space));
-        }
-
-        @Override
-        public Space getPrefix() {
-            return expression.getPrefix();
-        }
-
-        @Override
-        public <J2 extends Tree> J2 withMarkers(Markers markers) {
-            return (J2) withExpression(expression.withMarkers(markers));
-        }
-
-        @Override
-        public Markers getMarkers() {
-            return expression.getMarkers();
         }
 
         @Override
@@ -2578,31 +2566,19 @@ public interface JS extends J {
         UUID id;
 
         @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
         Statement statement;
 
         @Override
         public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
             return v.visitStatementExpression(this, p);
-        }
-
-        @Override
-        public <J2 extends J> J2 withPrefix(Space space) {
-            return (J2) withStatement(statement.withPrefix(space));
-        }
-
-        @Override
-        public Space getPrefix() {
-            return statement.getPrefix();
-        }
-
-        @Override
-        public <J2 extends Tree> J2 withMarkers(Markers markers) {
-            return (J2) withStatement(statement.withMarkers(markers));
-        }
-
-        @Override
-        public Markers getMarkers() {
-            return statement.getMarkers();
         }
 
         @Override
