@@ -186,6 +186,11 @@ sourceSets {
     }
 }
 
+tasks.named<Jar>("sourcesJar") {
+    from(createProductionPackage)
+    exclude("production-package.zip")
+}
+
 tasks.named<ProcessResources>("processResources") {
     dependsOn(createProductionPackage)
 }
