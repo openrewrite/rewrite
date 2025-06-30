@@ -133,17 +133,6 @@ export class JavaScriptTypeMapping {
             return JavaType.Primitive.Boolean;
         }
 
-        if (type.isUnion() || type.isIntersection()) {
-            let result: Draft<JavaType.Union> = {
-                kind: type.isUnion() ? JavaType.Kind.Union : JavaType.Kind.Intersection,
-                bounds: []
-            };
-            this.typeCache.set(cacheKey, result);
-
-            result.bounds = type.types.map(t => this.getType(t));
-            return result;
-        }
-
         // if (ts.isRegularExpressionLiteral(node)) {
         //     return JavaType.Primitive.String;
         // }
