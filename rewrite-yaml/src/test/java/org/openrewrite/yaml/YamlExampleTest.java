@@ -32,7 +32,7 @@ class YamlExampleTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void nonExistentBlock() {
+    void desiredSituation() {
         rewriteRun(
           yaml(
             """
@@ -59,6 +59,54 @@ class YamlExampleTest implements RewriteTest {
                 labels:
                   app: guestbook
                   tier: frontend
+              ---
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: nginx-deployment
+                labels:
+                  app: nginx
+                annotations:
+                  openrewrite/injected-by: "OpenRewrite Recipe"
+                  openrewrite/recipe-version: "1.0.0"
+                  openrewrite/agent-type: "Java"
+              """
+          )
+        );
+    }
+
+    @Test
+    void currentSituation() {
+        rewriteRun(
+          yaml(
+            """
+              apiVersion: apps/v1
+              kind: ReplicaSet
+              metadata:
+                name: frontend
+                labels:
+                  app: guestbook
+                  tier: frontend
+              ---
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: nginx-deployment
+                labels:
+                  app: nginx
+              """,
+            """
+              apiVersion: apps/v1
+              kind: ReplicaSet
+              metadata:
+                name: frontend
+                labels:
+                  app: guestbook
+                  tier: frontend
+                annotations:
+                  openrewrite/injected-by: "OpenRewrite Recipe"
+                  openrewrite/recipe-version: "1.0.0"
+                  openrewrite/agent-type: "Java"
               ---
               apiVersion: apps/v1
               kind: Deployment
