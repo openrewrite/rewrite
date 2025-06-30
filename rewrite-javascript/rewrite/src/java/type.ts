@@ -161,6 +161,37 @@ export namespace JavaType {
         static values(): Primitive[] {
             return Primitive._all.slice();
         }
+
+        static fromKeyword(keyword: string): Primitive | undefined {
+            switch (keyword) {
+                case 'boolean':
+                    return Primitive.Boolean;
+                case 'byte':
+                    return Primitive.Byte;
+                case 'char':
+                    return Primitive.Char;
+                case 'double':
+                    return Primitive.Double;
+                case 'float':
+                    return Primitive.Float;
+                case 'int':
+                    return Primitive.Int;
+                case 'long':
+                    return Primitive.Long;
+                case 'short':
+                    return Primitive.Short;
+                case 'String':
+                    return Primitive.String;
+                case 'void':
+                    return Primitive.Void;
+                case 'null':
+                    return Primitive.Null;
+                case '':
+                    return Primitive.None;
+                default:
+                    return undefined;
+            }
+        }
     }
 
     export interface Union extends JavaType {
