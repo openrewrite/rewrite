@@ -18,6 +18,7 @@ package org.openrewrite.java.internal.rpc;
 import org.jspecify.annotations.NonNull;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
@@ -664,8 +665,11 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType,
-                              RpcReceiveQueue rpcReceiveQueue) {
-        return requireNonNull(super.visitType(javaType, rpcReceiveQueue));
+    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType, RpcReceiveQueue q) {
+        if (javaType instanceof RpcCodec) {
+            //noinspection unchecked
+            return ((RpcCodec<@NonNull JavaType>) javaType).rpcReceive(javaType, q);
+        }
+        return requireNonNull(super.visitType(javaType, q));
     }
 }

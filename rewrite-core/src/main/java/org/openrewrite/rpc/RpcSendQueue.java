@@ -197,7 +197,11 @@ public class RpcSendQueue {
         }
         Class<?> type = after.getClass();
         if (type.isPrimitive() || type.getPackage().getName().startsWith("java.lang") ||
-            type.equals(UUID.class) || Iterable.class.isAssignableFrom(type) || Enum.class.isAssignableFrom(type)) {
+            type.equals(UUID.class) || Iterable.class.isAssignableFrom(type)) {
+            return null;
+//        } else if (Enum.class.isAssignableFrom(type) && !type.getName().equals("org.openrewrite.java.tree.JavaType$Primitive")) {
+        } else if (Enum.class.isAssignableFrom(type)) {
+            // FIXME special case for `JavaType.Primitive` here
             return null;
         }
         return type.getName();

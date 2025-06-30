@@ -38,7 +38,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuiteDisplayName("Java LSTs sent to and from a JavaScript Rewrite RPC server")
 @SelectPackages("org.openrewrite.java.tree")
 // If you need to narrow down the suite to debug one test
-//@IncludeClassNamePatterns(".*AnnotationTest")
+@IncludeClassNamePatterns(".*PrimitiveTest")
 @ExcludeClassNamePatterns({
   ".*JavadocTest",
   ".*TypeUtilsTest",
@@ -56,6 +56,7 @@ public class JavaToJavaScriptRpcTest {
                   JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder(Environment.builder().build())
                     .nodePath(Path.of("node"))
                     .installationDirectory(Path.of("./rewrite/dist"))
+//                    .inspectAndBreak()
 //                    .socket(12345)
                     .timeout(Duration.ofMinutes(10))
                     .build();

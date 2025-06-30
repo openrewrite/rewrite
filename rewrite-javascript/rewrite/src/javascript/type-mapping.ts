@@ -15,8 +15,9 @@
  */
 import * as ts from "typescript";
 import {JavaType} from "../java";
-import {Draft} from "immer";
-import {asRef} from "../rpc";
+import {createDraft, Draft, finishDraft} from "immer";
+import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {MarkersKind, ParseExceptionResult} from "../markers";
 
 export class JavaScriptTypeMapping {
     private readonly typeCache: Map<number, JavaType> = new Map();
@@ -228,3 +229,13 @@ export class JavaScriptTypeMapping {
         return JavaType.unknownType;
     }
 }
+
+RpcCodecs.registerCodec(JavaType.Kind.Primitive, {
+    async rpcSend(after: JavaType.Primitive, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, p => p.keyword);
+    },
+    async rpcReceive(before: JavaType.Primitive, q: RpcReceiveQueue): Promise<JavaType.Primitive> {
+        const keyword: string = await q.receive(before.keyword);
+        return JavaType.Primitive.fromKeyword(keyword)!;
+    }
+});
