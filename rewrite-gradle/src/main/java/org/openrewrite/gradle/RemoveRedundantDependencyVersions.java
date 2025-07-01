@@ -31,7 +31,9 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.ExactVersion;
@@ -275,8 +277,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         } catch (Exception ignore) {
                                         }
 
-                                        if (shouldRemoveRedundantDependency(dependency, m.getSimpleName())) {
-                                            return null;
+                                        try {
+                                            if (shouldRemoveRedundantDependency(dependency, m.getSimpleName(), gp.getMavenRepositories(), ctx)) {
+                                                return null;
+                                            }
+                                        } catch (MavenDownloadingException e) {
+                                            return Markup.error(m, e);
                                         }
                                     }
                                     return m;
@@ -295,21 +301,10 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     return DEPENDENCY_MANAGEMENT_METHODS.contains(methodName);
                                 }
 
-                                private boolean shouldRemoveRedundantDependency(Dependency dependency, String configurationName) {
-                                    if ((groupPattern != null && !matchesGlob(dependency.getGroupId(), groupPattern)) ||
-                                        (artifactPattern != null && !matchesGlob(dependency.getArtifactId(), artifactPattern))) {
+                                private boolean shouldRemoveRedundantDependency(@Nullable Dependency dependency, String configurationName, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
+                                    if (dependency == null || ((groupPattern != null && !matchesGlob(dependency.getGroupId(), groupPattern))
+                                                               || (artifactPattern != null && !matchesGlob(dependency.getArtifactId(), artifactPattern)))) {
                                         return false;
-                                    }
-
-                                    String dependencyManagedVersion = null;
-                                    if (platforms.get(configurationName) != null && !platforms.get(configurationName).isEmpty()) {
-                                        dependencyManagedVersion = platforms.get(configurationName)
-                                                .stream()
-                                                .map(e -> e.getManagedDependency(dependency.getGroupId(), dependency.getArtifactId(), null, null))
-                                                .filter(Objects::nonNull)
-                                                .map(ResolvedManagedDependency::getVersion)
-                                                .max(VERSION_COMPARATOR)
-                                                .orElse(null);
                                     }
 
                                     for (Map.Entry<String, List<ResolvedDependency>> entry : directDependencies.entrySet()) {
@@ -323,14 +318,35 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             if (d.getDependencies() == null) {
                                                 continue;
                                             }
-
-                                            ResolvedDependency resolvedDependency = d.findDependency(dependency.getGroupId(), dependency.getArtifactId());
-                                            if (resolvedDependency != null && (dependency.getVersion() == null ||
-                                                                               (dependencyManagedVersion == null && matchesConfiguration(configurationName, entry.getKey()) && dependency.getVersion().equals(resolvedDependency.getVersion())) ||
-                                                                               (dependencyManagedVersion != null && VERSION_COMPARATOR.compare(dependency.getVersion(), dependencyManagedVersion) <= 0))) {
+                                            if (matchesConfiguration(configurationName, entry.getKey())
+                                                && d.findDependency(dependency.getGroupId(), dependency.getArtifactId()) != null
+                                                && dependsOnNewerVersion(dependency.getGav(), d.getGav().asGroupArtifactVersion(), repositories, ctx)) {
                                                 return true;
                                             }
                                         }
+                                    }
+                                    return false;
+                                }
+
+                                private boolean dependsOnNewerVersion(GroupArtifactVersion searchGav, GroupArtifactVersion toSearch, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
+                                    if (toSearch.getVersion() == null) {
+                                        return false;
+                                    }
+                                    if (searchGav.asGroupArtifact().equals(toSearch.asGroupArtifact())) {
+                                        return searchGav.getVersion() == null || matchesComparator(toSearch.getVersion(), searchGav.getVersion());
+                                    }
+                                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                                    try {
+                                        List<ResolvedDependency> resolved = mpd.download(toSearch, null, null, repositories)
+                                                .resolve(emptyList(), mpd, repositories, ctx)
+                                                .resolveDependencies(Scope.Runtime, mpd, ctx);
+                                        for (ResolvedDependency r : resolved) {
+                                            if (Objects.equals(searchGav.getGroupId(), r.getGroupId()) && Objects.equals(searchGav.getArtifactId(), r.getArtifactId())) {
+                                                return searchGav.getVersion() == null || matchesComparator(r.getVersion(), searchGav.getVersion());
+                                            }
+                                        }
+                                    } catch (MavenDownloadingExceptions e) {
+                                        throw e.getExceptions().get(0);
                                     }
                                     return false;
                                 }

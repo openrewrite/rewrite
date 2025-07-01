@@ -30,7 +30,6 @@ import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.function.Function;
 
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 /**
@@ -51,10 +50,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
-        if (j instanceof JS.ExpressionStatement || j instanceof JS.StatementExpression) {
-            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
-            return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)));
-        }
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
@@ -603,9 +598,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType,
-                              RpcReceiveQueue rpcReceiveQueue) {
-        return requireNonNull(super.visitType(javaType, rpcReceiveQueue));
+    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType, RpcReceiveQueue q) {
+        return delegate.visitType(javaType, q);
     }
 
     private static class JavaScriptReceiverDelegate extends JavaReceiver {

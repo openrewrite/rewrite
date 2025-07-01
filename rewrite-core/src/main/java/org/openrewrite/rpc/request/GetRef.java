@@ -17,6 +17,7 @@ package org.openrewrite.rpc.request;
 
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcSendQueue;
 
@@ -70,7 +71,12 @@ public class GetRef implements RpcRequest {
                 RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, trace.get());
                 forkJoin.submit(() -> {
                     try {
-                        sendQueue.send(after, null, null);
+                        if (after instanceof Markers) {
+                            // FIXME check if we can solve this via RpcCodec
+                            sendQueue.sendMarkers(null, ignore -> (Markers) after);
+                        } else {
+                            sendQueue.send(after, null, null);
+                        }
 
                         // All the data has been sent, and the remote should have received
                         // the full tree, so update our understanding of the remote state

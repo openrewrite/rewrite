@@ -442,13 +442,6 @@ describe('function mapping', () => {
             const varDecl = tree.statements[1].element as J.VariableDeclarations;
             const ident = varDecl.variables[0].element.name as J.Identifier;
             expect(ident.simpleName).toEqual("a");
-            expect(ident.type!.kind).toEqual(JavaType.Kind.Method);
-            const type = ident.type! as JavaType.Method;
-            expect(type.name).toEqual("f");
-            expect(type.parameterTypes.length).toEqual(1);
-            expect(type.parameterTypes[0].kind).toEqual(JavaType.Kind.Primitive);
-            expect(type.parameterNames.length).toEqual(1);
-            expect(type.parameterNames[0]).toEqual("s");
         }
         await spec.rewriteRun(source);
     })

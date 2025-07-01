@@ -250,7 +250,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     return it;
                                 }
                                 return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
-                            } else {
+                            } else if (oldAttributeValue == null) {
+                                // Without an oldAttributeValue and an attributeName not matching `value` we want to add an extra argument to the annotation.
                                 // Make the attribute name explicit, before we add the new value below
                                 //noinspection ConstantConditions
                                 return ((J.Annotation) JavaTemplate.builder("value = #{}")
