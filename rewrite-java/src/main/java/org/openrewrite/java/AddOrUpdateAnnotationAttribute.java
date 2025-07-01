@@ -282,7 +282,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             }
 
                             if (attributeName != null && !attributeValue.equals("value")) {
-                                return createAnnotationAssignment(finalA, "value", it);
+                                return isAnnotationWithOnlyValueMethod(finalA) ? it : createAnnotationAssignment(finalA, "value", it);
                             }
 
                             J.NewArray arrayValue = (J.NewArray) it;

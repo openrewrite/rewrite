@@ -872,6 +872,36 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void dontChangeWhenAttributeDoesNotMatchAtAll() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "b",
+            null,
+            false,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"a"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void appendSingleValueToExistingArrayAttribute() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
@@ -901,6 +931,43 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               
               @Foo(array = {"a", "b"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendSingleValueToExistingArrayValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "b",
+            null,
+            false,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"a"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b"})
               public class A {
               }
               """
@@ -946,6 +1013,43 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void appendMultipleValuesToExistingArrayValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "b,c",
+            null,
+            false,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"a"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b", "c"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void appendMultipleValuesToExistingArrayAttributeWithOverlap() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
@@ -975,6 +1079,43 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               
               @Foo(array = {"a", "b", "c"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendMultipleValuesToExistingArrayValueAttributeWithOverlap() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "b,c",
+            null,
+            false,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b", "c"})
               public class A {
               }
               """
@@ -1015,6 +1156,46 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               
               @Foo(array = {"a", "b", "b", "c"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendMultipleValuesToExistingArrayValueAttributeNonSet() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "b,c",
+            null,
+            true,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              
+              public class A {
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b", "b", "c"})
               public class A {
               }
               """
