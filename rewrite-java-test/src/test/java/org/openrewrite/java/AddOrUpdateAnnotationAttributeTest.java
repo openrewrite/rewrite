@@ -1483,7 +1483,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
-    void doNotAddOrRemoveValueWhenOldAttributeValueDoesNotMatchAndAttributeNameIsNotValue() {
+    void doNotAddOrRemoveExplicitParameterNameValueWhenOldAttributeValueDoesNotMatchAndAttributeNameIsNotValue() {
         rewriteRun(
           spec -> spec.recipe(
             new AddOrUpdateAnnotationAttribute(
@@ -1519,7 +1519,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
 
     @Test
-    void doNotAddOrRemoveValueWhenOldAttributeValueDoesMatchAndAttributeNameIsValue() {
+    void doNotAddOrRemoveExplicitParameterNameValueWhenOldAttributeValueDoesMatchAndAttributeNameIsValue() {
         rewriteRun(
           spec -> spec.recipe(
             new AddOrUpdateAnnotationAttribute(
@@ -1554,7 +1554,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
-    void doAddValueWhenOldAttributeValueIsNullAndAttributeNameIsNotValue() {
+    void doAddExplicitParameterNameValueWhenOldAttributeValueIsNullAndAttributeNameIsNotValue() {
         rewriteRun(
           spec -> spec.recipe(
             new AddOrUpdateAnnotationAttribute(
