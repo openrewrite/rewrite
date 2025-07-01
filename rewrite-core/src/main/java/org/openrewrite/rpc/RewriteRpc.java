@@ -352,12 +352,16 @@ public class RewriteRpc implements AutoCloseable {
         }, false);
     }
 
-    public String print(SourceFile tree) {
-        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), null);
+    public String print(SourceFile sourceFile) {
+        return print(sourceFile, null);
     }
 
-    public String print(SourceFile tree, Print.@Nullable MarkerPrinter markerPrinter) {
-        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
+    public String print(SourceFile sourceFile, Print.@Nullable MarkerPrinter markerPrinter) {
+        try {
+            return print(sourceFile, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
+        } catch (Exception e) {
+            throw new RuntimeException("Print for source file failed: " + sourceFile.getSourcePath(), e);
+        }
     }
 
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
@@ -386,7 +390,7 @@ public class RewriteRpc implements AutoCloseable {
         // Check if we have a cached version of this object
         Object localObject = localObjects.getIfPresent(id);
         String lastKnownId = localObject != null ? id : null;
-        
+
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs.asMap(), traceFile, () -> send("GetObject",
                 new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
         Object remoteObject = q.receive(localObject, null);
@@ -406,7 +410,7 @@ public class RewriteRpc implements AutoCloseable {
         //noinspection unchecked
         return (T) remoteObject;
     }
-    
+
     private Object getRef(Integer refId) {
         // Fetch the complete batch like getObject() does
         List<RpcObjectData> completeBatch = send("GetRef", new GetRef(refId), GetRefResponse.class);
@@ -428,11 +432,11 @@ public class RewriteRpc implements AutoCloseable {
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
-        
+
         if (ref == null) {
             throw new IllegalStateException("Reference " + refId + " not found on remote");
         }
-        
+
         remoteRefs.put(refId, ref);
         return ref;
     }
