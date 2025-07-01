@@ -414,7 +414,7 @@ public class RewriteRpc implements AutoCloseable {
         // Create RpcReceiveQueue with the pre-fetched batch
         // Use a simple function that throws for nested refs to avoid recursion
         AtomicBoolean batchConsumed = new AtomicBoolean(false);
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs.asMap(), logFile, () -> {
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs.asMap(), traceFile, () -> {
             if (batchConsumed.getAndSet(true)) {
                 throw new IllegalStateException("GetRef batch already consumed");
             }
