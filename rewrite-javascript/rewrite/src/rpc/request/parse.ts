@@ -14,60 +14,43 @@
  * limitations under the License.
  */
 import * as rpc from "vscode-jsonrpc/node";
+import {MessageConnection} from "vscode-jsonrpc/node";
 import {ExecutionContext} from "../../execution";
 import {UUID} from "node:crypto";
 import {ParserInput, Parsers} from "../../parser";
+import {randomId} from "../../uuid";
+import {produce} from "immer";
 import {SourceFile} from "../../tree";
-import {LRUCache} from "lru-cache";
 
 export class Parse {
-    constructor(private readonly id: string,
-                private readonly inputs: ParserInput[],
+    constructor(private readonly inputs: ParserInput[],
                 private readonly relativeTo?: string) {
     }
 
-    static handle(connection: rpc.MessageConnection,
-                  localObjects: LRUCache<string, any>): void {
-        const ongoingRequests = new Map<string, AsyncGenerator<SourceFile>>();
-
+    static handle(connection: MessageConnection,
+                  localObjectGenerators: Map<string, (input: string) => any>): void {
         connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), async (request) => {
-            const requestId = request.id;
+            let parser = Parsers.createParser("javascript", {
+                ctx: new ExecutionContext(),
+                relativeTo: request.relativeTo
+            });
 
-            // Check if we already have an ongoing request for this ID
-            let generator = ongoingRequests.get(requestId);
+            if (!parser) {
+                return [];
+            }
+            const generator = parser.parse(...request.inputs);
+            const result: string[] = [];
 
-            if (!generator) {
-                let parser = Parsers.createParser("javascript", {
-                    ctx: new ExecutionContext(),
-                    relativeTo: request.relativeTo
+            for (let i = 0; i < request.inputs.length; i++) {
+                const id = randomId();
+                localObjectGenerators.set(id, async id => {
+                    let sourceFile: SourceFile = (await generator.next()).value;
+                    return produce(sourceFile, (draft) => {draft.id = id;});
                 });
-
-                if (!parser) {
-                    return [];
-                }
-                generator = parser.parse(...request.inputs);
-                ongoingRequests.set(requestId, generator);
+                result.push(id);
             }
 
-            const batch: string[] = [];
-            const batchSize = 10;
-
-            for (let i = 0; i < batchSize; i++) {
-                const result = await generator.next();
-
-                if (result.done) {
-                    // Generator is exhausted, clean up
-                    ongoingRequests.delete(requestId);
-                    break;
-                } else {
-                    // Store the generated object and add its ID to batch
-                    const sourceFile = result.value;
-                    localObjects.set(sourceFile.id.toString(), sourceFile);
-                    batch.push(sourceFile.id);
-                }
-            }
-
-            return batch;
+            return result;
         });
     }
 }
