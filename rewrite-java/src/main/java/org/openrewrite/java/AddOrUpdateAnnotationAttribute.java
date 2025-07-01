@@ -442,8 +442,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation a) {
         return a.getAnnotationType().getType() instanceof JavaType.Class &&
-                ((JavaType.Class) a.getAnnotationType().getType()).getMethods().size() == 1
-                && ((JavaType.Class) a.getAnnotationType().getType()).getMethods().get(0).getName().equals("value");
+                ((JavaType.Class) a.getAnnotationType().getType()).getMethods().size() == 1 &&
+                ((JavaType.Class) a.getAnnotationType().getType()).getMethods().get(0).getName().equals("value");
     }
 
     @Value
