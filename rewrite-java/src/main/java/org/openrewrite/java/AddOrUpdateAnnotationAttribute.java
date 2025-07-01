@@ -66,7 +66,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     String attributeName;
 
     @Option(displayName = "Attribute value",
-            description = "The value to set the attribute to. Set to `null` to remove the attribute.",
+            description = "The value to set the attribute to. If the attribute is an array, provide values separated by comma to add multiple attributes at once. Set to `null` to remove the attribute.",
             required = false,
             example = "500")
     @Nullable
