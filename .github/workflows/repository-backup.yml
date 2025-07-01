@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   repository-backup:
-    uses: openrewrite/gh-automation/.github/workflows/repository-backup.yml@maven-central-changes
+    uses: openrewrite/gh-automation/.github/workflows/repository-backup.yml@main
     secrets:
       bucket_mirror_target: ${{ secrets.S3_GITHUB_REPOSITORY_BACKUPS_BUCKET_NAME }}
       bucket_access_key_id: ${{ secrets.S3_GITHUB_REPOSITORY_BACKUPS_ACCESS_KEY_ID }}

@@ -8,4 +8,4 @@ on:
 
 jobs:
   build:
-    uses: openrewrite/gh-automation/.github/workflows/stale.yml@maven-central-changes
+    uses: openrewrite/gh-automation/.github/workflows/stale.yml@main
