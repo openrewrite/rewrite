@@ -15,7 +15,7 @@
  */
 import {RecipeSpec} from "../../../src/test";
 import {JS, typescript} from "../../../src/javascript";
-import {J} from "../../../src/java";
+import {J, TextComment} from "../../../src/java";
 
 describe('call mapping', () => {
     const spec = new RecipeSpec();
@@ -72,9 +72,9 @@ describe('call mapping', () => {
                     expect((select.after.comments[0] as TextComment).text).toEqual("a");
                 }
 
-                expect(((inits[0] as JS.FunctionCall).arguments.before.comments[0] as J.TextComment).text).toEqual("b");
-                expect(((inits[1] as J.MethodInvocation).name.prefix.comments[0] as J.TextComment).text).toEqual("b");
-                expect(((inits[2] as J.MethodInvocation).name.prefix.comments[0] as J.TextComment).text).toEqual("b");
+                expect(((inits[0] as JS.FunctionCall).arguments.before.comments[0] as TextComment).text).toEqual("b");
+                expect(((inits[1] as J.MethodInvocation).name.prefix.comments[0] as TextComment).text).toEqual("b");
+                expect(((inits[2] as J.MethodInvocation).name.prefix.comments[0] as TextComment).text).toEqual("b");
             }
         }));
 
