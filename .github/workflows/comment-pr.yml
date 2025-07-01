@@ -12,4 +12,4 @@ on:
 jobs:
   post-suggestions:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    uses: openrewrite/gh-automation/.github/workflows/comment-pr.yml@main
+    uses: openrewrite/gh-automation/.github/workflows/comment-pr.yml@maven-central-changes

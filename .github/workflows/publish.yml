@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   release:
-    uses: openrewrite/gh-automation/.github/workflows/publish-gradle.yml@main
+    uses: openrewrite/gh-automation/.github/workflows/publish-gradle.yml@maven-central-changes
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       sonatype_username: ${{ secrets.SONATYPE_USERNAME }}
