@@ -112,10 +112,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
 
                     if (attributeName == null || "value".equals(attributeName)) {
-                        return JavaTemplate.builder("#{}")
-                                .contextSensitive()
-                                .build()
-                                .apply(getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
+                        return JavaTemplate
+                                .apply("#{}", getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
                     } else {
                         String newAttributeValueResult = newAttributeValue;
                         if (((JavaType.FullyQualified) requireNonNull(a.getAnnotationType().getType())).getMethods().stream().anyMatch(method -> method.getReturnType().toString().equals("java.lang.String[]"))) {
@@ -125,10 +123,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     .map(String::valueOf)
                                     .collect(Collectors.joining("\", \"", "{\"", "\"}"));
                         }
-                        return JavaTemplate.builder("#{} = #{}")
-                                .contextSensitive()
-                                .build()
-                                .apply(getCursor(), a.getCoordinates().replaceArguments(), attributeName, newAttributeValueResult);
+                        return JavaTemplate
+                                .apply("#{} = #{}", getCursor(), a.getCoordinates().replaceArguments(), attributeName, newAttributeValueResult);
                     }
                 } else {
                     // First assume the value exists amongst the arguments and attempt to update it
@@ -171,10 +167,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                             continue;
                                         }
                                         changed = true;
-                                        Expression e = requireNonNull(((J.Annotation) JavaTemplate.builder(newAttributeListValue)
-                                                .contextSensitive()
-                                                .build()
-                                                .apply(getCursor(), finalA.getCoordinates().replaceArguments()))
+                                        Expression e = requireNonNull(((J.Annotation) JavaTemplate
+                                                .apply(newAttributeListValue, getCursor(), finalA.getCoordinates().replaceArguments()))
                                                 .getArguments()).get(0);
                                         initializerList.add(e);
                                     }
@@ -230,9 +224,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     if (Boolean.TRUE.equals(addOnly) || oldAttributeValue != null) {
                                         return it;
                                     }
-                                    int index = finalA.getArguments().indexOf(as);
-                                    as = (J.Assignment) ((J.Annotation) JavaTemplate.apply("#{} = #{}", getCursor(), as.getCoordinates().replace(), var.getSimpleName(), newAttributeValue)).getArguments().get(index);
-                                    return as;
+                                    //noinspection ConstantConditions
+                                    return ((J.Annotation) JavaTemplate
+                                            .apply("#{} = #{}", getCursor(), as.getCoordinates().replace(), var.getSimpleName(), newAttributeValue))
+                                            .getArguments().get(finalA.getArguments().indexOf(as));
                                 }
                             }
                         } else if (it instanceof J.Literal) {
@@ -253,12 +248,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             } else if (oldAttributeValue == null) {
                                 // Without an oldAttributeValue and an attributeName not matching `value` we want to add an extra argument to the annotation.
                                 // Make the attribute name explicit, before we add the new value below
-                                //noinspection ConstantConditions
-                                return ((J.Annotation) JavaTemplate.builder("value = #{}")
-                                        .contextSensitive()
-                                        .build()
-                                        .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it)
-                                ).getArguments().get(0);
+                                return createAnnotationAssignment(finalA, "value", it);
                             }
                         } else if (it instanceof J.FieldAccess) {
                             // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
@@ -275,16 +265,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     return it;
                                 }
                                 //noinspection ConstantConditions
-                                return ((J.Annotation) JavaTemplate.apply(newAttributeValue, getCursor(), finalA.getCoordinates().replaceArguments()))
+                                return ((J.Annotation) JavaTemplate
+                                        .apply(newAttributeValue, getCursor(), finalA.getCoordinates().replaceArguments()))
                                         .getArguments().get(0);
                             } else {
                                 // Make the attribute name explicit, before we add the new value below
-                                //noinspection ConstantConditions
-                                return ((J.Annotation) JavaTemplate.builder("value = #{any()}")
-                                        .contextSensitive()
-                                        .build()
-                                        .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it))
-                                        .getArguments().get(0);
+                                return createAnnotationAssignment(finalA, "value", it);
                             }
                         } else if (it instanceof J.NewArray) {
                             if (it.getMarkers().findFirst(AlreadyAppended.class).filter(ap -> ap.getValues().equals(newAttributeValue)).isPresent()) {
@@ -293,6 +279,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                             if (newAttributeValue == null) {
                                 return null;
+                            }
+
+                            if (attributeName != null && !attributeValue.equals("value")) {
+                                return createAnnotationAssignment(finalA, "value", it);
                             }
 
                             J.NewArray arrayValue = (J.NewArray) it;
@@ -309,10 +299,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     }
                                     changed = true;
 
-                                    Expression e = requireNonNull(((J.Annotation) JavaTemplate.builder(newAttributeListValue)
-                                            .contextSensitive()
-                                            .build()
-                                            .apply(getCursor(), finalA.getCoordinates().replaceArguments()))
+                                    Expression e = requireNonNull(((J.Annotation) JavaTemplate
+                                            .apply(newAttributeListValue, getCursor(), finalA.getCoordinates().replaceArguments()))
                                             .getArguments()).get(0);
                                     initializerList.add(e);
                                 }
@@ -353,10 +341,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 for (int j = m; j < attributeList.size(); j++) {
                                     String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(j), finalA);
 
-                                    Expression e = requireNonNull(((J.Annotation) JavaTemplate.builder(newAttributeListValue)
-                                            .contextSensitive()
-                                            .build()
-                                            .apply(getCursor(), finalA.getCoordinates().replaceArguments()))
+                                    Expression e = requireNonNull(((J.Annotation) JavaTemplate
+                                            .apply(newAttributeListValue, getCursor(), finalA.getCoordinates().replaceArguments()))
                                             .getArguments()).get(0);
                                     initializerList.add(j, e);
                                 }
@@ -373,17 +359,19 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (!foundOrSetAttributeWithDesiredValue.get() && !attributeValIsAlreadyPresent(newArgs, newAttributeValue) && oldAttributeValue == null && !isAnnotationWithOnlyValueMethod(a)) {
                         // There was no existing value to update and no requirements on a pre-existing old value, so add a new value into the argument list
                         String effectiveName = (attributeName == null) ? "value" : attributeName;
-                        //noinspection ConstantConditions
-                        J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")
-                                .contextSensitive()
-                                .build()
-                                .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue))
-                                .getArguments().get(0);
+                        J.Assignment as = createAnnotationAssignment(a, effectiveName, newAttributeValue);
                         a = a.withArguments(ListUtils.concat(as, a.getArguments()));
                     }
                 }
                 a = maybeAutoFormat(original, a, ctx);
                 return a;
+            }
+
+            private J.Assignment createAnnotationAssignment(J.Annotation annotation, String name, @Nullable Object parameter) {
+                //noinspection ConstantConditions
+                return (J.Assignment) ((J.Annotation) JavaTemplate
+                        .apply(name + " = " + (parameter instanceof J ? "#{any()}" : "#{}"), getCursor(), annotation.getCoordinates().replaceArguments(), parameter))
+                        .getArguments().get(0);
             }
         });
     }
