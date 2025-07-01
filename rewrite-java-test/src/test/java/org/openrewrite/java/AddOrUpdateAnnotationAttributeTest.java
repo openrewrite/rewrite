@@ -574,6 +574,43 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void arrayInAnnotationExplicitValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "newTest",
+            null,
+            false,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(value = {"oldTest"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(value = {"newTest"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void arrayInputMoreThanOneInAnnotationAttribute() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
@@ -603,6 +640,80 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               
               @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInputMoreThanOneInAnnotationLiteralAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "newTest1,newTest2",
+            null,
+            false,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(array = "oldTest")
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInputMoreThanOneInAnnotationLiteralValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "newTest1,newTest2",
+            null,
+            false,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("oldTest")
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"newTest1", "newTest2"})
               public class A {
               }
               """
