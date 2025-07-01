@@ -89,7 +89,7 @@ public class RewriteRpc implements AutoCloseable {
     private final AtomicInteger batchSize = new AtomicInteger(200);
     private final Duration timeout;
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
-    private @Nullable PrintStream logFile;
+    private @Nullable PrintStream traceFile;
 
     /**
      * Keeps track of the local and remote state of objects that are used in
@@ -172,7 +172,7 @@ public class RewriteRpc implements AutoCloseable {
     }
 
     public RewriteRpc traceGetObjectInput(PrintStream log) {
-        this.logFile = log;
+        this.traceFile = log;
         return this;
     }
 
@@ -387,7 +387,7 @@ public class RewriteRpc implements AutoCloseable {
         Object localObject = localObjects.getIfPresent(id);
         String lastKnownId = localObject != null ? id : null;
         
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs.asMap(), logFile, () -> send("GetObject",
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs.asMap(), traceFile, () -> send("GetObject",
                 new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
@@ -410,7 +410,7 @@ public class RewriteRpc implements AutoCloseable {
     private Object getRef(Integer refId) {
         // Fetch the complete batch like getObject() does
         List<RpcObjectData> completeBatch = send("GetRef", new GetRef(refId), GetRefResponse.class);
-        
+
         // Create RpcReceiveQueue with the pre-fetched batch
         // Use a simple function that throws for nested refs to avoid recursion
         AtomicBoolean batchConsumed = new AtomicBoolean(false);
@@ -422,7 +422,7 @@ public class RewriteRpc implements AutoCloseable {
         }, nestedRefId -> {
             throw new IllegalStateException("Nested ref calls not supported in GetRef: " + nestedRefId);
         });
-        
+
         // Process the ref object
         Object ref = q.receive(null, null);
         if (q.take().getState() != END_OF_OBJECT) {

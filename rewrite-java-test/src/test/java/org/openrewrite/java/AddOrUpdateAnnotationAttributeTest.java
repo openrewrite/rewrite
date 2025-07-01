@@ -1481,4 +1481,119 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotAddOrRemoveExplicitParameterNameValueWhenOldAttributeValueDoesNotMatchAndAttributeNameIsNotValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "name",
+              "newValue",
+              "oldValue",
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("oldValue")
+              public class A {}
+              
+              @Foo(value = "oldExplicitValue")
+              public class B {}
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void doNotAddOrRemoveExplicitParameterNameValueWhenOldAttributeValueDoesMatchAndAttributeNameIsValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "value",
+              "newValue",
+              "oldValue",
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("newValue")
+              public class A {}
+              
+              @Foo(value = "newValue")
+              public class B {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doAddExplicitParameterNameValueWhenOldAttributeValueIsNullAndAttributeNameIsNotValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "name",
+              "aName",
+              null,
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("someValue")
+              public class A {}
+              
+              @Foo(value = "someValue")
+              public class B {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(name = "aName", value = "someValue")
+              public class A {}
+        
+              @Foo(name = "aName", value = "someValue")
+              public class B {}
+              """
+          )
+        );
+    }
 }
