@@ -15,13 +15,14 @@
  */
 package org.openrewrite.rpc.request;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcSendQueue;
+import org.openrewrite.rpc.WeakIdentityHashMap;
 
 import java.util.ArrayList;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -39,8 +40,8 @@ public class GetRef implements RpcRequest {
     public static class Handler extends io.moderne.jsonrpc.JsonRpcMethod<GetRef> {
         private static final ExecutorService forkJoin = ForkJoinPool.commonPool();
 
-        private final Map<Integer, Object> remoteRefs;
-        private final IdentityHashMap<Object, Integer> localRefs;
+        private final Cache<Integer, Object> remoteRefs;
+        private final WeakIdentityHashMap<Object, Integer> localRefs;
         private final AtomicInteger batchSize;
         private final AtomicBoolean trace;
 

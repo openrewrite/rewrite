@@ -20,6 +20,9 @@ dependencies {
 
     implementation("org.apache.commons:commons-lang3:latest.release")
 
+    // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
+    implementation("com.github.ben-manes.caffeine:caffeine:2.+")
+
     implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")

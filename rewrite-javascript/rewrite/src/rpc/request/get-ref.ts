@@ -16,6 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../reference";
+import {LRUCache} from "lru-cache";
 
 export class GetRef {
     constructor(private readonly ref: number) {
@@ -23,7 +24,7 @@ export class GetRef {
 
     static handle(
         connection: rpc.MessageConnection,
-        remoteRefs: Map<number, any>,
+        remoteRefs: LRUCache<number, any>,
         localRefs: ReferenceMap,
         batchSize: number,
         trace: boolean

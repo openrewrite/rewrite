@@ -17,6 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
+import {LRUCache} from "lru-cache";
 
 export interface VisitResponse {
     modified: boolean
@@ -31,7 +32,7 @@ export class Visit {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  localObjects: Map<string, any>,
+                  localObjects: LRUCache<string, any>,
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string) => any,

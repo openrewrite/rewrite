@@ -18,6 +18,7 @@ import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
 import {asRef, isRef, Reference, ReferenceMap} from "./reference";
 import {Writable} from "node:stream";
+import {LRUCache} from "lru-cache";
 
 /**
  * Interface representing an RPC codec that defines methods
@@ -245,7 +246,7 @@ export class RpcSendQueue {
 export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
 
-    constructor(private readonly refs: Map<number, any>,
+    constructor(private readonly refs: LRUCache<number, any>,
                 private readonly pull: () => Promise<RpcObjectData[]>,
                 private readonly logFile?: Writable,
                 private readonly getRef: (refId: number) => Promise<any> = async (refId: number) => {

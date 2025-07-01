@@ -16,6 +16,7 @@
 package org.openrewrite.rpc.request;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +60,7 @@ public class Visit implements RpcRequest {
     public static class Handler extends JsonRpcMethod<Visit> {
         private static final ObjectMapper mapper = ObjectMappers.propertyBasedMapper(null);
 
-        private final Map<String, Object> localObjects;
+        private final Cache<String, Object> localObjects;
 
         private final Map<String, Recipe> preparedRecipes;
         private final Map<Recipe, Cursor> recipeCursors;
@@ -78,7 +79,7 @@ public class Visit implements RpcRequest {
             Tree after = visitor.visit(before, p, getCursor.apply(
                     request.getCursor()));
             if (after == null) {
-                localObjects.remove(before.getId().toString());
+                localObjects.invalidate(before.getId().toString());
             } else {
                 localObjects.put(after.getId().toString(), after);
             }

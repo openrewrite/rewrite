@@ -16,6 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../reference";
+import {LRUCache} from "lru-cache";
 
 export class GetObject {
     constructor(private readonly id: string, private readonly lastKnownId?: string) {
@@ -23,8 +24,8 @@ export class GetObject {
 
     static handle(
         connection: rpc.MessageConnection,
-        remoteObjects: Map<string, any>,
-        localObjects: Map<string, any>,
+        remoteObjects: LRUCache<string, any>,
+        localObjects: LRUCache<string, any>,
         localRefs: ReferenceMap,
         batchSize: number,
         trace: boolean

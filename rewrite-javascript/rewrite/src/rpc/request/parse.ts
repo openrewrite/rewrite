@@ -18,6 +18,7 @@ import {ExecutionContext} from "../../execution";
 import {UUID} from "node:crypto";
 import {Parser, ParserInput, Parsers} from "../../parser";
 import {SourceFile} from "../../tree";
+import {LRUCache} from "lru-cache";
 
 export class Parse {
     constructor(private readonly id: string,
@@ -26,7 +27,7 @@ export class Parse {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  localObjects: Map<string, any>): void {
+                  localObjects: LRUCache<string, any>): void {
         const ongoingRequests = new Map<string, AsyncGenerator<SourceFile>>();
 
         connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), async (request) => {

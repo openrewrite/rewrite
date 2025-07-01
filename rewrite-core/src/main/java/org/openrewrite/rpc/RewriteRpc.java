@@ -15,6 +15,8 @@
  */
 package org.openrewrite.rpc;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
@@ -95,19 +97,28 @@ public class RewriteRpc implements AutoCloseable {
      * between two processes.
      */
     @VisibleForTesting
-    final Map<String, Object> remoteObjects = new HashMap<>();
+    final Cache<String, Object> remoteObjects = Caffeine.newBuilder()
+            .maximumSize(1_000)
+            .weakValues()
+            .build();
 
     @VisibleForTesting
-    final Map<String, Object> localObjects = new HashMap<>();
+    final Cache<String, Object> localObjects = Caffeine.newBuilder()
+            .maximumSize(1_000)
+            .weakValues()
+            .build();
 
     /* A reverse map of the objects back to their IDs */
-    final Map<Object, String> localObjectIds = new IdentityHashMap<>();
+    final WeakIdentityHashMap<Object, String> localObjectIds = new WeakIdentityHashMap<>();
 
     @VisibleForTesting
-    final Map<Integer, Object> remoteRefs = new HashMap<>();
+    final Cache<Integer, Object> remoteRefs = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .weakValues()
+            .build();
 
     @VisibleForTesting
-    final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+    final WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
 
     /**
      * Creates a new RPC interface that can be used to communicate with a remote.
@@ -371,31 +382,48 @@ public class RewriteRpc implements AutoCloseable {
     }
 
     @VisibleForTesting
-    public <T> T getObject(String id) {
+    public <T> @Nullable T getObject(String id) {
         // Check if we have a cached version of this object
-        Object localObject = localObjects.get(id);
+        Object localObject = localObjects.getIfPresent(id);
         String lastKnownId = localObject != null ? id : null;
         
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs.asMap(), logFile, () -> send("GetObject",
                 new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
+
         // We are now in sync with the remote state of the object.
-        remoteObjects.put(id, remoteObject);
-        localObjects.put(id, remoteObject);
+        if (remoteObject == null) {
+            remoteObjects.invalidate(id);
+            localObjects.invalidate(id);
+        } else {
+            remoteObjects.put(id, remoteObject);
+            localObjects.put(id, remoteObject);
+        }
 
         //noinspection unchecked
         return (T) remoteObject;
     }
     
     private Object getRef(Integer refId) {
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetRef",
-                new GetRef(refId), GetRefResponse.class), nestedRefId -> {
+        // Fetch the complete batch like getObject() does
+        List<RpcObjectData> completeBatch = send("GetRef", new GetRef(refId), GetRefResponse.class);
+        
+        // Create RpcReceiveQueue with the pre-fetched batch
+        // Use a simple function that throws for nested refs to avoid recursion
+        AtomicBoolean batchConsumed = new AtomicBoolean(false);
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs.asMap(), logFile, () -> {
+            if (batchConsumed.getAndSet(true)) {
+                throw new IllegalStateException("GetRef batch already consumed");
+            }
+            return completeBatch;
+        }, nestedRefId -> {
             throw new IllegalStateException("Nested ref calls not supported in GetRef: " + nestedRefId);
         });
-
+        
+        // Process the ref object
         Object ref = q.receive(null, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
@@ -406,8 +434,6 @@ public class RewriteRpc implements AutoCloseable {
         }
         
         remoteRefs.put(refId, ref);
-        localRefs.put(ref, refId);
-
         return ref;
     }
 

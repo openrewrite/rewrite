@@ -36,18 +36,29 @@ import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
 import {ParserInput} from "../parser";
 import {randomId} from "../uuid";
-import {ReferenceMap} from "./reference";
+import {MemoryAwareLRU, ObjectIdentityMap, ReferenceMap} from "./reference";
 import {Writable} from "node:stream";
+import {LRUCache} from "lru-cache";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
 
-    readonly localObjects: Map<string, any> = new Map();
+    readonly localObjects: LRUCache<string, any> = new MemoryAwareLRU<string, any>({
+        max: 1000,
+        dispose: (value: any, key: string) => {
+            // When an entry is evicted from localObjects, remove it from the reverse mapping
+            this.localObjectIds.delete(value);
+        }
+    });
     /* A reverse map of the objects back to their IDs */
-    private readonly localObjectIds = new IdentityMap();
+    private readonly localObjectIds = new ObjectIdentityMap<string>();
 
-    readonly remoteObjects: Map<string, any> = new Map();
-    readonly remoteRefs: Map<number, any> = new Map();
+    readonly remoteObjects: LRUCache<string, any> = new MemoryAwareLRU<string, any>({
+        max: 1000
+    });
+    readonly remoteRefs: LRUCache<number, any> = new MemoryAwareLRU<number, any>({
+        max: 1000
+    });
     readonly localRefs: ReferenceMap = new ReferenceMap();
 
     constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
@@ -72,10 +83,10 @@ export class RewriteRpc {
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
-        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, this.localRefs, options?.batchSize || 100,
+        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, this.localRefs, options?.batchSize || 200,
             !!options?.traceGetObjectOutput);
         GetRecipes.handle(this.connection, registry);
-        GetRef.handle(this.connection, this.remoteRefs, this.localRefs, options?.batchSize || 100, !!options?.traceGetObjectOutput);
+        GetRef.handle(this.connection, this.remoteRefs, this.localRefs, options?.batchSize || 200, !!options?.traceGetObjectOutput);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
@@ -239,40 +250,5 @@ export class RewriteRpc {
         const ref = refData.value;
         this.remoteRefs.set(refId, ref);
         return ref;
-    }
-}
-
-class IdentityMap {
-    constructor(private objectMap = new WeakMap<any, string>(),
-                private readonly primitiveMap = new Map<any, string>()) {
-    }
-
-    set(key: any, value: any): void {
-        if (typeof key === 'object' && key !== null) {
-            this.objectMap.set(key, value);
-        } else {
-            this.primitiveMap.set(key, value);
-        }
-    }
-
-    get(key: any): string | undefined {
-        if (typeof key === 'object' && key !== null) {
-            return this.objectMap.get(key);
-        } else {
-            return this.primitiveMap.get(key);
-        }
-    }
-
-    has(key: any): boolean {
-        if (typeof key === 'object' && key !== null) {
-            return this.objectMap.has(key);
-        } else {
-            return this.primitiveMap.has(key);
-        }
-    }
-
-    clear() {
-        this.objectMap = new WeakMap<any, string>();
-        this.primitiveMap.clear();
     }
 }

@@ -18,13 +18,14 @@ import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor} from "../../tree";
 import {ExecutionContext} from "../../execution";
 import {UUID} from "node:crypto";
+import {LRUCache} from "lru-cache";
 
 export class Generate {
     constructor(private readonly id: string, private readonly p: string) {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  localObjects: Map<string, any>,
+                  localObjects: LRUCache<string, any>,
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string) => any): void {
