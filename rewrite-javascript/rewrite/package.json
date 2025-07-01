@@ -21,6 +21,7 @@
     "build": "rm -rf ./dist && tsc --build tsconfig.build.json",
     "dev": "tsc --watch -p tsconfig.json",
     "test": "npm run build && jest",
+    "build:test": "tsc --build tsconfig.test.json",
     "ci:test": "jest",
     "start": "npm run build && node ./dist/src/rpc/server.js"
   },

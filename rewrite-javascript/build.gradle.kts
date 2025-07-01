@@ -1,15 +1,14 @@
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
 import nl.javadude.gradle.plugins.license.LicenseExtension
-import org.eclipse.jgit.api.Git
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 plugins {
     id("org.openrewrite.build.language-library")
     id("org.openrewrite.build.moderne-source-available-license")
-    id("com.netflix.nebula.integtest-standalone")
     id("com.github.node-gradle.node") version "latest.release"
+    id("jvm-test-suite")
     id("publishing")
 }
 
@@ -28,11 +27,6 @@ dependencies {
     testImplementation(project(":rewrite-yaml"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testRuntimeOnly(project(":rewrite-java-21"))
-
-    integTestImplementation(project(":rewrite-json"))
-    integTestImplementation(project(":rewrite-java-tck"))
-    integTestImplementation("org.junit.platform:junit-platform-suite-api:latest.release")
-    integTestRuntimeOnly("org.junit.platform:junit-platform-suite-engine:latest.release")
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -178,25 +172,49 @@ val createProductionPackage by tasks.register<Zip>("createProductionPackage") {
 }
 
 // Include production-ready package into jar
-sourceSets {
-    main {
-        resources {
-            srcDir(createProductionPackage.destinationDirectory)
+tasks.named<Jar>("jar") {
+    from(createProductionPackage)
+}
+
+var npmTestBuild = tasks.register<NpmTask>("npmTestBuild") {
+    inputs.files(npmInstall)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(file("rewrite/package.json"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(npmRunBuild)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("rewrite/test"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(file("rewrite/dist/test/"))
+
+    args = listOf("run", "build:test")
+}
+
+testing {
+    suites {
+        register<JvmTestSuite>("integTest") {
+            useJUnitJupiter()
+
+            targets {
+                all {
+                    testTask.configure {
+                        dependsOn(npmTestBuild)
+                    }
+                }
+            }
+
+            dependencies {
+                implementation(project())
+                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-test"))
+                implementation(project(":rewrite-json"))
+                implementation(project(":rewrite-java-tck"))
+                implementation("org.assertj:assertj-core:latest.release")
+                implementation("org.junit.platform:junit-platform-suite-api:latest.release")
+                runtimeOnly("org.junit.platform:junit-platform-suite-engine:latest.release")
+            }
         }
     }
-}
-
-tasks.named<Jar>("sourcesJar") {
-    from(createProductionPackage)
-    exclude("production-package.zip")
-}
-
-tasks.named<ProcessResources>("processResources") {
-    dependsOn(createProductionPackage)
-}
-
-tasks.named("integrationTest") {
-    dependsOn(npmRunBuild)
 }
 
 // This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
