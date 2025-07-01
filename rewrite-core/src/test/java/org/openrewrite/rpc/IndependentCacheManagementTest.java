@@ -23,9 +23,7 @@ import org.openrewrite.rpc.request.GetRef;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Paths;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -40,7 +38,7 @@ class IndependentCacheManagementTest {
         // Setup local and remote objects
         Cache<String, Object> remoteObjects = Caffeine.newBuilder().build();
         Cache<String, Object> localObjects = Caffeine.newBuilder().build();
-        Map<Object, Integer> localRefs = new IdentityHashMap<>();
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
         
         // Create object on server
         String objectId = "test-object-id";
@@ -69,7 +67,7 @@ class IndependentCacheManagementTest {
         // Setup local and remote objects
         Cache<String, Object> remoteObjects = Caffeine.newBuilder().build();
         Cache<String, Object> localObjects = Caffeine.newBuilder().build();
-        Map<Object, Integer> localRefs = new IdentityHashMap<>();
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
         
         // Create object on server
         String objectId = "test-object-id";
@@ -99,8 +97,8 @@ class IndependentCacheManagementTest {
         // Setup local and remote objects
         Cache<String, Object> remoteObjects = Caffeine.newBuilder().build();
         Cache<String, Object> localObjects = Caffeine.newBuilder().build();
-        Map<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
+
         // Create object on server
         String objectId = "test-object-id";
         PlainText text = PlainText.builder()
@@ -129,8 +127,8 @@ class IndependentCacheManagementTest {
         // Setup local and remote objects
         Cache<String, Object> remoteObjects = Caffeine.newBuilder().build();
         Cache<String, Object> localObjects = Caffeine.newBuilder().build();
-        Map<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
+
         // Create original object on server
         String objectId = "test-object-id";
         PlainText originalText = PlainText.builder()
@@ -220,7 +218,7 @@ class IndependentCacheManagementTest {
     private static class TestableGetObjectHandler extends GetObject.Handler {
         
         TestableGetObjectHandler(AtomicInteger batchSize, Cache<String, Object> remoteObjects,
-                Cache<String, Object> localObjects, Map<Object, Integer> localRefs,
+                Cache<String, Object> localObjects, WeakIdentityHashMap<Object, Integer> localRefs,
                 AtomicBoolean trace) {
             super(batchSize, remoteObjects, localObjects, localRefs, trace);
         }
