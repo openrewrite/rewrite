@@ -370,7 +370,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (newArgs != currentArgs) {
                         a = a.withArguments(newArgs);
                     }
-                    if (!foundOrSetAttributeWithDesiredValue.get() && !attributeValIsAlreadyPresent(newArgs, newAttributeValue) && oldAttributeValue == null) {
+                    if (!foundOrSetAttributeWithDesiredValue.get() && !attributeValIsAlreadyPresent(newArgs, newAttributeValue) && oldAttributeValue == null && !isAnnotationWithOnlyValueMethod(a)) {
                         // There was no existing value to update and no requirements on a pre-existing old value, so add a new value into the argument list
                         String effectiveName = (attributeName == null) ? "value" : attributeName;
                         //noinspection ConstantConditions
@@ -450,6 +450,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             }
         }
         return false;
+    }
+
+    private static boolean isAnnotationWithOnlyValueMethod(J.Annotation a) {
+        return a.getAnnotationType().getType() instanceof JavaType.Class &&
+                ((JavaType.Class) a.getAnnotationType().getType()).getMethods().size() == 1
+                && ((JavaType.Class) a.getAnnotationType().getType()).getMethods().get(0).getName().equals("value");
     }
 
     @Value
