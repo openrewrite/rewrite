@@ -834,6 +834,44 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void addOtherAttributeInArrayValueAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "string",
+            "test",
+            null,
+            null,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+                  String string() default "";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"newTest1", "newTest2"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(string = "test", value = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void appendSingleValueToExistingArrayAttribute() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
