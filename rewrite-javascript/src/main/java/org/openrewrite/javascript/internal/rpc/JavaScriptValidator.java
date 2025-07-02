@@ -144,6 +144,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
 
     @Override
     public JS.Import visitImportDeclaration(JS.Import import_, P p) {
+        visitAndValidate(import_.getModifiers(), J.Modifier.class, p);
         visitAndValidate(import_.getImportClause(), JS.ImportClause.class, p);
         visitAndValidate(import_.getModuleSpecifier(), Expression.class, p);
         visitAndValidate(import_.getAttributes(), JS.ImportAttributes.class, p);

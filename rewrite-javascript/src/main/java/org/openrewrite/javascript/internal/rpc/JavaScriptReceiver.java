@@ -157,6 +157,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitImportDeclaration(JS.Import anImport, RpcReceiveQueue q) {
         return anImport
+                .withModifiers(q.receiveList(anImport.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
                 .withImportClause(q.receive(anImport.getImportClause(), el -> (JS.ImportClause) visitNonNull(el, q)))
                 .getPadding().withModuleSpecifier(q.receive(anImport.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q)))
                 .withAttributes(q.receive(anImport.getAttributes(), el -> (JS.ImportAttributes) visitNonNull(el, q)))
