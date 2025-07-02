@@ -19,6 +19,7 @@ import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.rpc.ObjectStore;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcSendQueue;
 
@@ -44,7 +45,7 @@ public class GetObject implements RpcRequest {
 
         private final AtomicInteger batchSize;
         private final Map<String, Object> remoteObjects;
-        private final Map<String, Object> localObjects;
+        private final ObjectStore objectStore;
         /**
          * Keeps track of objects that need to be referentially deduplicated, and
          * the ref IDs to look them up by on the remote.
@@ -56,7 +57,7 @@ public class GetObject implements RpcRequest {
 
         @Override
         protected List<RpcObjectData> handle(GetObject request) throws Exception {
-            Object after = localObjects.get(request.getId());
+            Object after = objectStore.get(request.getId());
 
             if (after == null) {
                 List<RpcObjectData> deleted = new ArrayList<>(2);

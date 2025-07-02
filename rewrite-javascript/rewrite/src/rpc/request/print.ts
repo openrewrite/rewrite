@@ -32,13 +32,18 @@ export class Print {
                   getObject: (id: string) => any,
                   getCursor: (cursorIds: string[] | undefined) => Promise<Cursor>): void {
         connection.onRequest(new rpc.RequestType<Print, string, Error>("Print"), async request => {
-            const tree: Tree = await getObject(request.treeId.toString());
-            const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
-            if (isSourceFile(tree)) {
-                return await printer(tree).print(tree, out);
-            } else {
-                const cursor = await getCursor(request.cursor);
-                return await printer(cursor).print(tree, out);
+            try {
+                const tree: Tree = await getObject(request.treeId);
+                const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
+                if (isSourceFile(tree)) {
+                    return await printer(tree).print(tree, out);
+                } else {
+                    const cursor = await getCursor(request.cursor);
+                    return await printer(cursor).print(tree, out);
+                }
+            } catch (e) {
+                console.error(e);
+                throw e;
             }
         });
     }

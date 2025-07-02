@@ -874,11 +874,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         }
         visit(multiVariable.getTypeExpression(), p);
         // For backwards compatibility.
-        for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
-            visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
-            p.append('[');
-            visitSpace(dim.getElement(), Space.Location.DIMENSION, p);
-            p.append(']');
+        if (multiVariable.getDimensionsBeforeName() != null) {
+            for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
+                visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
+                p.append('[');
+                visitSpace(dim.getElement(), Space.Location.DIMENSION, p);
+                p.append(']');
+            }
         }
         if (multiVariable.getVarargs() != null) {
             visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);

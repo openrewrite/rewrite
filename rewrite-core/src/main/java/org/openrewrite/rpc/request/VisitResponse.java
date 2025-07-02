@@ -16,8 +16,12 @@
 package org.openrewrite.rpc.request;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
 @Value
 public class VisitResponse {
     boolean modified;
+
+    @Nullable
+    String afterId;
 }

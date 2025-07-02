@@ -19,6 +19,7 @@ import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.rpc.ObjectStore;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
@@ -44,7 +45,7 @@ public class Generate implements RpcRequest {
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<Generate> {
-        private final Map<String, Object> localObjects;
+        private final ObjectStore objectStore;
         private final Map<String, Recipe> preparedRecipes;
         private final Map<Recipe, Cursor> recipeCursors;
         private final Function<String, ?> getObject;
@@ -68,9 +69,8 @@ public class Generate implements RpcRequest {
                 Object acc = scanningRecipe.getAccumulator(recipeCursors.computeIfAbsent(recipe,
                         r -> new Cursor(null, Cursor.ROOT_VALUE)), ctx);
                 Collection<? extends SourceFile> generated = scanningRecipe.generate(acc, ctx);
-                generated.forEach(g -> localObjects.put(g.getId().toString(), g));
                 return generated.stream()
-                        .map(SourceFile::getId)
+                        .map(objectStore::store)
                         .collect(Collectors.toList());
             }
             return emptyList();

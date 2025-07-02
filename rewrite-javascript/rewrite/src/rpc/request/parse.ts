@@ -18,6 +18,7 @@ import {ExecutionContext} from "../../execution";
 import {UUID} from "node:crypto";
 import {Parser, ParserInput, Parsers} from "../../parser";
 import {SourceFile} from "../../tree";
+import {ObjectStore} from "../object-store";
 
 export class Parse {
     constructor(private readonly id: string,
@@ -26,7 +27,7 @@ export class Parse {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  localObjects: Map<string, any>): void {
+                  objectStore: ObjectStore): void {
         const ongoingRequests = new Map<string, AsyncGenerator<SourceFile>>();
 
         connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), async (request) => {
@@ -58,8 +59,7 @@ export class Parse {
                     } else {
                         // Store the generated object and add its ID to batch
                         const sourceFile = result.value;
-                        localObjects.set(sourceFile.id.toString(), sourceFile);
-                        batch.push(sourceFile.id);
+                        batch.push(objectStore.store(sourceFile));
                     }
                 }
 
