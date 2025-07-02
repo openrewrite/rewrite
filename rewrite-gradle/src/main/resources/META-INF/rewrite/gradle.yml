@@ -21,6 +21,8 @@ description: Apply a set of [Gradle best practices](https://docs.gradle.org/curr
 recipeList:
   - org.openrewrite.gradle.MigrateToGradle8
   - org.openrewrite.gradle.DependencyUseStringNotation
+  - org.openrewrite.gradle.EnableGradleBuildCache
+  - org.openrewrite.gradle.EnableGradleParallelExecution
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.search.FindDependencyHandler
