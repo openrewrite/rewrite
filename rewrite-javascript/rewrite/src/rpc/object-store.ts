@@ -40,24 +40,94 @@ export class IdentityMap {
 export class ObjectStore {
     private readonly objects: Map<string, any>;
     private readonly objectIds: IdentityMap;
+    private readonly objectIdToVersion: Map<string, string>; // objectId -> currentVersionId
     private readonly snowflake: ReturnType<typeof SnowflakeId>;
 
     constructor(snowflake: ReturnType<typeof SnowflakeId>) {
         this.objects = new Map<string, any>();
         this.objectIds = new IdentityMap();
+        this.objectIdToVersion = new Map<string, string>();
         this.snowflake = snowflake;
     }
 
     /**
+     * Check if an object has an intrinsic ID property.
+     */
+    private hasIntrinsicId(obj: any): boolean {
+        return obj && typeof obj === 'object' && typeof obj.id === 'string';
+    }
+
+    /**
+     * Get the intrinsic ID from an object.
+     */
+    private getIntrinsicId(obj: any): string | undefined {
+        return this.hasIntrinsicId(obj) ? obj.id : undefined;
+    }
+
+    /**
+     * Create a composite ID from object ID and version ID.
+     */
+    private createCompositeId(objectId: string, versionId: string): string {
+        return `${objectId}@${versionId}`;
+    }
+
+    /**
+     * Parse a composite ID into object ID and version ID.
+     * Returns null if not a composite ID.
+     */
+    private parseCompositeId(compositeId: string): { objectId: string, versionId: string } | null {
+        const atIndex = compositeId.indexOf('@');
+        if (atIndex === -1) {
+            return null;
+        }
+        return {
+            objectId: compositeId.substring(0, atIndex),
+            versionId: compositeId.substring(atIndex + 1)
+        };
+    }
+
+    /**
+     * Get the current version ID for an object ID.
+     */
+    getCurrentVersion(objectId: string): string | undefined {
+        return this.objectIdToVersion.get(objectId);
+    }
+
+    /**
      * Store an object with an optional ID. If no ID is provided, a new one will be generated.
+     * For objects with intrinsic IDs, creates composite IDs with versioning.
      * Returns the ID used to store the object.
      */
     store<T>(obj: T, id?: string): string {
         const currentId = this.objectIds.get(obj);
-
+        const intrinsicId = this.getIntrinsicId(obj);
+        
         if (!currentId) {
             // Object not yet stored
-            const actualId = id ?? this.snowflake.generate();
+            let actualId: string;
+            
+            if (intrinsicId && !id) {
+                // Object has intrinsic ID, create composite ID with new version
+                const versionId = this.snowflake.generate();
+                actualId = this.createCompositeId(intrinsicId, versionId);
+                this.objectIdToVersion.set(intrinsicId, versionId);
+            } else if (intrinsicId && id) {
+                // Object has intrinsic ID and specific ID provided
+                const parsed = this.parseCompositeId(id);
+                if (parsed && parsed.objectId === intrinsicId) {
+                    actualId = id;
+                    this.objectIdToVersion.set(intrinsicId, parsed.versionId);
+                } else {
+                    // Provided ID doesn't match intrinsic ID, create new composite
+                    const versionId = this.snowflake.generate();
+                    actualId = this.createCompositeId(intrinsicId, versionId);
+                    this.objectIdToVersion.set(intrinsicId, versionId);
+                }
+            } else {
+                // Object has no intrinsic ID, use simple Snowflake ID
+                actualId = id ?? this.snowflake.generate();
+            }
+            
             this.objects.set(actualId, obj);
             this.objectIds.set(obj, actualId);
             return actualId;
@@ -66,6 +136,15 @@ export class ObjectStore {
             this.objects.delete(currentId);
             this.objects.set(id, obj);
             this.objectIds.set(obj, id);
+            
+            // Update version mapping if object has intrinsic ID
+            if (intrinsicId) {
+                const parsed = this.parseCompositeId(id);
+                if (parsed && parsed.objectId === intrinsicId) {
+                    this.objectIdToVersion.set(intrinsicId, parsed.versionId);
+                }
+            }
+            
             return id;
         } else {
             // Object already stored with same ID or no new ID provided
@@ -119,6 +198,7 @@ export class ObjectStore {
      */
     clear(): void {
         this.objects.clear();
+        this.objectIdToVersion.clear();
         // Note: WeakMap in objectIds will be garbage collected automatically
     }
 

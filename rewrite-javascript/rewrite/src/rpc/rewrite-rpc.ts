@@ -44,8 +44,8 @@ export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
 
     readonly localObjects: ObjectStore = new ObjectStore(this.snowflake);
+    readonly remoteObjects: ObjectStore = new ObjectStore(this.snowflake);
 
-    readonly remoteObjects: Map<string, any> = new Map();
     readonly remoteRefs: Map<number, any> = new Map();
     readonly localRefs: ReferenceMap = new ReferenceMap();
 
@@ -89,9 +89,26 @@ export class RewriteRpc {
     }
 
     async getObject<P>(id: string): Promise<P> {
+        const existingRemote = this.remoteObjects.get<P>(id);
+        if (existingRemote) {
+            return existingRemote;
+        }
+
         const localObject = this.localObjects.get<P>(id);
-        const lastKnownId = isTree(localObject) ? localObject.id : undefined;
         
+        // Get the lastKnownId from remote ObjectStore using version tracking
+        let lastKnownId: string | undefined;
+        if (localObject) {
+            const intrinsicId = (localObject as any)?.id;
+            if (intrinsicId && typeof intrinsicId === 'string') {
+                // For objects with intrinsic ID, get the last known version
+                const lastVersion = this.remoteObjects.getCurrentVersion(intrinsicId);
+                if (lastVersion) {
+                    lastKnownId = `${intrinsicId}@${lastVersion}`;
+                }
+            }
+        }
+
         const q = new RpcReceiveQueue(this.remoteRefs, () => {
             return this.connection.sendRequest(
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
@@ -106,7 +123,7 @@ export class RewriteRpc {
             throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
         }
 
-        this.remoteObjects.set(id, remoteObject);
+        this.remoteObjects.store(remoteObject, id);
         this.localObjects.store(remoteObject, id);
 
         return remoteObject;
@@ -117,7 +134,7 @@ export class RewriteRpc {
         if (cursorIds) {
             for (let i = cursorIds.length - 1; i >= 0; i--) {
                 const cursorObject = await this.getObject(cursorIds[i]);
-                this.remoteObjects.set(cursorIds[i], cursorObject);
+                this.remoteObjects.store(cursorObject, cursorIds[i]);
                 cursor = new Cursor(cursorObject, cursor);
             }
         }

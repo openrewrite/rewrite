@@ -16,6 +16,8 @@
 package org.openrewrite.rpc;
 
 import io.moderne.jsonrpc.internal.SnowflakeId;
+import org.openrewrite.Tree;
+import org.openrewrite.marker.Marker;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -27,39 +29,137 @@ import java.util.*;
 public class ObjectStore {
     private final Map<String, Object> objects;
     private final Map<Object, String> objectIds;
+    private final Map<String, String> objectIdToVersion; // objectId -> currentVersionId
 
     public ObjectStore() {
         this.objects = new HashMap<>();
         this.objectIds = new IdentityHashMap<>();
+        this.objectIdToVersion = new HashMap<>();
+    }
+
+    /**
+     * Check if an object has an intrinsic ID property.
+     */
+    private boolean hasIntrinsicId(Object obj) {
+        return obj instanceof Tree || obj instanceof Marker;
+    }
+
+    /**
+     * Get the intrinsic ID from an object.
+     */
+    @Nullable
+    private String getIntrinsicId(Object obj) {
+        if (obj instanceof Tree) {
+            return ((Tree) obj).getId().toString();
+        } else if (obj instanceof Marker) {
+            return ((Marker) obj).getId().toString();
+        }
+        return null;
+    }
+
+    /**
+     * Create a composite ID from object ID and version ID.
+     */
+    private String createCompositeId(String objectId, String versionId) {
+        return objectId + "@" + versionId;
+    }
+
+    /**
+     * Parse a composite ID into object ID and version ID.
+     * Returns null if not a composite ID.
+     */
+    @Nullable
+    private CompositeId parseCompositeId(String compositeId) {
+        int atIndex = compositeId.indexOf('@');
+        if (atIndex == -1) {
+            return null;
+        }
+        return new CompositeId(
+            compositeId.substring(0, atIndex),
+            compositeId.substring(atIndex + 1)
+        );
+    }
+
+    /**
+     * Get the current version ID for an object ID.
+     */
+    @Nullable
+    public String getCurrentVersion(String objectId) {
+        return objectIdToVersion.get(objectId);
+    }
+
+    /**
+     * Helper class to hold parsed composite ID components.
+     */
+    private static class CompositeId {
+        final String objectId;
+        final String versionId;
+        
+        CompositeId(String objectId, String versionId) {
+            this.objectId = objectId;
+            this.versionId = versionId;
+        }
     }
 
     /**
      * Store an object with an optional ID. If no ID is provided, a new one will be generated.
+     * For objects with intrinsic IDs, creates composite IDs with versioning.
      * @param obj The object to store
      * @param id The optional ID to use
      * @return The ID used to store the object
      */
     public String store(Object obj, @Nullable String id) {
         String currentId = objectIds.get(obj);
+        String intrinsicId = getIntrinsicId(obj);
         
         if (currentId == null) {
             // Object not yet stored
-            if (id == null) {
-                id = SnowflakeId.generateId();
+            String actualId;
+            
+            if (intrinsicId != null && id == null) {
+                // Object has intrinsic ID, create composite ID with new version
+                String versionId = SnowflakeId.generateId();
+                actualId = createCompositeId(intrinsicId, versionId);
+                objectIdToVersion.put(intrinsicId, versionId);
+            } else if (intrinsicId != null && id != null) {
+                // Object has intrinsic ID and specific ID provided
+                CompositeId parsed = parseCompositeId(id);
+                if (parsed != null && parsed.objectId.equals(intrinsicId)) {
+                    actualId = id;
+                    objectIdToVersion.put(intrinsicId, parsed.versionId);
+                } else {
+                    // Provided ID doesn't match intrinsic ID, create new composite
+                    String versionId = SnowflakeId.generateId();
+                    actualId = createCompositeId(intrinsicId, versionId);
+                    objectIdToVersion.put(intrinsicId, versionId);
+                }
+            } else {
+                // Object has no intrinsic ID, use simple Snowflake ID
+                actualId = id != null ? id : SnowflakeId.generateId();
             }
-            objects.put(id, obj);
-            objectIds.put(obj, id);
+            
+            objects.put(actualId, obj);
+            objectIds.put(obj, actualId);
+            return actualId;
         } else if (!currentId.equals(id) && id != null) {
             // Object already stored with different ID, update it
             objects.remove(currentId);
             objects.put(id, obj);
             objectIds.put(obj, id);
+            
+            // Update version mapping if object has intrinsic ID
+            if (intrinsicId != null) {
+                CompositeId parsed = parseCompositeId(id);
+                if (parsed != null && parsed.objectId.equals(intrinsicId)) {
+                    objectIdToVersion.put(intrinsicId, parsed.versionId);
+                }
+            }
+            
+            return id;
         } else {
             // Object already stored with same ID or no new ID provided
-            id = currentId;
+            return currentId;
         }
-        
-        return id;
     }
 
     /**
@@ -129,6 +229,7 @@ public class ObjectStore {
     public void clear() {
         objects.clear();
         objectIds.clear();
+        objectIdToVersion.clear();
     }
 
     /**

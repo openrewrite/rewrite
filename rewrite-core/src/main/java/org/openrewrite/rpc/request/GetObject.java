@@ -44,7 +44,7 @@ public class GetObject implements RpcRequest {
         private static final ExecutorService forkJoin = ForkJoinPool.commonPool();
 
         private final AtomicInteger batchSize;
-        private final Map<String, Object> remoteObjects;
+        private final ObjectStore remoteObjects;
         private final ObjectStore objectStore;
         /**
          * Keeps track of objects that need to be referentially deduplicated, and
@@ -88,7 +88,7 @@ public class GetObject implements RpcRequest {
                         // All the data has been sent, and the remote should have received
                         // the full tree, so update our understanding of the remote state
                         // of this tree.
-                        remoteObjects.put(id, after);
+                        remoteObjects.store(after, id);
                     } catch (Throwable ignored) {
                         // TODO do something with this exception
                     } finally {

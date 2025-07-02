@@ -24,7 +24,7 @@ export class GetObject {
 
     static handle(
         connection: rpc.MessageConnection,
-        remoteObjects: Map<string, any>,
+        remoteObjects: ObjectStore,
         objectStore: ObjectStore,
         localRefs: ReferenceMap,
         batchSize: number,
@@ -50,14 +50,14 @@ export class GetObject {
                     before = remoteObjects.get(request.lastKnownId);
                     if (before === undefined) {
                         // Remote had something cached, but we've evicted it - must send full object
-                        remoteObjects.delete(request.lastKnownId);
+                        remoteObjects.remove(request.lastKnownId);
                     }
                 }
 
                 allData = await new RpcSendQueue(localRefs, trace).generate(after, before);
                 pendingData.set(request.id, allData);
 
-                remoteObjects.set(request.id, after);
+                remoteObjects.store(after, request.id);
             }
 
             const batch = allData.splice(0, batchSize);

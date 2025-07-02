@@ -23,6 +23,7 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
@@ -96,7 +97,7 @@ public class RewriteRpc implements AutoCloseable {
      * between two processes.
      */
     @VisibleForTesting
-    final Map<String, Object> remoteObjects = new HashMap<>();
+    final ObjectStore remoteObjects = new ObjectStore();
 
     @VisibleForTesting
     final ObjectStore localObjects = new ObjectStore();
@@ -364,22 +365,59 @@ public class RewriteRpc implements AutoCloseable {
 
     @VisibleForTesting
     public <T> T getObject(String id) {
-        // Check if we have a cached version of this object
+        // Check what we think the remote has cached
+        Object existingRemote = remoteObjects.get(id);
+        if (existingRemote != null) {
+            return (T) existingRemote;
+        }
+
+        // Check if we have a local cached version
         Object localObject = localObjects.get(id);
-        String lastKnownId = localObject != null ? id : null;
+        
+        // Get the lastKnownId from remote ObjectStore using version tracking
+        final String lastKnownId;
+        if (localObject != null) {
+            String intrinsicId = getIntrinsicObjectId(localObject);
+            if (intrinsicId != null) {
+                // For objects with intrinsic ID, get the last known version from remote store
+                String lastVersion = remoteObjects.getCurrentVersion(intrinsicId);
+                if (lastVersion != null) {
+                    lastKnownId = intrinsicId + "@" + lastVersion;
+                } else {
+                    lastKnownId = null;
+                }
+            } else {
+                lastKnownId = null;
+            }
+        } else {
+            lastKnownId = null;
+        }
 
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
                 new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
-        Object remoteObject = q.receive(localObject, null);
+        Object receivedObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
         // We are now in sync with the remote state of the object.
-        remoteObjects.put(id, remoteObject);
-        localObjects.store(remoteObject, id);
+        remoteObjects.store(receivedObject, id);
+        localObjects.store(receivedObject, id);
 
         //noinspection unchecked
-        return (T) remoteObject;
+        return (T) receivedObject;
+    }
+
+    /**
+     * Get the intrinsic object ID from an object (for Tree or Marker objects).
+     */
+    @Nullable
+    private String getIntrinsicObjectId(Object obj) {
+        if (obj instanceof Tree) {
+            return ((Tree) obj).getId().toString();
+        } else if (obj instanceof Marker) {
+            return ((Marker) obj).getId().toString();
+        }
+        return null;
     }
 
     private Object getRef(Integer refId) {
@@ -422,7 +460,7 @@ public class RewriteRpc implements AutoCloseable {
             for (int i = cursorIds.size() - 1; i >= 0; i--) {
                 String cursorId = cursorIds.get(i);
                 Object cursorObject = getObject(cursorId);
-                remoteObjects.put(cursorId, cursorObject);
+                remoteObjects.store(cursorObject, cursorId);
                 cursor = new Cursor(cursor, cursorObject);
             }
         }

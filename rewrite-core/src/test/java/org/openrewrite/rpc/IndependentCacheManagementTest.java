@@ -37,7 +37,7 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithoutLastKnownId_returnsADD() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
+        ObjectStore remoteObjects = new ObjectStore();
         ObjectStore objectStore = new ObjectStore();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
@@ -66,7 +66,7 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithLastKnownId_whenRemoteHasNoEntry_returnsADD() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
+        ObjectStore remoteObjects = new ObjectStore();
         ObjectStore objectStore = new ObjectStore();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
@@ -96,7 +96,7 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithLastKnownId_whenRemoteHasSameEntry_returnsNOCHANGE() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
+        ObjectStore remoteObjects = new ObjectStore();
         ObjectStore objectStore = new ObjectStore();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
@@ -110,7 +110,7 @@ class IndependentCacheManagementTest {
                 .build();
         
         objectStore.store(text, objectId);
-        remoteObjects.put(objectId, text); // Same object in remote
+        remoteObjects.store(text, objectId); // Same object in remote
 
         // Simulate GetObject request with lastKnownId 
         TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
@@ -126,7 +126,7 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithLastKnownId_whenRemoteHasDifferentEntry_returnsCHANGE() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
+        ObjectStore remoteObjects = new ObjectStore();
         ObjectStore objectStore = new ObjectStore();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
@@ -143,7 +143,7 @@ class IndependentCacheManagementTest {
         PlainText modifiedText = originalText.withText("Modified Text");
         
         objectStore.store(modifiedText, objectId);
-        remoteObjects.put(objectId, originalText); // Different object in remote
+        remoteObjects.store(originalText, objectId); // Different object in remote
 
         // Simulate GetObject request with lastKnownId 
         TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
@@ -218,7 +218,7 @@ class IndependentCacheManagementTest {
     // Helper class to access protected method
     private static class TestableGetObjectHandler extends GetObject.Handler {
         
-        TestableGetObjectHandler(AtomicInteger batchSize, Map<String, Object> remoteObjects,
+        TestableGetObjectHandler(AtomicInteger batchSize, ObjectStore remoteObjects,
                 ObjectStore objectStore, IdentityHashMap<Object, Integer> localRefs,
                 AtomicBoolean trace) {
             super(batchSize, remoteObjects, objectStore, localRefs, trace);
