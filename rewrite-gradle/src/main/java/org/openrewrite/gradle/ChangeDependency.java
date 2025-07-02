@@ -57,8 +57,10 @@ public class ChangeDependency extends Recipe {
     // Minimize the number of allocations by caching the updated dependencies.
     @EqualsAndHashCode.Exclude
     transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new HashMap<>();
+
     @EqualsAndHashCode.Exclude
     transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new HashMap<>();
+
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
