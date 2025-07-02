@@ -278,6 +278,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         jsImport = statement as JS.Import;
 
         return this.produceJavaScript<JS.Import>(jsImport, p, async draft => {
+            draft.modifiers = await mapAsync(jsImport.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.importClause = jsImport.importClause && await this.visitDefined<JS.ImportClause>(jsImport.importClause, p);
             draft.moduleSpecifier = jsImport.moduleSpecifier && await this.visitLeftPadded(jsImport.moduleSpecifier, p);
             draft.attributes = jsImport.attributes && await this.visitDefined<JS.ImportAttributes>(jsImport.attributes, p);
