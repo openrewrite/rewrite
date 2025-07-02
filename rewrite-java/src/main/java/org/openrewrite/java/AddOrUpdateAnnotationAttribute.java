@@ -84,7 +84,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     @Option(displayName = "Append array",
             description = "If the attribute is an array and attribute is present, setting this option to `true` will append the value(s). Duplicate values will not be added. " +
-                    "Otherwise, the recipe will replace the existing value(s) with the new value(s).",
+                    "If omitted or `false`, the recipe will replace the existing value(s) with the new value(s).",
             required = false)
     @Nullable
     Boolean appendArray;
