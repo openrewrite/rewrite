@@ -429,6 +429,40 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradeVersionToRelease() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new UpgradeDependencyVersion("org.springframework.boot", "spring-boot", "3.5.x", null, null, null)
+          ),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <spring-boot.version>3.1.5</spring-boot.version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot</artifactId>
+                    <version>${spring-boot.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .containsPattern("<spring-boot.version>3.5.\\d+</spring-boot.version>")
+                .actual()
+            )
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
     void propertiesInDependencyGroupIdAndArtifactId() {
         rewriteRun(

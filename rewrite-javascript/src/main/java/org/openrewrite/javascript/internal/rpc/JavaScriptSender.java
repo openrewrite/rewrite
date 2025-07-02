@@ -46,11 +46,8 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
-        if (!(j instanceof JS.ExpressionStatement) && !(j instanceof JS.StatementExpression)) {
-            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
-            q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-            q.sendMarkers(j, Tree::getMarkers);
-        }
+        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
+        q.sendMarkers(j, Tree::getMarkers);
 
         return j;
     }
@@ -120,6 +117,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return expressionWithTypeArguments;
     }
 
+
     @Override
     public J visitFunctionType(JS.FunctionType functionType, RpcSendQueue q) {
         q.getAndSendList(functionType, JS.FunctionType::getModifiers, J.Modifier::getId, el -> visit(el, q));
@@ -149,6 +147,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitImportDeclaration(JS.Import jsImport, RpcSendQueue q) {
+        q.getAndSendList(jsImport, JS.Import::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSend(jsImport, JS.Import::getImportClause, el -> visit(el, q));
         q.getAndSend(jsImport, el -> el.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q));
         q.getAndSend(jsImport, JS.Import::getAttributes, el -> visit(el, q));
@@ -571,6 +570,15 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return exportSpecifier;
     }
 
+    @Override
+    public J visitFunctionCall(JS.FunctionCall functionCall, RpcSendQueue q) {
+        q.getAndSend(functionCall, m -> m.getPadding().getFunction(), select -> visitRightPadded(select, q));
+        q.getAndSend(functionCall, m -> m.getPadding().getTypeParameters(), typeParams -> visitContainer(typeParams, q));
+        q.getAndSend(functionCall, m -> m.getPadding().getArguments(), args -> visitContainer(args, q));
+        q.getAndSend(functionCall, m -> asRef(m.getMethodType()), type -> visitType(getValueNonNull(type), q));
+        return functionCall;
+    }
+
     private <T> void visitLeftPadded(JLeftPadded<T> left, RpcSendQueue q) {
         delegate.visitLeftPadded(left, q);
     }
@@ -585,6 +593,11 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     private void visitSpace(Space space, RpcSendQueue q) {
         delegate.visitSpace(space, q);
+    }
+
+    @Override
+    public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcSendQueue q) {
+        return delegate.visitType(javaType, q);
     }
 
     private static class JavaScriptSenderDelegate extends JavaSender {

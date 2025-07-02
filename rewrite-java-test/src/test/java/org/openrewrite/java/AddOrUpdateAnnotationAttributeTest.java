@@ -537,6 +537,80 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void arrayInAnnotationValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "newTest",
+            null,
+            false,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"oldTest"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"newTest"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInAnnotationExplicitValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "newTest",
+            null,
+            false,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(value = {"oldTest"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(value = {"newTest"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void arrayInputMoreThanOneInAnnotationAttribute() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
@@ -566,6 +640,117 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               
               @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInputMoreThanOneInAnnotationLiteralAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "newTest1,newTest2",
+            null,
+            false,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(array = "oldTest")
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(array = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInputMoreThanOneInAnnotationLiteralValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "newTest1,newTest2",
+            null,
+            false,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("oldTest")
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayInputMoreThanOneInAnnotationValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "newTest1,newTest2",
+            null,
+            false,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"oldTest"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"newTest1", "newTest2"})
               public class A {
               }
               """
@@ -760,6 +945,74 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void addOtherAttributeInArrayValueAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "string",
+            "test",
+            null,
+            null,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+                  String string() default "";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"newTest1", "newTest2"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(string = "test", value = {"newTest1", "newTest2"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dontChangeWhenAttributeDoesNotMatchAtAll() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "array",
+            "b",
+            null,
+            false,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"a"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void appendSingleValueToExistingArrayAttribute() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
@@ -789,6 +1042,43 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               
               @Foo(array = {"a", "b"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendSingleValueToExistingArrayValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "b",
+            null,
+            false,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"a"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b"})
               public class A {
               }
               """
@@ -834,6 +1124,43 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void appendMultipleValuesToExistingArrayValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "b,c",
+            null,
+            false,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"a"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b", "c"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void appendMultipleValuesToExistingArrayAttributeWithOverlap() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
@@ -863,6 +1190,43 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               
               @Foo(array = {"a", "b", "c"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendMultipleValuesToExistingArrayValueAttributeWithOverlap() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "b,c",
+            null,
+            false,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b", "c"})
               public class A {
               }
               """
@@ -903,6 +1267,46 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               
               @Foo(array = {"a", "b", "b", "c"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendMultipleValuesToExistingArrayValueAttributeNonSet() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "b,c",
+            null,
+            true,
+            true)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              
+              public class A {
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b"})
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo({"a", "b", "b", "c"})
               public class A {
               }
               """
@@ -1477,6 +1881,121 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               
               @Foo(value = "oldValue")
               public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddOrRemoveExplicitParameterNameValueWhenOldAttributeValueDoesNotMatchAndAttributeNameIsNotValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "name",
+              "newValue",
+              "oldValue",
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("oldValue")
+              public class A {}
+              
+              @Foo(value = "oldExplicitValue")
+              public class B {}
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void doNotAddOrRemoveExplicitParameterNameValueWhenOldAttributeValueDoesMatchAndAttributeNameIsValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "value",
+              "newValue",
+              "oldValue",
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("newValue")
+              public class A {}
+              
+              @Foo(value = "newValue")
+              public class B {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doAddExplicitParameterNameValueWhenOldAttributeValueIsNullAndAttributeNameIsNotValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AddOrUpdateAnnotationAttribute(
+              "org.example.Foo",
+              "name",
+              "aName",
+              null,
+              null,
+              null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String name() default "";
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo("someValue")
+              public class A {}
+              
+              @Foo(value = "someValue")
+              public class B {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(name = "aName", value = "someValue")
+              public class A {}
+        
+              @Foo(name = "aName", value = "someValue")
+              public class B {}
               """
           )
         );

@@ -58,7 +58,8 @@ export class RewriteRpc {
                     batchSize?: number,
                     registry?: RecipeRegistry,
                     traceGetObjectOutput?: boolean,
-                    traceGetObjectInput?: Writable
+                    traceGetObjectInput?: Writable,
+                    recipeInstallDir?: string
                 }) {
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
@@ -78,7 +79,7 @@ export class RewriteRpc {
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
-        InstallRecipes.handle(this.connection, ".rewrite", registry);
+        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry);
 
         this.connection.listen();
     }

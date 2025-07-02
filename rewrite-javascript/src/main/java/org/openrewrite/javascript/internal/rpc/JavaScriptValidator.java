@@ -112,6 +112,14 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
+    public JS.FunctionCall visitFunctionCall(JS.FunctionCall functionCall, P p) {
+        visitAndValidate(functionCall.getFunction(), Expression.class, p);
+        visitAndValidate(functionCall.getTypeParameters(), Expression.class, p);
+        visitAndValidate(functionCall.getArguments(), Expression.class, p);
+        return functionCall;
+    }
+
+    @Override
     public JS.FunctionType visitFunctionType(JS.FunctionType functionType, P p) {
         ListUtils.map(functionType.getModifiers(), el -> visitAndValidateNonNull(el, J.Modifier.class, p));
         visitAndValidate(functionType.getTypeParameters(), J.TypeParameters.class, p);
@@ -136,6 +144,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
 
     @Override
     public JS.Import visitImportDeclaration(JS.Import import_, P p) {
+        visitAndValidate(import_.getModifiers(), J.Modifier.class, p);
         visitAndValidate(import_.getImportClause(), JS.ImportClause.class, p);
         visitAndValidate(import_.getModuleSpecifier(), Expression.class, p);
         visitAndValidate(import_.getAttributes(), JS.ImportAttributes.class, p);

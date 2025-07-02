@@ -618,6 +618,23 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return mod;
     }
 
+    override async visitFunctionCall(functionCall: JS.FunctionCall, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(functionCall, p);
+
+        if (functionCall.function) {
+            await this.visitRightPadded(functionCall.function, p);
+            if (functionCall.function.element.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
+                p.append("?.");
+            }
+        }
+
+        functionCall.typeParameters && await this.visitContainerLocal("<", functionCall.typeParameters, ",", ">", p);
+        await this.visitContainerLocal("(", functionCall.arguments, ",", ")", p);
+
+        await this.afterSyntax(functionCall, p);
+        return functionCall;
+    }
+
     override async visitFunctionType(functionType: JS.FunctionType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(functionType, p);
         for (const m of functionType.modifiers) {
@@ -760,10 +777,17 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitMethodInvocation(method: J.MethodInvocation, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(method, p);
 
-        if (method.name.toString().length === 0) {
+        if (method.name.simpleName.length === 0) {
             method.select && await this.visitRightPadded(method.select, p);
         } else {
-            method.select && await this.visitRightPaddedLocalSingle(method.select, "", p);
+            if (method.select) {
+                await this.visitRightPadded(method.select, p);
+                if (!method.select.element.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
+                    p.append(".");
+                } else {
+                    p.append("?.");
+                }
+            }
             await this.visit(method.name, p);
         }
 
@@ -1857,31 +1881,27 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     protected async preVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
-        // FIXME: This is currently only required for `ExpressionStatement` and `StatementExpression`
-        if (tree.markers) {
-            for (const marker of tree.markers.markers) {
-                if (marker.kind === JS.Markers.Spread) {
-                    await this.visitSpace((marker as Spread).prefix, p);
-                    p.append("...");
-                }
+        for (const marker of tree.markers.markers) {
+            if (marker.kind === JS.Markers.Spread) {
+                await this.visitSpace((marker as Spread).prefix, p);
+                p.append("...");
             }
         }
         return tree;
     }
 
     protected async postVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
-        // FIXME: This is currently only required for `ExpressionStatement` and `StatementExpression`
-        if (tree.markers) {
-            for (const marker of tree.markers.markers) {
-                if (marker.kind === JS.Markers.NonNullAssertion) {
-                    await this.visitSpace((marker as NonNullAssertion).prefix, p);
-                    p.append("!");
-                }
-                if (marker.kind === JS.Markers.Optional) {
-                    await this.visitSpace((marker as Optional).prefix, p);
+        for (const marker of tree.markers.markers) {
+            if (marker.kind === JS.Markers.NonNullAssertion) {
+                await this.visitSpace((marker as NonNullAssertion).prefix, p);
+                p.append("!");
+            }
+            if (marker.kind === JS.Markers.Optional) {
+                await this.visitSpace((marker as Optional).prefix, p);
+                if (this.cursor.parent?.value?.kind !== J.Kind.MethodInvocation &&
+                    this.cursor.parent?.value?.kind !== JS.Kind.FunctionCall) {
                     p.append("?");
-                    if (this.cursor.parent?.value?.kind === J.Kind.MethodInvocation ||
-                        this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
+                    if (this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
                         p.append(".");
                     }
                 }
