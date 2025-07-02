@@ -23,6 +23,7 @@ public class JsSpace {
         ARRAY_LITERAL_PREFIX,
         ARRAY_LITERAL_SUFFIX,
         ARROW_FUNCTION_PREFIX,
+        AS_PREFIX,
         AWAIT_PREFIX,
         BINARY_PREFIX,
         BINDING_ELEMENTS,

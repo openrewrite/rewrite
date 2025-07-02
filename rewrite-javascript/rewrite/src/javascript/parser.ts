@@ -2432,14 +2432,13 @@ export class JavaScriptParserVisitor {
         return this.visit(node.expression);
     }
 
-    visitAsExpression(node: ts.AsExpression): JS.Binary {
+    visitAsExpression(node: ts.AsExpression): JS.As {
         return {
-            kind: JS.Kind.Binary,
+            kind: JS.Kind.As,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            left: this.convert(node.expression),
-            operator: this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), JS.Binary.Type.As),
+            left: this.rightPadded(this.convert(node.expression), this.prefix(node.getChildAt(1, this.sourceFile))),
             right: this.convert(node.type),
             type: this.mapType(node),
         };

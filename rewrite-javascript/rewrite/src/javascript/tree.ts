@@ -30,6 +30,7 @@ export namespace JS {
         Alias: "org.openrewrite.javascript.tree.JS$Alias",
         ArrayBindingPattern: "org.openrewrite.javascript.tree.JS$ArrayBindingPattern",
         ArrowFunction: "org.openrewrite.javascript.tree.JS$ArrowFunction",
+        As: "org.openrewrite.javascript.tree.JS$As",
         AssignmentOperation: "org.openrewrite.javascript.tree.JS$AssignmentOperation",
         Await: "org.openrewrite.javascript.tree.JS$Await",
         Binary: "org.openrewrite.javascript.tree.JS$Binary",
@@ -129,6 +130,17 @@ export namespace JS {
         readonly typeParameters?: J.TypeParameters;
         readonly lambda: J.Lambda;
         readonly returnTypeExpression?: TypeTree;
+    }
+
+    /**
+     * Represents an "as" expression, used for type assertions or casting.
+     * @example const x = value as Type;
+     */
+    export interface As extends JS, Expression, TypedTree {
+        readonly kind: typeof Kind.As;
+        readonly left: J.RightPadded<Expression>;
+        readonly right: Expression;
+        readonly type?: JavaType;
     }
 
     /**

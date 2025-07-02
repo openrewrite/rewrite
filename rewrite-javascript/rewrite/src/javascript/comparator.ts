@@ -1673,6 +1673,29 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
+     * Overrides the visitAs method to compare as expressions.
+     *
+     * @param as_ The as expression to visit
+     * @param other The other as expression to compare with
+     * @returns The visited as expression, or undefined if the visit was aborted
+     */
+    override async visitAs(as_: JS.As, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== JS.Kind.As) {
+            this.abort();
+            return as_;
+        }
+
+        const otherAs = other as JS.As;
+
+        // Visit left and right operands in lock step
+        await this.visit(as_.left.element, otherAs.left.element);
+        if (!this.match) return as_;
+
+        await this.visit(as_.right, otherAs.right);
+        return as_;
+    }
+
+    /**
      * Overrides the visitAssignmentOperationExtensions method to compare assignment operations.
      * 
      * @param assignmentOperation The assignment operation to visit
