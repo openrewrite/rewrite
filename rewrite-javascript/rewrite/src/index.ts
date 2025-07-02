@@ -33,8 +33,9 @@ export * from "./recipe";
 export * from "./run";
 
 // register all recipes in this package
-export function activate(registry: RecipeRegistry) {
-    import("./recipe/order-imports.js").then(({OrderImports}) => registry.register(OrderImports));
+export async function activate(registry: RecipeRegistry): Promise<void> {
+    const {OrderImports} = await import("./recipe/order-imports.js");
+    registry.register(OrderImports);
 }
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
