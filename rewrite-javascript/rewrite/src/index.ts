@@ -17,7 +17,6 @@ import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
 import {createDraft, Draft, finishDraft} from "immer";
 import {MarkersKind, ParseExceptionResult} from "./markers";
 import {RecipeRegistry} from "./recipe";
-import {OrderImports} from "./recipe/order-imports";
 
 export * from "./data-table";
 export * from "./execution";
@@ -35,7 +34,7 @@ export * from "./run";
 
 // register all recipes in this package
 export function activate(registry: RecipeRegistry) {
-    registry.register(OrderImports);
+    import("./recipe/order-imports.js").then(({OrderImports}) => registry.register(OrderImports));
 }
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
