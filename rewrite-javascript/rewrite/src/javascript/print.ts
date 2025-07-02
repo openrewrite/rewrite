@@ -21,7 +21,7 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {findMarker, Marker, Markers} from "../markers";
-import {Asterisk, DelegatedYield, FunctionDeclaration, NonNullAssertion, Optional, Spread} from "./markers";
+import {Generator, DelegatedYield, FunctionDeclaration, NonNullAssertion, Optional, Spread} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -715,7 +715,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             p.append("function");
         }
 
-        const asterisk = findMarker<Asterisk>(method, JS.Markers.Asterisk);
+        const asterisk = findMarker<Generator>(method, JS.Markers.Generator);
         if (asterisk) {
             await this.visitSpace(asterisk.prefix, p);
             p.append("*");
