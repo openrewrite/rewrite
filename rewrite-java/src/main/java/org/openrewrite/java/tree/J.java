@@ -3404,11 +3404,11 @@ public interface J extends Tree, RpcCodec<J> {
         public static class Padding {
             private final IntersectionType t;
 
-            public @Nullable JContainer<TypeTree> getBounds() {
+            public JContainer<TypeTree> getBounds() {
                 return t.bounds;
             }
 
-            public IntersectionType withBounds(@Nullable JContainer<TypeTree> bounds) {
+            public IntersectionType withBounds(JContainer<TypeTree> bounds) {
                 return t.bounds == bounds ? t : new IntersectionType(t.id, t.prefix, t.markers, bounds);
             }
         }
