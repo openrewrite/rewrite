@@ -466,6 +466,13 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
+    public JS.As visitAs(JS.As as_, P p) {
+        visitAndValidateNonNull(as_.getLeft(), Expression.class, p);
+        visitAndValidateNonNull(as_.getRight(), Expression.class, p);
+        return as_;
+    }
+
+    @Override
     public JS.AssignmentOperation visitAssignmentOperationExtensions(JS.AssignmentOperation assignmentOperation, P p) {
         visitAndValidateNonNull(assignmentOperation.getVariable(), Expression.class, p);
         visitAndValidateNonNull(assignmentOperation.getAssignment(), Expression.class, p);

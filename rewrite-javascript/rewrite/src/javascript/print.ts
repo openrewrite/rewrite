@@ -1367,6 +1367,16 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return type;
     }
 
+    override async visitAs(as_: JS.As, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(as_, p);
+        await this.visitRightPadded(as_.left, p);
+        p.append("as");
+        await this.visit(as_.right, p);
+        await this.afterSyntax(as_, p);
+
+        return as_;
+    }
+
     override async visitAssignment(assignment: J.Assignment, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(assignment, p);
         await this.visit(assignment.variable, p);
@@ -1582,9 +1592,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         let keyword = "";
 
         switch (binary.operator.element) {
-            case JS.Binary.Type.As:
-                keyword = "as";
-                break;
             case JS.Binary.Type.IdentityEquals:
                 keyword = "===";
                 break;

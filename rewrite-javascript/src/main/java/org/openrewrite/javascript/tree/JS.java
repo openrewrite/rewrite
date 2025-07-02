@@ -1922,13 +1922,11 @@ public interface JS extends J {
         }
 
         public enum Type {
-            As,
             IdentityEquals,
             IdentityNotEquals,
             In,
             QuestionQuestion,
             Comma
-
         }
 
         public JS.Binary.Padding getPadding() {
@@ -5008,6 +5006,80 @@ public interface JS extends J {
             }
         }
 
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
+    final class As implements JS, Expression, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<JS.As.Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        JRightPadded<Expression> left;
+
+        public Expression getLeft() {
+            return left.getElement();
+        }
+
+        @With
+        Expression right;
+
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
+            return v.visitAs(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public JS.As.Padding getPadding() {
+            JS.As.Padding p;
+            if (this.padding == null) {
+                p = new JS.As.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new JS.As.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final JS.As t;
+
+            public JRightPadded<Expression> getLeft() {
+                return t.left;
+            }
+
+            public JS.As withLeft(JRightPadded<Expression> left) {
+                return t.left == left ? t : new JS.As(t.id, t.prefix, t.markers, left, t.right, t.type);
+            }
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

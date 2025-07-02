@@ -44,6 +44,11 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.As visitAs(JS.As as_, P p) {
+        return (JS.As) super.visitAs(as_, p);
+    }
+
+    @Override
     public JS.AssignmentOperation visitAssignmentOperationExtensions(JS.AssignmentOperation assignOp, P p) {
         return (JS.AssignmentOperation) super.visitAssignmentOperationExtensions(assignOp, p);
     }
