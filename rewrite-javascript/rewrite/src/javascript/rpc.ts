@@ -101,6 +101,14 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return expressionWithTypeArguments;
     }
 
+    override async visitFunctionCall(functionCall: JS.FunctionCall, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(functionCall, m => m.function, f => this.visitRightPadded(f, q));
+        await q.getAndSend(functionCall, m => m.typeParameters, params => this.visitContainer(params, q));
+        await q.getAndSend(functionCall, m => m.arguments, args => this.visitContainer(args, q));
+        await q.getAndSend(functionCall, m => asRef(m.functionType), type => this.visitType(type, q));
+        return functionCall;
+    }
+
     override async visitFunctionType(functionType: JS.FunctionType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(functionType, el => el.modifiers, el => el.id, el => this.visit(el, q));
         await q.getAndSend(functionType, el => el.constructorType, el => this.visitLeftPadded(el, q));
@@ -624,6 +632,17 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.clazz = await q.receive(draft.clazz, el => this.visitDefined<J>(el, q));
         draft.typeArguments = await q.receive(draft.typeArguments, el => this.visitContainer(el, q));
         draft.type = await q.receive(draft.type, el => this.visitType(el, q));
+        return finishDraft(draft);
+    }
+
+    override async visitFunctionCall(functionCall: JS.FunctionCall, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(functionCall);
+
+        draft.function = await q.receive(functionCall.function, select => this.visitRightPadded(select, q));
+        draft.typeParameters = await q.receive(functionCall.typeParameters, typeParams => this.visitContainer(typeParams, q));
+        draft.arguments = await q.receive(functionCall.arguments, args => this.visitContainer(args, q));
+        draft.functionType = await q.receive(functionCall.functionType, type => this.visitType(type, q) as unknown as JavaType.Method);
+
         return finishDraft(draft);
     }
 

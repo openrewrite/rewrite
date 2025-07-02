@@ -226,6 +226,27 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
+    protected async visitFunctionCall(functionCall: JS.FunctionCall, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(functionCall, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.FunctionCall) {
+            return expression;
+        }
+        functionCall = expression as JS.FunctionCall;
+
+        const statement = await this.visitStatement(functionCall, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.FunctionCall) {
+            return statement;
+        }
+        functionCall = statement as JS.FunctionCall;
+
+        return this.produceJava<JS.FunctionCall>(functionCall, p, async draft => {
+            draft.function = await this.visitOptionalRightPadded(functionCall.function, p);
+            draft.typeParameters = await this.visitOptionalContainer(functionCall.typeParameters, p);
+            draft.arguments = await this.visitContainer(functionCall.arguments, p);
+            draft.functionType = await this.visitType(functionCall.functionType, p) as JavaType.Method | undefined;
+        });
+    }
+
     protected async visitFunctionType(functionType: JS.FunctionType, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(functionType, p);
            if (!expression?.kind || expression.kind !== JS.Kind.FunctionType) {
@@ -898,6 +919,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitExpressionStatement(tree as unknown as JS.ExpressionStatement, p);
                 case JS.Kind.ExpressionWithTypeArguments:
                     return this.visitExpressionWithTypeArguments(tree as unknown as JS.ExpressionWithTypeArguments, p);
+                case JS.Kind.FunctionCall:
+                    return this.visitFunctionCall(tree as unknown as JS.FunctionCall, p);
                 case JS.Kind.FunctionType:
                     return this.visitFunctionType(tree as unknown as JS.FunctionType, p);
                 case JS.Kind.InferType:

@@ -618,6 +618,23 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return mod;
     }
 
+    override async visitFunctionCall(functionCall: JS.FunctionCall, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(functionCall, p);
+
+        if (functionCall.function) {
+            await this.visitRightPadded(functionCall.function, p);
+            if (functionCall.function.element.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
+                p.append("?.");
+            }
+        }
+
+        functionCall.typeParameters && await this.visitContainerLocal("<", functionCall.typeParameters, ",", ">", p);
+        await this.visitContainerLocal("(", functionCall.arguments, ",", ")", p);
+
+        await this.afterSyntax(functionCall, p);
+        return functionCall;
+    }
+
     override async visitFunctionType(functionType: JS.FunctionType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(functionType, p);
         for (const m of functionType.modifiers) {
@@ -760,10 +777,17 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitMethodInvocation(method: J.MethodInvocation, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(method, p);
 
-        if (method.name.toString().length === 0) {
+        if (method.name.simpleName.length === 0) {
             method.select && await this.visitRightPadded(method.select, p);
         } else {
-            method.select && await this.visitRightPaddedLocalSingle(method.select, "", p);
+            if (method.select) {
+                await this.visitRightPadded(method.select, p);
+                if (!method.select.element.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
+                    p.append(".");
+                } else {
+                    p.append("?.");
+                }
+            }
             await this.visit(method.name, p);
         }
 
@@ -1874,10 +1898,12 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             }
             if (marker.kind === JS.Markers.Optional) {
                 await this.visitSpace((marker as Optional).prefix, p);
-                p.append("?");
-                if (this.cursor.parent?.value?.kind === J.Kind.MethodInvocation ||
-                    this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
-                    p.append(".");
+                if (this.cursor.parent?.value?.kind !== J.Kind.MethodInvocation &&
+                    this.cursor.parent?.value?.kind !== JS.Kind.FunctionCall) {
+                    p.append("?");
+                    if (this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
+                        p.append(".");
+                    }
                 }
             }
         }

@@ -585,6 +585,68 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
+     * Overrides the visitFunctionCall method to compare method invocations.
+     *
+     * @param functionCall The function call to visit
+     * @param other The other function call to compare with
+     * @returns The visited function call, or undefined if the visit was aborted
+     */
+    override async visitFunctionCall(functionCall: JS.FunctionCall, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== JS.Kind.FunctionCall) {
+            this.abort();
+            return functionCall;
+        }
+
+        const otherFunctionCall = other as JS.FunctionCall;
+
+        // Compare function
+        if ((functionCall.function === undefined) !== (otherFunctionCall.function === undefined)) {
+            this.abort();
+            return functionCall;
+        }
+
+        // Visit function if present
+        if (functionCall.function && otherFunctionCall.function) {
+            await this.visit(functionCall.function.element, otherFunctionCall.function.element);
+            if (!this.match) return functionCall;
+        }
+
+        // Compare typeParameters
+        if ((functionCall.typeParameters === undefined) !== (otherFunctionCall.typeParameters === undefined)) {
+            this.abort();
+            return functionCall;
+        }
+
+        // Visit typeParameters if present
+        if (functionCall.typeParameters && otherFunctionCall.typeParameters) {
+            if (functionCall.typeParameters.elements.length !== otherFunctionCall.typeParameters.elements.length) {
+                this.abort();
+                return functionCall;
+            }
+
+            // Visit each type parameter in lock step
+            for (let i = 0; i < functionCall.typeParameters.elements.length; i++) {
+                await this.visit(functionCall.typeParameters.elements[i].element, otherFunctionCall.typeParameters.elements[i].element);
+                if (!this.match) return functionCall;
+            }
+        }
+
+        // Compare arguments
+        if (functionCall.arguments.elements.length !== otherFunctionCall.arguments.elements.length) {
+            this.abort();
+            return functionCall;
+        }
+
+        // Visit each argument in lock step
+        for (let i = 0; i < functionCall.arguments.elements.length; i++) {
+            await this.visit(functionCall.arguments.elements[i].element, otherFunctionCall.arguments.elements[i].element);
+            if (!this.match) return functionCall;
+        }
+
+        return functionCall;
+    }
+
+    /**
      * Overrides the visitFunctionType method to compare function types.
      * 
      * @param functionType The function type to visit
