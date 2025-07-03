@@ -24,6 +24,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 
 import static java.lang.Boolean.TRUE;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.marker.Markers.EMPTY;
@@ -132,8 +134,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             }
                             if (as.getAssignment() instanceof J.NewArray) {
                                 List<Expression> initializerList = requireNonNull(((J.NewArray) as.getAssignment()).getInitializer());
-                                updateInitializerList(finalA, initializerList, getAttributeValues());
-                                return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(initializerList));
+                                return as.withAssignment(((J.NewArray) as.getAssignment())
+                                        .withInitializer(updateInitializer(finalA, initializerList, getAttributeValues())));
                             } else {
                                 Expression exp = as.getAssignment();
                                 if (exp instanceof J.Literal) {
@@ -206,9 +208,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 return isAnnotationWithOnlyValueMethod(finalA) ? it : createAnnotationAssignment(finalA, "value", it);
                             }
                             J.NewArray arrayValue = (J.NewArray) it;
-                            List<Expression> initializerList = requireNonNull(arrayValue.getInitializer());
-                            updateInitializerList(finalA, initializerList, getAttributeValues());
-                            return arrayValue.withInitializer(initializerList);
+                            return arrayValue.withInitializer(updateInitializer(finalA, requireNonNull(arrayValue.getInitializer()), getAttributeValues()));
                         }
                         return it;
                     });
@@ -239,58 +239,53 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return attributeName == null ? "value" : attributeName;
     }
 
-    private void updateInitializerList(J.Annotation finalA, List<Expression> initializerList, List<String> attributeList) {
+    private List<Expression> updateInitializer(J.Annotation finalA, List<Expression> initializerList, List<String> attributeList) {
         // If `oldAttributeValue` is defined, replace the old value with the new value(s). Ignore the `appendArray` option in this case.
         if (oldAttributeValue != null) {
-            for (int i = 0; i < initializerList.size(); i++) {
-                // TODO: support `oldAttributeValue` with multiple values (just like `attributeValue` can have multiple values)
-                if (initializerList.get(i) instanceof J.Literal && oldAttributeValue.equals(((J.Literal) initializerList.get(i)).getValue())) {
-                    initializerList.remove(i);
-                    for (int j = 0; j < attributeList.size(); j++) {
-                        String newAttributeListValue = maybeQuoteStringArgument(finalA, attributeList.get(j));
-                        J.Literal newLiteral = new J.Literal(randomId(), initializerList.get(i).getPrefix(), EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String);
-                        initializerList.add(i + j, newLiteral);
+            return ListUtils.flatMap(initializerList, it -> {
+                if (it instanceof J.Literal && oldAttributeValue.equals(((J.Literal) it).getValue())) {
+                    List<Expression> newItemsList = new ArrayList<>();
+                    for (String attribute : attributeList) {
+                        String newAttributeListValue = maybeQuoteStringArgument(finalA, attribute);
+                        J.Literal newLiteral = new J.Literal(randomId(), Space.SINGLE_SPACE, EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String);
+                        newItemsList.add(newLiteral);
                     }
-                    i--;
+                    return newItemsList;
                 }
-            }
-            return;
+                return it;
+            });
         }
 
-        // If `appendArray` is true, add the new value(s) to the existing array.
+        // If `appendArray` is true, add the new value(s) to the existing array (no duplicates)
         if (TRUE.equals(appendArray)) {
+            List<Expression> newItemsList = new ArrayList<>();
             for (String attribute : attributeList) {
                 String newAttributeListValue = maybeQuoteStringArgument(finalA, attribute);
                 if (attributeValIsAlreadyPresent(initializerList, newAttributeListValue)) {
                     continue;
                 }
-
-                J.Literal newLiteral = new J.Literal(randomId(), Space.SINGLE_SPACE, EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String);
-                initializerList.add(newLiteral);
+                newItemsList.add(new J.Literal(randomId(), Space.SINGLE_SPACE, EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
             }
-            return;
+            return ListUtils.concatAll(initializerList, newItemsList);
         }
 
-        // If no option is defined, replace the old array elements with the new elements. The logic is a little complicated, to make sure the second time the recipe is run, no changes are performed on the initializerList.
-        for (int i = 0; i < initializerList.size(); i++) {
+        // If no option is defined, replace the old array elements with the new elements
+        List<Expression> list = ListUtils.map(initializerList, (i, it) -> {
             if (i >= attributeList.size()) {
-                initializerList.remove(i);
-                i--;
-                continue;
+                return null;
             }
-
             String newAttributeListValue = maybeQuoteStringArgument(finalA, attributeList.get(i));
-            if (attributeValIsAlreadyPresent(initializerList, newAttributeListValue)) {
-                continue;
+            if (attributeValIsAlreadyPresent(singletonList(it), newAttributeListValue)) {
+                return it;
             }
-
-            J.Literal newLiteral = new J.Literal(randomId(), initializerList.get(i).getPrefix(), EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String);
-            initializerList.set(i, newLiteral);
+            return new J.Literal(randomId(), it.getPrefix(), EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String);
+        });
+        // and add extra new items if needed
+        for (int i = initializerList.size(); i < attributeList.size(); i++) {
+            String newAttributeListValue = maybeQuoteStringArgument(finalA, attributeList.get(i));
+            list.add(new J.Literal(randomId(), Space.SINGLE_SPACE, EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
         }
-        for (int j = initializerList.size(); j < attributeList.size(); j++) {
-            String newAttributeListValue = maybeQuoteStringArgument(finalA, attributeList.get(j));
-            initializerList.add(new J.Literal(randomId(), Space.SINGLE_SPACE, EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
-        }
+        return list;
     }
 
     private List<String> getAttributeValues() {
