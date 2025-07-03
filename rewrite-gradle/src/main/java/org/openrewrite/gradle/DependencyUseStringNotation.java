@@ -21,7 +21,6 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
@@ -55,7 +54,7 @@ public class DependencyUseStringNotation extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
                 if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;
