@@ -74,21 +74,22 @@ public class FindDependency extends Recipe {
                 });
     }
 
-    private static class FoundDependencyReport extends DataTable<Row> {
-
+    public static class FoundDependencyReport extends DataTable<Row> {
         public FoundDependencyReport(Recipe recipe) {
             super(recipe, "Dependencies found", "Dependencies found matching the groupId and artifactId");
         }
     }
 
     @Value
-    private static class Row {
+    public static class Row {
         @Column(displayName = "GroupId",
                 description = "The groupId of the dependency.")
         String groupId;
+
         @Column(displayName = "ArtifactId",
                 description = "The artifactId of the dependency.")
         String artifactId;
+
         @Column(displayName = "Version",
                 description = "The version of the dependency.")
         String version;

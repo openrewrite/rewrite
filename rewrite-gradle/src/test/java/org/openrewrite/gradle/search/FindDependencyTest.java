@@ -21,6 +21,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
@@ -119,6 +120,50 @@ class FindDependencyTest implements RewriteTest {
               }
               dependencies {
                   /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void generatesDataTableForFoundDependencies() {
+        rewriteRun(
+          spec -> {
+              spec.dataTable(FindDependency.Row.class, rows -> {
+                 assertThat(rows).containsExactly(
+                   new FindDependency.Row("org.openrewrite", "rewrite-core", "latest.release"),
+                   new FindDependency.Row("org.openrewrite", "rewrite-spring", "latest.release")
+                 );
+              });
+              spec.recipe(new FindDependency("org.openrewrite*", "*", ""));
+          },
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  api 'org.openrewrite:rewrite-core:latest.release'
+                  implementation 'org.openrewrite:rewrite-spring:latest.release'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:latest.release'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
+                  /*~~>*/implementation 'org.openrewrite:rewrite-spring:latest.release'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:latest.release'
               }
               """
           )
@@ -231,7 +276,7 @@ class FindDependencyTest implements RewriteTest {
               
               dependencies {
                   constraints {
-                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1') 
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
                   }
               }
               """
