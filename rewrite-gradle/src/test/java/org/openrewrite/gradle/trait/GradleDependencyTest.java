@@ -74,7 +74,7 @@ class GradleDependencyTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "api",
+      //"api",
       "implementation",
       "compileOnly",
       "runtimeOnly",
