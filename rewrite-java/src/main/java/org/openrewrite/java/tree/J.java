@@ -22,10 +22,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.LoathingOfOthers;
-import org.openrewrite.internal.SelfLoathing;
-import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -6130,11 +6127,13 @@ public interface J extends Tree, RpcCodec<J> {
         Space varargs;
 
         @Deprecated
+        @ToBeRemoved(after = "2025-10-31")
         public List<JLeftPadded<Space>> getDimensionsBeforeName() {
             return emptyList();
         }
 
         @Deprecated
+        @ToBeRemoved(after = "2025-10-31")
         public VariableDeclarations withDimensionsBeforeName(List<JLeftPadded<Space>> dimensionsBeforeName) {
             return this;
         }
@@ -6142,7 +6141,7 @@ public interface J extends Tree, RpcCodec<J> {
         List<JRightPadded<NamedVariable>> variables;
 
         @Deprecated
-        // TO-BE-REMOVED(2025-10-31)
+        @ToBeRemoved(after = "2025-10-31")
         public VariableDeclarations(UUID id, Space prefix, Markers markers, List<Annotation> leadingAnnotations, List<Modifier> modifiers, @Nullable TypeTree typeExpression, @Nullable Space varargs, @Nullable List<JLeftPadded<Space>> dimensionsBeforeName, List<JRightPadded<NamedVariable>> variables) {
             this.id = id;
             this.prefix = prefix;
