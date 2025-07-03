@@ -59,6 +59,8 @@ public class FindDependency extends Recipe {
     @Nullable
     String versionPattern;
 
+    transient FoundDependencyReport foundDependencyTable = new FoundDependencyReport(this);
+
     public static Set<Xml.Tag> find(Xml.Document maven, String groupId, String artifactId) {
         return find(maven, groupId, artifactId, null, null);
     }
@@ -102,6 +104,8 @@ public class FindDependency extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId) &&
                     versionIsValid(version, versionPattern, () -> findDependency(tag))) {
+                    ResolvedDependency rd = findDependency(tag);
+                    foundDependencyTable.insertRow(ctx, new Row(rd.getGroupId(), rd.getArtifactId(), rd.getVersion()));
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -126,5 +130,26 @@ public class FindDependency extends Recipe {
         }
         assert(validate.getValue() != null);
         return validate.getValue().isValid(actualVersion, actualVersion);
+    }
+
+    private static class FoundDependencyReport extends DataTable<Row> {
+        public FoundDependencyReport(Recipe recipe) {
+            super(recipe, "Dependencies found", "Dependencies found matching the groupId, artifactId and optional version");
+        }
+    }
+
+    @Value
+    public static class Row {
+        @Column(displayName = "GroupId",
+                description = "The groupId of the dependency.")
+        String groupId;
+
+        @Column(displayName = "ArtifactId",
+                description = "The artifactId of the dependency.")
+        String artifactId;
+
+        @Column(displayName = "Version",
+                description = "The version of the dependency.")
+        String version;
     }
 }

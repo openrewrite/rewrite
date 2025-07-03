@@ -74,7 +74,7 @@ public class FindDependency extends Recipe {
                 });
     }
 
-    public static class FoundDependencyReport extends DataTable<Row> {
+    private static class FoundDependencyReport extends DataTable<Row> {
         public FoundDependencyReport(Recipe recipe) {
             super(recipe, "Dependencies found", "Dependencies found matching the groupId and artifactId");
         }
