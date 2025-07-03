@@ -135,8 +135,10 @@ class GroovyParserTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              System.out.println("Hello World", )
               System.out.println("Hello World with no extra space",)
+              System.out.println("Hello World with space before comma" ,)
+              System.out.println("Hello World with space after comma", )
+              System.out.println("Hello World with space before & after comma" , )
               """
           )
         );
