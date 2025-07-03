@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.trait;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -80,13 +81,6 @@ class GradleDependencyTest implements RewriteTest {
       "testImplementation",
       "testCompileOnly",
       "testRuntimeOnly",
-      "debugImplementation",
-      "releaseImplementation",
-      "androidTestImplementation",
-      "featureImplementation",
-      "annotationProcessor",
-      "kapt",
-      "ksp"
     })
     void methods(String method) {
         rewriteRun(
@@ -122,6 +116,54 @@ class GradleDependencyTest implements RewriteTest {
         );
     }
 
+    @Disabled("Need additional plugins to test these methods")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      // Android
+      "debugImplementation",
+      "releaseImplementation",
+      "androidTestImplementation",
+      "featureImplementation",
+      // Kotlin
+      "annotationProcessor",
+      "kapt",
+      "ksp"
+    })
+    void methodsFromPlugins(String method) {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  %s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method),
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  /*~~(com.google.guava:guava:28.2-jre)~~>*/%s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method)
+          )
+        );
+    }
+
+    @Disabled("Requires at most Java 15")
     @ParameterizedTest
     @ValueSource(strings = {
       "compile", // deprecated
