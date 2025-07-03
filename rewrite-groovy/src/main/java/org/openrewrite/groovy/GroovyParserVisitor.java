@@ -796,9 +796,16 @@ public class GroovyParserVisitor {
                     }
 
                     Space after = EMPTY;
+                    Markers markers = Markers.EMPTY;
                     if (i == unparsedArgs.size() - 1) {
                         if (hasParentheses) {
-                            after = sourceBefore(")");
+                            if (source.charAt(cursor) == ',') {
+                                skip(",");
+                                TrailingComma t = new TrailingComma(randomId(), sourceBefore(")"));
+                                markers = Markers.build(singletonList(t));
+                            } else {
+                                after = sourceBefore(")");
+                            }
                         }
                     } else if (!(arg instanceof J.Lambda && lastArgumentsAreAllClosures && !hasParentheses)) {
                         after = whitespace();
@@ -809,7 +816,7 @@ public class GroovyParserVisitor {
                         cursor++;
                     }
 
-                    args.add(JRightPadded.build(arg).withAfter(after));
+                    args.add(JRightPadded.build(arg).withAfter(after).withMarkers(markers));
                 }
             }
 

@@ -128,4 +128,18 @@ class GroovyParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4614")
+    void trailingCommaInMethodCall() {
+        rewriteRun(
+          groovy(
+            """
+              System.out.println("Hello World", )
+              System.out.println("Hello World with no extra space",)
+              """
+          )
+        );
+    }
+
 }
