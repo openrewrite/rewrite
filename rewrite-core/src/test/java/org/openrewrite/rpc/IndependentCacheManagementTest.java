@@ -15,16 +15,15 @@
  */
 package org.openrewrite.rpc;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetRef;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -37,9 +36,9 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithoutLastKnownId_returnsADD() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
-        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+        Cache<String, Object> remoteObjects = Caffeine.newBuilder().build();
+        Cache<String, Object> localObjects = Caffeine.newBuilder().build();
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
         
         // Create object on server
         String objectId = "test-object-id";
@@ -66,9 +65,9 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithLastKnownId_whenRemoteHasNoEntry_returnsADD() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
-        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+        Cache<String, Object> remoteObjects = Caffeine.newBuilder().build();
+        Cache<String, Object> localObjects = Caffeine.newBuilder().build();
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
         
         // Create object on server
         String objectId = "test-object-id";
@@ -96,10 +95,10 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithLastKnownId_whenRemoteHasSameEntry_returnsNOCHANGE() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
-        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+        Cache<String, Object> remoteObjects = Caffeine.newBuilder().build();
+        Cache<String, Object> localObjects = Caffeine.newBuilder().build();
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
+
         // Create object on server
         String objectId = "test-object-id";
         PlainText text = PlainText.builder()
@@ -126,10 +125,10 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithLastKnownId_whenRemoteHasDifferentEntry_returnsCHANGE() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
-        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+        Cache<String, Object> remoteObjects = Caffeine.newBuilder().build();
+        Cache<String, Object> localObjects = Caffeine.newBuilder().build();
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
+
         // Create original object on server
         String objectId = "test-object-id";
         PlainText originalText = PlainText.builder()
@@ -158,8 +157,8 @@ class IndependentCacheManagementTest {
 
     @Test
     void getRefRequest_whenRefExists_returnsCorrectObject() throws InterruptedException {
-        Map<Integer, Object> remoteRefs = new HashMap<>();
-        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+        Cache<Integer, Object> remoteRefs = Caffeine.newBuilder().build();
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
         
         // Create a reference on server
         PlainText text = PlainText.builder()
@@ -189,8 +188,8 @@ class IndependentCacheManagementTest {
 
     @Test
     void getRefRequest_whenRefDoesNotExist_returnsDELETE() throws InterruptedException {
-        Map<Integer, Object> remoteRefs = new HashMap<>();
-        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+        Cache<Integer, Object> remoteRefs = Caffeine.newBuilder().build();
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
         
         // Test GetRef request for non-existent reference
         GetRef.Handler handler = new GetRef.Handler(remoteRefs, localRefs, new AtomicInteger(1), new AtomicBoolean(false));
@@ -203,8 +202,8 @@ class IndependentCacheManagementTest {
 
     @Test
     void getRefRequest_whenInvalidRefId_returnsDELETE() throws InterruptedException {
-        Map<Integer, Object> remoteRefs = new HashMap<>();
-        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+        Cache<Integer, Object> remoteRefs = Caffeine.newBuilder().build();
+        WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
         
         // Test GetRef request with invalid ref ID format
         GetRef.Handler handler = new GetRef.Handler(remoteRefs, localRefs, new AtomicInteger(1), new AtomicBoolean(false));
@@ -218,8 +217,8 @@ class IndependentCacheManagementTest {
     // Helper class to access protected method
     private static class TestableGetObjectHandler extends GetObject.Handler {
         
-        TestableGetObjectHandler(AtomicInteger batchSize, Map<String, Object> remoteObjects,
-                Map<String, Object> localObjects, IdentityHashMap<Object, Integer> localRefs,
+        TestableGetObjectHandler(AtomicInteger batchSize, Cache<String, Object> remoteObjects,
+                Cache<String, Object> localObjects, WeakIdentityHashMap<Object, Integer> localRefs,
                 AtomicBoolean trace) {
             super(batchSize, remoteObjects, localObjects, localRefs, trace);
         }

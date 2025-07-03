@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import {setAutoFreeze} from "immer";
+import {LRUCache} from "lru-cache";
 
 // this is required because otherwise `asRef()` won't work for objects created using immer
 setAutoFreeze(false);
@@ -45,8 +46,14 @@ export function isRef(obj?: any): obj is Reference {
 }
 
 export class ReferenceMap {
-    private refs = new WeakMap<Reference, number>();
-    private refsById = new Map<number, Reference>();
+    private refs = new ObjectIdentityMap<number>();
+    private refsById = new MemoryAwareLRU<number, Reference>({
+        max: 1000,
+        dispose: (value: Reference, key: number) => {
+            // When an entry is evicted from refsById, remove it from the forward mapping
+            this.refs.delete(value);
+        }
+    });
     private refCount = 0;
 
     has(obj: Reference): boolean {
@@ -69,8 +76,8 @@ export class ReferenceMap {
     }
 
     clear() {
-        this.refs = new WeakMap<Reference, number>();
-        this.refsById = new Map<number, Reference>();
+        this.refs.clear();
+        this.refsById.clear();
         this.refCount = 0;
     }
 
@@ -85,5 +92,87 @@ export class ReferenceMap {
     set(ref: Reference, refId: number) {
         this.refs.set(ref, refId);
         this.refsById.set(refId, ref);
+    }
+}
+
+export class ObjectIdentityMap<V> {
+    constructor(private objectMap = new WeakMap<{}, V>(),
+                private readonly primitiveMap = new Map<any, V>()) {
+    }
+
+    set(key: any, value: V): void {
+        if (typeof key === 'object' && key !== null) {
+            this.objectMap.set(key, value);
+        } else {
+            this.primitiveMap.set(key, value);
+        }
+    }
+
+    get(key: any): V | undefined {
+        if (typeof key === 'object' && key !== null) {
+            return this.objectMap.get(key);
+        } else {
+            return this.primitiveMap.get(key);
+        }
+    }
+
+    has(key: any): boolean {
+        if (typeof key === 'object' && key !== null) {
+            return this.objectMap.has(key);
+        } else {
+            return this.primitiveMap.has(key);
+        }
+    }
+
+    delete(key: any): boolean {
+        if (typeof key === 'object' && key !== null) {
+            return this.objectMap.delete(key);
+        } else {
+            return this.primitiveMap.delete(key);
+        }
+    }
+
+    clear() {
+        this.objectMap = new WeakMap<{}, V>();
+        this.primitiveMap.clear();
+    }
+}
+
+export type MemoryAwareLRUOptions<K, V, FC = unknown> = LRUCache.Options<K, V, FC> & {
+    minFreeRatio?: number;
+    resizeFactor?: number;
+};
+
+export class MemoryAwareLRU<K extends {}, V extends {}, FC = unknown> extends LRUCache<K, V, FC> {
+    private readonly minFreeRatio: number;
+    private readonly resizeFactor: number;
+
+    constructor(options: MemoryAwareLRUOptions<K, V, FC>) {
+        super(options);
+        this.minFreeRatio = options.minFreeRatio ?? 0.1;
+        this.resizeFactor = options.resizeFactor ?? 0.9;
+    }
+
+    private evictToSize(targetSize: number): void {
+        let oldestKeys = this.rkeys();
+        while (this.size > targetSize) {
+            const oldestKey = oldestKeys.next().value;
+            if (oldestKey !== undefined) {
+                this.delete(oldestKey);
+            } else {
+                break;
+            }
+        }
+    }
+
+    set(key: K, value: V, options?: LRUCache.SetOptions<K, V, FC>): this {
+        const memUsage = process.memoryUsage();
+
+        if (memUsage.heapUsed > (1 - this.minFreeRatio) * memUsage.heapTotal) {
+            const newMax = Math.floor(this.max * this.resizeFactor);
+            this.evictToSize(newMax);
+        }
+
+        return super.set(key, value, options);
     }
 }

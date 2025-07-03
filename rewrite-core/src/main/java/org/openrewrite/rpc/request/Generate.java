@@ -15,6 +15,7 @@
  */
 package org.openrewrite.rpc.request;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
@@ -44,7 +45,7 @@ public class Generate implements RpcRequest {
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<Generate> {
-        private final Map<String, Object> localObjects;
+        private final Cache<String, Object> localObjects;
         private final Map<String, Recipe> preparedRecipes;
         private final Map<Recipe, Cursor> recipeCursors;
         private final Function<String, ?> getObject;

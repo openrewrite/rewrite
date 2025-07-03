@@ -15,6 +15,8 @@
  */
 package org.openrewrite.rpc;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
@@ -95,19 +97,28 @@ public class RewriteRpc implements AutoCloseable {
      * between two processes.
      */
     @VisibleForTesting
-    final Map<String, Object> remoteObjects = new HashMap<>();
+    final Cache<String, Object> remoteObjects = Caffeine.newBuilder()
+            .maximumSize(1_000)
+            .weakValues()
+            .build();
 
     @VisibleForTesting
-    final Map<String, Object> localObjects = new HashMap<>();
+    final Cache<String, Object> localObjects = Caffeine.newBuilder()
+            .maximumSize(1_000)
+            .weakValues()
+            .build();
 
     /* A reverse map of the objects back to their IDs */
-    final Map<Object, String> localObjectIds = new IdentityHashMap<>();
+    final WeakIdentityHashMap<Object, String> localObjectIds = new WeakIdentityHashMap<>();
 
     @VisibleForTesting
-    final Map<Integer, Object> remoteRefs = new HashMap<>();
+    final Cache<Integer, Object> remoteRefs = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .weakValues()
+            .build();
 
     @VisibleForTesting
-    final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+    final WeakIdentityHashMap<Object, Integer> localRefs = new WeakIdentityHashMap<>();
 
     /**
      * Creates a new RPC interface that can be used to communicate with a remote.
@@ -271,30 +282,18 @@ public class RewriteRpc implements AutoCloseable {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputList.size()));
 
-        String parseId = SnowflakeId.generateId();
-
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
-            private @Nullable List<String> currentBatch;
-            private int batchIndex = 0;
-            private boolean isFirstCall = true;
+            private @Nullable List<String> ids;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
-                // Get next batch if needed
-                if (currentBatch == null || batchIndex >= currentBatch.size()) {
+                if (ids == null) {
                     // FIXME handle `TimeoutException` gracefully
-                    if (isFirstCall) {
-                        // First call with actual inputs
-                        currentBatch = send("Parse", new Parse(parseId, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
-                        isFirstCall = false;
-                    } else {
-                        currentBatch = send("Parse", new Parse(parseId, emptyList(), null), ParseResponse.class);
-                    }
-                    batchIndex = 0;
+                    ids = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
 
                     // If batch is empty, we're done
-                    if (currentBatch.isEmpty()) {
+                    if (ids.isEmpty()) {
                         return false;
                     }
                 }
@@ -305,9 +304,8 @@ public class RewriteRpc implements AutoCloseable {
                 }
 
                 Parser.Input input = inputList.get(index);
-                String id = currentBatch.get(batchIndex);
+                String id = ids.get(index);
                 index++;
-                batchIndex++;
 
                 SourceFile sourceFile = null;
                 parsingListener.startedParsing(input);
@@ -341,12 +339,16 @@ public class RewriteRpc implements AutoCloseable {
         }, false);
     }
 
-    public String print(SourceFile tree) {
-        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), null);
+    public String print(SourceFile sourceFile) {
+        return print(sourceFile, null);
     }
 
-    public String print(SourceFile tree, Print.@Nullable MarkerPrinter markerPrinter) {
-        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
+    public String print(SourceFile sourceFile, Print.@Nullable MarkerPrinter markerPrinter) {
+        try {
+            return print(sourceFile, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
+        } catch (Exception e) {
+            throw new RuntimeException("Print for source file failed: " + sourceFile.getSourcePath(), e);
+        }
     }
 
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
@@ -371,43 +373,58 @@ public class RewriteRpc implements AutoCloseable {
     }
 
     @VisibleForTesting
-    public <T> T getObject(String id) {
+    public <T> @Nullable T getObject(String id) {
         // Check if we have a cached version of this object
-        Object localObject = localObjects.get(id);
+        Object localObject = localObjects.getIfPresent(id);
         String lastKnownId = localObject != null ? id : null;
-        
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
+
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs.asMap(), traceFile, () -> send("GetObject",
                 new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
+
         // We are now in sync with the remote state of the object.
-        remoteObjects.put(id, remoteObject);
-        localObjects.put(id, remoteObject);
+        if (remoteObject == null) {
+            remoteObjects.invalidate(id);
+            localObjects.invalidate(id);
+        } else {
+            remoteObjects.put(id, remoteObject);
+            localObjects.put(id, remoteObject);
+        }
 
         //noinspection unchecked
         return (T) remoteObject;
     }
-    
+
     private Object getRef(Integer refId) {
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetRef",
-                new GetRef(refId), GetRefResponse.class), nestedRefId -> {
+        // Fetch the complete batch like getObject() does
+        List<RpcObjectData> completeBatch = send("GetRef", new GetRef(refId), GetRefResponse.class);
+
+        // Create RpcReceiveQueue with the pre-fetched batch
+        // Use a simple function that throws for nested refs to avoid recursion
+        AtomicBoolean batchConsumed = new AtomicBoolean(false);
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs.asMap(), traceFile, () -> {
+            if (batchConsumed.getAndSet(true)) {
+                throw new IllegalStateException("GetRef batch already consumed");
+            }
+            return completeBatch;
+        }, nestedRefId -> {
             throw new IllegalStateException("Nested ref calls not supported in GetRef: " + nestedRefId);
         });
 
+        // Process the ref object
         Object ref = q.receive(null, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
-        
+
         if (ref == null) {
             throw new IllegalStateException("Reference " + refId + " not found on remote");
         }
-        
-        remoteRefs.put(refId, ref);
-        localRefs.put(ref, refId);
 
+        remoteRefs.put(refId, ref);
         return ref;
     }
 

@@ -33,12 +33,12 @@ public class RpcSendQueue {
     private final int batchSize;
     private final List<RpcObjectData> batch;
     private final Consumer<List<RpcObjectData>> drain;
-    private final IdentityHashMap<Object, Integer> refs;
+    private final Map<Object, Integer> refs;
     private final boolean trace;
 
     private @Nullable Object before;
 
-    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, IdentityHashMap<Object, Integer> refs,
+    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, Map<Object, Integer> refs,
                         boolean trace) {
         this.batchSize = batchSize;
         this.batch = new ArrayList<>(batchSize);
@@ -166,7 +166,9 @@ public class RpcSendQueue {
                 return;
             }
             ref = refs.size() + 1;
-            refs.put(afterVal, ref);
+            if (afterVal != null) {
+                refs.put(afterVal, ref);
+            }
         }
         //noinspection unchecked
         RpcCodec<Object> afterCodec = afterVal instanceof RpcCodec ? (RpcCodec<Object>) afterVal : null;

@@ -16,6 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../reference";
+import {LRUCache} from "lru-cache";
 
 export class GetObject {
     constructor(private readonly id: string, private readonly lastKnownId?: string) {
@@ -23,8 +24,9 @@ export class GetObject {
 
     static handle(
         connection: rpc.MessageConnection,
-        remoteObjects: Map<string, any>,
-        localObjects: Map<string, any>,
+        remoteObjects: LRUCache<string, any>,
+        localObjectGenerators: Map<string, (input: string) => any>,
+        localObjects: LRUCache<string, any>,
         localRefs: ReferenceMap,
         batchSize: number,
         trace: boolean
@@ -32,16 +34,24 @@ export class GetObject {
         const pendingData = new Map<string, RpcObjectData[]>();
 
         connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
-            if (!localObjects.has(request.id)) {
-                return [
-                    {state: RpcObjectState.DELETE},
-                    {state: RpcObjectState.END_OF_OBJECT}
-                ];
+            let objId = request.id;
+            if (!localObjects.has(objId)) {
+                if (localObjectGenerators.has(objId)) {
+                    const generator = localObjectGenerators.get(objId)!;
+                    let obj = await generator(objId);
+                    localObjects.set(objId, obj);
+                    localObjectGenerators.delete(request.id);
+                } else {
+                    return [
+                        {state: RpcObjectState.DELETE},
+                        {state: RpcObjectState.END_OF_OBJECT}
+                    ];
+                }
             }
 
-            let allData = pendingData.get(request.id);
+            let allData = pendingData.get(objId);
             if (!allData) {
-                const after = localObjects.get(request.id);
+                const after = localObjects.get(objId);
                 
                 // Determine what the remote has cached
                 let before = undefined;
@@ -54,16 +64,16 @@ export class GetObject {
                 }
 
                 allData = await new RpcSendQueue(localRefs, trace).generate(after, before);
-                pendingData.set(request.id, allData);
+                pendingData.set(objId, allData);
 
-                remoteObjects.set(request.id, after);
+                remoteObjects.set(objId, after);
             }
 
             const batch = allData.splice(0, batchSize);
 
             // If we've sent all data, remove from pending
             if (allData.length === 0) {
-                pendingData.delete(request.id);
+                pendingData.delete(objId);
             }
 
             return batch;

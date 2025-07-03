@@ -15,22 +15,24 @@
  */
 package org.openrewrite.rpc.request;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcSendQueue;
+import org.openrewrite.rpc.WeakIdentityHashMap;
 
 import java.util.ArrayList;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.openrewrite.rpc.RpcObjectData.State.*;
+import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
+import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 @Value
 public class GetObject implements RpcRequest {
@@ -43,20 +45,20 @@ public class GetObject implements RpcRequest {
         private static final ExecutorService forkJoin = ForkJoinPool.commonPool();
 
         private final AtomicInteger batchSize;
-        private final Map<String, Object> remoteObjects;
-        private final Map<String, Object> localObjects;
+        private final Cache<String, Object> remoteObjects;
+        private final Cache<String, Object> localObjects;
         /**
          * Keeps track of objects that need to be referentially deduplicated, and
          * the ref IDs to look them up by on the remote.
          */
-        private final IdentityHashMap<Object, Integer> localRefs;
+        private final WeakIdentityHashMap<Object, Integer> localRefs;
         private final AtomicBoolean trace;
 
         private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
 
         @Override
         protected List<RpcObjectData> handle(GetObject request) throws Exception {
-            Object after = localObjects.get(request.getId());
+            Object after = localObjects.getIfPresent(request.getId());
 
             if (after == null) {
                 List<RpcObjectData> deleted = new ArrayList<>(2);
@@ -71,10 +73,10 @@ public class GetObject implements RpcRequest {
                 // Determine what the remote has cached
                 Object before = null;
                 if (request.getLastKnownId() != null) {
-                    before = remoteObjects.get(request.getLastKnownId());
+                    before = remoteObjects.getIfPresent(request.getLastKnownId());
                     if (before == null) {
                         // Remote had something cached, but we've evicted it - must send full object
-                        remoteObjects.remove(request.getLastKnownId());
+                        remoteObjects.invalidate(request.getLastKnownId());
                     }
                 }
 

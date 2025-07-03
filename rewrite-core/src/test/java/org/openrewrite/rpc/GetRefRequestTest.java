@@ -103,13 +103,13 @@ class GetRefRequestTest {
 
         // Test that we can manipulate caches independently
         server.remoteObjects.put("test", "value");
-        assertThat(server.remoteObjects).containsKey("test");
+        assertThat(server.remoteObjects.getIfPresent("test")).isEqualTo("value");
         
-        server.remoteObjects.clear();
-        assertThat(server.remoteObjects).isEmpty();
+        server.remoteObjects.invalidateAll();
+        assertThat(server.remoteObjects.getIfPresent("test")).isNull();
         
         // Client should be unaffected
-        assertThat(client.remoteObjects).isEmpty();
+        assertThat(client.remoteObjects.getIfPresent("test")).isNull();
     }
 
     @Test
