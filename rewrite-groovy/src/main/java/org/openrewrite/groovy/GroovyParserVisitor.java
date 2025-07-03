@@ -451,7 +451,6 @@ public class GroovyParserVisitor {
                     modifiers,
                     typeExpr,
                     null,
-                    emptyList(),
                     singletonList(JRightPadded.build(namedVariable))
             );
 
@@ -558,7 +557,7 @@ public class GroovyParserVisitor {
 
                 params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), EMPTY,
                         Markers.EMPTY, paramAnnotations, paramModifiers, paramType,
-                        varargs, emptyList(),
+                        varargs,
                         singletonList(paramName))).withAfter(rightPad));
             }
 
@@ -1109,7 +1108,7 @@ public class GroovyParserVisitor {
             skip(")");
             JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramType.getPrefix(),
                     Markers.EMPTY, emptyList(), emptyList(), paramType.withPrefix(EMPTY),
-                    null, emptyList(),
+                    null,
                     singletonList(paramName))
             ).withAfter(rightPad);
 
@@ -1205,7 +1204,7 @@ public class GroovyParserVisitor {
                     JavaType type = typeMapping.type(staticType(p));
                     J expr = new J.VariableDeclarations(randomId(), whitespace(), Markers.EMPTY,
                             emptyList(), emptyList(), p.isDynamicTyped() ? null : visitTypeTree(p.getType()),
-                            null, emptyList(),
+                            null,
                             singletonList(
                                     JRightPadded.build(
                                             new J.VariableDeclarations.NamedVariable(randomId(), sourceBefore(p.getName()), Markers.EMPTY,
@@ -1451,7 +1450,6 @@ public class GroovyParserVisitor {
                     modifiers,
                     typeExpr,
                     null,
-                    emptyList(),
                     singletonList(JRightPadded.build(namedVariable))
             );
             if (multiVariable.isPresent()) {
@@ -1541,7 +1539,7 @@ public class GroovyParserVisitor {
                     }
 
                     JRightPadded<Statement> variable = JRightPadded.<Statement>build(
-                            new J.VariableDeclarations(randomId(), paramFmt, Markers.EMPTY, emptyList(), modifiers, paramType, null, emptyList(), singletonList(paramName))
+                            new J.VariableDeclarations(randomId(), paramFmt, Markers.EMPTY, emptyList(), modifiers, paramType, null, singletonList(paramName))
                     ).withAfter(rightPad);
 
                     JRightPadded<Expression> iterable = JRightPadded.build((Expression) visit(forLoop.getCollectionExpression()))
