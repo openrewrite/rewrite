@@ -359,13 +359,9 @@ public class RewriteRpc implements AutoCloseable {
 
     @VisibleForTesting
     public <T> T getObject(String id) {
-        // Check if we have a cached version of this object
-        Object localObject = localObjects.get(id);
-        String lastKnownId = localObject != null ? id : null;
-        
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
-                new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
-        Object remoteObject = q.receive(localObject, null);
+                new GetObject(id), GetObjectResponse.class), this::getRef);
+        Object remoteObject = q.receive(localObjects.get(id), null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }

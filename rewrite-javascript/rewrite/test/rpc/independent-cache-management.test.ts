@@ -218,7 +218,7 @@ describe("Independent Cache Management", () => {
         // Client requests from server with null lastKnownId
         const response = await client.connection.sendRequest(
             new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
-            new GetObject(objectId, undefined)
+            new GetObject(objectId)
         );
 
         // Should return ADD state, not CHANGE

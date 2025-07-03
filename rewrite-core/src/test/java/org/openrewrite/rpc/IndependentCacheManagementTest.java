@@ -56,104 +56,11 @@ class IndependentCacheManagementTest {
         TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
                 localObjects, localRefs, new AtomicBoolean(false));
         
-        List<RpcObjectData> response = handler.handle(new GetObject(objectId, null));
+        List<RpcObjectData> response = handler.handle(new GetObject(objectId));
         
         // First data should be ADD state
         assertThat(response).isNotEmpty();
         assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.ADD);
-    }
-
-    @Test
-    void getObjectWithLastKnownId_whenRemoteHasNoEntry_returnsADD() {
-        // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
-        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
-        // Create object on server
-        String objectId = "test-object-id";
-        PlainText text = PlainText.builder()
-                .id(randomId())
-                .text("Hello World")
-                .markers(EMPTY)
-                .sourcePath(Paths.get("test.txt"))
-                .build();
-        
-        localObjects.put(objectId, text);
-        // Intentionally don't put anything in remoteObjects to simulate cache miss
-
-        // Simulate GetObject request with lastKnownId 
-        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
-                localObjects, localRefs, new AtomicBoolean(false));
-        
-        List<RpcObjectData> response = handler.handle(new GetObject(objectId, objectId));
-        
-        // Should return ADD since remote has no entry for this ID
-        assertThat(response).isNotEmpty();
-        assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.ADD);
-    }
-
-    @Test
-    void getObjectWithLastKnownId_whenRemoteHasSameEntry_returnsNOCHANGE() {
-        // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
-        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
-        // Create object on server
-        String objectId = "test-object-id";
-        PlainText text = PlainText.builder()
-                .id(randomId())
-                .text("Hello World")
-                .markers(EMPTY)
-                .sourcePath(Paths.get("test.txt"))
-                .build();
-        
-        localObjects.put(objectId, text);
-        remoteObjects.put(objectId, text); // Same object in remote
-
-        // Simulate GetObject request with lastKnownId 
-        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
-                localObjects, localRefs, new AtomicBoolean(false));
-        
-        List<RpcObjectData> response = handler.handle(new GetObject(objectId, objectId));
-        
-        // Should return NO_CHANGE since objects are identical
-        assertThat(response).isNotEmpty();
-        assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.NO_CHANGE);
-    }
-
-    @Test
-    void getObjectWithLastKnownId_whenRemoteHasDifferentEntry_returnsCHANGE() {
-        // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
-        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
-        // Create original object on server
-        String objectId = "test-object-id";
-        PlainText originalText = PlainText.builder()
-                .id(randomId())
-                .text("Original Text")
-                .markers(EMPTY)
-                .sourcePath(Paths.get("test.txt"))
-                .build();
-        
-        // Create modified object 
-        PlainText modifiedText = originalText.withText("Modified Text");
-        
-        localObjects.put(objectId, modifiedText);
-        remoteObjects.put(objectId, originalText); // Different object in remote
-
-        // Simulate GetObject request with lastKnownId 
-        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
-                localObjects, localRefs, new AtomicBoolean(false));
-        
-        List<RpcObjectData> response = handler.handle(new GetObject(objectId, objectId));
-        
-        // Should return CHANGE since objects are different
-        assertThat(response).isNotEmpty();
-        assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.CHANGE);
     }
 
     @Test

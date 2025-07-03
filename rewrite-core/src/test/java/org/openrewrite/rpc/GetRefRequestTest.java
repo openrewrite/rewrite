@@ -22,7 +22,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.Environment;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetRef;
 import org.openrewrite.rpc.request.GetRefResponse;
 
@@ -79,18 +78,6 @@ class GetRefRequestTest {
         assertThat(response).hasSize(2);
         assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.DELETE);
         assertThat(response.get(1).getState()).isEqualTo(RpcObjectData.State.END_OF_OBJECT);
-    }
-
-    @Test
-    void getObjectConstructorAcceptsLastKnownId() {
-        // Test that GetObject constructor accepts lastKnownId parameter
-        GetObject request1 = new GetObject("object-id", null);
-        assertThat(request1.getId()).isEqualTo("object-id");
-        assertThat(request1.getLastKnownId()).isNull();
-
-        GetObject request2 = new GetObject("object-id", "last-known-id");
-        assertThat(request2.getId()).isEqualTo("object-id");
-        assertThat(request2.getLastKnownId()).isEqualTo("last-known-id");
     }
 
     @Test

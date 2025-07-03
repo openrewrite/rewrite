@@ -90,13 +90,10 @@ export class RewriteRpc {
     }
 
     async getObject<P>(id: string): Promise<P> {
-        const localObject = this.localObjects.get(id);
-        const lastKnownId = localObject ? id : undefined;
-        
         const q = new RpcReceiveQueue(this.remoteRefs, () => {
             return this.connection.sendRequest(
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
-                new GetObject(id, lastKnownId)
+                new GetObject(id)
             );
         }, this.options.traceGetObjectInput, (refId: number) => this.getRef(refId));
 
