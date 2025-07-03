@@ -25,6 +25,7 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
@@ -801,6 +802,161 @@ public interface JS extends J {
 
             public ExpressionWithTypeArguments withTypeArguments(@Nullable JContainer<Expression> typeArguments) {
                 return t.typeArguments == typeArguments ? t : new ExpressionWithTypeArguments(t.id, t.prefix, t.markers, t.clazz, typeArguments, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class FunctionCall implements JS, Expression, TypedTree, MethodCall {
+        @Nullable
+        @NonFinal
+        transient WeakReference<FunctionCall.Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @Nullable
+        JRightPadded<Expression> function;
+
+        public @Nullable Expression getFunction() {
+            return function == null ? null : function.getElement();
+        }
+
+        public FunctionCall withFunction(@Nullable Expression function) {
+            return getPadding().withFunction(JRightPadded.withElement(this.function, function));
+        }
+
+        @Nullable
+        JContainer<Expression> typeParameters;
+
+        public FunctionCall withTypeParameters(@Nullable List<Expression> typeParameters) {
+            return new FunctionCall(this.id, this.prefix, this.markers, this.function,
+                    JContainer.withElementsNullable(this.typeParameters, typeParameters), this.arguments, this.functionType);
+        }
+
+        public @Nullable List<Expression> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElements();
+        }
+
+        JContainer<Expression> arguments;
+
+        @Override
+        public List<Expression> getArguments() {
+            return arguments.getElements();
+        }
+
+        @Override
+        public FunctionCall withArguments(List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
+        }
+
+        @Getter
+        JavaType.@Nullable Method functionType;
+
+        @Override
+        public JavaType.@Nullable Method getMethodType() {
+            return functionType;
+        }
+
+        public FunctionCall withFunctionType(JavaType.@Nullable Method type) {
+            if (type == this.functionType) {
+                return this;
+            }
+            return new FunctionCall(id, prefix, markers, function, typeParameters, arguments, type);
+        }
+
+        @Override
+        public FunctionCall withMethodType(JavaType.@Nullable Method type) {
+            return withFunctionType(type);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public FunctionCall withType(@Nullable JavaType type) {
+            throw new UnsupportedOperationException("To change the return type of this function call, use withFunctionType(..)");
+        }
+
+        @Override
+        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
+            return v.visitFunctionCall(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return functionType == null ? null : functionType.getReturnType();
+        }
+
+        @Transient
+        @Override
+        public List<J> getSideEffects() {
+            return singletonList(this);
+        }
+
+        public FunctionCall.Padding getPadding() {
+            FunctionCall.Padding p;
+            if (this.padding == null) {
+                p = new FunctionCall.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new FunctionCall.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final FunctionCall t;
+
+            public @Nullable JRightPadded<Expression> getFunction() {
+                return t.function;
+            }
+
+            public FunctionCall withFunction(@Nullable JRightPadded<Expression> function) {
+                return t.function == function ? t : new FunctionCall(t.id, t.prefix, t.markers, function, t.typeParameters, t.arguments, t.functionType);
+            }
+
+            public @Nullable JContainer<Expression> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public FunctionCall withTypeParameters(@Nullable JContainer<Expression> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new FunctionCall(t.id, t.prefix, t.markers, t.function, typeParameters, t.arguments, t.functionType);
+            }
+
+            public JContainer<Expression> getArguments() {
+                return t.arguments;
+            }
+
+            public FunctionCall withArguments(JContainer<Expression> arguments) {
+                return t.arguments == arguments ? t : new FunctionCall(t.id, t.prefix, t.markers, t.function, t.typeParameters, arguments, t.functionType);
             }
         }
     }
@@ -1766,13 +1922,11 @@ public interface JS extends J {
         }
 
         public enum Type {
-            As,
             IdentityEquals,
             IdentityNotEquals,
             In,
             QuestionQuestion,
             Comma
-
         }
 
         public JS.Binary.Padding getPadding() {
@@ -4852,6 +5006,80 @@ public interface JS extends J {
             }
         }
 
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
+    final class As implements JS, Expression, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<JS.As.Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        JRightPadded<Expression> left;
+
+        public Expression getLeft() {
+            return left.getElement();
+        }
+
+        @With
+        Expression right;
+
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
+            return v.visitAs(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public JS.As.Padding getPadding() {
+            JS.As.Padding p;
+            if (this.padding == null) {
+                p = new JS.As.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new JS.As.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final JS.As t;
+
+            public JRightPadded<Expression> getLeft() {
+                return t.left;
+            }
+
+            public JS.As withLeft(JRightPadded<Expression> left) {
+                return t.left == left ? t : new JS.As(t.id, t.prefix, t.markers, left, t.right, t.type);
+            }
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

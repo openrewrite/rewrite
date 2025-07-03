@@ -194,6 +194,35 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return ta;
     }
 
+    public J visitFunctionCall(JS.FunctionCall functionCall, P p) {
+        JS.FunctionCall f = functionCall;
+        f = f.withPrefix(visitSpace(f.getPrefix(), JsSpace.Location.FUNCTION_CALL_PREFIX, p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        Expression temp2 = (Expression) visitExpression(f, p);
+        if (!(temp2 instanceof JS.FunctionCall)) {
+            return temp2;
+        } else {
+            f = (JS.FunctionCall) temp2;
+        }
+        if (f.getPadding().getFunction() != null && f.getPadding().getFunction().getElement() instanceof NameTree &&
+                f.getMethodType() != null && f.getMethodType().hasFlags(Flag.Static)) {
+            //noinspection unchecked
+            f = f.getPadding().withFunction(
+                    (JRightPadded<Expression>) (JRightPadded<?>)
+                            visitTypeName((JRightPadded<NameTree>) (JRightPadded<?>) f.getPadding().getFunction(), p));
+        }
+        if (f.getPadding().getFunction() != null) {
+            f = f.getPadding().withFunction(visitRightPadded(f.getPadding().getFunction(), JsRightPadded.Location.FUNCTION_CALL_FUNCTION, p));
+        }
+        if (f.getPadding().getTypeParameters() != null) {
+            f = f.getPadding().withTypeParameters(visitContainer(f.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
+        }
+        f = f.getPadding().withTypeParameters(visitTypeNames(f.getPadding().getTypeParameters(), p));
+        f = f.getPadding().withArguments(visitContainer(f.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p));
+        f = f.withMethodType((JavaType.Method) visitType(f.getMethodType(), p));
+        return f;
+    }
+
     public J visitFunctionType(JS.FunctionType functionType, P p) {
         JS.FunctionType f = functionType;
         f = f.withPrefix(visitSpace(f.getPrefix(), JsSpace.Location.FUNCTION_TYPE_PREFIX, p));
@@ -989,6 +1018,22 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         c = c.getPadding().withElements(requireNonNull(visitContainer(c.getPadding().getElements(), JsContainer.Location.ARRAY_BINDING_PATTERN_ELEMENTS, p)));
         return c;
+    }
+
+    public J visitAs(JS.As as_, P p) {
+        JS.As b = as_;
+        b = b.withPrefix(visitSpace(b.getPrefix(), JsSpace.Location.AS_PREFIX, p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(b, p);
+        if (!(temp instanceof JS.As)) {
+            return temp;
+        } else {
+            b = (JS.As) temp;
+        }
+        b = b.getPadding().withLeft(requireNonNull(visitRightPadded(b.getPadding().getLeft(), JsRightPadded.Location.AS_LEFT, p)));
+        b = b.withRight(requireNonNull(visitAndCast(b.getRight(), p)));
+        b = b.withType(visitType(b.getType(), p));
+        return b;
     }
 
     public J visitAssignmentOperationExtensions(JS.AssignmentOperation assignOp, P p) {

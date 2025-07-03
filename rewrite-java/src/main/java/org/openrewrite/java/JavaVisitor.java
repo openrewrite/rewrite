@@ -952,12 +952,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.withVarargs(m.getVarargs() == null ?
                 null :
                 visitSpace(m.getVarargs(), Space.Location.VARARGS, p));
-        // For backwards compatibility.
-        //noinspection deprecation
-        m = m.withDimensionsBeforeName(ListUtils.map(m.getDimensionsBeforeName(), dim ->
-                dim.withBefore(visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p))
-                        .withElement(visitSpace(dim.getElement(), Space.Location.DIMENSION, p))
-        ));
         m = m.getPadding().withVariables(ListUtils.map(m.getPadding().getVariables(), t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, p)));
         return m;
     }
