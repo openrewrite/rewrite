@@ -722,7 +722,7 @@ public class GroovyParserVisitor {
             }
             while (true) {
                 int beginBracket = indexOfNextNonWhitespace(cursor, source);
-                if (source.charAt(beginBracket) != '[') {
+                if (beginBracket >= source.length() || source.charAt(beginBracket) != '[') {
                     break;
                 }
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaVisitor} from "./visitor";
-import {asRef, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {Expression, isSpace, J, TextComment} from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
@@ -575,7 +575,9 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     public override async visitType(javaType: JavaType | undefined, q: RpcSendQueue): Promise<JavaType | undefined> {
-        return super.visitType(javaType, q);
+        const codec = RpcCodecs.forInstance(javaType);
+        await codec?.rpcSend(javaType, q);
+        return javaType;
     }
 }
 
@@ -1372,6 +1374,10 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     public override async visitType(javaType: JavaType | undefined, q: RpcReceiveQueue): Promise<JavaType | undefined> {
+        const codec = RpcCodecs.forInstance(javaType);
+        if (codec) {
+            return await codec.rpcReceive(javaType, q);
+        }
         return super.visitType(javaType, q);
     }
 }
