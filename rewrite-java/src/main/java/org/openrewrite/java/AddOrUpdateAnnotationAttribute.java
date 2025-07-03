@@ -24,17 +24,15 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
+import java.util.*;
 
 import static java.lang.Boolean.TRUE;
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.singleton;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.Space.SINGLE_SPACE;
 import static org.openrewrite.marker.Markers.EMPTY;
 
 @Value
@@ -95,10 +93,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext ctx) {
-                J.Annotation original = super.visitAnnotation(a, ctx);
-                if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
-                    return original;
+            public J.Annotation visitAnnotation(J.Annotation original, ExecutionContext ctx) {
+                J.Annotation a = super.visitAnnotation(original, ctx);
+                if (!TypeUtils.isOfClassType(a.getType(), annotationType) || !findMethod(a, attributeName()).isPresent()) {
+                    return a;
                 }
 
                 String newAttributeValue = maybeQuoteStringArgument(a, attributeValue);
@@ -108,122 +106,123 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (newAttributeValue == null || oldAttributeValue != null) {
                         return a;
                     }
-
-                    if (attributeName == null || "value".equals(attributeName)) {
+                    if (attributeName().equals("value")) {
                         return JavaTemplate
                                 .apply("#{}", getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
                     }
-
-                    String newAttributeValueResult = attributeIsArray(a) ? getAttributeValuesAsString() : newAttributeValue;
+                    String x = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsString() : newAttributeValue;
                     return JavaTemplate
-                            .apply("#{} = #{}", getCursor(), a.getCoordinates().replaceArguments(), attributeName, newAttributeValueResult);
+                            .apply("#{} = #{}", getCursor(), a.getCoordinates().replaceArguments(), attributeName, x);
                 } else if (!TRUE.equals(addOnly)) {
                     // UPDATE the value when the annotation has arguments, like `@Foo(name="example")`
-                    AtomicBoolean foundOrSetAttributeWithDesiredValue = new AtomicBoolean(false);
                     final J.Annotation finalA = a;
                     List<Expression> newArgs = ListUtils.map(currentArgs, it -> {
                         if (it instanceof J.Assignment) {
-                            J.Assignment as = (J.Assignment) it;
-                            J.Identifier var_ = (J.Identifier) as.getVariable();
-                            if ((attributeName == null && !"value".equals(var_.getSimpleName())) || (attributeName != null && !attributeName.equals(var_.getSimpleName()))) {
-                                return it;
-                            }
-                            foundOrSetAttributeWithDesiredValue.set(true);
-                            if (newAttributeValue == null) {
-                                return null;
-                            }
-                            if (as.getAssignment() instanceof J.NewArray) {
-                                List<Expression> initializerList = requireNonNull(((J.NewArray) as.getAssignment()).getInitializer());
-                                return as.withAssignment(((J.NewArray) as.getAssignment())
-                                        .withInitializer(updateInitializer(finalA, initializerList, getAttributeValues())));
-                            } else {
-                                Expression exp = as.getAssignment();
-                                if (exp instanceof J.Literal) {
-                                    J.Literal literal = (J.Literal) exp;
-                                    if (!valueMatches(literal, oldAttributeValue) || newAttributeValue.equals(literal.getValueSource())) {
-                                        return it;
-                                    }
-                                    if (attributeIsArray(finalA)) {
-                                        //noinspection ConstantConditions
-                                        return as.withAssignment(((J.Annotation) JavaTemplate
-                                                .apply("#{}", getCursor(), finalA.getCoordinates().replaceArguments(), getAttributeValuesAsString()))
-                                                .getArguments().get(0));
-                                    }
-                                    return as.withAssignment(literal.withValue(newAttributeValue).withValueSource(newAttributeValue));
-                                } else if (exp instanceof J.FieldAccess) {
-                                    if (oldAttributeValue != null) {
-                                        return it;
-                                    }
-                                    //noinspection ConstantConditions
-                                    return ((J.Annotation) JavaTemplate
-                                            .apply("#{} = #{}", getCursor(), as.getCoordinates().replace(), var_.getSimpleName(), newAttributeValue))
-                                            .getArguments().get(finalA.getArguments().indexOf(as));
-                                }
-                            }
+                            return update((J.Assignment) it, finalA, newAttributeValue);
                         } else if (it instanceof J.Literal) {
-                            // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
-                            if (attributeName == null || "value".equals(attributeName)) {
-                                foundOrSetAttributeWithDesiredValue.set(true);
-                                if (newAttributeValue == null) {
-                                    return null;
-                                }
-                                J.Literal literal = (J.Literal) it;
-                                if (!valueMatches(literal, oldAttributeValue) || newAttributeValue.equals(literal.getValueSource())) {
-                                    return it;
-                                }
-                                if (attributeIsArray(finalA)) {
-                                    //noinspection ConstantConditions
-                                    return ((J.Annotation) JavaTemplate
-                                            .apply("#{}", getCursor(), finalA.getCoordinates().replaceArguments(), getAttributeValuesAsString()))
-                                            .getArguments().get(0);
-                                }
-                                return literal.withValue(newAttributeValue).withValueSource(newAttributeValue);
-                            } else if (oldAttributeValue == null) {
-                                // Without an oldAttributeValue and an attributeName not matching `value` we want to add an extra argument to the annotation.
-                                // Make the attribute name explicit, before we add the new value below
-                                return createAnnotationAssignment(finalA, "value", it);
-                            }
+                            return update((J.Literal) it, finalA, newAttributeValue);
                         } else if (it instanceof J.FieldAccess) {
-                            // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
-                            if (attributeName == null || "value".equals(attributeName)) {
-                                foundOrSetAttributeWithDesiredValue.set(true);
-                                if (newAttributeValue == null) {
-                                    return null;
-                                }
-                                if (!valueMatches(it, oldAttributeValue) || newAttributeValue.equals(((J.FieldAccess) it).toString())) {
-                                    return it;
-                                }
-                                //noinspection ConstantConditions
-                                return ((J.Annotation) JavaTemplate
-                                        .apply(newAttributeValue, getCursor(), finalA.getCoordinates().replaceArguments()))
-                                        .getArguments().get(0);
-                            }
-                            // Make the attribute name explicit, before we add the new value below
-                            return createAnnotationAssignment(finalA, "value", it);
+                            return update((J.FieldAccess) it, finalA, newAttributeValue);
                         } else if (it instanceof J.NewArray) {
-                            if (newAttributeValue == null) {
-                                return null;
-                            }
-                            if (attributeName != null && !attributeValue.equals("value")) {
-                                return isAnnotationWithOnlyValueMethod(finalA) ? it : createAnnotationAssignment(finalA, "value", it);
-                            }
-                            J.NewArray arrayValue = (J.NewArray) it;
-                            return arrayValue.withInitializer(updateInitializer(finalA, requireNonNull(arrayValue.getInitializer()), getAttributeValues()));
+                            return update((J.NewArray) it, finalA, newAttributeValue);
                         }
                         return it;
                     });
+                     a = a.withArguments(newArgs);
 
-                    if (newArgs != currentArgs) {
-                        a = a.withArguments(newArgs);
-                    }
-                    if (!foundOrSetAttributeWithDesiredValue.get() && !attributeValIsAlreadyPresent(newArgs, newAttributeValue) && oldAttributeValue == null && !isAnnotationWithOnlyValueMethod(a)) {
-                        // There was no existing value to update and no requirements on a pre-existing old value, so add a new value into the argument list
+                    // ADD the value into the argument list when there was no existing value to update and no requirements on a pre-existing old value, like `@Foo(value = "someValue")` with an attributeName of `name`
+                    if (oldAttributeValue == null && newAttributeValue != null && !attributeValIsAlreadyPresent(newArgs, getAttributeValues())) {
                         J.Assignment as = createAnnotationAssignment(a, attributeName(), newAttributeValue);
                         a = a.withArguments(ListUtils.concat(as, a.getArguments()));
                     }
                 }
 
                 return maybeAutoFormat(original, a, ctx);
+            }
+
+            private @Nullable Expression update(J.Assignment as, J.Annotation annotation, @Nullable String newAttributeValue) {
+                J.Identifier var_ = (J.Identifier) as.getVariable();
+                if ((attributeName == null && !"value".equals(var_.getSimpleName())) || (attributeName != null && !attributeName.equals(var_.getSimpleName()))) {
+                    return as;
+                }
+                if (newAttributeValue == null) {
+                    return null;
+                }
+                Expression exp = as.getAssignment();
+                if (exp instanceof J.NewArray) {
+                    List<Expression> initializerList = requireNonNull(((J.NewArray) exp).getInitializer());
+                    return as.withAssignment(((J.NewArray) exp)
+                            .withInitializer(updateInitializer(annotation, initializerList, getAttributeValues())));
+                } else if (exp instanceof J.Literal) {
+                    if (!valueMatches(exp, oldAttributeValue) || newAttributeValue.equals(((J.Literal) exp).getValueSource())) {
+                        return as;
+                    }
+                    return as.withAssignment(createAnnotationLiteral(annotation, newAttributeValue));
+                } else if (exp instanceof J.FieldAccess) {
+                    if (oldAttributeValue != null) {
+                        return as;
+                    }
+                    //noinspection ConstantConditions
+                    return ((J.Annotation) JavaTemplate
+                            .apply("#{} = #{}", getCursor(), as.getCoordinates().replace(), var_.getSimpleName(), newAttributeValue))
+                            .getArguments().get(annotation.getArguments().indexOf(as));
+                }
+                return as;
+            }
+
+            private @Nullable Expression update(J.Literal literal, J.Annotation annotation, @Nullable String newAttributeValue) {
+                // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
+                if (attributeName().equals("value")) {
+                    if (newAttributeValue == null) {
+                        return null;
+                    }
+                    if (!valueMatches(literal, oldAttributeValue) || newAttributeValue.equals(literal.getValueSource())) {
+                        return literal;
+                    }
+                    return createAnnotationLiteral(annotation, newAttributeValue);
+                } else if (oldAttributeValue == null) {
+                    // Without an oldAttributeValue and an attributeName not matching `value` we want to add an extra argument to the annotation.
+                    // Make the attribute name explicit, before we add the new value below
+                    return createAnnotationAssignment(annotation, "value", literal);
+                }
+                return literal;
+            }
+
+            private @Nullable Expression update(J.FieldAccess fieldAccess, J.Annotation annotation, @Nullable String newAttributeValue) {
+                // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
+                if (attributeName().equals("value")) {
+                    if (newAttributeValue == null) {
+                        return null;
+                    }
+                    if (!valueMatches(fieldAccess, oldAttributeValue) || newAttributeValue.equals(fieldAccess.toString())) {
+                        return fieldAccess;
+                    }
+                    String x = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValues().stream().map(String::valueOf).collect(joining(",", "{", "}")) : newAttributeValue;
+                    //noinspection ConstantConditions
+                    return ((J.Annotation) JavaTemplate
+                            .apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), x))
+                            .getArguments().get(0);
+                }
+                // Make the attribute name explicit, before we add the new value below
+                return createAnnotationAssignment(annotation, "value", fieldAccess);
+            }
+
+            private @Nullable Expression update(J.NewArray arrayValue, J.Annotation annotation, @Nullable String newAttributeValue) {
+                if (newAttributeValue == null) {
+                    return null;
+                }
+                if (attributeName != null && !newAttributeValue.equals("value")) {
+                    return isAnnotationWithOnlyValueMethod(annotation) ? arrayValue : createAnnotationAssignment(annotation, "value", arrayValue);
+                }
+                return arrayValue.withInitializer(updateInitializer(annotation, requireNonNull(arrayValue.getInitializer()), getAttributeValues()));
+            }
+
+            private Expression createAnnotationLiteral(J.Annotation annotation, String newAttributeValue) {
+                String x = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValuesAsString() : newAttributeValue;
+                //noinspection ConstantConditions
+                return ((J.Annotation) JavaTemplate
+                        .apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), x))
+                        .getArguments().get(0);
             }
 
             private J.Assignment createAnnotationAssignment(J.Annotation annotation, String name, @Nullable Object parameter) {
@@ -239,15 +238,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return attributeName == null ? "value" : attributeName;
     }
 
-    private List<Expression> updateInitializer(J.Annotation finalA, List<Expression> initializerList, List<String> attributeList) {
+    private List<Expression> updateInitializer(J.Annotation annotation, List<Expression> initializerList, List<String> attributeList) {
         // If `oldAttributeValue` is defined, replace the old value with the new value(s). Ignore the `appendArray` option in this case.
         if (oldAttributeValue != null) {
             return ListUtils.flatMap(initializerList, it -> {
                 if (it instanceof J.Literal && oldAttributeValue.equals(((J.Literal) it).getValue())) {
                     List<Expression> newItemsList = new ArrayList<>();
                     for (String attribute : attributeList) {
-                        String newAttributeListValue = maybeQuoteStringArgument(finalA, attribute);
-                        J.Literal newLiteral = new J.Literal(randomId(), Space.SINGLE_SPACE, EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String);
+                        J.Literal newLiteral = new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String);
                         newItemsList.add(newLiteral);
                     }
                     return newItemsList;
@@ -260,11 +258,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         if (TRUE.equals(appendArray)) {
             List<Expression> newItemsList = new ArrayList<>();
             for (String attribute : attributeList) {
-                String newAttributeListValue = maybeQuoteStringArgument(finalA, attribute);
-                if (attributeValIsAlreadyPresent(initializerList, newAttributeListValue)) {
+                if (attributeValIsAlreadyPresent(initializerList, singleton(attribute))) {
                     continue;
                 }
-                newItemsList.add(new J.Literal(randomId(), Space.SINGLE_SPACE, EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
+                newItemsList.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String));
             }
             return ListUtils.concatAll(initializerList, newItemsList);
         }
@@ -274,16 +271,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             if (i >= attributeList.size()) {
                 return null;
             }
-            String newAttributeListValue = maybeQuoteStringArgument(finalA, attributeList.get(i));
-            if (attributeValIsAlreadyPresent(singletonList(it), newAttributeListValue)) {
+            if (attributeValIsAlreadyPresent(it, singleton(attributeList.get(i)))) {
                 return it;
             }
-            return new J.Literal(randomId(), it.getPrefix(), EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String);
+            return new J.Literal(randomId(), it.getPrefix(), EMPTY, attributeList.get(i), maybeQuoteStringArgument(annotation, attributeList.get(i)), null, JavaType.Primitive.String);
         });
         // and add extra new items if needed
         for (int i = initializerList.size(); i < attributeList.size(); i++) {
-            String newAttributeListValue = maybeQuoteStringArgument(finalA, attributeList.get(i));
-            list.add(new J.Literal(randomId(), Space.SINGLE_SPACE, EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
+            list.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attributeList.get(i), maybeQuoteStringArgument(annotation, attributeList.get(i)), null, JavaType.Primitive.String));
         }
         return list;
     }
@@ -299,7 +294,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     private String getAttributeValuesAsString() {
         return getAttributeValues().stream()
                 .map(String::valueOf)
-                .collect(Collectors.joining("\", \"", "{\"", "\"}"));
+                .collect(joining("\", \"", "{\"", "\"}"));
     }
 
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {
@@ -336,41 +331,42 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     private boolean attributeIsArray(J.Annotation annotation) {
-        for (JavaType.Method m : getMethods(annotation)) {
-            if (attributeName().equals(m.getName())) {
-                return m.getReturnType() instanceof JavaType.Array;
-            }
-        }
-        return false;
+        return findMethod(annotation, attributeName())
+                .map(it -> it.getReturnType() instanceof JavaType.Array)
+                .orElse(false);
     }
 
     private boolean attributeIsString(J.Annotation annotation) {
-        for (JavaType.Method m : getMethods(annotation)) {
-            if (attributeName().equals(m.getName())) {
-                return TypeUtils.isOfClassType(m.getReturnType(), "java.lang.String");
-            }
-        }
-        return false;
+        return findMethod(annotation, attributeName())
+                .map(it -> TypeUtils.isOfClassType(it.getReturnType(), "java.lang.String"))
+                .orElse(false);
+    }
+
+    private Optional<JavaType.Method> findMethod(J.Annotation annotation, String methodName) {
+        return getMethods(annotation).stream().filter(it -> methodName.equals(it.getName())).findAny();
     }
 
     private static List<JavaType.Method> getMethods(J.Annotation annotation) {
         return ((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods();
     }
 
-    private static boolean attributeValIsAlreadyPresent(@Nullable List<Expression> expression, @Nullable String attributeValue) {
-        if (expression == null) {
-            return attributeValue == null;
-        }
-        for (Expression e : expression) {
-            if (e instanceof J.Literal) {
-                J.Literal literal = (J.Literal) e;
-                if (literal.getValueSource() != null && literal.getValueSource().equals(attributeValue)) {
-                    return true;
-                }
+    private boolean attributeValIsAlreadyPresent(Collection<Expression> expression, Collection<?> values) {
+        return expression.stream().anyMatch(e -> attributeValIsAlreadyPresent(e, values));
+    }
+
+    private boolean attributeValIsAlreadyPresent(Expression e, Collection<?> values) {
+        if (e instanceof J.Assignment) {
+            J.Assignment as = (J.Assignment) e;
+            if (as.getVariable() instanceof J.Identifier && ((J.Identifier) as.getVariable()).getSimpleName().equals(attributeName())) {
+                return attributeValIsAlreadyPresent(as.getAssignment(), values);
             }
-            if (e instanceof J.NewArray) {
-                return attributeValIsAlreadyPresent(((J.NewArray) e).getInitializer(), attributeValue);
-            }
+        } else if (e instanceof J.Literal) {
+            return values.contains(((J.Literal) e).getValue() + "");
+        } else if (e instanceof J.FieldAccess) {
+            return values.contains(e.toString());
+        } else if (e instanceof J.NewArray) {
+            List<Expression> initializer = ((J.NewArray) e).getInitializer();
+            return (initializer == null && attributeValue == null) || (initializer != null && attributeValIsAlreadyPresent(initializer, values));
         }
         return false;
     }

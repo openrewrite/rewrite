@@ -250,6 +250,39 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void removeValueAttributeWithAttributeName() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", "name", null, null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String value();
+                  String name();
+              }
+              """
+          ),
+
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(value = "newTest1", name = "newTest2")
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(value = "newTest1")
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addNamedAttribute() {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null, null, null)),
           java(
@@ -1469,6 +1502,74 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               )
             );
         }
+
+        @Test
+        void matchEnumValueArray() {
+            rewriteRun(
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Values.TWO,Values.THREE", "Values.ONE", null, null)),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                      Values[] value() default "";
+                  }
+                  public enum Values {ONE, TWO,THREE}
+                  """,
+                SourceSpec::skip
+              ),
+              java(
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(Values.ONE)
+                  public class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+                  
+                  @Foo({Values.TWO, Values.THREE})
+                  public class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void matchEnumValueArray2() {
+            rewriteRun(
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", "name", "hello", null, null, null)),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                      String name() default "";
+                      Values[] value() default "";
+                  }
+                  public enum Values {ONE, TWO}
+                  """,
+                SourceSpec::skip
+              ),
+              java(
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(Values.TWO)
+                  public class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(name = "hello", value = Values.TWO)
+                  public class A {
+                  }
+                  """
+              )
+            );
+        }
+
 
         @Test
         void matchValueInArray() {
