@@ -22,7 +22,7 @@ import {createDraft, finishDraft} from "immer";
 declare module "./tree" {
     namespace JS {
         export const Markers: {
-            readonly Asterisk: "org.openrewrite.javascript.marker.Asterisk";
+            readonly Generator: "org.openrewrite.javascript.marker.Generator";
             readonly Optional: "org.openrewrite.javascript.marker.Optional";
             readonly NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion";
             readonly Spread: "org.openrewrite.javascript.marker.Spread";
@@ -34,7 +34,7 @@ declare module "./tree" {
 
 // At runtime actually attach it to JS
 (JS as any).Markers = {
-    Asterisk: "org.openrewrite.javascript.marker.Asterisk",
+    Generator: "org.openrewrite.javascript.marker.Generator",
     DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield",
     Optional: "org.openrewrite.javascript.marker.Optional",
     NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion",
@@ -57,8 +57,8 @@ export interface Optional extends Marker {
     readonly prefix: J.Space;
 }
 
-export interface Asterisk extends Marker {
-    readonly kind: typeof JS.Markers.Asterisk;
+export interface Generator extends Marker {
+    readonly kind: typeof JS.Markers.Generator;
     readonly prefix: J.Space;
 }
 
@@ -100,7 +100,7 @@ function registerPrefixedMarkerCodec<M extends Marker & { prefix: J.Space }>(
 
 registerPrefixedMarkerCodec<DelegatedYield>(JS.Markers.DelegatedYield);
 registerPrefixedMarkerCodec<Optional>(JS.Markers.Optional);
-registerPrefixedMarkerCodec<Asterisk>(JS.Markers.Asterisk);
+registerPrefixedMarkerCodec<Generator>(JS.Markers.Generator);
 registerPrefixedMarkerCodec<NonNullAssertion>(JS.Markers.NonNullAssertion);
 registerPrefixedMarkerCodec<Spread>(JS.Markers.Spread);
 registerPrefixedMarkerCodec<FunctionDeclaration>(JS.Markers.FunctionDeclaration);

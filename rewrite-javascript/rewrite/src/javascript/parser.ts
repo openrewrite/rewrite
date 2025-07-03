@@ -28,7 +28,7 @@ import {
     TypeTree,
     VariableDeclarator,
 } from '../java';
-import {Asterisk, DelegatedYield, FunctionDeclaration, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
+import {Generator, DelegatedYield, FunctionDeclaration, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
 import {
     emptyMarkers,
     markers,
@@ -943,10 +943,10 @@ export class JavaScriptParserVisitor {
         const markers = produce(emptyMarkers, draft => {
             if (node.asteriskToken) {
                 draft.markers.push({
-                    kind: JS.Markers.Asterisk,
+                    kind: JS.Markers.Generator,
                     id: randomId(),
                     prefix: this.prefix(node.asteriskToken)
-                } satisfies Asterisk as Asterisk);
+                } satisfies Generator as Generator);
             }
         });
 
@@ -3046,10 +3046,10 @@ export class JavaScriptParserVisitor {
 
                 if (node.asteriskToken) {
                     draft.markers.push({
-                        kind: JS.Markers.Asterisk,
+                        kind: JS.Markers.Generator,
                         id: randomId(),
                         prefix: this.prefix(node.asteriskToken)
-                    } satisfies Asterisk as Asterisk);
+                    } satisfies Generator as Generator);
                 }
             }),
             leadingAnnotations: [],
