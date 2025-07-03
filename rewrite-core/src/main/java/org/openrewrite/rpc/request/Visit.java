@@ -23,6 +23,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ObjectMappers;
+import org.openrewrite.rpc.ObjectStore;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
@@ -59,7 +60,7 @@ public class Visit implements RpcRequest {
     public static class Handler extends JsonRpcMethod<Visit> {
         private static final ObjectMapper mapper = ObjectMappers.propertyBasedMapper(null);
 
-        private final Map<String, Object> localObjects;
+        private final ObjectStore objectStore;
 
         private final Map<String, Recipe> preparedRecipes;
         private final Map<Recipe, Cursor> recipeCursors;
@@ -77,13 +78,12 @@ public class Visit implements RpcRequest {
 
             Tree after = visitor.visit(before, p, getCursor.apply(
                     request.getCursor()));
-            if (after == null) {
-                localObjects.remove(before.getId().toString());
-            } else {
-                localObjects.put(after.getId().toString(), after);
+            String afterId = null;
+            if (after != null && after != before) {
+                afterId = objectStore.store(after);
             }
 
-            return new VisitResponse(before != after);
+            return new VisitResponse(before != after, afterId);
         }
 
         private TreeVisitor<?, ?> instantiateVisitor(Visit request, Object p) {

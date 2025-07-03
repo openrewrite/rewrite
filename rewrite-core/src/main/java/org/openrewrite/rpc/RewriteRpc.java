@@ -23,6 +23,7 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
@@ -47,6 +48,7 @@ import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 /**
@@ -95,14 +97,11 @@ public class RewriteRpc implements AutoCloseable {
      * between two processes.
      */
     @VisibleForTesting
-    final Map<String, Object> remoteObjects = new HashMap<>();
+    final ObjectStore remoteObjects = new ObjectStore();
 
     @VisibleForTesting
-    final Map<String, Object> localObjects = new HashMap<>();
-
-    /* A reverse map of the objects back to their IDs */
-    final Map<Object, String> localObjectIds = new IdentityHashMap<>();
-
+    final ObjectStore localObjects = new ObjectStore();
+    
     @VisibleForTesting
     final Map<Integer, Object> remoteRefs = new HashMap<>();
 
@@ -178,7 +177,7 @@ public class RewriteRpc implements AutoCloseable {
     public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
         VisitResponse response = scan(tree, visitorName, p, cursor);
         return response.isModified() ?
-                getObject(tree.getId().toString()) :
+                getObject(requireNonNull(response.getAfterId())) :
                 tree;
     }
 
@@ -186,17 +185,15 @@ public class RewriteRpc implements AutoCloseable {
         return scan(sourceFile, visitorName, p, null);
     }
 
-    public <P> VisitResponse scan(Tree sourceFile, String visitorName, P p,
-                                  @Nullable Cursor cursor) {
+    public <P> VisitResponse scan(Tree sourceFile, String visitorName, P p, @Nullable Cursor cursor) {
         // Set the local state of this tree, so that when the remote
         // asks for it, we know what to send.
-        localObjects.put(sourceFile.getId().toString(), sourceFile);
-
+        String treeId = localObject(sourceFile);
         String pId = maybeUnwrapExecutionContext(p);
 
         List<String> cursorIds = getCursorIds(cursor);
 
-        return send("Visit", new Visit(visitorName, null, sourceFile.getId().toString(), pId, cursorIds),
+        return send("Visit", new Visit(visitorName, null, treeId, pId, cursorIds),
                 VisitResponse.class);
     }
 
@@ -225,12 +222,15 @@ public class RewriteRpc implements AutoCloseable {
         while (p2 instanceof DelegatingExecutionContext) {
             p2 = ((DelegatingExecutionContext) p2).getDelegate();
         }
-        String pId = localObjectIds.computeIfAbsent(p2, p3 -> SnowflakeId.generateId());
+        String id = localObject(p2);
         if (p2 instanceof ExecutionContext) {
-            ((ExecutionContext) p2).putMessage("org.openrewrite.rpc.id", pId);
+            ((ExecutionContext) p2).putMessage("org.openrewrite.rpc.id", id);
         }
-        localObjects.put(pId, p2);
-        return pId;
+        return id;
+    }
+
+    private String localObject(Object o) {
+        return localObjects.store(o);
     }
 
     public List<RecipeDescriptor> getRecipes() {
@@ -350,8 +350,7 @@ public class RewriteRpc implements AutoCloseable {
     }
 
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
-        localObjects.put(tree.getId().toString(), tree);
-        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent), markerPrinter), String.class);
+        return send("Print", new Print(localObjects.store(tree), getCursorIds(parent), markerPrinter), String.class);
     }
 
     @VisibleForTesting
@@ -359,37 +358,68 @@ public class RewriteRpc implements AutoCloseable {
     List<String> getCursorIds(@Nullable Cursor cursor) {
         List<String> cursorIds = null;
         if (cursor != null) {
-            cursorIds = cursor.getPathAsStream().map(c -> {
-                String id = c instanceof Tree ?
-                        ((Tree) c).getId().toString() :
-                        localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
-                localObjects.put(id, c);
-                return id;
-            }).collect(Collectors.toList());
+            cursorIds = cursor.getPathAsStream().map(localObjects::store).collect(Collectors.toList());
         }
         return cursorIds;
     }
 
     @VisibleForTesting
     public <T> T getObject(String id) {
-        // Check if we have a cached version of this object
+        // Check what we think the remote has cached
+        Object existingRemote = remoteObjects.get(id);
+        if (existingRemote != null) {
+            return (T) existingRemote;
+        }
+
+        // Check if we have a local cached version
         Object localObject = localObjects.get(id);
-        String lastKnownId = localObject != null ? id : null;
         
+        // Get the lastKnownId from remote ObjectStore using version tracking
+        final String lastKnownId;
+        if (localObject != null) {
+            String intrinsicId = getIntrinsicObjectId(localObject);
+            if (intrinsicId != null) {
+                // For objects with intrinsic ID, get the last known version from remote store
+                String lastVersion = remoteObjects.getCurrentVersion(intrinsicId);
+                if (lastVersion != null) {
+                    lastKnownId = intrinsicId + "@" + lastVersion;
+                } else {
+                    lastKnownId = null;
+                }
+            } else {
+                lastKnownId = null;
+            }
+        } else {
+            lastKnownId = null;
+        }
+
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
                 new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
-        Object remoteObject = q.receive(localObject, null);
+        Object receivedObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
         // We are now in sync with the remote state of the object.
-        remoteObjects.put(id, remoteObject);
-        localObjects.put(id, remoteObject);
+        remoteObjects.store(receivedObject, id);
+        localObjects.store(receivedObject, id);
 
         //noinspection unchecked
-        return (T) remoteObject;
+        return (T) receivedObject;
     }
-    
+
+    /**
+     * Get the intrinsic object ID from an object (for Tree or Marker objects).
+     */
+    @Nullable
+    private String getIntrinsicObjectId(Object obj) {
+        if (obj instanceof Tree) {
+            return ((Tree) obj).getId().toString();
+        } else if (obj instanceof Marker) {
+            return ((Marker) obj).getId().toString();
+        }
+        return null;
+    }
+
     private Object getRef(Integer refId) {
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetRef",
                 new GetRef(refId), GetRefResponse.class), nestedRefId -> {
@@ -400,11 +430,11 @@ public class RewriteRpc implements AutoCloseable {
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
-        
+
         if (ref == null) {
             throw new IllegalStateException("Reference " + refId + " not found on remote");
         }
-        
+
         remoteRefs.put(refId, ref);
         localRefs.put(ref, refId);
 
@@ -430,7 +460,7 @@ public class RewriteRpc implements AutoCloseable {
             for (int i = cursorIds.size() - 1; i >= 0; i--) {
                 String cursorId = cursorIds.get(i);
                 Object cursorObject = getObject(cursorId);
-                remoteObjects.put(cursorId, cursorObject);
+                remoteObjects.store(cursorObject, cursorId);
                 cursor = new Cursor(cursor, cursorObject);
             }
         }

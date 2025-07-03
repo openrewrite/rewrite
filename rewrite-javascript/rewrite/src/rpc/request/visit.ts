@@ -17,9 +17,11 @@ import * as rpc from "vscode-jsonrpc/node";
 import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
+import {ObjectStore} from "../object-store";
 
 export interface VisitResponse {
     modified: boolean
+    afterId?: string
 }
 
 export class Visit {
@@ -31,25 +33,23 @@ export class Visit {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  localObjects: Map<string, any>,
+                  objectStore: ObjectStore,
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string) => any,
                   getCursor: (cursorIds: string[] | undefined) => Promise<Cursor>): void {
-        connection.onRequest(new rpc.RequestType<Visit, VisitResponse, Error>("Visit"), async (request) => {
+        connection.onRequest(new rpc.RequestType<Visit, VisitResponse, Error>("Visit"), async (request): Promise<VisitResponse> => {
             const p = await getObject(request.p);
             const before: Tree = await getObject(request.treeId);
-            localObjects.set(before.id.toString(), before);
 
             const visitor = Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
-            const after = await visitor.visit(before, p, await getCursor(request.cursor));
-            if (!after) {
-                localObjects.delete(before.id.toString());
-            } else if (after !== before) {
-                localObjects.set(after.id.toString(), after);
+            const after = await visitor.visit<Tree>(before, p, await getCursor(request.cursor));
+            let afterId: string | undefined;
+            if (after && after !== before) {
+                afterId = objectStore.store(after);
             }
 
-            return {modified: before !== after};
+            return {modified: before !== after, afterId};
         });
     }
 

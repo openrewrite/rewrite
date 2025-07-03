@@ -16,6 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../reference";
+import {ObjectStore} from "../object-store";
 
 export class GetObject {
     constructor(private readonly id: string, private readonly lastKnownId?: string) {
@@ -23,8 +24,8 @@ export class GetObject {
 
     static handle(
         connection: rpc.MessageConnection,
-        remoteObjects: Map<string, any>,
-        localObjects: Map<string, any>,
+        remoteObjects: ObjectStore,
+        objectStore: ObjectStore,
         localRefs: ReferenceMap,
         batchSize: number,
         trace: boolean
@@ -32,7 +33,7 @@ export class GetObject {
         const pendingData = new Map<string, RpcObjectData[]>();
 
         connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
-            if (!localObjects.has(request.id)) {
+            if (!objectStore.hasId(request.id)) {
                 return [
                     {state: RpcObjectState.DELETE},
                     {state: RpcObjectState.END_OF_OBJECT}
@@ -41,7 +42,7 @@ export class GetObject {
 
             let allData = pendingData.get(request.id);
             if (!allData) {
-                const after = localObjects.get(request.id);
+                const after = objectStore.get(request.id);
                 
                 // Determine what the remote has cached
                 let before = undefined;
@@ -49,14 +50,14 @@ export class GetObject {
                     before = remoteObjects.get(request.lastKnownId);
                     if (before === undefined) {
                         // Remote had something cached, but we've evicted it - must send full object
-                        remoteObjects.delete(request.lastKnownId);
+                        remoteObjects.remove(request.lastKnownId);
                     }
                 }
 
                 allData = await new RpcSendQueue(localRefs, trace).generate(after, before);
                 pendingData.set(request.id, allData);
 
-                remoteObjects.set(request.id, after);
+                remoteObjects.store(after, request.id);
             }
 
             const batch = allData.splice(0, batchSize);

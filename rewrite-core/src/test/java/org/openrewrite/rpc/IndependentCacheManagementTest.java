@@ -37,8 +37,8 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithoutLastKnownId_returnsADD() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
+        ObjectStore remoteObjects = new ObjectStore();
+        ObjectStore objectStore = new ObjectStore();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
         // Create object on server
@@ -50,11 +50,11 @@ class IndependentCacheManagementTest {
                 .sourcePath(Paths.get("test.txt"))
                 .build();
         
-        localObjects.put(objectId, text);
+        objectStore.store(text, objectId);
 
         // Simulate GetObject request without lastKnownId (null)
         TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
-                localObjects, localRefs, new AtomicBoolean(false));
+                objectStore, localRefs, new AtomicBoolean(false));
         
         List<RpcObjectData> response = handler.handle(new GetObject(objectId, null));
         
@@ -66,8 +66,8 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithLastKnownId_whenRemoteHasNoEntry_returnsADD() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
+        ObjectStore remoteObjects = new ObjectStore();
+        ObjectStore objectStore = new ObjectStore();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
         // Create object on server
@@ -79,12 +79,12 @@ class IndependentCacheManagementTest {
                 .sourcePath(Paths.get("test.txt"))
                 .build();
         
-        localObjects.put(objectId, text);
+        objectStore.store(text, objectId);
         // Intentionally don't put anything in remoteObjects to simulate cache miss
 
         // Simulate GetObject request with lastKnownId 
         TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
-                localObjects, localRefs, new AtomicBoolean(false));
+                objectStore, localRefs, new AtomicBoolean(false));
         
         List<RpcObjectData> response = handler.handle(new GetObject(objectId, objectId));
         
@@ -96,8 +96,8 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithLastKnownId_whenRemoteHasSameEntry_returnsNOCHANGE() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
+        ObjectStore remoteObjects = new ObjectStore();
+        ObjectStore objectStore = new ObjectStore();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
         // Create object on server
@@ -109,12 +109,12 @@ class IndependentCacheManagementTest {
                 .sourcePath(Paths.get("test.txt"))
                 .build();
         
-        localObjects.put(objectId, text);
-        remoteObjects.put(objectId, text); // Same object in remote
+        objectStore.store(text, objectId);
+        remoteObjects.store(text, objectId); // Same object in remote
 
         // Simulate GetObject request with lastKnownId 
         TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
-                localObjects, localRefs, new AtomicBoolean(false));
+                objectStore, localRefs, new AtomicBoolean(false));
         
         List<RpcObjectData> response = handler.handle(new GetObject(objectId, objectId));
         
@@ -126,8 +126,8 @@ class IndependentCacheManagementTest {
     @Test
     void getObjectWithLastKnownId_whenRemoteHasDifferentEntry_returnsCHANGE() {
         // Setup local and remote objects
-        Map<String, Object> remoteObjects = new HashMap<>();
-        Map<String, Object> localObjects = new HashMap<>();
+        ObjectStore remoteObjects = new ObjectStore();
+        ObjectStore objectStore = new ObjectStore();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         
         // Create original object on server
@@ -142,12 +142,12 @@ class IndependentCacheManagementTest {
         // Create modified object 
         PlainText modifiedText = originalText.withText("Modified Text");
         
-        localObjects.put(objectId, modifiedText);
-        remoteObjects.put(objectId, originalText); // Different object in remote
+        objectStore.store(modifiedText, objectId);
+        remoteObjects.store(originalText, objectId); // Different object in remote
 
         // Simulate GetObject request with lastKnownId 
         TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
-                localObjects, localRefs, new AtomicBoolean(false));
+                objectStore, localRefs, new AtomicBoolean(false));
         
         List<RpcObjectData> response = handler.handle(new GetObject(objectId, objectId));
         
@@ -218,10 +218,10 @@ class IndependentCacheManagementTest {
     // Helper class to access protected method
     private static class TestableGetObjectHandler extends GetObject.Handler {
         
-        TestableGetObjectHandler(AtomicInteger batchSize, Map<String, Object> remoteObjects,
-                Map<String, Object> localObjects, IdentityHashMap<Object, Integer> localRefs,
+        TestableGetObjectHandler(AtomicInteger batchSize, ObjectStore remoteObjects,
+                ObjectStore objectStore, IdentityHashMap<Object, Integer> localRefs,
                 AtomicBoolean trace) {
-            super(batchSize, remoteObjects, localObjects, localRefs, trace);
+            super(batchSize, remoteObjects, objectStore, localRefs, trace);
         }
         
         @Override
