@@ -18,10 +18,7 @@ package org.openrewrite.gradle.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.marker.SearchResult;
 
@@ -45,6 +42,8 @@ public class FindDependency extends Recipe {
     @Nullable
     String configuration;
 
+    transient FoundDependencyReport foundDependencyTable = new FoundDependencyReport(this);
+
     @Override
     public String getDisplayName() {
         return "Find Gradle dependency";
@@ -64,10 +63,34 @@ public class FindDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new GradleDependency.Matcher()
+        GradleDependency.Matcher matcher = new GradleDependency.Matcher();
+        return matcher
                 .groupId(groupId)
                 .artifactId(artifactId)
                 .configuration(configuration)
-                .asVisitor(gd -> SearchResult.found(gd.getTree()));
+                .asVisitor((gd, ctx) -> {
+                    foundDependencyTable.insertRow(ctx, new Row(gd.getResolvedDependency().getGroupId(), gd.getResolvedDependency().getArtifactId(), gd.getResolvedDependency().getVersion()));
+                    return SearchResult.found(gd.getTree());
+                });
+    }
+
+    private static class FoundDependencyReport extends DataTable<Row> {
+
+        public FoundDependencyReport(Recipe recipe) {
+            super(recipe, "Dependencies found", "Dependencies found matching the groupId and artifactId");
+        }
+    }
+
+    @Value
+    private static class Row {
+        @Column(displayName = "GroupId",
+                description = "The groupId of the dependency.")
+        String groupId;
+        @Column(displayName = "ArtifactId",
+                description = "The artifactId of the dependency.")
+        String artifactId;
+        @Column(displayName = "Version",
+                description = "The version of the dependency.")
+        String version;
     }
 }
