@@ -111,9 +111,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         return JavaTemplate
                                 .apply("#{}", getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
                     }
-                    String x = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsString() : newAttributeValue;
+                    String attrVal = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsString() : newAttributeValue;
                     return JavaTemplate
-                            .apply("#{} = #{}", getCursor(), a.getCoordinates().replaceArguments(), attributeName, x);
+                            .apply("#{} = #{}", getCursor(), a.getCoordinates().replaceArguments(), attributeName, attrVal);
                 }
 
                 // UPDATE the value when the annotation has arguments, e.g. @Foo(name="old") to `@Foo(name="new")
@@ -199,10 +199,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (!valueMatches(fieldAccess, oldAttributeValue) || newAttributeValue.equals(fieldAccess.toString())) {
                         return fieldAccess;
                     }
-                    String x = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValues().stream().map(String::valueOf).collect(joining(",", "{", "}")) : newAttributeValue;
+                    String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValues().stream().map(String::valueOf).collect(joining(",", "{", "}")) : newAttributeValue;
                     //noinspection ConstantConditions
                     return ((J.Annotation) JavaTemplate
-                            .apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), x))
+                            .apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), attrVal))
                             .getArguments().get(0);
                 }
                 // Make the attribute name explicit, before we add the new value below
@@ -220,10 +220,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             }
 
             private Expression createAnnotationLiteral(J.Annotation annotation, String newAttributeValue) {
-                String x = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValuesAsString() : newAttributeValue;
+                String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValuesAsString() : newAttributeValue;
                 //noinspection ConstantConditions
                 return ((J.Annotation) JavaTemplate
-                        .apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), x))
+                        .apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), attrVal))
                         .getArguments().get(0);
             }
 
