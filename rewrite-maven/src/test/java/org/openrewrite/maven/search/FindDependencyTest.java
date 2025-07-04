@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class FindDependencyTest implements RewriteTest {
@@ -251,6 +253,130 @@ class FindDependencyTest implements RewriteTest {
               """
           ,
                 sourceSpecs -> sourceSpecs.path("sample-module/pom.xml"))
+        );
+    }
+
+
+    @Test
+    void generatesDataTableForFoundDependencies() {
+        rewriteRun(
+          spec -> {
+              spec.dataTable(FindDependency.Row.class, rows -> {
+                  assertThat(rows).containsExactly(
+                    new FindDependency.Row("project/pom.xml", "org.openrewrite", "rewrite-core", "8.56.0"),
+                    new FindDependency.Row("project/pom.xml", "org.openrewrite.recipe", "rewrite-spring", "6.9.0"),
+                    new FindDependency.Row("otherproject/pom.xml", "org.openrewrite", "rewrite-core", "8.55.0"),
+                    new FindDependency.Row("otherproject/pom.xml", "org.openrewrite.recipe", "rewrite-spring", "6.8.0")
+                  );
+              });
+              spec.recipe(new FindDependency("org.openrewrite*", "*", null, null));
+          },
+          mavenProject("project",
+            pomXml(
+              //language=xml
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>project</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-core</artifactId>
+                      <version>8.56.0</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.openrewrite.recipe</groupId>
+                      <artifactId>rewrite-spring</artifactId>
+                      <version>6.9.0</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.junit.jupiter</groupId>
+                      <artifactId>junit-jupiter</artifactId>
+                      <version>5.13.2</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>project</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                    <!--~~>--><dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-core</artifactId>
+                      <version>8.56.0</version>
+                    </dependency>
+                    <!--~~>--><dependency>
+                      <groupId>org.openrewrite.recipe</groupId>
+                      <artifactId>rewrite-spring</artifactId>
+                      <version>6.9.0</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.junit.jupiter</groupId>
+                      <artifactId>junit-jupiter</artifactId>
+                      <version>5.13.2</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("otherproject",
+            pomXml(
+              //language=xml
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>otherproject</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-core</artifactId>
+                      <version>8.55.0</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.openrewrite.recipe</groupId>
+                      <artifactId>rewrite-spring</artifactId>
+                      <version>6.8.0</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.junit.jupiter</groupId>
+                      <artifactId>junit-jupiter</artifactId>
+                      <version>5.13.1</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>otherproject</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                    <!--~~>--><dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-core</artifactId>
+                      <version>8.55.0</version>
+                    </dependency>
+                    <!--~~>--><dependency>
+                      <groupId>org.openrewrite.recipe</groupId>
+                      <artifactId>rewrite-spring</artifactId>
+                      <version>6.8.0</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.junit.jupiter</groupId>
+                      <artifactId>junit-jupiter</artifactId>
+                      <version>5.13.1</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
+          )
         );
     }
 

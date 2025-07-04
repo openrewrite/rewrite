@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.SearchResult;
 

@@ -105,12 +105,20 @@ public class FindDependency extends Recipe {
                 if (isDependencyTag(groupId, artifactId) &&
                     versionIsValid(version, versionPattern, () -> findDependency(tag))) {
                     ResolvedDependency rd = findDependency(tag);
-                    foundDependencyTable.insertRow(ctx, new Row(rd.getGroupId(), rd.getArtifactId(), rd.getVersion()));
+                    foundDependencyTable.insertRow(ctx, new Row(getDeclaringFilePath(getCursor()), rd.getGroupId(), rd.getArtifactId(), rd.getVersion()));
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
             }
         };
+    }
+
+    private String getDeclaringFilePath(Cursor cursor) {
+        Xml.Document document = cursor.firstEnclosing(Xml.Document.class);
+        if (document != null) {
+            return document.getSourcePath().toString();
+        }
+        return "";
     }
 
     private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern,
@@ -140,6 +148,10 @@ public class FindDependency extends Recipe {
 
     @Value
     public static class Row {
+        @Column(displayName = "Source path",
+                description = "Full path to the file declaring the dependency.")
+        String sourcePath;
+
         @Column(displayName = "GroupId",
                 description = "The groupId of the dependency.")
         String groupId;
