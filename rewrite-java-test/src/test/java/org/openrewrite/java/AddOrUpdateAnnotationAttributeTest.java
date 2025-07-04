@@ -250,7 +250,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
-    void removeValueAttributeWithAttributeName() {
+    void removeExplicitAttributeNameWhenRemovingValue() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", "name", null, null, null, null)),
           java(
@@ -1540,7 +1540,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         }
 
         @Test
-        void matchEnumValueArray() {
+        void replaceValueArrayWhenSingleValueMatchesImplicitArray() {
             rewriteRun(
               spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Values.TWO,Values.THREE", "Values.ONE", null, null)),
               java(
@@ -1573,7 +1573,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         }
 
         @Test
-        void matchEnumValueArray2() {
+         void addExplicitValueToImplicitArrayWhenAddingNewAttribute() {
             rewriteRun(
               spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", "name", "hello", null, null, null)),
               java(
