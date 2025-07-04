@@ -752,6 +752,12 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitModifier(it, p);
         }
 
+        const generator = findMarker<Generator>(method, JS.Markers.Generator);
+        if (generator) {
+            await this.visitSpace(generator.prefix, p);
+            p.append("*");
+        }
+
         await this.visit(method.name, p);
 
         const typeParameters = method.typeParameters;
