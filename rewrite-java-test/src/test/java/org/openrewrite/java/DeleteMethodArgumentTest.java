@@ -35,6 +35,8 @@ class DeleteMethodArgumentTest implements RewriteTest {
          public static void foo(int n1, int n2, int n3) {}
          public B() {}
          public B(int n) {}
+         public static void foo(String s) {}
+         public static void foo(java.util.List<?> l) {}
       }
       """;
 
@@ -122,6 +124,133 @@ class DeleteMethodArgumentTest implements RewriteTest {
           java(
             "public class C {{ B.foo(\n\t\t0, 1, 2); }}",
             "public class C {{ B.foo(\n\t\t1, 2); }}"
+          )
+        );
+    }
+
+    @Test
+    void deleteNullArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteMethodArgument("B foo(String)", 0)),
+          java(
+            "public class A {{ B.foo(null); }}",
+            "public class A {{ B.foo(); }}"
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedImportOfGenericType() {
+        rewriteRun(
+          spec -> spec.recipes(new DeleteMethodArgument("B foo(java.util.List)", 0)),
+          java(
+            """
+              import java.util.ArrayList;
+              
+              class A {{ B.foo(new ArrayList<>()); }}
+              """,
+            """
+              class A {{ B.foo(); }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedImportOfClassOfStaticMethodWithoutAStaticImport() {
+        rewriteRun(
+          spec -> spec.recipes(new DeleteMethodArgument("B foo(java.util.List)", 0)),
+          java(
+            """
+              import java.util.Collections;
+              
+              class A {{ B.foo(Collections.emptyList()); }}
+              """,
+            """
+              class A {{ B.foo(); }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedStaticMethodImport() {
+        rewriteRun(
+          spec -> spec.recipes(new DeleteMethodArgument("B foo(int)", 0)),
+          java(
+            """
+              import static java.lang.Math.max;
+              
+              class A {{ B.foo(max(1,2)); }}
+              """,
+            """
+              class A {{ B.foo(); }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedStaticFieldImport() {
+        rewriteRun(
+          spec -> spec.recipes(new DeleteMethodArgument("B foo(int)", 0)),
+          java(
+            """
+              import static java.lang.Integer.MAX_VALUE;
+              
+              class A {{ B.foo(MAX_VALUE); }}
+              """,
+            """
+              class A {{ B.foo(); }}
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void removeUnusedImportOfInnerClass() {
+        rewriteRun(
+          spec -> spec.recipes(new DeleteMethodArgument("B foo(java.util.List)", 0)),
+          java(
+            """
+              import java.util.AbstractMap.SimpleEntry;
+              import java.util.List;
+              
+              class A {{
+                  B.foo(List.of(new SimpleEntry<>("a", "b")));
+              }}
+              """,
+            """
+              class A {{
+                  B.foo();
+              }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedImportWithLambda() {
+        rewriteRun(
+          spec -> spec.recipes(new DeleteMethodArgument("B foo(java.util.List)", 0)),
+          java(
+            """
+              import java.math.BigInteger;
+              import java.util.stream.Collectors;
+              import java.util.stream.Stream;
+              
+              class A {{
+                  B.foo(Stream.of("23").map(s -> {
+                      return new BigInteger(s).toString();
+                  }).collect(Collectors.toList()));
+              }}
+              """,
+            """
+              class A {{
+                  B.foo();
+              }}
+              """
           )
         );
     }
