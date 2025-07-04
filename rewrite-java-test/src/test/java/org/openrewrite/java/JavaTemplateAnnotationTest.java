@@ -15,13 +15,13 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -142,7 +142,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
           java(
             """
               import org.jetbrains.annotations.NotNull;
-
+              
               public record Person(
                   @NotNull String firstName,
                   @NotNull String lastName
@@ -150,7 +150,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               """,
             """
               import lombok.NonNull;
-
+              
               public record Person(
                   @NonNull String firstName,
                   @NonNull String lastName
@@ -163,9 +163,25 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/5712")
     @Test
     void replaceArgumentsInNestedAnnotation() {
+        @Language("java")
+        String annotations = """
+          package foo;
+          
+          import java.lang.annotation.*;
+          
+          @Repeatable(NestedAnnotations.class)
+          public @interface NestedAnnotation {
+              String a() default "";
+              String b() default "";
+          }
+          
+          public @interface NestedAnnotations {
+              NestedAnnotation[] value();
+          }
+          """;
         rewriteRun(
           spec -> spec
-            .afterTypeValidationOptions(TypeValidation.none()) // the annotations are not on classpath
+            .parser(JavaParser.fromJavaVersion().dependsOn(annotations))
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
                 public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
@@ -180,6 +196,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
 
                             // Replace 'a' with 'b' in the annotation
                             return JavaTemplate.builder("@NestedAnnotation(b = #{any(java.lang.String)})")
+                              .javaParser(JavaParser.fromJavaVersion().dependsOn(annotations))
+                              .imports("foo.*")
                               .build()
                               .apply(getCursor(), annotation.getCoordinates().replace(), value);
                         }
@@ -189,17 +207,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
             })),
           java(
             """
-              import java.lang.annotation.*;
-              
-              @Repeatable(NestedAnnotations.class)
-              @interface NestedAnnotation {
-                  String a() default "";
-                  String b() default "";
-              }
-              
-              @interface NestedAnnotations {
-                  NestedAnnotation[] value();
-              }
+              import foo.*;
               
               @NestedAnnotations({
                       @NestedAnnotation(a = "1"),
@@ -209,17 +217,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               }
               """,
             """
-              import java.lang.annotation.*;
-              
-              @Repeatable(NestedAnnotations.class)
-              @interface NestedAnnotation {
-                  String a() default "";
-                  String b() default "";
-              }
-              
-              @interface NestedAnnotations {
-                  NestedAnnotation[] value();
-              }
+              import foo.*;
               
               @NestedAnnotations({
                       @NestedAnnotation(b = "1"),
